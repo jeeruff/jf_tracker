@@ -7702,9 +7702,9 @@ function D.frame(L, snap, rows, state, info)
       if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = math.max(1, math.floor((room - bx) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       local bw = bw1 * ncol
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
-      if f.kit and D.DR and info.dsp_zoomed then
+      if f.kit and D.DR then
         local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
-        if ((D.kit_list or {})[kk] or 'list') == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
+        if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
       end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
       local vtw = (f.pages and f.page) and (L.th + 2 * L.pad + 2) or 0
@@ -7892,20 +7892,8 @@ function D.frame(L, snap, rows, state, info)
           -- 19 окт: рэк на всё окно (zz) — вкладки pads | list; list — таблица всех пэдов со всеми параметрами
           D.kit_list = D.kit_list or {}
           local zoomed = info.dsp_zoomed
-          if D.DR and zoomed then
-            local tx2 = bx + bw - L.pad
-            for _, tb in ipairs({ { 'list', 'list' }, { 'pads', 'pads' } }) do
-              local w2 = ms(tb[1]) + 2 * L.pad
-              tx2 = tx2 - w2 - 2
-              local on = (D.kit_list[kkey] or 'list') == tb[2]
-              local ht = not drag and mx >= tx2 and mx < tx2 + w2 and my >= by and my < by + L.rh
-              set(on and U.tint(U.AMBER, 0.3) or (ht and D.CURROW or U.BG)); gfx.rect(tx2, by, w2, L.rh - 1, 1)
-              set(on and U.AMBER or U.LINE); gfx.rect(tx2, by, w2, L.rh - 1, 0)
-              text(tx2 + L.pad, by, tb[1], on and U.AMBER or U.GREY)
-              if ht then hover.dspbtn = { fx = k, f = f, what = 'kview', view = tb[2], key = kkey } end
-            end
-          end
-          if D.DR and zoomed and (D.kit_list[kkey] or 'list') == 'list' then
+          -- 19 окт: вид pads | list — кнопка list в шапке (вкладки на всё окно убраны: одна кнопка на функцию)
+          if D.DR and (D.kit_list[kkey] or (zoomed and 'list' or 'pads')) == 'list' then   -- 19 окт: и без zz (кнопка list)
             local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 14 }, { 'vol', 'volume', 7 }, { 'pan', 'pan', 6 }, { 'pitch', 'pitch', 7 },
               { 'att', 'attack', 6 }, { 'dec', 'decay', 6 }, { 'sus', 'sustain', 6 }, { 'rel', 'release', 6 },
               { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 4 } }
@@ -7980,6 +7968,18 @@ function D.frame(L, snap, rows, state, info)
               set(hc and U.AMBER or U.LINE); gfx.rect(cxb, hy, cw2, L.rh - 1, 0)
               text(cxb + L.pad, hy, cl_lbl, hc and U.AMBER or U.TEXT)
               if hc then hover.dspbtn = { fx = k, f = f, what = 'kcell' } end
+              -- 19 окт: list — все пэды таблицей (все параметры), на месте сетки; ещё раз — пэды
+              D.kit_list = D.kit_list or {}
+              local lon = (D.kit_list[kkey] or (info.dsp_zoomed and 'list' or 'pads')) == 'list'
+              local lw2 = ms('list') + 2 * L.pad
+              local lxb = cxb - lw2 - 2
+              if lxb > bx + 2 + ah + L.pad then
+                local hl = not drag and mx >= lxb and mx < lxb + lw2 and my >= hy and my < hy + L.rh
+                set(lon and U.tint(U.AMBER, 0.3) or (hl and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(lxb, hy, lw2, L.rh - 1, 1)
+                set((lon or hl) and U.AMBER or U.LINE); gfx.rect(lxb, hy, lw2, L.rh - 1, 0)
+                text(lxb + L.pad, hy, 'list', (lon or hl) and U.AMBER or U.TEXT)
+                if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = lon and 'pads' or 'list', key = kkey } end
+              end
               local cnt_s = ('%d pads'):format(#f.kids)
               if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
             end
