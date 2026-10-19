@@ -16079,6 +16079,24 @@ local function poll_midi_in()
   if #fresh == 0 then return end
   if not midiin.seq then midiin.seq = fresh[1].seq; return end   -- старт: старое не пишем
   midiin.seq = fresh[1].seq
+  -- 19 окт: индикатор входа в шапке — трек, чей вход MIDI (устройство / канал) принял событие, вспыхивает жёлтым
+  do
+    local now = reaper.time_precise()
+    ctx.midi_in_t = ctx.midi_in_t or {}
+    for _, c in ipairs(snap and snap.cols or {}) do
+      if c.track and not c.master and reaper.ValidatePtr(c.track, 'MediaTrack*') then
+        local inp = math.floor(reaper.GetMediaTrackInfo_Value(c.track, 'I_RECINPUT'))
+        local armed = reaper.GetMediaTrackInfo_Value(c.track, 'I_RECARM') == 1
+        if armed and inp >= 0 and inp & 4096 ~= 0 then
+          local dv, ch = (inp >> 5) & 63, inp & 31
+          for _, ev in ipairs(fresh) do
+            local st = ev.buf:byte(1) or 0
+            if st >= 0x80 and st < 0xF0 and (dv == 63 or dv == ev.dev) and (ch == 0 or (st & 0x0F) + 1 == ch) then ctx.midi_in_t[c.guid] = now; break end
+          end
+        end
+      end
+    end
+  end
   -- 9 окт: свои ноты превью (StuffMIDIMessage в виртуальную клавиатуру) —
   -- не вход: иначе нота писалась второй раз и курсор шагал дважды
   if ctx.stuffed and #ctx.stuffed > 0 then
@@ -18179,7 +18197,8 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold,   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
+    dsp_fold = model.dsp_fold,
+    midi_in_age = function(col) local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]; return t and (reaper.time_precise() - t) or nil end,   -- 19 окт: индикатор входа   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,

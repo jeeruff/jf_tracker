@@ -6276,6 +6276,26 @@ function D.frame(L, snap, rows, state, info)
         end
       else
       slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
+      -- 19 окт: метр трека — тонкая полоса под v (та же шкала -60..+12): пик трека (взведённый аудио — вход);
+      -- вход MIDI на трек — жёлтая вспышка, гаснет за 0.3 с
+      if not c.master then
+        local my0 = hy + 3 * L.rh - 1
+        local lw0 = ms('v') + L.pad
+        local mx0, mw0 = sx + lw0, math.max(4, sw - lw0)
+        local pl, pr = 0, 0
+        if info.peaks then pl, pr = info.peaks(col) end
+        local pk = math.max(pl or 0, pr or 0)
+        local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+        if pdb > -60 then
+          local fw = math.floor(mw0 * (math.min(12, pdb) + 60) / 72 + 0.5)
+          set(pdb > 0 and U.RED or (pdb > -6 and U.AMBER or U.GREEN)); gfx.rect(mx0, my0, fw, 2, 1)
+        end
+        local age = info.midi_in_age and info.midi_in_age(col)
+        if age and age < 0.3 then
+          local yl = U.YELLOW or U.AMBER
+          gfx.set(yl[1], yl[2], yl[3], 1 - age / 0.3); gfx.rect(mx0, my0, mw0, 2, 1); gfx.a = 1
+        end
+      end
       -- 16 окт: width — своей строкой под паном: w ----+----, от центра в обе стороны ---===--- (шире —
       -- длиннее, отрицательная — красным); строка — вторая строка кнопок, если она пуста
       local wrow = D.hdr_row2_free and D.hdr_row2_free > py and col.panmode ~= 6 and not c.master and D.hdr_row2_free or nil
