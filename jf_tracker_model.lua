@@ -1710,6 +1710,8 @@ function M.track_midilanes(tr, lpb, guid)
         local _, _, _, ppq, typ, msg = R.MIDI_GetTextSysexEvt(tk, k)
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
         if typ == -1 then put(lane('sx', 'sx'), row, #(msg or ''), ('%02X'):format((msg or ''):byte(1) or 0))
+        elseif typ == 15 and (msg or ''):find('jf_soff=', 1, true) then
+          -- 19 окт: служебная метка 0Sxx ноты кита — видна командой у ноты, не текстом в лейне
         elseif typ and typ >= 1 then
           -- нотация REAPER: «NOTE ch pitch articulation staccato …» — слово после articulation
           local t = msg or ''
