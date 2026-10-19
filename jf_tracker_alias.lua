@@ -637,6 +637,8 @@ end
 function A.rename(rg, name)
   local i, pos, rgnend, _, color = marker_i(rg.idx)
   if not i then return false end
+  -- 19 окт: пустое имя — REAPER оставляет старое; SetProjectMarker4 с флагом 1 очищает его
+  if name == '' and R.SetProjectMarker4 then R.SetProjectMarker4(0, rg.idx, true, pos, rgnend, '', color or 0, 1); return true end
   R.SetProjectMarkerByIndex(0, i, true, pos, rgnend, -1, name, color or 0)
   return true
 end

@@ -8944,7 +8944,14 @@ ctx = {
     local rg = seq[MX.cur.ri]
     text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
     if not rg then vim.msg = 'no region'; return end
-    if text == '' then vim.msg = 'name: empty'; return end
+    if text == '' then
+      -- 19 окт: пустое имя + Enter — имя удалено (код паттерна, если есть, остаётся — его ставит выпадашка)
+      if rg.gap then vim.msg = 'name: empty'; return end
+      ctx.slot_op('name removed', function() alias.rename(rg, '') end)
+      model.invalidate(); regions = model.regions(state.lpb)
+      vim.msg = 'name removed'
+      return
+    end
     if rg.gap then
       -- 18 окт: имя уже есть у паттерна — спросить: эти ноты новым вариантом (по умолчанию) или связанный повтор того
       -- (клетки заменятся его содержимым; синхронизация явно от него — без хука, не наугад)
