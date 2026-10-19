@@ -3131,6 +3131,7 @@ end
 -- delta solo (4 окт): нативный параметр :delta эффекта (REAPER 7) — слышна
 -- разница сухого и обработанного; nil — у эффекта нет :delta
 function E.fx_delta_idx(obj, fx)
+  if not (obj and (R.ValidatePtr(obj, 'MediaTrack*') or R.ValidatePtr(obj, 'MediaItem_Take*'))) then return nil end   -- 19 окт: трек / take ушли — не падать
   local A = FA(obj)
   if not A.GetParamFromIdent then return nil end
   local i = A.GetParamFromIdent(obj, fx, ':delta')

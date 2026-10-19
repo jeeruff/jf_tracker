@@ -5301,7 +5301,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
       if id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
       elseif id == 'patterns' then   -- 19 окт: палитра паттернов — своя панель (клетки — под треками матрицы)
-        if info.palette_draw and L.mx_label_w then local _, hv = info.palette_draw(L, ct.x, ct.y + 2, ct.w - 4, ct.h - 4); hover.patpane = inside and hv or nil end
+        if info.patlist_draw then local _, hv = info.patlist_draw(L, ct.x, ct.y + 2, ct.w - 4, ct.h - 4); hover.patpane = inside and hv or nil end   -- 19 окт: список
       elseif id == 'matrix' then
         if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()

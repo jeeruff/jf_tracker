@@ -18120,6 +18120,7 @@ local function frame()
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
+    patlist_draw = ctx.patlist_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
@@ -21016,6 +21017,10 @@ local function frame()
         else ctx.mx_tsel = { a = ri, last = ri }; vim.msg = 'double-click - loop this slot; drag - several; Cmd+click - pick slots, the loop jumps between them' end
       end
       click = { t = now2, zone = 'mxtsel', row = ri }
+    elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
+      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow
+      if dbl and click.zone == 'patrow' then ctx.patlist_do('go') else ctx.patlist_do('listen') end
+      click = { t = now2, zone = 'patrow' }
     elseif hover.matrix and hover.matrix.palbtn then   -- 18 окт: кнопки палитры
       local b = hover.matrix.palbtn
       ctx.set_focus('matrix')
@@ -23524,10 +23529,13 @@ local function frame()
         -- 19 окт: панель patterns: c — clipkb (1qaz… — трек, ряд — паттерн), j k — прокрутка, остальное — Vim
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
-        if ch == 'c' and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'patterns clipkb: 1qaz 2wsx 3edc ... column = track, row = pattern; Shift - pick, Ctrl - silence, Esc - off'; return end
-        if MX.pal_kb and ctx.palette_key(c) then return end
-        if ch == 'j' or c == 1685026670 then MX.pal_scroll = (MX.pal_scroll or 0) + 1; return end
-        if ch == 'k' or c == 30064 then MX.pal_scroll = math.max(0, (MX.pal_scroll or 0) - 1); return end
+        -- 19 окт: список: j k — выбор, g G — края, Space — слушать, Enter — к паттерну в трекере, n — заметка
+        if ch == 'j' or c == 1685026670 then MX.pl_sel = (MX.pl_sel or 1) + 1; return end
+        if ch == 'k' or c == 30064 then MX.pl_sel = math.max(1, (MX.pl_sel or 1) - 1); return end
+        if ch == 'G' then MX.pl_sel = #(ctx.pat_rows or {}); return end
+        if ch == ' ' then ctx.patlist_do('listen'); return end
+        if c == 13 then ctx.patlist_do('go'); return end
+        if ch == 'n' then ctx.patlist_do('note'); return end
         return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
@@ -24263,6 +24271,86 @@ end
 -- панель в матрице (под кнопками, матрица ниже): имя, кнопки, текст словами (играющее — янтарём, ошибка — красным), итог
 -- 18 окт: палитра паттернов (матрица, view → p): все паттерны проекта — и те, что не стоят в песне;
 -- клетка — превью трека (волна / ноты), зажать клетку — слушать трек соло, имя — весь паттерн; отпустил — тишина
+-- 19 окт: панель patterns — список: строка на паттерн — код, имя / заметка, длина, сколько раз в песне, на каких
+-- тактах, треки, где в нём что-то есть (полоска на трек). j k — выбор, Space — слушать паттерн, Enter — к его первому
+-- месту в песне (трекер), n — заметка. Клетки трек × паттерн (clipkb, набор, render) — в матрице (c)
+ctx.patlist_draw = function(Lx, x, y, w, h)
+  local hv = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local list = {}
+  for _, p in ipairs(model.patterns(regions)) do if not p.name:match('^=') and not (p.src and p.src.session) then list[#list + 1] = p end end
+  ctx.pat_rows = list
+  local rh = Lx.rh
+  local nvis = math.max(1, math.floor(h / rh))
+  MX.pl_sel = math.max(1, math.min(#list, MX.pl_sel or 1))
+  if MX.pl_sel <= (MX.pal_scroll or 0) then MX.pal_scroll = MX.pl_sel - 1 elseif MX.pl_sel > (MX.pal_scroll or 0) + nvis then MX.pal_scroll = MX.pl_sel - nvis end
+  MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll or 0))
+  if gfx.mouse_wheel ~= 0 and mx >= x and mx < x + w and my >= y and my < y + h then
+    MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll + (gfx.mouse_wheel > 0 and -1 or 1))); gfx.mouse_wheel = 0
+  end
+  local W_CODE, W_LEN, W_N = U.measure('W00 '), U.measure('128 '), U.measure('x99 ')
+  local ncol = #(snap and snap.cols or {})
+  local strip_w = math.min(ncol * 4, math.floor(w * 0.25))
+  local where_w = math.floor(w * 0.30)
+  local name_w = w - W_CODE - W_LEN - W_N - where_w - strip_w - 4 * Lx.pad
+  if ctx.pal_snap ~= snap then ctx.pal_parts, ctx.pal_snap = {}, snap end
+  for r = 1, nvis do
+    local i = (MX.pal_scroll or 0) + r
+    local p = list[i]; if not p then break end
+    local ry = y + (r - 1) * rh
+    local sel = i == MX.pl_sel
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + rh
+    if sel then U.set(U.tint(U.AMBER, state.focus == 'patterns' and 0.3 or 0.15)); gfx.rect(x, ry, w, rh, 1) elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, rh, 1) end
+    local code = model.SEC.code_of(p.name) and (p.name:match('^(%S+)') or p.name) or '--'   -- без кода — имя целиком в колонке имени
+    local rest = code ~= '--' and p.name:sub(#code + 2) or p.name
+    local note = ctx.pat_note(p.name)
+    local xx = x + Lx.pad
+    U.text(xx, ry, ctx.fit(code, W_CODE), sel and U.AMBER or U.TEXT); xx = xx + W_CODE
+    local nm = rest ~= '' and rest or note
+    U.text(xx, ry, ctx.fit(nm ~= '' and nm or '', name_w), note ~= '' and rest == '' and U.GREY or U.TEXT); xx = xx + name_w + Lx.pad
+    local src = p.src
+    local len = src and math.floor((src.r1 or 0) - (src.r0 or 0) + 0.5) or 0
+    U.text(xx + W_LEN - Lx.pad - U.measure(tostring(len)), ry, tostring(len), U.GREY); xx = xx + W_LEN
+    local where, n = {}, 0
+    for _, rg in ipairs(seq) do if not rg.gap and rg.name == p.name then n = n + 1; if #where < 6 then where[#where + 1] = mx_bar_label(rg.pos) end end end
+    U.text(xx, ry, n > 0 and ('x' .. n) or '-', n > 0 and U.TEXT or U.DIM); xx = xx + W_N
+    U.text(xx, ry, ctx.fit(n > 0 and table.concat(where, ' ') or 'not in the song', where_w), n > 0 and U.GREY or U.DIM); xx = xx + where_w + Lx.pad
+    -- треки: полоска на трек — есть ли в паттерне что-то на нём
+    if src and strip_w >= ncol * 2 then
+      local sw = math.max(2, math.floor(strip_w / math.max(1, ncol)))
+      for ci, col in ipairs(snap.cols) do
+        local key = p.name .. ':' .. ci
+        local parts = ctx.pal_parts[key]
+        if not parts and col.track then parts = ctx.mx_cell_parts(col.track, src.pos, src.rgnend); ctx.pal_parts[key] = parts end
+        local has = parts and #parts > 0
+        U.set(has and (col.rgb or U.CYAN) or U.mix(U.LINE, U.PANEL, 0.5))
+        gfx.rect(xx + (ci - 1) * sw, ry + 3, sw - 1, rh - 6, has and 1 or 0)
+      end
+    end
+    if hot then hv.patrow = i end
+  end
+  if #list == 0 then U.text(x + Lx.pad, y, 'no patterns yet - n in the matrix names a bar', U.DIM) end
+  if ctx.vbar then ctx.vbar('palette', x, y, w, nvis * rh, MX.pal_scroll, nvis, #list) end
+  if ctx.mx_solo and ctx.mx_solo_owner == 'patlist' and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_t or 0) > 0.6 then ctx.mx_cell_preview_end() end
+  return h, hv
+end
+ctx.patlist_do = function(what, i)
+  local list = ctx.pat_rows or {}
+  local p = list[i or MX.pl_sel or 1]
+  if not p then return end
+  if what == 'listen' then
+    if ctx.mx_solo then ctx.mx_cell_preview_end(); vim.msg = 'patterns: silence'; return end
+    local all = {}
+    for _, col in ipairs(snap.cols) do if col.track then all[col.track] = true end end
+    ctx.mx_cell_preview(all, p.src.pos, p.src.rgnend, 'patlist'); ctx.pal_t = reaper.time_precise()
+    vim.msg = 'patterns: ' .. p.name .. ' (Space - silence)'
+  elseif what == 'go' then
+    local r0 = math.floor(model.row_of_time(p.src.pos, state.lpb) + 0.5)
+    for _, rg in ipairs(seq) do if not rg.gap and rg.name == p.name then r0 = math.floor(model.row_of_time(rg.pos, state.lpb) + 0.5); break end end
+    vim.cur.row = r0; ctx.set_focus('tracker'); vim.ensure_visible()
+    vim.msg = 'pattern ' .. p.name .. ' at row ' .. r0
+  elseif what == 'note' then ctx.pat_note_prompt(p.name) end
+end
 ctx.pal_in_pane = function()
   local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
   return bp and bp.patterns ~= nil
