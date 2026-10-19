@@ -19930,24 +19930,40 @@ local function frame()
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   -- параметр TCP под эффектом (8 окт): тянуть по горизонтали, двойной
   -- клик — умолчание, колесо — шаг 1 %
-  -- 19 окт: Ctrl+Cmd над сеткой пэдов drumrs5k — тачпад как пэды: заехал пальцем на пэд — он звучит;
-  -- громкость — по высоте внутри пэда (верх — громко); силу нажатия gfx не даёт. SLIDER при этом не берётся
+  -- 19 окт: Ctrl+Cmd над рэком drumrs5k — тачпад = 16 пэдов: окно делится на 4 × 4, зона под пальцем — пэд нижних
+  -- 4 рядов видимой сетки (как пэды MPC: низ-лево — первый); громкость — по высоте в зоне (верх — громко). Нажал над
+  -- рэком — захват, дальше всё окно — пэды, пока держишь; силу нажатия gfx не даёт. SLIDER при этом не берётся
   do
     local mm = ctx.mods()
-    local hk = hover.dspkid and hover.dspkit and hover.dspkid.kid
-    if mm.ctrl and mm.cmd and hk and hk.note then
+    local hk = nil
+    local pg = ctx.pad_grid16
+    if mm.ctrl and mm.cmd and not pg and hover.dspkit and hover.dspkid and hover.dspkid.f and hover.dspkid.f.kids then
+      pg = { f = hover.dspkid.f, key = hover.dspkit.key }
+      ctx.pad_grid16 = pg
+    end
+    if mm.ctrl and mm.cmd and pg then
       ctx.drum_pad_glide = true
-      if ctx.drum_last_pad ~= hk then
-        ctx.drum_last_pad = hk
+      hk = true
+      local wb = (draw.kit_scroll or {})[pg.key] or 9
+      local zc = math.max(0, math.min(3, math.floor(gfx.mouse_x / math.max(1, gfx.w) * 4)))
+      local zr = math.max(0, math.min(3, math.floor(gfx.mouse_y / math.max(1, gfx.h) * 4)))
+      local note = (wb + 3 - zr) * 4 + zc
+      draw.pad_zone = { key = pg.key, note = note }
+      if pg.note ~= note then
+        pg.note = note
+        local kd
+        for _, k2 in ipairs(pg.f.kids) do if k2.note == note then kd = k2 end end
         local col = dsp_target()
-        local r = hover.dspkid.rect
-        local v0 = vim.vel
-        if r then vim.vel = math.max(20, math.min(127, math.floor(127 - (gfx.mouse_y - r[2]) / math.max(1, r[4]) * 100))) end
-        if col then ctx.preview(col.track, hk.note, 'midi') end
-        vim.msg = ('pad %s  vel %d (Ctrl+Cmd: slide over the pads)'):format(hk.name or '', vim.vel or 100)
-        vim.vel = v0
+        if kd and col then
+          local zy = gfx.mouse_y / math.max(1, gfx.h) * 4 - zr
+          local v0 = vim.vel
+          vim.vel = math.max(20, math.min(127, math.floor(127 - zy * 100)))
+          ctx.preview(col.track, note, 'midi')
+          vim.msg = ('pad %s  vel %d   (Ctrl+Cmd: the window is a 4 x 4 pad grid)'):format(kd.name or '', vim.vel)
+          vim.vel = v0
+        else vim.msg = ('note %d: no pad   (Ctrl+Cmd: the window is a 4 x 4 pad grid)'):format(note) end
       end
-    else ctx.drum_last_pad = nil; ctx.drum_pad_glide = nil end
+    else ctx.pad_grid16 = nil; ctx.drum_pad_glide = nil; draw.pad_zone = nil end
     -- clipkb (матрица / patterns): отпустил Shift — набранное звучит вместе (19 окт: здесь, а не в рисовании палитры)
     if MX.pal_kb and MX.pal_shift and not mm.shift then MX.pal_shift = nil; ctx.palette_play_picks() end
     -- 19 окт: Ctrl+Cmd над строкой матрицы — jog / scrub по паттерну в лупе: палец влево-вправо по строке — место в паттерне
