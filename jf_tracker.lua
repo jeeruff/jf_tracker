@@ -13484,7 +13484,7 @@ ctx = {
     for _, c in ipairs(snap and snap.cols or {}) do if c.track == track then col = c; break end end
     -- плагин-инструмент: нота прямо в него (виртуальная клавиатура REAPER —
     -- слышит взведённый трек с MIDI-входом), note-off через 0.4 с
-    if col and #ctx.track_insts(col) > 0 and (not has_midi or ctx.inst_fx(col)) then
+    if col and #ctx.track_insts(col) > 0 and (not has_midi or ctx.inst_fx(col) or row == nil) then   -- 19 окт: без строки (пэд рэка) — нотой в инструмент
       -- 10 окт: опция auto MIDI input — на треке плагин-инструмент, а вход аудио: переключить на
       -- все MIDI-входы, все каналы (4096 | 63<<5), мониторинг включить — иначе ноты клавиатуры не слышны
       if state.automidi and reaper.GetMediaTrackInfo_Value(track, 'I_RECINPUT') < 4096 then
@@ -13525,7 +13525,7 @@ ctx = {
       ctx.note_offs[#ctx.note_offs + 1] = { p = p, t = now + delay + 0.4 }
       return
     end
-    if not has_midi then return end
+    if not has_midi or not row then return end   -- 19 окт: превью без строки не роняет кадр
     local t0 = edit.row_time(row, state.lpb, 0)
     local t1 = edit.row_time(row + math.max(1, step or 1), state.lpb, 0)
     PV.midi(t0, t1)
@@ -19385,8 +19385,8 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
-    kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or ''   -- 19 окт: незнакомая кнопка не роняет кадр
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+    kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'

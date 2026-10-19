@@ -2916,6 +2916,15 @@ function E.drum_pad_set(track, addr, path, note, num)
   if pi.stop then A.SetParamNormalized(track, addr, pi.stop, 1) end
   if note and pi.note then A.SetParamNormalized(track, addr, pi.note, note / 127) end
   if note and pi.note_end then A.SetParamNormalized(track, addr, pi.note_end, note / 127) end
+  -- 19 окт: новый пэд — 1 голос (ударный не наслаивается сам на себя), pitch bend ±12
+  if note then
+    for p2 = 0, A.GetNumParams(track, addr) - 1 do
+      local _, pn = A.GetParamName(track, addr, p2)
+      pn = (pn or ''):lower()
+      if pn == 'max voices' then A.SetParamNormalized(track, addr, p2, 0)
+      elseif pn == 'pitchbend range' then A.SetParamNormalized(track, addr, p2, 1) end
+    end
+  end
   local nm = (path:match('[^/\\]+$') or path):gsub('%.%w+$', '')
   if num then A.SetNamedConfigParm(track, addr, 'renamed_name', ('S%02X %s'):format(num, nm)) end
 end
