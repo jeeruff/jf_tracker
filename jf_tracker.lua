@@ -13839,13 +13839,13 @@ ctx.np_key = function(c)
   local R2 = SPROP.ROWS
   local ch = c < 256 and string.char(c) or ''
   local r = R2[NP.sel]
-  if c == 27 or (c == 13 and ctx.mods().ctrl) then ctx.NP = nil
+  if c == 27 or c == 13 then ctx.NP = nil   -- 19 окт: Enter — закрыть (не +1); выпадашка строки — Space
   elseif ch == 'j' or c == keys.down then NP.sel = math.min(#R2, NP.sel + 1)
   elseif ch == 'k' or c == keys.up then NP.sel = math.max(1, NP.sel - 1)
   elseif ch == 'g' then NP.sel = 1 elseif ch == 'G' then NP.sel = #R2
   elseif ch == 'h' or ch == 'H' or c == keys.left then ctx.sp_adjust(e, r.k, -1); NP.key = nil
   elseif ch == 'l' or ch == 'L' or c == keys.right then ctx.sp_adjust(e, r.k, 1); NP.key = nil
-  elseif c == 13 then if not ctx.sp_menu(e, r.k) then ctx.sp_adjust(e, r.k, 1) end; NP.key = nil
+  elseif ch == ' ' then ctx.sp_menu(e, r.k); NP.key = nil
   elseif ch == 'R' then ctx.sp_reset(e, r.k); NP.key = nil
   elseif ch == 'W' then local it = NP.item; ctx.NP = nil; select_item_in_reaper(it); reaper.Main_OnCommand(40009, 0)   -- 18 окт: окно свойств item REAPER (было в гидре 5 окт)
   elseif ch:match('^%l$') then local i = SPROP.jump(R2, NP.sel, ch); if i then NP.sel = i end   -- 17 окт: буква — прыжок на строку
