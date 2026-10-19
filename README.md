@@ -118,6 +118,9 @@ by Hundred Rabbits (MIT), the esoteric livecoding language - no code copied.
 The dsp big routing view follows the idea of Sexan's ParaNormal FX Router
 for REAPER - an own implementation, no code copied.
 
+The reform pane (time scale / curve / shift / redistribute and value ranges of the selected notes)
+follows the idea of [Reform](https://www.aqu.surf/reform) for Renoise - an own implementation, no code copied.
+
 The DSP module texts use descriptions from Chris Johnson's
 [Airwindopedia](https://www.airwindows.com/) when it is installed.
 

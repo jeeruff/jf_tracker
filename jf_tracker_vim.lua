@@ -2516,6 +2516,9 @@ function V.key_impl(c)
       if c == ('i'):byte() and (V.mode == 'visual' or V.mode == 'vline') and not V.op then
         V.interp_menu(); return   -- 19 окт: gi — интерполятор (формы кривой)
       end
+      if c == ('r'):byte() and (V.mode == 'visual' or V.mode == 'vline') and not V.op then
+        if ctx.rf_open then ctx.rf_open() end; return   -- 19 окт: gr — reform выделенных нот
+      end
       -- 10 окт: g + цифры + Enter (или g) — на строку с этим номером (g12 ↵ → 0012); Esc — отмена
       if c >= 48 and c <= 57 and not V.op then
         V.gnum = (V.gnum or '') .. string.char(c); V.pending = 'g'

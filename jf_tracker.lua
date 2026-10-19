@@ -401,6 +401,7 @@ state.panes = (function()
     -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
     if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
     -- 19 окт вечер: patterns + chain — своя панель над матрицей (один раз)
+    if reaper.GetExtState(EXT, 'rf_tab') ~= '1' and draw.panes.keep_in(m, 'reform', 'help') then reaper.SetExtState(EXT, 'rf_tab', '1', true) end   -- 19 окт: reform — вкладкой у help
     if reaper.GetExtState(EXT, 'hum_tab') ~= '1' and draw.panes.keep_in(m, 'humanizer', 'help') then reaper.SetExtState(EXT, 'hum_tab', '1', true) end   -- 19 окт: humanizer — вкладкой у help
     if reaper.GetExtState(EXT, 'pat_pane2') ~= '1' then draw.panes.split(m, 'matrix', 'patterns', 'u', 0.3); reaper.SetExtState(EXT, 'pat_pane2', '1', true) end
     if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
@@ -18290,6 +18291,7 @@ local function frame()
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
+    rf_draw = function(Lx, x, y, w, h, foc) local S = ctx.RFS; return ctx.RF.draw(U, Lx, ctx.rf_p, S and { n = #S.heads, target = S.code or 'vol' } or nil, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 19 окт
     hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
       ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
@@ -20020,6 +20022,23 @@ local function frame()
   end
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
   if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
+  -- 19 окт: панель reform мышью: переключатели, слайдеры (тянуть — применяется не чаще 10 раз в секунду), keep / revert
+  if hover.rf and U.click then
+    local hh = hover.rf
+    ctx.set_focus('reform')
+    if hh.toggle then local r = ctx.RF.ROWS[hh.toggle]; ctx.rf_p[r.k] = not ctx.rf_p[r.k]; ctx.rf_apply()
+    elseif hh.btn then ctx.rf_close(hh.btn == 'keep')
+    elseif hh.slider then ctx.rf_drag = hh.slider; ctx.RF.sel = hh.slider.i
+    elseif hh.row then ctx.RF.sel = hh.row end
+  end
+  if ctx.rf_drag then
+    local dg = ctx.rf_drag
+    if gfx.mouse_cap & 1 == 1 then
+      ctx.RF.set_from_x(ctx.rf_p, dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w))
+      local now = reaper.time_precise()
+      if now - (ctx.rf_t or 0) > 0.1 then ctx.rf_t = now; ctx.rf_apply() else ctx.rf_dirty = true end
+    else ctx.rf_drag = nil; if ctx.rf_dirty then ctx.rf_dirty = nil; ctx.rf_apply() end end
+  end
   -- 19 окт: панель humanizer мышью: галки, слайдеры (тянуть), insert, apply
   if hover.hum and U.click then
     local hh = hover.hum
@@ -23855,6 +23874,13 @@ local function frame()
       elseif state.focus == 'actions' then   -- 16 окт: панель actions
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not ctx.act_key(c) then return vim.key(c) end
+      elseif state.focus == 'reform' then   -- 19 окт: панель reform
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local r = ctx.RF.key(ctx.rf_p, c, ctx.mods().shift)
+        if r == 'changed' then ctx.rf_apply()
+        elseif r == 'keep' then ctx.rf_close(true)
+        elseif r == 'revert' then ctx.rf_close(false)
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         ctx.hum_load()
@@ -24405,7 +24431,105 @@ ctx.hum_apply = function()
   end
   vim.msg = ('humanizer: %d note(s)%s, amount %d %% (u - undo)'):format(n, np > 0 and (', ' .. np .. ' dsp point(s)') or '', math.floor(amt * 100 + 0.5))
 end
-ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)   -- 18 окт: выпадашка размера такта
+ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)
+-- 19 окт: reform (идея — Reform для Renoise, https://www.aqu.surf/reform): gr в VISUAL — снимок выделенных нот;
+-- каждое изменение — откат прошлого шага (undo) и применение заново от снимка одним undo; Enter — оставить, Esc — вернуть
+ctx.RF = dofile(DIR .. '/jf_tracker_reform.lua')
+ctx.rf_p = ctx.RF.defaults()
+ctx.rf_open = function()
+  if not (vim.mode == 'visual' or vim.mode == 'vline') then vim.msg = 'reform: select notes first (v / V, or a right drag), then gr'; return end
+  local f0, f1, r0, r1 = vim.visual_range()
+  local hs = vim.heads_in(f0, f1, r0, r1)
+  -- 19 окт: и точки автоматизации (колонки огибающих в выделении): время и значения, как у нот
+  local envs = {}
+  local ta, tb = edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0)
+  for fi = f0, f1 do
+    local f = L.flat[fi]
+    local e = f and f.env
+    if e and e.env and reaper.ValidatePtr(e.env, 'TrackEnvelope*') then
+      local pts = {}
+      for k = 0, reaper.CountEnvelopePoints(e.env) - 1 do
+        local _, t, v, shp, ten = reaper.GetEnvelopePoint(e.env, k)
+        if t >= ta - 1e-9 and t < tb - 1e-9 then
+          local span = (e.max or 1) - (e.min or 0)
+          pts[#pts + 1] = { t = t, raw = v, shape = shp, ten = ten, row = model.row_of_time(t, state.lpb), v = span > 0 and math.floor((v - (e.min or 0)) / span * 255 + 0.5) or 0 }
+        end
+      end
+      if #pts > 0 then envs[#envs + 1] = { e = e, pts = pts } end
+    end
+  end
+  if #hs == 0 and #envs == 0 then vim.msg = 'reform: no notes or automation points in the selection'; return end
+  local fld = vim.vfield or vim.cur.field or 1
+  local code
+  if fld >= 4 then for _, h in ipairs(hs) do local x = (h.fx or {})[fld - 3]; if x then code = x:sub(1, 2); break end end end
+  local ev = {}
+  for i, h in ipairs(hs) do
+    local v
+    if code then local x = (h.fx or {})[fld - 3]; v = x and x:sub(1, 2) == code and tonumber(x:sub(3), 16) or nil
+    else v = tonumber(h.vol or '', 16) end
+    ev[i] = { row = (h.row0 or 0) + (h.delay or 0) / 256, v = v }
+  end
+  ctx.RFS = { heads = hs, ev = ev, r0 = r0, r1 = r1, fld = fld, code = code, applied = false, envs = envs, ta = ta, tb = tb }
+  ctx.rf_p = ctx.RF.defaults()
+  vim.mode = 'normal'; vim.vfield = nil
+  ctx.pane_focus('reform')
+  local np = 0; for _, g in ipairs(envs) do np = np + #g.pts end
+  vim.msg = ('reform: %d note(s)%s - j k row, h l value, Space switch, Enter keep, Esc revert'):format(#hs, np > 0 and (', ' .. np .. ' automation point(s)') or '')
+end
+ctx.rf_apply = function()
+  local S = ctx.RFS
+  if not S then vim.msg = 'reform: select notes (v) and press gr'; return end
+  if S.applied then
+    if (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then edit.undo() end   -- откат только своего шага (другое действие между — не трогать)
+    S.applied = false
+  end
+  local out = ctx.RF.compute(S.ev, S.r0, S.r1, ctx.rf_p)
+  local rows, vols = {}, {}
+  local moved, vchanged = false, false
+  for i, o in ipairs(out) do
+    rows[i] = o.row; if math.abs(o.row - S.ev[i].row) > 1e-6 then moved = true end
+    if o.v ~= S.ev[i].v then vchanged = true end
+  end
+  -- огибающие: свой пересчёт по точкам каждой колонки
+  local eout = {}
+  local echanged = false
+  for gi, g in ipairs(S.envs or {}) do
+    local o = ctx.RF.compute(g.pts, S.r0, S.r1, ctx.rf_p)
+    eout[gi] = o
+    for i, pt in ipairs(g.pts) do if math.abs(o[i].row - pt.row) > 1e-6 or o[i].v ~= pt.v then echanged = true end end
+  end
+  if not moved and not vchanged and not echanged then return end
+  edit.run('reform', function()
+    for gi, g in ipairs(S.envs or {}) do
+      if eout[gi] then
+        local env, e = g.e.env, g.e
+        reaper.DeleteEnvelopePointRange(env, S.ta - 1e-9, S.tb - 1e-9)
+        local span = (e.max or 1) - (e.min or 0)
+        for i, pt in ipairs(g.pts) do
+          local o = eout[gi][i]
+          local rf = math.floor(o.row)
+          local t = edit.row_time(rf, state.lpb, 0) + (o.row - rf) * (edit.row_time(rf + 1, state.lpb, 0) - edit.row_time(rf, state.lpb, 0))
+          local raw = (o.v ~= pt.v) and ((e.min or 0) + span * math.max(0, math.min(255, o.v)) / 255) or pt.raw
+          reaper.InsertEnvelopePoint(env, t, raw, pt.shape or 0, pt.ten or 0, false, true)
+        end
+        reaper.Envelope_SortPoints(env)
+      end
+    end
+    if vchanged and S.code then   -- команда — до сдвига (ноты ещё на своих строках)
+      for i, h in ipairs(S.heads) do if out[i].v then edit.set_fx({ h }, state.lpb, S.code, math.max(0, math.min(255, out[i].v))) end end
+    elseif vchanged then for i, o in ipairs(out) do if o.v then vols[i] = math.max(0, math.min(255, o.v)) / 255 end end end
+    if moved or vchanged then edit.retime(S.heads, state.lpb, moved and rows or nil, (vchanged and not S.code) and vols or nil, 'reform') end
+  end)
+  S.applied = true
+  vim.msg = ('reform: scale x%.2f curve %+.2f shift %+d%s'):format(ctx.rf_p.scale, ctx.rf_p.curve, ctx.rf_p.shift, ctx.rf_p.vals and (' values %02X..%02X'):format(ctx.rf_p.lo, ctx.rf_p.hi) or '')
+end
+ctx.rf_close = function(keep)
+  local S = ctx.RFS
+  if S and not keep and S.applied and (reaper.Undo_CanUndo2(0) or ''):find('reform', 1, true) then edit.undo() end
+  ctx.RFS = nil
+  vim.msg = keep and 'reform: kept (u - undo)' or 'reform: reverted'
+  ctx.set_focus('tracker')
+end   -- 18 окт: выпадашка размера такта
 ctx.pl_load = function()
   local P = ctx.PL
   local proj = reaper.EnumProjects(-1)
