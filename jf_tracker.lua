@@ -6546,6 +6546,16 @@ ctx = {
     vim.open_prompt('arr name ', nm)
   end,
   arr = function(what, arg)
+    -- 19 окт: плейлист едет с аранжировкой: dup — копия его плейлиста, имя — тот же плейлист под новым именем
+    if (what == 'dup' or what == 'name') and ctx.spl_key and ctx.arr_name and ctx.arr_name() then
+      local pl = ctx.spl_text()
+      local fn = ctx.arr_impl(what, arg)
+      if pl ~= '' then ctx.spl_set(pl) end
+      return fn
+    end
+    return ctx.arr_impl(what, arg)
+  end,
+  arr_impl = function(what, arg)
     local AR = draw.arr
     local list, cur = ctx.arr_load()
     local function save(c)
@@ -24631,8 +24641,13 @@ ctx.chain_draw = function(Lx, x, y, w)
 end
 -- 19 окт: плейлист песни — порядок СЕКЦИЙ и регионов (не паттернов: те — chain), строкой у аранжировки внизу
 -- матрицы. Щелчок по строке — выпадашка секций (выбор дописывает), > — играть, x — очистить. В проекте (songpl)
-ctx.spl_text = function() local _, s = reaper.GetProjExtState(0, EXT, 'songpl'); return s or '' end
-ctx.spl_set = function(t) reaper.SetProjExtState(0, EXT, 'songpl', t); reaper.MarkProjectDirty(0) end
+-- 19 окт: плейлист — часть аранжировки: у каждой свой (ключ — имя аранжировки; без аранжировок — общий)
+ctx.spl_key = function()
+  local an = ctx.arr_name and ctx.arr_name()
+  return an and ('songpl:' .. an) or 'songpl'
+end
+ctx.spl_text = function() local _, s = reaper.GetProjExtState(0, EXT, ctx.spl_key()); return s or '' end
+ctx.spl_set = function(t) reaper.SetProjExtState(0, EXT, ctx.spl_key(), t); reaper.MarkProjectDirty(0) end
 ctx.spl_find = function(ref)
   local pats, secs = ctx.pl_song()
   local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
