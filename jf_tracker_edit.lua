@@ -20,7 +20,8 @@ local model
 -- 12 окт: модуляция по нотам — сверка automation items после каждой правки (jf_tracker_notemod.lua)
 local DIR = (debug.getinfo(1, 'S').source:sub(2):match('(.*)/') or '.')
 E.NM = dofile(DIR .. '/jf_tracker_notemod.lua')
-function E.init(m) model = m; E.NM.init(E, m) end
+E.LY = dofile(DIR .. '/jf_tracker_layers.lua')   -- 19 окт: слоёный инструмент (¥)
+function E.init(m) model = m; m.LY = E.LY; E.NM.init(E, m) end
 
 -- ── связь копий с инструментом (3 окт): метка P_EXT:jf_iid ─────────────
 -- Все вставки трекера — копии item-инструмента с его меткой: модель считает
@@ -288,6 +289,7 @@ local function run(desc, fn)
   -- 13 окт: луп удержания — хвосты нот за головами (после всех правок, в том же undo)
   if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
+  if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
@@ -4488,5 +4490,136 @@ function E.garden_pin(tag)
   end)
   return n
 end
+
+-- ── слоёный инструмент ¥ (19 окт; формат и расчёт — jf_tracker_layers.lua) ─────────────────
+-- Корень — item инструмента в LIB, метка P_EXT:jf_layers — его слои. Слой — свой item в LIB
+-- (P_EXT:jf_layerof = iid корня; в lib отдельной строкой не виден). Нота корня на треке — сама
+-- звучит, плюс производные items слоёв (P_EXT:jf_lof = GUID ноты; трекер их не показывает).
+-- layers_sync пересобирает их после каждой правки (в том же undo): нота не менялась (P_EXT:jf_lsig) — не трогает.
+local LAYERS, LAYEROF, LOF, LSIG = 'P_EXT:jf_layers', 'P_EXT:jf_layerof', 'P_EXT:jf_lof', 'P_EXT:jf_lsig'
+local function ext(it, k) local _, v = R.GetSetMediaItemInfo_String(it, k, '', false); return v or '' end
+local function iguid(it) local _, g = R.GetSetMediaItemInfo_String(it, 'GUID', '', false); return g or '' end
+local function strip_ids(chunk) return (chunk:gsub('\n%s*GUID %b{}', ''):gsub('\n%s*IGUID %b{}', '')) end
+local function seed_of(g) local h = 0; for k = 1, #g do h = (h * 31 + g:byte(k)) % 2147483647 end; return h end
+function E.layer_roots()
+  local roots, srcs = {}, {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    local _, nm = R.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
+    if model.LIB_NAMES[nm] then
+      for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, ii)
+        local lt = ext(it, LAYERS)
+        if lt ~= '' then local b = iid_base(E.get_iid(it)); if b and b ~= '' then roots[b] = { list = E.LY.parse(lt), tag = lt, item = it } end end
+        if ext(it, LAYEROF) ~= '' then srcs[iguid(it)] = it end
+      end
+    end
+  end
+  return roots, srcs
+end
+function E.layers_sync()
+  local roots, srcs = E.layer_roots()
+  if not next(roots) and not E.ly_seen then return end
+  E.ly_seen = next(roots) ~= nil
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    local _, tn = R.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
+    if not model.LIB_NAMES[tn] then
+      local notes, derived = {}, {}
+      for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, ii)
+        local lof = ext(it, LOF)
+        if lof ~= '' then derived[lof] = derived[lof] or {}; table.insert(derived[lof], it)
+        elseif ext(it, 'P_EXT:jf_gen') == '' and ext(it, 'P_EXT:jf_susof') == '' then
+          local b = iid_base(E.get_iid(it))
+          if b and roots[b] then notes[#notes + 1] = { it = it, b = b, pos = R.GetMediaItemInfo_Value(it, 'D_POSITION') } end
+        end
+      end
+      table.sort(notes, function(a, b2) return a.pos < b2.pos end)
+      local count, alive = {}, {}
+      for _, n in ipairs(notes) do
+        count[n.b] = (count[n.b] or 0) + 1
+        local it, root = n.it, roots[n.b]
+        local g = iguid(it)
+        alive[g] = true
+        local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        local vol = R.GetMediaItemInfo_Value(it, 'D_VOL')
+        local mute = R.GetMediaItemInfo_Value(it, 'B_MUTE')
+        local tk = R.GetActiveTake(it)
+        local pitch = tk and R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') or 0
+        local lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')
+        local sig = ('%.6f|%.6f|%.4f|%d|%.3f|%d|%d|%s'):format(n.pos, len, vol, mute, pitch, lane, count[n.b], root.tag)
+        if sig ~= ext(it, LSIG) or not derived[g] then
+          for _, d in ipairs(derived[g] or {}) do if R.ValidatePtr(d, 'MediaItem*') then R.DeleteTrackMediaItem(tr, d) end end
+          local seed = seed_of(g)
+          for k, l in ipairs(root.list) do
+            local pl = E.LY.plan(l, k, count[n.b], seed)
+            local src = pl and srcs[l.guid]
+            if src and R.ValidatePtr(src, 'MediaItem*') then
+              local ok, chunk = R.GetItemStateChunk(src, '', false)
+              if ok then
+                local c = R.AddMediaItemToTrack(tr)
+                R.SetItemStateChunk(c, strip_ids(chunk), false)
+                R.SetMediaItemInfo_Value(c, 'D_POSITION', math.max(0, n.pos + pl.dt))
+                R.SetMediaItemInfo_Value(c, 'D_LENGTH', math.max(0.001, len - math.max(0, pl.dt)))
+                R.SetMediaItemInfo_Value(c, 'D_VOL', vol * pl.gain)          -- минус — фаза перевёрнута (REAPER)
+                R.SetMediaItemInfo_Value(c, 'B_MUTE', mute)
+                if R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(c, 'I_FIXEDLANE', lane) end
+                local ct = R.GetActiveTake(c)
+                if ct then
+                  R.SetMediaItemTakeInfo_Value(ct, 'D_PAN', pl.pan)
+                  R.SetMediaItemTakeInfo_Value(ct, 'D_PITCH', pitch + pl.semis)
+                end
+                for _, key in ipairs({ LAYEROF, LAYERS, LSIG, IID, 'P_EXT:jf_home', 'P_EXT:jf_ord' }) do R.GetSetMediaItemInfo_String(c, key, '', true) end
+                R.GetSetMediaItemInfo_String(c, LOF, g, true)
+              end
+            end
+          end
+          if not derived[g] then derived[g] = {} end
+          R.GetSetMediaItemInfo_String(it, LSIG, sig, true)
+        end
+      end
+      for g, list in pairs(derived) do
+        if not alive[g] then for _, d in ipairs(list) do if R.ValidatePtr(d, 'MediaItem*') then R.DeleteTrackMediaItem(tr, d) end end end
+      end
+    end
+  end
+end
+-- слой: копия src_it в LIB (свой лейн), корень root_it получает его в метку (и iid, если не было)
+function E.layer_add(root_it, src_it)
+  if not (root_it and src_it and R.ValidatePtr(root_it, 'MediaItem*') and R.ValidatePtr(src_it, 'MediaItem*')) then return nil end
+  local res
+  run('layer add', function()
+    local b = iid_base(E.ensure_iid(root_it))
+    local ok, chunk = R.GetItemStateChunk(src_it, '', false)
+    if not ok then return end
+    local tr, lane = E.lib_slot()
+    local c = R.AddMediaItemToTrack(tr)
+    R.SetItemStateChunk(c, strip_ids(chunk), false)
+    for _, key in ipairs({ LAYERS, LSIG, IID, LOF, 'P_EXT:jf_ord', 'P_EXT:jf_slices' }) do R.GetSetMediaItemInfo_String(c, key, '', true) end
+    R.GetSetMediaItemInfo_String(c, LAYEROF, b, true)
+    E.lib_mark(c, nil, lane)
+    local list = E.LY.parse(ext(root_it, LAYERS))
+    list[#list + 1] = E.LY.new(iguid(c))
+    R.GetSetMediaItemInfo_String(root_it, LAYERS, E.LY.tag(list), true)
+    res = #list
+  end)
+  return res
+end
+-- слои корня целиком (правка полей); удалённые из списка — их items в LIB тоже
+function E.layers_set(root_it, list)
+  if not (root_it and R.ValidatePtr(root_it, 'MediaItem*')) then return end
+  run('layers', function()
+    local keep = {}
+    for _, l in ipairs(list) do keep[l.guid] = true end
+    local _, srcs = E.layer_roots()
+    for _, l in ipairs(E.LY.parse(ext(root_it, LAYERS))) do
+      local it = not keep[l.guid] and srcs[l.guid]
+      if it then R.DeleteTrackMediaItem(R.GetMediaItem_Track(it), it) end
+    end
+    R.GetSetMediaItemInfo_String(root_it, LAYERS, #list > 0 and E.LY.tag(list) or '', true)
+  end)
+end
+function E.layer_item(guid) local _, srcs = E.layer_roots(); return srcs[guid] end
 
 return E

@@ -667,35 +667,41 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     -- 19 окт: stack — вторая строка под именем: такт · размер · длина (· темп); те же щелчки и курсор длины
     if MX.stack and not MX.fold and nw > 0 then
       local y2 = y + L.rh
-      local sx = nx
-      local function part(s2, col, what, w2)
-        w2 = w2 or U.measure(s2)
-        if sx + U.measure(s2) > nx + nw then return end
-        local hot = what and hover.ri == ri and mx >= sx and mx < sx + w2 and my >= y2 and my < y2 + L.rh
-        U.text(sx, y2, s2, hot and U.AMBER or col)
+      -- 19 окт: такт — слева от линейки (под «< A1 >»), справа у края — темп, длина, размер (4/4 последним)
+      local lx0, rx = xa, L.mx_label_w - L.pad
+      local function put(x2, s2, col, what)
+        local w2 = U.measure(s2)
+        local hot = what and hover.ri == ri and mx >= x2 and mx < x2 + w2 and my >= y2 and my < y2 + L.rh
+        U.text(x2, y2, s2, hot and U.AMBER or col)
         if hot then hover[what] = ri end
-        if what and ctx.hint then ctx.hint('mx' .. what, sx, y2, w2, L.rh, ri) end
-        local x0 = sx
-        sx = sx + w2 + 2 * L.pad
-        return x0
+        if what and ctx.hint then ctx.hint('mx' .. what, x2, y2, w2, L.rh, ri) end
       end
-      if info.bar_label then part(info.bar_label(rg.pos), U.GREY) end
+      local function right(s2, col, what)            -- справа налево; не влезает до такта — не рисуется
+        local x2 = rx - U.measure(s2)
+        if x2 < lx0 then return nil end
+        put(x2, s2, col, what); rx = x2 - 2 * L.pad
+        return x2
+      end
       if info.sig_at and not rg.gap then
         local n, d = info.sig_at(rg.pos)
         local ss = ('%d/%d'):format(n or 4, d or 4)
         local beat = MX.vismetro and playing and info.play_row and ctx.state
         if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
-        part(ss, beat and U.AMBER or U.DIM, 'sig')
+        right(ss, beat and U.AMBER or U.DIM, 'sig')
       end
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len'
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
-      local lx = part(ds, U.GREY, 'dur')
-      if oncur and lx then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(lx - 2, y2, U.measure(ds) + 4, L.rh, 0) end
+      local lxd = right(ds, U.GREY, 'dur')
+      if oncur and lxd then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(lxd - 2, y2, U.measure(ds) + 4, L.rh, 0) end
       if MX.bpm and ctx.bpm_at and not rg.gap then
         local bpm = ctx.bpm_at(rg.pos)
         local bs = (math.abs(bpm - math.floor(bpm + 0.5)) < 0.05) and tostring(math.floor(bpm + 0.5)) or ('%.1f'):format(bpm)
-        part(bs .. ' bpm', MX.bpm_diff and U.TEXT or U.DIM, 'bpm')
+        right(bs, MX.bpm_diff and U.TEXT or U.DIM, 'bpm')
+      end
+      if info.bar_label then
+        local bl = info.bar_label(rg.pos)
+        if lx0 + U.measure(bl) <= rx + 2 * L.pad then put(lx0, bl, U.GREY) end
       end
     end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
