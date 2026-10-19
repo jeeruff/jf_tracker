@@ -262,7 +262,8 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
-  mxstack = flag('mxstack', true),   -- 19 окт: такт / размер / длина — второй строкой под именем паттерна
+  mxstack = flag('mxstack', true),
+  stepflash = flag('stepflash', true),   -- 19 окт: смена шага — цифра step вспыхивает крупно, клавиши не горят   -- 19 окт: такт / размер / длина — второй строкой под именем паттерна
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   dotcolor = flag('dotcolor', false),   -- 18 окт: пустые точки — цветом поля
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
@@ -723,7 +724,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -11513,6 +11514,7 @@ ctx = {
       flag('edgezoom', 'slice edge zoom', 'the sample wave splits: the whole sample on top, below - the edge you work on, close up (as in Xfer Nerve): the slice line you drag, the zone edge you drag, the slice picked in the list, else the start of the zone. Drag there - fine move of the line, wheel - wider / closer'),
       { key = 'slicemk', label = 'slice by click', kind = 'cycle', values = { 'double', 'click' }, desc = 'how the mouse makes a slice on the sample wave: double - a double click (a single click selects, as before); click - one click without dragging, as the Slice Marker Tool in Renoise (dragging still selects). A double click on a slice line removes it', get = function() return state.slicemk or 'double' end, set = function(v) state.slicemk = v end },
       flag('hidereaper', 'hide REAPER items in menus', 'right-click menus collect what opens REAPER windows (FX window, modulation window, track header, native FX browser) in a submenu "in REAPER"; on - that submenu is hidden, menus show only what works in the tracker'),
+      flag('stepflash', 'step flash', 'Ctrl+digit changes the step: the big step number flashes and shrinks back (the piano keys do not light up); off - the keys light as for a note'),
       flag('escstop', 'Esc stops playback', 'while playing the first Esc stops and leaves the cursor on the play position (Space - stops and goes back); stopped - Esc toggles INSERT; not while recording - there Esc deletes the take'),
       flag('recdelprompt', 'ask before deleting a take', 'Esc while recording: ask before the take is deleted (off - delete at once)'),
       flag('stretchmarks', 'stretch markers', 'amber ticks of the item stretch markers on the wave'),
@@ -17990,6 +17992,7 @@ local function frame()
   draw.envfmt = state.envfmt or 'midi'
   draw.envvals = state.envvals
   draw.hybrid = not draw.ttf                             -- не-ASCII в битмапе — моно-шрифтом высотой с битмап; TTF всё умеет сам (5 окт)
+  draw.stepflash_on = state.stepflash   -- 19 окт: вспышка цифры step
   local hover
   if idle_skip then hover = idle.hover else
   -- 8 окт: вкладка automation включает в lib строку automation — в модуле
@@ -18049,7 +18052,10 @@ local function frame()
       local held = {}
       -- 15 окт: клавиши играют ноты (INSERT или слой пианино) — нажатая подсвечивает клавиатуру: краем глаза видно, что идут ноты, не команды
       local notemode = (vim.mode == 'insert' or vim.piano) and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
-      if (active or notemode) and reaper.JS_VKeys_GetState then
+      -- 19 окт: шаг сменился (Ctrl+цифра) — вспышка цифры step; клавиши этой цифрой не горят
+      if vim.step ~= ctx.step_seen then ctx.step_seen = vim.step; if ctx.step_seen_once then draw.step_flash = reaper.time_precise() end; ctx.step_seen_once = true end
+      local stepping = state.stepflash and draw.step_flash and reaper.time_precise() - draw.step_flash < 0.7 and ctx.mods().ctrl
+      if (active or notemode) and reaper.JS_VKeys_GetState and not stepping then
         local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 30)
         for code, off in pairs(keys.piano) do
           local vk = keys.vk_of(code)                    -- 16 окт: F-ряд (frow) — коды > 255, не символ

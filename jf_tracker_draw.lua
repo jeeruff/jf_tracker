@@ -4023,7 +4023,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local vh = (it.vlab_rows or 2) * L.rh
           local up = math.max(0, math.min(3, ms(it.vlab) - vh))
           D.vtext(cx, cy - up, vh + up + 2, it.vlab, U.GREY, U.PANEL)   -- +2 — зазор до строки listen
-          D.big_text(cx + L.th + L.pad, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
+          -- 19 окт: step сменился — цифра вспыхивает крупнее (×4 → ×2 за полсекунды), янтарём
+          local fl = it[1] == 'step' and D.step_flash and reaper.time_precise() - D.step_flash
+          if fl and fl < 0.5 and D.stepflash_on then
+            local k = fl < 0.17 and 4 or (fl < 0.34 and 3 or 2)
+            local bx2, by2 = cx + L.th + L.pad, cy - (k - 2) * math.floor(L.rh / 2)
+            set(U.PANEL); gfx.rect(bx2 - 2, by2 - 2, D.big_measure(it[2], k) + 4, k * L.rh + 4, 1)
+            D.big_text(bx2, by2, it[2], U.AMBER, k)
+          else
+            D.big_text(cx + L.th + L.pad, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
+          end
         elseif it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
         elseif it[1] ~= '_' then text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT)) end
         if it.beats then
