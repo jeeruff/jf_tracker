@@ -992,6 +992,7 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     ppitch = R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH') == 1,
     pmode = math.floor(R.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE')),
     loop = R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1,
+    rev = (function() local s = R.GetMediaItemTake_Source(take); return s and R.PCM_Source_GetSectionInfo and select(4, R.PCM_Source_GetSectionInfo(s)) or false end)(),   -- 19 окт: реверс take
     fin = R.GetMediaItemInfo_Value(it, 'D_FADEINLEN'), fout = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN'),
     nfx = R.TakeFX_GetCount and R.TakeFX_GetCount(take) or 0,
     fxnames = (function()

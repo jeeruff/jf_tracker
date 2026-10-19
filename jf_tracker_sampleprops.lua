@@ -18,7 +18,7 @@ SP.ROWS = {
   { k = 'st', label = 'transpose' }, { k = 'cent', label = 'finetune' },
   { k = 'rate', label = 'rate' }, { k = 'bsync', label = 'beatsync' }, { k = 'bspat', label = 'beatsync to' },   -- 15 окт: кнопки длины от паттерна { k = 'ppitch', label = 'keep pitch' },
   { k = 'mode', label = 'stretch' },
-  { k = 'loop', label = 'loop' },
+  { k = 'loop', label = 'loop' }, { k = 'rev', label = 'reverse' },   -- 19 окт: реверс take (нативный, REAPER 41051)
   { k = 'fin', label = 'fade in' }, { k = 'fout', label = 'fade out' },
   -- 5 окт: остальное из окна свойств item REAPER (позиция у сэмпла lib не нужна)
   { k = 'finshape', label = 'fade in shape' }, { k = 'foutshape', label = 'fade out shape' },
@@ -47,6 +47,7 @@ function SP.value(e, k)
   if k == 'ppitch' then return e.ppitch and 'on' or 'off' end
   if k == 'mode' then return ctx.pitch_mode_name(e.pmode or -1) end
   if k == 'loop' then return e.loop and 'on' or 'off' end
+  if k == 'rev' then return e.rev and 'on' or 'off' end   -- 19 окт: модуль без reaper.* — признак кладёт модель
   if k == 'fin' then return ('%d ms'):format(math.floor((e.fin or 0) * 1000 + 0.5)) end
   if k == 'fout' then return ('%d ms'):format(math.floor((e.fout or 0) * 1000 + 0.5)) end
   if k == 'fx' then return (e.nfx or 0) > 0 and (('%d: %s'):format(e.nfx, (e.fxnames or {})[1] or '')) or 'none (click: add, dbl: window)' end

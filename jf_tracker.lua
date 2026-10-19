@@ -11066,6 +11066,19 @@ ctx = {
       local k0 = 1
       for i, m in ipairs(modes) do if m == cur or (m >= 0 and cur >= 0 and (m >> 16) == (math.floor(cur) >> 16)) then k0 = i end end
       P('take:I_PITCHMODE', modes[(k0 - 1 + d) % #modes + 1], 'abs', 'sample stretch mode')
+    elseif k == 'rev' then
+      -- 19 окт: реверс — нативное действие REAPER над выбранными items (все копии инструмента / нота), выбор возвращается
+      local keep = {}
+      for i = 0, reaper.CountSelectedMediaItems(0) - 1 do keep[#keep + 1] = reaper.GetSelectedMediaItem(0, i) end
+      edit.run('sample reverse', function()
+        reaper.SelectAllMediaItems(0, false)
+        for _, o in ipairs(items) do if reaper.ValidatePtr(o, 'MediaItem*') then reaper.SetMediaItemSelected(o, true) end end
+        reaper.Main_OnCommand(41051, 0)
+        reaper.SelectAllMediaItems(0, false)
+        for _, o in ipairs(keep) do if reaper.ValidatePtr(o, 'MediaItem*') then reaper.SetMediaItemSelected(o, true) end end
+      end)
+      model.invalidate()
+      vim.msg = ('reverse: %d item(s) flipped'):format(#items)
     elseif k == 'loop' then
       P('B_LOOPSRC', e.loop and 0 or 1, 'abs', 'sample loop')
       vim.msg = e.loop and 'loop off' or 'loop on: the whole sample repeats'
