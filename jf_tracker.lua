@@ -21762,7 +21762,7 @@ local function frame()
         local head = cell
         local opt = gfx.mouse_cap & 16 == 16
         -- протяжка без модификатора — выделение блока (NORMAL и INSERT), 2 окт
-        if not move_ev and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, col = L.flat[hover.fi] and L.flat[hover.fi].col } end
+        if not move_ev and not dbl then sel_drag = { fi = hover.fi, row = hover.row.row, field = hover.field, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, col = L.flat[hover.fi] and L.flat[hover.fi].col } end
         if head and not dbl and move_ev then
           local hr = head.row0 or hover.row.row
           local heads = (vis_heads and #vis_heads > 0) and vis_heads or vim.heads_in(hover.fi, hover.fi, hr, hr)
@@ -21963,10 +21963,22 @@ local function frame()
     if gfx.mouse_cap & (sel_drag.btn or 1) ~= 0 then
       if not sel_drag.active and (math.abs(gfx.mouse_y - sel_drag.y0) > 3 or math.abs(gfx.mouse_x - sel_drag.x0) > 3) then
         sel_drag.active = true
-        vim.anchor = { fi = sel_drag.fi, row = sel_drag.row }; vim.mode = 'visual'
+        vim.anchor = { fi = sel_drag.fi, row = sel_drag.row }; vim.mode = 'visual'; vim.vtrack = nil; vim.sx = nil
       end
-      if sel_drag.active and hover.row and hover.fi and not hover.row.clip then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
+      -- 19 окт: вид не едет за мышью (курсор стоит — иначе содержимое прокручивалось под мышью и выделение
+      -- убегало); рамка — от точки нажатия до мыши, по колонкам; внутри одного поля (vol / delay / команда) — только оно
+      if sel_drag.active and hover.row and hover.fi and not hover.row.clip then
+        sel_drag.efi, sel_drag.erow = hover.fi, hover.row.row
+        local same = hover.fi == sel_drag.fi and hover.field == sel_drag.field and (sel_drag.field or 1) >= 2
+        vim.vfield = same and sel_drag.field or nil
+        vim.vbox = { math.min(sel_drag.fi, hover.fi), math.max(sel_drag.fi, hover.fi), math.min(sel_drag.row, hover.row.row), math.max(sel_drag.row, hover.row.row), at = { fi = vim.cur.fi, row = vim.cur.row } }
+      end
     else
+      if sel_drag.active and sel_drag.efi then   -- отпустил — курсор в конец рамки один раз, выделение то же (якорь — начало)
+        vim.vbox = nil; vim.anchor = { fi = sel_drag.fi, row = sel_drag.row }
+        vim.cur.fi, vim.cur.row = sel_drag.efi, sel_drag.erow
+        if sel_drag.field then vim.cur.field = sel_drag.field end
+      end
       if sel_drag.btn == 2 and not sel_drag.active then          -- правый клик без протяжки — контекстное меню
         vim.cur.fi, vim.cur.row = sel_drag.fi, sel_drag.row
         local ok, e = pcall(context_menu, hover); if not ok then vim.msg = tostring(e):match('[^\n]*$') end
@@ -22182,7 +22194,7 @@ local function frame()
   elseif U.rclick and (state.seldrag or 'right') == 'right' and hover.row and hover.fi and not hover.row.clip and not hover.env and not (vim.hydra or vim.picker) then
     -- 8 окт: правая протяжка — выделение блока; отпустили без движения — меню
     ctx.set_focus('tracker')
-    sel_drag = { fi = hover.fi, row = hover.row.row, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, btn = 2, col = L.flat[hover.fi] and L.flat[hover.fi].col }
+    sel_drag = { fi = hover.fi, row = hover.row.row, field = hover.field, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, btn = 2, col = L.flat[hover.fi] and L.flat[hover.fi].col }
   elseif U.rclick then
     local ok, e = pcall(context_menu, hover)
     if not ok then vim.msg = tostring(e):match('[^\n]*$') end
