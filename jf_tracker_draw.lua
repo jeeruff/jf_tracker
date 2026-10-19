@@ -3669,7 +3669,7 @@ end
 D.RATE_SNAPS = { 0.25, 0.5, 0.75, 1, 1.5, 2 }
 function D.transport_sub(c)
   -- 15 окт: слов нет — символы: * freeze (*N — заморожено N), ^O^ shift rec (^ — шифт, O — как rec), ++ dub; слова — в статусе
-  local frz = c.frz and ('*%s'):format(c.frz) or '*'
+  local frz = c.frz and ('**%s'):format(c.frz) or '**'   -- 19 окт: ** — freeze-луп (было *)
   -- 11 окт: под play — slow (белая: игра /2), под rec — smart (запись по нажатию, обсуждается)
   return { { 'tp_start', '|<<' }, { 'freeze', frz, c.frz and U.CYAN or nil },
            { 'slowplay', 'x0.5', halves = {   -- 12 окт: две половины — x0.5 и x2; включённая мигает
@@ -4097,21 +4097,21 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     for i, b in ipairs(blist) do
       local w2 = ms(b[5] or b[2])
       local sb = sub0[i]
-      if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 4 * L.pad + 2) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[2])) end
+      if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 2 * L.pad + 4) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[2])) end
       TW[i] = w2 + 2 * L.pad
       if b[1] == 'tp_play' then pi = i end
     end
+    local need = 0
     if c.tpfull then
       TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
       TW[2] = math.max(TW[2], ms('x1.10') + 2 * L.pad)
-      local need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad
-      local have = 0
-      for i = 3, #blist do have = have + TW[i] + (i > 3 and 2 or 0) end
-      if pi and have < need then TW[pi] = TW[pi] + (need - have) end
+      need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad
     end
-    if pi then TW[pi] = math.max(TW[pi], wide) end
+    local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
     btot = -2
     for i = 1, #blist do btot = btot + TW[i] + 2 end
+    -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
+    if need > 0 then btot = math.max(btot, TW[1] + TW[2] + 4 + need) end
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
@@ -7993,7 +7993,7 @@ function D.frame(L, snap, rows, state, info)
             -- 18 окт (2): кубик = нота MIDI 0..127, снизу вверх по 4 в ряду (как пэды MPC / drum rack): ряд — 4 ноты,
             -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
             -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
-            local side = math.min(gw // 4, math.max(3 * L.rh + 6, gh // 4))   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
+            local side = math.min(gw // 4, math.max(4 * L.rh + 6, gh // 4))   -- 19 окт: крупнее (имя + мини-волна + кнопки)   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
             local G = { cols = 4, cw = side, ch = side }
             G.fit = math.max(1, math.min(32, gh // G.ch))   -- 19 окт: влезает больше рядов — показываем
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
@@ -8135,12 +8135,23 @@ function D.frame(L, snap, rows, state, info)
                     end
                   else set(U.LINE); gfx.line(cx0 + 2, mid, cx0 + 2 + npx, mid) end
                 elseif ah2 >= L.rh - 2 then
+                  -- 19 окт: мини-волна сэмпла пэда фоном под подписью (тускло)
+                  local npx = cw0 - 4
+                  local pk = kid.file and npx > 4 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b)
+                  if pk and pk.n and pk.n > 0 then
+                    local mid, hh = ay + ah2 / 2, ah2 / 2 - 1
+                    set(U.mix(kid.enabled and U.CYAN or U.DIM, U.PANEL, 0.6))
+                    for px = 0, npx - 1 do
+                      local idx = math.floor(px / npx * pk.n) + 1
+                      gfx.line(cx0 + 2 + px, mid - math.min(1, pk.max[idx] or 0) * hh, cx0 + 2 + px, mid - math.max(-1, pk.min[idx] or 0) * hh)
+                    end
+                  end
                   local lbl
                   if cm == 'key' then lbl = kid.note and info.drum_key and info.drum_key(kid.note) or '-'
                   else lbl = kid.note and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[kid.note % 12 + 1] .. math.max(0, kid.note // 12 - 1)) or '---' end
                   text(cx0 + L.pad, ay, fit(lbl, cw0 - 2 * L.pad), kid.enabled and (on and U.AMBER or U.TEXT) or U.DIM)
                 end
-                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid, rect = { cx0, cy0, cw0, ch0 } } end
                 hint('dspkit', cx0, cy0, cw0, ch0, { key = kkey, ki = ki })
               end
             end

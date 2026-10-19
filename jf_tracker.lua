@@ -19916,6 +19916,25 @@ local function frame()
   if U.click and hover.dbig then ctx.set_focus('dsp'); MX.DB.click(hover, reaper.time_precise()); U.click = false end   -- DSP big: узел
   -- параметр TCP под эффектом (8 окт): тянуть по горизонтали, двойной
   -- клик — умолчание, колесо — шаг 1 %
+  -- 19 окт: Ctrl+Cmd над сеткой пэдов drumrs5k — тачпад как пэды: заехал пальцем на пэд — он звучит;
+  -- громкость — по высоте внутри пэда (верх — громко); силу нажатия gfx не даёт. SLIDER при этом не берётся
+  do
+    local mm = ctx.mods()
+    local hk = hover.dspkid and hover.dspkit and hover.dspkid.kid
+    if mm.ctrl and mm.cmd and hk and hk.note then
+      ctx.drum_pad_glide = true
+      if ctx.drum_last_pad ~= hk then
+        ctx.drum_last_pad = hk
+        local col = dsp_target()
+        local r = hover.dspkid.rect
+        local v0 = vim.vel
+        if r then vim.vel = math.max(20, math.min(127, math.floor(127 - (gfx.mouse_y - r[2]) / math.max(1, r[4]) * 100))) end
+        if col then ctx.preview(col.track, hk.note, 'midi') end
+        vim.msg = ('pad %s  vel %d (Ctrl+Cmd: slide over the pads)'):format(hk.name or '', vim.vel or 100)
+        vim.vel = v0
+      end
+    else ctx.drum_last_pad = nil; ctx.drum_pad_glide = nil end
+  end
   -- мышь с Ctrl (8 окт, jf_tracker_ctrlmouse): Control зажат — движение мыши
   -- крутит выделенные / под мышью / в фокусе клавиатуры (относительно, вверх —
   -- больше, Shift — мелко; две выделенные — XY). Cmd+щелчок — в выделение,
@@ -20013,7 +20032,7 @@ local function frame()
       ctx.im = nil
     end
     local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
-    local sl_raw = gfx.mouse_cap & 52 == 36 or sl_pan
+    local sl_raw = (gfx.mouse_cap & 52 == 36 or sl_pan) and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не SLIDER
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local SG = ctx.sl
