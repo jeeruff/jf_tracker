@@ -22097,9 +22097,10 @@ local function frame()
         if B.is_marked(bd.e) and B.nmarked() > 1 then for _, o in ipairs(B.sel_order) do if o.full then many[#many + 1] = o.full end end end
         local dk = hover.dspkid and hover.dspkid.kid
         local fr = hover.dspkid and hover.dspkid.f
-        if #many > 1 and fr then
+        if fr and not dk and #many <= 1 then many = { pth } end   -- 19 окт: пустая нота — файл туда (новый пэд на ней)
+        if #many >= 1 and fr and (#many > 1 or not dk) then
           -- 19 окт: по нотам подряд с этого пэда: занятые — переписать, Shift — оставить и класть в свободные
-          ctx.drum_drop_files(fr, (dk and dk.note) or (draw.kit_note or {})[hover.dspkit.key] or 36, many, ctx.mods().shift)
+          ctx.drum_drop_files(fr, (dk and dk.note) or hover.dspkid.note or (draw.kit_note or {})[hover.dspkit.key] or 36, many, ctx.mods().shift)
         elseif hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл

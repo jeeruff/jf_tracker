@@ -8086,6 +8086,10 @@ function D.frame(L, snap, rows, state, info)
                 if not by_note[note] then
                   local ex, ey = gx0 + c * G.cw, gy0 + (G.fit - 1 - rr) * G.ch
                   set(note == kn and U.AMBER or U.mix(U.LINE, U.PANEL, 0.5)); rrect(ex, ey, G.cw - 2, G.ch - 2, false)
+                  -- 19 окт: пустая нота — цель броска файлов (новый пэд на этой ноте)
+                  if not drag and mx >= ex and mx < ex + G.cw - 2 and my >= ey and my < ey + G.ch - 2 then
+                    hover.dspkit = { k = k, key = kkey, ki = 0, note = note }; hover.dspkid = { k = k, f = f, ki = 0, note = note }
+                  end
                   text(ex + L.pad, ey + 1, nname(note), U.mix(U.DIM, U.PANEL, 0.4))
                 end
               end
