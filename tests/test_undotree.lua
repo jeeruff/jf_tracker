@@ -101,5 +101,16 @@ do
   eq('delta: seconds', UT.delta(12), '+12s'); eq('delta: minutes', UT.delta(300), '+5m')
   eq('delta: hours', UT.delta(7300), '+2h'); eq('delta: none', UT.delta(0), '')
 end
+-- 19 окт: сжатие файла — dump → load: те же узлы, текущий, умершие; снимков — сколько было в памяти
+do
+  local T = UT.new()
+  UT.add(T, 'a', 1); UT.add(T, 'b', 2); T.cur = 1; UT.add(T, 'c', 3)
+  local snaps = { [1] = 'SNAP1', [3] = 'SNAP3' }
+  local T2, s2 = UT.load(UT.dump(T, snaps))
+  eq('dump: nodes', #(function() local t = {}; for id in pairs(T2.nodes) do t[#t + 1] = id end; return t end)(), 4)
+  eq('dump: cur', T2.cur, T.cur)
+  eq('dump: dead', T2.nodes[2].live, false)
+  eq('dump: snap', s2[3], 'SNAP3')
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

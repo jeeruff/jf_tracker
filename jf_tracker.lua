@@ -14447,6 +14447,7 @@ ctx.ut_api = {
   restore = function(data, label) ctx.USN.restore(ctx.UTM, data, label); model.invalidate() end,
   read = function(path) local f = io.open(path, 'rb'); if not f then return nil end; local t = f:read('a'); f:close(); return t end,
   append = function(path, s2) local f = io.open(path, 'ab'); if f then f:write(s2); f:close() end end,
+  write = function(path, s2) local f = io.open(path, 'wb'); if f then f:write(s2); f:close() end end,   -- 19 окт: сжатие файла дерева
   now = function() return os.time() end,
 }
 ctx.ut_state = function()
@@ -14454,7 +14455,7 @@ ctx.ut_state = function()
   local path = (rpp and rpp ~= '') and (rpp:gsub('%.[Rr][Pp][Pp]$', '') .. '.jf-undo') or nil
   local key = tostring(proj)
   local ST = ctx.UTS[key]
-  if not ST then ST = ctx.UTM.session(ctx.ut_api, path); ctx.UTS[key] = ST
+  if not ST then ST = ctx.UTM.session(ctx.ut_api, path); ctx.UTS[key] = ST; collectgarbage('collect')   -- 19 окт: текст файла — сразу из памяти
   elseif path ~= ST.path then ctx.UTM.set_path(ST, path) end
   return ST
 end

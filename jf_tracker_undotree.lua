@@ -163,11 +163,34 @@ function UT.load(text)
     elseif tag == 'S' then
       local id, len = line:match('^S\t(%-?%d+)\t(%d+)')
       id, len = tonumber(id), tonumber(len)
-      if id and len then snaps[id] = text:sub(i, i + len - 1); i = i + len + 1 end
+      if id and len then snaps[id] = { i, len }; i = i + len + 1 end   -- 19 окт: сначала только место в тексте
     end
   end
-  for id in pairs(snaps) do if T.nodes[id] then T.nodes[id].snap = true end end
-  return T, snaps
+  -- 19 окт: вырезаются только последние SNAP_MAX снимков (файл за вечер — сотни МБ, всё в память не нужно)
+  local ids = {}
+  for id in pairs(snaps) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local out = {}
+  for k = math.max(1, #ids - (UT.SNAP_MAX or 24) + 1), #ids do
+    local id = ids[k]
+    if T.nodes[id] then local pos = snaps[id]; out[id] = text:sub(pos[1], pos[1] + pos[2] - 1); T.nodes[id].snap = true end
+  end
+  return T, out
+end
+-- 19 окт: файл заново — узлы (по порядку), умершие, текущий и снимки из памяти (сжатие разросшегося файла)
+function UT.dump(T, snaps)
+  local ids = {}
+  for id in pairs(T.nodes) do if id ~= 0 then ids[#ids + 1] = id end end
+  table.sort(ids, function(a, b) return T.nodes[a].seq < T.nodes[b].seq end)
+  local o = {}
+  for _, id in ipairs(ids) do o[#o + 1] = UT.ev_node(T.nodes[id]) end
+  for _, id in ipairs(ids) do if not T.nodes[id].live then o[#o + 1] = UT.ev_dead(id) end end
+  local sids = {}
+  for id in pairs(snaps or {}) do sids[#sids + 1] = id end
+  table.sort(sids)
+  for _, id in ipairs(sids) do o[#o + 1] = UT.ev_snap(id, snaps[id]) end
+  o[#o + 1] = UT.ev_cur(T.cur)
+  return table.concat(o)
 end
 
 -- ── снимок: блоки «тег длина\nданные\n» (chunk-и треков, маркеры, темп) ──
@@ -200,6 +223,7 @@ function UT.session(api, path)
   local txt = path and api.read(path)
   if txt then
     S.T, S.snaps = UT.load(txt)
+    if #txt > 8 * 1024 * 1024 and api.write then api.write(path, UT.dump(S.T, S.snaps)) end   -- 19 окт: разросся — сжать
     do   -- 19 окт: из файла — в памяти только последние SNAP_MAX снимков
       local ids = {}
       for id in pairs(S.snaps) do ids[#ids + 1] = id end
