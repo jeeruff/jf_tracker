@@ -240,7 +240,12 @@ function V.empty_midi_at(fi, row)
   if not (f and f.col and not f.env and not f.ml) then return nil end
   local lane = f.lane or f.col.lanes[1]
   for _, it in ipairs(lane and lane.items or {}) do
-    if it.empty and math.floor(it.r0 + 1e-6) <= row and row < it.r1 - 1e-6 then return it.item end   -- строка внутри пустого клипа
+    if math.floor(it.r0 + 1e-6) <= row and row < math.max(it.r1, math.floor(it.r0 + 1e-6) + 1) - 1e-6 then   -- строка внутри клипа (крошечный — его строка)
+      if it.empty then return it.item end   -- пустой клип
+      -- 19 окт: клип без видимых нот (ноты за его концом, клип в строку) — тоже удаляется dw / x
+      local a0, a1 = math.floor(it.r0 + 1e-6), math.max(math.floor(it.r0 + 1e-6), math.ceil(it.r1 - 1e-6) - 1)
+      if #V.heads_in(fi, fi, a0, a1) == 0 then return it.item end
+    end
   end
 end
 function V.covering(fi, row)

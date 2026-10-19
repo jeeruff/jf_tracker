@@ -275,7 +275,7 @@ end
 -- порядок: часто нужные сперва). 0 — эффекты, S — свойства сэмпла (item),
 -- Z — песня. Единственный список кодов для ввода, меню и подсказок
 SM.FX = {
-  { '0S', 'slice xx / sample offset xx/256' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
+  { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
   { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
   { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
   { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0O', 'volume down xx/256 per row' },
@@ -285,13 +285,13 @@ SM.FX = {
   { 'ZT', 'tempo: BPM = xx' }, { 'ZJ', 'jump to sequence slot xx' },
 }
 -- 12 окт: короткие имена — список команд читается словами (0U pitch up), не только кодами
-SM.FX_NAME = { ['0S'] = 'slice', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
+SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 -- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
 local function st(x) return ('%+.2f'):format(x):gsub('0+$', ''):gsub('%.$', '') end
 SM.FX_MEAN = {
-  ['0S'] = function(v) return ('slice %d, or offset %d%% of the sample'):format(v, math.floor(v / 256 * 100 + 0.5)) end,
+  ['0S'] = function(v) return ('start at %d%% (sliced audio: slice %d)'):format(math.floor(v / 256 * 100 + 0.5), v) end,
   ['0M'] = function(v) return ('volume %d%%'):format(math.floor(v / 128 * 100 + 0.5)) end,
   ['0P'] = function(v) if v == 128 then return 'centre' end; return (v < 128 and 'left ' or 'right ') .. math.floor(math.abs(v - 128) / 128 * 100 + 0.5) .. '%' end,
   ['0U'] = function(v) return st(v / 16) .. ' semitone per row' end,
