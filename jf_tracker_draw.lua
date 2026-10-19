@@ -8132,7 +8132,7 @@ function D.frame(L, snap, rows, state, info)
                   local col2 = not kid and U.mix(U.LINE, U.PANEL, 0.5)
                     or (solo and (blink and U.GREEN or U.mix(U.GREEN, U.PANEL, 0.5)))
                     or (not kid.enabled and U.RED)
-                    or (ki == ks and U.YELLOW) or U.AMBER
+                    or (ki == ks and U.YELLOW) or U.mix(U.AMBER, U.PANEL, 0.4)   -- 19 окт: занятые темнее — соседи не сливаются, выбранный ярче
                   local hit2 = D.pad_hit and D.pad_hit[note]
                   if hit2 and reaper.time_precise() - hit2 < 0.25 then col2 = U.GREEN end
                   set(col2); gfx.rect(cxm, cym, cube, cube, kid and 1 or 0)
