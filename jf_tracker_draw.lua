@@ -2144,10 +2144,12 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if cell.kind == 'midi' or cell.kind == 'audio' then tick(cell, true) end
     for _, fh in ipairs(cell.fold) do tick(fh, false) end
     -- 19 окт: «+» перед нотой, в которой что-то сложено (как папка в lib: 01+)
-    local pw = ms('+')
-    local px = x + L.x_note - pw - 1
-    if px < x + 1 then px = x + L.x_note + ms('C-4') + 1 end   -- слева нет места — сразу за нотой
-    text(px, ty, '+', U.CYAN)
+    if cell.kind == 'midi' or cell.kind == 'audio' then   -- только у ноты (не у OFF / продолжения)
+      local pw = ms('+')
+      local px = x + L.x_note - pw - 1
+      if px < x + 1 then px = x + L.x_note + ms('C-4') + 1 end   -- слева нет места — сразу за нотой
+      text(px, ty, '+', U.CYAN)
+    end
     -- for _, fh in ipairs(cell.fold) do   -- линии в своё время внутри строки (пока выключено)
     --   local yy = y + math.max(1, math.min(L.rh - 2, math.floor((fh.delay or 0) / 256 * L.rh + 0.5)))
     --   set(fh.muted and U.GREY or U.TEXT); gfx.rect(x + L.x_note, yy, math.max(4, L.w_note), 1, 1)
