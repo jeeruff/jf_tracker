@@ -289,7 +289,7 @@ B.file_len = file_len
 local function fmatch(e, terms)
   local hay = (e.label or e.name):lower()
   local base = (e.name:match('[^/]+$') or e.name):lower()
-  local total = 0
+  local total, exact = 0, true
   for _, t0 in ipairs(terms) do
     local t, neg = t0, false
     if t:sub(1, 1) == '!' or (t:sub(1, 1) == '-' and #t > 1) then neg, t = true, t:sub(2) end   -- 17 окт: -drum = !drum
@@ -303,11 +303,11 @@ local function fmatch(e, terms)
     elseif t:sub(1, 1) == "'" then sc = hay:find(t:sub(2), 1, true) and 10 or nil
     elseif t:sub(1, 1) == '^' then sc = (base:sub(1, #t - 1) == t:sub(2)) and 10 or nil
     elseif #t > 1 and t:sub(-1) == '$' then local s = t:sub(1, -2); sc = (base:sub(-#s) == s) and 10 or nil
-    else sc = fz(hay, t) end
+    else sc = fz(hay, t); if sc and not hay:find(t, 1, true) then exact = false end end   -- 19 окт: подстрока — точное совпадение
     if neg then if sc then return nil end
     else if not sc then return nil end; total = total + sc end
   end
-  return total
+  return total, exact
 end
 
 B.findidx = {}
@@ -356,11 +356,13 @@ function B.set_all(list)
     local terms = {}
     for t in q:gmatch('%S+') do terms[#terms + 1] = t end
     table.sort(terms, function(a, b) local la, lb = a:match('^[<>]') ~= nil, b:match('^[<>]') ~= nil; return (not la) and lb end)   -- 17 окт: длина — последней (файл открывается только у совпавших по словам)
-    local hits = {}
+    local hits, ex = {}, {}
     for _, e in ipairs(src) do
-      local sc = fmatch(e, terms)
-      if sc then hits[#hits + 1] = { e = e, sc = sc } end
+      local sc, exact = fmatch(e, terms)
+      if sc then hits[#hits + 1] = { e = e, sc = sc }; if exact then ex[#ex + 1] = hits[#hits] end end
     end
+    -- 19 окт: есть совпадения подстрокой (alarm в имени) — только они; нечёткое (a…l…a…r…m) — когда точных нет
+    if #ex > 0 then hits = ex end
     table.sort(hits, function(a, b) return a.sc > b.sc end)
     B.entries = {}
     for i = 1, math.min(#hits, 3000) do B.entries[i] = hits[i].e end
@@ -972,6 +974,7 @@ function B.preview()
   if pth then ctx.preview_file(pth) end
 end
 
+function B.refilter_soon() if R.time_precise then B.filter_due = R.time_precise() + 0.25 else B.set_all(B.all) end end
 -- клавиши в фокусе браузера; true — съедена
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
@@ -979,11 +982,11 @@ function B.key(c)
     -- набор запроса: символы сужают список (fzf), стрелки ходят по результатам,
     -- Enter — закончить набор (результаты остаются), Esc — сбросить, BS — стереть
     if c == 27 then B.filtering = false; B.filter = ''; B.set_all(B.all)
-    elseif c == 13 then B.filtering = false
+    elseif c == 13 then B.filtering = false; if B.filter_due then B.filter_due = nil; B.set_all(B.all) end
     elseif c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
     elseif c == 30064 then B.cur = math.max(1, B.cur - 1)
-    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.cur = 1; B.set_all(B.all)
-    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.cur = 1; B.set_all(B.all)
+    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.cur = 1; B.refilter_soon()   -- 19 окт: ищем, когда набор замер на 0.25 с
+    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.cur = 1; B.refilter_soon()
     else return false end
     return true
   end
@@ -1050,6 +1053,7 @@ function B.draw_marks(btn, bx, by, U)
 end
 
 function B.draw(U, L, x, y, w, h)
+  if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end   -- 19 окт: поиск после паузы набора
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover

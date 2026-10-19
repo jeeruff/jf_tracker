@@ -436,15 +436,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local ah = nrow * (L.rh + 1) + 3
     local ax0, ax1, ay = L.pad, W - L.pad - 4, ybot - ah + 2
     -- 19 окт: под аранжировкой — плейлист песни (секции по порядку)
-    if ctx.spl_draw and ybot - ah - L.rh - 2 > hy + 6 * L.rh then
-      local phv = ctx.spl_draw(L, ax0, ybot - L.rh - 1, ax1 - ax0)
+    local plh = 0
+    if ctx.spl_draw and ybot - ah - L.rh - 2 > hy + 6 * L.rh then   -- 19 окт: плейлист — над аранжировкой
+      local phv = ctx.spl_draw(L, ax0, ybot - ah - L.rh, ax1 - ax0)
       for k, v in pairs(phv) do hover[k] = v end
-      ybot = ybot - L.rh - 2
-      ay = ybot - ah + 2
+      plh = L.rh + 2
     end
     if ybot - ah > hy + 6 * L.rh then
-      U.set(U.LINE); gfx.rect(0, ybot - ah, W - 4, 1, 1)
-      ybot = ybot - ah
+      U.set(U.LINE); gfx.rect(0, ybot - ah - plh, W - 4, 1, 1)
+      ybot = ybot - ah - plh
     else nrow = 0 end
     local an, ac, anum = nil, 0, 0
     if ctx.arr_name then an, ac, anum = ctx.arr_name() end

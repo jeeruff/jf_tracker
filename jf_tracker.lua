@@ -21068,8 +21068,17 @@ local function frame()
     elseif hover.matrix and hover.matrix.splbtn then   -- 19 окт: плейлист песни (секции)
       local b = hover.matrix.splbtn
       if b == 'pick' then ctx.spl_pick() elseif b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.spl_play() end
-      else ctx.spl_set(''); vim.msg = 'playlist: cleared' end
+      elseif ctx.mods().shift then ctx.spl_set(''); vim.msg = 'playlist: cleared'
+      else ctx.spl_set((ctx.spl_text():gsub('%s*%S+%s*$', ''))); vim.msg = 'playlist: the last one removed (Shift+x - all)' end
       click = { t = now2, zone = 'splbtn' }
+    elseif hover.matrix and hover.matrix.splword then   -- 19 окт: секция плейлиста — играть с неё
+      local words = {}
+      for wd in ctx.spl_text():gmatch('%S+') do words[#words + 1] = wd end
+      local k = hover.matrix.splword
+      local rest = table.concat(words, ' ', k)
+      local steps, _, errs = ctx.PL.parse(rest, ctx.spl_find)
+      if #steps > 0 then ctx.pl_play(steps, errs); vim.msg = 'playlist from ' .. words[k] end
+      click = { t = now2, zone = 'splword' }
     elseif hover.matrix and hover.matrix.chainbtn then   -- 19 окт: строка chain
       local b = hover.matrix.chainbtn
       if b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.pl_play() end
@@ -24620,7 +24629,7 @@ ctx.spl_set = function(t) reaper.SetProjExtState(0, EXT, 'songpl', t); reaper.Ma
 ctx.spl_find = function(ref)
   local pats, secs = ctx.pl_song()
   local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
-  local n, lo = tonumber(ref), ref:lower()
+  local n, lo = tonumber(ref), ref:lower():gsub('_', ' ')
   for _, s2 in ipairs(secs) do
     if (n and s2.idx == n) or (not n and s2.name:lower() == lo) then
       local o = {}
@@ -24636,7 +24645,7 @@ ctx.spl_pick = function()
   if #labels == 0 then vim.msg = 'playlist: no sections yet (Tr in the matrix makes one)'; return end
   ctx.choice_pick('playlist: add a section (the song order)', '', labels, function(v)
     if (v or '') == '' then return end
-    local t = (ctx.spl_text() .. ' ' .. v):gsub('^%s+', '')
+    local t = (ctx.spl_text() .. ' ' .. v:gsub('%s+', '_')):gsub('^%s+', '')   -- пробел в имени секции — _ (слова плейлиста через пробел)
     ctx.spl_set(t); vim.msg = 'playlist: ' .. t
   end)
 end
@@ -24646,20 +24655,31 @@ ctx.spl_play = function()
   ctx.pl_play(steps, errs)
 end
 ctx.spl_draw = function(Lx, x, y, w)
+  -- 19 окт: только имена секций в ряд (цветом секции); щелчок — играть с неё, + — добавить, x — убрать последнюю (Shift — все)
   local hv = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local text = ctx.spl_text()
-  U.text(x, y + 1, 'playlist', U.GREY)
-  local bx = x + U.measure('playlist ') + Lx.pad
-  local bw2 = (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 4
-  local tw = math.max(Lx.cw * 4, x + w - bx - bw2)
-  local ht = mx >= bx and mx < bx + tw and my >= y and my < y + Lx.rh
-  U.set(ht and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(bx, y, tw, Lx.rh, 1)
-  U.set(U.LINE); gfx.rect(bx, y, tw, Lx.rh, 0)
-  U.text(bx + Lx.pad, y + 1, ctx.fit(text ~= '' and text or 'click - add sections in the song order', tw - 2 * Lx.pad), text ~= '' and U.TEXT or U.DIM)
-  if ht then hv.splbtn = 'pick' end
-  local cx = bx + tw + 2
-  for _, b in ipairs({ { '>', 'play' }, { 'x', 'clear' } }) do
+  local words = {}
+  for wd in ctx.spl_text():gmatch('%S+') do words[#words + 1] = wd end
+  local col = {}
+  for _, s2 in ipairs(regions.sections or {}) do col[s2.name:gsub('%s+', '_')] = s2.color end
+  local bx = x
+  local tail = (U.measure('+') + 2 * Lx.pad) + (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 6
+  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: + adds sections in the song order', w - tail), U.DIM) end
+  for k, wd in ipairs(words) do
+    local lab = wd:gsub('_', ' ')
+    local bw = U.measure(lab) + 2 * Lx.pad
+    if bx + bw > x + w - tail then U.text(bx, y + 1, '…', U.GREY); break end
+    local c = col[wd] and col[wd] ~= 0 and ctx.region_rgb and ctx.region_rgb(col[wd]) or U.CYAN
+    local playing = ctx.PLY and ctx.spl_on and ctx.spl_on == k
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+    U.set(U.tint(c, (hot or playing) and 0.45 or 0.25)); gfx.rect(bx, y, bw, Lx.rh, 1)
+    U.set(c); gfx.rect(bx, y, bw, Lx.rh, 0)
+    U.text(bx + Lx.pad, y + 1, lab, hot and U.AMBER or U.TEXT)
+    if hot then hv.splword = k end
+    bx = bx + bw + 2
+  end
+  local cx = x + w - tail + 6
+  for _, b in ipairs({ { '+', 'pick' }, { '>', 'play' }, { 'x', 'clear' } }) do
     local bw = U.measure(b[1]) + 2 * Lx.pad
     local hot = mx >= cx and mx < cx + bw and my >= y and my < y + Lx.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y, bw, Lx.rh, 1)
