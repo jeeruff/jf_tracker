@@ -23535,7 +23535,7 @@ local function frame()
         if (state.ss_big or MX.clips) and MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then return end
         -- 19 окт: clipkb прямо в матрице: 1qaz 2wsx … — столбец трек, ряд — видимый слот; Shift — набор из разных
         -- паттернов, отпустил — звучат вместе; Enter — render (новый паттерн из набранного); Ctrl — тишина; Esc — выкл
-        if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render them as a new pattern, Ctrl - silence, Esc - off'; return end
+        if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render, arrows / [ ] - other rows, Esc - off (letters are cells now, c too)'; return end
         if MX.pal_kb and c == 13 then ctx.palette_render(); return end
         if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
@@ -24386,6 +24386,15 @@ ctx.palette_key = function(c)
   if c == 27 then MX.pal_kb, MX.pal_pick = false, {}; ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette clipkb off'; return true end
   local SH = { ['!'] = '1', ['@'] = '2', ['#'] = '3', ['$'] = '4', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['*'] = '8', ['('] = '9', [')'] = '0', ['<'] = ',', ['>'] = '.', [':'] = ';', ['?'] = '/' }
   if ch == ':' then return false end            -- : — строка команды, не Shift+; палитры
+  -- 19 окт: в clipkb все буквы — клетки (и c, и h j k l), выход — Esc; окно 4 рядов: стрелки вверх / вниз — ряд, [ ] — 4 ряда, влево / вправо — трек
+  local inmx = state.focus == 'matrix'
+  local dr = (c == 30064 and -1) or (c == 1685026670 and 1) or (ch == '[' and -4) or (ch == ']' and 4) or nil
+  if dr then
+    if inmx then MX.scroll = math.max(0, math.min(math.max(0, #seq - 1), (MX.scroll or 0) + dr)); MX.cur.ri = math.max(1, math.min(#seq, MX.cur.ri + dr))
+    else MX.pal_scroll = math.max(0, (MX.pal_scroll or 0) + dr) end
+    vim.msg = 'clipkb: rows moved (arrows / [ ]), Esc - off'; return true
+  end
+  if c == 1818584692 or c == 1919379572 then MX.hs = math.max(0, (MX.hs or 0) + (c == 1919379572 and 1 or -1)); vim.msg = 'clipkb: tracks moved'; return true end
   local base = SH[ch] or ch:lower()
   local shift = m.shift or SH[ch] ~= nil or ch:match('%u') ~= nil
   local k, r = MX.SS.kb_pos(base)

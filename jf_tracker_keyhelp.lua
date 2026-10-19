@@ -250,7 +250,7 @@ KH.PAGES = {
   matrix = { title = 'matrix of regions (slots)', e = {
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
     { k = 'gg G', d = 'first slot / last slot' },
-    { k = 'c (clipkb)', t = {}, d = 'clipkb right in the matrix: 1qaz 2wsx 3edc ... - column = track, row = a visible slot; a key - hear that cell, Shift + keys - pick cells of any patterns, let go of Shift - they play together in a loop, Enter - render them as a new pattern, Ctrl + key - silence, Esc - off' },
+    { k = 'c (clipkb)', t = {}, d = 'clipkb right in the matrix: 1qaz 2wsx 3edc ... - column = track, row = a visible slot; a key - hear that cell, Shift + keys - pick cells of any patterns, let go of Shift - they play together in a loop, Enter - render them as a new pattern, Ctrl + key - silence, arrows up / down - a row, [ ] - 4 rows, left / right - tracks; every letter is a cell now (c too) - Esc - off' },
     { k = 'Ctrl+Cmd (trackpad)', t = {}, d = 'jog / scrub: slide along a slot row - the pattern loops and plays from that place (to the tracker row); another row - another pattern; let go - stop, loop and cursor as before' },
     { k = 'patterns (pane)', t = {}, d = 'the palette of every pattern is its own pane above the matrix (Ctrl+W T, gtT): c - clipkb (1qaz… = track, row = pattern; Shift picks, Ctrl silence, Esc off), j k scroll, hold a cell - listen; render / +playlist / rec as before' },
     { k = 'c', g = 'view', d = 'palette on (view p): clipkb - the keyboard columns 1qaz 2wsx ... are the tracks, the rows the palette rows: a key - listen to that cell (again - silence), Shift + keys - pick (render - a new pattern of them at the end, +playlist), Ctrl - silence, Esc - off' },
