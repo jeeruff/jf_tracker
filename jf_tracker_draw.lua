@@ -7672,6 +7672,11 @@ function D.frame(L, snap, rows, state, info)
       local room = right
       if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = math.max(1, math.floor((room - bx) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       local bw = bw1 * ncol
+      -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
+      if f.kit and D.DR and info.dsp_zoomed then
+        local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+        if ((D.kit_list or {})[kk] or 'list') == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
+      end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
       local vtw = (f.pages and f.page) and (L.th + 2 * L.pad + 2) or 0
       bw = bw + vtw
@@ -7844,7 +7849,7 @@ function D.frame(L, snap, rows, state, info)
           -- выбрать; справа свойства выбранного слайса тем же модулем RS5K. all — общий
           -- контроль: показаны параметры первого слайса, запись идёт на все (ctx.fx_write)
           D.kit_sel = D.kit_sel or {}
-          local kkey = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.i)
+          local kkey = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)   -- 19 окт: GUID рэка, не номер
           local ks = math.max(0, math.min(#f.kids, D.kit_sel[kkey] or 0))
           f.kit_all = ks == 0
           set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
@@ -7854,6 +7859,77 @@ function D.frame(L, snap, rows, state, info)
               if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return vals[pi] and vals[pi].s or '' end
             end
             return ''
+          end
+          -- 19 окт: рэк на всё окно (zz) — вкладки pads | list; list — таблица всех пэдов со всеми параметрами
+          D.kit_list = D.kit_list or {}
+          local zoomed = info.dsp_zoomed
+          if D.DR and zoomed then
+            local tx2 = bx + bw - L.pad
+            for _, tb in ipairs({ { 'list', 'list' }, { 'pads', 'pads' } }) do
+              local w2 = ms(tb[1]) + 2 * L.pad
+              tx2 = tx2 - w2 - 2
+              local on = (D.kit_list[kkey] or 'list') == tb[2]
+              local ht = not drag and mx >= tx2 and mx < tx2 + w2 and my >= by and my < by + L.rh
+              set(on and U.tint(U.AMBER, 0.3) or (ht and D.CURROW or U.BG)); gfx.rect(tx2, by, w2, L.rh - 1, 1)
+              set(on and U.AMBER or U.LINE); gfx.rect(tx2, by, w2, L.rh - 1, 0)
+              text(tx2 + L.pad, by, tb[1], on and U.AMBER or U.GREY)
+              if ht then hover.dspbtn = { fx = k, f = f, what = 'kview', view = tb[2], key = kkey } end
+            end
+          end
+          if D.DR and zoomed and (D.kit_list[kkey] or 'list') == 'list' then
+            local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 14 }, { 'vol', 'volume', 7 }, { 'pan', 'pan', 6 }, { 'pitch', 'pitch', 7 },
+              { 'att', 'attack', 6 }, { 'dec', 'decay', 6 }, { 'sus', 'sustain', 6 }, { 'rel', 'release', 6 },
+              { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'g', 'g', 4 }, { 'cg', 'cg', 4 }, { 'on', 'on', 4 } }
+            local tot = 0
+            for _, c2 in ipairs(COLS) do tot = tot + c2[3] end
+            local cwx = math.max(L.cw, math.floor((bw - 2 * L.pad) / tot))
+            local ly0 = hy
+            local xh = bx + L.pad
+            for _, c2 in ipairs(COLS) do text(xh, ly0, fit(c2[1], c2[3] * cwx - L.pad), U.GREY); xh = xh + c2[3] * cwx end
+            set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bw - 2 * L.pad, 1, 1)
+            local function pidx(ki, want)
+              for pi, p in ipairs(f.params) do if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return pi end end
+            end
+            local nrow = math.max(1, math.floor((by + bh - ly0 - L.rh - 4) / L.rh))
+            D.kit_lscroll = D.kit_lscroll or {}
+            local sc = math.max(0, math.min(#f.kids - nrow, D.kit_lscroll[kkey] or 0))
+            if ks > 0 and ks - 1 < sc then sc = ks - 1 elseif ks > sc + nrow then sc = ks - nrow end
+            D.kit_lscroll[kkey] = sc
+            for r = 1, nrow do
+              local ki = sc + r
+              local kid = f.kids[ki]
+              if not kid then break end
+              local ry = ly0 + L.rh + 2 + (r - 1) * L.rh
+              local on = ki == ks
+              local hotr = not drag and mx >= bx and mx < bx + bw and my >= ry and my < ry + L.rh
+              local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
+              local flash = hit and reaper.time_precise() - hit < 0.25
+              if flash then set(U.tint(U.GREEN, 0.35)); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1)
+              elseif on or hotr then set(on and U.tint(U.AMBER, 0.28) or D.CURROW); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1) end
+              local x2 = bx + L.pad
+              for _, c2 in ipairs(COLS) do
+                local cw3 = c2[3] * cwx
+                local s2, col2, what = '', kid.enabled and U.TEXT or U.DIM, nil
+                if c2[1] == 'name' then s2 = kid.name or ''
+                elseif c2[1] == 'note' then local nn = kid.note; s2 = nn and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[nn % 12 + 1] .. math.max(0, nn // 12 - 1)) or '---'
+                elseif c2[1] == 'g' then s2 = (kid.group or 0) > 0 and ('g' .. kid.group) or '-'; col2 = (kid.group or 0) > 0 and U.CYAN or U.DIM; what = 'kgroup'
+                elseif c2[1] == 'cg' then s2 = (kid.choke or 0) > 0 and ('c' .. kid.choke) or '-'; col2 = (kid.choke or 0) > 0 and U.RED or U.DIM; what = 'kchoke'
+                elseif c2[1] == 'on' then s2 = kid.enabled and 'on' or 'off'; col2 = kid.enabled and U.GREEN or U.RED; what = 'kbypass'
+                else s2 = kv(ki, c2[2]) end
+                local hc = hotr and mx >= x2 and mx < x2 + cw3
+                text(x2, ry, fit(s2, cw3 - L.pad), hc and U.AMBER or (on and c2[1] == 'name' and U.AMBER or col2))
+                if hc then
+                  if what then hover.dspbtn = { fx = k, f = f, what = what, kid = kid, ki = ki }
+                  elseif c2[2] and c2[1] ~= 'note' then hover.kitcell = { k = k, pi = pidx(ki, c2[2]), ki = ki, key = kkey } end
+                end
+                x2 = x2 + cw3
+              end
+              if hotr and not hover.dspbtn and not hover.kitcell then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+            end
+            D.kit_lkey = kkey; D.vbar('kitlist', bx, ly0 + L.rh + 2, bw - 2, nrow * L.rh, sc, nrow, #f.kids)
+            cl = {}
+            for pi in ipairs(f.params) do cl[pi] = { 99, 0 } end
+            goto kit_done
           end
           if D.DR then
             -- 16 окт: drumrs5k — сетка пэдов вместо списка: шапка «all · N pads · cell: …»,
@@ -7889,7 +7965,7 @@ function D.frame(L, snap, rows, state, info)
             -- 18 окт (2): кубик = нота MIDI 0..127, снизу вверх по 4 в ряду (как пэды MPC / drum rack): ряд — 4 ноты,
             -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
             -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
-            local side = math.max(3 * L.rh + 6, math.min(gw // 4, gh // 4))
+            local side = math.min(gw // 4, math.max(3 * L.rh + 6, gh // 4))   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
             local G = { cols = 4, cw = side, ch = side }
             G.fit = math.max(1, math.min(4, gh // G.ch))
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
@@ -7976,12 +8052,14 @@ function D.frame(L, snap, rows, state, info)
                 local nm = kid.name or ''
                 nm = nm:match('^S%x%x%s+(.+)$') and nm:match('^(S%x%x)') or nm        -- «S01 kick» → S01 (имя сэмпла у всех одно)
                 local tag = #(kid.slots or {}) > 0 and ('+' .. #kid.slots) or ''
-                if (kid.group or 0) > 0 then tag = ('g%d'):format(kid.group) .. (tag ~= '' and (' ' .. tag) or '') end   -- 18 окт: mute group
+                -- 19 окт: на пэде — его группы: g1 (играют вместе), c1 (choke)
+                local gtag = ((kid.group or 0) > 0 and ('g' .. kid.group) or '') .. ((kid.choke or 0) > 0 and (((kid.group or 0) > 0 and ' ' or '') .. 'c' .. kid.choke) or '')
+                if gtag ~= '' then tag = gtag .. (tag ~= '' and (' ' .. tag) or '') end
                 local tw = ms(tag)
                 text(cx0 + L.pad, cy0 + 1, fit((kid.enabled and '' or '(off) ') .. nm, cw0 - 2 * L.pad - (tw > 0 and tw + L.pad or 0)), fg)
                 if tw > 0 then text(cx0 + cw0 - L.pad - tw, cy0 + 1, tag, U.CYAN) end
                 -- 19 окт: нижний ряд пэда — m (mute) слева, > (послушать) шире посередине, s (solo) справа
-                do
+                if ch0 >= 3 * L.rh then   -- 19 окт: мелкий пэд — без кнопок (не наезжают на имя)
                   local byb = cy0 + ch0 - L.rh - 1
                   local wm = ms('m') + 2 * L.pad
                   local bxs = { { 'm', 'kpm', cx0 + 2, wm }, { '>', 'kpp', cx0 + 2 + wm + 2, cw0 - 2 * wm - 8 }, { 's', 'kps', cx0 + cw0 - 2 - wm, wm } }
@@ -7998,7 +8076,7 @@ function D.frame(L, snap, rows, state, info)
                     end
                   end
                 end
-                local ay, ah2 = cy0 + L.rh + 1, ch0 - 2 * L.rh - 3
+                local ay, ah2 = cy0 + L.rh + 1, ch0 - (ch0 >= 3 * L.rh and 2 or 1) * L.rh - 3
                 if cm == 'wave' or cm == 'spec' then
                   local npx = cw0 - 4
                   local pk = kid.file and npx > 4 and ah2 > 3 and info.file_peaks and info.file_peaks(kid.file, npx, kid.pad_a, kid.pad_b, cm == 'spec')
@@ -8067,23 +8145,27 @@ function D.frame(L, snap, rows, state, info)
               text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
               if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
             end
-            -- 18 окт: mute group пэда — g (без группы) / g1..g16; щелчок — выпадашка групп
+            -- 19 окт: g — group (пэды группы звучат вместе), cg — choke group (обрывают друг друга); щелчок — выпадашка
             local gw = 0
             if D.DR and kid.note then
-              local gl = (kid.group or 0) > 0 and ('g' .. kid.group) or 'g'
-              gw = ms('g16') + 2 * L.pad
-              local gx = cx + bw1 - 2 * kb2 - 3 - gw - 2
-              local hb = not drag and mx >= gx and mx < gx + gw and my >= hy and my < hy + L.rh
-              local lit = (kid.group or 0) > 0
-              set(hb and U.tint(U.AMBER, 0.35) or (lit and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(gx, hy, gw, L.rh - 1, 1)
-              set(hb and U.AMBER or (lit and U.CYAN or U.LINE)); gfx.rect(gx, hy, gw, L.rh - 1, 0)
-              text(gx + math.floor((gw - ms(gl)) / 2), hy, gl, hb and U.AMBER or (lit and U.CYAN or U.GREY))
-              if hb then hover.dspbtn = { fx = k, f = f, what = 'kgroup', kid = kid } end
-              hint('kgroup', gx, hy, gw, L.rh, { kid = kid })
-              gw = gw + 2
+              local gx = cx + bw1 - 2 * kb2 - 3
+              for _, gb in ipairs({ { 'kchoke', 'cg', kid.choke, U.RED }, { 'kgroup', 'g', kid.group, U.CYAN } }) do
+                local n = gb[3] or 0
+                local gl = n > 0 and (gb[2] .. n) or gb[2]
+                local bw2 = ms(gb[2] .. '16') + 2 * L.pad
+                gx = gx - bw2 - 2
+                local hb = not drag and mx >= gx and mx < gx + bw2 and my >= hy and my < hy + L.rh
+                set(hb and U.tint(U.AMBER, 0.35) or (n > 0 and U.tint(gb[4], 0.25) or U.BG)); gfx.rect(gx, hy, bw2, L.rh - 1, 1)
+                set(hb and U.AMBER or (n > 0 and gb[4] or U.LINE)); gfx.rect(gx, hy, bw2, L.rh - 1, 0)
+                text(gx + math.floor((bw2 - ms(gl)) / 2), hy, gl, hb and U.AMBER or (n > 0 and gb[4] or U.GREY))
+                if hb then hover.dspbtn = { fx = k, f = f, what = gb[1], kid = kid } end
+                hint(gb[1], gx, hy, bw2, L.rh, { kid = kid })
+                gw = gw + bw2 + 2
+              end
+              gw = gw - 2
               -- 19 окт: r — ячейка в роутере: слои инструментов и эффектов параллельно, контейнеры внутри
               local rw = ms('r') + 2 * L.pad
-              local rx = gx - rw - 2
+              local rx = gx - rw - 2   -- левее g / cg
               local hr = not drag and mx >= rx and mx < rx + rw and my >= hy and my < hy + L.rh
               local nested = kid.entry and kid.entry.container
               set(hr and U.tint(U.AMBER, 0.35) or (nested and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(rx, hy, rw, L.rh - 1, 1)
@@ -8167,6 +8249,7 @@ function D.frame(L, snap, rows, state, info)
           for pi, p in ipairs(f.params) do
             if p.kid == show and not p.macro then cl[pi] = { 1, cnt }; cnt = cnt + 1 else cl[pi] = { 99, 0 } end
           end
+          ::kit_done::
         elseif #f.kids > 0 and ncol >= (f.cols or 1) then
           -- развёрнут (6 окт): контейнер — рамка, внутри колонка на каждый
           -- плагин: имя (| за предыдущим, = параллельно, + с суммой) и его

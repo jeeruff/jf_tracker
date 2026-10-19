@@ -1,163 +1,301 @@
-desc:jf_tracker_choke (mute groups for drumrs5k pads: a hit in a group cuts the pad sounding in it)
+desc:jf_tracker_choke (drumrs5k pad groups: g - pads of a group play together, cg - a hit cuts the pad sounding in its choke group)
 //tags: MIDI processing
 //author: jeeruff
 
-// Mute groups (choke) для drumrs5k (18 окт). Как стоковый MIDI Choke Group (Cockos), но группа — у каждой ноты
-// своя (стоковый умеет только сплошной диапазон нот): слайдер N+1 — группа ноты N (0 — без группы, 1..16).
-// Нота-он в группе → нота-офф звучащей ноте этой группы (RS5K пэда с «Obey note-offs» её обрывает);
-// свои нота-оффы нот группы глушатся — пэд звучит, пока его не оборвёт следующий удар группы (как на драм-машине).
-// Слайдеры ставит трекер. Звук не трогает.
+// Группы пэдов drumrs5k (18–19 окт). Слайдер N+1 — choke-группа ноты N (cg: удар обрывает звучащую ноту
+// той же группы, её нота-оффы глушатся — пэд звучит до следующего удара; RS5K пэда — с Obey note-offs).
+// Слайдер 129+N — group ноты N (g: удар по одному пэду группы играет все её пэды — слой прямо в рэке).
+// Как стоковый MIDI Choke Group (Cockos), но группа — у каждой ноты. Слайдеры ставит трекер. Звук не трогает.
 
-slider1:0<0,16,1>-note 0 group
-slider2:0<0,16,1>-note 1 group
-slider3:0<0,16,1>-note 2 group
-slider4:0<0,16,1>-note 3 group
-slider5:0<0,16,1>-note 4 group
-slider6:0<0,16,1>-note 5 group
-slider7:0<0,16,1>-note 6 group
-slider8:0<0,16,1>-note 7 group
-slider9:0<0,16,1>-note 8 group
-slider10:0<0,16,1>-note 9 group
-slider11:0<0,16,1>-note 10 group
-slider12:0<0,16,1>-note 11 group
-slider13:0<0,16,1>-note 12 group
-slider14:0<0,16,1>-note 13 group
-slider15:0<0,16,1>-note 14 group
-slider16:0<0,16,1>-note 15 group
-slider17:0<0,16,1>-note 16 group
-slider18:0<0,16,1>-note 17 group
-slider19:0<0,16,1>-note 18 group
-slider20:0<0,16,1>-note 19 group
-slider21:0<0,16,1>-note 20 group
-slider22:0<0,16,1>-note 21 group
-slider23:0<0,16,1>-note 22 group
-slider24:0<0,16,1>-note 23 group
-slider25:0<0,16,1>-note 24 group
-slider26:0<0,16,1>-note 25 group
-slider27:0<0,16,1>-note 26 group
-slider28:0<0,16,1>-note 27 group
-slider29:0<0,16,1>-note 28 group
-slider30:0<0,16,1>-note 29 group
-slider31:0<0,16,1>-note 30 group
-slider32:0<0,16,1>-note 31 group
-slider33:0<0,16,1>-note 32 group
-slider34:0<0,16,1>-note 33 group
-slider35:0<0,16,1>-note 34 group
-slider36:0<0,16,1>-note 35 group
-slider37:0<0,16,1>-note 36 group
-slider38:0<0,16,1>-note 37 group
-slider39:0<0,16,1>-note 38 group
-slider40:0<0,16,1>-note 39 group
-slider41:0<0,16,1>-note 40 group
-slider42:0<0,16,1>-note 41 group
-slider43:0<0,16,1>-note 42 group
-slider44:0<0,16,1>-note 43 group
-slider45:0<0,16,1>-note 44 group
-slider46:0<0,16,1>-note 45 group
-slider47:0<0,16,1>-note 46 group
-slider48:0<0,16,1>-note 47 group
-slider49:0<0,16,1>-note 48 group
-slider50:0<0,16,1>-note 49 group
-slider51:0<0,16,1>-note 50 group
-slider52:0<0,16,1>-note 51 group
-slider53:0<0,16,1>-note 52 group
-slider54:0<0,16,1>-note 53 group
-slider55:0<0,16,1>-note 54 group
-slider56:0<0,16,1>-note 55 group
-slider57:0<0,16,1>-note 56 group
-slider58:0<0,16,1>-note 57 group
-slider59:0<0,16,1>-note 58 group
-slider60:0<0,16,1>-note 59 group
-slider61:0<0,16,1>-note 60 group
-slider62:0<0,16,1>-note 61 group
-slider63:0<0,16,1>-note 62 group
-slider64:0<0,16,1>-note 63 group
-slider65:0<0,16,1>-note 64 group
-slider66:0<0,16,1>-note 65 group
-slider67:0<0,16,1>-note 66 group
-slider68:0<0,16,1>-note 67 group
-slider69:0<0,16,1>-note 68 group
-slider70:0<0,16,1>-note 69 group
-slider71:0<0,16,1>-note 70 group
-slider72:0<0,16,1>-note 71 group
-slider73:0<0,16,1>-note 72 group
-slider74:0<0,16,1>-note 73 group
-slider75:0<0,16,1>-note 74 group
-slider76:0<0,16,1>-note 75 group
-slider77:0<0,16,1>-note 76 group
-slider78:0<0,16,1>-note 77 group
-slider79:0<0,16,1>-note 78 group
-slider80:0<0,16,1>-note 79 group
-slider81:0<0,16,1>-note 80 group
-slider82:0<0,16,1>-note 81 group
-slider83:0<0,16,1>-note 82 group
-slider84:0<0,16,1>-note 83 group
-slider85:0<0,16,1>-note 84 group
-slider86:0<0,16,1>-note 85 group
-slider87:0<0,16,1>-note 86 group
-slider88:0<0,16,1>-note 87 group
-slider89:0<0,16,1>-note 88 group
-slider90:0<0,16,1>-note 89 group
-slider91:0<0,16,1>-note 90 group
-slider92:0<0,16,1>-note 91 group
-slider93:0<0,16,1>-note 92 group
-slider94:0<0,16,1>-note 93 group
-slider95:0<0,16,1>-note 94 group
-slider96:0<0,16,1>-note 95 group
-slider97:0<0,16,1>-note 96 group
-slider98:0<0,16,1>-note 97 group
-slider99:0<0,16,1>-note 98 group
-slider100:0<0,16,1>-note 99 group
-slider101:0<0,16,1>-note 100 group
-slider102:0<0,16,1>-note 101 group
-slider103:0<0,16,1>-note 102 group
-slider104:0<0,16,1>-note 103 group
-slider105:0<0,16,1>-note 104 group
-slider106:0<0,16,1>-note 105 group
-slider107:0<0,16,1>-note 106 group
-slider108:0<0,16,1>-note 107 group
-slider109:0<0,16,1>-note 108 group
-slider110:0<0,16,1>-note 109 group
-slider111:0<0,16,1>-note 110 group
-slider112:0<0,16,1>-note 111 group
-slider113:0<0,16,1>-note 112 group
-slider114:0<0,16,1>-note 113 group
-slider115:0<0,16,1>-note 114 group
-slider116:0<0,16,1>-note 115 group
-slider117:0<0,16,1>-note 116 group
-slider118:0<0,16,1>-note 117 group
-slider119:0<0,16,1>-note 118 group
-slider120:0<0,16,1>-note 119 group
-slider121:0<0,16,1>-note 120 group
-slider122:0<0,16,1>-note 121 group
-slider123:0<0,16,1>-note 122 group
-slider124:0<0,16,1>-note 123 group
-slider125:0<0,16,1>-note 124 group
-slider126:0<0,16,1>-note 125 group
-slider127:0<0,16,1>-note 126 group
-slider128:0<0,16,1>-note 127 group
+slider1:0<0,16,1>-note 0 choke
+slider2:0<0,16,1>-note 1 choke
+slider3:0<0,16,1>-note 2 choke
+slider4:0<0,16,1>-note 3 choke
+slider5:0<0,16,1>-note 4 choke
+slider6:0<0,16,1>-note 5 choke
+slider7:0<0,16,1>-note 6 choke
+slider8:0<0,16,1>-note 7 choke
+slider9:0<0,16,1>-note 8 choke
+slider10:0<0,16,1>-note 9 choke
+slider11:0<0,16,1>-note 10 choke
+slider12:0<0,16,1>-note 11 choke
+slider13:0<0,16,1>-note 12 choke
+slider14:0<0,16,1>-note 13 choke
+slider15:0<0,16,1>-note 14 choke
+slider16:0<0,16,1>-note 15 choke
+slider17:0<0,16,1>-note 16 choke
+slider18:0<0,16,1>-note 17 choke
+slider19:0<0,16,1>-note 18 choke
+slider20:0<0,16,1>-note 19 choke
+slider21:0<0,16,1>-note 20 choke
+slider22:0<0,16,1>-note 21 choke
+slider23:0<0,16,1>-note 22 choke
+slider24:0<0,16,1>-note 23 choke
+slider25:0<0,16,1>-note 24 choke
+slider26:0<0,16,1>-note 25 choke
+slider27:0<0,16,1>-note 26 choke
+slider28:0<0,16,1>-note 27 choke
+slider29:0<0,16,1>-note 28 choke
+slider30:0<0,16,1>-note 29 choke
+slider31:0<0,16,1>-note 30 choke
+slider32:0<0,16,1>-note 31 choke
+slider33:0<0,16,1>-note 32 choke
+slider34:0<0,16,1>-note 33 choke
+slider35:0<0,16,1>-note 34 choke
+slider36:0<0,16,1>-note 35 choke
+slider37:0<0,16,1>-note 36 choke
+slider38:0<0,16,1>-note 37 choke
+slider39:0<0,16,1>-note 38 choke
+slider40:0<0,16,1>-note 39 choke
+slider41:0<0,16,1>-note 40 choke
+slider42:0<0,16,1>-note 41 choke
+slider43:0<0,16,1>-note 42 choke
+slider44:0<0,16,1>-note 43 choke
+slider45:0<0,16,1>-note 44 choke
+slider46:0<0,16,1>-note 45 choke
+slider47:0<0,16,1>-note 46 choke
+slider48:0<0,16,1>-note 47 choke
+slider49:0<0,16,1>-note 48 choke
+slider50:0<0,16,1>-note 49 choke
+slider51:0<0,16,1>-note 50 choke
+slider52:0<0,16,1>-note 51 choke
+slider53:0<0,16,1>-note 52 choke
+slider54:0<0,16,1>-note 53 choke
+slider55:0<0,16,1>-note 54 choke
+slider56:0<0,16,1>-note 55 choke
+slider57:0<0,16,1>-note 56 choke
+slider58:0<0,16,1>-note 57 choke
+slider59:0<0,16,1>-note 58 choke
+slider60:0<0,16,1>-note 59 choke
+slider61:0<0,16,1>-note 60 choke
+slider62:0<0,16,1>-note 61 choke
+slider63:0<0,16,1>-note 62 choke
+slider64:0<0,16,1>-note 63 choke
+slider65:0<0,16,1>-note 64 choke
+slider66:0<0,16,1>-note 65 choke
+slider67:0<0,16,1>-note 66 choke
+slider68:0<0,16,1>-note 67 choke
+slider69:0<0,16,1>-note 68 choke
+slider70:0<0,16,1>-note 69 choke
+slider71:0<0,16,1>-note 70 choke
+slider72:0<0,16,1>-note 71 choke
+slider73:0<0,16,1>-note 72 choke
+slider74:0<0,16,1>-note 73 choke
+slider75:0<0,16,1>-note 74 choke
+slider76:0<0,16,1>-note 75 choke
+slider77:0<0,16,1>-note 76 choke
+slider78:0<0,16,1>-note 77 choke
+slider79:0<0,16,1>-note 78 choke
+slider80:0<0,16,1>-note 79 choke
+slider81:0<0,16,1>-note 80 choke
+slider82:0<0,16,1>-note 81 choke
+slider83:0<0,16,1>-note 82 choke
+slider84:0<0,16,1>-note 83 choke
+slider85:0<0,16,1>-note 84 choke
+slider86:0<0,16,1>-note 85 choke
+slider87:0<0,16,1>-note 86 choke
+slider88:0<0,16,1>-note 87 choke
+slider89:0<0,16,1>-note 88 choke
+slider90:0<0,16,1>-note 89 choke
+slider91:0<0,16,1>-note 90 choke
+slider92:0<0,16,1>-note 91 choke
+slider93:0<0,16,1>-note 92 choke
+slider94:0<0,16,1>-note 93 choke
+slider95:0<0,16,1>-note 94 choke
+slider96:0<0,16,1>-note 95 choke
+slider97:0<0,16,1>-note 96 choke
+slider98:0<0,16,1>-note 97 choke
+slider99:0<0,16,1>-note 98 choke
+slider100:0<0,16,1>-note 99 choke
+slider101:0<0,16,1>-note 100 choke
+slider102:0<0,16,1>-note 101 choke
+slider103:0<0,16,1>-note 102 choke
+slider104:0<0,16,1>-note 103 choke
+slider105:0<0,16,1>-note 104 choke
+slider106:0<0,16,1>-note 105 choke
+slider107:0<0,16,1>-note 106 choke
+slider108:0<0,16,1>-note 107 choke
+slider109:0<0,16,1>-note 108 choke
+slider110:0<0,16,1>-note 109 choke
+slider111:0<0,16,1>-note 110 choke
+slider112:0<0,16,1>-note 111 choke
+slider113:0<0,16,1>-note 112 choke
+slider114:0<0,16,1>-note 113 choke
+slider115:0<0,16,1>-note 114 choke
+slider116:0<0,16,1>-note 115 choke
+slider117:0<0,16,1>-note 116 choke
+slider118:0<0,16,1>-note 117 choke
+slider119:0<0,16,1>-note 118 choke
+slider120:0<0,16,1>-note 119 choke
+slider121:0<0,16,1>-note 120 choke
+slider122:0<0,16,1>-note 121 choke
+slider123:0<0,16,1>-note 122 choke
+slider124:0<0,16,1>-note 123 choke
+slider125:0<0,16,1>-note 124 choke
+slider126:0<0,16,1>-note 125 choke
+slider127:0<0,16,1>-note 126 choke
+slider128:0<0,16,1>-note 127 choke
+slider129:0<0,16,1>-note 0 group
+slider130:0<0,16,1>-note 1 group
+slider131:0<0,16,1>-note 2 group
+slider132:0<0,16,1>-note 3 group
+slider133:0<0,16,1>-note 4 group
+slider134:0<0,16,1>-note 5 group
+slider135:0<0,16,1>-note 6 group
+slider136:0<0,16,1>-note 7 group
+slider137:0<0,16,1>-note 8 group
+slider138:0<0,16,1>-note 9 group
+slider139:0<0,16,1>-note 10 group
+slider140:0<0,16,1>-note 11 group
+slider141:0<0,16,1>-note 12 group
+slider142:0<0,16,1>-note 13 group
+slider143:0<0,16,1>-note 14 group
+slider144:0<0,16,1>-note 15 group
+slider145:0<0,16,1>-note 16 group
+slider146:0<0,16,1>-note 17 group
+slider147:0<0,16,1>-note 18 group
+slider148:0<0,16,1>-note 19 group
+slider149:0<0,16,1>-note 20 group
+slider150:0<0,16,1>-note 21 group
+slider151:0<0,16,1>-note 22 group
+slider152:0<0,16,1>-note 23 group
+slider153:0<0,16,1>-note 24 group
+slider154:0<0,16,1>-note 25 group
+slider155:0<0,16,1>-note 26 group
+slider156:0<0,16,1>-note 27 group
+slider157:0<0,16,1>-note 28 group
+slider158:0<0,16,1>-note 29 group
+slider159:0<0,16,1>-note 30 group
+slider160:0<0,16,1>-note 31 group
+slider161:0<0,16,1>-note 32 group
+slider162:0<0,16,1>-note 33 group
+slider163:0<0,16,1>-note 34 group
+slider164:0<0,16,1>-note 35 group
+slider165:0<0,16,1>-note 36 group
+slider166:0<0,16,1>-note 37 group
+slider167:0<0,16,1>-note 38 group
+slider168:0<0,16,1>-note 39 group
+slider169:0<0,16,1>-note 40 group
+slider170:0<0,16,1>-note 41 group
+slider171:0<0,16,1>-note 42 group
+slider172:0<0,16,1>-note 43 group
+slider173:0<0,16,1>-note 44 group
+slider174:0<0,16,1>-note 45 group
+slider175:0<0,16,1>-note 46 group
+slider176:0<0,16,1>-note 47 group
+slider177:0<0,16,1>-note 48 group
+slider178:0<0,16,1>-note 49 group
+slider179:0<0,16,1>-note 50 group
+slider180:0<0,16,1>-note 51 group
+slider181:0<0,16,1>-note 52 group
+slider182:0<0,16,1>-note 53 group
+slider183:0<0,16,1>-note 54 group
+slider184:0<0,16,1>-note 55 group
+slider185:0<0,16,1>-note 56 group
+slider186:0<0,16,1>-note 57 group
+slider187:0<0,16,1>-note 58 group
+slider188:0<0,16,1>-note 59 group
+slider189:0<0,16,1>-note 60 group
+slider190:0<0,16,1>-note 61 group
+slider191:0<0,16,1>-note 62 group
+slider192:0<0,16,1>-note 63 group
+slider193:0<0,16,1>-note 64 group
+slider194:0<0,16,1>-note 65 group
+slider195:0<0,16,1>-note 66 group
+slider196:0<0,16,1>-note 67 group
+slider197:0<0,16,1>-note 68 group
+slider198:0<0,16,1>-note 69 group
+slider199:0<0,16,1>-note 70 group
+slider200:0<0,16,1>-note 71 group
+slider201:0<0,16,1>-note 72 group
+slider202:0<0,16,1>-note 73 group
+slider203:0<0,16,1>-note 74 group
+slider204:0<0,16,1>-note 75 group
+slider205:0<0,16,1>-note 76 group
+slider206:0<0,16,1>-note 77 group
+slider207:0<0,16,1>-note 78 group
+slider208:0<0,16,1>-note 79 group
+slider209:0<0,16,1>-note 80 group
+slider210:0<0,16,1>-note 81 group
+slider211:0<0,16,1>-note 82 group
+slider212:0<0,16,1>-note 83 group
+slider213:0<0,16,1>-note 84 group
+slider214:0<0,16,1>-note 85 group
+slider215:0<0,16,1>-note 86 group
+slider216:0<0,16,1>-note 87 group
+slider217:0<0,16,1>-note 88 group
+slider218:0<0,16,1>-note 89 group
+slider219:0<0,16,1>-note 90 group
+slider220:0<0,16,1>-note 91 group
+slider221:0<0,16,1>-note 92 group
+slider222:0<0,16,1>-note 93 group
+slider223:0<0,16,1>-note 94 group
+slider224:0<0,16,1>-note 95 group
+slider225:0<0,16,1>-note 96 group
+slider226:0<0,16,1>-note 97 group
+slider227:0<0,16,1>-note 98 group
+slider228:0<0,16,1>-note 99 group
+slider229:0<0,16,1>-note 100 group
+slider230:0<0,16,1>-note 101 group
+slider231:0<0,16,1>-note 102 group
+slider232:0<0,16,1>-note 103 group
+slider233:0<0,16,1>-note 104 group
+slider234:0<0,16,1>-note 105 group
+slider235:0<0,16,1>-note 106 group
+slider236:0<0,16,1>-note 107 group
+slider237:0<0,16,1>-note 108 group
+slider238:0<0,16,1>-note 109 group
+slider239:0<0,16,1>-note 110 group
+slider240:0<0,16,1>-note 111 group
+slider241:0<0,16,1>-note 112 group
+slider242:0<0,16,1>-note 113 group
+slider243:0<0,16,1>-note 114 group
+slider244:0<0,16,1>-note 115 group
+slider245:0<0,16,1>-note 116 group
+slider246:0<0,16,1>-note 117 group
+slider247:0<0,16,1>-note 118 group
+slider248:0<0,16,1>-note 119 group
+slider249:0<0,16,1>-note 120 group
+slider250:0<0,16,1>-note 121 group
+slider251:0<0,16,1>-note 122 group
+slider252:0<0,16,1>-note 123 group
+slider253:0<0,16,1>-note 124 group
+slider254:0<0,16,1>-note 125 group
+slider255:0<0,16,1>-note 126 group
+slider256:0<0,16,1>-note 127 group
 
 in_pin:none
 out_pin:none
 
 @init
-cur = 0; curch = 32;
+cur = 0; curch = 32; held = 64;
 i = 0; loop(17, cur[i] = -1; curch[i] = 0; i += 1);
+i = 0; loop(128, held[i] = 0; i += 1);
+
+function hit(ofs, ch, n, v) local(c) (
+  c = slider(n + 1) | 0;
+  c > 0 ? (
+    cur[c] >= 0 ? midisend(ofs, 0x80 | curch[c], cur[c], 0);
+    cur[c] = n; curch[c] = ch;
+  );
+  midisend(ofs, 0x90 | ch, n, v);
+);
+function release(ofs, ch, n) (
+  (slider(n + 1) | 0) == 0 ? midisend(ofs, 0x80 | ch, n, 0);   // в choke-группе нота-офф глушится
+);
 
 @block
 while (midirecv(ofs, m1, m2, m3)) (
-  pass = 1;
   st = m1 & 0xF0; ch = m1 & 0x0F;
-  (st == 0x90 || st == 0x80) ? (
-    g = slider(m2 + 1) | 0;
+  st == 0x90 && m3 > 0 ? (
+    g = slider(m2 + 129) | 0;
     g > 0 ? (
-      st == 0x90 && m3 > 0 ? (
-        cur[g] >= 0 ? midisend(ofs, 0x80 | curch[g], cur[g], 0);
-        cur[g] = m2; curch[g] = ch;
-      ) : (
-        pass = 0;
-      );
-    );
-  );
-  pass ? midisend(ofs, m1, m2, m3);
+      k = 0; loop(128, (slider(k + 129) | 0) == g ? hit(ofs, ch, k, m3); k += 1);
+    ) : hit(ofs, ch, m2, m3);
+  ) : (st == 0x80 || (st == 0x90 && m3 == 0)) ? (
+    g = slider(m2 + 129) | 0;
+    g > 0 ? (
+      k = 0; loop(128, (slider(k + 129) | 0) == g ? release(ofs, ch, k); k += 1);
+    ) : release(ofs, ch, m2);
+  ) : midisend(ofs, m1, m2, m3);
 );

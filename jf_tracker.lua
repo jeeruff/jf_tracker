@@ -10684,6 +10684,7 @@ ctx = {
     elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
     elseif key == 'fxb' then FB.scroll = v; FB.cur = math.max(v + 1, math.min(v + (r and r.nvis or 1), FB.cur))
     elseif key == 'keyhelp' then KH.scroll = v
+    elseif key == 'kitlist' then draw.kit_lscroll = draw.kit_lscroll or {}; draw.kit_lscroll[draw.kit_lkey or ''] = v   -- 19 окт
     elseif key == 'notes' then NT.scroll = v   -- 19 окт: полоса notes тянется (курсор не возвращает её, пока сам не сдвинулся)
     elseif key == 'actions' then local AC = ctx.AC; AC.scroll = v; local nv = r and r.nvis or 1; AC.sel = math.max(v + 1, math.min(v + nv, AC.sel))   -- 16 окт
     elseif key == 'undotree' then   -- 15 окт: дерево undo держит прокрутку за выделенным — выделение в видимое
@@ -14960,7 +14961,7 @@ local function hint_go(t)
   elseif t.kind == 'dsprouting' and d == 'route' then ctx.dsp_big()
   elseif t.kind == 'dsptrkname' then ctx.dsptrack_toggle()
   elseif t.kind == 'tmpl' then ctx.tmpl_do(d)
-  elseif t.kind == 'kgroup' then ctx.pad_group_menu(d.kid)   -- 18 окт: mute group пэда
+  elseif t.kind == 'kgroup' or t.kind == 'kchoke' then ctx.pad_group_menu(d.kid, t.kind == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
   elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
@@ -18021,6 +18022,7 @@ local function frame()
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
+    dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
@@ -18619,6 +18621,15 @@ local function frame()
   })
   -- 19 окт: панель patterns — её hover там же, где палитра в матрице (щелчки и статус — одним кодом)
   if hover.patpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.patpane) do hover.matrix[k] = v end end
+  -- 19 окт: list рэка — колесо над значением меняет параметр пэда, щелчок — пэд выбран, параметр — в DSP
+  if hover.kitcell and hover.kitcell.pi then
+    if gfx.mouse_wheel ~= 0 then ctx.dsp_value(hover.kitcell.k, hover.kitcell.pi, gfx.mouse_wheel > 0 and 1 or -1, ctx.mods().shift); gfx.mouse_wheel = 0 end
+    if U.click then
+      draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.kitcell.key] = hover.kitcell.ki
+      dsp_sel.fx, dsp_sel.param = hover.kitcell.k, hover.kitcell.pi; ctx.set_focus('dsp'); DK.pads = nil
+      vim.msg = 'pad param: wheel / + - change it (Shift - coarse)'; U.click = false
+    end
+  end
   -- 15 окт: строка курсора — из этого кадра (курсор без фиксации ходит; прошлый кадр давал лупу с опозданием)
   if ctx.bigcur and draw.cur_y and draw.cur_y >= L.body_y and draw.cur_y + 2 * L.rh <= ctx.bigcur.yb then ctx.bigcur.yc = draw.cur_y end
   if ctx.bigcur then draw.bigcur(ctx.bigcur) end
@@ -19174,7 +19185,7 @@ local function frame()
   elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then
-    local KT = { kdel = ' - remove this plugin from the container', kgroup = ' - mute group: a hit cuts the other pads of the group (hi-hat open / closed)',
+    local KT = { kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
       kpm = ' - mute (= Opt+click on the pad)', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (KT[hover.dspbtn.what] or ' - bypass on / off')
@@ -20976,7 +20987,8 @@ local function frame()
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
-      elseif hover.dspbtn.what == 'kgroup' and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid)   -- 18 окт: mute group пэда
+      elseif hover.dspbtn.what == 'kview' then draw.kit_list = draw.kit_list or {}; draw.kit_list[hover.dspbtn.key] = hover.dspbtn.view   -- 19 окт: pads | list
+      elseif (hover.dspbtn.what == 'kgroup' or hover.dspbtn.what == 'kchoke') and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid, hover.dspbtn.what == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
       elseif (hover.dspbtn.what == 'kpm' or hover.dspbtn.what == 'kps') and hover.dspbtn.ki then
         ctx.pad_mute_solo(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kps')   -- 19 окт: m / s внизу пэда
       elseif hover.dspbtn.what == 'kroute' and hover.dspbtn.ki then ctx.pad_route(hover.dspbtn.f, hover.dspbtn.ki)   -- 19 окт: ячейка в роутере
@@ -23507,6 +23519,12 @@ local function frame()
           if root and MX.DB.key(c, root, o) then return end
           return vim.key(c)
         end
+        -- 19 окт: в режиме пэдов zz — рэк на всё окно (вкладки pads | list), а не роутер
+        if DK.pads and state.dsp_z and ch == 'z' and not DK.pending then
+          state.dsp_z = nil
+          ctx.pane_do(function() return draw.panes.zoom(state.panes, 'dsp') end, state.panes.zoom == 'dsp' and 'dsp back in its pane' or 'drumrs5k on the whole window: pads | list (zz - back)')
+          return
+        end
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
@@ -24441,22 +24459,28 @@ end
 -- 18 окт: пэд drumrs5k: mute — выкл / вкл (bypass), solo — включён только он (повтор — все включены). Один undo
 -- 18 окт: mute group пэда drumrs5k — выпадашка: off / 1..8 (удар в группе обрывает звучащий пэд той же группы:
 -- хэт закрытый / открытый). Группы держит jf_tracker_choke первым в цепочке — работает и без трекера
-ctx.pad_group_menu = function(kid)
+-- 19 окт: kind = 'group' (g: пэды группы звучат вместе — слой прямо в рэке) | 'choke' (cg: обрывают друг друга)
+ctx.pad_group_menu = function(kid, kind)
   local col = dsp_target()
   if not (col and kid and kid.note) then vim.msg = 'pad group: no pad note'; return end
+  local fld = kind == 'choke' and 'choke' or 'group'
   local used = {}
   for _, f in ipairs(col.fx or {}) do for _, kd in ipairs(f.kids or {}) do
-    if (kd.group or 0) > 0 then used[kd.group] = (used[kd.group] or 0) + 1 end
+    if (kd[fld] or 0) > 0 then used[kd[fld]] = (used[kd[fld]] or 0) + 1 end
   end end
   local labels = { 'off' }
   for g = 1, 8 do labels[#labels + 1] = used[g] and ('%d  (%d pad%s)'):format(g, used[g], used[g] == 1 and '' or 's') or tostring(g) end
-  local cur = (kid.group or 0) > 0 and labels[kid.group + 1] or 'off'
-  ctx.choice_pick(('mute group of %s - a hit cuts the other pads of its group'):format(kid.name or 'pad'), cur, labels, function(v)
+  local cur = (kid[fld] or 0) > 0 and labels[kid[fld] + 1] or 'off'
+  local title = fld == 'choke' and 'choke group (cg) of %s - a hit cuts the other pads of its choke group' or 'group (g) of %s - a hit plays every pad of its group together'
+  ctx.choice_pick(title:format(kid.name or 'pad'), cur, labels, function(v)
     local g = v == 'off' and 0 or tonumber((v or ''):match('^%s*(%d+)'))
     if not g or g < 0 or g > 16 then vim.msg = 'pad group: off or 1..16'; return end
-    if edit.drum_group(col.track, kid.note, kid.rs5k_i, g) then
-      vim.msg = g > 0 and ('%s: group %d - cuts / is cut by the pads of group %d (obeys note-offs)'):format(kid.name or 'pad', g, g)
-        or ((kid.name or 'pad') .. ': no group (plays its sample out)')
+    if edit.drum_group(col.track, kid.note, kid.rs5k_i, g, fld) then
+      if fld == 'choke' then
+        vim.msg = g > 0 and ('%s: choke group %d - cuts / is cut by the pads of cg %d (obeys note-offs)'):format(kid.name or 'pad', g, g) or ((kid.name or 'pad') .. ': no choke group (plays its sample out)')
+      else
+        vim.msg = g > 0 and ('%s: group %d - a hit on any pad of g %d plays them all'):format(kid.name or 'pad', g, g) or ((kid.name or 'pad') .. ': no group')
+      end
     else vim.msg = 'pad group: could not add jf_tracker_choke' end
   end)
 end
@@ -24698,7 +24722,7 @@ end
 ctx.pad_cur = function(k)
   local col, f = ctx.pad_rack(k)
   if not f then return end
-  local kkey = tostring(cur_col() and cur_col().guid or '') .. ':' .. tostring(f.i)
+  local kkey = tostring(cur_col() and cur_col().guid or '') .. ':' .. tostring(f.fguid or f.i)
   draw.kit_sel = draw.kit_sel or {}; draw.kit_note = draw.kit_note or {}
   local ki = draw.kit_sel[kkey] or 0
   local kid = ki > 0 and f.kids[ki] or nil
@@ -24763,6 +24787,10 @@ end
 ctx.pad_listen = function(k)
   local col, _, _, _, kid = ctx.pad_cur(k)
   if kid and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+end
+ctx.pad_group_cur = function(k, kind)
+  local _, _, _, _, kid = ctx.pad_cur(k)
+  if kid then ctx.pad_group_menu(kid, kind) else vim.msg = 'pads: no pad here' end
 end
 ctx.pad_route_cur = function(k)
   local _, f, _, ki = ctx.pad_cur(k)

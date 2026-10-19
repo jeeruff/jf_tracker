@@ -1466,7 +1466,9 @@ function build_one(tr, fx, out)
           kid.pad_b = pi.stop and A.GetParamNormalized(tr, rid, pi.stop) or 1
           kid.note = pi.note and math.floor(A.GetParamNormalized(tr, rid, pi.note) * 127 + 0.5) or nil
           -- 18 окт: mute group пэда — слайдер его ноты в jf_tracker_choke (0 — без группы)
-          kid.group = (chi and kid.note) and math.floor(A.GetParamNormalized(tr, chi, kid.note) * 16 + 0.5) or 0
+          kid.choke = (chi and kid.note) and math.floor(A.GetParamNormalized(tr, chi, kid.note) * 16 + 0.5) or 0
+          -- 19 окт: group (слайдер 129+ноты) — пэды группы звучат вместе (слой прямо в рэке)
+          kid.group = (chi and kid.note and A.GetNumParams(tr, chi) > 128 + kid.note) and math.floor(A.GetParamNormalized(tr, chi, 128 + kid.note) * 16 + 0.5) or 0
           kid.slots = {}
           if kid.entry and kid.entry.container then
             for gi, g in ipairs(kid.entry.kids or {}) do
@@ -1479,7 +1481,8 @@ function build_one(tr, fx, out)
         end
       end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
-                        cols = kit and 2 or math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m, kit = kit or nil }
+                        cols = kit and 2 or math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m, kit = kit or nil,
+                        fguid = A.GetFXGUID and A.GetFXGUID(tr, fx) or nil }   -- 19 окт: ключ курсора рэка (номер едет, когда чок встаёт первым)
     elseif um then
       -- пользовательский модуль (learn касанием): параметры по номерам
       for _, sp in ipairs(um.params or {}) do

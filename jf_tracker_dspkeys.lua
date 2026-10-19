@@ -18,7 +18,7 @@
 --   t            цепочка трека ↔ take FX инструмента (обрабатывает main)
 --   Enter на drumrs5k — режим пэдов (19 окт): h l нота ∓1, j k ряд (∓4), x вырезать пэд, yy взять,
 --                yp дубль на свободную ноту рядом, p вставить на ноту курсора, M mute, S solo,
---                Enter послушать, r пэд в роутере, Esc — обратно к эффектам
+--                Enter послушать, r пэд в роутере, G group (играют вместе), C choke group, Esc — обратно к эффектам
 -- Ожидающий оператор показывает продолжения в статусе (DK.pending_hint).
 --
 -- Без reaper.*: действия — ctx.dsp_* (main), тестируется стабами.
@@ -96,6 +96,7 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'M' or ch == 'S' then ctx.pad_ms(sel.fx, ch == 'S'); return true end
       if c == 13 then ctx.pad_listen(sel.fx); return true end
       if ch == 'r' then ctx.pad_route_cur(sel.fx); return true end
+      if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
   end
   -- 8 окт: режим слайдера параметра (f на параметр / щелчок): h l — значение
