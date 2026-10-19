@@ -4129,14 +4129,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if b[1] == 'tp_play' then pi = i end
     end
     local need = 0
-    if c.tpfull then   -- 19 окт: mark и rate — в конце третьей строки (колонки << и || — по своим знакам)
-      need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad + ms('mark') + 2 * L.pad + ms('x1.10') + L.pad + 3 * L.cw + 4
+    if c.tpfull then   -- 19 окт: mark под <<, rate под play, тоглы записи — правее play
+      TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
+      if pi then TW[pi] = math.max(TW[pi], ms('x1.10') + 2 * L.pad) end
+      need = ms('punch') + ms('pre') + ms('lib') + ms('slow*') + ms('rip*') + 10 * L.pad
+      local pre = -2
+      for i = 1, (pi or 2) do pre = pre + TW[i] + 2 end
+      need = pre + 2 + need
     end
+    D.tp_play_i = pi
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
     btot = -2
     for i = 1, #blist do btot = btot + TW[i] + 2 end
     -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
-    if need > 0 then btot = math.max(btot, need) end
+    if need > 0 then btot = math.max(btot, need) end   -- тоглы записи длиннее колонок справа от play — группа шире
   end
   local function draw_text_buttons(bx0)
     local bx = bx0
@@ -4230,13 +4236,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 16 окт: маркеры — кнопка markers (не влезло — mk), щелчок — выпадашка 1..0
       local any = false
       for k = 1, 10 do if c.marks and c.marks[k] then any = true end end
-      -- 19 окт: третья строка: тоглы записи с первой колонки, затем mark и rate (x1.00 + слайдер) — до конца группы
-      local a1e = bx0 + btot
-      local w2c = ms('x1.10') + L.pad + 3 * L.cw
-      local rx0 = a1e - w2c
-      local w1 = ms('mark') + 2 * L.pad
-      local mkx = rx0 - 2 - w1
-      cellb('markers', 'mark', mkx, w1, false, not any)   -- 16 окт: mark (не mk)
+      -- 19 окт: третья строка: mark под <<, rate (x1.00 + слайдер) под play, тоглы записи — с колонки после play
+      local pi3 = D.tp_play_i or 2
+      local w1 = TW[1] or tbw
+      cellb('markers', 'mark', colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
+      local rx0 = colx(pi3)
+      local w2c = TW[pi3] or tbw
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
       local rhot = cell_hot(rx0, ry, w2c, L.rh)
@@ -4251,8 +4256,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       if rhot then hover.ctrl = 'ratebar' end
       hint('ctrl', rx0, ry, w2c, L.rh, 'ratebar')
       D.strip_cell.ratebar = { sx2, ry, sw2 }
-      -- запись: с первой колонки до mark
-      local ax, a1 = colx(1), mkx - 2
+      -- запись: с колонки после play до конца группы
+      local ax, a1 = colx(pi3 + 1), bx0 + btot
       local full = { { 'punch', 'punch', c.punch }, { 'preroll', 'pre-roll', c.preroll }, { 'reclib', 'rec>lib', c.reclib }, { 'slow', c.slowrate and 'slow*' or 'slow', c.slowrec or c.slowrate },
                      { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
       local tot = 0
@@ -4306,12 +4311,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   } or nil
   local bigw = 0
   -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
-  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], 2); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', 2)) end; bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
+  local BKT = c.bigbpm and 2 or 1   -- 19 окт: опция big time and BPM — крупно (x2) / обычным текстом на том же месте
+  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], BKT); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', BKT)) end; bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
   local function draw_big(bx)
     local bx0 = bx
     for _, b in ipairs(big) do
       local hot = cell_hot(bx, ly, b.w, 2 * L.rh)
-      D.big_text(bx, ly, b[2], hot and U.AMBER or b[3], 2)
+      D.big_text(bx, ly + (BKT == 1 and math.floor(L.rh / 2) or 0), b[2], hot and U.AMBER or b[3], BKT)
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
       bx = bx + b.w + 3 * L.pad
