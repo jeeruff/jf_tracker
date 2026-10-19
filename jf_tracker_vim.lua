@@ -3813,6 +3813,10 @@ function V.smart()
                    local tr = reaper.GetMediaItem_Track(h0.item)
                    local _, nt = E.midi_note_of and E.midi_note_of(h0, lpb())
                    if tr then ctx.preview(tr, (nt and nt.pitch) or h0.pitch, 'midi') end   -- 0S на ките мог сменить пэд
+                   -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — xx/16 полутона за строку
+                   if (letter == '0U' or letter == '0D') and ctx.preview_bend and ctx.row_sec then
+                     ctx.preview_bend(h0.ch or 0, (it.v / 16) * (letter == '0U' and 1 or -1) / ctx.row_sec(), 0.4, tr)
+                   end
                  elseif ctx.play_note_item and h0 and h0.item then ctx.play_note_item(h0.item) end
                end,
                on_close = restore,

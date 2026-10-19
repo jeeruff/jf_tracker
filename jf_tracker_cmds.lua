@@ -231,7 +231,8 @@ function C.rebuild(head, lpb, prev_semis)
     end
     local segs = C.segments(list, { ['0U'] = true, ['0D'] = true }, tq, len)
     if #segs > 0 then
-      local function bend_at(semis) return math.max(0, math.min(16383, math.floor(8192 + semis / 2 * 8191 + 0.5))) end
+      local brange = (C.bend_range and C.bend_range(tr)) or 2   -- 19 окт: диапазон bend инструмента (пэды кита — их Pitchbend range)
+      local function bend_at(semis) return math.max(0, math.min(16383, math.floor(8192 + semis / brange * 8191 + 0.5))) end
       local pts = { { 0, 0 } }
       for _, sg in ipairs(segs) do
         local ne = note_end(sg[1])

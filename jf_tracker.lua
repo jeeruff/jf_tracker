@@ -13557,6 +13557,26 @@ edit.start_at = function() if state.lock and vim and vim.cur then return edit.ro
 alias.init(model, edit)
 CM.init(model)
 edit.cmds = CM
+-- 19 окт: диапазон pitch bend трека для команд 0U / 0D: у кита drumrs5k — Pitchbend range первого пэда, иначе ±2
+CM.bend_range = function(tr)
+  for _, col in ipairs(snap and snap.cols or {}) do
+    if col.track == tr then
+      for _, f in ipairs(col.fx or {}) do
+        if f.kit and f.kids then
+          for _, kd in ipairs(f.kids) do
+            if kd.rs5k_i then
+              for p = 0, reaper.TrackFX_GetNumParams(tr, kd.rs5k_i) - 1 do
+                local _, pn = reaper.TrackFX_GetParamName(tr, kd.rs5k_i, p)
+                if (pn or ''):lower() == 'pitchbend range' then return math.max(0.5, reaper.TrackFX_GetParamNormalized(tr, kd.rs5k_i, p) * 12) end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  return 2
+end
 -- высота предыдущего события в той же подколонке (для Gxx glide)
 edit.prev_semis = function(head)
   if not L then return nil end
@@ -17883,6 +17903,18 @@ local function frame()
       else keep[#keep + 1] = o end
     end
     ctx.note_offs = keep
+  end
+  -- 19 окт: превью pitch-команды (0U / 0D) у MIDI-ноты — изгиб по шагам, как его запишет клип; потом центр
+  if ctx.bend_q then
+    local now = reaper.time_precise()
+    local q = ctx.bend_q
+    if now >= q.t1 then
+      reaper.StuffMIDIMessage(0, 0xE0 | (q.ch or 0), 0, 64); ctx.bend_q = nil
+    elseif now >= q.t0 then
+      local semis = q.slope * (now - q.t0)
+      local v = math.max(0, math.min(16383, math.floor(8192 + semis / (q.range or 2) * 8191 + 0.5)))   -- шкала — как у jf_tracker_cmds
+      if v ~= q.last then reaper.StuffMIDIMessage(0, 0xE0 | (q.ch or 0), v & 127, v >> 7); q.last = v end
+    end
   end
   if ctx.obey_back and #ctx.obey_back > 0 then
     local now, keep = reaper.time_precise(), {}
@@ -24545,6 +24577,14 @@ ctx.rf_play = function()
   reaper.SetEditCurPos(edit.row_time(r0, state.lpb, 0), false, false)
   reaper.OnPlayButton()
   vim.msg = 'reform: playing the selection (Space - stop)'
+end
+-- 19 окт: изгиб превью: slope — полутонов в секунду, dur — сколько; старт — когда нота уже ушла (арм на время превью)
+ctx.row_sec = function() local t0 = edit.row_time(vim.cur.row, state.lpb, 0); return math.max(1e-3, edit.row_time(vim.cur.row + 1, state.lpb, 0) - t0) end
+ctx.preview_bend = function(ch, slope, dur, tr)
+  local now = reaper.time_precise()
+  reaper.StuffMIDIMessage(0, 0xE0 | (ch or 0), 0, 64)
+  local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0   -- трек только что взведён — нота уйдёт через 0.15 с
+  ctx.bend_q = { ch = ch, slope = slope, t0 = now + delay, t1 = now + delay + dur, range = tr and CM.bend_range(tr) or 2 }
 end
 ctx.rf_close = function(keep)
   local S = ctx.RFS
