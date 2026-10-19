@@ -262,6 +262,7 @@ local state = {
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
   itemnames = flag('itemnames', true),           -- имя item второй строкой под нотой (3 окт)               -- стоп транспорта на =END (3 окт)
   mxruler = flag('mxruler', true),
+  mxstack = flag('mxstack', true),   -- 19 окт: такт / размер / длина — второй строкой под именем паттерна
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   dotcolor = flag('dotcolor', false),   -- 18 окт: пустые точки — цветом поля
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
@@ -722,7 +723,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13609,6 +13610,7 @@ IK.init(ctx)
 MM.hint = function(...) return draw.hint(...) end
 MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
+MX.stack = state.mxstack
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
 edit.human = state.human or 0                   -- 9 окт: human слайсов (опция)
 edit.mono = state.slicemono                     -- 9 окт: mono слайсера
@@ -15547,6 +15549,9 @@ function ctx.context_items(hover)
     add((MX.fill and '!' or '') .. 'Fill: cells show their content (f)', function() MX.fill = not MX.fill end, 'f')
     add('Trim items to their regions (t)', function() ctx.mx_trim() end, 't')
     add((MX.ruler and '!' or '') .. 'Ruler (R)', function() ctx.mx_ruler_toggle() end, 'R')
+    add((MX.stack and '!' or '') .. 'Info under the name: bar, size, length (columns off - wider cells)', function()
+      state.mxstack = not state.mxstack; MX.stack = state.mxstack; vim.msg = 'matrix: bar / size / length ' .. (MX.stack and 'under the name' or 'in columns')
+    end, 'i')
     if MX.loops or (ctx.dev_on and ctx.dev_on()) then add((MX.loops and '!' or '') .. 'Loops layer (dev: Garden loops per cell)', function() ctx.mx_loops_toggle() end, 'l') end   -- 19 окт: непонятен — только dev, как в \\-меню
     add((MX.zoom == 'detail' and '!' or '') .. 'Detail view (z)', function() ctx.mx_zoom() end, 'z')
     add('Arrangement …', function() ctx.arr() end, 'a')

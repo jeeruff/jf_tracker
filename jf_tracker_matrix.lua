@@ -239,17 +239,19 @@ function MX.width(L, nregions, ncols)
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
   -- 18 окт: секции — полоса их цвета с вертикальным именем слева от номеров тактов
   MX.sec_w = (MX.ruler and not MX.fold and MX.has_sec) and (L.th + 4) or 0
-  L.mx_ruler_w = (MX.ruler and not MX.fold) and (U.measure('999.9') + 2 * L.pad + 4 + MX.sec_w) or 0
+  -- 19 окт: stack — такт / размер / длина второй строкой под именем: линейка — только риски, колонок справа нет
+  local st = MX.stack and not MX.fold
+  L.mx_ruler_w = (MX.ruler and not MX.fold) and ((st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) + MX.sec_w) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
-  L.mx_dur_w = MX.fold and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
+  L.mx_dur_w = (MX.fold or st) and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
-  L.mx_sig_w = (MX.fold or (MX.sig_same and not MX.vismetro)) and 0 or (U.measure('15/16') + L.pad)   -- 18 окт: vismetro — колонка размера всегда
+  L.mx_sig_w = (MX.fold or st or (MX.sig_same and not MX.vismetro)) and 0 or (U.measure('15/16') + L.pad)   -- 18 окт: vismetro — колонка размера всегда
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
-  L.mx_bpm_w = (MX.fold or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
+  L.mx_bpm_w = (MX.fold or st or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
   L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_bpm_w + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
-  L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
+  L.mx_row_h = math.max(st and (2 * L.rh + 1) or L.rh, math.floor(L.rh * MX.vz + 0.5))
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
   local bw = L.pad
   for _, b in ipairs(btns()) do
@@ -600,7 +602,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local sc = sec_first[ri]
       local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)
       local _ = sc
-      if info.bar_label then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
+      if info.bar_label and not MX.stack then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
       if info.ticks then
         for _, tk in ipairs(info.ticks(rg)) do
           local ty = y + math.floor(tk.f * rh)
@@ -662,8 +664,42 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if insel then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(xa - 2, y, nx + nw - xa + 2, L.rh, 1); gfx.a = 1 end
     end
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
+    -- 19 окт: stack — вторая строка под именем: такт · размер · длина (· темп); те же щелчки и курсор длины
+    if MX.stack and not MX.fold and nw > 0 then
+      local y2 = y + L.rh
+      local sx = nx
+      local function part(s2, col, what, w2)
+        w2 = w2 or U.measure(s2)
+        if sx + U.measure(s2) > nx + nw then return end
+        local hot = what and hover.ri == ri and mx >= sx and mx < sx + w2 and my >= y2 and my < y2 + L.rh
+        U.text(sx, y2, s2, hot and U.AMBER or col)
+        if hot then hover[what] = ri end
+        if what and ctx.hint then ctx.hint('mx' .. what, sx, y2, w2, L.rh, ri) end
+        local x0 = sx
+        sx = sx + w2 + 2 * L.pad
+        return x0
+      end
+      if info.bar_label then part(info.bar_label(rg.pos), U.GREY) end
+      if info.sig_at and not rg.gap then
+        local n, d = info.sig_at(rg.pos)
+        local ss = ('%d/%d'):format(n or 4, d or 4)
+        local beat = MX.vismetro and playing and info.play_row and ctx.state
+        if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
+        part(ss, beat and U.AMBER or U.DIM, 'sig')
+      end
+      local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
+      local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len'
+      if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
+      local lx = part(ds, U.GREY, 'dur')
+      if oncur and lx then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(lx - 2, y2, U.measure(ds) + 4, L.rh, 0) end
+      if MX.bpm and ctx.bpm_at and not rg.gap then
+        local bpm = ctx.bpm_at(rg.pos)
+        local bs = (math.abs(bpm - math.floor(bpm + 0.5)) < 0.05) and tostring(math.floor(bpm + 0.5)) or ('%.1f'):format(bpm)
+        part(bs .. ' bpm', MX.bpm_diff and U.TEXT or U.DIM, 'bpm')
+      end
+    end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
-    do
+    if not (MX.stack and not MX.fold) then
       -- длина в шагах по LPB (просьба 1 окт: без тактов и секунд)
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local dx = L.mx_label_w - L.mx_dur_w
