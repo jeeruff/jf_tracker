@@ -612,7 +612,7 @@ function motion(c, n, op)
     end
     return { fi = fi, row = r, field = 1, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('e'):byte() then
-    return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true }
+    return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true, exclusive = true }   -- 19 окт: граница — строка после события, оператор её не берёт
   elseif c == ('E'):byte() then
     -- 15 окт: E — конец нижнего видимого события трека (последнее, что начинается на экране)
     local st = ctx.state
@@ -620,7 +620,7 @@ function motion(c, n, op)
     bottom = math.min(bottom, (ctx.snap().last_row or 0) + 2)   -- 16 окт: экран длиннее трека — поиск от конца содержимого (иначе nil, dE молчал)
     local r = next_ev(cur.fi, bottom, -1)
     if not r then return nil end
-    return { fi = cur.fi, row = event_end(cur.fi, r), linewise = true }
+    return { fi = cur.fi, row = event_end(cur.fi, r), linewise = true, exclusive = true }
   elseif c == ('G'):byte() then return { fi = cur.fi, row = V.count and (n - 1) or last, linewise = true }
   elseif c == ('{'):byte() or c == ('}'):byte() then
     local r = cur.row
@@ -2781,6 +2781,20 @@ function V.key_impl(c)
       -- 9 окт: dl / dh (yl, cl …) — только своя подколонка: шаг по полю через
       -- край задевал соседнюю колонку; dl = x (событие строки курсора)
       if t and (c == ('l'):byte() or c == ('h'):byte() or c == RIGHT or c == LEFT) then t.fi = V.cur.fi; t.row = V.cur.row end
+      -- 19 окт: de / ce внутри ноты — хвост ноты от курсора до её конца (нота кончается перед курсором);
+      -- раньше пустой диапазон отдавал оператору следующую ноту — она и удалялась
+      local fl0 = flat()[V.cur.fi]
+      if t and (p == 'd' or p == 'c') and c == ('e'):byte() and fl0 and not fl0.env and not fl0.ml then
+        local tail = {}
+        for _, h in ipairs(V.covering(V.cur.fi, V.cur.row)) do if h.row0 < V.cur.row then tail[#tail + 1] = h end end
+        if #tail > 0 then
+          local E = ctx.edit
+          E.note_off(tail, lpb(), V.cur.row - 1 + (E.OFF_END and 0 or 1))
+          V.msg = ('%se: the note ends before row %04d (its tail deleted)'):format(p, V.cur.row)
+          if p == 'c' then V.mode = 'insert' end
+          finish_edit(); V.count = nil; return
+        end
+      end
       if t then
         local f0, f1, r0, r1 = range_or_event(p, t)
         local e = apply(p, f0, f1, r0, r1)
