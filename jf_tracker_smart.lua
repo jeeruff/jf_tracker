@@ -80,7 +80,8 @@ local function pick(i)
   if not it then return end
   p.picked = true
   local nxt = p.on_pick and p.on_pick(it)
-  if type(nxt) == 'table' then SM.open(nxt) else SM.close() end
+  if type(nxt) == 'table' then SM.open(nxt)
+  elseif SM.p == p then SM.close() end   -- 19 окт: выбор открыл другую панель (timesel → section) — её не закрывать
 end
 SM.pick = pick
 

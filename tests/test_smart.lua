@@ -48,5 +48,13 @@ SM.open({ title = 'note', items = (SM.notes(60, 4)), cols = 12 }, { x = 990, y =
 local x, y, w, h = SM.layout(L, ms, 1000, 720)
 eq(x + w <= 998, true, 'inside on the right'); eq(y + h <= 686, true, 'above the cell when no room below')
 eq(y >= 2, true, 'inside on the top')
+-- 19 окт: выбор открыл другую панель (timesel → section) — она остаётся
+do
+  local p2 = { title = 'names', items = { { label = 'verse', v = 'verse' } } }
+  SM.open({ title = 'menu', items = { { label = 'section', v = 's' } }, on_pick = function() SM.open(p2) end })
+  SM.pick(1)
+  eq(SM.p, p2, 'nested panel stays open')
+  SM.close()
+end
 print(('test_smart: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
