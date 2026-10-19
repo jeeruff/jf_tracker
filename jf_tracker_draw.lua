@@ -450,13 +450,22 @@ function D.layout(snap, state, nregions)
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_pan = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
-  -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево
-  do
-    local d = L.w_slc + L.pad
+  -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево.
+  -- L.kitG(G) — кит-вариант любой раскладки с полем слайса (обычная, уровни ширины GL), кэш на раскладку
+  L.GKc = setmetatable({}, { __mode = 'k' })
+  function L.kitG(G)
+    G = G or L
+    if not G.x_slc or G.notes_only then return G end
+    local k = L.GKc[G]
+    if k then return k end
+    local s0, d = G.x_slc, (G.w_slc or L.w_slc) + L.pad
+    local function sh(v) if v and v > s0 then return v - d end return v end
     local fx2 = {}
-    for k, v in ipairs(L.x_fx) do fx2[k] = v - d end
-    L.GK = setmetatable({ x_slc = false, x_vol = L.x_vol - d, x_pan = L.x_pan and (L.x_pan - d) or false, x_fx = fx2, x_del = L.x_del - d,
-      x_fold = L.x_fold and (L.x_fold - d) or nil, sub_w = L.sub_w - d }, { __index = L })
+    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
+    k = setmetatable({ x_slc = false, x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or false, x_fx = fx2, x_del = sh(G.x_del),
+      x_fold = G.x_fold and sh(G.x_fold) or G.x_fold, sub_w = G.sub_w - d }, { __index = G })
+    L.GKc[G] = k
+    return k
   end
   L.fold_w = ms('o') + 2 * L.pad
   L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
@@ -467,13 +476,19 @@ function D.layout(snap, state, nregions)
   L.MAXFX = 4
   L.MAXLVL = 3 + L.MAXFX + 3
   L.GL = { [1] = L.GC }
-  L.GL[2] = setmetatable({ narrow = true, nfx = 0, x_fx = {}, x_del = L.x_vol + L.w_vol + L.pad, nfields = 2,
-                           sub_w = L.x_vol + L.w_vol + L.pad }, { __index = L })
+  -- 19 окт: fold — и на уровнях ширины своя колонка справа (иначе +N ложился на delay от L.x_fold)
+  local function fold_tail(t, xx)
+    if L.x_fold then t.x_fold = xx; xx = xx + L.w_fold + 2 * L.pad else t.x_fold = false end
+    t.sub_w = xx
+  end
+  L.GL[2] = { narrow = true, nfx = 0, x_fx = {}, x_del = L.x_vol + L.w_vol + L.pad, nfields = 2 }
+  fold_tail(L.GL[2], L.x_vol + L.w_vol + L.pad)
+  setmetatable(L.GL[2], { __index = L })
   for k = 0, L.MAXFX do
     local t = { nfx = k, x_fx = {}, nfields = 3 + k }
     local xx = L.x_vol + L.w_vol + L.pad
     for i = 1, k do t.x_fx[i] = xx; xx = xx + L.w_fx + L.pad end
-    t.x_del = xx; t.sub_w = xx + L.w_del + L.pad
+    t.x_del = xx; fold_tail(t, xx + L.w_del + L.pad)
     L.GL[3 + k] = setmetatable(t, { __index = L })
   end
   -- 11 окт: wave only — аудио-подколонка полосой волны; ширина по зуму трека (кэш по ширине)
@@ -807,7 +822,7 @@ function D.layout(snap, state, nregions)
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
-          if G == nil and D.col_is_kit(col) then G = L.GK end   -- 19 окт: кит — без Sxx
+          if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -1871,11 +1886,13 @@ end
 -- 19 окт: трек с рэком drumrs5k (кэш на снимок: col живёт до перестройки)
 local kit_cols = setmetatable({}, { __mode = 'k' })
 function D.col_is_kit(col)
-  local v = kit_cols[col]
+  local fx = col.fx   -- ключ — сам список FX: колонка живёт дольше, fx приходит позже / пересобирается
+  if not fx then return false end
+  local v = kit_cols[fx]
   if v == nil then
     v = false
-    for _, f in ipairs(col.fx or {}) do if f.kit then v = true; break end end
-    kit_cols[col] = v
+    for _, f in ipairs(fx) do if f.kit then v = true; break end end
+    kit_cols[fx] = v
   end
   return v
 end
