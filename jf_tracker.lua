@@ -11987,6 +11987,39 @@ ctx = {
     local v = math.max(1, math.min(8, (n or 1) + d))
     state.subs_min[key] = v
     vim.msg = ('%s: %d column%s'):format(col.name, v, v == 1 and '' or 's')
+    -- 19 окт: меньше не выходит — колонки заняты нотами, звучащими одновременно: предложить обрезать наложения
+    local used = #(lane.subs or {})
+    if d < 0 and v < used then
+      vim.open_hydra({ title = ('%s: %d columns are taken by overlapping notes'):format(col.name, used), items = {
+        { key = 't', label = 'trim the overlaps - every note ends where the next one starts (drums: sounds the same)', fn = function() ctx.unoverlap(col) end },
+        { key = 'k', label = 'keep them', fn = function() vim.msg = 'columns kept' end } } })
+      state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    end
+  end,
+  -- 19 окт: обрезать наложения MIDI-нот трека: нота кончается на начале следующей (любой высоты) — одна колонка
+  unoverlap = function(col)
+    local tr = col and col.track
+    if not tr then return end
+    local n = 0
+    edit.run('trim overlapping notes', function()
+      for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(tr, i))
+        if tk and reaper.TakeIsMIDI(tk) then
+          local _, nn = reaper.MIDI_CountEvts(tk)
+          local ns = {}
+          for k = 0, nn - 1 do local _, sel, mu, sp, ep, ch, pi, ve = reaper.MIDI_GetNote(tk, k); ns[#ns + 1] = { k = k, sel = sel, mu = mu, sp = sp, ep = ep, ch = ch, pi = pi, ve = ve } end
+          table.sort(ns, function(a2, b2) return a2.sp < b2.sp end)
+          for j = 1, #ns - 1 do
+            local a2 = ns[j]
+            local nx
+            for q = j + 1, #ns do if ns[q].sp > a2.sp then nx = ns[q].sp; break end end
+            if nx and a2.ep > nx then reaper.MIDI_SetNote(tk, a2.k, a2.sel, a2.mu, a2.sp, nx, a2.ch, a2.pi, a2.ve, true); n = n + 1 end
+          end
+          reaper.MIDI_Sort(tk)
+        end
+      end
+    end)
+    vim.msg = ('%s: %d overlapping note(s) trimmed (u - undo); notes on the same row still need their own columns'):format(col.name or '', n)
   end,
   -- «< N >» над номерами строк: длина региона курсора ±d шагов
   region_len_step = function(d)
