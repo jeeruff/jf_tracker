@@ -22868,12 +22868,14 @@ local function frame()
       c = 0
     end
   end
-  if c == keys.f1 then ctx.help_big(); c = 0 end   -- 10 окт: Shift+F1 — транспоз трека (туториал — в меню и :tutorial)
+  -- 19 окт: раскладка frow — F-клавиши это чёрные клавиши (f1 = C#, f4 = F# …): играют ноту — справка / панели их не берут
+  local fnote = keys.frow and keys.frow() and vim.plays_note and vim.plays_note(c)
+  if c == keys.f1 and not fnote then ctx.help_big(); c = 0 end   -- 10 окт: Shift+F1 — транспоз трека (туториал — в меню и :tutorial)
   if c == keys.f11 and ctx.mods().cmd then toggle_dock(); c = 0 end   -- 17 окт: весь экран — Cmd+F11 (Cmd = окно; F11 в frow — нота)
   -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
   -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
-  do
+  if not fnote then
     -- 16 окт: F3 — нижний стек (dsp / mixer): фокус туда, ещё раз — следующая вкладка; F4 — верхний стек (было F3)
     local freeF = not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search'
     if c == 26163 and freeF and state.panes_ui and L and L.pn then
