@@ -112,6 +112,8 @@ Parts of jf_tracker are based on his [Paketti](https://github.com/esaruoho/paket
 for Renoise and are used with his permission. Support his work:
 <https://www.patreon.com/esaruoho>.
 
+Also thanks to my brother **beast**, who showed me trackers and the demoscene in the first place.
+
 The Orca field is an own implementation of [Orca](https://github.com/hundredrabbits/Orca)
 by Hundred Rabbits (MIT), the esoteric livecoding language - no code copied.
 
