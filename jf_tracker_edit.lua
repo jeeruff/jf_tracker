@@ -160,7 +160,8 @@ local function census(with_chunks)
       for i = 0, R.CountTrackMediaItems(tr) - 1 do
         local it = R.GetTrackMediaItem(tr, i)
         local tk = R.GetActiveTake(it)
-        if tk and not R.TakeIsMIDI(tk) then
+        -- 19 окт: производный item слоя ¥ (jf_lof) — не владелец сэмпла: его удаление пересборкой не «спасаем» в LIB
+        if tk and not R.TakeIsMIDI(tk) and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) == '' then
           local fn = root_file(R.GetMediaItemTake_Source(tk))
           if fn ~= '' then
             local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
@@ -4507,6 +4508,10 @@ function E.layer_roots()
     local tr = R.GetTrack(0, ti)
     local _, nm = R.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
     if model.LIB_NAMES[nm] then
+      for ii = R.CountTrackMediaItems(tr) - 1, 0, -1 do   -- производному слою (jf_lof) в LIB не место (старая страховка сэмплов)
+        local it = R.GetTrackMediaItem(tr, ii)
+        if ext(it, LOF) ~= '' then R.DeleteTrackMediaItem(tr, it) end
+      end
       for ii = 0, R.CountTrackMediaItems(tr) - 1 do
         local it = R.GetTrackMediaItem(tr, ii)
         local lt = ext(it, LAYERS)
