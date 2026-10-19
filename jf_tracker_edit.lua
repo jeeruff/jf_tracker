@@ -3432,9 +3432,44 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
         local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
         local tk = R.GetActiveTake(it)
         local audio = notes and not (tk and R.TakeIsMIDI(tk))
+        -- 19 окт: MIDI-клип через вставленные строки — без разреза (как удаление, 13 окт): ноты ниже едут вниз внутри
+        -- item, нота через курсор длиннее, item (и источник MIDI) растёт; зацикленный item — режется, как раньше
+        local midi_in = false
+        if notes and tk and R.TakeIsMIDI(tk) and pos < t0 - EPS and fin > t0 + EPS and pos < limit - EPS then
+          local slen, isqn = R.GetMediaSourceLength(R.GetMediaItemTake_Source(tk))
+          local ilen = isqn and (R.TimeMap2_timeToQN(0, fin) - R.TimeMap2_timeToQN(0, pos)) or (fin - pos)
+          midi_in = R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 0 or (slen or 0) >= ilen - 1e-6
+        end
         if audio and pos < t0 - EPS and fin > t0 + EPS and pos < limit - EPS then
           -- 12 окт: аудио-нота через вставленные строки — длиннее на них, не разрез на две ноты
           R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(fin + dt, limit) - pos)
+        elseif midi_in then
+          local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
+          local nfin = math.min(fin + dt, limit)
+          local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), P(limit)
+          local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
+          for k = nn - 1, 0, -1 do
+            local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
+            if a0 >= p0 - 1 then
+              if a0 + dp >= plim - 1 then R.MIDI_DeleteNote(tk, k)
+              else R.MIDI_SetNote(tk, k, sel, mu, a0 + dp, math.min(a1 + dp, plim), ch, pi, ve, true) end
+            elseif a1 > p0 then R.MIDI_SetNote(tk, k, sel, mu, a0, math.min(a1 + dp, plim), ch, pi, ve, true) end
+          end
+          for k = ncc - 1, 0, -1 do
+            local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
+            if a0 >= p0 then
+              if a0 + dp >= plim then R.MIDI_DeleteCC(tk, k) else R.MIDI_SetCC(tk, k, sel, mu, a0 + dp, cm, ch, m1, m2, true) end
+            end
+          end
+          for k = ntx - 1, 0, -1 do
+            local _, sel, mu, a0, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
+            if a0 >= p0 then
+              if a0 + dp >= plim then R.MIDI_DeleteTextSysexEvt(tk, k) else R.MIDI_SetTextSysexEvt(tk, k, sel, mu, a0 + dp, ty, msg, true) end
+            end
+          end
+          R.MIDI_Sort(tk)
+          if R.MIDI_SetItemExtents then R.MIDI_SetItemExtents(it, R.TimeMap2_timeToQN(0, pos), R.TimeMap2_timeToQN(0, nfin))
+          else R.SetMediaItemInfo_Value(it, 'D_LENGTH', nfin - pos) end
         elseif pos < limit - EPS and fin > t0 + EPS then
           local target = it
           if pos < t0 - EPS then target = R.SplitMediaItem(it, t0) end   -- правая часть едет
