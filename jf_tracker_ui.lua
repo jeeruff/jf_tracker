@@ -97,7 +97,7 @@ U.set = set
 
 -- 13 окт: слайдер-ромбик: тонкая дорожка, тонкая заливка (от центра или от края) и ромбик на значении
 -- 18 окт: стороны панорамы — L бордовый, R зелёный
-U.PAN_L = function() return U.mix(U.RED, U.BG, 0.3) end   -- бордовый (просьба)
+U.PAN_L = function() return U.RED end   -- 19 окт: красный темы (был бордовый — тускло)
 U.PAN_R = function() return U.GREEN end
 function U.dslider(sx, cy, sw, fr, centered, col, hot, rh, lr)
   fr = math.max(0, math.min(1, fr or 0))
