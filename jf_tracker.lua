@@ -133,7 +133,7 @@ local function flag(k, d)
   return v ~= '0'
 end
 
-local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16 }
+local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128 }   -- 19 окт: до 128
 local state = {
   -- режим разработчика (5 окт): файл .dev рядом со скриптом (в .gitignore) —
   -- Orca и monome; в релизе их нет
@@ -791,7 +791,7 @@ local function set_lpb(n, dir)
     if i < 1 or i > #LPBS then return end
     new = LPBS[i]
   end
-  if new < 1 or new > 64 then return end
+  if new < 1 or new > 128 then return end
   local q0, qc = state.row0 / state.lpb, vim.cur.row / state.lpb
   state.lpb = new
   state.row0 = math.floor(q0 * new)

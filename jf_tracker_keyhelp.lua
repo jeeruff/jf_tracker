@@ -140,7 +140,7 @@ KH.PAGES = {
     { k = 'zss zsm zsl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
-    { k = '- +', d = 'zoom rows: LPB down / up (as Cmd + wheel) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
+    { k = '- +', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
     { k = 'z. z,', d = 'the cursor track wider / narrower (its own width)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
     { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r edit the text (:vis / :mcmd), Enter - visor: pick with previews, x delete; w b e - next / previous marker', t = {} },
