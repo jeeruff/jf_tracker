@@ -21065,6 +21065,11 @@ local function frame()
       if ctx.mods().shift then MX.sk_sel[k] = (not MX.sk_sel[k]) or nil else MX.sk_sel = { [k] = true } end
       ctx.set_focus('matrix'); ctx.sketch_play()
       click = { t = now2, zone = 'sketch' }
+    elseif hover.matrix and hover.matrix.splbtn then   -- 19 окт: плейлист песни (секции)
+      local b = hover.matrix.splbtn
+      if b == 'pick' then ctx.spl_pick() elseif b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.spl_play() end
+      else ctx.spl_set(''); vim.msg = 'playlist: cleared' end
+      click = { t = now2, zone = 'splbtn' }
     elseif hover.matrix and hover.matrix.chainbtn then   -- 19 окт: строка chain
       local b = hover.matrix.chainbtn
       if b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.pl_play() end
@@ -24092,7 +24097,7 @@ ctx.patternize = function(cuts, how)
 end
 -- 17 окт: pads (MPC): паттерны на нотных клавишах. :pads — вкл / выкл, :pads quant | sudden — режим,
 -- :pads rec — запись порядка сыгранных; ещё раз :pads rec — дописать его в конец песни (связанные повторы)
-MX.vismetro = reaper.GetExtState(EXT, 'vismetro') ~= '0'   -- 18 окт: метроном в клетках матрицы (кнопка vismetro)
+MX.vismetro = true   -- 19 окт: визуальный метроном матрицы всегда (кнопка убрана)   -- 18 окт: метроном в клетках матрицы (кнопка vismetro)
 ctx.PADS = dofile(DIR .. '/jf_tracker_padseq.lua')
 ctx.pad_list = function() return ctx.PADS.list(ctx.sequence()) end
 ctx.pad_key = function(name)
@@ -24213,8 +24218,9 @@ ctx.pl_parsed = function()
 end
 ctx.pl_cancel = function() ctx.PLY = nil end
 ctx.pl_playing = function() return ctx.PLY and ctx.PLY.segs[ctx.PLY.i] end
-ctx.pl_play = function()
+ctx.pl_play = function(steps0, errs0)
   local steps, _, errs = ctx.pl_parsed()
+  if steps0 then steps, errs = steps0, errs0 or {} end   -- 19 окт: свои шаги (плейлист песни по секциям)
   if #steps == 0 then vim.msg = 'chain: nothing to play' .. (#errs > 0 and (' - ' .. errs[1]) or ' - type it: :ch A1 A1 B1x2 …'); return end
   local segs = {}
   for i, st in ipairs(steps) do
@@ -24606,6 +24612,63 @@ ctx.chain_draw = function(Lx, x, y, w)
     cx = cx + bw + 2
   end
   return Lx.rh + 2, hv
+end
+-- 19 окт: плейлист песни — порядок СЕКЦИЙ и регионов (не паттернов: те — chain), строкой у аранжировки внизу
+-- матрицы. Щелчок по строке — выпадашка секций (выбор дописывает), > — играть, x — очистить. В проекте (songpl)
+ctx.spl_text = function() local _, s = reaper.GetProjExtState(0, EXT, 'songpl'); return s or '' end
+ctx.spl_set = function(t) reaper.SetProjExtState(0, EXT, 'songpl', t); reaper.MarkProjectDirty(0) end
+ctx.spl_find = function(ref)
+  local pats, secs = ctx.pl_song()
+  local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
+  local n, lo = tonumber(ref), ref:lower()
+  for _, s2 in ipairs(secs) do
+    if (n and s2.idx == n) or (not n and s2.name:lower() == lo) then
+      local o = {}
+      for _, p in ipairs(pats) do if p.pos >= s2.pos - 1e-6 and p.rgnend <= s2.rgnend + 1e-6 then o[#o + 1] = one(p) end end
+      return o
+    end
+  end
+  if n then for _, rg in ipairs(pats) do if rg.idx == n then return { one(rg) } end end end
+end
+ctx.spl_pick = function()
+  local labels, seen = {}, {}
+  for _, s2 in ipairs(regions.sections or {}) do if not seen[s2.name] then seen[s2.name] = true; labels[#labels + 1] = s2.name end end
+  if #labels == 0 then vim.msg = 'playlist: no sections yet (Tr in the matrix makes one)'; return end
+  ctx.choice_pick('playlist: add a section (the song order)', '', labels, function(v)
+    if (v or '') == '' then return end
+    local t = (ctx.spl_text() .. ' ' .. v):gsub('^%s+', '')
+    ctx.spl_set(t); vim.msg = 'playlist: ' .. t
+  end)
+end
+ctx.spl_play = function()
+  local steps, _, errs = ctx.PL.parse(ctx.spl_text(), ctx.spl_find)
+  if #steps == 0 then vim.msg = 'playlist: empty - click it to add sections'; return end
+  ctx.pl_play(steps, errs)
+end
+ctx.spl_draw = function(Lx, x, y, w)
+  local hv = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local text = ctx.spl_text()
+  U.text(x, y + 1, 'playlist', U.GREY)
+  local bx = x + U.measure('playlist ') + Lx.pad
+  local bw2 = (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 4
+  local tw = math.max(Lx.cw * 4, x + w - bx - bw2)
+  local ht = mx >= bx and mx < bx + tw and my >= y and my < y + Lx.rh
+  U.set(ht and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(bx, y, tw, Lx.rh, 1)
+  U.set(U.LINE); gfx.rect(bx, y, tw, Lx.rh, 0)
+  U.text(bx + Lx.pad, y + 1, ctx.fit(text ~= '' and text or 'click - add sections in the song order', tw - 2 * Lx.pad), text ~= '' and U.TEXT or U.DIM)
+  if ht then hv.splbtn = 'pick' end
+  local cx = bx + tw + 2
+  for _, b in ipairs({ { '>', 'play' }, { 'x', 'clear' } }) do
+    local bw = U.measure(b[1]) + 2 * Lx.pad
+    local hot = mx >= cx and mx < cx + bw and my >= y and my < y + Lx.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y, bw, Lx.rh, 1)
+    U.set(U.LINE); gfx.rect(cx, y, bw, Lx.rh, 0)
+    U.text(cx + Lx.pad, y + 1, b[1], hot and U.AMBER or U.TEXT)
+    if hot then hv.splbtn = b[2] end
+    cx = cx + bw + 2
+  end
+  return hv
 end
 ctx.pal_in_pane = function()
   local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel

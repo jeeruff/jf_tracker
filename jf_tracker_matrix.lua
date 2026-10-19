@@ -60,7 +60,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'chain' }, { 'vismetro', 'vismetro' }, { 'timesel', 'timesel' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'plist', 'chain' }, { 'timesel', 'timesel' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -435,6 +435,13 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local nrow = 4
     local ah = nrow * (L.rh + 1) + 3
     local ax0, ax1, ay = L.pad, W - L.pad - 4, ybot - ah + 2
+    -- 19 окт: под аранжировкой — плейлист песни (секции по порядку)
+    if ctx.spl_draw and ybot - ah - L.rh - 2 > hy + 6 * L.rh then
+      local phv = ctx.spl_draw(L, ax0, ybot - L.rh - 1, ax1 - ax0)
+      for k, v in pairs(phv) do hover[k] = v end
+      ybot = ybot - L.rh - 2
+      ay = ybot - ah + 2
+    end
     if ybot - ah > hy + 6 * L.rh then
       U.set(U.LINE); gfx.rect(0, ybot - ah, W - 4, 1, 1)
       ybot = ybot - ah
