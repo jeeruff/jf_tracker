@@ -2270,6 +2270,7 @@ E.human = 0
 E.HUM = nil
 local function HV(k, d) local h = E.HUM; if h and h.on and h.on[k] == false then return 0 end; return (h and h.v and h.v[k]) or d end
 E.hum_v = HV
+E.midi_note_of = function(h, lpb) return midi_note(h, lpb) end   -- 19 okt: высота ноты после правки (превью команды)
 function E.humanize(it, tk)
   local h = (E.human or 0) / 100
   if h <= 0 then return end
