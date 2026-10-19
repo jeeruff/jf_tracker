@@ -24788,7 +24788,9 @@ ctx.arm_restore = function()
   local ar = ctx.arm_tmp
   ctx.arm_tmp = nil
   if not (ar and reaper.ValidatePtr(ar.track, 'MediaTrack*')) then return end
-  reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECARM', 0)
+  -- rec follows selection: трек под курсором и должен остаться взведённым — арм не снимать
+  local cc = cur_col()
+  if not (state.armsel and cc and cc.track == ar.track) then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECARM', 0) end
   if ar.inp then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECINPUT', ar.inp) end
   if ar.mon then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECMON', ar.mon) end
 end
