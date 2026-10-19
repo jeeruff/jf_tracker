@@ -22512,9 +22512,21 @@ local function frame()
     local GT = { top = true, dsp = true, inst = true, matrix = true, slices = true, undotree = true, session = true, mixer = true, clipboard = true }
     if ctx.g_at and (c == 116 or c == 84) and GT[state.focus] and reaper.time_precise() - ctx.g_at < 1.5 then
       ctx.g_at = nil; SL.gpend = nil; MX.pending = nil
+      -- 19 окт: g модуля уже увела выбор наверх — вернуть его (lib: инструмент, матрица: клетка, dsp: параметр)
+      local gr = ctx.g_restore
+      if gr then
+        if gr.inst then pool_select(gr.inst) end
+        if gr.mx then MX.cur.ri, MX.cur.ci = gr.mx[1], gr.mx[2] end
+        if gr.dsp then dsp_sel.fx, dsp_sel.param = gr.dsp[1], gr.dsp[2] end
+        ctx.g_restore = nil
+      end
       if c == 116 then ctx.tab_menu() else ctx.project_menu() end
       c = 0
-    else ctx.g_at = (c == 103 and GT[state.focus]) and reaper.time_precise() or nil end
+    else
+      ctx.g_at = (c == 103 and GT[state.focus]) and reaper.time_precise() or nil
+      ctx.g_restore = ctx.g_at and { inst = state.focus == 'inst' and vim.inst or nil, mx = state.focus == 'matrix' and { MX.cur.ri, MX.cur.ci } or nil,
+        dsp = state.focus == 'dsp' and { dsp_sel.fx, dsp_sel.param } or nil } or nil
+    end
   end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
   -- 11 окт: rec follows selection — и за треком курсора трекера: сменился трек курсора — армлен он,
