@@ -2366,7 +2366,7 @@ ctx = {
   help_page = function()
     local f = state.focus
     -- 18 окт: щёлкнул по плейлисту / набираешь :pl — справка о нём и его синтаксис
-    if vim.mode == 'cmd' and (vim.cmdline or ''):match('^pl') and ((vim.cmdline or ''):match('^pl ') or (vim.cmdline or ''):match('^playlist')) then return 'playlist' end
+    if vim.mode == 'cmd' and ((vim.cmdline or ''):match('^pl ') or (vim.cmdline or ''):match('^playlist') or (vim.cmdline or ''):match('^ch ') or (vim.cmdline or ''):match('^chain')) then return 'playlist' end
     if ctx.pl_help and MX.plist and f == 'matrix' then return 'playlist' end
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
@@ -23966,7 +23966,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'pldel' then
     local l = ctx.pl_cur()
     if l then OPT.ask.open('delete the playlist?', '"' .. l.name .. '" - its text goes (the song stays)', {
-      { key = 'k', label = 'keep', fn = function() vim.msg = 'playlist kept' end },
+      { key = 'k', label = 'keep', fn = function() vim.msg = 'chain kept' end },
       { key = 'd', label = 'delete', fn = function() ctx.pl_cmd('del') end } }) end
   elseif b == 'pltext' then ctx.pl_edit()
   elseif b == 'menu' then ctx.mx_menu()
@@ -24155,7 +24155,7 @@ ctx.pl_cancel = function() ctx.PLY = nil end
 ctx.pl_playing = function() return ctx.PLY and ctx.PLY.segs[ctx.PLY.i] end
 ctx.pl_play = function()
   local steps, _, errs = ctx.pl_parsed()
-  if #steps == 0 then vim.msg = 'playlist: nothing to play' .. (#errs > 0 and (' - ' .. errs[1]) or ' - type it: :pl A1 A1 B1x2 …'); return end
+  if #steps == 0 then vim.msg = 'chain: nothing to play' .. (#errs > 0 and (' - ' .. errs[1]) or ' - type it: :ch A1 A1 B1x2 …'); return end
   local segs = {}
   for i, st in ipairs(steps) do
     local rg = st.rg
@@ -24167,7 +24167,7 @@ ctx.pl_play = function()
   ctx.PLY = { segs = segs, i = 1, pp = segs[1].t0 }
   if playing() then reaper.SetEditCurPos(segs[1].t0, false, true)
   else reaper.SetEditCurPos(segs[1].t0, false, false); reaper.OnPlayButton() end
-  vim.msg = ('playlist: %d step(s)%s'):format(#segs, #errs > 0 and (' - skipped: ' .. errs[1]) or '')
+  vim.msg = ('chain: %d step(s)%s'):format(#segs, #errs > 0 and (' - skipped: ' .. errs[1]) or '')
 end
 -- каждый кадр с позицией воспроизведения
 ctx.pl_tick = function(pp)
@@ -24182,9 +24182,9 @@ ctx.pl_tick = function(pp)
   end
   local back = pp < P.pp - 0.05
   P.pp = pp
-  if back or pp < s.t0 - 0.05 or pp > s.t1 + 0.3 then ctx.PLY = nil; vim.msg = 'playlist: stopped following (the play position moved)'; return end
+  if back or pp < s.t0 - 0.05 or pp > s.t1 + 0.3 then ctx.PLY = nil; vim.msg = 'chain: stopped following (the play position moved)'; return end
   if not nx then
-    if pp >= s.t1 - 0.005 then ctx.PLY = nil; reaper.OnStopButton(); vim.msg = 'playlist: end' end
+    if pp >= s.t1 - 0.005 then ctx.PLY = nil; reaper.OnStopButton(); vim.msg = 'chain: end' end
     return
   end
   local seamless = math.abs(s.t1 - s.rg.rgnend) < 1e-6 and math.abs(nx.t0 - nx.rg.pos) < 1e-6
@@ -24198,11 +24198,11 @@ end
 -- дописать после песни: целые — связанные повторы, сокращённые / с проскоком — копия, обрезанная, своим именем
 ctx.pl_write = function()
   local steps = ctx.pl_parsed()
-  if #steps == 0 then vim.msg = 'playlist: nothing to write'; return end
+  if #steps == 0 then vim.msg = 'chain: nothing to write'; return end
   local t = 0
   for _, rg in ipairs(ctx.real_seq()) do if not rg.session and not rg.lib and rg.rgnend > t then t = rg.rgnend end end
   local n = 0
-  ctx.slot_op('playlist: write after the song', function()
+  ctx.slot_op('chain: write after the song', function()
     local trs = {}
     for i = 0, reaper.CountTracks(0) - 1 do trs[#trs + 1] = reaper.GetTrack(0, i) end
     for _, st in ipairs(steps) do
@@ -24234,11 +24234,11 @@ ctx.pl_write = function()
     end
   end)
   model.invalidate(); regions = model.regions(state.lpb)
-  vim.msg = ('playlist: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
+  vim.msg = ('chain: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
 end
 ctx.plist_toggle = function()
   MX.plist = not MX.plist
-  if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'playlist: :pl A1 A1 B1x2 C1:16 D1-8 B2+8 … (Tab completes names) - or click the text line' end end
+  if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'chain: :ch A1 A1 B1x2 C1:16 D1-8 B2+8 … (Tab completes names) - or click the text line' end end
 end
 ctx.pl_edit = function()
   local l = ctx.pl_cur()
@@ -24252,7 +24252,7 @@ ctx.pl_cmd = function(arg)
   MX.plist = true
   if arg == '' then ctx.pl_edit(); return
   elseif arg == 'play' then ctx.pl_play(); return
-  elseif arg == 'stop' then ctx.PLY = nil; vim.msg = 'playlist: stopped following'; return
+  elseif arg == 'stop' then ctx.PLY = nil; vim.msg = 'chain: stopped following'; return
   elseif arg == 'write' then ctx.pl_write(); return
   elseif arg == 'next' or arg == 'prev' then
     if #P.lists > 0 then P.cur = (P.cur - 1 + (arg == 'next' and 1 or -1)) % #P.lists + 1; ctx.pl_save() end
@@ -24270,11 +24270,11 @@ ctx.pl_cmd = function(arg)
     P.lists[P.cur].text = arg; ctx.pl_save()
     local steps, _, errs = ctx.pl_parsed()
     local _, rows = P.summary(steps)
-    vim.msg = ('playlist "%s": %d step(s), %d rows%s'):format(P.lists[P.cur].name, #steps, rows, #errs > 0 and (' - ' .. errs[1]) or '')
+    vim.msg = ('chain "%s": %d step(s), %d rows%s'):format(P.lists[P.cur].name, #steps, rows, #errs > 0 and (' - ' .. errs[1]) or '')
     return
   end
   local l = P.lists[P.cur]
-  vim.msg = l and ('playlist %d/%d "%s"'):format(P.cur, #P.lists, l.name) or 'no playlists - :pl new [name]'
+  vim.msg = l and ('chain %d/%d "%s"'):format(P.cur, #P.lists, l.name) or 'no chains - :ch new [name]'
 end
 -- панель в матрице (под кнопками, матрица ниже): имя, кнопки, текст словами (играющее — янтарём, ошибка — красным), итог
 -- 18 окт: палитра паттернов (матрица, view → p): все паттерны проекта — и те, что не стоят в песне;
@@ -24643,7 +24643,7 @@ ctx.palette_to_playlist = function()
   local l = P.lists[P.cur]
   l.text = ((l.text or '') .. ' ' .. table.concat(names, ' ')):gsub('^%s+', '')
   ctx.pl_save()
-  vim.msg = ('playlist %s: + %s'):format(l.name, table.concat(names, ' '))
+  vim.msg = ('chain %s: + %s'):format(l.name, table.concat(names, ' '))
 end
 ctx.palette_listen = function(p, ci, owner)
   local src = p and p.src
@@ -24683,7 +24683,7 @@ ctx.plist_draw = function(Lx, x, y, w)
   local hot = mx >= bx and mx < bx + nw and my >= y and my < y + rh
   U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, nw, rh, 1)
   U.set(U.LINE); gfx.rect(bx, y, nw, rh, 0)
-  local nm = l and (('%d/%d %s'):format(P.cur, #P.lists, l.name)) or 'playlist - new makes one'
+  local nm = l and (('%d/%d %s'):format(P.cur, #P.lists, l.name)) or 'chain - new makes one'
   U.text(bx + pad, y + 1, ctx.fit(nm, nw - 2 * pad), hot and U.AMBER or (l and U.CYAN or U.GREY))
   if hot then hover.btn = 'plname' end
   bx = btn(bx + nw + pad, y, '>', 'plnext')
@@ -25346,7 +25346,7 @@ ctx.ASK = {
   ['curvesave '] = { 'curve name', {} },
   ['mkdir '] = { 'new folder', { 'samples', 'loops', 'stems', 'bounces', 'renders' } },
   ['pmtag '] = { 'project tags', {} },
-  ['pl name '] = { 'playlist name', { 'main', 'live', 'short', 'long', 'alt' } },
+  ['pl name '] = { 'chain name', { 'main', 'live', 'short', 'long', 'alt' } },
   ['drumstr '] = { 'drum stretch: rate pitch', { '1 0', '0.5 0', '2 0', '1 -12', '1 12' } },
 }
 ctx.ask_prompt = function(pre, text)

@@ -673,7 +673,7 @@ KH.PAGES = {
     { k = 'Space', d = 'play / stop' },
     { k = 'Esc', d = 'back to garden' },
   } },
-  playlist = { title = 'playlist: the order of the song as text (the playlist button of the matrix, :pl)', e = {   -- 18 окт
+  playlist = { title = 'chain: patterns in a row as text (the chain button of the matrix, :ch; was playlist)', e = {   -- 18 окт
     { k = 'what', t = {}, d = 'words in a row, one per step: the song plays them in this order; named playlists are kept in the project, the song itself stays as it is' },
     { k = 'A1', t = {}, d = 'a pattern by its name (any case)' },
     { k = 'verse', t = {}, d = 'a section by its name - all its patterns in order' },
