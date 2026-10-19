@@ -159,8 +159,18 @@ function NT.draw(U, L, x, y, w, h, focused, fit, title)
     end
   end
   local nvis = math.max(1, math.floor((y + h - top - 2) / L.rh))
-  if cur_v - 1 < NT.scroll then NT.scroll = cur_v - 1 end
-  if cur_v - 1 >= NT.scroll + nvis then NT.scroll = cur_v - nvis end
+  -- 19 окт: за курсором — только когда он сдвинулся (иначе полоса и колесо не листали: прокрутку возвращало к курсору)
+  local ck = NT.l .. ':' .. NT.c .. ':' .. #vis
+  if NT.cur_key ~= ck then
+    NT.cur_key = ck
+    if cur_v - 1 < NT.scroll then NT.scroll = cur_v - 1 end
+    if cur_v - 1 >= NT.scroll + nvis then NT.scroll = cur_v - nvis end
+  end
+  -- колесо над заметками — 3 строки
+  if gfx.mouse_wheel ~= 0 and mx >= x and mx < x + w and my >= top and my < top + nvis * L.rh then
+    NT.scroll = NT.scroll + (gfx.mouse_wheel > 0 and -3 or 3); gfx.mouse_wheel = 0
+  end
+  NT.scroll = math.max(0, math.min(math.max(0, #vis - nvis), NT.scroll))
   if U.vbar then U.vbar('notes', x, top, w, nvis * L.rh, NT.scroll, nvis, #vis) end   -- 15 окт: полоса всегда
   for i = 1, nvis do
     local v = vis[NT.scroll + i]

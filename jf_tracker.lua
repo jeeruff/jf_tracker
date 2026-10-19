@@ -10683,6 +10683,7 @@ ctx = {
     elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
     elseif key == 'fxb' then FB.scroll = v; FB.cur = math.max(v + 1, math.min(v + (r and r.nvis or 1), FB.cur))
     elseif key == 'keyhelp' then KH.scroll = v
+    elseif key == 'notes' then NT.scroll = v   -- 19 окт: полоса notes тянется (курсор не возвращает её, пока сам не сдвинулся)
     elseif key == 'actions' then local AC = ctx.AC; AC.scroll = v; local nv = r and r.nvis or 1; AC.sel = math.max(v + 1, math.min(v + nv, AC.sel))   -- 16 окт
     elseif key == 'undotree' then   -- 15 окт: дерево undo держит прокрутку за выделенным — выделение в видимое
       local ST = ctx.ut_state(); ST.scroll = v
