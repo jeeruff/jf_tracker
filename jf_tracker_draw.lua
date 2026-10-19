@@ -4725,11 +4725,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- preview; клик — сортировка, активная — янтарём
   do
     local hy2 = iy + 2 + L.rh
+    local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad   -- 19 окт: колонки pt (транспозиция) и bs (beatsync)
     local cols_h = { { '#', ix + 6, sort == 'track' or sort == 'mark', sort == 'mark' and '#@' or '#', 'index' },
                      { 'name', ix + 6 + ms('00 @ '), sort == 'name', 'name', 'name' },
-                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' } }
-    if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad, false, TILDE, nil } end
-    cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + tew, false, 'preview', nil }
+                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' },
+                     { 'pt', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'pt', nil },
+                     { 'bs', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW, false, 'bs', nil } }
+    if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad + XPW + XBW, false, TILDE, nil } end
+    cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW + XBW + tew, false, 'preview', nil }
     -- type (9 окт): у правого края строки заголовков — сортировка по типу
     local tyw = ms('type')
     local tyx = ix + w - L.pad - 4 - tyw
@@ -4840,9 +4843,24 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local t0 = e.slices and e.slices[row.k] or 0
         local t1 = e.slices and (e.slices[row.k + 1] or e.len) or t0
         local nl = info.slice_note and info.slice_note(row.k) or '---'   -- 19 окт: нота слайса вместо клавиши
-        lbl = ('%-3s  S%02X  %.2fs'):format(nl or '---', row.k, math.max(0, t1 - t0))
+        lbl = ('%-3s  S%02X'):format(nl or '---', row.k)
+        -- 19 окт: длина, pt, bs — в колонках инструмента (под len / pt / bs); pt — свой у ноты-слайса в lib, иначе инструмента
+        local dx = ix + 6 + label_w + L.pad
+        local dw = ms('88.88s') + L.pad
+        if w - (dx - ix) - L.pad > dw + 8 then
+          local len = math.max(0, t1 - t0)
+          local ds = len < 10 and ('%.2fs'):format(len) or ('%.1fs'):format(len)
+          text(dx + dw - L.pad - ms(ds), y + 1, ds, on and U.AMBER or U.GREY)
+          local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad
+          local pv = e.pitch or 0
+          for _, o in ipairs(pool) do if o.parent == e and o.slice_k == row.k then pv = o.pitch or pv; break end end
+          local ps = math.abs(pv) < 0.005 and '0' or ('%+g'):format(math.floor(pv * 10 + 0.5) / 10)
+          text(dx + dw + XPW - L.pad - ms(ps), y + 1, ps, math.abs(pv) >= 0.005 and U.TEXT or U.DIM)
+          local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
+          text(dx + dw + XPW + XBW - L.pad - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+        else lbl = lbl .. ('  %.2fs'):format(math.max(0, t1 - t0)) end
       end
-      text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, w - 12 - 4 * L.cw), on and U.AMBER or U.TEXT)
+      text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, row.sub == 's' and math.min(w - 12 - 4 * L.cw, label_w - 4 * L.cw) or (w - 12 - 4 * L.cw)), on and U.AMBER or U.TEXT)
       if hot then hover.pool = { ci = info.pool_ci, i = row.i, sub = row.sub, k = row.k } end
     elseif row.empty then
       -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека
@@ -4900,8 +4918,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         text(dx + dw - L.pad - ms(dtxt), y + 1, dtxt, sel and U.AMBER or U.GREY)
       else dw = 0 end
       local tx0 = dx + dw
+      -- 19 окт: pt — транспозиция (полутоны take), bs — beatsync в долях («-» — выкл)
+      local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad
+      if dw > 0 then
+        local ps = math.abs(e.pitch or 0) < 0.005 and '0' or ('%+g'):format(math.floor((e.pitch or 0) * 10 + 0.5) / 10)
+        text(tx0 + XPW - L.pad - ms(ps), y + 1, ps, (math.abs(e.pitch or 0) >= 0.005) and U.TEXT or U.DIM)
+        local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
+        text(tx0 + XPW + XBW - L.pad - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+        tx0 = tx0 + XPW + XBW
+      else XPW, XBW = 0, 0 end
       local ntenv = tew > 0 and info.pool_tenv(e) or 0
-      local wx = dx + dw + tew
+      local wx = dx + dw + XPW + XBW + tew
       local rowhot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if ntenv > 0 then
         local th = rowhot and mx >= tx0 and mx < wx
