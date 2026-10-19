@@ -751,6 +751,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local g = grid[ri][ci]
       local col = snap.cols[ci]
       U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+      -- 19 окт: clipkb в матрице — набранная клетка голубой рамкой, буква клавиши (1qaz… столбец = трек, ряд = видимый слот)
+      if MX.pal_kb and not rg.gap then
+        local pk = MX.pal_pick and MX.pal_pick[(rg.name or '') .. '@' .. rg.pos .. ':' .. ci]
+        if pk then U.set(U.CYAN); gfx.rect(x, y, L.mx_cell_w, rh - 1, 0); gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 3, 0) end
+        local r = ri - MX.scroll
+        local colk = MX.SS and MX.SS.KEYCOLS and MX.SS.KEYCOLS[ci - MX.hs]
+        local kl = r >= 1 and r <= 4 and colk and colk:sub(r, r)
+        if kl and kl ~= '' then U.text(x + L.mx_cell_w - 2 - U.measure(kl), y + rh - L.rh - 1, kl, pk and U.CYAN or U.AMBER) end
+      end
       local iw = L.mx_cell_w - 4
       if MX.fill then
         if MX.zoom == 'detail' then

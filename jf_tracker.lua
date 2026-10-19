@@ -19948,23 +19948,44 @@ local function frame()
         vim.vel = v0
       end
     else ctx.drum_last_pad = nil; ctx.drum_pad_glide = nil end
-    -- 19 окт: Ctrl+Cmd над матрицей — палец по клеткам: заехал на клетку — она звучит (трек × паттерн), отпустил — тишина
+    -- clipkb (матрица / patterns): отпустил Shift — набранное звучит вместе (19 окт: здесь, а не в рисовании палитры)
+    if MX.pal_kb and MX.pal_shift and not mm.shift then MX.pal_shift = nil; ctx.palette_play_picks() end
+    -- 19 окт: Ctrl+Cmd над строкой матрицы — jog / scrub по паттерну в лупе: палец влево-вправо по строке — место в паттерне
+    -- (до строки трекера), паттерн играет лупом; другая строка — другой паттерн; отпустил — стоп, луп / курсор как были
     local hm = hover.matrix
-    if mm.ctrl and mm.cmd and hm and hm.ri and hm.ci and hm.ci > 0 and not hk then
+    local jog = ctx.mx_jog
+    if mm.ctrl and mm.cmd and hm and hm.ri and not hk then
       ctx.drum_pad_glide = true
-      local key = hm.ri .. ':' .. hm.ci
-      if ctx.mx_glide ~= key then
-        ctx.mx_glide = key
-        local rg = seq[hm.ri]; local col = snap and snap.cols[hm.ci]
-        if rg and not rg.gap and col and col.track then
-          if ctx.mx_solo then ctx.mx_cell_preview_end() end
-          ctx.mx_cell_preview(col.track, rg.pos, rg.rgnend, 'glide')
-          vim.msg = ('%s - %s (Ctrl+Cmd: slide over the cells)'):format(rg.name or '', col.name or '')
+      local rg = seq[hm.ri]
+      local cell = state.panes and draw.pn_lay and draw.pn_lay.by_panel and draw.pn_lay.by_panel.matrix
+      local ct = cell and cell.content
+      if rg and not rg.gap and ct then
+        local x0 = ct.x + (L.mx_label_w or 0)
+        local fr = math.max(0, math.min(0.999, (gfx.mouse_x - x0) / math.max(1, ct.x + ct.w - x0)))
+        if not jog then
+          local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
+          jog = { l0 = l0, l1 = l1, rep = reaper.GetSetRepeat(-1), cur = reaper.GetCursorPosition(), play = reaper.GetPlayState() & 1 == 1 }
+          ctx.mx_jog = jog
+        end
+        if jog.ri ~= hm.ri then
+          jog.ri, jog.row = hm.ri, nil
+          reaper.GetSet_LoopTimeRange(true, true, rg.pos, rg.rgnend, false); reaper.GetSetRepeat(1)
+        end
+        local nrow = math.max(1, math.floor((rg.r1 or 1) - (rg.r0 or 0) + 0.5))
+        local row = math.floor(fr * nrow)
+        if jog.row ~= row then
+          jog.row = row
+          local t = edit.row_time((rg.r0 or 0) + row, state.lpb, 0)
+          reaper.SetEditCurPos(t, false, reaper.GetPlayState() & 1 == 1)
+          if reaper.GetPlayState() & 1 == 0 then reaper.OnPlayButton() end
+          vim.msg = ('jog %s  row %d / %d (Ctrl+Cmd: slide along the row)'):format(rg.name or '', row, nrow)
         end
       end
-    elseif ctx.mx_glide then
-      ctx.mx_glide = nil
-      if ctx.mx_solo and ctx.mx_solo_owner == 'glide' then ctx.mx_cell_preview_end() end
+    elseif jog then
+      ctx.mx_jog = nil
+      if not jog.play then reaper.OnStopButton() end
+      reaper.GetSet_LoopTimeRange(true, true, jog.l0, jog.l1, false); reaper.GetSetRepeat(jog.rep)
+      if not jog.play then reaper.SetEditCurPos(jog.cur, false, false) end
     end
   end
   -- мышь с Ctrl (8 окт, jf_tracker_ctrlmouse): Control зажат — движение мыши
@@ -23496,8 +23517,11 @@ local function frame()
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if (state.ss_big or MX.clips) and MX.SS.key(c, seq, ctx.ss_V(), ctx.ss_G(), ctx.mods()) then return end
-        if MX.palette and not ctx.pal_in_pane() and c == ('c'):byte() and not MX.pal_kb then MX.pal_kb = true; vim.msg = 'palette clipkb: 1qaz 2wsx 3edc ... column = track, row = palette row; Shift - pick, Ctrl - silence, Esc - off'; return end   -- 18 окт
-        if MX.palette and MX.pal_kb and ctx.palette_key(c) then return end
+        -- 19 окт: clipkb прямо в матрице: 1qaz 2wsx … — столбец трек, ряд — видимый слот; Shift — набор из разных
+        -- паттернов, отпустил — звучат вместе; Enter — render (новый паттерн из набранного); Ctrl — тишина; Esc — выкл
+        if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render them as a new pattern, Ctrl - silence, Esc - off'; return end
+        if MX.pal_kb and c == 13 then ctx.palette_render(); return end
+        if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
@@ -24305,7 +24329,6 @@ ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя па�
   end
   if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
   if ctx.vbar then ctx.vbar('palette', x, y0, w, nvis * rh, MX.pal_scroll, nvis, #list) end   -- 18 окт: скроллбар палитры
-  if MX.pal_kb and MX.pal_shift and not ctx.mods().shift then MX.pal_shift = nil; ctx.palette_play_picks() end
   if ctx.pal_mix and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_mix.t or 0) > 0.6 then ctx.palette_mix_stop() end   -- Space — стоп: луп вернуть
   -- прослушка с клавиши доиграла сама — соло снять, курсор вернуть
   if ctx.mx_solo and ctx.mx_solo_owner == 'palkb' and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_t or 0) > 0.6 then ctx.mx_cell_preview_end(); ctx.pal_on = nil end
@@ -24353,8 +24376,12 @@ ctx.palette_key = function(c)
   if not k or base == '' then return false end
   local list = ctx.pal_list or {}
   local p, ci = list[(MX.pal_scroll or 0) + r], MX.hs + k
+  if state.focus == 'matrix' then   -- 19 окт: в матрице ряд клавиатуры — видимый слот песни
+    local rg = seq[(MX.scroll or 0) + r]
+    p = (rg and not rg.gap) and { name = rg.name, src = rg, key = (rg.name or '') .. '@' .. rg.pos } or nil
+  end
   if not p or not (snap and snap.cols[ci]) then vim.msg = 'palette: nothing on this key'; return true end
-  local key = p.name .. ':' .. ci
+  local key = (p.key or p.name) .. ':' .. ci
   if m.ctrl then ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
   if shift then
     MX.pal_pick = MX.pal_pick or {}
