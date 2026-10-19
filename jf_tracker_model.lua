@@ -105,6 +105,7 @@ end
 -- Возвращает ноты {ppq, ppq_end, pitch, vel, ch, muted} в порядке потока.
 function M.parse_midi(buf)
   local notes, active = {}, {}
+  local soff = nil   -- 19 окт: 0Sxx нот кита — notation-событие «NOTE ch pitch text jf_soff=XX» у ноты
   local tune
   local pos, ppq = 1, 0
   local n = #buf
@@ -118,7 +119,10 @@ function M.parse_midi(buf)
       local st, ch = b1 & 0xF0, b1 & 0x0F
       local pitch, vel = msg:byte(2), msg:byte(3)
       local key = ch * 128 + pitch
-      if b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
+      if b1 == 0xFF and msg:byte(2) == 0x0F then
+        local nch, np2, xx = msg:match('^..NOTE (%d+) (%d+) .-jf_soff=(%x%x)')
+        if nch then soff = soff or {}; soff[#soff + 1] = { ppq = ppq, key = tonumber(nch) * 128 + tonumber(np2), xx = tonumber(xx, 16) } end
+      elseif b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
         local t = M.mts_parse(msg)
         if t then tune = tune or {}; for kk, c in pairs(t) do tune[kk] = { ppq = ppq, c = c } end end
       elseif st == 0x90 and vel > 0 then
@@ -135,6 +139,12 @@ function M.parse_midi(buf)
     end
   end
   for _, a in pairs(active) do a.ppq_end = ppq; notes[#notes + 1] = a end
+  if soff then
+    for _, nt in ipairs(notes) do
+      local k = nt.ch * 128 + nt.pitch
+      for _, so in ipairs(soff) do if so.key == k and math.abs(so.ppq - nt.ppq) <= 60 then nt.soff = so.xx end end
+    end
+  end
   table.sort(notes, function(a, b)
     if a.ppq ~= b.ppq then return a.ppq < b.ppq end
     return a.pitch < b.pitch
@@ -429,7 +439,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
           note = M.note_name(nt.pitch), pitch = nt.pitch, semis = nt.pitch - M.BASE_NOTE,
           micro = M.micro_of_cents(nt.cents), ppq = nt.ppq,   -- 16 окт: микротон (MTS sysex перед нотой)
           vol = M.hex2(nt.vel), delay = d0, ch = nt.ch,
-          muted = muted_item or nt.muted, row0 = r0, fx = midi_fx,
+          muted = muted_item or nt.muted, row0 = r0, fx = nt.soff and (function() local t = { ('0S%02X'):format(nt.soff) }; for _, x in ipairs(midi_fx) do t[#t + 1] = x end; return t end)() or midi_fx,   -- 19 окт: 0Sxx ноты кита
         }
         if head.micro then M.seen_micro = true end
         local tail = { kind = 'off', of = head, delay = d1 }

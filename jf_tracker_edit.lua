@@ -1096,12 +1096,92 @@ end
 
 -- off (12 окт) — строка внутри ноты, четверти от её начала (команды-огибающие / генераторы /
 -- песня); свойства item (0S 0M 0P SI …) — у всей ноты, off не нужен
+-- 19 окт: 0Sxx ноты кита drumrs5k — сдвиг окна пэда (start и end RS5K) на xx/256 длины слайса. Метка — notation-
+-- событие у ноты (едет с ней при Ins / BS), автоматизация start / end пэда собирается по всем его нотам на треке:
+-- ступенька за 5 мс до ноты; база (исходные start / end) — P_EXT трека jf_soffb:<GUID пэда>. E.kit_pad ставит main
+E.kit_pad = nil
+local function soff_map(tk)
+  local m = {}
+  local _, _, _, ntx = R.MIDI_CountEvts(tk)
+  for k = 0, ntx - 1 do
+    local _, _, _, pp, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
+    if ty == 15 then
+      local ch, pi, xx = (msg or ''):match('^NOTE (%d+) (%d+) .-jf_soff=(%x%x)')
+      if ch then m[#m + 1] = { k = k, ppq = pp, key = tonumber(ch) * 128 + tonumber(pi), xx = tonumber(xx, 16) } end
+    end
+  end
+  return m
+end
+function E.kit_soff_rebuild(track, pitch)
+  local pad = E.kit_pad and E.kit_pad(track, pitch)
+  if not (pad and pad.start_i and pad.stop_i) then return end
+  local bkey = 'P_EXT:jf_soffb:' .. (pad.guid or '')
+  local _, bs = R.GetSetMediaTrackInfo_String(track, bkey, '', false)
+  local a, b = (bs or ''):match('^([%d%.]+) ([%d%.]+)$')
+  a, b = tonumber(a), tonumber(b)
+  if not a then
+    a, b = R.TrackFX_GetParamNormalized(track, pad.fx, pad.start_i), R.TrackFX_GetParamNormalized(track, pad.fx, pad.stop_i)
+    R.GetSetMediaTrackInfo_String(track, bkey, ('%.6f %.6f'):format(a, b), true)
+  end
+  local pts = {}
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local tk = R.GetActiveTake(R.GetTrackMediaItem(track, i))
+    if tk and R.TakeIsMIDI(tk) then
+      local m = soff_map(tk)
+      local _, nn = R.MIDI_CountEvts(tk)
+      for k = 0, nn - 1 do
+        local _, _, mu, sp, _, ch, pi = R.MIDI_GetNote(tk, k)
+        if pi == pitch and not mu then
+          local xx = 0
+          for _, so in ipairs(m) do if so.key == ch * 128 + pi and math.abs(so.ppq - sp) <= 60 then xx = so.xx end end
+          pts[#pts + 1] = { t = R.MIDI_GetProjTimeFromPPQPos(tk, sp), xx = xx }
+        end
+      end
+    end
+  end
+  table.sort(pts, function(p, q) return p.t < q.t end)
+  local any = false
+  for _, p in ipairs(pts) do if p.xx > 0 then any = true end end
+  local eS = R.GetFXEnvelope(track, pad.fx, pad.start_i, any)
+  local eE = R.GetFXEnvelope(track, pad.fx, pad.stop_i, any)
+  for _, env in ipairs({ eS, eE }) do if env then R.DeleteEnvelopePointRange(env, -1, 1e9) end end
+  if not any then
+    R.TrackFX_SetParamNormalized(track, pad.fx, pad.start_i, a); R.TrackFX_SetParamNormalized(track, pad.fx, pad.stop_i, b)
+    R.GetSetMediaTrackInfo_String(track, bkey, '', true)
+    return
+  end
+  local len = b - a
+  local function put(env, t, v) if env then R.InsertEnvelopePoint(env, math.max(0, t), R.ScaleToEnvelopeMode(R.GetEnvelopeScalingMode(env), math.max(0, math.min(1, v))), 1, 0, false, true) end end
+  put(eS, 0, a); put(eE, 0, b)
+  local prev = 0
+  for _, p in ipairs(pts) do
+    local d = p.xx / 256 * len
+    local t = math.max(prev + 0.0005, p.t - 0.005)
+    put(eS, t, a + d); put(eE, t, b + d)
+    prev = t
+  end
+  for _, env in ipairs({ eS, eE }) do if env then R.Envelope_SortPoints(env) end end
+end
+function E.kit_soff_set(h, lpb, xx)
+  local i, nt = midi_note(h, lpb)
+  if not i then return false end
+  local tk = h.take
+  for _, so in ipairs(soff_map(tk)) do
+    if so.key == nt.ch * 128 + nt.pitch and math.abs(so.ppq - nt.sppq) <= 60 then R.MIDI_DeleteTextSysexEvt(tk, so.k) end
+  end
+  if xx and xx > 0 then R.MIDI_InsertTextSysexEvt(tk, false, false, nt.sppq, 15, ('NOTE %d %d text jf_soff=%02X'):format(nt.ch, nt.pitch, xx)) end
+  R.MIDI_Sort(tk)
+  E.kit_soff_rebuild(R.GetMediaItem_Track(h.item), nt.pitch)
+  return true
+end
 function E.set_fx(heads, lpb, cmd, xx, off)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
     for _, h in ipairs(heads) do
       if E.cmds and E.cmds.CODES[cmd] then
         if h.item then E.cmds.put(h.item, cmd, xx, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
+      elseif h.kind == 'midi' and cmd == '0S' and E.kit_pad and h.item and E.kit_pad(R.GetMediaItem_Track(h.item), h.pitch) then
+        E.kit_soff_set(h, lpb, xx)   -- 19 окт: нота кита — сдвиг окна пэда
       elseif h.kind == 'midi' then   -- 19 окт: команды item (0S, SI, SO, SL …) — только у аудио; MIDI молча не писал
         E.skip_msg = cmd .. 'xx: a MIDI note cannot take it (audio notes only' .. (cmd == '0S' and '; drumrs5k: the slice column picks the pad, a start offset - later in jf_slixer)' or ')')
       else

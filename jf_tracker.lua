@@ -256,7 +256,7 @@ local state = {
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
   transpos = 'tracker',                            -- 15 окт: полоса транспорта — под трекером, опции нет
-  reclib = flag('reclib', true),                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
+  reclib = true,   -- 19 окт: всегда (кнопки нет): записанное — инструментом в lib, другого места у аудио нет                      -- записанное в трекер — ещё и инструментом в lib (5 окт)                -- режим крупно слева в полосе транспорта (5 окт)
   recdelprompt = flag('recdelprompt', true),          -- Esc при записи: спросить перед удалением тейка (5 окт)                      -- 5 окт: по умолчанию вкл
   stretchmarks = flag('stretchmarks', true),          -- stretch-маркеры на волне (5 окт)                     -- BPM крупно в полосе транспорта (5 окт)
   focusclick = reaper.GetExtState(EXT, 'focusclick') == 'click' and 'click' or 'option',   -- фокус мышью: Option-клик (5 окт)
@@ -9157,7 +9157,7 @@ ctx = {
       act('Options: Toggle metronome', 'c', 'metronome')
       own('W', 'start slow rec (records at the slow speed)', ctx.slowrec ~= nil and not ctx.slowrec.play, function() if not state.slowrate then state.slowrate = 0.5 end; ctx.slow_rec() end)
       own('w', 'slow rec speed: ' .. (state.slowrate and ('x%.2f'):format(state.slowrate) or 'off') .. ' … (the red slow button records)', state.slowrate ~= nil and state.slowrate ~= false, function() ctrl_action('slow', 0) end)
-      own('b', 'rec > lib: a new recording goes into the lib too (tracker)', state.reclib, function() ctrl_action('reclib', 0) end)
+      -- 19 окт: rec > lib — всегда (пункт убран)
       own('R', 'the cursor track: arm, record mode, monitoring, input …', false, function()
         local col = cur_col(); if col then ctx.open_context({ btn = { col = col, what = 'arm' } }) end
       end)
@@ -16906,7 +16906,7 @@ function ctrl_action(name, delta)
     elseif p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'ripple' then ctx.ripple_menu()   -- 16 окт: ripple editing — три значения, выпадашкой
   elseif name == 'preroll' then local p = ctx.cmd_exact('Pre-roll: toggle pre-roll on record') or ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
-  elseif name == 'reclib' then state.reclib = not state.reclib; vim.msg = 'rec -> lib ' .. (state.reclib and 'on: recorded takes also become instruments' or 'off')
+  elseif name == 'reclib' then state.reclib = true; vim.msg = 'rec -> lib: always on - a recorded take becomes a lib instrument'
   -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
   elseif name == 'sig' or name == 'beats' then if delta == 0 then ctx.sig_menu() else ctx.sig_wheel(delta) end
   end
@@ -24673,6 +24673,23 @@ end
 -- 19 окт: волна пэда drumrs5k на треке: MIDI-нота кита → пэд по ноте → кусок его сэмпла (пики файла a..b),
 -- длина — секунды куска в строках от строки ноты. col без рэка — nil (быстро: рэк ищется раз на снимок)
 ctx.kit_wave_c = setmetatable({}, { __mode = 'k' })
+-- 19 окт: пэд кита по ноте — для 0Sxx (edit.kit_pad): адрес RS5K, индексы start / end, GUID
+edit.kit_pad = function(track, pitch)
+  for _, col in ipairs(snap and snap.cols or {}) do
+    if col.track == track then
+      for _, f in ipairs(col.fx or {}) do
+        if f.kit and f.kids then
+          for _, kd in ipairs(f.kids) do
+            if kd.note == pitch and kd.rs5k_i then
+              local pi = model.rs5k_pidx(model.fxapi(track), track, kd.rs5k_i)
+              return { fx = kd.rs5k_i, start_i = pi.start, stop_i = pi.stop, guid = reaper.TrackFX_GetFXGUID(track, kd.rs5k_i) }
+            end
+          end
+        end
+      end
+    end
+  end
+end
 ctx.kit_wave = function(col, pitch, row)
   local kc = ctx.kit_wave_c[col]
   if kc == nil then

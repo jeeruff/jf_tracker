@@ -4132,7 +4132,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if c.tpfull then   -- 19 окт: mark под <<, rate под play, тоглы записи — правее play
       TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
       if pi then TW[pi] = math.max(TW[pi], ms('x1.10') + 2 * L.pad) end
-      need = ms('pun') + ms('pre') + ms('lib') + ms('slo*') + ms('rip*') + 10 * L.pad
+      need = ms('pun') + ms('pre') + ms('slo*') + ms('rip*') + 8 * L.pad
       local pre = -2
       for i = 1, (pi or 2) do pre = pre + TW[i] + 2 end
       need = pre + 2 + need
@@ -4258,11 +4258,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cell.ratebar = { sx2, ry, sw2 }
       -- запись: с колонки после play до конца группы
       local ax, a1 = colx(pi3 + 1), bx0 + btot
-      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'reclib', 'lib', c.reclib }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate },   -- 19 окт: короче (pun / slo)
+      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate },   -- 19 окт: короче (pun / slo)
                      { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
       local tot = 0
       for _, t in ipairs(full) do tot = tot + ms(t[2]) + 2 * L.pad end
-      if ax + tot > a1 then full[2][2], full[3][2] = 'pre', 'lib'; full[5][2] = (c.ripple or 0) == 2 and 'rip*' or 'rip' end   -- 16 окт: тесно — rip
+      if ax + tot > a1 then full[4][2] = (c.ripple or 0) == 2 and 'rip*' or 'rip' end   -- 16 окт: тесно — rip
       for _, t in ipairs(full) do
         local w0 = ms(t[2]) + 2 * L.pad
         if ax + w0 > a1 + L.pad then break end
