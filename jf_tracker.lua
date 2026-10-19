@@ -18106,6 +18106,7 @@ local function frame()
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
+    _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
@@ -19270,7 +19271,7 @@ local function frame()
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then
     local KT = { kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
-      kpm = ' - mute (= Opt+click on the pad)', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
+      kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = hover.dspbtn.kid.name .. ' in ' .. hover.dspbtn.f.name .. (KT[hover.dspbtn.what] or ' - bypass on / off')
   elseif hover.dspbtn then state.status = hover.dspbtn.f.name .. ' - ' .. ({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
@@ -21074,6 +21075,7 @@ local function frame()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
       elseif hover.dspbtn.what == 'kview' then draw.kit_list = draw.kit_list or {}; draw.kit_list[hover.dspbtn.key] = hover.dspbtn.view   -- 19 окт: pads | list
       elseif (hover.dspbtn.what == 'kgroup' or hover.dspbtn.what == 'kchoke') and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid, hover.dspbtn.what == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
+      elseif hover.dspbtn.what == 'kall_m' or hover.dspbtn.what == 'kall_s' then ctx.pad_ms_all(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kall_s')   -- 19 окт: m s под пэдами
       elseif (hover.dspbtn.what == 'kpm' or hover.dspbtn.what == 'kps') and hover.dspbtn.ki then
         ctx.pad_mute_solo(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kps')   -- 19 окт: m / s внизу пэда
       elseif hover.dspbtn.what == 'kroute' and hover.dspbtn.ki then ctx.pad_route(hover.dspbtn.f, hover.dspbtn.ki)   -- 19 окт: ячейка в роутере
@@ -23602,7 +23604,7 @@ local function frame()
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
         -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
-        if not DK.pending and (ch == 'm' or vim.plays_note(c) or (vim.piano and (ch == '[' or ch == ']'))) then return vim.key(c) end
+        if not DK.pending and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()
           if root and MX.DB.key(c, root, o) then return end
@@ -24872,6 +24874,19 @@ ctx.pad_param_key = function(sel, ch)
     if p.kid == ki and (p.name or ''):lower() == key then sel.param = pi; vim.msg = ('%s: h l change, j k next, Esc - pads'):format(p.name); return true end
   end
   return false
+end
+-- 19 окт: m s под пэдами: что-то заглушено / соло — всех обратно, иначе — выбранный пэд
+ctx.pad_ms_all = function(f, ki, solo)
+  local col = dsp_target()
+  if not (col and f and f.kids) then return end
+  local off = 0
+  for _, kd in ipairs(f.kids) do if not kd.enabled then off = off + 1 end end
+  if off > 0 then
+    local A = model.fxapi(col.track)
+    edit.run(solo and 'pads: solo off' or 'pads: unmute all', function() for _, kd in ipairs(f.kids) do if kd.i then A.SetEnabled(col.track, kd.i, true) end end end)
+    model.invalidate(); vim.msg = 'pads: all on'
+  elseif ki and ki > 0 then ctx.pad_mute_solo(f, ki, solo)
+  else vim.msg = 'pads: select a pad first' end
 end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)

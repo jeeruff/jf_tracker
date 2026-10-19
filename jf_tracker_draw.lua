@@ -7620,6 +7620,15 @@ function D.frame(L, snap, rows, state, info)
     -- 11 окт: под блоками — полоса прокрутки цепочки (вместо кнопок «<N» / «N>»)
     local bh0 = boxh
     local function ncol_of(f)
+      -- 19 окт: рэк drumrs5k в низкой панели — параметры пэда расходятся колонками вправо
+      if f.kit and D.DR and f.kids then
+        local np = 0
+        for _, p in ipairs(f.params or {}) do if p.kid == 1 and not p.macro then np = np + 1 end end
+        local rows = math.max(2, math.floor((bh0 - L.rh - 2) / L.rh) - 2)
+        local first = math.max(1, rows - 6)                -- первая колонка: под слотами и волной
+        local extra = np > first and math.ceil((np - first) / rows) or 0
+        return math.min(5, 2 + extra)
+      end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2) / L.rh))
@@ -7986,7 +7995,7 @@ function D.frame(L, snap, rows, state, info)
             -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
             local side = math.min(gw // 4, math.max(3 * L.rh + 6, gh // 4))   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
             local G = { cols = 4, cw = side, ch = side }
-            G.fit = math.max(1, math.min(4, gh // G.ch))
+            G.fit = math.max(1, math.min(32, gh // G.ch))   -- 19 окт: влезает больше рядов — показываем
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
             local by_note = {}
             for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not by_note[pn] then by_note[pn] = ki2 end end
@@ -7997,8 +8006,21 @@ function D.frame(L, snap, rows, state, info)
               for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not lo or pn < lo then lo = pn end end
               wb = (lo or (D.slice_base_note or 48)) // 4     -- нижний пэд, без пэдов — базовая октава (C3)
             end
+            -- 19 окт: октава клавиатуры ([ ]) сменилась — окно пэдов к ней (нижний ряд — с ноты октавы)
+            D.kit_octs = D.kit_octs or {}
+            if D.kit_octave and D.kit_octs[kkey] ~= D.kit_octave then
+              if D.kit_octs[kkey] ~= nil then wb = ((D.kit_octave + 1) * 12) // 4; D.kit_wheel = true end
+              D.kit_octs[kkey] = D.kit_octave
+            end
+            -- колесо над картой или сеткой — по рядам (курсор пэда окно не возвращает, пока сам не сдвинулся)
+            if gfx.mouse_wheel ~= 0 and not drag and mx >= mapx and mx < gx0 + 4 * G.cw and my >= gy0 and my < by + bh then
+              wb = wb + (gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0; D.kit_wheel = true
+            end
+            D.kit_selseen = D.kit_selseen or {}
+            local skey = tostring(ks) .. ':' .. tostring(D.kit_note and D.kit_note[kkey])
+            if D.kit_selseen[kkey] ~= skey then D.kit_selseen[kkey] = skey; D.kit_wheel = nil end
             local kn = ks == 0 and D.kit_note and D.kit_note[kkey] or nil      -- 19 окт: курсор режима пэдов на пустой ноте
-            if ks > 0 or kn then
+            if (ks > 0 or kn) and not D.kit_wheel then
               local kr = (ks > 0 and pos(ks) or kn) // 4
               if kr < wb then wb = kr elseif kr >= wb + G.fit then wb = kr - G.fit + 1 end
             end
@@ -8174,10 +8196,15 @@ function D.frame(L, snap, rows, state, info)
             if D.DR and kid.note then
               local by2 = by + bh - L.rh - 4
               local gx = bx + L.pad
-              for _, gb in ipairs({ { 'kgroup', 'grp', kid.group, U.CYAN }, { 'kchoke', 'chk', kid.choke, U.RED }, { 'kroute', 'r', (kid.entry and kid.entry.container) and 1 or 0, U.CYAN } }) do
+              local noff, non = 0, 0
+              for _, kd in ipairs(f.kids) do if kd.enabled then non = non + 1 else noff = noff + 1 end end
+              local soloed = non == 1 and #f.kids > 1
+              for _, gb in ipairs({ { 'kall_m', 'm', (noff > 0 and not soloed) and 1 or 0, U.RED }, { 'kall_s', 's', soloed and 1 or 0, U.GREEN },
+                  { 'kgroup', 'grp', kid.group, U.CYAN }, { 'kchoke', 'chk', kid.choke, U.RED }, { 'kroute', 'r', (kid.entry and kid.entry.container) and 1 or 0, U.CYAN } }) do
                 local n = gb[3] or 0
-                local gl = gb[1] == 'kroute' and 'r' or (n > 0 and (gb[2] .. n) or gb[2])
-                local bw2 = gb[1] == 'kroute' and (ms('r') + 2 * L.pad) or (ms(gb[2] .. '16') + 2 * L.pad)
+                local one = gb[1] == 'kroute' or gb[1] == 'kall_m' or gb[1] == 'kall_s'
+                local gl = one and gb[2] or (n > 0 and (gb[2] .. n) or gb[2])
+                local bw2 = one and (ms(gb[2]) + 2 * L.pad) or (ms(gb[2] .. '16') + 2 * L.pad)
                 if gx + bw2 > bx + bw1 - L.pad then break end
                 local hb = not drag and mx >= gx and mx < gx + bw2 and my >= by2 and my < by2 + L.rh
                 set(hb and U.tint(U.AMBER, 0.35) or (n > 0 and U.tint(gb[4], 0.25) or U.BG)); gfx.rect(gx, by2, bw2, L.rh - 1, 1)
@@ -8260,8 +8287,14 @@ function D.frame(L, snap, rows, state, info)
               cnt = 1 + WR
             end
           end
+          -- 19 окт: не влезли по высоте — следующая колонка справа (с верха), сколько колонок дал ncol_of
+          local rmax = math.max(2, nfit - 2)
+          local colp = 1
           for pi, p in ipairs(f.params) do
-            if p.kid == show and not p.macro then cl[pi] = { 1, cnt }; cnt = cnt + 1 else cl[pi] = { 99, 0 } end
+            if p.kid == show and not p.macro then
+              if cnt >= rmax and colp + 1 < ncol then colp, cnt = colp + 1, 0 end
+              cl[pi] = { colp, cnt }; cnt = cnt + 1
+            else cl[pi] = { 99, 0 } end
           end
           ::kit_done::
         elseif #f.kids > 0 and ncol >= (f.cols or 1) then
