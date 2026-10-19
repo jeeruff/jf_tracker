@@ -24289,20 +24289,24 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   local list = {}
   for _, p in ipairs(model.patterns(regions)) do if not p.name:match('^=') and not (p.src and p.src.session) then list[#list + 1] = p end end
   ctx.pat_rows = list
-  -- 19 окт: плотно — кубики подряд по коду (A1 A2 … B1 …, без кода — в конце), подпись — сам код; без шапок и счётчиков
-  local order = {}
-  for i, p in ipairs(list) do order[#order + 1] = i end
-  table.sort(order, function(a, b)
-    local la, va = model.SEC.code_of(list[a].name); local lb, vb = model.SEC.code_of(list[b].name)
-    if (la ~= nil) ~= (lb ~= nil) then return la ~= nil end
-    if la and lb then if la ~= lb then return la < lb end return (va or 0) < (vb or 0) end
-    return list[a].name < list[b].name
-  end)
+  -- 19 окт: плотно — сетка всех кодов: ряд — буква A, B, C …, колонки — варианты 1, 2 … (hex) сколько влезает;
+  -- паттерна ещё нет — серый кубик с кодом; без кода — последним рядом
   local cw = U.measure('W00') + 2 * Lx.pad
   local ch = Lx.rh + 2
   local per = math.max(1, math.floor(w / cw))
+  local nrow = math.max(1, math.floor(h / ch))
+  local byc, other = {}, {}
+  for i, p in ipairs(list) do
+    local l, v = model.SEC.code_of(p.name)
+    if l and v then byc[l .. v] = i else other[#other + 1] = i end
+  end
   local cells = {}
-  for k, i in ipairs(order) do cells[#cells + 1] = { i = i, r = (k - 1) // per + 1, c = (k - 1) % per + 1 } end
+  local letters = math.max(1, nrow - (#other > 0 and 1 or 0))
+  for r = 1, letters do
+    local l = string.char(64 + r)
+    for v = 1, per do cells[#cells + 1] = { i = byc[l .. v], code = l .. ('%X'):format(v), r = r, c = v } end
+  end
+  for k, i in ipairs(other) do if k <= per then cells[#cells + 1] = { i = i, r = letters + 1, c = k } end end
   ctx.pat_cells = cells
   MX.pl_sel = math.max(1, math.min(#list, MX.pl_sel or 1))
   local play_name
@@ -24315,7 +24319,12 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   for _, cl in ipairs(cells) do
     local cx, cy = x + (cl.c - 1) * cw, y + (cl.r - 1) * ch
     if cy + ch > y + h then break end
-    local p = list[cl.i]
+    local p = cl.i and list[cl.i]
+    if not p then   -- ещё нет: серый кубик с кодом
+      U.set(U.mix(U.LINE, U.PANEL, 0.55)); gfx.rect(cx, cy, cw - 1, ch - 1, 0)
+      U.text(cx + Lx.pad, cy + 1, cl.code or '', U.mix(U.DIM, U.PANEL, 0.4))
+      goto pcell_next
+    end
     local on = cl.i == MX.pl_sel
     local n = uses[p.name] or 0
     local playing = play_name == p.name
@@ -24325,6 +24334,7 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
     local code = model.SEC.code_of(p.name) and (p.name:match('^(%S+)') or p.name) or p.name
     U.text(cx + Lx.pad, cy + 1, ctx.fit(code, cw - 2 * Lx.pad), on and U.AMBER or (playing and U.GREEN or (n > 0 and U.TEXT or U.DIM)))
     if hot then hv.patrow = cl.i end
+    ::pcell_next::
   end
   if #list == 0 then U.text(x + Lx.pad, y + Lx.rh, 'no patterns yet - n in the matrix names a bar', U.DIM) end
   -- в статус: выбранный / под мышью — сколько раз и на каких тактах
