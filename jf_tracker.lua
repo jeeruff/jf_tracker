@@ -19514,7 +19514,7 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
-  elseif hover.viewbtn == 'foldfast' then state.status = 'fd - fold: a fast note (shorter than a row) with no free column becomes a line inside the row, no new lane; zoom (LPB +) shows it on its own row'
+  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column is a line inside the row - no new lane (white - a note, under the commands - it has a command); zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'

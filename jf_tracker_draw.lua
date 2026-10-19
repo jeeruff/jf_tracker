@@ -6673,7 +6673,11 @@ function D.frame(L, snap, rows, state, info)
       all = all and nt > 0
       local ay = hy + 1 + 2 * L.rh
       local ny0 = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
-      if ny0 >= ay + L.rh then small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'aa', all and 'off' or 'on', all, 'mautoarm')
+      if ny0 >= ay + L.rh then
+        local xf = small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'aa', all and 'off' or 'on', all, 'mautoarm')
+        -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
+        local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)
+        if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
       else
         local xa = plb and (x2 + ms(plb) + 4) or x2
         if xa + ms('aa') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'aa', all and 'off' or 'on', all, 'mautoarm') end
@@ -6705,7 +6709,6 @@ function D.frame(L, snap, rows, state, info)
         for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
         local pw = ms('als') + ms('cln') + 6
         local px = bx + bw - pw
-        if x + ms('fd') + 4 <= px then x = small(x, by2, 'fd', 'foldfast', state.foldfast, 'viewbtn') end   -- 19 окт: fold быстрых нот
         if px >= x then px = small(px, by2, 'als', 'alias', false, 'rgbtn'); small(px, by2, 'cln', 'clone', false, 'rgbtn')
         elseif x + ms('cln') + 2 <= bx + bw then small(x, by2, 'cln', 'clone', false, 'rgbtn') end
       end

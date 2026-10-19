@@ -2285,6 +2285,15 @@ function M.peaks(head, npix, want_spec)
   -- сэмпле, 1 окт). Просим реже, пока не вернутся пары max/min, и
   -- растягиваем на сетку npix.
   local n = math.min(npix * os, 16384)
+  -- 19 окт: короткий кусок (слайс в пару строк) — плотность выше файла пиков, а при уменьшении на пиксель
+  -- оставалось по сэмплу (волна — линия у нуля): просим сэмплы густо и собираем max / min по пикселю сами
+  if (rv >> 20) & 0xF ~= 0 then
+    local nd = math.min(16384, math.max(npix * 8, math.floor(span * 16000)))
+    if nd >= npix * 4 and nd <= 16384 then
+      local r2, s2, b2 = fetch(nd, 0)
+      if s2 > 0 then rv, spl, buf, nreq = r2, s2, b2, nd; n = 32 end   -- сырые сэмплы густо — без уменьшения ниже
+    end
+  end
   while (rv >> 20) & 0xF ~= 0 and n > 32 do
     n = n // 2
     local r2, s2, b2 = fetch(n, 0)
