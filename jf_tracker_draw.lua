@@ -6278,7 +6278,7 @@ function D.frame(L, snap, rows, state, info)
       slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
       -- 19 окт: метр трека — тонкая полоса под v (та же шкала -60..+12): пик трека (взведённый аудио — вход);
       -- вход MIDI на трек — жёлтая вспышка, гаснет за 0.3 с
-      if not c.master then
+      if not c.master and info.hdrmeter ~= false then
         local my0 = hy + 3 * L.rh - 1
         local lw0 = ms('v') + L.pad
         local mx0, mw0 = sx + lw0, math.max(4, sw - lw0)
@@ -7286,6 +7286,23 @@ function D.frame(L, snap, rows, state, info)
             eighths = eighths - part
             cell = cell + 1
           end
+        end
+      end
+    end
+    gfx.a = 1
+  end
+  -- 19 окт: вход MIDI прямо на треке — жёлтый столбик справа от метров L R (и без метров), гаснет за 0.3 с
+  if info.midi_in_age then
+    local cwm = math.max(3, L.cw - 1)
+    local by = L.body_y + L.nrows * L.rh
+    local hh = math.floor(L.body_h * 0.575)
+    for _, c in ipairs(L.cols) do
+      if c.x and not c.folded and c.col and not c.col.master then
+        local age = info.midi_in_age(c.col)
+        if age and age < 0.3 then
+          local yl = U.YELLOW or U.AMBER
+          local x0 = (state.meterstyle == 'pt') and (c.x + 2 + math.max(2, math.min(c.w - 4, 3 * L.cw)) + 2) or (c.x + 2 + 2 * (cwm + 1) + 1)
+          gfx.set(yl[1], yl[2], yl[3], 0.9 * (1 - age / 0.3)); gfx.rect(x0, math.max(L.body_y, by - hh), math.max(2, math.floor(cwm / 2)), hh, 1)
         end
       end
     end
