@@ -2128,28 +2128,32 @@ local function draw_cell(L, cell, x, y, ty, inv)
     -- чёрточка на месте каждой ноты (delay), высота — velocity; видимая — ярко, сложенные — светлее, команда — голубая точка
     local tw = L.w_fold or ms('OOO')
     local sx = (L.x_fold and L.sub_w and L.x_fold < L.sub_w) and (x + L.x_fold) or (x + (L.sub_w or (L.x_note + L.w_note + tw + 2)) - tw - 1)   -- узкая подколонка — у правого края
-    -- 19 окт (4): заметнее — подложка колонки, чёрточки в 2 px: сложенные — янтарём, видимая — белым
-    local top, bh = y + 1, L.rh - 2
-    set(U.tint(U.AMBER, 0.14)); gfx.rect(sx, top, tw, bh, 1)
-    set(U.tint(U.AMBER, 0.35)); gfx.rect(sx, top, tw, bh, 0)
-    local base = top + bh - 1
-    local function tick(h, bright)
-      local px = sx + 1 + math.max(0, math.min(tw - 4, math.floor((h.delay or 0) / 256 * (tw - 3))))
-      local v = (tonumber(h.vol or '', 16) or 100) / 127
-      local th = math.max(3, math.floor((bh - 2) * math.max(0.3, math.min(1, v)) + 0.5))
-      set(h.muted and U.GREY or (bright and U.TEXT or U.AMBER))
-      gfx.rect(px, base - th + 1, 2, th, 1)
-      if h.fx and #h.fx > 0 then set(U.CYAN); gfx.rect(px, top, 2, 2, 1) end
-    end
-    if cell.kind == 'midi' or cell.kind == 'audio' then tick(cell, true) end
-    for _, fh in ipairs(cell.fold) do tick(fh, false) end
-    -- 19 окт: «+» перед нотой, в которой что-то сложено (как папка в lib: 01+)
-    if cell.kind == 'midi' or cell.kind == 'audio' then   -- только у ноты (не у OFF / продолжения)
-      local pw = ms('+')
-      local px = x + L.x_note - pw - 1
-      if px < x + 1 then px = x + L.x_note + ms('C-4') + 1 end   -- слева нет места — сразу за нотой
-      text(px, ty, '+', U.CYAN)
-    end
+    -- 19 окт (5): гребёнка не читалась — в колонке число сложенных нот: +1 +2 … (голубым, шрифт трекера)
+    local cnt = '+' .. #cell.fold
+    text(sx + math.max(0, math.floor((tw - ms(cnt)) / 2)), ty, cnt, U.CYAN)
+    -- гребёнка (мини-таймлайн строки) — выключена:
+    -- -- 19 окт (4): заметнее — подложка колонки, чёрточки в 2 px: сложенные — янтарём, видимая — белым
+    -- local top, bh = y + 1, L.rh - 2
+    -- set(U.tint(U.AMBER, 0.14)); gfx.rect(sx, top, tw, bh, 1)
+    -- set(U.tint(U.AMBER, 0.35)); gfx.rect(sx, top, tw, bh, 0)
+    -- local base = top + bh - 1
+    -- local function tick(h, bright)
+    --   local px = sx + 1 + math.max(0, math.min(tw - 4, math.floor((h.delay or 0) / 256 * (tw - 3))))
+    --   local v = (tonumber(h.vol or '', 16) or 100) / 127
+    --   local th = math.max(3, math.floor((bh - 2) * math.max(0.3, math.min(1, v)) + 0.5))
+    --   set(h.muted and U.GREY or (bright and U.TEXT or U.AMBER))
+    --   gfx.rect(px, base - th + 1, 2, th, 1)
+    --   if h.fx and #h.fx > 0 then set(U.CYAN); gfx.rect(px, top, 2, 2, 1) end
+    -- end
+    -- if cell.kind == 'midi' or cell.kind == 'audio' then tick(cell, true) end
+    -- for _, fh in ipairs(cell.fold) do tick(fh, false) end
+    -- -- 19 окт: «+» перед нотой, в которой что-то сложено (как папка в lib: 01+)
+    -- if cell.kind == 'midi' or cell.kind == 'audio' then   -- только у ноты (не у OFF / продолжения)
+    --   local pw = ms('+')
+    --   local px = x + L.x_note - pw - 1
+    --   if px < x + 1 then px = x + L.x_note + ms('C-4') + 1 end   -- слева нет места — сразу за нотой
+    --   text(px, ty, '+', U.CYAN)
+    -- end
     -- for _, fh in ipairs(cell.fold) do   -- линии в своё время внутри строки (пока выключено)
     --   local yy = y + math.max(1, math.min(L.rh - 2, math.floor((fh.delay or 0) / 256 * L.rh + 0.5)))
     --   set(fh.muted and U.GREY or U.TEXT); gfx.rect(x + L.x_note, yy, math.max(4, L.w_note), 1, 1)

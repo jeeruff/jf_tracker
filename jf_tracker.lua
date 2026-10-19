@@ -26401,6 +26401,18 @@ ctx.sec_select = function(sc)
   ctx.set_focus('matrix')
   vim.msg = ('section %s: %d slots selected (y d M - copy / cut / mute the block; double-click - loop, rclick - menu)'):format(sc.name or '', #ps)
 end
+-- 19 окт: имя / удаление секции — и из меню, и клавишами на её полосе (c, x)
+ctx.sec_rename = function(sc)
+  ctx.name_pick('region', 'section name', sc.name or '', function(nm)
+    if nm == '' then vim.msg = 'section: a name is needed'; return end
+    edit.run('section rename', function() reaper.SetProjectMarker3(0, sc.idx, true, sc.pos, sc.rgnend, nm, sc.color or 0) end); ctx.mx_refresh()
+  end)
+end
+ctx.sec_remove = function(sc)
+  edit.run('section remove ' .. (sc.name or ''), function() reaper.DeleteProjectMarker(0, sc.idx, true) end); ctx.mx_refresh()
+  MX.cur.sec = nil
+  vim.msg = 'section ' .. (sc.name or '') .. ' removed - its patterns stay'
+end
 ctx.sec_menu = function(sc)
   local items = {
     { label = 'launch (quantized)', v = 'launch' },
@@ -26418,14 +26430,8 @@ ctx.sec_menu = function(sc)
     elseif it.v == 'rep' then ctx.sec_repeat(sc, true)
     elseif it.v == 'copy' then ctx.sec_repeat(sc, false)
     elseif it.v == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
-    elseif it.v == 'name' then
-      ctx.name_pick('region', 'section name', sc.name or '', function(nm)
-        if nm == '' then vim.msg = 'section: a name is needed'; return end
-        edit.run('section rename', function() reaper.SetProjectMarker3(0, sc.idx, true, sc.pos, sc.rgnend, nm, sc.color or 0) end); ctx.mx_refresh()
-      end)
-    elseif it.v == 'del' then
-      edit.run('section remove ' .. (sc.name or ''), function() reaper.DeleteProjectMarker(0, sc.idx, true) end); ctx.mx_refresh()
-      vim.msg = 'section ' .. (sc.name or '') .. ' removed - its patterns stay'
+    elseif it.v == 'name' then ctx.sec_rename(sc)
+    elseif it.v == 'del' then ctx.sec_remove(sc)
     end
   end })
 end

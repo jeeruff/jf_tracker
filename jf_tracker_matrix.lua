@@ -972,6 +972,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
       U.set(c)
       gfx.rect(1, b.y0, xr, b.y1 - b.y0, 0)
+      -- 19 окт: курсор на полосе секции — рамкой всю секцию
+      if MX.cur.sec and sc == MX.sec_at(regions, MX.cur.ri) then
+        U.set(U.AMBER); gfx.rect(0, b.y0, xr + 1, b.y1 - b.y0, 0); gfx.rect(1, b.y0 + 1, xr - 1, b.y1 - b.y0 - 2, 0)
+        if sw > 0 then U.set(U.AMBER); gfx.rect(2, b.y0 + 1, sw - 2, b.y1 - b.y0 - 2, 0) end
+      end
     end
     -- 18 окт: протяжка секции — куда встанет (черта у слота)
     local sd = MX.sec_drag
@@ -1110,9 +1115,31 @@ local MX_HINT = {
 function MX.pending_hint() return MX.pending and MX_HINT[MX.pending] or nil end
 local OPS = { d = true, y = true, g = true, T = true }   -- 18 окт: T r — выделение в секцию   -- 13 окт: z — меню вида (ctx.mx_view_menu)
 
+-- 19 окт: секция слота (по регионам секций), для курсора на её полосе
+function MX.sec_at(regions, ri)
+  local rg = regions[ri]
+  if not rg or not ctx.sections then return nil end
+  for _, sc in ipairs(ctx.sections()) do if rg.pos >= sc.pos - 1e-6 and rg.pos < sc.rgnend - 1e-6 then return sc end end
+end
 function MX.key(c, regions, snap)
   local ch = c < 256 and string.char(c) or ''
   local mods = ctx.mods and ctx.mods() or {}
+  -- 19 окт: курсор на полосе секции (h с колонки имени): рамка вокруг секции; Enter — меню, c — change (имя),
+  -- x — убрать секцию (паттерны остаются), Space — запустить, l / Esc — назад к имени, j k — по слотам
+  if MX.cur.sec and not MX.pending then
+    local sc = MX.sec_at(regions, MX.cur.ri)
+    if ch == 'l' or c == 1919379572 or c == 27 then MX.cur.sec = nil; return true end
+    if c == 13 then if sc then ctx.sec_menu(sc) end; return true end
+    if ch == 'c' then if sc and ctx.sec_rename then ctx.sec_rename(sc) end; return true end
+    if ch == 'x' then if sc and ctx.sec_remove then ctx.sec_remove(sc) end; return true end
+    if ch == ' ' then if sc and ctx.sec_launch then ctx.sec_launch(sc) end; return true end
+    if ch == 'h' or c == 1818584692 then return true end
+  end
+  if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then
+    MX.cur.sec = true
+    ctx.msg('section ' .. (MX.sec_at(regions, MX.cur.ri).name or '') .. ': Enter menu, c change name, x remove (patterns stay), Space launch, l back')
+    return true
+  end
   -- оператор ждёт второй клавиши: dd yy cc cw gg
   if MX.pending then
     local op = MX.pending
