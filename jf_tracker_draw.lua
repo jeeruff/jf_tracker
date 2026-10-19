@@ -7132,10 +7132,19 @@ function D.frame(L, snap, rows, state, info)
             D.cur_box = nil; D.fx_half = nil
             if in_body and mx >= x and mx < x + f.w then
               hover.fi = fi; hover.cell = cell; hover.col = c.col
-              for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + L.nfx)) do
-                local fx, fw = D.field_rect(f.G or L, fld)
-                if mx >= x + fx and mx < x + fx + fw + L.pad then hover.field = fld; break end
+              -- 19 окт: колонки команд — по геометрии этой подколонки (у трека их бывает больше общего L.nfx);
+              -- промежуток между полями — ближайшее (щелчок по пустой ячейке ставит курсор в её поле)
+              local Gf = f.G or L
+              local best, bd
+              for fld = 1, f.compact and 1 or (f.narrow and 2 or (3 + math.max(Gf.nfx or L.nfx or 0, #(Gf.x_fx or {})))) do
+                local fx, fw = D.field_rect(Gf, fld)
+                if fx then
+                  if mx >= x + fx and mx < x + fx + fw + L.pad then best = fld; bd = 0; break end
+                  local dd = math.min(math.abs(mx - (x + fx)), math.abs(mx - (x + fx + fw)))
+                  if not bd or dd < bd then best, bd = fld, dd end
+                end
               end
+              hover.field = best
               -- номер инструмента под мышью (5 окт) — подполе ноты
               local G2 = f.G or L
               if G2.x_inst and mx >= x + G2.x_inst and mx < x + G2.x_inst + ms('00') + 2 then hover.field = 1; hover.fsub = 'inst' end
