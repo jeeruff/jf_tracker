@@ -19974,6 +19974,38 @@ local function frame()
         else vim.msg = ('note %d: no pad   (Ctrl+Cmd: the window is a 4 x 4 pad grid)'):format(note) end
       end
     else ctx.pad_grid16 = nil; ctx.drum_pad_glide = nil; draw.pad_zone = nil end
+    -- 19 окт: sniper zoom — Ctrl+Cmd над волной вкладки item: окно делится по высоте пополам. Низ — выбор слайса
+    -- (по x: какой из слайсов, звучит); верх — прицел зума: x — точка в сэмпле, y — сила зума (выше — ближе), курсор волны там
+    local sn = ctx.sniper
+    if mm.ctrl and mm.cmd and not sn and not pg and hover.sample and hover.sample.wave then
+      sn = { t = reaper.time_precise() }; ctx.sniper = sn
+    end
+    if mm.ctrl and mm.cmd and sn then
+      ctx.drum_pad_glide = true
+      local root = ctx.slice_root and ctx.slice_root()
+      local wv = SL.wave
+      local fx = math.max(0, math.min(0.9999, gfx.mouse_x / math.max(1, gfx.w)))
+      local fy = gfx.mouse_y / math.max(1, gfx.h)
+      if root and wv and wv.len and wv.len > 0 then
+        if fy >= 0.5 then
+          local ns = root.slices and #root.slices or 0
+          if ns > 0 then
+            local k = math.floor(fx * ns) + 1
+            if sn.k ~= k then sn.k = k; local cur = (ctx.ssel.item == root.item) and ctx.ssel.k or 0; ctx.slice_step(k - cur) end
+          end
+          SL.va, SL.vb, sn.aim = 0, nil, nil
+        else
+          local t = fx * wv.len
+          local zf = 1 - fy * 2                                   -- 0 у середины окна .. 1 у верха
+          local span = math.max(0.005, wv.len * (1 - 0.985 * zf))
+          local na = math.max(0, math.min(wv.len - span, t - span / 2))
+          SL.va, SL.vb = na, na + span
+          SL.wcur, SL.wcur_e = t, root.item
+          sn.aim = t
+          vim.msg = ('sniper: %.3fs  x%.0f  (low half - slices, high half - aim; higher = closer)'):format(t, wv.len / span)
+        end
+      end
+    elseif sn then ctx.sniper = nil end
     -- clipkb (матрица / patterns): отпустил Shift — набранное звучит вместе (19 окт: здесь, а не в рисовании палитры)
     if MX.pal_kb and MX.pal_shift and not mm.shift then MX.pal_shift = nil; ctx.palette_play_picks() end
     -- 19 окт: Ctrl+Cmd над строкой матрицы — jog / scrub по паттерну в лупе: палец влево-вправо по строке — место в паттерне
