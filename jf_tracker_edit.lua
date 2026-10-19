@@ -3361,7 +3361,7 @@ local function row_shift(it, pos, lpb, nrows)
   return E.swing_time(r + nrows, lpb, it) + (pos - E.swing_time(r, lpb, it))
 end
 E.row_shift = row_shift
-function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows)
+function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- keepend (19 окт): MIDI-клип до limit держит длину (паттерн Renoise)
   local dt = t1 - t0
   if dt <= 0 then return end
   run(('delete time %.3fs'):format(dt), function()
@@ -3408,6 +3408,7 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows)
             R.MIDI_Sort(tk)
             if pos >= t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos) end
             local nfin = (fin >= t1) and (fin - dt) or t0
+            if keepend and fin >= limit - EPS then nfin = math.min(fin, limit) end   -- 19 окт: до конца паттерна — длина та же, пустые строки в конце
             if nfin <= math.max(pos, t0) + EPS and pos >= t0 - EPS then R.DeleteTrackMediaItem(tr, it)
             else R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(EPS, nfin - pos)) end
           elseif pos < t0 - EPS and fin > t1 + EPS then
