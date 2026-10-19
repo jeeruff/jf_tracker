@@ -23847,6 +23847,8 @@ frame = (function(inner)
     err_streak = err_streak + 1
     local msg = tostring(e)
     if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg; pcall(ctx.dlog, 'ERROR ' .. msg) end
+    -- 19 окт: кадр падает каждый раз — недоделанные кэши кадра копятся быстрее сборщика (750 МБ): собрать раз в секунду
+    if reaper.time_precise() - (ctx.err_gc or 0) > 1 then ctx.err_gc = reaper.time_precise(); collectgarbage('collect') end
     vim.msg = 'error (tracker keeps running): ' .. (msg:match('^[^\n]*') or msg)
     if err_streak > 100 then save_win(); gfx.quit(); return end
     gfx.update()
