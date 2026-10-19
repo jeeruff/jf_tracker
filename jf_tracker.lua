@@ -21064,6 +21064,12 @@ local function frame()
       if ctx.mods().shift then MX.sk_sel[k] = (not MX.sk_sel[k]) or nil else MX.sk_sel = { [k] = true } end
       ctx.set_focus('matrix'); ctx.sketch_play()
       click = { t = now2, zone = 'sketch' }
+    elseif hover.matrix and hover.matrix.chainbtn then   -- 19 окт: строка chain
+      local b = hover.matrix.chainbtn
+      if b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.pl_play() end
+      elseif b == 'render' then ctx.chain_render()
+      else ctx.pl_load(); local l = ctx.PL.lists[ctx.PL.cur]; if l then l.text = ''; ctx.pl_save() end; vim.msg = 'chain: cleared' end
+      click = { t = now2, zone = 'chainbtn' }
     elseif hover.matrix and hover.matrix.sketchbtn then
       local b = hover.matrix.sketchbtn
       if b == 'after' or b == 'before' then ctx.sketch_insert(b == 'before')
@@ -21077,7 +21083,8 @@ local function frame()
       click = { t = now2, zone = 'sketchbtn' }
     elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
       ctx.set_focus('matrix'); MX.pl_sel = hover.matrix.patrow
-      if dbl and click.zone == 'patrow' then ctx.patlist_do('go') else ctx.patlist_do('listen') end
+      if dbl and click.zone == 'patrow' then local p = (ctx.pat_rows or {})[hover.matrix.patrow]; if p then ctx.chain_add(p.name) end   -- 19 окт: двойной — в цепь
+      else ctx.patlist_do('listen') end
       click = { t = now2, zone = 'patrow' }
     elseif hover.matrix and hover.matrix.palbtn then   -- 18 окт: кнопки палитры
       local b = hover.matrix.palbtn
@@ -24247,11 +24254,14 @@ ctx.pl_tick = function(pp)
   end
 end
 -- дописать после песни: целые — связанные повторы, сокращённые / с проскоком — копия, обрезанная, своим именем
-ctx.pl_write = function()
+-- 19 окт: at — куда (слот курсора матрицы: цепь встаёт перед ним, остальное едет); sec — имя секции над записанным
+ctx.pl_write = function(at, sec)
   local steps = ctx.pl_parsed()
   if #steps == 0 then vim.msg = 'chain: nothing to write'; return end
   local t = 0
   for _, rg in ipairs(ctx.real_seq()) do if not rg.session and not rg.lib and rg.rgnend > t then t = rg.rgnend end end
+  if at then t = at end
+  local t_start = t
   local n = 0
   ctx.slot_op('chain: write after the song', function()
     local trs = {}
@@ -24283,9 +24293,11 @@ ctx.pl_write = function()
       end
       t = nt; n = n + 1
     end
+    if sec and sec ~= '' and t > t_start then reaper.AddProjectMarker2(0, true, t_start, t, sec, -1, 0) end   -- 19 окт: секция над цепью
   end)
   model.invalidate(); regions = model.regions(state.lpb)
-  vim.msg = ('chain: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
+  vim.msg = at and ('chain: %d step(s) rendered into the matrix at the cursor%s (u - undo)'):format(n, (sec and sec ~= '') and (' as section ' .. sec) or '')
+    or ('chain: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
 end
 ctx.plist_toggle = function()
   MX.plist = not MX.plist
@@ -24547,6 +24559,49 @@ ctx.sketch_draw = function(Lx, x, y, w)
     U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or U.TEXT)
     if hot then hv.sketchbtn = b[2] end
     bx = bx + bw + 2
+  end
+  return Lx.rh + 2, hv
+end
+-- 19 окт: блок над матрицей: кубики паттернов на всю ширину + строка chain (двойной щелчок по кубику — в цепь,
+-- > — слушать цепь, имя секции — выпадашкой, render — в матрицу перед слотом курсора, x — очистить)
+ctx.chain_add = function(name)
+  ctx.pl_load()
+  local P = ctx.PL
+  if #P.lists == 0 then P.lists[1] = { name = 'chain 1', text = '' }; P.cur = 1 end
+  local l = P.lists[P.cur]
+  l.text = ((l.text or '') .. ' ' .. (name:match('^%S+') or name)):gsub('^%s+', '')
+  ctx.pl_save()
+  vim.msg = ('chain: %s (> listen, render - into the matrix at the cursor)'):format(l.text)
+end
+ctx.chain_render = function()
+  local slot = seq[MX.cur.ri]
+  local at = slot and slot.pos
+  ctx.name_pick('region', 'section name for the chain (empty - none)', '', function(nm) ctx.pl_write(at, nm) end)
+end
+ctx.chain_draw = function(Lx, x, y, w)
+  local hv = {}
+  ctx.pl_load()
+  local P = ctx.PL
+  local l = P.lists[P.cur]
+  local text = l and l.text or ''
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  U.text(x + Lx.pad, y, 'chain', U.GREY)
+  local bx = x + Lx.pad + U.measure('chain ') + Lx.pad
+  local btns = { { '>', 'play' }, { 'render', 'render' }, { 'x', 'clear' } }
+  local bw_all = 0
+  for _, b in ipairs(btns) do bw_all = bw_all + U.measure(b[1]) + 2 * Lx.pad + 2 end
+  local tw = math.max(Lx.cw * 4, x + w - bw_all - bx - Lx.pad)
+  U.text(bx, y, ctx.fit(text ~= '' and text or 'double click a pattern - it joins the chain', tw), text ~= '' and U.TEXT or U.DIM)
+  local cx = bx + tw + Lx.pad
+  for _, b in ipairs(btns) do
+    local bw = U.measure(b[1]) + 2 * Lx.pad
+    local hot = mx >= cx and mx < cx + bw and my >= y and my < y + Lx.rh
+    local on = b[2] == 'play' and ctx.PLY ~= nil
+    U.set(on and U.tint(U.GREEN, 0.3) or (hot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(cx, y, bw, Lx.rh - 1, 1)
+    U.set(U.LINE); gfx.rect(cx, y, bw, Lx.rh - 1, 0)
+    U.text(cx + Lx.pad, y, b[1], hot and U.AMBER or (on and U.GREEN or U.TEXT))
+    if hot then hv.chainbtn = b[2] end
+    cx = cx + bw + 2
   end
   return Lx.rh + 2, hv
 end
