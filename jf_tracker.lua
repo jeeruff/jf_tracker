@@ -4974,6 +4974,12 @@ ctx = {
       if listen then ctx.inst_listen() end
       local e = cur_col() and (cur_col().pool or {})[r.i]
       vim.msg = ('inst %02d: %s'):format(r.i, e and e.name or '') .. (listen and '' or '  (Space - listen, Enter / l - pick)')
+    elseif r.k == 'y' then                                -- 19 окт: слой ¥ — инструмент выбран, Space — слушать слой, Enter — меню слоя
+      if r.ci then ctx.tl_cursor(r.ci) end
+      pool_select(r.i)
+      local root = cur_col() and (cur_col().pool or {})[r.i]
+      local l = root and root.layers and root.layers[r.lk]
+      if listen then ctx.layer_listen(l) else ctx.layer_menu(root, r.lk) end
     elseif r.k == 's' then                                -- слайс: инструмент — его исходник, слайс выбран и звучит
       if r.ci then ctx.tl_cursor(r.ci) end
       pool_select(r.i)
@@ -5260,7 +5266,7 @@ ctx = {
       else ctx.tl_row_do(r) end
     elseif c == 13 then if r then if r.k == 't' then ctx.tlist_do(r.ci, 'go') elseif r.key and r.k ~= 'i' then TL.open[r.key] = (not TL.open[r.key]) or nil else ctx.tl_row_do(r) end end
     elseif ch == ' ' then
-      if inst then ctx.tl_row_do(r, true)
+      if inst or (r and r.k == 'y') then ctx.tl_row_do(r, true)   -- 19 окт: слой ¥ — слушать его
       elseif col then TL.marks[col.guid] = (not TL.marks[col.guid]) or nil; TL.cur = math.min(#rows, TL.cur + 1) end
     elseif ch == 'v' then for _, rr in ipairs(rows) do if rr.k == 't' then local g = snap.cols[rr.ci].guid; TL.marks[g] = (not TL.marks[g]) or nil end end
     elseif ch == 'u' then TL.marks = {}; vim.msg = 'tracks: marks cleared'
@@ -5361,6 +5367,7 @@ ctx = {
     vim.open_hydra({ title = 'add ' .. nf .. ' to', items = {
       { key = 'l', label = 'the lib - each file its own instrument (= Enter)', fn = function() for _, f in ipairs(files) do ctx.add_to_depot(f) end; done(); vim.msg = #files .. ' file(s) into the lib' end },
       { key = 'd', label = 'drumrs5k - a pad per file, a key each (the rack on the DSP track, or a new one)', fn = function() ctx.drum_add_files(files); done() end },
+      { key = 'y', label = 'layers (¥) of the selected lib instrument - they sound together with it on one note', fn = function() ctx.layer_add_files(files); done() end },   -- 19 окт
       { key = 's', label = 'sampler - one RS5K per file on the DSP track, played by pitch', fn = function()
         local col = dsp_target() or cur_col(); if not col then return end
         edit.run('files to RS5K', function()
@@ -18012,6 +18019,7 @@ local function frame()
     drum_key = function(n) return model.DR.key_of(n, ctx.piano, vim.octave) end,   -- 16 окт: подпись пэда drumrs5k (key)
     drumcell = state.drumcell or 'note',
     file_len = function(path) return model.file_len(path) end,
+    layer_src = function(g) return model.layer_src and model.layer_src[g] end,   -- 19 окт: слой ¥ по GUID
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
@@ -20611,7 +20619,9 @@ local function frame()
       click = { t = now2, zone = 'tlfold' }
     elseif hover.tlist and hover.tlist.what == 'row' then   -- 13 окт: строка дерева (инструмент, automation, lib)
       draw.TL.cur = hover.tlist.li
-      ctx.tl_row_do((draw.TL.rows or {})[hover.tlist.li], dbl)
+      local rw = (draw.TL.rows or {})[hover.tlist.li]
+      if rw and rw.k == 'y' then ctx.tl_row_do(rw, not dbl)   -- 19 окт: слой — щелчок слушает, двойной — его меню
+      else ctx.tl_row_do(rw, dbl) end
       click = { t = now2, zone = 'tlist' }
     elseif hover.tlist then ctx.tlist_do(hover.tlist.ci, hover.tlist.what); click = { t = now2, zone = 'tlist' }   -- 11 окт: track list
     elseif hover.viewbtn == 'session' then ctx.clips_toggle()          -- уголок: session | effects (7 окт)
@@ -24420,6 +24430,105 @@ ctx.pad_route = function(f, ki)
   ctx.db_cache = nil
   if not state.dsp_big then ctx.dsp_big() end
   vim.msg = 'pad in the router: l - inside, A - a layer in parallel (RS5K / synth / fx), a - after, zz - back to the pads'
+end
+-- 19 окт: слоёный инструмент ¥ (движок — edit.layers_sync / layer_add, формат — jf_tracker_layers.lua).
+-- L в lib — другой инструмент слоем этого; в дереве tracks слои — папкой у инструмента, Enter на слое — его меню
+ctx.layer_add_files = function(paths)
+  local col = cur_col(); local e = col and (col.pool or {})[vim.inst]
+  if not (e and e.item and e.depot and e.stype == 'audio') then vim.msg = 'layers: select an audio instrument of the lib first'; return end
+  local n = 0
+  for _, pth in ipairs(paths or {}) do
+    local it = edit.depot_add(pth, col.track)
+    if it then
+      if edit.layer_add(e.item, it) then n = n + 1 end
+      edit.run('layer source', function() reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(it), it) end)   -- копия — в слое, сам сэмпл lib не нужен
+    end
+  end
+  model.invalidate()
+  vim.msg = ('%s: %d layer(s) added'):format(e.name or '', n)
+end
+ctx.inst_layer_pick = function()
+  local col = cur_col(); local pool = col and col.pool or {}
+  local e = pool[vim.inst]
+  if not (e and e.item) then vim.msg = 'layer: pick an instrument in the lib first'; return end
+  if not e.depot then vim.msg = 'layer: the instrument must live in the lib (p puts it there)'; return end
+  if e.stype ~= 'audio' then vim.msg = 'layer: an audio instrument'; return end
+  local items = {}
+  for j, o in ipairs(pool) do
+    if o ~= e and o.item and o.stype == 'audio' and not o.layers and not o.parent then items[#items + 1] = { label = ('%02d %s'):format(j, o.name or ''), v = o } end
+  end
+  if #items == 0 then vim.msg = 'layer: no other audio instrument in the lib (add samples first)'; return end
+  vim.open_picker('layer of ' .. (e.name or 'instrument') .. ' - sounds together with it on one note', items, function(it)
+    local n = edit.layer_add(e.item, it.v.item)
+    model.invalidate()
+    vim.msg = n and ('%s: layer %d = %s (tracks: the instrument folder - its layers; Enter on a layer - offset, pan, random, cycle ...)'):format(e.name or '', n, it.v.name or '') or 'layer: failed'
+  end)
+end
+-- поле слоя: подписи выпадашки — человеческие значения
+ctx.LAYER_FIELDS = {
+  { 'o', 'offs', 'offset (ms)', { '0', '5', '10', '20', '-5', '-10' } },
+  { 'v', 'vol', 'volume (dB)', { '0', '-3', '-6', '-12', '+3' } },
+  { 'p', 'pan', 'pan (-1 left .. 1 right)', { '0', '-0.5', '0.5', '-1', '1' } },
+  { 's', 'semis', 'pitch (semitones)', { '0', '12', '-12', '7', '5', '-5' } },
+  { 'P', 'rpan', 'random pan (±)', { '0', '0.2', '0.5', '1' } },
+  { 'V', 'rvol', 'random volume (± dB)', { '0', '1', '3', '6' } },
+  { 'S', 'rsemis', 'random pitch (± semitones)', { '0', '0.1', '0.5', '1' } },
+  { 'O', 'rstart', 'random start (± ms)', { '0', '2', '5', '10' } },
+}
+ctx.layer_menu = function(root, lk)
+  local list = root and root.layers and model.LY.parse(model.LY.tag(root.layers))
+  local l = list and list[lk]
+  if not l then return end
+  local function save(msg) edit.layers_set(root.item, list); model.invalidate(); vim.msg = msg end
+  local items = {}
+  for _, fd in ipairs(ctx.LAYER_FIELDS) do
+    items[#items + 1] = { key = fd[1], label = ('%s  %s'):format(fd[3], tostring(l[fd[2]] or 0)), fn = function()
+      ctx.choice_pick(fd[3] .. ' of L' .. lk, tostring(l[fd[2]] or 0), fd[4], function(v)
+        local x = tonumber(v); if not x then vim.msg = 'layer: a number'; return end
+        l[fd[2]] = x; save(('L%d %s = %s'):format(lk, fd[3], v))
+      end)
+    end }
+  end
+  items[#items + 1] = { key = 'c', label = ('cycle: plays the k-th of every n notes  %d/%d'):format(l.ck or 1, l.cn or 1), fn = function()
+    ctx.choice_pick('cycle of L' .. lk .. ' (k/n)', ('%d/%d'):format(l.ck or 1, l.cn or 1), { '1/1', '1/2', '2/2', '1/3', '2/3', '3/3', '1/4', '4/4' }, function(v)
+      local k, n = (v or ''):match('^(%d+)/(%d+)$')
+      if not k then vim.msg = 'cycle: k/n, like 2/3'; return end
+      l.ck, l.cn = math.max(1, tonumber(k)), math.max(1, tonumber(n)); save(('L%d plays note %d of every %d'):format(lk, l.ck, l.cn))
+    end)
+  end }
+  items[#items + 1] = { key = 'm', label = 'mute' .. (l.mute and ' (on)' or ''), fn = function() l.mute = not l.mute; save(('L%d %s'):format(lk, l.mute and 'muted' or 'on')) end }
+  items[#items + 1] = { key = 'f', label = 'flip the phase' .. (l.phase and ' (on)' or ''), fn = function() l.phase = not l.phase; save(('L%d phase %s'):format(lk, l.phase and 'flipped' or 'normal')) end }
+  items[#items + 1] = { key = 'a', label = 'align: offset by the best phase match with the instrument', fn = function() ctx.layer_align(root, list, lk, save) end }
+  items[#items + 1] = { key = ' ', label = 'listen to this layer', fn = function() ctx.layer_listen(l) end }
+  items[#items + 1] = { key = 'x', label = 'remove this layer', fn = function() table.remove(list, lk); save(('L%d removed'):format(lk)) end }
+  local src = model.layer_src and model.layer_src[l.guid]
+  vim.open_hydra({ title = ('L%d of %s: %s'):format(lk, root.name or '', src and src.name or '?'), items = items })
+end
+ctx.layer_listen = function(l)
+  local src = l and model.layer_src and model.layer_src[l.guid]
+  local col = cur_col()
+  if not (src and col) then return end
+  local e2 = model.entry_of(src.item)
+  if e2 then ctx.inst_preview(e2, col.track) end
+end
+-- выравнивание по фазе: отсчёты начала корня и слоя (GetPeaks не годятся — нужен сам звук: AudioAccessor), LY.align
+ctx.layer_align = function(root, list, lk, save)
+  local l = list[lk]
+  local src = model.layer_src and model.layer_src[l.guid]
+  if not (src and root.take and src.take) then return end
+  local function samples(tk, n, sr)
+    local acc = reaper.CreateTakeAudioAccessor(tk)
+    local buf = reaper.new_array(n)
+    reaper.GetAudioAccessorSamples(acc, sr, 1, 0, n, buf)
+    reaper.DestroyAudioAccessor(acc)
+    local t = buf.table()
+    return t
+  end
+  local sr = 48000
+  local a, b = samples(root.take, 4096, sr), samples(src.take, 4096, sr)
+  local d, cval = model.LY.align(a, b, 2048, 960)
+  l.offs = -d / sr * 1000
+  save(('L%d aligned: offset %.2f ms (match %.2f)'):format(lk, l.offs, cval or 0))
 end
 -- 19 окт: пэды с клавиатуры (режим пэдов DSP, jf_tracker_dspkeys.lua): курсор — пэд (draw.kit_sel) или пустая нота (draw.kit_note)
 ctx.pad_rack = function(k)

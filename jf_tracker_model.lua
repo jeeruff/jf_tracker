@@ -922,7 +922,12 @@ local function pool_add(pool, seen, it, from_depot)
   if not take then return end
   if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then return end   -- хвост лупа удержания (13 окт)
   -- 19 окт: слой ¥ — не свой инструмент (живёт в своём корне), производный item слоя — тоже
-  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layerof', '', false)) ~= '' then return end
+  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layerof', '', false)) ~= '' then
+    local _, g = R.GetSetMediaItemInfo_String(it, 'GUID', '', false)
+    M.layer_src = M.layer_src or {}
+    M.layer_src[g] = { item = it, take = take, name = R.GetTakeName(take), len = R.GetMediaItemInfo_Value(it, 'D_LENGTH') }   -- 19 окт: слой ¥ по GUID — имя / прослушка
+    return
+  end
   if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) ~= '' then return end
   -- MIDI-клипы (9 окт): только из зоны lib / трека LIB — MIDI-item песни это
   -- контейнеры нот трекера, не инструменты; каждый клип — свой (без склейки)

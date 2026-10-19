@@ -10,6 +10,7 @@
 --   v            диапазон от якоря, Esc — снять
 --   Enter s      слайсер   Space  прослушать   a  слушать при выборе
 --   /            fzf-поиск   Esc  назад в трекер
+--   L            слой ¥ (19 окт): другой инструмент lib звучит вместе с этим одной нотой
 -- Ожидающий оператор показывает продолжения в статусе (IK.pending_hint).
 --
 -- Без reaper.*: действия — ctx.inst_* (main), тестируется стабами.
@@ -86,6 +87,7 @@ function IK.key(c, cur, n, nslots)
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)
   elseif c == 13 then ctx.open_slicer()                         -- Enter — выбрать: сэмпл во вкладке item
+  elseif ch == 'L' then if ctx.inst_layer_pick then ctx.inst_layer_pick() end   -- 19 окт: слой ¥
   elseif ch == 's' then if ctx.slice_hydra then ctx.slice_hydra() end   -- s — сразу меню нарезки (5 окт)
   elseif ch == ' ' then ctx.inst_listen()
   elseif ch == 'a' then ctx.inst_listen_toggle()

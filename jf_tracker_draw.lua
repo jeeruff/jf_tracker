@@ -1324,8 +1324,10 @@ function D.tl_tree(state, snap)
     local other = {}
     for _, j in ipairs(kids[e] or {}) do if not (e.slices and pool[j].slice_k and pool[j].slice_k > 0) then other[#other + 1] = j end end
     local ns = e.slices and #e.slices or 0
-    out[#out + 1] = { k = 'i', ci = ci, i = i, d = d, key = key, nk = ns + #other, ns = ns }
+    local nl = e.layers and #e.layers or 0                -- 19 окт: слоёный ¥ — его слои папкой, как слайсы
+    out[#out + 1] = { k = 'i', ci = ci, i = i, d = d, key = key, nk = ns + #other + nl, ns = ns }
     if TL.open[key] then
+      for lk = 1, nl do out[#out + 1] = { k = 'y', ci = ci, i = i, lk = lk, d = d + 1 } end
       for sk = 1, ns do out[#out + 1] = { k = 's', ci = ci, i = i, sk = sk, d = d + 1 } end
       for _, j in ipairs(other) do out[#out + 1] = { k = 'c', ci = ci, i = j, d = d + 1 } end
     end
@@ -1522,6 +1524,13 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
         if son then set(U.tint(U.AMBER, 0.25)); gfx.rect(x, ry, w, rhh, 1) end
         -- зум: волна куска строкой ниже подписи (как было в модуле slices)
         if rhh > L.rh and info.mini_wave and e then info.mini_wave(e, t0, t1, ix, ry + L.rh, x + w - ix - L.pad - 3, rhh - L.rh - 2, son and U.AMBER or U.mix(U.TEXT, U.BG, 0.3)) end
+      elseif rw.k == 'y' then
+        -- 19 окт: слой ¥: имя его сэмпла, сдвиг / громкость / цикл, m — выключен, p — фаза
+        local l = e and e.layers and e.layers[rw.lk]
+        local src = l and info.layer_src and info.layer_src(l.guid)
+        local fl = l and ((l.mute and ' m' or '') .. (l.phase and ' p' or '') .. ((l.cn or 1) > 1 and (' %d/%d'):format(l.ck, l.cn) or '')) or ''
+        lbl = l and ('¥ L%d %s  %+gms %+gdB%s'):format(rw.lk, src and src.name or '?', l.offs or 0, l.vol or 0, fl) or '¥ ?'
+        colr = (l and l.mute) and U.DIM or U.TEXT
       elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. (D.mu() .. ' midi clips  %d'):format(rw.n); colr = U.GREY
       elseif rw.k == 'mc' then lbl = D.mu() .. ' ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
       elseif rw.k == 'i' or rw.k == 'c' then
@@ -4864,7 +4873,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local pre = ('%02d '):format(e.num or i)
       local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
-      if not child then body = (e.kit and '& ' or '@ ') .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 16 окт: @ — аудио, & — набор файлов
+      if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '@ ')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
       local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
       local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf)))
