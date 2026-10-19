@@ -4681,6 +4681,20 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     rows = out
   end
+  -- 19 окт: lib как в lf — инструмент со слоями / слайсами — папка (+ / -), открыт — дети строками под ним
+  do
+    D.LIBO = D.LIBO or {}
+    local out = {}
+    for _, row in ipairs(rows) do
+      out[#out + 1] = row
+      local e = row.i and not row.sub and pool[row.i]
+      if e and not e.parent and D.LIBO[e.gkey or ''] then
+        for lk = 1, #(e.layers or {}) do out[#out + 1] = { sub = 'y', i = row.i, k = lk, sec = row.sec } end
+        for sk = 1, #(e.slices or {}) do out[#out + 1] = { sub = 's', i = row.i, k = sk, sec = row.sec } end
+      end
+    end
+    rows = out
+  end
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
@@ -4809,6 +4823,27 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + w - L.pad - 4 - kw, y + 1, fit(kd, kw), sel and U.CYAN or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, instfx = row.instfx, col = row.col } end
       hint('poolinst', ix + 2, y, w - 4, L.rh, row.instfx)
+    elseif row.sub then
+      -- 19 окт: ребёнок папки lib: слой ¥ (имя его сэмпла, сдвиг, громкость, флаги) или слайс (клавиша, Sxx, длина)
+      local e = pool[row.i]
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      local cs = D.LIBSUB
+      local on = cs and cs.i == row.i and cs.kind == row.sub and cs.k == row.k
+      if on then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      local lbl
+      if row.sub == 'y' then
+        local l = e.layers and e.layers[row.k]
+        local src = l and info.layer_src and info.layer_src(l.guid)
+        local fl = l and ((l.mute and ' m' or '') .. (l.phase and ' p' or '') .. ((l.cn or 1) > 1 and (' %d/%d'):format(l.ck, l.cn) or '')) or ''
+        lbl = l and ('¥ L%d %s  %+gms %+gdB%s'):format(row.k, src and src.name or '?', l.offs or 0, l.vol or 0, fl) or '¥ ?'
+      else
+        local t0 = e.slices and e.slices[row.k] or 0
+        local t1 = e.slices and (e.slices[row.k + 1] or e.len) or t0
+        local kl = info.slice_key and info.slice_key(row.k) or ' '
+        lbl = ('%s  S%02X  %.2fs'):format(kl or ' ', row.k, math.max(0, t1 - t0))
+      end
+      text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, w - 12 - 4 * L.cw), on and U.AMBER or U.TEXT)
+      if hot then hover.pool = { ci = info.pool_ci, i = row.i, sub = row.sub, k = row.k } end
     elseif row.empty then
       -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека
       local sel = row.empty == inst
@@ -4846,7 +4881,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         body = '  ' .. (tree and ((last and '`-' or '|-') .. ' ') or '') .. (kname or (e.slice_k and e.slice_k > 0 and ('s' .. e.slice_k) or 'cut'))
       end
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
-      local pre = ('%02d '):format(e.num or i)
+      local nkids = child and 0 or (#(e.layers or {}) + #(e.slices or {}))   -- 19 окт: папка (как lf): + закрыта, - открыта
+      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and ((D.LIBO or {})[e.gkey or ''] and '-' or '+') or ' ')
+      if nkids > 0 and mx >= ix + 6 + ms('00') and mx < ix + 6 + ms('00+') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
       local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '@ ')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем

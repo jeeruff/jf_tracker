@@ -31,7 +31,7 @@ PN.PANELS = {
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
-  { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'slices_on' },
+  { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'merged' },   -- 19 окт: слайсы (и слои) — папкой в lib (как lf); панель выключена — вернуть: avail = 'slices_on'
   { id = 'sprops',     label = 'properties', key = 'e', hint = 'sprops',  side = 'right', avail = 'itemtab' },   -- 10 окт: свойства item / слайса — свой модуль (был справа во вкладке item)
   { id = 'nmod',       label = 'note mod',   key = 'N', hint = 'nmod',    side = 'right', avail = 'itemtab' },   -- 12 окт: модуляция, которую запускает нота (слоты инструмента)
   { id = 'mixer',      label = 'mixer',      key = 'x', hint = 'tracker', side = 'bottom', avail = 'mixer' },   -- 11 окт: нижний микшер — свой модуль (полоски под колонками треков)

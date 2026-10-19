@@ -21121,6 +21121,18 @@ local function frame()
     elseif hover.libtab then
       state.libtab = hover.libtab; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. ' (F4)'
       click = { t = now2, zone = 'libtab' }
+    elseif hover.libfold then   -- 19 окт: + / - у инструмента — папка lib
+      draw.LIBO = draw.LIBO or {}; draw.LIBO[hover.libfold] = (not draw.LIBO[hover.libfold]) or nil; ctx.set_focus('inst')
+      click = { t = now2, zone = 'libfold' }
+    elseif hover.pool and hover.pool.sub then   -- 19 окт: ребёнок папки: щелчок — выбрать (слой — слушать), двойной — Enter
+      ctx.set_focus('inst'); pool_select(hover.pool.i)
+      local kid = { kind = hover.pool.sub, k = hover.pool.k }
+      ctx.lib_sub_go(hover.pool.i, kid)
+      local root = cur_col() and (cur_col().pool or {})[hover.pool.i]
+      if dbl and click.zone == 'libsub' then if kid.kind == 'y' then ctx.layer_menu(root, kid.k) else ctx.slice_list_do('insert') end
+      elseif kid.kind == 'y' then ctx.layer_listen(root and root.layers and root.layers[kid.k])
+      else ctx.slice_list_do('play') end
+      click = { t = now2, zone = 'libsub' }
     elseif hover.pool and hover.pool.instfx then
       -- 9 окт: плагин-инструмент: щелчок — выбрать (ноты — MIDI в него) и DSP на нём, двойной — его окно
       local pc = hover.pool.col
@@ -21131,6 +21143,8 @@ local function frame()
       click = { t = now2, zone = 'poolinst', row = hover.pool.instfx }
     elseif hover.pool then
       ctx.set_focus('inst')
+      -- 19 окт: Shift+щелчок — несколько инструментов: диапазон от выбранного до щёлкнутого (как v)
+      if ctx.mods().shift and not hover.pool.empty then IK.anchor = IK.anchor or vim.inst else IK.anchor = nil end
       state.prev_by_mouse = true
       pool_select(hover.pool.i)
       state.prev_by_mouse = nil
@@ -23376,6 +23390,7 @@ local function frame()
         -- 13 окт: вид tracks в lib — клавиши дерева (как в lf), остальное — прежние клавиши lib
         if state.libtree == true and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
         if c == ('c'):byte() and vim.mode ~= 'cmd' then ctx.slices_render_menu(); return end   -- 13 окт: convert — и во вкладке lib
+        if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
         local col = cur_col()
         local n = #(col and col.pool or {})
         local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n))
@@ -24425,6 +24440,66 @@ ctx.pad_route = function(f, ki)
   ctx.db_cache = nil
   if not state.dsp_big then ctx.dsp_big() end
   vim.msg = 'pad in the router: l - inside, A - a layer in parallel (RS5K / synth / fx), a - after, zz - back to the pads'
+end
+-- 19 окт: lib как в lf — папки инструментов (слои ¥ и слайсы внутри). draw.LIBO[gkey] — открыта,
+-- draw.LIBSUB = { i, kind = 'y' | 's', k } — курсор на ребёнке. l — открыть / внутрь, h — закрыть / к родителю,
+-- в детях: j k, Space слушать, Enter — слой: меню / слайс: вставить, x — убрать, e — слайс в item
+ctx.lib_kids = function(e)
+  local t = {}
+  for lk = 1, #(e and e.layers or {}) do t[#t + 1] = { kind = 'y', k = lk } end
+  for sk = 1, #(e and e.slices or {}) do t[#t + 1] = { kind = 's', k = sk } end
+  return t
+end
+ctx.lib_sub_go = function(i, kid)
+  draw.LIBSUB = kid and { i = i, kind = kid.kind, k = kid.k } or nil
+  if not kid then return end
+  local root = cur_col() and (cur_col().pool or {})[i]
+  if not root then return end
+  if kid.kind == 's' then ctx.ssel = { item = root.item, k = 0 }; ctx.slice_step(kid.k); vim.msg = ('S%02X of %s - key %s plays it'):format(kid.k, root.name or '', ctx.slice_key(kid.k) or '?')
+  else local l = root.layers[kid.k]; local src = l and model.layer_src and model.layer_src[l.guid]; vim.msg = ('L%d of %s: %s - Space listen, Enter its menu, x remove'):format(kid.k, root.name or '', src and src.name or '?') end
+end
+ctx.lib_tree_key = function(c)
+  local ch = c < 256 and string.char(c) or ''
+  local col = cur_col(); local pool = col and col.pool or {}
+  draw.LIBO = draw.LIBO or {}
+  local cs = draw.LIBSUB
+  if cs and pool[cs.i] ~= pool[vim.inst] then draw.LIBSUB = nil; cs = nil end   -- выбор сменился мышью / j k
+  local e = pool[vim.inst]
+  if cs then
+    local kids = ctx.lib_kids(e)
+    local at = 1
+    for n, kd in ipairs(kids) do if kd.kind == cs.kind and kd.k == cs.k then at = n end end
+    if ch == 'j' or c == keys.down then if kids[at + 1] then ctx.lib_sub_go(vim.inst, kids[at + 1]) end; return true end
+    if ch == 'k' or c == keys.up then if at > 1 then ctx.lib_sub_go(vim.inst, kids[at - 1]) else draw.LIBSUB = nil end; return true end
+    if ch == 'h' or c == keys.left or c == 27 then draw.LIBSUB = nil; vim.msg = (e and e.name or '') .. ' (h - close the folder)'; return true end
+    if cs.kind == 'y' then
+      local l = e.layers and e.layers[cs.k]
+      if ch == ' ' then ctx.layer_listen(l); return true end
+      if c == 13 or ch == 'l' then ctx.layer_menu(e, cs.k); return true end
+      if ch == 'x' or ch == 'd' then
+        local list = model.LY.parse(model.LY.tag(e.layers)); table.remove(list, cs.k)
+        edit.layers_set(e.item, list); model.invalidate(); draw.LIBSUB = nil; vim.msg = ('L%d removed'):format(cs.k); return true
+      end
+    else
+      if ch == ' ' then if PV.playing() then PV.stop() else ctx.slice_list_do('play') end; return true end
+      if c == 13 or ch == 'i' then ctx.slice_list_do('insert'); return true end
+      if ch == 'x' or ch == 'd' then ctx.slice_list_do('delete'); return true end
+      if ch == 'e' or ch == 'l' then ctx.slice_list_do('edit'); return true end
+    end
+    return false
+  end
+  if not e then return false end
+  local kids = ctx.lib_kids(e)
+  if ch == 'l' or c == keys.right then
+    if #kids == 0 then vim.msg = (e.name or '') .. ': no layers or slices inside (L - a layer, s - slice it)'; return true end
+    if not draw.LIBO[e.gkey or ''] then draw.LIBO[e.gkey or ''] = true else ctx.lib_sub_go(vim.inst, kids[1]) end
+    return true
+  end
+  if ch == 'h' or c == keys.left then
+    if draw.LIBO[e.gkey or ''] then draw.LIBO[e.gkey or ''] = nil; return true end
+    return true
+  end
+  return false
 end
 -- 19 окт: слоёный инструмент ¥ (движок — edit.layers_sync / layer_add, формат — jf_tracker_layers.lua).
 -- L в lib — другой инструмент слоем этого; в дереве tracks слои — папкой у инструмента, Enter на слое — его меню
