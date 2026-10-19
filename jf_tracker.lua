@@ -14981,6 +14981,8 @@ local function hint_go(t)
       else reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 and 0 or 1) end
     end)
   elseif t.kind == 'mx' then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d.ri, d.ci)
+  elseif t.kind == 'patcube' then   -- 19 окт: f + код паттерна (a1, bc …) — к нему в трекер; серого ещё нет
+    if d.i then MX.pl_sel = d.i; ctx.patlist_do('go', d.i) else vim.msg = d.fixed:upper() .. ': no such pattern yet (n in the matrix names a bar)' end
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
@@ -21088,6 +21090,10 @@ local function frame()
       elseif ctx.mods().shift then ctx.spl_set(''); vim.msg = 'playlist: cleared'
       else ctx.spl_set((ctx.spl_text():gsub('%s*%S+%s*$', ''))); vim.msg = 'playlist: the last one removed (Shift+x - all)' end
       click = { t = now2, zone = 'splbtn' }
+    elseif hover.matrix and hover.matrix.splsrc then   -- 19 окт: секция над плейлистом — в конец плейлиста
+      local sc = ctx.spl_secs()[hover.matrix.splsrc]
+      if sc then ctx.spl_add(sc.name, 1); MX.spl_i = hover.matrix.splsrc end
+      click = { t = now2, zone = 'splsrc' }
     elseif hover.matrix and hover.matrix.splword then   -- 19 окт: секция плейлиста — играть с неё
       local words = {}
       for wd in ctx.spl_text():gmatch('%S+') do words[#words + 1] = wd end
@@ -23643,6 +23649,11 @@ local function frame()
         -- 19 окт: clipkb прямо в матрице: 1qaz 2wsx … — столбец трек, ряд — видимый слот; Shift — набор из разных
         -- паттернов, отпустил — звучат вместе; Enter — render (новый паттерн из набранного); Ctrl — тишина; Esc — выкл
         if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render, arrows / [ ] - other rows, Esc - off (letters are cells now, c too)'; return end
+        if MX.spl_focus and ctx.spl_kb(c) then return end   -- 19 окт: строка секций плейлиста с клавиатуры
+        if c == ('C'):byte() and not MX.pal_kb and not MX.pending then ctx.pl_edit(); return end   -- 19 окт: C — набрать chain
+        if c == ('s'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: s (song) — строка секций над плейлистом
+          MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
+        end
         if MX.pal_kb and c == 13 then ctx.sketch_add(); return end   -- 19 окт: набранное — эскизом в sketchpad (render — p там)
         if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
@@ -24431,6 +24442,7 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
     local code = model.SEC.code_of(p.name) and (p.name:match('^(%S+)') or p.name) or p.name
     U.text(cx + Lx.pad, cy + 1, ctx.fit(code, cw - 2 * Lx.pad), on and U.AMBER or (playing and U.GREEN or (n > 0 and U.TEXT or U.DIM)))
     if hot then hv.patrow = cl.i end
+    if ctx.hint and cl.code then ctx.hint('patcube', cx, cy, cw - 1, ch - 1, { i = cl.i, fixed = cl.code:lower() }) end   -- 19 окт: f a1 — прыжок к паттерну
     ::pcell_next::
   end
   if #list == 0 then U.text(x + Lx.pad, y + Lx.rh, 'no patterns yet - n in the matrix names a bar', U.DIM) end
@@ -24619,14 +24631,43 @@ ctx.chain_draw = function(Lx, x, y, w)
   local l = P.lists[P.cur]
   local text = l and l.text or ''
   local mx, my = gfx.mouse_x, gfx.mouse_y
+  -- 19 окт: всё одной строкой — chain < имя > шаги · такты  > render x
   U.text(x + Lx.pad, y, 'chain', U.GREY)
   local bx = x + Lx.pad + U.measure('chain ') + Lx.pad
+  local function sb(lab, id)   -- маленькая кнопка < / >
+    local bw = U.measure(lab) + 2 * Lx.pad
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+    U.text(bx + Lx.pad, y, lab, hot and U.AMBER or U.GREY)
+    if hot then hv.btn = id end
+    bx = bx + bw
+  end
+  if #P.lists > 1 then sb('<', 'plprev') end
+  if l then
+    local nm = (#P.lists > 1 and (P.cur .. '/' .. #P.lists .. ' ') or '') .. l.name
+    local nw = U.measure(nm)
+    local hot = mx >= bx and mx < bx + nw and my >= y and my < y + Lx.rh
+    U.text(bx, y, nm, hot and U.AMBER or U.CYAN)
+    if hot then hv.btn = 'plname' end
+    bx = bx + nw
+  end
+  if #P.lists > 1 then sb('>', 'plnext') end
+  bx = bx + Lx.pad
   local btns = { { '>', 'play' }, { 'render', 'render' }, { 'x', 'clear' } }
   local bw_all = 0
   for _, b in ipairs(btns) do bw_all = bw_all + U.measure(b[1]) + 2 * Lx.pad + 2 end
-  local tw = math.max(Lx.cw * 4, x + w - bw_all - bx - Lx.pad)
-  U.text(bx, y, ctx.fit(text ~= '' and text or 'double click a pattern - it joins the chain', tw), text ~= '' and U.TEXT or U.DIM)
-  local cx = bx + tw + Lx.pad
+  local st = ''
+  if text ~= '' then
+    local steps = ctx.pl_parsed()
+    local n, rows = P.summary(steps or {})
+    st = ('%d · %.1f bars'):format(n, rows / math.max(1, state.lpb * 4))
+  end
+  local stw = st ~= '' and U.measure(st) + 2 * Lx.pad or 0
+  local tw = math.max(Lx.cw * 4, x + w - bw_all - bx - Lx.pad - stw)
+  local thot = mx >= bx and mx < bx + tw and my >= y and my < y + Lx.rh   -- 19 окт: щелчок по тексту (или C) — набрать цепь с клавиатуры
+  if thot then hv.btn = 'pltext'; U.set(U.LINE); gfx.rect(bx - 2, y - 1, tw + 2, Lx.rh, 0) end
+  U.text(bx, y, ctx.fit(text ~= '' and text or 'double click a pattern or C - type it: A1 A1 B1x2 C1:16', tw), text ~= '' and U.TEXT or U.DIM)
+  if st ~= '' then U.text(bx + tw + Lx.pad, y, st, U.GREY) end
+  local cx = bx + tw + Lx.pad + stw
   for _, b in ipairs(btns) do
     local bw = U.measure(b[1]) + 2 * Lx.pad
     local hot = mx >= cx and mx < cx + bw and my >= y and my < y + Lx.rh
@@ -24676,6 +24717,52 @@ ctx.spl_play = function()
   if #steps == 0 then vim.msg = 'playlist: empty - click it to add sections'; return end
   ctx.pl_play(steps, errs)
 end
+-- 19 окт: строка-источник над плейлистом — все секции песни (как кубики паттернов): щелчок — в конец плейлиста;
+-- с клавиатуры: s в матрице — фокус сюда, h l — секция, Enter — добавить (3 Enter — трижды), x — убрать последнюю, Esc — назад
+ctx.spl_secs = function()
+  local o, seen = {}, {}
+  for _, s2 in ipairs(regions.sections or {}) do if not seen[s2.name] then seen[s2.name] = true; o[#o + 1] = s2 end end
+  return o
+end
+ctx.spl_add = function(name, n)
+  local w = name:gsub('%s+', '_')
+  local t = ctx.spl_text()
+  for _ = 1, math.max(1, n or 1) do t = (t .. ' ' .. w):gsub('^%s+', '') end
+  ctx.spl_set(t); vim.msg = 'playlist: ' .. t:gsub('_', ' ')
+end
+ctx.spl_src_draw = function(Lx, x, y, w)
+  local hv = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local secs = ctx.spl_secs()
+  MX.spl_i = math.max(1, math.min(#secs, MX.spl_i or 1))
+  local bx = x
+  if #secs == 0 then U.text(bx, y + 1, ctx.fit('sections: none yet (Tr in the matrix makes one)', w), U.DIM) end
+  for k, s2 in ipairs(secs) do
+    local bw = U.measure(s2.name) + 2 * Lx.pad
+    if bx + bw > x + w then break end
+    local c = (s2.color and s2.color ~= 0 and ctx.region_rgb and ctx.region_rgb(s2.color)) or U.CYAN
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+    local on = MX.spl_focus and k == MX.spl_i
+    U.set(U.tint(c, hot and 0.35 or 0.12)); gfx.rect(bx, y, bw, Lx.rh, 1)
+    U.set(on and U.AMBER or U.mix(c, U.PANEL, 0.4)); gfx.rect(bx, y, bw, Lx.rh, 0)
+    U.text(bx + Lx.pad, y + 1, s2.name, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hv.splsrc = k end
+    bx = bx + bw + 2
+  end
+  return hv
+end
+ctx.spl_kb = function(c)
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  local secs = ctx.spl_secs()
+  if c == 27 then MX.spl_focus, MX.spl_cnt = nil, nil; vim.msg = 'playlist: back to the matrix'; return true end
+  if ch:match('^%d$') then MX.spl_cnt = (MX.spl_cnt or '') .. ch; vim.msg = 'playlist: ' .. MX.spl_cnt .. ' x'; return true end
+  if ch == 'h' or c == 1818584692 then MX.spl_i = math.max(1, (MX.spl_i or 1) - 1); return true end
+  if ch == 'l' or c == 1919379572 then MX.spl_i = math.min(#secs, (MX.spl_i or 1) + 1); return true end
+  if c == 13 and secs[MX.spl_i or 1] then ctx.spl_add(secs[MX.spl_i or 1].name, tonumber(MX.spl_cnt or '1')); MX.spl_cnt = nil; return true end
+  if ch == 'x' then ctx.spl_set((ctx.spl_text():gsub('%s*%S+%s*$', ''))); vim.msg = 'playlist: the last one removed'; return true end
+  if ch == ' ' then ctx.spl_play(); return true end
+  return true
+end
 ctx.spl_draw = function(Lx, x, y, w)
   -- 19 окт: только имена секций в ряд (цветом секции); щелчок — играть с неё, + — добавить, x — убрать последнюю (Shift — все)
   local hv = {}
@@ -24685,8 +24772,8 @@ ctx.spl_draw = function(Lx, x, y, w)
   local col = {}
   for _, s2 in ipairs(regions.sections or {}) do col[s2.name:gsub('%s+', '_')] = s2.color end
   local bx = x
-  local tail = (U.measure('+') + 2 * Lx.pad) + (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 6
-  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: + adds sections in the song order', w - tail), U.DIM) end
+  local tail = (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 6
+  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: click a section above (s - keys) - the song order', w - tail), U.DIM) end
   for k, wd in ipairs(words) do
     local lab = wd:gsub('_', ' ')
     local bw = U.measure(lab) + 2 * Lx.pad
@@ -24701,7 +24788,7 @@ ctx.spl_draw = function(Lx, x, y, w)
     bx = bx + bw + 2
   end
   local cx = x + w - tail + 6
-  for _, b in ipairs({ { '+', 'pick' }, { '>', 'play' }, { 'x', 'clear' } }) do
+  for _, b in ipairs({ { '>', 'play' }, { 'x', 'clear' } }) do
     local bw = U.measure(b[1]) + 2 * Lx.pad
     local hot = mx >= cx and mx < cx + bw and my >= y and my < y + Lx.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(cx, y, bw, Lx.rh, 1)

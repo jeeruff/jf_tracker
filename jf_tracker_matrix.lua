@@ -262,7 +262,7 @@ function MX.width(L, nregions, ncols)
   MX.btns_w = bw
   -- шапка матрицы: вертикальные имена треков (до 10 букв) + полоса кнопок
   -- 8 окт: высота — по самому длинному имени трека (прошлый кадр), не больше 10 знаков
-  MX.name_h = L.cw * math.max(3, math.min(10, MX.name_chars or 10)) + 4
+  MX.name_h = math.max(L.cw * math.max(3, math.min(10, MX.name_chars or 10)) + 4, MX.corner_need or 0)   -- 19 окт: кнопки в углу — шапка не ниже них
   L.mx_head_h = L.rh + 2 + MX.name_h + 4
   -- справа — колонка кнопок < > = у линии раздела: ячейки под неё не уходят
   local knob_w = U.measure('>') + 2 * L.pad + 6
@@ -336,19 +336,28 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
   end
   MX.overflow = over
+  -- 19 окт: кнопки — в пустом углу над слотами (левее имён треков), потоком; свёрнутая / clips — ряд сверху, как было
+  local corner = not MX.fold and not MX.clips
+  if corner then list = btns(); MX.overflow = {} end
+  local function draw_btns(x0, y0, x1)
+  local bx, by = x0, y0
   for _, b in ipairs(list) do
     local label = b[2]
     if ctx.ic and b[1] ~= 'more' then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
-    local hot = mx >= bx and mx < bx + bw and my >= hy + 1 and my < hy + L.rh + 1
-    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, hy + 1, bw, L.rh, 1)
-    U.set(U.LINE); gfx.rect(bx, hy + 1, bw, L.rh, 0)
-    U.text(bx + L.pad, hy + 2, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6)) and U.CYAN or U.TEXT))
+    if x1 and bx > x0 and bx + bw > x1 then bx, by = x0, by + L.rh + 2 end
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
+    U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+    U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
-    MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, hy + 1 + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
-    if ctx.hint then ctx.hint('mxbtn', bx, hy + 1, bw, L.rh, b[1]) end
+    MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, by + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
+    if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, b[1]) end
     bx = bx + bw + L.pad
   end
+  return by + L.rh - y0
+  end
+  if corner then hy = hy - L.rh - 2 else draw_btns(L.pad, hy + 1) end
   MX.ss_split_y = nil
   -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
   -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
@@ -379,6 +388,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     for _, r in ipairs(regions) do local l = ctx.SEC and ctx.SEC.code_of(r.name or ''); if l then used = math.max(used, l:byte() - 64) end end
     local nr = math.max(3, math.min(8, used + 2))
     local ph = nr * (L.rh + 2)
+    U.text(L.pad, hy + L.rh + 2, 'patterns', U.GREY)   -- 19 окт: заголовок над кубиками
+    hy = hy + L.rh
     local _, phv = ctx.patlist_draw(L, 2, hy + L.rh + 2, W - 8, ph)
     for k, v in pairs(phv or {}) do hover[k] = v end
     hy = hy + ph + 2
@@ -423,6 +434,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if col.rgb then U.set(col.rgb); gfx.rect(x + 1, ny + MX.name_h, L.mx_cell_w - 2, 2, 1) end
     end
   end
+  if corner then   -- 19 окт: кнопки в углу над слотами
+    local need = draw_btns(L.pad, ny, L.mx_label_w - L.pad)
+    MX.corner_need = need + 4
+  end
   -- 11 окт: заголовок колонки visor
   if (MX.vis_w or 0) > 0 then
     local vx = L.mx_label_w + (#snap.cols - MX.hs) * L.mx_cell_w + 2
@@ -437,10 +452,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local ax0, ax1, ay = L.pad, W - L.pad - 4, ybot - ah + 2
     -- 19 окт: под аранжировкой — плейлист песни (секции по порядку)
     local plh = 0
-    if ctx.spl_draw and ybot - ah - L.rh - 2 > hy + 6 * L.rh then   -- 19 окт: плейлист — над аранжировкой
+    if ctx.spl_draw and ybot - ah - 2 * L.rh - 4 > hy + 6 * L.rh then   -- 19 окт: плейлист — над аранжировкой, над ним — секции
       local phv = ctx.spl_draw(L, ax0, ybot - ah - L.rh, ax1 - ax0)
       for k, v in pairs(phv) do hover[k] = v end
-      plh = L.rh + 2
+      local shv = ctx.spl_src_draw(L, ax0, ybot - ah - 2 * L.rh - 2, ax1 - ax0)
+      for k, v in pairs(shv) do hover[k] = v end
+      plh = 2 * L.rh + 4
     end
     if ybot - ah > hy + 6 * L.rh then
       U.set(U.LINE); gfx.rect(0, ybot - ah - plh, W - 4, 1, 1)

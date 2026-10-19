@@ -50,6 +50,13 @@ function H.start(filter)
   -- отрисовки
   local lw, lh = H.lw or 16, H.lh or 12
   local placed, k = {}, 0
+  -- 19 окт: свои метки (data.fixed: кубик паттерна — его код a1 … ff) ставятся первыми, буквенные их обходят
+  local fixed = {}
+  H.digits = false
+  for _, t in ipairs(H.targets) do
+    local fx = type(t.data) == 'table' and t.data.fixed
+    if fx and not fixed[fx] then fixed[fx] = true; t.label = fx; placed[#placed + 1] = t; if fx:match('%d') then H.digits = true end end
+  end
   -- 9 окт: меток 676, целей бывает больше (клетки матрицы, строки) —
   -- подписи панелей и вкладок, кнопки получают буквы первыми, массовые
   -- цели — последними (порядок внутри уровня — как рисовались)
@@ -58,6 +65,7 @@ function H.start(filter)
   table.sort(order, function(a, b) if a.lv ~= b.lv then return a.lv < b.lv end return a.i < b.i end)
   for _, o in ipairs(order) do
     local t = o.t
+    if t.label and fixed[t.label] and type(t.data) == 'table' and t.data.fixed == t.label then goto hnext end
     t.label = nil
     t.lx, t.ly = nil, nil
     local free = false
@@ -77,12 +85,13 @@ function H.start(filter)
       local a = math.floor(k / n) + 1
       local b = k % n + 1
       t.label = ALPHA:sub(a, a) .. ALPHA:sub(b, b)
+      while fixed[t.label] and k + 1 < max do k = k + 1; a = math.floor(k / n) + 1; b = k % n + 1; t.label = ALPHA:sub(a, a) .. ALPHA:sub(b, b) end
       placed[#placed + 1] = t
       k = k + 1
     end
+    ::hnext::
   end
-  do local f = reaper and io.open('/private/tmp/claude-501/-Users-jeeruff/4c37a009-86dd-4ef8-9af2-720655b33b41/scratchpad/hints.log', 'w') --DBGH
-    if f then f:write(('n=%d lw=%d lh=%d\n'):format(#H.targets, lw, lh)); for _, o in ipairs(order) do local t = o.t; f:write(('%s %s %d %d %d %d\n'):format(t.label or '--', t.kind, t.x, t.y, t.w, t.h)) end; f:close() end end --DBGH
+  if next(fixed) then k = k + 1 end
   if k == 0 then return false end
   H.active = true
   H.typed, H.upper = '', false
@@ -102,7 +111,7 @@ function H.key(c)
   if c == 8 then H.typed = H.typed:sub(1, -2); return 'pending' end
   if c < 32 or c > 126 then return 'pending' end
   local ch = string.char(c):lower()
-  if not ALPHA:find(ch, 1, true) then return 'pending' end
+  if not ALPHA:find(ch, 1, true) and not (H.digits and ch:match('%d')) then return 'pending' end
   if H.typed == '' then H.upper = false end
   if string.char(c) ~= ch then H.upper = true end     -- 8 окт: метка заглавной (Shift) — вариант цели, у фейдера «туда и обратно»
   H.typed = H.typed .. ch

@@ -37,4 +37,10 @@ H.key(('a'):byte()); H.key(('d'):byte()); eq('second picked', H.targets[3].picke
 H.key(('a'):byte()); H.key(('a'):byte()); eq('again - unpicked', H.targets[1].picked, false)
 local r = H.key(13); eq('Enter -> multi', r.kind, 'multi'); eq('one picked left', #r.picked, 1); eq('it is clip 3', r.picked[1].data.ri, 3)
 eq('multi off after Enter', H.multi, false)
+-- 19 окт: свои метки — кубики паттернов по коду (a1, ad); буквенные обходят занятые
+H.stop(); H.reset()
+H.add('btn', 0, 0, 10, 10, 'b1'); H.add('patcube', 100, 0, 10, 10, { i = 1, fixed = 'a1' }); H.add('patcube', 200, 0, 10, 10, { i = 2, fixed = 'aa' })
+H.start()
+eq('fixed a1', H.targets[2].label, 'a1'); eq('fixed aa', H.targets[3].label, 'aa'); eq('letter label skips aa', H.targets[1].label, 'as')
+H.key(('a'):byte()); local hc = H.key(('1'):byte()); eq('a1 -> pattern 1', type(hc) == 'table' and hc.data.i, 1)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
