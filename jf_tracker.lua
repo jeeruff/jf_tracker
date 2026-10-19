@@ -22333,11 +22333,13 @@ local function frame()
     end
   end
   -- автопревью браузера: курсор перешёл на другую строку → слушаем её
-  if (state.side or state.panes_ui) and B.auto and B.cur ~= browse_last then
+  if (state.side or state.panes_ui) and (B.auto or B.drum) and B.cur ~= browse_last then
     browse_last = B.cur
     local pth = B.preview_path(B.entries[B.cur])
     if pth then
-      ctx.preview_file(pth)          -- целиком (2 окт)
+      -- 19 окт: drum — файл в активный пэд (в игре слышно в ритме; стоп — пэд прозвучит сам)
+      if B.drum and ctx.drum_audition(pth) then
+      elseif B.auto then ctx.preview_file(pth) end          -- целиком (2 окт)
     end
   end
 
@@ -24812,6 +24814,51 @@ ctx.arm_restore = function()
   if not (state.armsel and cc and cc.track == ar.track) then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECARM', 0) end
   if ar.inp then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECINPUT', ar.inp) end
   if ar.mon then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECMON', ar.mon) end
+end
+-- 19 окт: кнопка drum плеера браузера — выбранный файл на лету в активный пэд рэка трека DSP (без undo на каждый),
+-- выкл drum — выбор фиксируется одним undo (откат вернёт прежний сэмпл пэда)
+ctx.drum_audition = function(path)
+  if not (path and path:lower():match('%.%w+$')) then return false end
+  local col = dsp_target()
+  if not (col and col.track) or col.take then vim.msg = 'drum: the DSP track has no drumrs5k'; return false end
+  local k
+  for i, f in ipairs(col.fx or {}) do if f.kit and f.kids and model.DR.is_rack(f.kids) then k = i; break end end
+  if not k then vim.msg = 'drum: the DSP track has no drumrs5k'; return false end
+  local _, f, _, ki, kid = ctx.pad_cur(k)
+  if not (kid and kid.rs5k_i) then vim.msg = 'drum: select a pad (click it or Enter on the rack)'; return false end
+  local A = model.fxapi(col.track)
+  local g = A.GetFXGUID(col.track, kid.rs5k_i)
+  ctx.drum_aud = ctx.drum_aud or {}
+  local da = ctx.drum_aud[g]
+  if not da then
+    local _, f0 = A.GetNamedConfigParm(col.track, kid.rs5k_i, 'FILE0')
+    da = { track = col.track, orig = f0, num = ki, name = kid.name }
+    ctx.drum_aud[g] = da
+  end
+  da.cur = path
+  A.SetNamedConfigParm(col.track, kid.rs5k_i, 'FILE0', path)
+  A.SetNamedConfigParm(col.track, kid.rs5k_i, 'DONE', '')
+  if reaper.GetPlayState() & 1 == 0 and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+  vim.msg = ('drum: %s on %s (drum off - keep it, one undo)'):format(path:match('[^/]+$') or path, kid.name or 'pad')
+  return true
+end
+ctx.drum_audition_toggle = function(on)
+  if on then vim.msg = 'drum: a file selected in the browser goes straight into the active pad - hear it in the groove'; return end
+  local n = 0
+  for g, da in pairs(ctx.drum_aud or {}) do
+    if reaper.ValidatePtr(da.track, 'MediaTrack*') and da.cur and da.cur ~= da.orig then
+      local addr = edit.fx_by_guid(da.track, g)
+      if addr then
+        local A = model.fxapi(da.track)
+        A.SetNamedConfigParm(da.track, addr, 'FILE0', da.orig or ''); A.SetNamedConfigParm(da.track, addr, 'DONE', '')   -- undo снимет прежний
+        edit.run('drum: pad sample', function() edit.drum_pad_set(da.track, addr, da.cur, nil, da.num) end)
+        n = n + 1
+      end
+    end
+  end
+  ctx.drum_aud = nil
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = n > 0 and ('drum off: %d pad(s) keep the new sample (u - back)'):format(n) or 'drum off'
 end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)

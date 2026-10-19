@@ -409,6 +409,7 @@ KH.PAGES = {
     { k = 'sync', d = 'button: while the project plays, a file starts on the next bar' },
     { k = '*.* .*', d = 'buttons: all file types / hidden files; Enter on MIDI / video inserts it, others open in their app' },
     { k = 'Space', d = 'preview (mini player below)' },
+    { k = 'drum (player)', t = {}, d = 'the drum button of the player: a selected file goes straight into the active drumrs5k pad - while the song plays you hear it in the groove, stopped - the pad sounds; drum off keeps the last one (one undo). Dropping a file on a pad - its sample too' },
     { k = '/ f', d = 'fzf find: ^start end$ \'exact !not' },
     { k = 't', d = 'mode: files / db / projects' },
     { k = 'p', d = 'auto preview on / off' },

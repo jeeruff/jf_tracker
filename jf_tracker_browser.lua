@@ -39,6 +39,7 @@ B.pm_sort = (R.GetExtState and R.GetExtState('jf_tracker', 'pmsort') ~= '' and R
 B.pm_daw = (R.GetExtState and R.GetExtState('jf_tracker', 'pmdaw') ~= '' and R.GetExtState('jf_tracker', 'pmdaw')) or 'all'
 B.pm_scroll = { v = 0 }   -- прокрутка сетки в рядах
 B.auto = true       -- автопревью: курсор на файле → слушаем (кнопка play; по умолчанию вкл, 5 окт)
+B.drum = false      -- 19 окт: drum — выбранный файл сразу в активный пэд drumrs5k (слышно в игре), выкл — выбор фиксируется
 B.keys = false      -- клавиатура играет выбранный файл с высотой (кнопка keys, 5 окт)
 B.drag = nil        -- перетаскивание: { e=, x0=, y0=, active= }
 B.db = nil          -- открытая база { file=, title= } или nil (список баз)
@@ -760,6 +761,7 @@ function B.click(what)
   if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
+  elseif what == 'drum' then B.drum = not B.drum; if ctx.drum_audition_toggle then ctx.drum_audition_toggle(B.drum) end
   elseif what == 'pvvol' then B.vol_drag = true
   elseif what == 'pvwave' then if B.pv_path and ctx.preview_from then ctx.preview_from(B.pv_path, B.pv_frac or 0) end
   elseif what == 'find' then B.start_find(); if ctx.set_focus then ctx.set_focus('browser') end
@@ -1124,7 +1126,7 @@ function B.draw(U, L, x, y, w, h)
     -- play / keys — на строке плеера (5 окт): автопрослушивание и клавиатура
     -- с высотой выбранного файла
     local px0 = x0
-    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end
+    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'drum', 'drum', B.drum } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end
     local lx0 = px0 + L.pad
     local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
     local sx0, sw = lx0 + lw, math.max(8, x0 + ww - lx0 - lw - vw)
