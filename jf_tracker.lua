@@ -18443,7 +18443,7 @@ local function frame()
       state.sp_none = sel_e == nil   -- 11 окт: нет сэмпла — панели properties нет (раскладка прячет)
       if state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops') then
         SPROP.hover_tab = nil
-        return SL.draw_in(U, L, x, y, w, h, e, col and col.track, zone)
+        return ctx.sl_layers(x, y, w, h, e, col and col.track, zone)
       end
       local pw = sel_e and math.min(L.cw * 90, math.floor((w - lw) * 0.55)) or 0   -- 5 окт: втрое шире, слайдеры
       ctx.sprops_maxw = pw
@@ -18465,9 +18465,9 @@ local function frame()
       else pw = 0; SPROP.hover = nil end
       if pleft then
         local wx = x + (pw > 0 and (pw + 2 * L.pad) or 0)
-        return SL.draw_in(U, L, wx, y, x + w - wx, h, e, col and col.track, zone)
+        return ctx.sl_layers(wx, y, x + w - wx, h, e, col and col.track, zone)
       end
-      return SL.draw_in(U, L, x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
+      return ctx.sl_layers(x, y, px - x - (pw > 0 and L.pad or 0), h, e, col and col.track, zone)
     end,
     sprops_draw = function(Lx, x, y, w, h)
       local se = ctx.sp_sel
@@ -21121,6 +21121,10 @@ local function frame()
     elseif hover.libtab then
       state.libtab = hover.libtab; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. ' (F4)'
       click = { t = now2, zone = 'libtab' }
+    elseif ctx.sl_layer_hot and reaper.time_precise() - ctx.sl_layer_hot.t < 0.25 then   -- 19 окт: дорожка слоя в слайсере
+      local hl = ctx.sl_layer_hot
+      if dbl and click.zone == 'sllayer' then ctx.layer_menu(hl.root, hl.k) else ctx.layer_listen(hl.root.layers[hl.k]) end
+      click = { t = now2, zone = 'sllayer' }
     elseif hover.libfold then   -- 19 окт: + / - у инструмента — папка lib
       draw.LIBO = draw.LIBO or {}; draw.LIBO[hover.libfold] = (not draw.LIBO[hover.libfold]) or nil; ctx.set_focus('inst')
       click = { t = now2, zone = 'libfold' }
@@ -24440,6 +24444,54 @@ ctx.pad_route = function(f, ki)
   ctx.db_cache = nil
   if not state.dsp_big then ctx.dsp_big() end
   vim.msg = 'pad in the router: l - inside, A - a layer in parallel (RS5K / synth / fx), a - after, zz - back to the pads'
+end
+-- 19 окт: слайсер слоёного ¥ — вид layer: под волной инструмента его слои дорожками друг над другом,
+-- каждая — волна сэмпла слоя со сдвигом (offset) в том же масштабе, что весь инструмент; щелчок по дорожке — слушать,
+-- двойной — меню слоя
+ctx.sl_layers = function(x, y, w, h, e, track, zone)
+  local root = e and (e.parent or e)
+  local ls = root and root.layers
+  local n = ls and #ls or 0
+  local lh = math.max(L.rh + 4, math.min(3 * L.rh, math.floor(h * 0.12)))
+  if n == 0 or h < 6 * L.rh + n * lh then return SL.draw_in(U, L, x, y, w, h, e, track, zone) end
+  local top = h - n * lh - 2
+  ctx.sl_layer_hot = nil
+  local hv = SL.draw_in(U, L, x, y, w, top, e, track, zone)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local len = math.max(1e-3, root.len or 1)
+  for k, l in ipairs(ls) do
+    local ly = y + top + 2 + (k - 1) * lh
+    local src = model.layer_src and model.layer_src[l.guid]
+    local hot = mx >= x and mx < x + w and my >= ly and my < ly + lh - 1
+    U.set(hot and U.tint(U.AMBER, 0.15) or U.PANEL); gfx.rect(x, ly, w, lh - 1, 1)
+    U.set(U.LINE); gfx.rect(x, ly + lh - 1, w, 1, 1)
+    if src then
+      local se = ctx.layer_ent and ctx.layer_ent(src) or nil
+      local x0 = x + math.floor((l.offs or 0) / 1000 / len * w)
+      local pw = math.max(2, math.min(x + w - x0, math.floor((src.len or 0) / len * w)))
+      local fl = se and model.file_len(se.fpath)
+      if se and not fl then model.file_peaks(se.fpath, pw); fl = model.file_len(se.fpath) end   -- первый кадр — источник ещё не открыт
+      local pk = se and fl and fl > 0 and model.file_peaks(se.fpath, pw, (se.offs or 0) / fl, ((se.offs or 0) + (src.len or 0)) / fl)
+      local cy, hh = ly + math.floor((lh - 1) / 2), math.floor((lh - 3) / 2)
+      U.set(l.mute and U.DIM or U.mix(U.CYAN, U.TEXT, 0.3))
+      if pk and pk.n and pk.n > 0 then
+        for px = 0, pw - 1 do
+          local i2 = math.floor(px / pw * pk.n) + 1
+          local lo, hi = pk.min[i2] or 0, pk.max[i2] or 0
+          local g = 10 ^ ((l.vol or 0) / 20)
+          gfx.line(x0 + px, cy - math.min(1, hi * g) * hh, x0 + px, cy - math.max(-1, lo * g) * hh)
+        end
+      else gfx.line(x0, cy, x0 + pw, cy) end
+    end
+    U.text(x + 2, ly + 1, ctx.fit(('¥ L%d %s %+gms'):format(k, src and src.name or '?', l.offs or 0), math.floor(w * 0.5)), l.mute and U.DIM or U.TEXT)
+    if hot then ctx.sl_layer_hot = { root = root, k = k, t = reaper.time_precise() } end
+  end
+  return hv
+end
+ctx.layer_ent = function(src)
+  if src.ent and src.ent_t == src.item then return src.ent end
+  src.ent, src.ent_t = model.entry_of(src.item), src.item
+  return src.ent
 end
 -- 19 окт: lib как в lf — папки инструментов (слои ¥ и слайсы внутри). draw.LIBO[gkey] — открыта,
 -- draw.LIBSUB = { i, kind = 'y' | 's', k } — курсор на ребёнке. l — открыть / внутрь, h — закрыть / к родителю,
