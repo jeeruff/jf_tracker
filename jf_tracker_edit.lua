@@ -777,43 +777,69 @@ function E.retime(heads, lpb, rows, vols, label)
   if #heads == 0 then return 0 end
   local n = 0
   run(label or 'transform', function()
+    local function t_of(r)
+      local rf = math.floor(r)
+      return math.max(0, row_time(rf, lpb, 0) + (r - rf) * (row_time(rf + 1, lpb, 0) - row_time(rf, lpb, 0)))
+    end
+    -- 19 окт: сначала найти ВСЕ ноты (до правок), потом двигать: одинаковые ноты подряд (C-3 C-3 …) — иначе поиск
+    -- следующей находил уже сдвинутую предыдущую и двигал её ещё раз (наложения, лишние OFF и подколонки)
+    local found, taken, tags = {}, {}, {}
+    for i, h in ipairs(heads) do
+      if h.kind == 'midi' and h.take then
+        local hp = head_ppq(h, lpb)
+        local tol = math.abs(R.MIDI_GetPPQPosFromProjTime(h.take, row_time(h.row0 + 1, lpb, 0)) - R.MIDI_GetPPQPosFromProjTime(h.take, row_time(h.row0, lpb, 0))) / 2
+        local _, cnt = R.MIDI_CountEvts(h.take)
+        taken[h.take] = taken[h.take] or {}
+        local bi, bd, bn
+        for k = 0, cnt - 1 do
+          if not taken[h.take][k] then
+            local _, sel, muted, sppq, eppq, ch, pitch, vel = R.MIDI_GetNote(h.take, k)
+            if pitch == h.pitch and ch == h.ch then
+              local d = math.abs(sppq - hp)
+              if d <= tol and (not bd or d < bd) then bi, bd, bn = k, d, { sel = sel, muted = muted, sppq = sppq, eppq = eppq, ch = ch, pitch = pitch, vel = vel } end
+            end
+          end
+        end
+        if bi then taken[h.take][bi] = true; found[i] = { k = bi, nt = bn } end
+        if not tags[h.take] then   -- метки 0Sxx (notation jf_soff) — едут с нотой
+          tags[h.take] = {}
+          local _, _, _, ntx = R.MIDI_CountEvts(h.take)
+          for k = 0, ntx - 1 do
+            local _, _, _, pp, ty, msg = R.MIDI_GetTextSysexEvt(h.take, k)
+            local ch2, pi2 = (ty == 15) and (msg or ''):match('^NOTE (%d+) (%d+) .-jf_soff=') or nil, nil
+            if ch2 then pi2 = tonumber((msg or ''):match('^NOTE %d+ (%d+)')); tags[h.take][#tags[h.take] + 1] = { k = k, ppq = pp, key = tonumber(ch2) * 128 + pi2, ty = ty, msg = msg } end
+          end
+        end
+      end
+    end
+    local kits = {}
     for i, h in ipairs(heads) do
       local r = rows and rows[i]
-      local t
-      if r then
-        local rf = math.floor(r)
-        t = row_time(rf, lpb, 0) + (r - rf) * (row_time(rf + 1, lpb, 0) - row_time(rf, lpb, 0))
-        t = math.max(0, t)
-      end
+      local t = r and t_of(r)
       local v = vols and vols[i]
       if h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then
         if t then R.SetMediaItemInfo_Value(h.item, 'D_POSITION', t) end
         if v then R.SetMediaItemInfo_Value(h.item, 'D_VOL', math.max(0, math.min(2, v * 2))) end   -- 1.0 = 0 dB (как set_vol: FF/128)
         n = n + 1
-      elseif h.kind == 'midi' and h.take then
-        -- нота по времени головы с допуском в полстроки (после трансформаций строки дробные — ±2 тика мало)
-        local hp = head_ppq(h, lpb)
-        local tol = math.abs(R.MIDI_GetPPQPosFromProjTime(h.take, row_time(h.row0 + 1, lpb, 0)) - R.MIDI_GetPPQPosFromProjTime(h.take, row_time(h.row0, lpb, 0))) / 2
-        local i2, nt
-        local _, cnt = R.MIDI_CountEvts(h.take)
-        local bestd
-        for k = 0, cnt - 1 do
-          local _, sel, muted, sppq, eppq, ch, pitch, vel = R.MIDI_GetNote(h.take, k)
-          if pitch == h.pitch and ch == h.ch then
-            local d = math.abs(sppq - hp)
-            if d <= tol and (not bestd or d < bestd) then i2, bestd, nt = k, d, { sel = sel, muted = muted, sppq = sppq, eppq = eppq, ch = ch, pitch = pitch, vel = vel } end
+      elseif h.kind == 'midi' and h.take and found[i] then
+        local nt = found[i].nt
+        local sp = t and R.MIDI_GetPPQPosFromProjTime(h.take, t) or nt.sppq
+        local ep = sp + (nt.eppq - nt.sppq)
+        local vel = v and math.max(1, math.min(127, math.floor(v * 127 + 0.5))) or nt.vel
+        R.MIDI_SetNote(h.take, found[i].k, nt.sel, nt.muted, sp, ep, nt.ch, nt.pitch, vel, true)
+        if sp ~= nt.sppq then
+          for _, tg in ipairs(tags[h.take] or {}) do
+            if not tg.moved and tg.key == nt.ch * 128 + nt.pitch and math.abs(tg.ppq - nt.sppq) <= 60 then
+              R.MIDI_SetTextSysexEvt(h.take, tg.k, false, false, sp, tg.ty, tg.msg, true); tg.moved = true
+              kits[R.GetMediaItem_Track(h.item)] = kits[R.GetMediaItem_Track(h.item)] or {}; kits[R.GetMediaItem_Track(h.item)][nt.pitch] = true
+            end
           end
         end
-        if i2 then
-          local sp = t and R.MIDI_GetPPQPosFromProjTime(h.take, t) or nt.sppq
-          local ep = sp + (nt.eppq - nt.sppq)
-          local vel = v and math.max(1, math.min(127, math.floor(v * 127 + 0.5))) or nt.vel
-          R.MIDI_SetNote(h.take, i2, nt.sel, nt.muted, sp, ep, nt.ch, nt.pitch, vel, true)
-          n = n + 1
-        end
+        n = n + 1
       end
     end
     for _, h in ipairs(heads) do if h.kind == 'midi' and h.take then R.MIDI_Sort(h.take) end end
+    for tr, ps in pairs(kits) do for pitch in pairs(ps) do E.kit_soff_rebuild(tr, pitch) end end   -- автоматизация пэда — за метками
   end)
   return n
 end
