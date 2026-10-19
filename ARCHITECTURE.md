@@ -104,8 +104,8 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 26008 | трекерный вид таймлайна REAPER с Vim-редактированием. |
-| `jf_tracker_model.lua` | 2323 | снимок проекта REAPER в трекерных строках. |
+| `jf_tracker.lua` | 26182 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker_model.lua` | 2324 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 4633 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 841 | алиасы паттернов (этап 6). |
 | `jf_tracker_arr.lua` | 101 | аранжировки (9 окт): фиксированные лейны трека — его версии, аранжировка — именованный набор играющих лейнов всех треков (C_LANEPLAYS). |
@@ -113,7 +113,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_chord.lua` | 202 | аккорды (8 окт): анализатор и гармонайзер. |
 | `jf_tracker_import.lua` | 184 | импорт нарезанных инструментов (2 окт). |
 | **клавиши и команды** | | |
-| `jf_tracker_vim.lua` | 3714 | Vim-слой трекера: режимы, движения, операторы. |
+| `jf_tracker_vim.lua` | 3717 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 128 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 69 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
 | `jf_tracker_keyhelp.lua` | 1078 | контекстная справка по клавишам (2 окт). |
@@ -123,7 +123,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 9401 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 9518 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 827 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 243 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 102 | темы трекера (3 окт). |
@@ -132,7 +132,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_png.lua` | 78 | PNG без внешних программ (8 окт, снимки measure). |
 | `jf_tracker_logo.lua` | 517 | логотип JFTRACKER для about (главный модуль, 3 окт). |
 | **панели и вкладки** | | |
-| `jf_tracker_matrix.lua` | 1263 | матрица паттернов (этап 3). |
+| `jf_tracker_matrix.lua` | 1266 | матрица паттернов (этап 3). |
 | `jf_tracker_session.lua` | 1027 | session: клипы как в Ableton поверх линейного таймлайна REAPER (6 окт). |
 | `jf_tracker_browser.lua` | 1328 | сайдбар-браузер (справа от трекера). |
 | `jf_tracker_fxbrowser.lua` | 298 | браузер эффектов слева от DSP-панели (2 окт). |
@@ -176,7 +176,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_nmodui.lua` | 130 | модуль note mod (12 окт): слоты модуляции инструмента. |
 | `jf_tracker_notemod.lua` | 268 | модуляция, которую запускает нота (12 окт, этап 1). |
 | `jf_tracker_padseq.lua` | 54 | pads (17 окт, MPC style): паттерны песни на нотных клавишах, игра паттернами вживую. |
-| `jf_tracker_playlist.lua` | 104 | playlist матрицы (18 окт): порядок паттернов текстом, как region playlist. |
+| `jf_tracker_playlist.lua` | 142 | playlist матрицы (18 окт): порядок паттернов текстом, как region playlist. |
 | `jf_tracker_presets.lua` | 94 | пресеты инструментов на шаблонах треков REAPER (16 окт). |
 | `jf_tracker_sections.lua` | 138 | коды паттернов и секции (12 окт). |
 | `jf_tracker_sigpick.lua` | 161 | выпадашка размера такта (18 окт): вместо строки :sig N/D here. |
@@ -242,7 +242,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `@` | @ - play a macro | `a..z` `@` `Opt+Shift+2` |
 | `T` | T - take (the note under the cursor) | `f` `o` |
 | `c` | c - change | `c` |
-| `d` | d - delete | `d` `c` `W` `p` `P` `t` `r` `R` `a` |
+| `d` | d - delete | `d` `c` `W` `p` `P` `t` `r` `R` `T` `a` |
 | `da` | da - delete all (the track, in the song) | `w` `e` `l` `j` `k` `h` `E` `L` `J K H` |
 | `dsp_a` | a - add / automate | `f` `F` `a` `p` `i` `d` `m` |
 | `dsp_c` | c - container | `c` |

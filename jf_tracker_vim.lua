@@ -2716,9 +2716,8 @@ function V.key_impl(c)
       end
       V.count = nil; return
     elseif p == 'da' then
-      -- daw (4 окт): все item трека курсора в песне (библиотека за =LIB остаётся)
-      if c == ('w'):byte() and ctx.clear_track(true) then finish_edit()
-      elseif ctx.clear_track_part and string.char(c):lower():match('^[eljkh]$')
+      -- 19 окт: daw → dT (одна клавиша на функцию)
+      if ctx.clear_track_part and string.char(c):lower():match('^[eljkh]$')
         and ctx.clear_track_part(string.char(c):lower(), string.char(c):match('%u') ~= nil) then finish_edit()   -- 17 окт: dae dal daj dak dah; заглавная — все треки (daE — в паттерне)
       else finish_move() end
       V.count = nil; return
@@ -2760,6 +2759,10 @@ function V.key_impl(c)
       end
       if p == 'd' and c == ('r'):byte() then
         if ctx.clear_track() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
+      if p == 'd' and c == ('T'):byte() then   -- 19 окт: dT — всё на треке курсора во всех регионах (было daw; =LIB остаётся)
+        if ctx.clear_track(true) then finish_edit() else finish_move() end
         V.count = nil; return
       end
       if p == 'd' and c == ('R'):byte() then   -- 17 окт: dR — регион на всех треках
@@ -3414,7 +3417,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | R region, all tracks | aw all items of track | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a e l j k h - to there | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',

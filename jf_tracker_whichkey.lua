@@ -16,7 +16,7 @@ local MOTIONS = {
 
 local T = {
   d = { title = 'd - delete', items = { { 'd', 'row (3dd)' }, { 'c', 'automation column' }, { 'W', 'whole item' }, { 'p', 'up to the pause' }, { 'P', 'all of sel. tracks' },
-        { 't', 'time select' }, { 'r', 'track in rgn' }, { 'R', 'region, all tracks' }, { 'a', 'all … (w e l j k h)' } } },
+        { 't', 'time select' }, { 'r', 'track in rgn' }, { 'R', 'region, all tracks' }, { 'T', 'track, all regions' }, { 'a', 'all … (e l j k h)' } } },
   y = { title = 'y - copy', items = { { 'y', 'row (3yy)' } } },
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },
   da = { title = 'da - delete all (the track, in the song)', items = { { 'w', 'every item of the track' }, { 'e', 'all automation' }, { 'l', 'notes of the cursor row' }, { 'j', 'notes below the cursor' }, { 'k', 'notes above the cursor' }, { 'h', 'notes except the cursor row' }, { 'E', 'automation of all tracks in the pattern' }, { 'L', 'the row on all tracks' }, { 'J K H', 'the same on all tracks' } } },

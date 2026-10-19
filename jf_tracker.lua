@@ -18205,6 +18205,7 @@ local function frame()
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_fold = model.dsp_fold, hdrmeter = state.hdrmeter,
+    kit_wave = ctx.kit_wave,
     midi_in_age = function(col)   -- 19 окт: метр MIDI: возраст события и velocity последней ноты
       local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]
       if not t then return nil end
@@ -24527,6 +24528,37 @@ ctx.patgrid_move = function(dc, dr)
     end
   end
   if best then MX.pl_sel = best.i; return true end
+end
+-- 19 окт: волна пэда drumrs5k на треке: MIDI-нота кита → пэд по ноте → кусок его сэмпла (пики файла a..b),
+-- длина — секунды куска в строках от строки ноты. col без рэка — nil (быстро: рэк ищется раз на снимок)
+ctx.kit_wave_c = setmetatable({}, { __mode = 'k' })
+ctx.kit_wave = function(col, pitch, row)
+  local kc = ctx.kit_wave_c[col]
+  if kc == nil then
+    kc = false
+    for _, f in ipairs(col.fx or {}) do
+      if f.kit and f.kids then
+        kc = {}
+        for _, kd in ipairs(f.kids) do if kd.note and kd.file and not kc[kd.note] then kc[kd.note] = kd end end
+        break
+      end
+    end
+    ctx.kit_wave_c[col] = kc
+  end
+  if not kc then return nil end
+  if not pitch then return true end
+  local kd = kc[pitch]
+  if not kd then return nil end
+  model.file_peaks(kd.file, 8)                                   -- длина файла в кеше
+  local flen = model.file_len(kd.file)
+  if not flen or flen <= 0 then return nil end
+  local secs = flen * math.max(0, (kd.pad_b or 1) - (kd.pad_a or 0))
+  local t0 = edit.row_time(row, state.lpb, 0)
+  local rows_f = model.row_of_time(t0 + secs, state.lpb) - row
+  if rows_f <= 0 then return nil end
+  local file, a, b = kd.file, kd.pad_a or 0, kd.pad_b or 1
+  return { rows_f = rows_f, start_f = 0, obey = kd.obey, muted = not kd.enabled,
+    kpk = function(n, spec) return model.file_peaks(file, n, a, b, spec) end }
 end
 -- 19 окт: строка chain ячейками (Vim) в панели patterns: j с нижнего ряда / Tab — туда, k / Esc — к кубикам
 MX.ch_ed = MX.ch_ed or { toks = {}, i = 1 }

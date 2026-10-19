@@ -699,7 +699,7 @@ eq(':arp live off', V.arp_live, false)
 reset()
 keysin('dt'); eq('dt removes the time selection', last(), 'deltime')
 keysin('dr'); eq('dr clears the track in the region', last(), 'cleartrack')
-keysin('daw'); eq('daw clears all items of the track', last(), 'cleartrack:all')
+keysin('dT'); eq('dT clears all items of the track (was daw)', last(), 'cleartrack:all')
 -- :interp (4 окт, Paketti): vol от первого к последнему по строкам
 reset()
 do

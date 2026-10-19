@@ -1902,7 +1902,9 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   -- своя колонка (3 окт): курсор на ноте её не касается — волна не темнеет;
   -- инверсия только в режиме note, где волна лежит под подсвеченным полем
   if column then inv = nil end
-  local pk = get_peaks and get_peaks(head, math.min(total, 8192), column and mode == 'spec')
+  local pk
+  if head.kpk then pk = head.kpk(math.min(total, 8192), column and mode == 'spec')   -- 19 окт: пэд drumrs5k — пики файла пэда
+  else pk = get_peaks and get_peaks(head, math.min(total, 8192), column and mode == 'spec') end
   local cx, hw, x0w
   if column then cx = x + L.x_wave + L.w_wave / 2; hw = (L.w_wave / 2) - 1; x0w = x + L.x_wave
   else cx = x + L.x_note + L.w_note / 2; hw = (L.w_note / 2) - 1 end
@@ -6967,6 +6969,44 @@ function D.frame(L, snap, rows, state, info)
   -- как номер; деления доли — ступенями тише); база восстанавливается после строк
   local empty0, under0 = D.EMPTY, D.EMPTY_UNDER
   local ACC_F = { [0] = 1, 0.8, 0.5, 0.3, 0.15, 0 }
+  -- 19 окт: волна пэда drumrs5k под MIDI-нотой кита: строка → { голова-волна, номер строки в ней }; конец — следующая
+  -- нота подколонки (one-shot) или и OFF (obey note-offs); голова выше окна тоже звучит
+  local kwmap = nil
+  if info.kit_wave and #rows > 0 then
+    local r0, r1 = rows[1].row, rows[#rows].row
+    D.kw_heads = D.kw_heads or setmetatable({}, { __mode = 'k' })
+    for fi, f in ipairs(L.flat) do
+      local G = f.G or L
+      if f.x and f.lane and f.sub and (G.w_wave or 0) > 0 and f.col and info.kit_wave(f.col) then
+        local hs = D.kw_heads[f.sub]
+        if not hs then
+          hs = {}
+          for row, cl in pairs(f.sub) do if type(row) == 'number' and (cl.kind == 'midi' or cl.kind == 'off' or cl.kind == 'audio') then hs[#hs + 1] = { row = row, c = cl } end end
+          table.sort(hs, function(p, q) return p.row < q.row end)
+          D.kw_heads[f.sub] = hs
+        end
+        for k, h in ipairs(hs) do
+          if h.row > r1 then break end
+          if h.c.kind == 'midi' and h.c.pitch and h.row >= r0 - 2048 then
+            local ph = info.kit_wave(f.col, h.c.pitch, h.row)
+            if ph then
+              local e = h.row + math.ceil(ph.rows_f)
+              for k2 = k + 1, #hs do
+                local nx = hs[k2]
+                if nx.c.kind ~= 'off' or ph.obey then e = math.min(e, nx.row); break end
+              end
+              if e > r0 then
+                ph.muted = ph.muted or h.c.muted
+                kwmap = kwmap or {}
+                local m = kwmap[fi] or {}; kwmap[fi] = m
+                for rr = math.max(r0, h.row), math.min(r1, e - 1) do m[rr] = { ph, rr - h.row } end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     local ty = y + 1
@@ -7057,7 +7097,11 @@ function D.frame(L, snap, rows, state, info)
               end
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
-            else cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv) end
+            else
+              cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv)
+              local kw = kwmap and kwmap[fi] and kwmap[fi][r.row]
+              if kw and not (cell and (cell.kind == 'audio' or (cell.kind == 'cont' and cell.of and cell.of.kind == 'audio'))) then draw_wave(f.G or L, kw[1], kw[2], x, y, kw[1].muted, false) end
+            end
             -- 13 окт: набираемая команда / значение — прямо в ячейке курсора («0R__»), не только в статусе
             if inv and info.hexbuf and info.hexbuf ~= '' and type(inv) == 'number' and inv >= 2 and not c.folded and not f.env then
               local fx, fw = D.field_rect(f.G or L, inv)

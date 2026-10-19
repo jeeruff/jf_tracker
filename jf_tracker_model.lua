@@ -1466,6 +1466,7 @@ function build_one(tr, fx, out)
           kid.pad_a = pi.start and A.GetParamNormalized(tr, rid, pi.start) or 0
           kid.pad_b = pi.stop and A.GetParamNormalized(tr, rid, pi.stop) or 1
           kid.note = pi.note and math.floor(A.GetParamNormalized(tr, rid, pi.note) * 127 + 0.5) or nil
+          kid.obey = pi.obey and A.GetParamNormalized(tr, rid, pi.obey) >= 0.5 or false   -- 19 окт: волна пэда на треке — до OFF (obey) / до конца сэмпла
           -- 18 окт: mute group пэда — слайдер его ноты в jf_tracker_choke (0 — без группы)
           kid.choke = (chi and kid.note) and math.floor(A.GetParamNormalized(tr, chi, kid.note) * 16 + 0.5) or 0
           -- 19 окт: group (слайдер 129+ноты) — пэды группы звучат вместе (слой прямо в рэке)
