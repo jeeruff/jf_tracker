@@ -1200,12 +1200,18 @@ function E.kit_soff_set(h, lpb, xx)
   E.kit_soff_rebuild(R.GetMediaItem_Track(h.item), nt.pitch)
   return true
 end
+-- 19 окт: смещение команды MIDI-ноты — от начала клипа до ноты (четверти); аудио — как было (строка внутри ноты)
+function E.midi_cmd_off(h, lpb, off)
+  if h.kind ~= 'midi' or not h.take or not h.item then return off end
+  local q = R.MIDI_GetProjQNFromPPQPos(h.take, head_ppq(h, lpb)) - R.TimeMap2_timeToQN(0, R.GetMediaItemInfo_Value(h.item, 'D_POSITION'))
+  return math.max(0, q) + (off or 0)
+end
 function E.set_fx(heads, lpb, cmd, xx, off)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
     for _, h in ipairs(heads) do
       if E.cmds and E.cmds.CODES[cmd] then
-        if h.item then E.cmds.put(h.item, cmd, xx, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
+        if h.item then E.cmds.put(h.item, cmd, xx, E.midi_cmd_off(h, lpb, off)); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
       elseif h.kind == 'midi' and cmd == '0S' and E.kit_pad and h.item and E.kit_pad(R.GetMediaItem_Track(h.item), h.pitch) then
         E.kit_soff_set(h, lpb, xx)   -- 19 окт: нота кита — сдвиг окна пэда
       elseif h.kind == 'midi' then   -- 19 окт: команды item (0S, SI, SO, SL …) — только у аудио; MIDI молча не писал
@@ -1220,7 +1226,14 @@ end
 function E.clear_fx(heads, lpb, cmd, off)
   if E.cmds and E.cmds.CODES[cmd] then
     run('fx clear ' .. cmd, function()
-      for _, h in ipairs(heads) do if h.item then E.cmds.put(h.item, cmd, nil, off); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end end
+      for _, h in ipairs(heads) do
+        if h.item then
+          local o = E.midi_cmd_off(h, lpb, off)
+          E.cmds.put(h.item, cmd, nil, o)
+          if h.kind == 'midi' and (o or 0) <= 0.5 / lpb then E.cmds.put(h.item, cmd, nil, 0) end   -- старый токен без @ у первой ноты
+          E.cmds.rebuild(h, lpb, E.prev_semis(h))
+        end
+      end
     end)
     return
   end

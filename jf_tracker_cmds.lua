@@ -213,15 +213,33 @@ function C.rebuild(head, lpb, prev_semis)
     end
     -- 12 окт: отрезки slide (0U / 0D со своих строк), pitchbend ±2 полутона, линейно между границами
     local tq = function(off) return R.TimeMap2_QNToTime(0, qn0 + off) - pos end
+    -- 19 окт: команда — у своей ноты: отрезок slide до конца этой ноты (или до следующей 0U / 0D), потом bend — в центр;
+    -- соседние ноты клипа не задеваются
+    table.sort(list, function(a, b) return (a.off or 0) < (b.off or 0) end)
+    local nends = {}
+    do
+      local _, nn = R.MIDI_CountEvts(take)
+      for k = 0, nn - 1 do
+        local _, _, _, sp, ep = R.MIDI_GetNote(take, k)
+        nends[#nends + 1] = { s = R.MIDI_GetProjTimeFromPPQPos(take, sp) - pos, e = R.MIDI_GetProjTimeFromPPQPos(take, ep) - pos }
+      end
+    end
+    local function note_end(t)
+      local best
+      for _, ne in ipairs(nends) do if math.abs(ne.s - t) < row_sec / 2 and (not best or ne.e > best) then best = ne.e end end
+      return best
+    end
     local segs = C.segments(list, { ['0U'] = true, ['0D'] = true }, tq, len)
     if #segs > 0 then
       local function bend_at(semis) return math.max(0, math.min(16383, math.floor(8192 + semis / 2 * 8191 + 0.5))) end
-      local acc, pts = 0, { { 0, 0 } }
+      local pts = { { 0, 0 } }
       for _, sg in ipairs(segs) do
+        local ne = note_end(sg[1])
+        local b = ne and math.min(sg[2], ne) or sg[2]
         local slope = (sg[3].xx / 16) * (sg[3].cmd == '0U' and 1 or -1) / row_sec
-        pts[#pts + 1] = { sg[1], acc }
-        acc = acc + slope * (sg[2] - sg[1])
-        pts[#pts + 1] = { sg[2], acc }
+        pts[#pts + 1] = { sg[1], 0 }
+        pts[#pts + 1] = { b, slope * (b - sg[1]) }
+        pts[#pts + 1] = { b + 0.0005, 0 }   -- после ноты — назад в центр
       end
       for _, p in ipairs(pts) do
         local bnd = bend_at(p[2])

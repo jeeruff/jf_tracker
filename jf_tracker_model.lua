@@ -420,11 +420,30 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
     reps = math.min(M.MAX_UNROLL, math.ceil((qn1 - qn0) / period))
   end
   local muted_item = R.GetMediaItemInfo_Value(it, 'B_MUTE_ACTUAL') == 1
-  local midi_fx = {}
+  -- 19 окт: команды MIDI-клипа — у своей ноты: токен «0DA5@1.25» (смещение ноты от начала клипа, в четвертях);
+  -- без @ — у первой ноты (так они и звучали: от начала клипа). Раньше без @ показывались на всех нотах
+  local midi_cmds = {}
   do
     local _, cm = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
-    if cm and cm ~= '' then for tok in cm:gmatch('[^,]+') do if not tok:find('@', 1, true) then midi_fx[#midi_fx + 1] = tok end end end   -- 12 окт: строки внутри — только у аудио-нот
+    if cm and cm ~= '' then
+      for tok in cm:gmatch('[^,]+') do
+        local code, off = tok:match('^(%w%w%x%x)@([%d%.]+)$')
+        if code then midi_cmds[#midi_cmds + 1] = { t = code, off = tonumber(off) or 0 }
+        elseif tok:match('^%w%w%x%x$') then midi_cmds[#midi_cmds + 1] = { t = tok, off = 0, first = true } end
+      end
+    end
   end
+  local first_off
+  for _, nt in ipairs(notes) do local o = nt.qn - qn0; if not first_off or o < first_off then first_off = o end end
+  local half = 0.5 / math.max(1, lpb)
+  local function note_fx(o)
+    local t
+    for _, c in ipairs(midi_cmds) do
+      if (c.first and first_off and math.abs(o - first_off) < half) or (not c.first and math.abs(o - c.off) < half) then t = t or {}; t[#t + 1] = c.t end
+    end
+    return t
+  end
+  local midi_fx = {}
   for k = 0, reps - 1 do
     local shift = k * period
     for _, nt in ipairs(notes) do
@@ -439,7 +458,13 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
           note = M.note_name(nt.pitch), pitch = nt.pitch, semis = nt.pitch - M.BASE_NOTE,
           micro = M.micro_of_cents(nt.cents), ppq = nt.ppq,   -- 16 окт: микротон (MTS sysex перед нотой)
           vol = M.hex2(nt.vel), delay = d0, ch = nt.ch,
-          muted = muted_item or nt.muted, row0 = r0, fx = nt.soff and (function() local t = { ('0S%02X'):format(nt.soff) }; for _, x in ipairs(midi_fx) do t[#t + 1] = x end; return t end)() or midi_fx,   -- 19 окт: 0Sxx ноты кита
+          muted = muted_item or nt.muted, row0 = r0, fx = (function()
+            local nf = (k == 0) and note_fx(nt.qn - qn0) or nil
+            if not nt.soff and not nf then return midi_fx end
+            local t = nt.soff and { ('0S%02X'):format(nt.soff) } or {}   -- 19 окт: 0Sxx ноты кита
+            for _, x in ipairs(nf or {}) do t[#t + 1] = x end
+            return t
+          end)(),
         }
         if head.micro then M.seen_micro = true end
         local tail = { kind = 'off', of = head, delay = d1 }
