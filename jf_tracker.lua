@@ -4757,6 +4757,7 @@ ctx = {
   -- JSFX — по словам в имени
   is_inst_name = function(raw)
     raw = raw or ''
+    if raw:find('jf_tracker_choke', 1, true) or raw:find('jf_tracker_probe', 1, true) then return false end   -- 19 окт: служебные JSFX трекера (в описании чока есть «drum»)
     if raw:match('^%w+i:') then return true end
     local lo = raw:lower()
     if lo:match('^au%w*:') and (lo:find('mfx', 1, true) or lo:find('music effect', 1, true)) then return true end
