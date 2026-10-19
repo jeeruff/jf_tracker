@@ -353,7 +353,8 @@ function D.panes_layout(state, L, nregions, ncols)
   s.hi = D.hint_mode(state)
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
-  M.tab_h = L.rh + 2                                    -- подпись листа — в верхней линии рамки (zellij)
+  D.TABGAP = 3                                           -- 19 окт: пустота над вкладками — панели видно отдельно
+  M.tab_h = L.rh + 2 + D.TABGAP                         -- подпись листа — вкладкой над рамкой
   M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.hint_trk = (state.hints and state.hintpos == 'tabs') and (L.rh + 1) or nil   -- 15 окт: tabs — подсказки в строке вкладок; у трекера вкладок нет — его строка внизу
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
@@ -2828,11 +2829,12 @@ end
 function D.pane_badge(L, c, h)
   local ns = tostring(c.num)
   local nx = c.x + c.w - ms(ns) - L.pad - 2
-  set(U.AMBER); gfx.rect(nx - 2, c.y, ms(ns) + 4, h, 1)
+  local g0 = D.TABGAP or 0                              -- 19 окт: под пустотой над вкладками
+  set(U.AMBER); gfx.rect(nx - 2, c.y + g0, ms(ns) + 4, h - g0, 1)
   -- 13 окт: обрезка — своего листа (от прошлого листа оставалась чужая — цифру срезало, плашка пустая)
   local keep = D.clip
   D.clip = { c.x, c.x + c.w, c.y, c.y + h }
-  text(nx, c.y + 1, ns, U.BG)
+  text(nx, c.y + g0 + 1, ns, U.BG)
   D.clip = keep
 end
 -- 11 окт: у трекера нет строки вкладок, и его тело рисуется после рамок —
@@ -5145,8 +5147,12 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       local fon = focused(id)
       if c.tab then
         local th = c.tab.h
-        local ty = c.y + 1                                -- текст подписи; линия — через середину его глифа
-        local lyl = ty + D.SPACE + math.floor((L.th or L.rh) / 2)
+        local G0 = D.TABGAP or 0
+        -- 19 окт: над вкладками — G0 px пустоты (фон окна); вкладка — рамка сверху и с боков, линия панели — под вкладками,
+        -- выбранная вкладка открыта вниз (её фон поверх линии) — как настоящая вкладка
+        set(U.BG); gfx.rect(c.x, c.y, c.w, G0, 1)
+        local tyt, tth = c.y + G0, th - G0
+        local lyl = c.y + th - 1
         local pm = state.panecol ~= 'off' and state.panecol or nil   -- 17 окт: цвета панелей
         local pcol = pm and function(pid) return D.pane_col(pid, pm, state.shadehue) end or nil
         set(fon and D.FOCUS or (pcol and U.mix(pcol(id), U.PANEL, 0.55)) or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
@@ -5162,15 +5168,16 @@ function D.panes_frame(L, snap, state, info, hover, ph)
               -- 15 окт: вкладка в фокусе — акцентом (жёлтым), активные в других стопках — контрастно, но тише
               local soft = U.TEXT   -- 15 окт: выбранная вне фокуса — сам заголовок полным TEXT (было тише — терялся)
               if pcol and on and not fon then soft = pcol(t.id) end   -- выбранная вне фокуса — рамка и фон её цветом
-              set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.20)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, c.y, bw, th, 1)
-              set(on and (fon and U.AMBER or soft) or (pcol and U.mix(pcol(t.id), U.PANEL, 0.6)) or U.LINE); gfx.rect(bx, c.y, 1, th, 1); gfx.rect(bx + bw - 1, c.y, 1, th, 1)
+              set(on and (fon and U.tint(U.AMBER, 0.30) or U.tint(soft, 0.20)) or (hot and D.CURROW or U.PANEL)); gfx.rect(bx, tyt, bw, tth - (on and 0 or 1), 1)
+              set(on and (fon and U.AMBER or soft) or (pcol and U.mix(pcol(t.id), U.PANEL, 0.6)) or U.LINE)
+              gfx.rect(bx, tyt, bw, 1, 1); gfx.rect(bx, tyt, 1, tth, 1); gfx.rect(bx + bw - 1, tyt, 1, tth, 1)
             else
-              set(U.PANEL); gfx.rect(tx - 3, c.y, ms(lbl) + 6, th, 1)   -- фон под подписью на всю высоту строки
+              set(U.PANEL); gfx.rect(tx - 3, tyt, ms(lbl) + 6, tth, 1)   -- фон под подписью на всю высоту строки
             end
             local col = on and (fon and U.AMBER or U.TEXT) or (hot and U.TEXT or U.GREY)
             if t.id == 'retro' and not on then col = D.ARM end
             if pcol and not (on and fon) then col = (on or hot) and pcol(t.id) or U.mix(pcol(t.id), U.PANEL, 0.25) end
-            text(tx, c.y + 1, lbl, col)
+            text(tx, tyt + 1, lbl, col)
             if hot then hover.ptab = { id = t.id } end
             hint('ptab', t.x, t.y, t.w, t.h, t.id)
           end
@@ -5187,7 +5194,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local qb = D.qm_bars[bar]
         if not qb then qb = { { '\\', 'menu' } }; for _, it in ipairs(bar) do qb[#qb + 1] = it end; D.qm_bars[bar] = qb end
         local badge = (state.pane_mode and c.num and c.num <= 9) and (3 * L.cw) or 0
-        D.hint_pairs(hx, c.y + 1, c.x + c.w - L.pad - badge, qb, U.PANEL)
+        D.hint_pairs(hx, c.y + (D.TABGAP or 0) + 1, c.x + c.w - L.pad - badge, qb, U.PANEL)
       end
       -- режим PANE: номер листа (1..9 — фокус цифрой) у правого края рамки
       if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
