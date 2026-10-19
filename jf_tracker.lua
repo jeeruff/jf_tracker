@@ -17807,7 +17807,8 @@ local function frame()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
   if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
   if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
-  if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end   -- 18 окт: выборочный луп матрицы
+  if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end
+  pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
     T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
@@ -19556,6 +19557,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
+  elseif hover.matrix and hover.matrix.btn == 'follow' then state.status = 'follow ' .. (MX.follow and 'on' or 'off') .. ': while you are in the tracker the matrix cursor stands on the slot and the track of the tracker cursor and scrolls to it; click - ' .. (MX.follow and 'off' or 'on')
   elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
@@ -24287,6 +24289,9 @@ ctx.mx_btn_do = function(b)
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'timesel' then ctx.tsel_menu()
+  elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
+    MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
+    vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
   elseif b == 'vismetro' then
     MX.vismetro = not MX.vismetro; reaper.SetExtState(EXT, 'vismetro', MX.vismetro and '1' or '0', true)
     vim.msg = 'vismetro ' .. (MX.vismetro and 'on: the beats of a slot as vertical strips, the playing beat lights up' or 'off: the quarters as lines')
@@ -24638,6 +24643,21 @@ ctx.raw_undo = function()
   model.invalidate()
   if ST then pcall(ctx.UTM.poll, ST); ST.in_nav = false end
   if edit.after_undo then pcall(edit.after_undo) end
+end
+-- 19 окт: matrix follow (по умолчанию вкл): курсор матрицы — слот и трек курсора трекера (когда фокус не в матрице)
+MX.follow = reaper.GetExtState(EXT, 'mxfollow') ~= '0'
+ctx.mx_follow_tick = function()
+  if not MX.follow or state.focus == 'matrix' then return end
+  local key = vim.cur.row .. ':' .. vim.cur.fi
+  if key == ctx.mx_follow_key then return end
+  ctx.mx_follow_key = key
+  local t = edit.row_time(vim.cur.row, state.lpb, 0)
+  local sq = ctx.sequence and ctx.sequence() or seq
+  for i, rg in ipairs(sq or {}) do
+    if t >= rg.pos - 1e-6 and t < rg.rgnend - 1e-6 then MX.cur.ri = i; break end
+  end
+  local f = L.flat and L.flat[vim.cur.fi]
+  if f and f.col then for ci, c in ipairs(snap.cols or {}) do if c == f.col then MX.cur.ci = ci; break end end end
 end
 ctx.foldfast_toggle = function()
   state.foldfast = not state.foldfast; model.FOLD = state.foldfast; model.invalidate()
