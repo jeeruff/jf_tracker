@@ -101,4 +101,42 @@ function PL.summary(steps)
   return #steps, rows
 end
 
+-- 19 окт: строка chain как ячейки (Vim): ed = { toks = {слова}, i = курсор, op = 'd'|'y'|nil, reg = слово }
+-- h l w b e — ячейка, 0 $ — края, x / dw — удалить, dd — очистить, y / yw — в регистр, p P — вставить после / перед;
+-- ответ: 'changed' (toks изменились), 'go' (Enter), 'play' (Space), 'edit' (C), 'up' (k / Esc — к кубикам), true
+local LEFT, RIGHT = 1818584692, 1919379572
+function PL.ed_key(ed, c)
+  local ch = c > 0 and c < 256 and string.char(c) or ''
+  local n = #ed.toks
+  ed.i = math.max(1, math.min(math.max(1, n), ed.i or 1))
+  local op = ed.op; ed.op = nil
+  if op == 'd' and (ch == 'd') then for k = n, 1, -1 do ed.toks[k] = nil end; ed.i = 1; return 'changed' end
+  if (op == 'd' and (ch == 'w' or ch == 'e' or ch == 'l')) or (not op and ch == 'x') then
+    if n == 0 then return true end
+    ed.reg = table.remove(ed.toks, ed.i); ed.i = math.min(ed.i, math.max(1, #ed.toks)); return 'changed'
+  end
+  if op == 'y' and (ch == 'y' or ch == 'w' or ch == 'e' or ch == 'l') then ed.reg = ed.toks[ed.i]; return true end
+  if op then return true end                                   -- dj, yk … — не наше: отмена оператора
+  if ch == 'd' or ch == 'y' then ed.op = ch; return true end
+  if ch == 'h' or ch == 'b' or c == LEFT then ed.i = math.max(1, ed.i - 1); return true end
+  if ch == 'l' or ch == 'w' or ch == 'e' or c == RIGHT then ed.i = math.min(math.max(1, n), ed.i + 1); return true end
+  if ch == '0' or ch == '^' then ed.i = 1; return true end
+  if ch == '$' then ed.i = math.max(1, n); return true end
+  if (ch == 'p' or ch == 'P') and ed.reg then
+    local at = (ch == 'p' and n > 0) and ed.i + 1 or ed.i
+    table.insert(ed.toks, math.min(at, #ed.toks + 1), ed.reg); ed.i = math.min(at, #ed.toks); return 'changed'
+  end
+  if c == 13 then return 'go' end
+  if ch == ' ' then return 'play' end
+  if ch == 'C' then return 'edit' end
+  if ch == 'k' or c == 30064 or c == 27 then return 'up' end
+  return true
+end
+-- вставить слово: после курсора (a — в конец, i — перед курсором)
+function PL.ed_put(ed, w, where)
+  local n = #ed.toks
+  local at = where == 'end' and n + 1 or math.max(1, math.min(n + 1, ed.i or 1))
+  table.insert(ed.toks, at, w); ed.i = at
+end
+
 return PL

@@ -23604,7 +23604,13 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
         -- 19 окт: список: j k — выбор, g G — края, Space — слушать, Enter — к паттерну в трекере, n — заметка
-        if ch == 'j' or c == 1685026670 then ctx.patgrid_move(0, 1); return end
+        if MX.ch_focus then ctx.chain_kb(c); return end
+        if c == 9 or ((ch == 'j' or c == 1685026670) and not ctx.patgrid_move(0, 1)) then
+          MX.ch_focus = true; vim.msg = 'chain: h l w b move, x dw delete, dd clear, y p P, Enter - to it, Space - play from it, C - type, k / Esc - back'; return
+        end
+        if ch == 'j' or c == 1685026670 then return end
+        if ch == 'a' then ctx.chain_put('end'); return end
+        if ch == 'i' then ctx.chain_put('cursor'); return end
         if ch == 'k' or c == 30064 then ctx.patgrid_move(0, -1); return end
         if ch == 'l' or c == 1919379572 then ctx.patgrid_move(1, 0); return end
         if ch == 'h' or c == 1818584692 then ctx.patgrid_move(-1, 0); return end
@@ -24444,7 +24450,50 @@ ctx.patgrid_move = function(dc, dr)
       end
     end
   end
-  if best then MX.pl_sel = best.i end
+  if best then MX.pl_sel = best.i; return true end
+end
+-- 19 окт: строка chain ячейками (Vim) в панели patterns: j с нижнего ряда / Tab — туда, k / Esc — к кубикам
+MX.ch_ed = MX.ch_ed or { toks = {}, i = 1 }
+ctx.chain_ed = function()
+  local l = ctx.pl_cur()
+  local e = MX.ch_ed
+  e.toks = {}
+  for w in ((l and l.text) or ''):gmatch('%S+') do e.toks[#e.toks + 1] = w end
+  return e, l
+end
+ctx.chain_store = function(e, l)
+  if not l then ctx.pl_cmd('new'); l = ctx.pl_cur() end
+  if not l then return end
+  l.text = table.concat(e.toks, ' '); ctx.pl_save()
+end
+ctx.chain_put = function(where)   -- a — паттерн кубика в конец цепи, i — перед курсором цепи
+  local p = (ctx.pat_rows or {})[MX.pl_sel or 1]
+  if not p then return end
+  local e, l = ctx.chain_ed()
+  local code = p.name:match('^(%S+)') or p.name
+  ctx.PL.ed_put(e, code, where); ctx.chain_store(e, l)
+  vim.msg = ('chain: %s %s - %s'):format(code, where == 'end' and 'appended' or 'inserted', table.concat(e.toks, ' '))
+end
+ctx.chain_kb = function(c)
+  local e, l = ctx.chain_ed()
+  local r = ctx.PL.ed_key(e, c)
+  if r == 'changed' then ctx.chain_store(e, l); vim.msg = 'chain: ' .. (#e.toks > 0 and table.concat(e.toks, ' ') or 'empty')
+  elseif r == 'up' then MX.ch_focus = nil; vim.msg = 'patterns'
+  elseif r == 'edit' then ctx.pl_edit()
+  elseif r == 'go' or r == 'play' then
+    local w = e.toks[e.i]
+    if not w then return end
+    if r == 'go' then
+      local base = w:match('^([%w_]+)')
+      for i, p in ipairs(ctx.pat_rows or {}) do if (p.name:match('^(%S+)') or p.name) == base then MX.pl_sel = i; ctx.patlist_do('go', i); return end end
+      vim.msg = 'chain: ' .. w .. ' - no such pattern'
+    else
+      local tail = {}
+      for k = e.i, #e.toks do tail[#tail + 1] = e.toks[k] end
+      local steps, _, errs = ctx.PL.parse(table.concat(tail, ' '), ctx.pl_find)
+      ctx.pl_play(steps, errs)
+    end
+  elseif e.op then vim.msg = 'chain: ' .. e.op .. '_' end
 end
 ctx.patlist_do = function(what, i)
   local list = ctx.pat_rows or {}
@@ -24636,7 +24685,24 @@ ctx.chain_draw = function(Lx, x, y, w)
   local tw = math.max(Lx.cw * 4, x + w - bw_all - bx - Lx.pad - stw)
   local thot = mx >= bx and mx < bx + tw and my >= y and my < y + Lx.rh   -- 19 окт: щелчок по тексту (или C) — набрать цепь с клавиатуры
   if thot then hv.btn = 'pltext'; U.set(U.LINE); gfx.rect(bx - 2, y - 1, tw + 2, Lx.rh, 0) end
-  U.text(bx, y, ctx.fit(text ~= '' and text or 'double click a pattern or C - type it: A1 A1 B1x2 C1:16', tw), text ~= '' and U.TEXT or U.DIM)
+  local cfoc = MX.ch_focus and state.focus == 'patterns'
+  if text == '' then
+    U.text(bx, y, ctx.fit(cfoc and 'empty - a on a cube appends, i inserts' or 'a / double click a cube, or C - type it: A1 A1 B1x2 C1:16', tw), cfoc and U.AMBER or U.DIM)
+  else   -- 19 окт: ячейками — курсор (фокус chain), играющая — зелёным
+    local cur = ctx.PLY and ctx.PLY.segs[ctx.PLY.i]
+    local tx, k = bx, 0
+    for w2 in text:gmatch('%S+') do
+      k = k + 1
+      local ww = U.measure(w2)
+      if tx + ww > bx + tw then U.text(tx, y, '…', U.GREY); break end
+      local on = cfoc and k == MX.ch_ed.i
+      local pl = cur and cur.tok == k
+      if on then U.set(U.AMBER); gfx.rect(tx - 1, y, ww + 2, Lx.rh - 1, 1)
+      elseif pl then U.set(U.tint(U.GREEN, 0.35)); gfx.rect(tx - 1, y, ww + 2, Lx.rh - 1, 1) end
+      U.text(tx, y, w2, on and U.BG or (pl and U.GREEN or U.TEXT))
+      tx = tx + ww + Lx.cw
+    end
+  end
   if st ~= '' then U.text(bx + tw + Lx.pad, y, st, U.GREY) end
   local cx = bx + tw + Lx.pad + stw
   for _, b in ipairs(btns) do

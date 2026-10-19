@@ -42,5 +42,20 @@ eq('complete: matches', #c, 3); eq('complete: sorted', c[1], 'A1'); eq('complete
 local l = PL.decode(PL.encode({ { name = 'main', text = 'A1 B1x2' }, { name = 'short', text = 'A1:8' } }))
 eq('store: two', #l, 2); eq('store: name', l[2].name, 'short'); eq('store: text', l[1].text, 'A1 B1x2')
 eq('free name', PL.free_name({ { name = 'playlist 1' } }), 'playlist 2')
+
+-- 19 окт: chain как ячейки
+do
+  local ed = { toks = { 'A1', 'B1', 'C1' }, i = 1 }
+  local function k(s2) local r; for ch in s2:gmatch('.') do r = PL.ed_key(ed, ch:byte()) end; return r end
+  k('l'); eq('l -> 2', ed.i, 2)
+  eq('x deletes', k('x'), 'changed'); eq('B1 gone', table.concat(ed.toks, ' '), 'A1 C1'); eq('reg B1', ed.reg, 'B1')
+  k('p'); eq('p after', table.concat(ed.toks, ' '), 'A1 C1 B1')
+  k('0'); k('dw'); eq('dw', table.concat(ed.toks, ' '), 'C1 B1')
+  k('yy'); k('$'); k('P'); eq('yy P before', table.concat(ed.toks, ' '), 'C1 C1 B1')
+  k('dd'); eq('dd clears', #ed.toks, 0)
+  PL.ed_put(ed, 'D1', 'end'); PL.ed_put(ed, 'A1', 'end'); eq('put end', table.concat(ed.toks, ' '), 'D1 A1')
+  ed.i = 1; PL.ed_put(ed, 'B1'); eq('put before cursor', table.concat(ed.toks, ' '), 'B1 D1 A1')
+  eq('Enter go', PL.ed_key(ed, 13), 'go'); eq('k up', k('k'), 'up')
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
