@@ -22,6 +22,18 @@ D.SCALE_MAX = 3
 local U, get_peaks, MX
 D.font_id = 0
 D.hint = nil   -- функция сбора целей подсказок (kind, x, y, w, h, data); ставит main
+-- 19 окт: бросок файлов на рэк — подсветка ячеек, куда лягут: под мышью и (несколько отмеченных) N нот с неё
+-- D.drop_note — нота под мышью прошлого кадра; info.drag_n — сколько файлов летит
+function D.drop_lit(info, note, hot)
+  if not info.dragging then D.drop_note = nil; return false end
+  if hot then return true end
+  local n0, n = D.drop_note, info.drag_n or 1
+  return n0 ~= nil and note ~= nil and n > 1 and note >= n0 and note < n0 + n
+end
+function D.drop_mark(x, y, w, h)
+  U.set(U.tint(U.AMBER, 0.35)); gfx.rect(x, y, w, h, 1)
+  U.set(U.AMBER); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
+end
 local function hint(kind, x, y, w, h, data) if D.hint then D.hint(kind, x, y, w, h, data) end end
 -- рамка выделения Ctrl-мыши (Cmd+щелчок, 8 окт) — объявлена до всех рисовальщиков
 local function csel_frame(x, y, w, h) U.set(U.CYAN); gfx.rect(x, y, w, h, 0) end
@@ -7708,6 +7720,8 @@ function D.frame(L, snap, rows, state, info)
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
       local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
       local bw1 = math.max(L.cw * 14, math.min(L.cw * (f.colw or 22), share))   -- 13 окт: модуль может просить колонку шире
+      -- 19 окт: рэк drumrs5k не свёрнут (zf) — колонки вдвое шире: пэды 4 × 4 крупно (m > s, волна, подписи, группа)
+      if f.kit and D.DR and not info.dsp_fold and bx + 4 * bw1 <= right then bw1 = 2 * bw1 end
       local by = boxy
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
@@ -8009,8 +8023,9 @@ function D.frame(L, snap, rows, state, info)
             -- 3 ряда — октава; сетка 4 × 4 — окно из 16 нот снизу вверх; пэд стоит на кубике своей ноты
             -- 19 окт: пэды квадратные (сторона — меньшая из ширины / высоты четверти, не меньше трёх строк текста)
             local side = math.min(gw // 4, math.max(4 * L.rh + 6, gh // 4))   -- 19 окт: крупнее (имя + мини-волна + кнопки)   -- 19 окт: не шире четверти колонки (низкая панель — прокрутка рядов, но не наезд на свойства)
+            if not info.dsp_fold then side = math.max(2 * L.rh, math.min(gw // 4, gh // 4)) end   -- 19 окт: развёрнуто — строго 4 × 4 на всё место
             local G = { cols = 4, cw = side, ch = side }
-            G.fit = math.max(1, math.min(32, gh // G.ch))   -- 19 окт: влезает больше рядов — показываем
+            G.fit = info.dsp_fold and math.max(1, math.min(32, gh // G.ch)) or math.max(1, math.min(4, gh // G.ch))   -- zf (свёрнуто) — сколько влезает рядов мелко
             local function pos(ki) local kd = f.kids[ki]; return math.max(0, math.min(127, (kd and kd.note) or (48 + ki - 1))) end
             local by_note = {}
             for ki2 in ipairs(f.kids) do local pn = pos(ki2); if not by_note[pn] then by_note[pn] = ki2 end end
@@ -8092,9 +8107,12 @@ function D.frame(L, snap, rows, state, info)
                   local ex, ey = gx0 + c * G.cw, gy0 + (G.fit - 1 - rr) * G.ch
                   set(note == kn and U.AMBER or U.mix(U.LINE, U.PANEL, 0.5)); rrect(ex, ey, G.cw - 2, G.ch - 2, false)
                   -- 19 окт: пустая нота — цель броска файлов (новый пэд на этой ноте)
-                  if not drag and mx >= ex and mx < ex + G.cw - 2 and my >= ey and my < ey + G.ch - 2 then
+                  local ehot = not drag and mx >= ex and mx < ex + G.cw - 2 and my >= ey and my < ey + G.ch - 2
+                  if ehot then
                     hover.dspkit = { k = k, key = kkey, ki = 0, note = note }; hover.dspkid = { k = k, f = f, ki = 0, note = note }
+                    if info.dragging then D.drop_note = note end
                   end
+                  if D.drop_lit(info, note, ehot) then D.drop_mark(ex, ey, G.cw - 2, G.ch - 2) end
                   text(ex + L.pad, ey + 1, nname(note), U.mix(U.DIM, U.PANEL, 0.4))
                 end
               end
@@ -8175,7 +8193,8 @@ function D.frame(L, snap, rows, state, info)
                   else lbl = kid.note and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[kid.note % 12 + 1] .. math.max(0, kid.note // 12 - 1)) or '---' end
                   text(cx0 + L.pad, ay, fit(lbl, cw0 - 2 * L.pad), kid.enabled and (on and U.AMBER or U.TEXT) or U.DIM)
                 end
-                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid, rect = { cx0, cy0, cw0, ch0 } } end
+                if hot then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid, rect = { cx0, cy0, cw0, ch0 } }; if info.dragging then D.drop_note = kid.note end end
+                if D.drop_lit(info, kid.note, hot) then D.drop_mark(cx0, cy0, cw0, ch0) end   -- 19 окт: ячейка, куда ляжет брошенный файл
                 hint('dspkit', cx0, cy0, cw0, ch0, { key = kkey, ki = ki })
               end
             end

@@ -13185,6 +13185,10 @@ ctx = {
     vim.msg = 'mixer ' .. (state.mixer and 'on' or 'off') .. ' (m)'
   end,
   toggle_piano = function()
+    -- 19 окт: автоповтор m (0.14 с) включал и тут же выключал клавиатуру — переключение не чаще раза в 0.25 с
+    local now = reaper.time_precise()
+    if now - (ctx.piano_t or 0) < 0.25 then return end
+    ctx.piano_t = now
     state.piano_show = not state.piano_show
     vim.piano = state.piano_show
     reaper.SetExtState('jf_tracker', 'piano', state.piano_show and '1' or '0', true)
@@ -17812,12 +17816,34 @@ local function frame()
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
     for _, o in ipairs(ctx.note_offs) do
+      -- 19 окт: пэд по щелчку держится, пока зажата ЛКМ (арм на время прослушки продлевается); отпустил — стоп
+      if o.hold then
+        if gfx.mouse_cap & 1 == 1 then o.t = now + 1; if ctx.arm_tmp then ctx.arm_tmp.t = now + 0.8 end
+        else o.hold = nil; o.t = math.max(now, o.t_on or now) end
+      end
       if now >= o.t then
+        -- one-shot RS5K (obey note-offs off) note-off не слушает: на миг включить obey, потом вернуть
+        local ob = o.obey
+        if ob and reaper.ValidatePtr(ob.track, 'MediaTrack*') then
+          local v = reaper.TrackFX_GetParamNormalized(ob.track, ob.fx, ob.i)
+          if v < 0.5 then
+            reaper.TrackFX_SetParamNormalized(ob.track, ob.fx, ob.i, 1)
+            ctx.obey_back = ctx.obey_back or {}; ctx.obey_back[#ctx.obey_back + 1] = { track = ob.track, fx = ob.fx, i = ob.i, v = v, t = now + 0.2 }
+          end
+        end
         ctx.stuffed = ctx.stuffed or {}; ctx.stuffed[#ctx.stuffed + 1] = { p = o.p, t = now }
         reaper.StuffMIDIMessage(0, 0x80, o.p, 0)
       else keep[#keep + 1] = o end
     end
     ctx.note_offs = keep
+  end
+  if ctx.obey_back and #ctx.obey_back > 0 then
+    local now, keep = reaper.time_precise(), {}
+    for _, b in ipairs(ctx.obey_back) do
+      if now >= b.t then if reaper.ValidatePtr(b.track, 'MediaTrack*') then reaper.TrackFX_SetParamNormalized(b.track, b.fx, b.i, b.v) end
+      else keep[#keep + 1] = b end
+    end
+    ctx.obey_back = keep
   end
   draw.pmark('pre: lock sync')
   -- LOCK: трекер — зеркало REAPER. Edit-курсор / выделенный трек изменились
@@ -18149,9 +18175,11 @@ local function frame()
     vorder = vim.vorder,                            -- 10 окт: линейка прыжков по ячейкам
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
+    drag_n = (B.drag and B.drag.active and B.is_marked(B.drag.e) and B.nmarked()) or 1,
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
+    dsp_fold = model.dsp_fold,   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
@@ -21060,6 +21088,12 @@ local function frame()
       elseif ctx.mods().shift then ctx.spl_set(''); vim.msg = 'playlist: cleared'
       else ctx.spl_set((ctx.spl_text():gsub('%s*%S+%s*$', ''))); vim.msg = 'playlist: the last one removed (Shift+x - all)' end
       click = { t = now2, zone = 'splbtn' }
+    elseif hover.matrix and hover.matrix.mxtname then   -- 19 окт: имя трека в шапке матрицы: двойной щелчок — переименовать
+      local ci = hover.matrix.mxtname
+      local col = snap.cols[ci]
+      if col and click.zone == 'mxtname' and click.ci == ci and now2 - click.t < 0.4 then ctx.rename_track_prompt(col)
+      elseif col then vim.msg = (col.name or '') .. ': double click - rename (tn)' end
+      click = { t = now2, zone = 'mxtname', ci = ci }
     elseif hover.matrix and hover.matrix.splsrc then   -- 19 окт: секция над плейлистом — в конец плейлиста
       local sc = ctx.spl_secs()[hover.matrix.splsrc]
       if sc then ctx.spl_add(sc.name, 1); MX.spl_i = hover.matrix.splsrc end
@@ -21281,7 +21315,19 @@ local function frame()
       end
       -- 16 окт: пэд drumrs5k звучит по щелчку (его нота в трек; трек взведён — см. preview)
       local dk = hover.dspkid and hover.dspkid.kid
-      if dk and dk.note and dk.rs5k_i then local col = dsp_target(); if col then ctx.preview(col.track, dk.note, 'midi') end end
+      if dk and dk.note and dk.rs5k_i then
+        local col = dsp_target()
+        if col then
+          ctx.preview(col.track, dk.note, 'midi')
+          -- 19 окт: держится до отпускания ЛКМ (note_offs: hold); one-shot — через obey note-offs
+          local o = ctx.note_offs and ctx.note_offs[#ctx.note_offs]
+          if o and o.p == dk.note then
+            local pi = model.rs5k_pidx(model.fxapi(col.track), col.track, dk.rs5k_i)
+            o.hold, o.t_on = true, o.t - 0.4 + 0.03
+            if pi and pi.obey then o.obey = { track = col.track, fx = dk.rs5k_i, i = pi.obey } end
+          end
+        end
+      end
       click = { t = now2, zone = 'dspkit' }
     elseif hover.tmpl then ctx.tmpl_do(hover.tmpl); click = { t = now2, zone = 'tmpl' }   -- 11 окт: < шаблон > в шапке DSP
     elseif hover.dsptrkname then ctx.dsptrack_toggle(); click = { t = now2, zone = 'dsptrkname' }   -- 11 окт: имя трека в DSP
@@ -23796,7 +23842,7 @@ local function frame()
           elseif ch == 'f' then   -- 16 окт: zf — модули со страницами (Surge): все сразу ↔ по одной, вкладки справа
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-            vim.msg = model.dsp_fold and 'zf: pages folded - one page, tabs on the right of the module' or 'zf: pages unfolded - all of them in one pane'
+            vim.msg = model.dsp_fold and 'zf: folded - one page, tabs on the right; drumrs5k: small pads' or 'zf: unfolded - all pages in one pane; drumrs5k: big 4 x 4 pads'
           end
           return
         end

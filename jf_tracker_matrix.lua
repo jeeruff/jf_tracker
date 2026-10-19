@@ -429,8 +429,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if x + L.mx_cell_w > W - 4 then break end
     if ci > MX.hs then
     local is_cur = (info.cur_ci == ci)
+    local nhot = mx >= x and mx < x + L.mx_cell_w and my >= ny and my < ny + MX.name_h
+    if nhot then hover.mxtname = ci end   -- 19 окт: двойной щелчок по имени — переименовать трек
     ctx.vtext(x + (L.mx_cell_w - L.th) / 2, ny, MX.name_h - 2, col.name ~= '' and col.name or tostring(ci),
       is_cur and U.AMBER or U.TEXT, U.PANEL)
+    if nhot then U.set(U.LINE); gfx.rect(x + 1, ny, L.mx_cell_w - 2, MX.name_h, 0) end
     if col.rgb then U.set(col.rgb); gfx.rect(x + 1, ny + MX.name_h, L.mx_cell_w - 2, 2, 1) end
     end
   end
