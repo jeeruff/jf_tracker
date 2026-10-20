@@ -876,12 +876,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           end
           local gap = (rh - 4) / 4
           local rgb = g.ev[1] and g.ev[1].rgb or U.TEXT   -- схема в цвете первого item
+          -- 20 окт: тёмный цвет трека (bass) на тёмном фоне не виден, короткая нота — 3x1 px: цвет читаемый,
+          -- черта не уже четверти клетки и в 2 px
+          if U.readable then rgb = U.readable(rgb, U.BG, 3) end
           for k = 1, 4 do
             if q[k] > 0 then
               local ly = y + 2 + math.floor((k - 0.5) * gap)
-              local lw = math.max(3, math.floor(q[k] * iw + 0.5))
+              local lw = math.max(math.max(3, math.floor(iw / 4)), math.floor(q[k] * iw + 0.5))
               U.set(g.state == 'muted' and U.GREY or rgb)
-              gfx.rect(x + 2 + math.floor((iw - lw) / 2), ly, lw, q[k] > 0.5 and 2 or 1, 1)
+              gfx.rect(x + 2 + math.floor((iw - lw) / 2), ly, lw, 2, 1)
             end
           end
         end
