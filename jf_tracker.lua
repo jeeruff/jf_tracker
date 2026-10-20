@@ -27104,10 +27104,11 @@ ctx.sec_remove = function(sc)
 end
 ctx.sec_menu = function(sc)
   local items = {
+    -- 20 окт: duplicate — этим словом и наверх (искали «дублировать», а было «copy after it»); набор букв меню: d — duplicate
+    { label = 'duplicate (new patterns)', v = 'copy' },
+    { label = 'duplicate linked (same patterns)', v = 'rep' },
     { label = 'launch (quantized)', v = 'launch' },
     { label = 'show in the tracker', v = 'show' },
-    { label = 'repeat after it (linked)', v = 'rep' },
-    { label = 'copy after it (new patterns)', v = 'copy' },
     { label = 'loop it', v = 'loop' },
     { label = 'rename', v = 'name' },
     { label = 'remove the section (patterns stay)', v = 'del' },
