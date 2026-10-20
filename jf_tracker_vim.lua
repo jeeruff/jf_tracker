@@ -811,7 +811,16 @@ local function apply(op, f0, f1, r0, r1)
       end
       for _, h in ipairs(heads) do
         local f = (h.fx or {})[fld - 3]
-        if f then E.set_fx({ h }, lpb(), f:sub(1, 2), tonumber(f:sub(3), 16) + d) end
+        -- 20 окт: auto capture — поле пустое: команда ближайшей ноты выше в этой колонке (код и значение), сразу ± d
+        if not f and h.row0 then
+          local best
+          for _, h2 in ipairs(V.heads_in(f0, f0, 0, math.max(0, h.row0 - 1))) do
+            local f2 = (h2.fx or {})[fld - 3]
+            if f2 and h2 ~= h and (h2.row0 or -1) < h.row0 and (not best or h2.row0 > best.row0) then best = { row0 = h2.row0, f = f2 } end
+          end
+          if best then f = best.f; V.msg = ('auto capture: %s from row %d'):format(best.f, best.row0) end
+        end
+        if f then E.set_fx({ h }, lpb(), f:sub(1, 2), math.max(0, math.min(255, tonumber(f:sub(3), 16) + d))) end
       end
     end
   end

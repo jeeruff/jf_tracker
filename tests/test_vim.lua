@@ -1152,5 +1152,8 @@ local RT; local rt0 = E.retime; E.retime = function(hs, lpb, rows) RT = { n = #h
 local hd = V.heads_in(1, 1, 0, 3)[1]; local d0 = hd and hd.delay; if hd then hd.delay = 200 end
 keysin('vjjjQ'); eq('Q: back to NORMAL', V.mode, 'normal'); eq('Q: one note moved', RT and RT.n, 1); eq('Q: to the nearest row', RT and RT.r, hd and (hd.row0 + 1))
 if hd then hd.delay = d0 end; E.retime = rt0
+-- 20 окт: auto capture — ^A на пустом поле команды ноты: команда ноты выше (kick 0PA0) +1
+reset(); V.cur = { fi = 1, row = 8, field = 4 }; V.key(1); eq('auto capture ^A', last(), 'fx:snare:0PA1')
+reset(); V.cur = { fi = 1, row = 8, field = 4 }; V.key(24); eq('auto capture ^X', last(), 'fx:snare:0P9F')
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

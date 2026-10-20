@@ -127,7 +127,7 @@ KH.PAGES = {
     { k = 'yy p P', d = 'copy rows / paste: p replaces the note on the row (x-fade on - keeps it), P beside it in a new subcolumn', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'c s', d = 'replace / split the event (mute events: select with v, then M)', t = { 'c', 's' } },
     { k = 'M S', d = 'mute / solo the cursor track (Shift+m / Shift+s)', t = { 'M', 'S' } },
-    { k = '^A ^X', d = 'field value +1 / -1' },
+    { k = '^A ^X', d = 'field value +1 / -1; an empty command field of a note - auto capture: the command of the nearest note above, then +1 / -1' },
     { k = 'r', d = 'set value of field' },
     { k = 'u ⌘⇧Z .', d = 'undo / redo / repeat last edit' },
     { k = '^R', d = 'the rec tab' },
