@@ -115,7 +115,12 @@ local function nfields(fi)
   local f = flat()[fi or V.cur.fi]
   if not f or f.folded then return 1 end
   if f.ml then return 1 end                 -- MIDI-лейн (CC / PC / артикуляции / SysEx): одно поле
-  if f.env then return f.compact and 1 or 2 end   -- огибающая: значение, форма сегмента (свёрнутый — только значение)
+  if f.env then   -- огибающая: значение, форма сегмента (свёрнутый — только значение)
+    -- 20 окт: узкая колонка (мастер — числами) — формы нет: курсор поля формы рисовался в соседней колонке строкой ниже
+    local Lx = ctx.layout()
+    if f.compact or (f.w and Lx and Lx.env_w and f.w < Lx.env_w) then return 1 end
+    return 2
+  end
   if f.compact then return 1 end           -- свёрнутый трек: только нота
   if f.G and f.G.nfields then return f.G.nfields end   -- уровень ширины (7 окт): свои поля
   if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
@@ -1713,8 +1718,8 @@ function V.key_impl(c)
     local cpd = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local m1 = ctx.mods and ctx.mods() or {}
     -- 20 окт: Opt+W (∑) в NORMAL — курсор на мастер (сложенный раскрывается); в INSERT Option+w — нота, как была
-    -- 20 окт: Shift+Opt+F (Ï) — поиск сэмпла по файлам для этого места (Shift+F — по базе)
-    if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('files'); return end
+    -- 20 окт: Shift+Opt+F (Ï) — выбрать базу для поиска сэмпла этого места (Shift+F — сразу поиск в базе)
+    if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('pickdb'); return end
     if (cpd == 8721 or (m1.alt and c == 119)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end
   end

@@ -15492,6 +15492,9 @@ local function context_menu(hover, anchor)
       end
     end
   end
+  -- 20 окт: подменю — своими буквами раньше строк справки модуля (было: трек — K, bounce — L): t трек, B bounce
+  local GPREF, mg_key = { track = 't', bounce = 'B' }, {}
+  for _, g in ipairs(mgo) do local want = GPREF[g]; if want and not used[want] then used[want] = true; mg_key[g] = want end end
   if #rp > 0 then
     local k = pick_key('R', 'in REAPER')
     local ru = {}
@@ -15545,7 +15548,8 @@ local function context_menu(hover, anchor)
   end
   for _, p1 in ipairs(gorder) do
     local list = groups[p1]
-    local k = (not used[p1] and p1) or pick_key(nil, 'menu ' .. p1)   -- буква занята одиночной командой — другая
+    local k = (not used[p1] and p1) or (not used[p1:upper()] and p1:upper()) or pick_key(nil, 'menu ' .. p1)   -- буква занята одиночной командой — заглавная (d … → D), потом другая
+    if k then used[k] = true end
     if k then
       used[k] = true
       local names = {}
@@ -15555,7 +15559,7 @@ local function context_menu(hover, anchor)
   end
   for _, g in ipairs(mgo) do
     local list = mg[g]
-    local k = pick_key(g:sub(1, 1), g)
+    local k = mg_key[g] or pick_key(g:sub(1, 1), g)
     if k and #list > 0 then
       local names = {}
       for i = 1, math.min(3, #list) do names[#names + 1] = (list[i].label:match('^(%S+)') or ''):lower() end
@@ -25018,10 +25022,14 @@ ctx.sample_find = function(mode)
   local f = L and L.flat[vim.cur.fi]
   if not (f and f.col and not f.env and not f.ml) then vim.msg = 'sample find: put the cursor on a track column'; return end
   ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name }
-  -- 20 окт: Shift+F — база (Media Explorer), Shift+Opt+F — просто файлы (папка браузера)
-  local want = mode == 'files' and 'files' or 'db'
-  if B.mode ~= want then B.set_mode(want) end
+  -- 20 окт: Shift+F — поиск в базе (Media Explorer; база запоминается), Shift+Opt+F — сначала выбрать базу
+  if B.mode ~= 'db' then B.set_mode('db') end
   ctx.pane_focus('browser')
+  if mode == 'pickdb' or not B.db then
+    B.db = nil; B.cur = 1; B.filter = ''; B.refresh_db()
+    vim.msg = ('sample find for %s @ %04d: pick a database (Enter), then / to find, j k listen, Enter - put it there, Esc - cancel'):format(f.col.name ~= '' and f.col.name or 'track', vim.cur.row)
+    return
+  end
   B.start_find()
   vim.msg = ('sample find for %s @ %04d: type, Enter - done typing, j k - listen, Enter - put it there, Esc - cancel'):format(f.col.name ~= '' and f.col.name or 'track', vim.cur.row)
 end
