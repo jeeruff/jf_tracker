@@ -24609,6 +24609,29 @@ reaper.DeleteExtState(EXT, 'err', false)
 -- надёжность (3 окт): ошибка кадра не закрывает трекер — пишется в ExtState
 -- err с местом (traceback), показывается в статусе, следующий кадр идёт как
 -- обычно; закрываемся, только если ошибка повторяется ~3 с подряд (цикл)
+-- 21 окт: :mem — кто держит память Lua: полная сборка (до / после — мусор или живое), затем перепись
+-- по корням — upvalues кадра (локальные кэши main), ctx, state; отчёт в статус, debug log и ExtState mem
+ctx.mem = function()
+  local before = collectgarbage('count')
+  collectgarbage('collect')
+  local after = collectgarbage('count')
+  local MEM = dofile(DIR .. '/jf_tracker_mem.lua')
+  local roots = { { 'ctx', ctx }, { 'state', state } }
+  local i = 1
+  while true do
+    local n, v = debug.getupvalue(ctx.frame_inner, i)
+    if not n then break end
+    if n ~= 'ctx' and n ~= 'state' then roots[#roots + 1] = { n, v } end
+    i = i + 1
+  end
+  local t0 = reaper.time_precise()
+  local list, nobj = MEM.census(roots)
+  local rep = ('heap %s -> %s after collect, %d objects (%.0f ms): '):format(MEM.fmt(before * 1024), MEM.fmt(after * 1024), nobj, (reaper.time_precise() - t0) * 1000) .. MEM.report(list, 14)
+  reaper.SetExtState(EXT, 'mem', rep, false)
+  if ctx.dlog then pcall(ctx.dlog, 'mem: ' .. rep) end
+  vim.msg = rep
+end
+ctx.frame_inner = frame          -- сам кадр (ниже frame — обёртка xpcall)
 local err_streak, err_last = 0, nil
 frame = (function(inner)
   return function()
