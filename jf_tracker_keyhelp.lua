@@ -174,6 +174,7 @@ KH.PAGES = {
     { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MTS sysex before the notes (MTS-ESP Master on the track before Surge XT), audio items - fractional pitch; Shift - the track' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt', d = 'the cursor row to the top (as in Vim)' },
+    { k = 'Opt+W', d = 'the cursor to the master columns (∑); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
     { k = 'zu', d = 'unfold: the folded notes (cyan line under the row, +N) of the selection / cursor row - LPB rises to the smallest one that gives each its row (up to 128); zu again - the previous LPB (:unfold)' },
     { k = 'zw', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },
     { k = 'zZ', d = 'fixed cursor on / off: the cursor row stays in the middle, the pattern scrolls under it (zz - centre once)' },

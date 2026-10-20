@@ -169,6 +169,8 @@ local function step_field(dir, n)
     if pos < 1 then
       if fi > 1 then fi = fi - 1; pos = #vorder(fi) else pos = 1 end
     elseif pos > #vorder(fi) then
+      -- 20 окт: с последнего поля вправо — сложенный мастер раскрывается (auto / fold), курсор идёт в него
+      if fi >= nflat() and dir > 0 and ctx.master_peek and ctx.master_peek() then end
       if fi < nflat() then fi = fi + 1; pos = 1 else pos = #vorder(fi) end
     end
   end
@@ -1709,6 +1711,8 @@ function V.key_impl(c)
   do
     local cpd = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local m1 = ctx.mods and ctx.mods() or {}
+    -- 20 окт: Opt+W (∑) в NORMAL — курсор на мастер (сложенный раскрывается); в INSERT Option+w — нота, как была
+    if (cpd == 8721 or (m1.alt and c == 119)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end
   end
   if ctx.slicer_active and ctx.slicer_active() then

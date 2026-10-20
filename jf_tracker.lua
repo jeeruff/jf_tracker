@@ -11653,7 +11653,7 @@ ctx = {
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
-      flag('mfoldauto', 'auto fold master', 'the master column folds by itself into two characters (a stereo meter and the gain reduction of its compressor / limiter) when the tracks do not fit, and opens again when there is room; the fold button in its header folds it by hand'),
+      flag('mfoldauto', 'auto fold master', 'the master column stays folded (a stereo meter, RMS at the sides) while the cursor is not on it; Opt+W, l from the last track or a click on it opens it; the same as the auto button in its header'),
       { key = 'shadehue', label = 'shades hue', kind = 'num', min = 0, max = 360, step = 10, fmt = '%d', desc = 'pane colours = shades: the colour the shades are made of - 0 = the theme accent, 1..360 - a hue on the colour wheel (30 orange, 120 green, 200 blue, 280 violet); Shift - fine', get = function() return state.shadehue or 0 end, set = function(v) state.shadehue = v end },
       { key = 'dimfocus', label = 'dim unfocused', kind = 'num', min = 0, max = 60, step = 2, fmt = '%d %%', desc = 'how much darker the modules without the keyboard focus are (0 = off; digits type the value)', get = function() return state.dimfocus or 0 end, set = function(v) state.dimfocus = v end },   -- 15 окт: слайдер
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
@@ -17837,6 +17837,7 @@ local function frame()
   if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
   if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
   if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end
+  pcall(ctx.master_peek_tick)   -- 20 окт: мастер складывается, когда курсор ушёл
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
@@ -19517,7 +19518,8 @@ local function frame()
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm')
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
-  elseif hover.mfold_meter then state.status = ('master: L R meter, red at the right - gain reduction %.1f dB (the strongest compressor / limiter on the master)'):format(hover.mfold_meter)
+  elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
+  elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
@@ -20096,7 +20098,10 @@ local function frame()
     U.click = false; model.invalidate()
     vim.msg = on and 'auto-arm on every track: the selected track records (click again - off)' or 'auto-arm off on every track'
   end
-  if U.click and hover.mfold then state.mfold = not state.mfold; U.click = false; relayout(); vim.msg = state.mfold and 'master folded: L R meter and gain reduction (click < to open)' or 'master open' end   -- 17 окт
+  if U.click and hover.mfold then state.mfold = not state.mfold; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfold and 'master folded: L R meter, RMS at the sides (click it or Opt+W to open)' or 'master open' end   -- 17 окт
+  -- 20 окт: auto — мастер сложен, пока курсор не на нём; клик по сложенному мастеру — раскрыть и курсор на мастер
+  if U.click and hover.mfoldauto then state.mfoldauto = not state.mfoldauto; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfoldauto and 'master auto: folded while the cursor is not on it (Opt+W / l from the last track / a click opens it)' or 'master auto off' end
+  if U.click and (hover.mfold_meter or hover.mfold_open) then U.click = false; ctx.master_jump() end
   if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
   -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
   -- 8 окт: клип во вкладке item — только выбранный (клик / курсор клип-мода),
@@ -24675,6 +24680,33 @@ ctx.raw_undo = function()
 end
 -- 19 окт: matrix follow (по умолчанию вкл): курсор матрицы — слот и трек курсора трекера (когда фокус не в матрице)
 MX.follow = reaper.GetExtState(EXT, 'mxfollow') ~= '0'
+-- 20 окт: мастер сложен (fold / auto) — peek раскрывает его, пока курсор на нём: клик по сложенному,
+-- Opt+W (∑), l с последнего поля. Курсор ушёл с мастера — сложить снова (ctx.master_peek_tick)
+ctx.master_fi = function()
+  local mc = snap and snap.master
+  if not (mc and L) then return nil end
+  for i, f in ipairs(L.flat) do if f.col == mc then return i end end
+end
+ctx.master_peek = function()
+  if not (L and L.mfold) then return false end
+  state.m_peek = true; relayout()
+  return ctx.master_fi() ~= nil
+end
+ctx.master_jump = function()
+  if L and L.mfold then ctx.master_peek() end
+  local i = ctx.master_fi()
+  if not i then vim.msg = 'no master column (options: master position)'; return end
+  if ctx.jump_mark then ctx.jump_mark() end
+  vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil
+  if vim.ensure_visible then vim.ensure_visible() end
+  vim.msg = 'master (Opt+W): the cursor on the master columns' .. ((state.mfold or state.mfoldauto) and ' - it folds again when the cursor leaves' or '')
+end
+ctx.master_peek_tick = function()
+  if not state.m_peek then return end
+  local f = L and L.flat[vim.cur.fi]
+  if f and snap and f.col == snap.master then return end
+  state.m_peek = nil; relayout()
+end
 ctx.mx_follow_tick = function()
   if not MX.follow or state.focus == 'matrix' then return end
   local key = vim.cur.row .. ':' .. vim.cur.fi

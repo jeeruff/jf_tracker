@@ -785,9 +785,10 @@ function D.layout(snap, state, nregions)
   end
   -- 17 окт: мастер сложен (кнопка fold в его шапке; опция auto fold master — сам, когда треки не влезают):
   -- два символа — стерео-метр и подавление компрессора / лимитера мастера, колонок нет
-  L.mfold = L.mtrack and (state.mfold or (state.mfoldauto and D.mfold_auto)) or false
+  -- 20 окт: auto — сложен, пока курсор не на мастере (state.m_peek — раскрыт: клик, Opt+W, l с последнего поля)
+  L.mfold = L.mtrack and (state.mfold or state.mfoldauto) and not state.m_peek or false
   L.master_w_full = L.master_w
-  if L.mfold then L.master_w = 4 * ms('W') + 2 * L.pad + 2 end   -- 17 окт: шире (2 знака — узко)
+  if L.mfold then L.master_w = 6 * ms('W') + 2 * L.pad + 2 end   -- 20 окт: стерео-пики + RMS по бокам (4 знака — узко)
   L.cols_r = L.win_w - L.master_w - (L.ruler_right and L.rg_w or 0)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
@@ -884,7 +885,8 @@ function D.layout(snap, state, nregions)
     -- строка эффектов выходили за линию модуля); подколонки за краем — без x
     -- 17 окт: не влез целиком и он не первый видимый — не показывать (и всё после него): к нему ведёт
     -- полоса прокрутки треков; раньше он рисовался обрезанным («drum» у мастера)
-    if vis and c.x and c.x + c.w > L.cols_r - 2 and #L.cols > 0 then
+    -- 20 окт: влезает хотя бы половина — показать обрезанным (ниже), меньше — спрятать
+    if vis and c.x and c.x + c.w > L.cols_r - 2 and #L.cols > 0 and (L.cols_r - 2 - c.x) < c.w / 2 then
       for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do local f = L.flat[k]; if f.ci == ci then f.x = nil end end
       vis = false; L.hs_cut = true; lx = cx
     end
@@ -907,8 +909,6 @@ function D.layout(snap, state, nregions)
   -- 11 окт: колонка мастера — справа, в своём углу; огибающие — элементы L.flat (курсор, точки), как у трека
   -- 17 окт: auto fold master — треки не влезли: сложить на следующей раскладке; развернуть, только если справа
   -- хватит места на полную ширину мастера (иначе сложил-развернул по кругу)
-  if L.mfold then D.mfold_auto = L.hs_cut or (L.cols_r - cx) < (L.master_w_full - L.master_w) + 2
-  else D.mfold_auto = L.hs_cut or false end
   if L.mtrack and L.mfold then L.mcol = nil
   elseif L.mtrack then
     local mc = snap.master
@@ -5568,39 +5568,50 @@ function D.mfold_draw(L, snap, hover)
   local keep = D.clip; D.clip = { x, x + w + 1 }   -- своя колонка: клип модуля рядом резал подписи
   local function done() D.clip = keep end
   set(D.HDR); gfx.rect(x, hy, w, hh, 1)
-  text(x + L.pad, hy + 1, 'M', U.AMBER)
+  -- 20 окт: ∑ — мастер (Opt+W набирает ∑ и ведёт сюда курсор); < — раскрыть
+  text(x + L.pad, hy + 1, '∑', U.AMBER)
   local by = hy + L.rh + 2
-  local bw = math.max(ms('>') + 4, w - 2)
-  local hot = mx >= x and mx < x + bw and my >= by and my < by + L.rh
+  local bw = ms('<') + 4
+  local hot = mx >= x + 1 and mx < x + 1 + bw and my >= by and my < by + L.rh
   set(hot and D.CURROW or U.PANEL); gfx.rect(x + 1, by, bw, L.rh - 2, 1)
   set(U.DIM); gfx.rect(x + 1, by, bw, L.rh - 2, 0)
   text(x + 3, by, '<', hot and U.AMBER or U.TEXT)
   if hot then hover.mfold = true end
-  -- метр: два столбика во всю высоту тела, снизу вверх (-60..0 dB), выше 0 — красный
-  local y0, h0 = L.body_y, L.body_h
-  set(U.BG); gfx.rect(x, y0, w, h0, 1)
-  local mw = math.max(2, math.floor((w - 6) / 3))
-  local function db(v) return v > 0 and 20 * math.log(v, 10) or -150 end
-  for ch = 0, 1 do
-    local v = reaper.Track_GetPeakInfo(tr, ch)
-    local f = math.max(0, math.min(1, (db(v) + 60) / 60))
-    local bx = x + 2 + ch * (mw + 1)
-    set(U.LINE); gfx.rect(bx, y0, mw, h0, 1)
-    local hgt = math.floor(f * h0)
-    set(v >= 1 and U.RED or (f > 0.85 and U.AMBER or U.GREEN)); gfx.rect(bx, y0 + h0 - hgt, mw, hgt, 1)
-  end
   local gr = 0
   for k = 0, reaper.TrackFX_GetCount(tr) - 1 do
     local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, k, 'GainReduction_dB')
     local g = ok and tonumber(v)
     if g then gr = math.max(gr, math.abs(g)) end
   end
-  local gx = x + 2 + 2 * (mw + 1)
-  set(U.LINE); gfx.rect(gx, y0, mw, h0, 1)
-  if gr > 0.05 then
-    local hgt = math.floor(math.min(1, gr / 20) * h0)            -- 0..20 dB подавления — сверху вниз
-    set(U.RED); gfx.rect(gx, y0, mw, hgt, 1)
+  -- подавление компрессора / лимитера — числом под <, если влезает (была третья полоса)
+  if gr > 0.05 and by + 2 * L.rh <= hy + hh then
+    local gs = ('-%.0f'):format(gr)
+    if ms(gs) <= w - 2 then text(x + 1, by + L.rh, gs, U.RED) end
   end
+  -- 20 окт: метр — шкала треков (-60..+12, > 0 красный, > -6 янтарь): пики L R посередине,
+  -- RMS L R (Track_GetPeakInfo 1024 / 1025 — то, что показывает VU мастера) узкими столбиками по бокам
+  local y0, h0 = L.body_y, L.body_h
+  set(U.BG); gfx.rect(x, y0, w, h0, 1)
+  local function db(v) return v > 1e-6 and 20 * math.log(v, 10) or -150 end
+  local function frac(d) return math.max(0, math.min(1, (math.min(12, d) + 60) / 72)) end
+  local trk = U.mix(U.BG, U.LINE, 0.3)   -- подложка столбика — едва видна: в тишине не «полоски»
+  local rw = math.max(2, math.floor(L.cw / 2))
+  local pw = math.max(2, math.floor((w - 4 - 2 * rw - 3) / 2))
+  local px0 = x + 2 + rw + 1
+  local xs = { rms = { x + 2, px0 + 2 * pw + 2 }, pk = { px0, px0 + pw + 1 } }
+  for ch = 0, 1 do
+    local d = db(reaper.Track_GetPeakInfo(tr, ch))
+    local bx = xs.pk[ch + 1]
+    set(trk); gfx.rect(bx, y0, pw, h0, 1)
+    local hgt = math.floor(frac(d) * h0)
+    if d > -60 then set(d > 0 and U.RED or (d > -6 and U.AMBER or U.GREEN)); gfx.rect(bx, y0 + h0 - hgt, pw, hgt, 1) end
+    local r = db(reaper.Track_GetPeakInfo(tr, 1024 + ch))
+    local rx = xs.rms[ch + 1]
+    set(trk); gfx.rect(rx, y0, rw, h0, 1)
+    if r > -60 then local rh2 = math.floor(frac(r) * h0); set(U.CYAN); gfx.rect(rx, y0 + h0 - rh2, rw, rh2, 1) end
+  end
+  -- риска 0 dB — по всей ширине, тусклая
+  set(U.DIM); gfx.rect(x + 1, y0 + h0 - math.floor(frac(0) * h0), w - 1, 1, 1)
   if mx >= x and mx < x + w and my >= y0 and my < y0 + h0 then hover.mfold_meter = gr end
   done()
 end
@@ -5726,17 +5737,28 @@ function D.frame(L, snap, rows, state, info)
     elseif not c.master then
       text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
     else
-      text(c.x + L.pad, hy + 1, fit('master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана
+      text(c.x + L.pad, hy + 1, fit('∑ master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
       -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
       if c.mtrack then
         local fw = ms('fold') + 4
         local fx = c.x + c.w - fw - 2
-        if fx > c.x + ms('master') + 2 * L.pad then
+        if fx > c.x + ms('∑ master') + 2 * L.pad then
           local fhot = mx >= fx and mx < fx + fw and my >= hy and my < hy + L.rh
           set(fhot and D.CURROW or U.PANEL); gfx.rect(fx, hy + 1, fw, L.rh - 2, 1)
           set(U.DIM); gfx.rect(fx, hy + 1, fw, L.rh - 2, 0)
           text(fx + 2, hy + 1, 'fold', fhot and U.AMBER or U.GREY)
           if fhot then hover.mfold = true end
+          -- 20 окт: [auto] — сложен, пока курсор не на мастере
+          local aw = ms('auto') + 4
+          local ax = fx - aw - 2
+          if ax > c.x + ms('∑ master') + 2 * L.pad then
+            local ahot = mx >= ax and mx < ax + aw and my >= hy and my < hy + L.rh
+            local on = state.mfoldauto
+            set(on and U.tint(U.CYAN, 0.25) or (ahot and D.CURROW or U.PANEL)); gfx.rect(ax, hy + 1, aw, L.rh - 2, 1)
+            set(on and U.CYAN or U.DIM); gfx.rect(ax, hy + 1, aw, L.rh - 2, 0)
+            text(ax + 2, hy + 1, 'auto', ahot and U.AMBER or (on and U.CYAN or U.GREY))
+            if ahot then hover.mfoldauto = true end
+          end
         end
       end
     end
