@@ -96,5 +96,18 @@ eq(dk('ai', sel), 'dsp_autoitem:2:1', 'dsp ai')
 eq(dk('vlc', sel), 'dsp_pack:2:3', 'dsp v l c = pack range'); eq(sel.fx, 3, 'dsp l moved')
 eq(dk('vhd', sel), 'dsp_delete:2:3', 'dsp v h d = delete range')
 eq(DK.key(27, sel, 4, 8, {}), 'leave', 'dsp esc leaves')
+-- 21 окт: модификаторы в записях справки
+local m, r = KH.mods_of('Ctrl+Shift+H'); eq(m.ctrl and m.shift and r, 'H', 'mods Ctrl+Shift+H')
+m, r = KH.mods_of('^A'); eq(m.ctrl and r, 'A', 'mods ^A'); m = KH.mods_of('^'); eq(m, nil, 'mods ^ alone - a motion')
+m, r = KH.mods_of('⌘⇧h'); eq(m.cmd and m.shift and r, 'h', 'mods cmd shift glyphs')
+m = KH.mods_of('M'); eq(m and m.shift, true, 'capital = Shift'); eq(KH.mods_of('dd'), nil, 'plain')
+m, r = KH.mods_of('Cmd+'); eq(m.cmd and r, '+', 'Cmd+ = Cmd and +')
+KH.PAGES.__t = { title = 't', e = { { k = 'Ctrl+h j k l', d = 'move' }, { k = 'Opt+F1 F2', d = 'tr' }, { k = 'Esc Opt+Tab', d = 'back' }, { k = 'M', d = 'mute' }, { k = 'Ctrl+Shift+H L', d = 'pat' } } }
+local l = KH.mod_entries({ '__t' }, { ctrl = true }); eq(#l, 1, 'ctrl: one'); eq(l[1].key, 'Ctrl+h j k l', 'ctrl inherits to j k l')
+l = KH.mod_entries({ '__t' }, { opt = true }); eq(#l, 2, 'opt: two'); eq(l[2].key, 'Opt+Tab', 'Esc not taken')
+l = KH.mod_entries({ '__t' }, { shift = true }); eq(#l, 1, 'shift: capital'); eq(l[1].text, 'mute', 'shift: M')
+l = KH.mod_entries({ '__t' }, { ctrl = true, shift = true }); eq(l[1] and l[1].key, 'Ctrl+Shift+H L', 'ctrl+shift: L inherits')
+KH.PAGES.__t = nil
+eq(KH.mods_name({ cmd = true, shift = true }), 'Shift+Cmd', 'name order')
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

@@ -15573,6 +15573,36 @@ function ctx.tok_codes(t)
 end
 ctx.CTX_FOCUS = { tracker = 'tracker', insert = 'tracker', matrix = 'matrix', inst = 'inst', browser = 'browser', dsp = 'dsp', fxb = 'fxb',
                     slices = 'slices', sprops = 'sprops', sample = 'top', modulation = 'top', midi = 'top', retro = 'top', master = 'top', pm = 'browser' }
+-- 21 окт: справка модификаторов. Shift / Ctrl / Opt / Cmd (или сочетание) держится 0.45 с без клавиши и мыши,
+-- окно в фокусе — у модуля список из справки: что это сочетание делает здесь и везде (панели). Клавиша — гаснет
+ctx.MOD_BITS = { { 8, 'shift' }, { 32, 'ctrl' }, { 16, 'opt' }, { 4, 'cmd' } }
+function ctx.mod_tick(c)
+  local cap = gfx.mouse_cap or 0
+  local sig = cap & (4 | 8 | 16 | 32)
+  if sig == 0 then ctx.mod_t0, ctx.mod_sig, ctx.mod_used = nil, nil, nil; return end      -- отпустил — заново
+  if c > 0 or cap & (1 | 2 | 64) ~= 0 or (gfx.getchar(65536) & 2) == 0 then ctx.mod_t0, ctx.mod_used = nil, sig; return end   -- клавиша / мышь с ним — пока держишь, не мешать
+  if ctx.mod_used == sig then return end
+  if ctx.mod_sig ~= sig or not ctx.mod_t0 then ctx.mod_sig, ctx.mod_t0 = sig, reaper.time_precise() end
+end
+function ctx.mod_pop()
+  if not ctx.mod_t0 or reaper.time_precise() - ctx.mod_t0 < 0.45 then return nil end
+  local held = {}
+  for _, b in ipairs(ctx.MOD_BITS) do if ctx.mod_sig & b[1] ~= 0 then held[b[2]] = true end end
+  local page = ctx.ctx_page({}) or 'tracker'
+  local pages = { page }
+  if page == 'insert' then pages[#pages + 1] = 'tracker' end
+  local here = KH.mod_entries(pages, held)
+  local glob = KH.mod_entries({ 'pane' }, held)
+  local lines = {}
+  for _, e in ipairs(here) do lines[#lines + 1] = { key = e.key, text = e.text } end
+  if #glob > 0 then
+    lines[#lines + 1] = { key = '', text = 'everywhere:', col = U.DIM }
+    for _, e in ipairs(glob) do lines[#lines + 1] = { key = e.key, text = e.text } end
+  end
+  local nm = KH.mods_name(held)
+  if #lines == 0 then lines[1] = { key = '', text = 'nothing on ' .. nm .. ' here', col = U.DIM } end
+  return { title = nm .. ' + ... in ' .. ((KH.PAGES[page] and KH.PAGES[page].title or page):gsub(' %(.*$', '')), lines = lines, kind = 'hydra' }
+end
 function ctx.ctx_page(hover)
   if state.ss_big then return 'session' end
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
@@ -19517,6 +19547,7 @@ local function frame()
     end
   end
   local pop = vim.popup()
+  if not pop and state.whichkey and not state.pane_mode then pop = ctx.mod_pop() end   -- 21 окт: держишь модификатор — что он даёт здесь
   if not pop and (state.whichkey or state.pane_mode) then
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
@@ -23334,6 +23365,7 @@ local function frame()
   draw.pmark('keys, commands, polls')
   local c = gfx.getchar()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
+  ctx.mod_tick(c)
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   local from_q = false

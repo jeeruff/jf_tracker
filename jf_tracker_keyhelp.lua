@@ -228,6 +228,7 @@ KH.PAGES = {
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
+    { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - a list at the module: what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere (option whichkey)' },
     { k = 'F2', d = 'back to the tracker from anywhere (closes the routing diagram, big router / chain); the item tab is in the F4 circle' },
     { k = 'F3', d = 'mixer on / off (in its routing strip Option+click on a routing name or a wire removes it)' },
     { k = 'F4', d = 'the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)' },
@@ -759,6 +760,7 @@ KH.PAGES = {
     { k = 'BS', d = 'erase search' },
     { k = 'Esc', d = 'clear search / back to module' },
     { k = 'F1', d = 'the whole help' },
+    { k = 'hold Shift Ctrl Opt Cmd', t = {}, d = 'hold a modifier (or two) half a second, no key - a list at the module: what it does here and everywhere (option whichkey)' },
   } },
 }
 -- строка подсказок под модулем (опция hints, 2 окт): самое нужное в одну
@@ -923,6 +925,71 @@ local function subseq(hay, pat)
   return #pat == 0
 end
 
+-- 21 окт: справка модификаторов — держишь Shift / Ctrl / Opt / Cmd (или сочетание) без клавиши — у фокуса
+-- список того, что они дают здесь. Записи справки пишут модификаторы по-разному: Ctrl+ ^ C- / Opt+ ⌥ A- /
+-- Cmd+ ⌘ M- / Shift+ ⇧ S-; одиночная заглавная (A, U, M) — это Shift + буква (как в Vim).
+local MODP = {
+  { 'Shift+', 'shift' }, { 'Shift-', 'shift' }, { '⇧', 'shift' }, { 'S-', 'shift' },
+  { 'Ctrl+', 'ctrl' }, { 'Ctrl-', 'ctrl' }, { 'C-', 'ctrl' },
+  { 'Option+', 'opt' }, { 'Opt+', 'opt' }, { 'Opt-', 'opt' }, { 'Alt+', 'opt' }, { '⌥', 'opt' }, { 'A-', 'opt' },
+  { 'Cmd+', 'cmd' }, { 'Cmd-', 'cmd' }, { '⌘', 'cmd' }, { 'M-', 'cmd' },
+}
+-- токен → набор модификаторов { shift, ctrl, opt, cmd } и сама клавиша; без модификаторов — nil
+function KH.mods_of(tok)
+  local m, rest, any = {}, tok, false
+  local again = true
+  while again do
+    again = false
+    for _, mp in ipairs(MODP) do
+      local pre = mp[1]
+      if rest:sub(1, #pre) == pre and #rest > #pre then m[mp[2]] = true; rest = rest:sub(#pre + 1); any = true; again = true; break end
+      if rest == pre and pre:sub(-1) == '+' then m[mp[2]] = true; rest = '+'; any = true; break end   -- «Cmd+» — Cmd и +
+    end
+    if not again and rest:sub(1, 1) == '^' and #rest > 1 then m.ctrl = true; rest = rest:sub(2); any = true; again = true end
+  end
+  if not any and rest:match('^%u$') then return { shift = true }, rest, true end   -- заглавная — Shift + буква
+  if not any then return nil, tok end
+  return m, rest
+end
+local function same(a, b) return (a.shift or false) == (b.shift or false) and (a.ctrl or false) == (b.ctrl or false) and (a.opt or false) == (b.opt or false) and (a.cmd or false) == (b.cmd or false) end
+-- короткая подпись записи: m, иначе описание до скобки / «;» / « - »
+function KH.short(e)
+  if e.m then return e.m end
+  local d = e.d:gsub(' %(.*$', ''):gsub('; .*$', '')
+  if #d > 44 then d = d:gsub(' %- .*$', '') end
+  return d
+end
+-- pages — список страниц (первая — фокуса); held — { shift, ctrl, opt, cmd } → { { key, text, page } … }
+-- клавиши без модификатора после клавиши с ним — те же модификаторы (Ctrl+h j k l, Opt+F1 F2)
+function KH.mod_entries(pages, held)
+  local out, seen = {}, {}
+  for _, pg in ipairs(pages) do
+    local P = KH.PAGES[pg]
+    for _, e in ipairs(P and P.e or {}) do
+      local keys, last = {}, nil
+      for tok in e.k:gsub(' / ', ' '):gmatch('%S+') do
+        local m, rest, caps = KH.mods_of(tok)
+        if m and not caps then last = m
+        elseif last and #tok <= 6 then m = last end          -- Ctrl+Shift+H L — L тоже с Ctrl+Shift (не просто Shift)
+        if m and same(m, held) then keys[#keys + 1] = tok end
+      end
+      if #keys > 0 then
+        local kk = table.concat(keys, ' ')
+        if not seen[kk] then seen[kk] = true; out[#out + 1] = { key = kk, text = KH.short(e), page = pg } end
+      end
+    end
+  end
+  return out
+end
+function KH.mods_name(h)
+  local t = {}
+  if h.ctrl then t[#t + 1] = 'Ctrl' end
+  if h.opt then t[#t + 1] = 'Opt' end
+  if h.shift then t[#t + 1] = 'Shift' end
+  if h.cmd then t[#t + 1] = 'Cmd' end
+  return table.concat(t, '+')
+end
+
 function KH.fmatch(e, q)
   local hay = (e.k .. ' ' .. e.d):lower()
   for term in q:lower():gmatch('%S+') do
@@ -1033,7 +1100,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
     local h = KH.hist[KH.hpos or #KH.hist]
     local he = h and KH.PAGES[h.page] and KH.PAGES[h.page].e[h.i]
     if he then qs, qc = '[' .. (KH.hpos and ('%d/%d: '):format(KH.hpos, #KH.hist) or 'last used: ') .. he.k .. ' - ' .. he.d .. ']', U.GREY   -- 18 окт: скобками, тише строк справки
-    else qs, qc = focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up', U.GREY end
+    else qs, qc = focused and 'type to search, Left/Right page, Esc back' or 'Tab here: search  |  keys you press light up  |  hold Shift / Ctrl / Opt / Cmd: what they do here', U.GREY end
   end
   U.text(qx, y + 3, fit(qs, math.max(0, qend - qx)), qc)
   local rows = KH.rows()
