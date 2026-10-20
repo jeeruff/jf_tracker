@@ -46,7 +46,8 @@ B.up(); eq('up above root allowed', B.path, '/')
 B.go('/r/Bass'); B.mark(1); eq('empty mark assigns', B.marks[1], '/r/Bass')
 B.go('/r'); B.mark(1); eq('mark jumps', B.path, '/r/Bass')
 B.go('/r'); B.key(('!'):byte()); eq('Shift+1 reassigns', B.marks[1], '/r')
-B.key(('2'):byte()); eq('2 on empty assigns', B.marks[2], '/r')
+B.key(('2'):byte()); eq('2 is a count now, not a bookmark', B.marks[2], nil); B.key(27)
+B.key(('@'):byte()); eq('Shift+2 assigns', B.marks[2], '/r')
 local parts = B.path_parts('/r/Drums/Kicks')
 eq('path parts', #parts, 4); eq('crumb path', parts[3].path, '/r/Drums')
 B.go('/r'); eq('mkdir', B.mkdir('New Kit'), true); eq('mkdir selects', B.entries[B.cur].name, 'New Kit')
@@ -122,4 +123,11 @@ do
   eq('marks cleared after Enter', B.nmarked(), 0)
   B.key(('m'):byte()); B.key(('u'):byte()); eq('u unmarks all (as in lf, 12 окт)', B.nmarked(), 0)
 end
+-- 20 окт: цифры — счётчик (10j), закладки — '1, Shift+цифра — поставить
+B.go('/r'); B.cur = 1
+local ne = #B.entries
+B.key(('1'):byte()); B.key(('0'):byte()); B.key(('j'):byte()); eq('10j moves', B.cur, math.min(ne, 11)); eq('10j keeps the folder', B.path, '/r')
+B.cur = math.min(ne, 11); B.key(('2'):byte()); B.key(('k'):byte()); eq('2k', B.cur, math.max(1, math.min(ne, 11) - 2))
+B.go('/r/Bass'); B.key(("'"):byte()); B.key(('1'):byte()); eq("'1 jumps to bookmark 1", B.path, '/r')
+B.go('/r'); B.key(("'"):byte()); B.key(('5'):byte()); eq("'5 empty: no jump, no set", B.marks[5], nil)
 print(('%d checks, %d failed'):format(n, bad))

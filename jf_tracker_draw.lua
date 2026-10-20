@@ -85,6 +85,7 @@ function D.init(u, peaks_fn, matrix)
   -- 15 окт: цвет режима — рамка поля и слово режима: NORMAL белый, INSERT красный, VISUAL янтарный, ввод команды голубой
   local function cp(c) return { c[1], c[2], c[3] } end   -- копия: своя запись в D.KEEP, не весь янтарь цветной в mono
   D.MODE_COL = { normal = { 1, 1, 1 }, insert = D.FOCUS_INS, visual = cp(U.AMBER), vline = nil, cmd = cp(U.CYAN), search = nil }
+  D.light_bg = type(U.BG) == 'table' and (0.2126 * (U.BG[1] or 0) + 0.7152 * (U.BG[2] or 0) + 0.0722 * (U.BG[3] or 0)) > 0.45 or false   -- 20 окт: светлая тема (крупный текст — по альфе)
   -- 20 окт: слово режима — читаемо к панели (светлые темы: белый NORMAL / KEYS пропадал — тянется к тёмному)
   for k, c in pairs(D.MODE_COL) do if c then D.MODE_COL[k] = U.readable(c, U.PANEL, 4.5) end end
   D.MODE_COL.vline, D.MODE_COL.search = D.MODE_COL.visual, D.MODE_COL.cmd
@@ -305,7 +306,7 @@ D.measure, D.texth = ms, TH
 -- строка → offscreen-картинка (один раз на строку+цвет+фон)
 local function txt_img(str, col, bg)
   local key = str .. '|' .. math.floor(col[1] * 255) .. ',' .. math.floor(col[2] * 255) .. ',' .. math.floor(col[3] * 255)
-    .. '|' .. (bg and (math.floor(bg[1] * 255) .. ',' .. math.floor(bg[2] * 255) .. ',' .. math.floor(bg[3] * 255)) or '')
+    .. '|' .. (bg and (math.floor(bg[1] * 255) .. ',' .. math.floor(bg[2] * 255) .. ',' .. math.floor(bg[3] * 255)) or (D.light_bg and 'a' or ''))
   local e = tcache[key]
   if e then return e end
   gfx.setfont(D.font_id)
@@ -316,8 +317,13 @@ local function txt_img(str, col, bg)
   gfx.setimgdim(id, w, hi)
   local old = gfx.dest
   gfx.dest = id
+  -- 20 окт: светлая тема без подложки — фон картинки прозрачный (a2 = 0), вывод обычным наложением по альфе:
+  -- сложение (mode 1) чёрного фона с текстом на светлом окне давало белый текст (kcast, крупные надписи)
+  local clear = not bg and D.light_bg
   if bg then gfx.set(bg[1], bg[2], bg[3], 1) else gfx.set(0, 0, 0, 1) end
+  if clear then gfx.a2 = 0 end
   gfx.rect(0, 0, w, hi, 1)
+  gfx.a2 = 1
   gfx.set(col[1], col[2], col[3], 1)
   gfx.setfont(D.font_id)
   if D.hybrid and str:find('[\128-\255]') then
@@ -334,7 +340,7 @@ local function txt_img(str, col, bg)
     gfx.x, gfx.y = 0, 0; gfx.drawstr(str)
   end
   gfx.dest = old
-  e = { id = id, w = w, h = hi }
+  e = { id = id, w = w, h = hi, clear = clear }
   tcache[key] = e
   return e
 end
@@ -1029,7 +1035,7 @@ local function text(x, y, s, col, bg)
   local e = txt_img(s, col, bg)
   local mode = gfx.mode
   gfx.a = 1
-  if D.SCALE % 1 ~= 0 then
+  if D.SCALE % 1 ~= 0 and not e.clear then   -- 20 окт: прозрачная картинка — без промежуточного ×2 (альфа в нём не сохранялась бы)
     -- дробный масштаб (x1.5, 5 окт): ближайший сосед даёт штрихи 1-2-1-2 px;
     -- поэтому картинка ×(2·масштаб) без сглаживания и вывод /2 со сглаживанием —
     -- все штрихи одной толщины, край мягкий
@@ -1047,7 +1053,7 @@ local function text(x, y, s, col, bg)
     gfx.mode = (bg and 0 or 1) | 4          -- без сглаживания (5 окт: сглаженный /2 мелкий текст размывал)
     gfx.blit(e.ov, 1, 0, 0, 0, e.w * k, e.h * k, math.floor(x), math.floor(y), e.w * D.SCALE, e.h * D.SCALE)
   else
-    gfx.mode = (bg and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании
+    gfx.mode = ((bg or e.clear) and 0 or 1) | 4          -- 4 = без фильтрации при масштабировании; прозрачная — обычным наложением
     -- 10 окт: с подложкой — без запаса +2 px справа (он нужен только ×1.5): при ×2 он
     -- торчал из блока курсора ступенькой
     local sw = bg and math.max(1, e.w - 2) or e.w
@@ -9533,7 +9539,7 @@ function D.frame(L, snap, rows, state, info)
           if y < L.body_y then break end
           local lbl = e.label .. (e.n > 1 and (' x' .. e.n) or '')
           -- 20 окт: светлая тема — свежая клавиша основным (тёмным) текстом, янтарь на светлом не читался
-          local light = U.contrast(U.BG, { 0, 0, 0 }) > U.contrast(U.BG, { 1, 1, 1 })
+          local light = D.light_bg
           local col = i == 0 and (light and U.TEXT or U.AMBER) or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
           if D.kcfont then
             -- 20 окт: опция keycast font — свой шрифт (из mode font), высота строки keycast

@@ -20054,8 +20054,8 @@ local function frame()
   elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d+$') then
     -- путь — во всплывашке у кнопки (5 окт), здесь только клавиши
     local i = tonumber(hover.browser:sub(3))
-    state.status = B.marks[i] and ('bookmark %d - click: go, Shift+click: set to this folder, Opt+click: clear (key %d)'):format(i, i % 10)
-      or ('bookmark %d empty - click: remember this folder (key %d)'):format(i, i % 10)
+    state.status = B.marks[i] and ("bookmark %d - click: go, Shift+click: set to this folder, Opt+click: clear (keys '%d, Shift+%d sets)"):format(i, i % 10, i % 10)
+      or ("bookmark %d empty - click: remember this folder (Shift+%d)"):format(i, i % 10)
   elseif type(hover.browser) == 'string' and hover.browser:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
     state.status = 'go to ' .. (c and c.path or '?')

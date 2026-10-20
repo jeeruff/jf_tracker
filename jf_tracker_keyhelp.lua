@@ -467,7 +467,7 @@ KH.PAGES = {
     { k = 'p', d = 'auto preview on / off' },
     { k = 'v', d = 'show file in sample tab' },
     { k = 'w q', d = 'panel width / hide' },
-    { k = '1 2 3 4 5', d = 'bookmark: go (empty: remember this folder)' },
+    { k = "'1 '2 '3", t = { "'" }, d = "bookmark: go ('1 ... '0); the digits alone are a count: 10j 5k 3G" },
     { k = '! @ # $ %', d = 'Shift+1..5: set bookmark to this folder', t = { '!', '@', '#', '$', '%' } },
     { k = 'H L', d = 'folder history back / forward (< > buttons)' },
     { k = '*', d = 'new folder here (:mkdir name)' },

@@ -196,7 +196,7 @@ function B.history(d)
   B.go(p, true)
 end
 function B.mark(i, how)
-  if how == 'set' or (how == nil and not B.marks[i]) then
+  if how == 'set' or (how == nil and not B.marks[i]) then   -- how == 'go' — только переход (пустая не ставится)
     B.marks[i] = B.path
     if R.SetExtState then R.SetExtState('jf_tracker', 'bmark' .. i, B.path, true) end
     if ctx.msg then ctx.msg(('bookmark %d = %s'):format(i, B.path)) end
@@ -204,7 +204,10 @@ function B.mark(i, how)
     B.marks[i] = nil
     if R.DeleteExtState then R.DeleteExtState('jf_tracker', 'bmark' .. i, true) end
     if ctx.msg then ctx.msg(('bookmark %d cleared'):format(i)) end
-  else B.go(B.marks[i]) end
+  else
+    if not B.marks[i] then if ctx.msg then ctx.msg(('bookmark %d is empty - Shift+%d sets it'):format(i, i % 10)) end; return end
+    B.go(B.marks[i])
+  end
 end
 -- новая папка в текущей (имя из :mkdir)
 function B.mkdir(name)
@@ -997,8 +1000,19 @@ function B.key(c)
     if c == 27 and ctx.pm_big_on and ctx.pm_big_on() and B.filter == '' then if ctx.pm_big then ctx.pm_big() end; return true end
     if PMm().key(c, B, ctx.mods and ctx.mods() or {}) then return true end
   end
-  if ch:match('^%d$') then B.mark(ch == '0' and 10 or tonumber(ch))
-  elseif MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
+  -- 20 окт: цифры — счётчик, как в Vim (10j 5k 3G); закладка — '1 … '0 (как метки Vim 'a), Shift+цифра — поставить
+  if B.quote then
+    B.quote = nil
+    if ch:match('^%d$') then B.count = nil; B.mark(ch == '0' and 10 or tonumber(ch), 'go'); return true end
+    if c == 27 then B.count = nil; return true end
+  end
+  if ch == "'" then B.quote = true; if ctx.msg then ctx.msg("' - a bookmark: 1 ... 0") end; return true end
+  if ch:match('^%d$') and not (ch == '0' and not B.count) then B.count = (B.count or 0) * 10 + tonumber(ch); if ctx.msg then ctx.msg(tostring(B.count)) end; return true end
+  local n = B.count or 1
+  local had_count = B.count ~= nil
+  B.count = nil
+  if c == 27 and had_count then return true end   -- Esc — только сбросить набранный счётчик
+  if MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
   elseif ch == '*' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
@@ -1012,10 +1026,10 @@ function B.key(c)
   elseif ch == 'w' then B.click('size')
   elseif ch == 'q' then B.click('hide')
   elseif c == 27 and B.filter ~= '' then B.filter = ''; B.set_all(B.all)
-  elseif ch == 'j' or c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
-  elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - 1)
+  elseif ch == 'j' or c == 1685026670 then B.cur = math.max(1, math.min(#B.entries, B.cur + n))
+  elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - n)
   elseif ch == 'g' then B.cur = 1
-  elseif ch == 'G' then B.cur = #B.entries
+  elseif ch == 'G' then B.cur = had_count and math.max(1, math.min(#B.entries, n)) or #B.entries   -- 3G — третья строка
   elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере (первым: пэд / отметки не перехватывают)
   elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
