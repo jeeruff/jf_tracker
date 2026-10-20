@@ -402,6 +402,7 @@ KH.PAGES = {
     { k = 'Space', d = 'preview (how its note sounds: offset, rate, pitch); Esc stops' },
     { k = 'a', d = 'preview on select on / off (button preview; rclick: full / hold / first second)' },
     { k = 'bsync', d = 'header button: beatsync - the item lasts N beats at the tempo where each note sits (wheel in the item panel: N)' },
+    { k = 'beatsync to', t = {}, d = 'item panel row (click v / h l): the pattern x/4../x4, n until the next note (each copy), s the row selection, t the first transient on the next beat, T on the next note' },
     { k = 'linked', d = 'every note of an item is linked to it: the item panel changes all of them; a stretched / offset note becomes unique - the question offers a: apply to all' },
     { k = '/', d = 'fzf find instrument' },
     { k = 'f', d = 'hint labels: jump to an instrument (focus moves here)' },

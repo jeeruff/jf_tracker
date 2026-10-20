@@ -308,6 +308,7 @@ local state = {
   mixroute = flag('mixroute', true),
   jumps = flag('jumps', false),
   rowjumps = flag('rowjumps', false),
+  relwave = flag('relwave', true),   -- 20 окт: ширина волны — по громкости / velocity ноты
   unitedruler = flag('unitedruler', true),   -- 20 окт: такт.доля на месте номера строки (колонка линейки не нужна)
   jrbg = flag('jrbg', false),                      -- 10 окт: подложка линейки прыжков              -- 10 окт: линейка прыжков по строкам слева (relativenumber)                    -- 9 окт: линейка прыжков над шапками (3L / 3H)
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
@@ -739,7 +740,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -9127,7 +9128,7 @@ ctx = {
   -- beatsync инструмента (3 окт): edit.bsync_* — метка на всех его копиях
   bsync_set = function(e, n)
     if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then vim.msg = 'no item selected'; return end
-    local items = ctx.inst_group(e)
+    local items = e.multi or ctx.inst_group(e)   -- 20 окт: Ctrl+Enter на выделении — только эти ноты
     edit.bsync_set(items, e.item, n)
     model.invalidate()
     vim.msg = n and ('beatsync %s: %g beats, %d note(s) fitted to the tempo where they sit'):format(e.name, n, #items) or ('beatsync off: %s, %d note(s) back to rate %.3f'):format(e.name, #items, reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(e.item), 'D_PLAYRATE'))
@@ -9146,6 +9147,61 @@ ctx = {
     local beats = (rg.r1 - rg.r0) / (state.lpb or 4) * f
     if beats <= 0 then return end
     ctx.bsync_set(e, beats)
+  end,
+  -- 20 окт: beatsync to — next (каждая копия до следующей ноты своей дорожки), sel (выделение строк),
+  -- tbeat / tnote (первый транзиент сэмпла ложится на следующую долю / следующую ноту: опора — транзиент)
+  bsync_next_at = function(it)
+    local tr = reaper.GetMediaItem_Track(it)
+    local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local free = reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+    local lane = free and reaper.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') or 0
+    local best
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local o = reaper.GetTrackMediaItem(tr, i)
+      local p = reaper.GetMediaItemInfo_Value(o, 'D_POSITION')
+      if o ~= it and p > pos + 1e-4 and (not free or reaper.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane) and (not best or p < best) then best = p end
+    end
+    return best
+  end,
+  bsync_to = function(e, how)
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then vim.msg = 'no item selected'; return end
+    local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)
+    local QN = function(t) return reaper.TimeMap2_timeToQN(0, t) end
+    if how == 'sel' then
+      if not (vim.mode == 'visual' or vim.mode == 'vline') then vim.msg = 'beatsync to the selection: select rows first (v / V)'; return end
+      local _, _, r0, r1 = vim.visual_range()
+      ctx.bsync_set(e, (r1 - r0 + 1) / (state.lpb or 4)); return
+    end
+    local s
+    if how == 'tbeat' or how == 'tnote' then
+      for _, t in ipairs(SL.transients_of(e)) do
+        local src = t * (e.rate or 1)
+        if src > 0.02 then s = src; break end
+      end
+      if not s then vim.msg = 'beatsync to the transient: no transient after the start (sensitivity: the slicer, + -)'; return end
+    end
+    local per, spans, n = {}, s and {} or nil, 0
+    for _, it in ipairs(items) do
+      local tk = reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+      if tk then
+        local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local q0, qt = QN(pos), nil
+        if how == 'tbeat' then
+          local r = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+          qt = math.ceil(QN(pos + s / (r > 0 and r or 1)) - 1e-3)
+          if qt <= q0 + 1e-3 then qt = math.floor(q0) + 1 end
+        else
+          local nx = ctx.bsync_next_at(it)
+          qt = nx and QN(nx)
+        end
+        if qt and qt > q0 + 1e-4 then per[it] = qt - q0; if spans then spans[it] = s end; n = n + 1 end
+      end
+    end
+    if n == 0 then vim.msg = 'beatsync: no next note after this one'; return end
+    edit.bsync_set(items, e.item, per, spans)
+    model.invalidate()
+    local what = how == 'next' and 'until the next note' or (how == 'tbeat' and 'its transient on the next beat' or 'its transient on the next note')
+    vim.msg = ('beatsync %s: %s, %d note(s)'):format(e.name or '', what, n)
   end,
   bsync_adjust = function(e, d)
     if not e.bsync then if d > 0 then ctx.bsync_toggle(e) end return end
@@ -11155,10 +11211,11 @@ ctx = {
     vim.msg = n > 1 and ('crossfade editor (REAPER): %d overlapping notes selected'):format(n) or 'crossfade editor (REAPER): this note has no overlap - its fades'
   end,
   sp_adjust = function(e, k, d)
+    if k == 'bspat' then return ctx.sp_menu(e, 'bspat') end   -- 20 окт: h / l на beatsync to — выпадашка
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'instrument item is gone'; return end
     local fine = ctx.mods().shift
-    local items = e.note_scope and { it } or ctx.inst_group(e)   -- 11 окт: уровень note — только эта нота
+    local items = e.multi or (e.note_scope and { it }) or ctx.inst_group(e)   -- 11 окт: уровень note — только эта нота
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     if k == 'vol' then
       local v = reaper.GetMediaItemInfo_Value(it, 'D_VOL')
@@ -11284,7 +11341,7 @@ ctx = {
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
     fr = math.max(0, math.min(1, fr))
-    local items = e.note_scope and { e.item } or ctx.inst_group(e)   -- 13 окт: уровень note
+    local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)   -- 13 окт: уровень note
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
     if k == 'vol' or k == 'tvol' then
@@ -11328,7 +11385,7 @@ ctx = {
     local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
     if not (k and e and e.item and e.take and reaper.ValidatePtr(e.item, 'MediaItem*')) then return end
     local it, tk = e.item, e.take
-    local items = e.note_scope and { e.item } or ctx.inst_group(e)
+    local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     local t = (txt or ''):lower()
     local n = tonumber(t:match('[%+%-]?%d*%.?%d+'))
@@ -11369,7 +11426,7 @@ ctx = {
   sp_menu = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return false end
-    local items = e.note_scope and { e.item } or ctx.inst_group(e)
+    local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)
     local function P(key, v, desc) edit.inst_prop(items, it, key, v, 'abs', desc); model.invalidate() end
     local list, title = {}, k
     local KEYS = '123456789abcdefghijklmnopqrstuvwxyz'
@@ -11389,6 +11446,17 @@ ctx = {
       for i, nm in ipairs({ 'linear', 'fast start', 'fast end', 'fast start steep', 'fast end steep', 'slow start/end', 'slow start/end steep' }) do
         add(nm, function() P(key, i - 1, 'fade shape') end, cur == i - 1)
       end
+    elseif k == 'bspat' then
+      -- 20 окт: beatsync to — выпадашка (кнопки в узком попапе не влезали): доли паттерна, следующая нота, выделение, транзиент
+      title = 'beatsync to'
+      list[#list + 1] = { key = 'p', label = 'the pattern', fn = function() ctx.bsync_pattern(e, 1) end }
+      for _, b in ipairs({ { 'q', '/4', 0.25 }, { 'h', '/2', 0.5 }, { 'o', 'x1.5', 1.5 }, { '2', 'x2', 2 }, { '3', 'x3', 3 }, { '4', 'x4', 4 } }) do
+        list[#list + 1] = { key = b[1], label = 'the pattern ' .. b[2], fn = function() ctx.bsync_pattern(e, b[3]) end }
+      end
+      list[#list + 1] = { key = 'n', label = 'until the next note (each copy)', fn = function() ctx.bsync_to(e, 'next') end }
+      list[#list + 1] = { key = 's', label = 'the selection (rows)', fn = function() ctx.bsync_to(e, 'sel') end }
+      list[#list + 1] = { key = 't', label = 'the next transient on the next beat', fn = function() ctx.bsync_to(e, 'tbeat') end }
+      list[#list + 1] = { key = 'T', label = 'the next transient on the next note', fn = function() ctx.bsync_to(e, 'tnote') end }
     elseif k == 'chan' then
       title = 'channels'
       local cur = math.floor(reaper.GetMediaItemTakeInfo_Value(tk, 'I_CHANMODE'))
@@ -11403,7 +11471,7 @@ ctx = {
   sp_reset = function(e, k)
     local it, tk = e.item, e.take
     if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return end
-    local items = e.note_scope and { e.item } or ctx.inst_group(e)
+    local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)
     local function P(key, v, how, desc) edit.inst_prop(items, it, key, v, how, desc) end
     if k == 'vol' then P('D_VOL', 1, 'mul', 'sample volume reset')
     elseif k == 'pan' then P('take:D_PAN', 0, 'add', 'sample pan reset')
@@ -11657,6 +11725,7 @@ ctx = {
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
       { key = 'pmpane', label = 'pm as a pane', kind = 'toggle', desc = 'pm (projects) as a pane of its own, stacked with the browser; off - a tab of the browser (fx is a pane either way)', get = function() return state.pmpane end, set = function(v) state.pmpane = v; ctx.pmpane_apply() end },
       flag('jrbg', 'jump ruler background', 'the jump ruler over the rows on a panel strip; off (default) - on the window background, only the numbers'),
+      flag('relwave', 'relative wave', 'the wave of a note is as wide as it is loud: volume / velocity under 80 - a narrower wave (80 and up - full width)'),
       flag('unitedruler', 'united stepruler', 'bar.beat (1.2) right in the row number column on the beats, a bit brighter, the steps under it a bit darker - no separate timeline ruler column (the timeline ruler option then shows the time only)'),
       flag('rowjumps', 'line number', 'line numbers (the ln button over them): a narrow column left of the region strip, like relativenumber in Vim: how many rows each one is from the cursor (cyan above - k, grey below - j); the region strip moves right by its width'),
       flag('jumps', 'jump ruler', 'a row over the track headers, like relativenumber in Vim: how many tracks away each one is (3 - 3L right, cyan 2 - 2H left), the cursor track shows its number'),
@@ -11744,7 +11813,7 @@ ctx = {
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
-      { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
+      { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
@@ -13985,14 +14054,43 @@ ctx.np_open = function(item, at)
     if cell and cell.kind == 'cont' then cell = cell.of end
     item = cell and cell.kind == 'audio' and cell.item
   end
+  -- 20 окт: выделение (v / V) — все аудио-ноты в нём: правка панели идёт по всем сразу
+  local multi
+  if not at and (vim.mode == 'visual' or vim.mode == 'vline') then
+    local f0, f1, r0, r1 = vim.visual_range()
+    local seen = {}
+    multi = {}
+    for fi = f0, f1 do
+      local f = L and L.flat and L.flat[fi]
+      for r = r0, r1 do
+        local cell = f and f.sub and f.sub[r]
+        if cell and cell.kind == 'audio' and cell.item and not seen[cell.item] and reaper.ValidatePtr(cell.item, 'MediaItem*') then
+          seen[cell.item] = true; multi[#multi + 1] = cell.item
+        end
+      end
+    end
+    if #multi == 0 then vim.msg = 'Ctrl+Enter: no audio notes in the selection (MIDI notes: reform, gr)'; return end
+    item = multi[1]
+    if #multi < 2 then multi = nil end
+  end
   if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
-  ctx.NP = { item = item, sel = (ctx.NP and ctx.NP.sel) or 1, at = at or ctx.cursor_anchor() }
+  ctx.NP = { item = item, multi = multi, sel = (ctx.NP and ctx.NP.sel) or 1, at = at or ctx.cursor_anchor() }
 end
 ctx.np_entry = function()
   local NP = ctx.NP
   if not (NP and reaper.ValidatePtr(NP.item, 'MediaItem*')) then ctx.NP = nil; return nil end
   local key = tostring(NP.item) .. ':' .. reaper.GetProjectStateChangeCount(0)
-  if NP.key ~= key then NP.key = key; NP.e = model.entry_of(NP.item); if NP.e then NP.e.note_scope = true end end
+  if NP.key ~= key then
+    NP.key = key; NP.e = model.entry_of(NP.item)
+    if NP.e then
+      NP.e.note_scope = true
+      if NP.multi then   -- 20 окт: несколько нот — правка по всем, в заголовке их число
+        local ok = {}
+        for _, it in ipairs(NP.multi) do if reaper.ValidatePtr(it, 'MediaItem*') then ok[#ok + 1] = it end end
+        NP.e.multi = ok; NP.e.name = ('%d notes: %s'):format(#ok, NP.e.name or '')
+      end
+    end
+  end
   return NP.e
 end
 ctx.np_key = function(c)
@@ -21309,6 +21407,7 @@ local function frame()
         ctx.sp_reset(e, SPROP.hover.k)
       elseif e and SPROP.hover.val then ctx.sp_value_prompt(e, SPROP.hover.k)   -- 15 окт: клик по числу — ввод с клавиатуры
       elseif e and SPROP.hover.bspat then ctx.bsync_pattern(e, SPROP.hover.bspat)   -- 15 окт: beatsync = паттерн × доля
+      elseif e and SPROP.hover.k == 'bspat' then ctx.sp_menu(e, 'bspat')   -- 20 окт: мимо кнопок — выпадашка всех вариантов
       elseif e and SPROP.hover.bar then
         local fr0 = (gfx.mouse_x - SPROP.hover.bar.x) / math.max(1, SPROP.hover.bar.w)
         SPROP.drag = { k = SPROP.hover.k, x = SPROP.hover.bar.x, w = SPROP.hover.bar.w, fr = fr0, lx = gfx.mouse_x }   -- 15 окт: fr — для Shift (тонко)

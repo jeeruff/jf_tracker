@@ -292,11 +292,10 @@ end
 S.DT = { thr_db = nil, gap_ms = 40, pre_ms = 0 }   -- thr_db nil — порог от чувствительности
 S.dpanel = false
 S.dsel = 1
-function S.detect()
-  S.trans = {}
-  S.trans_amp = {}
-  local env = S.env
-  if not env then return end
+-- 20 окт: детектор — чистая функция огибающей (beatsync to transient зовёт её для любого сэмпла, не трогая S)
+local function detect_env(env, erate)
+  local trans, amp = {}, {}
+  if not env then return trans, amp end
   local thr = 0.04 + (1 - S.sens) * 0.30
   if S.DT.thr_db then thr = 10 ^ (S.DT.thr_db / 20) end
   local ratio = 1.6 + (1 - S.sens) * 2.5
@@ -311,17 +310,23 @@ function S.detect()
       bg = bg / win
       if v > bg * ratio then
         local t_src = (i - 1) / env.rate
-        S.trans[#S.trans + 1] = t_src / (S.entry.rate or 1)
+        trans[#trans + 1] = t_src / (erate or 1)
         -- громкость атаки (~30 мс после начала) — для smart quantize: сильный / слабый
         local a = 0
         for j = i, math.min(env.n, i + math.floor(env.rate * 0.03)) do if env.v[j] > a then a = env.v[j] end end
-        S.trans_amp = S.trans_amp or {}
-        S.trans_amp[#S.trans] = a
+        amp[#trans] = a
         last = i
       end
     end
   end
+  return trans, amp
 end
+S.detect_env = detect_env
+function S.detect()
+  S.trans, S.trans_amp = detect_env(S.env, S.entry and S.entry.rate)
+end
+-- транзиенты сэмпла e ({ src, offs, len, rate }) — время в item при его rate
+function S.transients_of(e) return (detect_env(build_env(e), e.rate)) end
 
 function S.use_transients()
   S.detect()

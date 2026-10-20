@@ -570,6 +570,7 @@ function D.layout(snap, state, nregions)
   local tlr = state.tlruler or 'off'
   -- 20 окт: united stepruler — такт.доля в колонке номеров (beats там не нужен; both → только time)
   L.united = state.unitedruler and true or false
+  L.relwave = state.relwave and true or false
   if L.united and tlr == 'beats' then tlr = 'off' elseif L.united and tlr == 'both' then tlr = 'time' end
   L.tlr = tlr
   L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
@@ -1990,6 +1991,11 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   local cx, hw, x0w
   if column then cx = x + L.x_wave + L.w_wave / 2; hw = (L.w_wave / 2) - 1; x0w = x + L.x_wave
   else cx = x + L.x_note + L.w_note / 2; hw = (L.w_note / 2) - 1 end
+  -- 20 окт: relative wave — тише нота, уже волна (vol / velocity hex, 80 = полная ширина)
+  if L.relwave and head.vol then
+    local v = tonumber(head.vol, 16)
+    if v and v < 128 then hw = hw * math.max(0.12, v / 128) end
+  end
   local base_col = inv and U.BG or (muted and D.PEAKM or D.PEAK)
   set(base_col)
   -- непрерывная ось (3 окт): без спектральных пиков волна не рвётся на тишине

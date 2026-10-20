@@ -1582,7 +1582,8 @@ function E.bsync_of(it)
   local _, v = R.GetSetMediaItemInfo_String(it, BSYNC, '', false)
   local n, span, r0, pp0 = (v or ''):match('^([%d%.]+);([%d%.]+);([%d%.]+);(%d)')
   if not n then return nil end
-  return { n = tonumber(n), span = tonumber(span), rate0 = tonumber(r0), pp0 = tonumber(pp0) }
+  local full = (v or ''):match('^[^;]*;[^;]*;[^;]*;[^;]*;([%d%.]+)')   -- 20 окт: весь сэмпл (span — до транзиента)
+  return { n = tonumber(n), span = tonumber(span), rate0 = tonumber(r0), pp0 = tonumber(pp0), full = tonumber(full) or tonumber(span) }
 end
 -- подогнать копию под её место (без undo-блока: внутри run)
 function E.bsync_fit(it, b)
@@ -1608,20 +1609,25 @@ function E.bsync_guess(span, pos)
 end
 -- включить (n > 0) / выключить (n = nil) beatsync у items инструмента;
 -- rep — представитель (по нему span и исходный rate)
-function E.bsync_set(items, rep, n)
+-- 20 окт: n — таблица item → доли (у каждой копии своё: до следующей ноты), spans — item → секунды источника
+-- до опорной точки (транзиент), иначе весь сэмпл; копия без своего n — пропуск
+function E.bsync_set(items, rep, n, spans)
   local tk = rep and R.GetActiveTake(rep)
   if not tk then return end
-  run(n and ('beatsync %g beats'):format(n) or 'beatsync off', function()   -- 15 окт: %g — и дробные (паттерн x1.5, /4)
+  local per = type(n) == 'table'
+  run(per and 'beatsync to the next' or (n and ('beatsync %g beats'):format(n) or 'beatsync off'), function()   -- 15 окт: %g — и дробные (паттерн x1.5, /4)
     local old = E.bsync_of(rep)
     local r0 = old and old.rate0 or R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
     local pp0 = old and old.pp0 or math.floor(R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH'))
-    local span = old and old.span or R.GetMediaItemInfo_Value(rep, 'D_LENGTH') * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    local span = old and old.full or R.GetMediaItemInfo_Value(rep, 'D_LENGTH') * R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
     for _, it in ipairs(items) do
       local t = R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
-      if t then
-        if n then
-          local b = { n = n, span = span, rate0 = r0, pp0 = pp0 }
-          R.GetSetMediaItemInfo_String(it, BSYNC, ('%g;%.6f;%.6f;%d'):format(n, span, r0, pp0), true)
+      local nn = per and n[it] or n
+      if t and (nn or not per) then
+        if nn then
+          local sp = spans and spans[it] or span
+          local b = { n = nn, span = sp, rate0 = r0, pp0 = pp0 }
+          R.GetSetMediaItemInfo_String(it, BSYNC, ('%g;%.6f;%.6f;%d;%.6f'):format(nn, sp, r0, pp0, span), true)
           E.bsync_fit(it, b)
         else
           local cur = R.GetMediaItemTakeInfo_Value(t, 'D_PLAYRATE')

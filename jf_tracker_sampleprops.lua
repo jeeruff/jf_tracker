@@ -155,9 +155,12 @@ function SP.draw(L, x, y, w, h, e, focused)
     if r.k == 'bspat' then
       local bxx = x + lw
       local bh0
+      -- 20 окт: справа «v» — выпадашка всех вариантов (next note, selection, transient); кнопки — до неё
+      local vx = x + w - U.measure('v') - L.pad
+      local ahot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
       for _, b in ipairs(SP.BSPAT) do
         local bw = U.measure(b[1]) + 2 * L.pad
-        if bxx + bw > x + w then break end
+        if bxx + bw > vx - L.pad then break end
         local bh = mx >= bxx and mx < bxx + bw and my >= ry and my < ry + L.rh
         U.set(bh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bxx, ry + 1, bw - 2, L.rh - 2, 1)
         U.set(bh and U.AMBER or U.LINE); gfx.rect(bxx, ry + 1, bw - 2, L.rh - 2, 0)
@@ -165,7 +168,8 @@ function SP.draw(L, x, y, w, h, e, focused)
         if bh then bh0 = b[2] end
         bxx = bxx + bw
       end
-      if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then SP.hover = { row = i, k = r.k, bspat = bh0 } end
+      U.text(vx, ry, 'v', (ahot and not bh0) and U.AMBER or U.GREY)
+      if ahot then SP.hover = { row = i, k = r.k, bspat = bh0 } end
       if ctx.hint then ctx.hint('sprop', x, ry, w, L.rh, i) end
       goto row_done
     end
