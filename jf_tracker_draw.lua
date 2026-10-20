@@ -5493,7 +5493,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
-      if id == 'reform' and info.rf_draw then hover.rf = info.rf_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'reform'); if not inside then hover.rf = nil end   -- 19 окт
+      if c.min then   -- 20 окт: свёрнута (zm) — только вкладки, модуль не рисуется
+      elseif id == 'reform' and info.rf_draw then hover.rf = info.rf_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'reform'); if not inside then hover.rf = nil end   -- 19 окт
       elseif id == 'renderer' and info.rd_draw then hover.rd = info.rd_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'renderer'); if not inside then hover.rd = nil end   -- 20 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт
       elseif id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
@@ -9519,7 +9520,7 @@ function D.frame(L, snap, rows, state, info)
     for k = #L.cols, 1, -1 do if not L.cols[k].master then lc = L.cols[k]; break end end
     local kx0 = (lc.x or 0) + (lc.w or 0) + 2 * L.pad
     -- 11 окт: мастер справа (колонка Tempo у края) — keycast до него, а не до края окна
-    local kx1 = (L.master_right and L.cols_r or W) - L.pad
+    local kx1 = ((L.master_right or L.mfold) and L.cols_r or W) - L.pad   -- 20 окт: и сложенный мастер — до его полосы
     local now = info.now or 0
     -- свой масштаб (4 окт: keys - / keys + в главном модуле)
     local s0, kcs = D.SCALE, (info.keycast_scale or 0) > 0 and info.keycast_scale or nil
@@ -9543,9 +9544,13 @@ function D.frame(L, snap, rows, state, info)
           local col = i == 0 and (light and U.TEXT or U.AMBER) or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
           if D.kcfont then
             -- 20 окт: опция keycast font — свой шрифт (из mode font), высота строки keycast
-            gfx.setfont(5, D.kcfont, math.floor(krh * 1.1))
+            -- длинное слово — мельче, пока не влезет в зону (до полувысоты), потом — обрезка по символам
+            local px = math.floor(krh * 1.1)
+            gfx.setfont(5, D.kcfont, px)
             local lw = gfx.measurestr(lbl)
-            set(col); gfx.x, gfx.y = math.max(kx0, kx1 - lw), y - math.floor(krh * 0.05); gfx.drawstr(lbl)
+            while lw > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(5, D.kcfont, px); lw = gfx.measurestr(lbl) end
+            while lw > kx1 - kx0 and #lbl > 1 do lbl = lbl:sub(1, (utf8.offset(lbl, -1) or #lbl) - 1); lw = gfx.measurestr(lbl) end
+            set(col); gfx.x, gfx.y = kx1 - lw, y + math.floor((krh - gfx.texth) / 2); gfx.drawstr(lbl)
             gfx.setfont(D.font_id)
           else
             text(kx1 - ms(lbl), y, fit(lbl, kx1 - kx0), col)

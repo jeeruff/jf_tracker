@@ -2647,9 +2647,31 @@ ctx = {
     if n then local id = tabs[n]; if id then ctx.pane_focus(id); vim.msg = 'tab ' .. n .. ': ' .. PN.BY[id].label else vim.msg = ('gt: %d tabs'):format(#tabs) end; return end
     local items = {}
     for i, id in ipairs(tabs) do
-      items[#items + 1] = { key = PN.BY[id].key, label = (id == cur and '* ' or '') .. i .. ' ' .. PN.BY[id].label, fn = function() ctx.pane_focus(id) end }
+      items[#items + 1] = { key = PN.BY[id].key, label = (id == cur and '* ' or '') .. PN.BY[id].label, fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
     end
     vim.open_hydra({ title = 'go to module', items = items })
+  end,
+  -- 20 окт: gt / gT — следующая / предыдущая вкладка стопки модуля в фокусе (везде, как в Vim); Ngt — N-я.
+  -- lib вкладками (lib tabs) — её вкладки. Меню модулей — Ctrl+W g, вкладки проектов — gR
+  tab_step = function(d, n)
+    if state.focus == 'inst' and state.libtabs then
+      local LT = { 'audio', 'instruments', 'automation', 'midi' }
+      local i = 1
+      for k, t in ipairs(LT) do if t == state.libtab then i = k end end
+      i = n and math.max(1, math.min(#LT, n)) or ((i - 1 + d) % #LT + 1)
+      state.libtab = LT[i]; vim.msg = 'lib: ' .. state.libtab .. ' (gt / gT)'
+      return
+    end
+    local PN = draw.panes
+    local cur = ctx.pane_cur()
+    local lf = state.panes and L and L.pn and PN.find(state.panes, cur)
+    local list = {}
+    for _, id in ipairs(lf and lf.panes or {}) do if L.pn.by_panel[id] and PN.BY[id] then list[#list + 1] = id end end
+    if #list < 2 then vim.msg = 'gt: no other tabs here (' .. tostring(cur) .. ')'; return end
+    local i = 1
+    for k, id in ipairs(list) do if id == cur then i = k end end
+    i = n and math.max(1, math.min(#list, n)) or ((i - 1 + d) % #list + 1)
+    ctx.pane_focus(list[i]); vim.msg = ('tab %d/%d: %s (gt / gT)'):format(i, #list, PN.BY[list[i]].label or list[i])
   end,
   -- 12 окт: gT — вкладки проектов REAPER выпадашкой (* — текущая, + — несохранённые правки), NgT — сразу N-я
   project_menu = function(n)
@@ -4502,10 +4524,21 @@ ctx = {
     if id == 'modulation' then id = 'automation'; mod_pane = 'mod' end   -- 18 окт: модуляция — страница automation
     local PN = draw.panes
     if not (id and PN.BY[id]) then return end
+    do local lf = state.panes and PN.find(state.panes, id); if lf and lf.min then lf.min = nil; state.panes.v = (state.panes.v or 1) + 1 end end   -- 20 окт: фокус на свёрнутую — развернуть
     ctx.pn_prev = ctx.pane_cur()
     if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
     else PN.set_active(state.panes, id); ctx.set_focus(id) end   -- 13 окт: и в стеке без tab (tracks у lib) — вкладка активна
     relayout()
+  end,
+  -- 20 окт: zm — свернуть панель в фокусе до строки вкладок (ещё раз / фокус на неё — развернуть); трекер не сворачивается
+  pane_min = function(id)
+    if not (state.panes_ui and L and L.pn) then vim.msg = 'zm: panes are off (options: panes)'; return end
+    id = id or ctx.pane_cur()
+    if not id or id == 'tracker' then vim.msg = 'zm: the tracker does not fold (zz - the tracker alone; F3 - the mixer)'; return end
+    local lf = draw.panes.find(state.panes, id)
+    local was = lf and lf.min
+    ctx.pane_do(function() return draw.panes.minimize(state.panes, id) end, was and (id .. ' open again') or (id .. ' folded into its tabs - zm / a click on a tab opens it'))
+    if not was then ctx.set_focus('tracker') end
   end,
   -- операция над деревом: снимок для u (20 шагов), пересчёт раскладки
   -- 10 окт: zz в любом модуле (кроме трекера — там Vim) — панель в фокусе на всё окно, повтор — назад
@@ -17798,7 +17831,7 @@ local function frame()
     local vis = PNm.visible(state.panes, 'mixer')
     local want = state.mixer and (state.mixpos or 'bottom') == 'bottom'
     if want and not vis then
-      if ctx.mix_vis_prev then state.mixer = false; vim.msg = 'mixer off (its pane was hidden; zm - back)'
+      if ctx.mix_vis_prev then state.mixer = false; vim.msg = 'mixer off (its pane was hidden; F3 - back)'
       else PNm.split(state.panes, 'tracker', 'mixer', 'd', 0.28) end
       relayout()
     end
@@ -23335,13 +23368,14 @@ local function frame()
     local own = state.focus == 'matrix' or (state.focus == 'top' and state.toptab == 'sample')   -- у них g — свой префикс
     if ctx.g_at and GT[state.focus] then
       ctx.g_at = nil
-      if c == 116 then ctx.tab_menu(); c = 0
-      elseif c == 84 then ctx.project_menu(); c = 0
+      if c == 116 then ctx.tab_step(1); c = 0          -- 20 окт: gt / gT — вкладки модуля в фокусе, gR — проекты REAPER
+      elseif c == 84 then ctx.tab_step(-1); c = 0
+      elseif c == 82 then ctx.project_menu(); c = 0
       elseif c == 103 then ctx.keyq[#ctx.keyq + 1] = 103; if own then ctx.keyq[#ctx.keyq + 1] = 103 end; c = 0   -- gg — наверх
       elseif c == 27 then c = 0
       else ctx.keyq[#ctx.keyq + 1] = 103; ctx.keyq[#ctx.keyq + 1] = c; c = 0 end
     elseif c == 103 and GT[state.focus] then
-      ctx.g_at = reaper.time_precise(); vim.msg = 'g: t - module, T - project tab, g - to the top'; c = 0
+      ctx.g_at = reaper.time_precise(); vim.msg = 'g: t T - next / previous tab, R - project tab, g - to the top'; c = 0
     end
   end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена
@@ -23612,22 +23646,10 @@ local function frame()
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;
   -- F4 midi, F5 scopes, F6 master — повтор той же клавиши возвращает в трекер
   do
-    -- 16 окт: F3 — нижний стек (dsp / mixer): фокус туда, ещё раз — следующая вкладка; F4 — верхний стек (было F3)
+    -- 16 окт: F4 — верхний стек (было F3); 20 окт: F3 — микшер
     local freeF = not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search'
-    if c == 26163 and freeF and state.panes_ui and L and L.pn then
-      local PNm = draw.panes
-      local lf = PNm.find(state.panes, 'dsp') or PNm.find(state.panes, 'mixer')
-      local list = {}
-      for _, id in ipairs(lf and lf.panes or {}) do if L.pn.by_panel[id] then list[#list + 1] = id end end
-      if #list > 0 then
-        local cur = ctx.pane_cur()
-        local act = lf.panes[lf.active] or list[1]
-        local nxt = act
-        for k, id in ipairs(list) do if id == cur then nxt = list[k % #list + 1] end end
-        ctx.pane_focus(nxt); vim.msg = 'bottom: ' .. nxt .. ' (F3 - next, F4 - top tabs)'
-      end
-      c = 0
-    end
+    -- 20 окт: F3 — микшер вкл / выкл, всегда (вкладки — gt / gT; свернуть панель — zm)
+    if c == 26163 and freeF then ctx.toggle_mixer(); c = 0 end
     local libf = c == 26164 and state.libtabs and state.focus == 'inst'   -- в lib (вкладками) F4 листает вкладки lib
     if c == 26164 and not libf then c = 26163 end                          -- F4 — то, что было F3 (верхний стек по кругу)
     local FTAB = { [26162] = 'sample', [26163] = 'automation', [26165] = 'scopes', [26166] = 'master' }

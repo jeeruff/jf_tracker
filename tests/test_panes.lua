@@ -301,5 +301,26 @@ do
   PN.split(m4, 'inst', 'mixer', 'd')
   eq('mixer far from the tracker goes back', PN.pin_mixer(m4), true)
 end
+-- 20 окт: zm — свёрнутый лист: только строка вкладок, тела нет, сосед забирает место; ~ в строке раскладки
+do
+  local m5 = PN.DEFAULT()
+  local id
+  for _, p in ipairs(PN.PANELS) do if p.id ~= 'tracker' and PN.find(m5, p.id) then id = p.id; break end end
+  local lay0 = PN.layout(m5, 1600, 900, M)
+  local h0 = lay0.by_panel[id].h
+  local okm, on = PN.minimize(m5, id)
+  eq('minimize ok', okm, true); eq('minimize on', on, true)
+  local lay1 = PN.layout(m5, 1600, 900, M)
+  local c1 = lay1.by_panel[id]
+  ok('folded cell is smaller', c1.h < h0 or c1.w < lay0.by_panel[id].w)
+  eq('folded: no content rect', lay1.rects[id], nil); eq('folded: cell.min', c1.min, true)
+  local area = 0
+  for _, c in ipairs(lay1.cells) do area = area + c.w * c.h end
+  for _, sp in ipairs(lay1.seps) do area = area + sp.w * sp.h end
+  eq('folded: area still tiles', area, 1600 * 900)
+  local m6 = PN.decode(PN.encode(m5)); eq('folded survives encode', PN.find(m6, id).min, true)
+  PN.minimize(m5, id); eq('minimize again opens', PN.find(m5, id).min, nil)
+  eq('tracker does not fold', PN.minimize(m5, 'tracker'), false)
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

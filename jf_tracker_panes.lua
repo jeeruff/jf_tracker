@@ -235,7 +235,10 @@ local function alive(M, n)
   for _, k in ipairs(n.kids) do if alive(M, k) then return true end end
   return false
 end
+-- 20 окт: свёрнутый лист (zm) — по оси родителя только строка вкладок (v) / узкая полоса (h)
+local function min_px(M, ax) return ax == 'v' and M.tab_h or 4 * M.cw end
 local function leaf_min(M, n, ax)
+  if n.min then return min_px(M, ax) end
   if ax == 'v' then
     local m = (n.panes[1] == 'tracker' and 4 or 2) * M.rh
     -- панель может требовать своё (item: все параметры сэмпла) — по всему стеку,
@@ -281,11 +284,12 @@ local function place_leaf(lay, M, n, x, y, w, h)
       end
     end
   end
+  if n.min then hh = 0; cell.min = true end   -- 20 окт: свёрнут — без строки клавиш и тела
   if hh > 0 then cell.hint = { x = x, y = y + h - hh, w = w, h = hh } end
-  cell.content = { x = x, y = y + th, w = w, h = math.max(0, h - th - hh) }
+  cell.content = { x = x, y = y + th, w = w, h = n.min and 0 or math.max(0, h - th - hh) }
   lay.cells[#lay.cells + 1] = cell
   for _, id in ipairs(n.panes) do if avail(M, id) then lay.by_panel[id] = cell end end
-  lay.rects[act] = cell.content
+  if not n.min then lay.rects[act] = cell.content end
   lay.order[#lay.order + 1] = act
   cell.num = #lay.order
 end
@@ -301,18 +305,27 @@ local function place(lay, M, n, x, y, w, h)
   if #kids == 0 then return end
   local total = (n.ax == 'h' and w or h) - M.sep * (#kids - 1)
   local px, used = {}, 0
-  for i = 1, #kids do px[i] = math.floor(frs[i] / fs * total + 0.5) end
+  -- 20 окт: свёрнутые листы — свой размер, остальным — остаток по долям
+  local fixed, fs2 = 0, 0
+  for i, k in ipairs(kids) do if k.min then fixed = fixed + min_px(M, n.ax) else fs2 = fs2 + frs[i] end end
+  if fs2 <= 0 then fs2, fixed = fs, 0 end
+  for i, k in ipairs(kids) do
+    if k.min and fixed > 0 then px[i] = min_px(M, n.ax) else px[i] = math.floor(frs[i] / fs2 * (total - fixed) + 0.5) end
+  end
   -- минимумы: добираем у самого большого
   for i = 1, #kids do
     if px[i] < mins[i] then
       local need = mins[i] - px[i]
       local big, bv = nil, -1
-      for j = 1, #kids do if j ~= i and px[j] - mins[j] > bv then big, bv = j, px[j] - mins[j] end end
+      for j = 1, #kids do if j ~= i and not kids[j].min and px[j] - mins[j] > bv then big, bv = j, px[j] - mins[j] end end
       if big and bv > 0 then local d = math.min(need, bv); px[big] = px[big] - d; px[i] = px[i] + d end
     end
   end
-  for i = 1, #kids - 1 do used = used + px[i] end
-  px[#kids] = math.max(0, total - used)             -- последний — остаток: сумма точная
+  -- последний несвёрнутый — остаток: сумма точная
+  local rest = #kids
+  for i = #kids, 1, -1 do if not kids[i].min then rest = i; break end end
+  for i = 1, #kids do if i ~= rest then used = used + px[i] end end
+  px[rest] = math.max(0, total - used)
   local cur = n.ax == 'h' and x or y
   for i, k in ipairs(kids) do
     if n.ax == 'h' then place(lay, M, k, cur, y, px[i], h) else place(lay, M, k, x, cur, w, px[i]) end
@@ -658,6 +671,13 @@ function PN.equalize(model, id)
   for i = 1, #par.kids do par.fr[i] = 1 / #par.kids end
   return bump(model)
 end
+-- 20 окт: zm — свернуть лист панели до строки вкладок / развернуть; трекер не сворачивается
+function PN.minimize(model, id)
+  local lf = PN.find(model, id)
+  if not lf or id == 'tracker' then return false end
+  lf.min = not lf.min or nil
+  return bump(model), lf.min == true
+end
 function PN.zoom(model, id)
   if id and not PN.find(model, id) then return false end
   model.zoom = (id and model.zoom ~= id) and id or nil
@@ -683,7 +703,7 @@ local function enc(n)
   if is_leaf(n) then
     local t = {}
     for i, id in ipairs(n.panes) do t[i] = id .. (i == n.active and '*' or '') end
-    return table.concat(t, ',')
+    return table.concat(t, ',') .. (n.min and '~' or '')   -- 20 окт: ~ — свёрнут (zm)
   end
   local t = {}
   for i, k in ipairs(n.kids) do t[i] = fmt(n.fr[i]) .. ':' .. enc(k) end
@@ -712,9 +732,10 @@ local function dec(s, pos)
       if c == '|' then pos = pos + 1 elseif c == ']' then return n, pos + 1 else return nil end
     end
   end
-  local body, p2 = s:match('^([%w_%*,]+)()', pos)
+  local body, p2 = s:match('^([%w_%*,]+~?)()', pos)
   if not body then return nil end
   local lf = { panes = {}, active = 1 }
+  if body:sub(-1) == '~' then lf.min = true; body = body:sub(1, -2) end
   for tok in body:gmatch('[^,]+') do
     local id, star = tok:match('^(%w+)(%*?)$')
     if not id then return nil end
