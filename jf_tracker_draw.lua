@@ -814,6 +814,7 @@ function D.layout(snap, state, nregions)
     local fs = state.folds[col.guid]
     -- уровень ширины (7 окт): задан — колонка по нему, свёртка za не действует
     local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
+    if lvl and state.autozoom and state.az_full == col.guid and not (state.wlevel and state.wlevel[col.guid]) then lvl = nil end   -- 20 окт: autozoom — трек курсора во всю ширину
     if lvl then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
@@ -5576,29 +5577,6 @@ end
 
 -- 17 окт: сложенный мастер — шапка M и кнопка (развернуть), в теле стерео-метр L R во всю высоту и красная полоса
 -- подавления сверху (максимум GainReduction_dB среди эффектов мастера: ReaComp, ReaLimit, плагины с этим полем)
--- 20 окт: шапка паттерна / секции строки курсора — вертикально в пустом куске над правой линейкой регионов
--- (справа от мастера): первый столбик — «номер имя» паттерна в его цвете, второй — секция; клик — выпадашка
--- команд паттерна (как \\ p: очередь, alias, clone, /2 x2, длина …)
-function D.rg_head(L, info, hover)
-  if not L.ruler_right then return end
-  local x, w = L.win_w - L.rg_w, L.rg_w
-  local y, h = L.header_y, L.header_h
-  local rg = info.cur_region_full
-  local mx, my = gfx.mouse_x, gfx.mouse_y
-  local hot = mx >= x and mx < x + w and my >= y and my < y + h
-  set(hot and D.CURROW or D.HDR); gfx.rect(x + 1, y, w - 1, h, 1)
-  if not rg then
-    D.vtext(x + 3, y + 2, h - 4, 'no pattern', U.DIM, hot and D.CURROW or D.HDR, true)
-  else
-    local c = rg.rgb or U.LINE
-    local cw = L.th + 6
-    set(c); gfx.rect(x + 1, y, 2, h, 1)
-    local bg = hot and D.CURROW or D.HDR
-    D.vtext(x + 4, y + 2, h - 4, tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), hot and U.AMBER or U.TEXT, bg, true)
-    if rg.sec and rg.sec ~= '' and w >= 2 * cw then D.vtext(x + 4 + cw, y + 2, h - 4, rg.sec, U.GREY, bg, true) end
-  end
-  if hot then hover.rghead = true end
-end
 function D.mfold_draw(L, snap, hover)
   if not (L.mfold and snap.master and snap.master.track) then return end
   local tr = snap.master.track
@@ -6845,7 +6823,23 @@ function D.frame(L, snap, rows, state, info)
         if xa + ms('aa') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'aa', all and 'off' or 'on', all, 'mautoarm') end
       end
     end
-    -- 20 окт: имя паттерна и /2 x2 als cln — вертикальной шапкой справа от мастера (клик — выпадашка);
+    -- 20 окт: строка 3 — номер и имя паттерна курсора (и секция) в его цвете; клик — выпадашка команд паттерна
+    -- (очередь, alias, clone, /2 x2, длина …); als cln — в ней. Вертикальная шапка справа от мастера — отменена
+    local ny = hy + 1 + 3 * L.rh
+    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+      local rg = info.cur_region_full
+      local nhot = mx >= bx and mx < bx + bw and my >= ny and my < ny + L.rh
+      if rg then
+        local c = rg.rgb or U.LINE
+        set(nhot and U.tint(U.AMBER, 0.3) or U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
+        set(c); gfx.rect(bx, ny, 3, L.rh, 1)
+        local t = tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or '') .. ((rg.sec and rg.sec ~= '') and (' / ' .. rg.sec) or '')
+        text(bx + 5, ny, fit(t, bw - 7), nhot and U.AMBER or U.TEXT)
+      else
+        text(bx + 5, ny, fit('no pattern', bw - 7), U.DIM)
+      end
+      if nhot then hover.rghead = true end
+    end
   end
   -- последняя строка уголка (20 окт): «< N >» — длина региона курсора в шагах (стрелки и колесо ±1 шаг,
   -- клик по числу — выпадашка длин), справа x2 /2; строкой выше — autozoom и markers
@@ -7429,7 +7423,6 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
-  D.rg_head(L, info, hover)      -- 20 окт: шапка паттерна вертикально над правой линейкой
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil

@@ -768,11 +768,16 @@ local function relayout()
   state.piano_strip = state.piano_show or nil
   draw.sroslash = state.sroslash and true or false   -- 16 окт: /// по умолчанию; выкл — буквы s r o
   draw.micro = (state.micro or model.seen_micro) and true or nil; draw.micro_tag = model.micro_tag   -- 16 окт: микротоны — шире колонка нот
+  local f_old = state.autozoom and L and L.flat[vim.cur.fi] or nil   -- 20 окт: поле курсора до новой раскладки
   L = draw.layout(snap, state, #regions)
   -- 20 окт: autozoom — общая ширина треков сама: самая широкая, при которой влезают все треки,
   -- но не уже ноты и волны (уровень 1); ручной уровень (Cmd+колесо) — после выключения
   if state.autozoom and not state.ptmode then
     state.hscroll = 0
+    local f0 = f_old or L.flat[vim.cur.fi]
+    state.az_full = f0 and f0.col and f0.col.guid or nil   -- 20 окт: трек курсора — во всю ширину, остальные ужимаются
+    -- всегда с полной ширины вниз (место освободилось — треки снова шире)
+    state.wzlevel = nil
     L = draw.layout(snap, state, #regions)
     if L.cols_cut or L.hs_cut then
       local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
@@ -781,6 +786,17 @@ local function relayout()
         L = draw.layout(snap, state, #regions)
         if not (L.cols_cut or L.hs_cut) then break end
       end
+    end
+    -- курсор — на том же треке / лейне / подколонке (номера полей сдвинулись с шириной)
+    if f0 and f0.col then
+      local best
+      for i, g in ipairs(L.flat) do
+        if g.col == f0.col then
+          best = best or i
+          if g.li == f0.li and g.si == f0.si and g.env == f0.env and g.ml == f0.ml then best = i; break end
+        end
+      end
+      if best then vim.cur.fi = best end
     end
   end
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
@@ -17864,6 +17880,7 @@ local function frame()
   if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
   if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end
   pcall(ctx.master_peek_tick)   -- 20 окт: мастер складывается, когда курсор ушёл
+  pcall(ctx.autozoom_tick)
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
@@ -19586,7 +19603,7 @@ local function frame()
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - an o at the side of the cell (O - several), no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
-  elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the track width by itself - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
+  elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
@@ -24756,6 +24773,13 @@ ctx.master_jump = function()
   vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil
   if vim.ensure_visible then vim.ensure_visible() end
   vim.msg = 'master (Opt+W): the cursor on the master columns' .. ((state.mfold or state.mfoldauto) and ' - it folds again when the cursor leaves' or '')
+end
+-- 20 окт: autozoom — курсор перешёл на другой трек: раскрыть его, ужать остальные (relayout)
+ctx.autozoom_tick = function()
+  if not state.autozoom or not L then return end
+  local f = L.flat[vim.cur.fi]
+  local g = f and f.col and f.col.guid
+  if g and g ~= state.az_full then relayout() end
 end
 ctx.master_peek_tick = function()
   if not state.m_peek then return end
