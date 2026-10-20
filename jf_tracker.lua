@@ -2651,28 +2651,6 @@ ctx = {
     end
     vim.open_hydra({ title = 'go to module', items = items })
   end,
-  -- 20 окт: gt / gT — следующая / предыдущая вкладка стопки модуля в фокусе (везде, как в Vim); Ngt — N-я.
-  -- lib вкладками (lib tabs) — её вкладки. Меню модулей — Ctrl+W g, вкладки проектов — gR
-  tab_step = function(d, n)
-    if state.focus == 'inst' and state.libtabs then
-      local LT = { 'audio', 'instruments', 'automation', 'midi' }
-      local i = 1
-      for k, t in ipairs(LT) do if t == state.libtab then i = k end end
-      i = n and math.max(1, math.min(#LT, n)) or ((i - 1 + d) % #LT + 1)
-      state.libtab = LT[i]; vim.msg = 'lib: ' .. state.libtab .. ' (gt / gT)'
-      return
-    end
-    local PN = draw.panes
-    local cur = ctx.pane_cur()
-    local lf = state.panes and L and L.pn and PN.find(state.panes, cur)
-    local list = {}
-    for _, id in ipairs(lf and lf.panes or {}) do if L.pn.by_panel[id] and PN.BY[id] then list[#list + 1] = id end end
-    if #list < 2 then vim.msg = 'gt: no other tabs here (' .. tostring(cur) .. ')'; return end
-    local i = 1
-    for k, id in ipairs(list) do if id == cur then i = k end end
-    i = n and math.max(1, math.min(#list, n)) or ((i - 1 + d) % #list + 1)
-    ctx.pane_focus(list[i]); vim.msg = ('tab %d/%d: %s (gt / gT)'):format(i, #list, PN.BY[list[i]].label or list[i])
-  end,
   -- 12 окт: gT — вкладки проектов REAPER выпадашкой (* — текущая, + — несохранённые правки), NgT — сразу N-я
   project_menu = function(n)
     local cur = reaper.EnumProjects(-1)
@@ -23368,14 +23346,13 @@ local function frame()
     local own = state.focus == 'matrix' or (state.focus == 'top' and state.toptab == 'sample')   -- у них g — свой префикс
     if ctx.g_at and GT[state.focus] then
       ctx.g_at = nil
-      if c == 116 then ctx.tab_step(1); c = 0          -- 20 окт: gt / gT — вкладки модуля в фокусе, gR — проекты REAPER
-      elseif c == 84 then ctx.tab_step(-1); c = 0
-      elseif c == 82 then ctx.project_menu(); c = 0
+      if c == 116 then ctx.tab_menu(); c = 0          -- 20 окт: gt — модуль (меню), gT — проект REAPER; соседняя вкладка — Tab
+      elseif c == 84 then ctx.project_menu(); c = 0
       elseif c == 103 then ctx.keyq[#ctx.keyq + 1] = 103; if own then ctx.keyq[#ctx.keyq + 1] = 103 end; c = 0   -- gg — наверх
       elseif c == 27 then c = 0
       else ctx.keyq[#ctx.keyq + 1] = 103; ctx.keyq[#ctx.keyq + 1] = c; c = 0 end
     elseif c == 103 and GT[state.focus] then
-      ctx.g_at = reaper.time_precise(); vim.msg = 'g: t T - next / previous tab, R - project tab, g - to the top'; c = 0
+      ctx.g_at = reaper.time_precise(); vim.msg = 'g: t - module, T - project tab, g - to the top'; c = 0
     end
   end
   if MX.mkedit and state.focus ~= 'matrix' then MX.mkedit = nil end      -- поле маркера: ушёл фокус — отмена

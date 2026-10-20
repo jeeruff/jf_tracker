@@ -2614,11 +2614,11 @@ function V.key_impl(c)
         end
         V.count = nil; ensure_visible(); return
       end
-      if (c == ('t'):byte() or c == ('T'):byte() or c == ('R'):byte()) and not V.op then
-        -- 20 окт: gt / gT — следующая / предыдущая вкладка модуля в фокусе (Ngt — N-я), gR — вкладка проекта REAPER (NgR)
+      if (c == ('t'):byte() or c == ('T'):byte()) and not V.op then
+        -- 12 окт: gt — вкладка модуля, gT — вкладка проекта REAPER: выпадашка; Ngt / NgT — сразу N-я
+        -- (20 окт: gt «следующая вкладка» отменён — это уже Tab)
         local k = V.count; V.count = nil; finish_move()
-        if c == ('R'):byte() then if ctx.project_menu then ctx.project_menu(k) end
-        elseif ctx.tab_step then ctx.tab_step(c == ('t'):byte() and 1 or -1, k) end
+        if c == ('t'):byte() then if ctx.tab_menu then ctx.tab_menu(k) end elseif ctx.project_menu then ctx.project_menu(k) end
         return
       end
       if c == ('m'):byte() and not V.op then

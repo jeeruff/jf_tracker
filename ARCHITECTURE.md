@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 27319 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 27297 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2401 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 4841 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 848 | алиасы паттернов (этап 6). |
@@ -116,7 +116,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_vim.lua` | 3988 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 128 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 70 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1122 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1121 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 148 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 101 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 146 | клавиши DSP-панели в духе Vim (2 окт). |
@@ -257,7 +257,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `dsp_y` | y - copy | `y` |
 | `dsp_z` | z - router / pages | `z r` `R` `f` `s` |
 | `dsp_zs` | zs - pad size | `s` `m` `l` |
-| `g` | g - go | `g` `12 Enter` `w` `p` `P` `s` `S` `m` `t` `T` `R` `i` `r` |
+| `g` | g - go | `g` `12 Enter` `w` `p` `P` `s` `S` `m` `t` `T` `i` `r` |
 | `pane` | PANE (Ctrl+W) - Esc out | `h j k l` `H J K L` `w W  1..9` `g + key` `s v + key` `T + key` `B` `X + key  x` `+ -  < >` `=` `z` `c` `Space` `u` |
 | `q` | q - record a macro | `a..z` |
 | `r` | r - replace | `key` |
