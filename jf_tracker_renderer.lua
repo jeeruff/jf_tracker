@@ -129,8 +129,8 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
   local vwn = U.measure('000.0 s')
   local yy = y + 2
   local head
-  if p.mode then head = info.inst and ('renderer: ' .. info.inst .. ' -> RS5K sampler') or 'renderer: no instrument on the cursor track'
-  else head = ('renderer: %d note(s) of %s -> audio'):format(info.n or 0, info.track or 'the track') end
+  if p.mode then head = info.inst and ('bouncer: ' .. info.inst .. ' -> RS5K sampler') or 'bouncer: no instrument on the cursor track'
+  else head = ('bouncer: %d note(s) of %s -> audio'):format(info.n or 0, info.track or 'the track') end
   U.text(x + pad, yy, head, U.GREY)
   yy = yy + rh + 2
   for i, r in ipairs(RD.ROWS) do
@@ -168,7 +168,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
     yy = yy + rh
   end
   if yy + rh + 2 <= y + h then
-    local lab = 'render (Enter)'
+    local lab = 'bounce (Enter)'
     local bw = U.measure(lab) + 2 * pad
     local bh = mx >= x + pad and mx < x + pad + bw and my >= yy + 2 and my < yy + 2 + rh
     U.set(bh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x + pad, yy + 2, bw, rh - 1, 1)

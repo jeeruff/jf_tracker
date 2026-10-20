@@ -15742,7 +15742,7 @@ function ctx.context_items(hover)
     -- 20 окт: инструмент-плагин (VSTi / RS5K / drumrs5k) — рендер в сэмплер (панель renderer)
     if hover.pool.instfx then
       local pc, fx = hover.pool.col, hover.pool.instfx
-      add('Render to a sampler … (renderer, gB): RS5K by note zones and velocity layers', function() ctx.inst_fx_pick(pc or cur_col(), fx); ctx.rd_open('sampler') end, 'R')
+      add('Bounce to a sampler … (bouncer, gB): RS5K by note zones and velocity layers', function() ctx.inst_fx_pick(pc or cur_col(), fx); ctx.rd_open('sampler') end, 'R')
     end
     if e then
       add('Select instrument', function() pool_select(i) end, 's')
@@ -15852,9 +15852,9 @@ function ctx.context_items(hover)
       add('Rename the track … (tn)', function() ctx.rename_track_prompt() end, 'n')
       for _, a in ipairs(track_actions(hover.col)) do if a.key ~= 'n' then items[#items + 1] = { a[1], a.fn, key = a.key, g = 'track' } end end
     end
-    items[#items + 1] = { 'Bounce the notes to audio (selection / note / track in the region)', function() ctx.rd_notes() end, key = 'b', g = 'render' }
-    items[#items + 1] = { 'Instrument of the track to a sampler …', function() ctx.rd_open('sampler') end, key = 's', g = 'render' }
-    items[#items + 1] = { 'Renderer pane (gB)', function() ctx.rd_open() end, key = 'p', g = 'render' }
+    items[#items + 1] = { 'Bounce the notes to audio (selection / note / track in the region)', function() ctx.rd_notes() end, key = 'b', g = 'bounce' }
+    items[#items + 1] = { 'Instrument of the track to a sampler …', function() ctx.rd_open('sampler') end, key = 's', g = 'bounce' }
+    items[#items + 1] = { 'Bouncer pane (gB)', function() ctx.rd_open() end, key = 'p', g = 'bounce' }
   elseif hover.matrix then
     -- 10 окт: пустое место матрицы — её собственное меню (раньше общий «view»)
     add('New slot at the end (+)', function() ctx.mx_add() end, '+')
@@ -24688,7 +24688,7 @@ ctx.rd_keep_sel = function()
 end
 ctx.rd_notes = function()
   local p = ctx.rd_load()
-  local col = cur_col(); if not (col and col.track) then vim.msg = 'renderer: no track'; return end
+  local col = cur_col(); if not (col and col.track) then vim.msg = 'bouncer: no track'; return end
   local notes, a, b, heads = {}, nil, nil, {}
   for _, h in ipairs(ctx.rd_heads()) do
     if h.kind == 'midi' and h.take then
@@ -24700,7 +24700,7 @@ ctx.rd_notes = function()
       end
     end
   end
-  if #notes == 0 then vim.msg = 'renderer: no MIDI notes here (select them - v / V)'; return end
+  if #notes == 0 then vim.msg = 'bouncer: no MIDI notes here (select them - v / V)'; return end
   local tr, out = col.track, nil
   local back = ctx.rd_keep_sel()
   edit.run('render notes', function()
@@ -24712,7 +24712,7 @@ ctx.rd_notes = function()
     back()
   end)
   model.invalidate()
-  vim.msg = out and ('renderer: %d note(s) -> audio on "%s bounce" (tail %.1f s)%s'):format(#notes, col.name, p.tail or 0, p.mute and ', source muted' or '') or 'renderer: render failed'
+  vim.msg = out and ('bouncer: %d note(s) -> audio on "%s bounce" (tail %.1f s)%s'):format(#notes, col.name, p.tail or 0, p.mute and ', source muted' or '') or 'bouncer: bounce failed'
 end
 -- RS5K: параметр по точному имени (как в модуле RS5K)
 ctx.rd_pidx = function(tr, fx)
@@ -24722,10 +24722,10 @@ ctx.rd_pidx = function(tr, fx)
 end
 ctx.rd_sampler = function()
   local p = ctx.rd_load()
-  local col = cur_col(); if not (col and col.track) then vim.msg = 'renderer: no track'; return end
+  local col = cur_col(); if not (col and col.track) then vim.msg = 'bouncer: no track'; return end
   local tr = col.track
   local inst = ctx.rd_inst_name(tr)
-  if not inst then vim.msg = 'renderer: no instrument on ' .. (col.name or 'the track') .. ' (DSP)'; return end
+  if not inst then vim.msg = 'bouncer: no instrument on ' .. (col.name or 'the track') .. ' (DSP)'; return end
   local plan = ctx.RD.plan(p)
   local t0 = reaper.GetProjectLength(0) + 4                 -- за концом проекта: ничего не мешает
   local notes = {}
@@ -24762,8 +24762,8 @@ ctx.rd_sampler = function()
     back()
   end)
   model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-  vim.msg = made and ('renderer: %s -> "%s sampled": %d RS5K (%s..%s every %d st, %d vel layer(s)), one file %s'):format(inst, inst, made, ctx.RD.nname(p.lo), ctx.RD.nname(p.hi), p.step, p.layers, (path or ''):match('[^/]+$') or '')
-    or 'renderer: render failed'
+  vim.msg = made and ('bouncer: %s -> "%s sampled": %d RS5K (%s..%s every %d st, %d vel layer(s)), one file %s'):format(inst, inst, made, ctx.RD.nname(p.lo), ctx.RD.nname(p.hi), p.step, p.layers, (path or ''):match('[^/]+$') or '')
+    or 'bouncer: bounce failed'
 end
 ctx.rd_render = function()
   local p = ctx.rd_load()
