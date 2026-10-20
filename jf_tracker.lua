@@ -15365,7 +15365,7 @@ function event_actions(hover)
   if #heads > 0 or sel then
     add('Delete ' .. what .. ' (x)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0); edit.delete(heads, lpb) end, 'x')
     add('Copy ' .. what .. ' (y)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0) end, 'y')
-    add('Mute ' .. what .. ' (M)', function() edit.mute(heads, lpb) end, 'm')
+    add('Mute ' .. what .. (sel and ' (M)' or ' (v … M)'), function() edit.mute(heads, lpb) end, 'm')   -- 20 окт: в NORMAL M — трек, нота — выделением
     add('Transpose ... (Opt+F1 F2, F11 F12)', function() vim.transpose_smart() end, 'T')   -- 20 окт: t — подменю трека   -- 12 окт: одна выпадашка вместо четырёх пунктов
   end
   add('Split at row (s)', function()
@@ -15513,6 +15513,7 @@ local function context_menu(hover, anchor)
   local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
   local groups, gorder = nil, {}
+  if page == 'tracker' then used['m'] = true end   -- 20 окт: m в меню трекера — только mute ноты (smart panel — Enter, своей буквой)
   if P then
     for _, e in ipairs(P.e) do
       local toks = {}

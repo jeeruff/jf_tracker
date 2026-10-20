@@ -95,7 +95,7 @@ KH.PAGES = {
     { k = 'Ctrl+O / Ctrl+I', d = 'jumps: back / forward to where you were before a jump (f label, harpoon, gg, G)' },
     { k = "'a '1..'9 '' 'd", d = "harpoon: pin the place under the cursor - a track row (tracker), a cell (matrix) or a parameter (DSP); jump to pin 1..9 (the focus goes to its module), list the pins by module (fzf), unpin; works in the tracker, the matrix and DSP; per project" },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
-    { k = 'Enter  middle click', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with a left or middle click or h j k l + Enter; VISUAL - the whole block' },
+    { k = 'Enter  middle click', m = 'smart panel (Enter)', d = 'smart panel (as in PlayerPro): a grid of the values of the field under the cursor - notes, volume, delay, command letter then value, instrument, envelope / CC; pick with a left or middle click or h j k l + Enter; VISUAL - the whole block' },
     { k = ':xf', d = 'modifiers (15 Oct) on VISUAL / the track in the region: stretch k, reverse, rotate n, shuffle, gravity g, bounce r, fib, tuplet n, golden, vel k (also built-in macros)' },
     { k = ':mackey', d = ':mackey name x - a hotkey for the macro: @x plays it; :keys - all keys and commands as text (Data/jf_tracker_keys.md)' },
     { k = 'π (Opt+P)', t = {}, d = 'smart paste: the clipboard buffers at the cursor - a digit / Enter pastes that one, π again - the last yank (layout qwerty: with the keyboard / INSERT π is still the note p beside)' },
