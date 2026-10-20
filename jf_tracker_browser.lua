@@ -1016,6 +1016,7 @@ function B.key(c)
   elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - 1)
   elseif ch == 'g' then B.cur = 1
   elseif ch == 'G' then B.cur = #B.entries
+  elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере (первым: пэд / отметки не перехватывают)
   elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
     local e = B.entries[B.cur]
@@ -1030,7 +1031,6 @@ function B.key(c)
       else local e = B.entries[B.cur]; if e and not e.dir and not e.pm and not e.db and not e.kit then fs[1] = B.full(e) end end
       return #fs > 0 and ctx.drum_browser_enter(fs)
     end)() then
-  elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()

@@ -25022,7 +25022,7 @@ end
 ctx.sample_find = function(mode)
   local f = L and L.flat[vim.cur.fi]
   if not (f and f.col and not f.env and not f.ml) then vim.msg = 'sample find: put the cursor on a track column'; return end
-  ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name }
+  ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name, sampler = mode == 'sampler' }
   -- 20 окт: Shift+F — поиск в базе (Media Explorer; база запоминается), Shift+Opt+F — сначала выбрать базу
   if B.mode ~= 'db' then B.set_mode('db') end
   ctx.pane_focus('browser')
@@ -25040,7 +25040,7 @@ ctx.sf_path = function()
   local p = B.full(e)
   if not p or p == '' then return nil end
   local ext = (p:match('%.(%w+)$') or ''):lower()
-  if not ({ wav = 1, aif = 1, aiff = 1, flac = 1, mp3 = 1, ogg = 1, wv = 1, opus = 1, m4a = 1 })[ext] then return nil end
+  if ({ rpp = 1, mid = 1, midi = 1, txt = 1, rpl = 1, jfcurve = 1 })[ext] then return nil end   -- 20 окт: любой звук (база отдаёт и без расширения)
   return p
 end
 ctx.sf_enter = function()
@@ -25056,6 +25056,9 @@ ctx.sf_enter = function()
   end
   ctx.sf_target = nil
   if not fi then vim.msg = 'sample find: the track is gone'; return true end
+  vim.cur.fi, vim.cur.row = fi, t.row
+  -- 20 окт: Shift+F — аудио item на место; Shift+Ctrl+F — в сэмплер (как Enter браузера: lib трека + нота)
+  if t.sampler then ctx.set_focus('tracker'); B.enter(); return true end
   ctx.drop_to(fi, t.row, p)
   vim.cur.fi, vim.cur.row = fi, t.row
   ctx.set_focus('tracker')

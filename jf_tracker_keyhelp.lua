@@ -208,6 +208,7 @@ KH.PAGES = {
     { k = 'Space', d = 'play / stop' },
     { k = 'C-⌘Space', d = 'play at x0.5 (x2 - the button under play); again or Space - stop, x1 comes back' },
     { k = '⌥⌘Space ⇧⌘Space', d = 'listen step on / off (the row the cursor lands on plays on the cursor track) / listen line on / off (the row, all tracks)' },
+    { k = 'Shift+Ctrl+F', d = 'sample find for this place - into the sampler (the lib of the track + a note), not an audio item as F' },
     { k = 'Shift+Opt+F', d = 'sample find for this place: pick the database first (it is remembered), then as F' },
     { k = 'F', d = 'sample find for this place: the browser db with find - j k listen, the channel shows the wave of the picked one over its length in rows, Enter puts it here, Esc cancels (follow playhead - its button / option)' },
     { k = 'o', d = 'reveal item in REAPER' },
