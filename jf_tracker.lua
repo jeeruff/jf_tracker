@@ -20328,7 +20328,16 @@ local function frame()
     U.click = false; model.invalidate()
     vim.msg = on and 'auto-arm on every track: the selected track records (click again - off)' or 'auto-arm off on every track'
   end
-  if U.click and hover.mfold then state.mfold = not state.mfold; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfold and 'master folded: L R meter, RMS at the sides (click it or Opt+W to open)' or 'master open' end   -- 17 окт
+  if U.click and hover.mfold then
+    U.click = false
+    -- 20 окт: сложен (сам или auto fold) — клик открывает: auto держал сложенным, переключение mfold не помогало
+    if L and L.mfold then
+      state.mfold = false
+      if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
+    else
+      state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded: L R meter, RMS at the sides (click it or Opt+W to open)'
+    end
+  end   -- 17 окт
   -- 20 окт: auto — мастер сложен, пока курсор не на нём; клик по сложенному мастеру — раскрыть и курсор на мастер
   if U.click and hover.mfoldauto then state.mfoldauto = not state.mfoldauto; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfoldauto and 'master auto: folded while the cursor is not on it (Opt+W / l from the last track / a click opens it)' or 'master auto off' end
   if U.click and (hover.mfold_meter or hover.mfold_open) then U.click = false; ctx.master_jump() end

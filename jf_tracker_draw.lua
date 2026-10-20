@@ -5654,6 +5654,14 @@ function D.sf_draw(L, info, state)
   end
   D.clip = keep
 end
+-- 20 окт: правый край последней видимой колонки трека (мастер сложен — граница его полосы)
+function D.cols_edge(L)
+  local e
+  for _, c in ipairs(L.cols or {}) do
+    if c.x and c.w and not c.master then e = math.max(e or 0, math.min(c.x + c.w, L.cols_r + 1)) end
+  end
+  return e
+end
 function D.mfold_draw(L, snap, hover)
   if not (L.mfold and snap.master and snap.master.track) then return end
   local tr = snap.master.track
@@ -5661,6 +5669,11 @@ function D.mfold_draw(L, snap, hover)
   local x, w = L.cols_r + 1, L.master_w - 2
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hy, hh = L.header_y, L.header_h
+  -- 20 окт: зазор от последней колонки до полосы — фон, граница — линия на всю высоту (шапка, линейка прыжков, строки)
+  local ex = D.cols_edge(L) or x
+  local ybot = L.body_y + L.body_h
+  if ex < x then set(U.BG); gfx.rect(ex + 1, L.header_y, x - ex - 1, ybot - L.header_y, 1) end
+  set(U.LINE); gfx.rect(ex, L.header_y, 1, ybot - L.header_y, 1)
   local keep = D.clip; D.clip = { x, x + w + 1 }   -- своя колонка: клип модуля рядом резал подписи
   local function done() D.clip = keep end
   set(D.HDR); gfx.rect(x, hy, w, hh, 1)
@@ -6822,6 +6835,7 @@ function D.frame(L, snap, rows, state, info)
           end
         end
       end
+      D.jr_master_d = cur_i and (idx + 1 - cur_i) or nil   -- 20 окт: шагов l до сложенного мастера (за последней ячейкой)
       local last_r = -1e9                     -- 11 окт: метка, налезающая на предыдущую, пропускается (узкие поля инструмент / слайс)
       local function lab_x(p, d)
         local fx, fw = D.field_rect(p.f.G or L, p.fld)
@@ -6855,6 +6869,15 @@ function D.frame(L, snap, rows, state, info)
     end
     for _, c in ipairs(L.cols or {}) do
       if c.x and c.ci and not c.master then set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1) end
+    end
+    -- 20 окт: сложенный мастер — и у него метка: через столько l курсор встанет на мастер (он раскроется)
+    if L.mfold and D.jr_master_d and D.jr_master_d > 0 then
+      local lab = tostring(D.jr_master_d)
+      local mx0, mw0 = L.cols_r + 1, L.master_w - 2
+      if ms(lab) <= mw0 then
+        set(D.jr_bg and U.PANEL or U.BG); gfx.rect(mx0, jy, mw0, L.jr_h, 1)
+        text(mx0 + math.floor((mw0 - ms(lab)) / 2), jy, lab, U.mix(U.GREY, U.BG, 0.35))
+      end
     end
   end
   if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
@@ -7018,14 +7041,17 @@ function D.frame(L, snap, rows, state, info)
   end
   -- полосы строки курсора и плейхеда — до рамок items (5 окт): item и
   -- automation item лежат поверх, сверху — только зелёная линия курсора
+  -- 20 окт: мастер сложен — полосы до края последней колонки (не за линию мастера)
+  local WB = W
+  if L.mfold then WB = D.cols_edge(L) or W end
   for i, r in ipairs(rows) do
     local y = L.body_y + (i - 1) * L.rh
     if ph then
       local k = ph - r.row
-      if k == 0 then set(D.PLAY); gfx.rect(tx0, y, W - tx0, L.rh, 1)
-      elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.30 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, W - tx0, L.rh, 1) end
+      if k == 0 then set(D.PLAY); gfx.rect(tx0, y, WB - tx0, L.rh, 1)
+      elseif k > 0 and k <= D.PHTAIL then set(D.PLAYC, 0.30 * (1 - k / (D.PHTAIL + 1))); gfx.rect(tx0, y, WB - tx0, L.rh, 1) end
     end
-    if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, W - tx0, L.rh, 1); D.cur_y = y end
+    if vc and vc.row == r.row then set(state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW); gfx.rect(tx0, y, WB - tx0, L.rh, 1); D.cur_y = y end
   end
   -- рамки items — ДО строк (5 окт): фоном, под волной и текстом; раньше
   -- рисовались последними и резали ноту, начатую посреди строки.
