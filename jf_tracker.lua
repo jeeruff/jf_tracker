@@ -15428,26 +15428,26 @@ end
 function region_actions(rg)
   if not rg then return {} end
   return {
-    { 'Queue: play this pattern after the current one (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
-    { 'Go here now: the play cursor to this pattern, no waiting', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
-    { 'Mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
-    { 'Next pattern in slot (>)', key = 'n', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
-    { 'Previous pattern in slot (<)', key = 'b', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
-    { 'Yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
-    { 'Alias: linked repeat to the right (A)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
-    { 'Duplicate: free copy to the right (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
-    { 'Make unique: unlink this repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
-    { 'Paste pattern copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
-    { 'Sync this pattern', key = 's', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
+    { 'queue after current (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
+    { 'jump here now', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
+    { 'mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
+    { 'next pattern (>)', key = 'n', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
+    { 'back: previous pattern (<)', key = 'b', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
+    { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
+    { 'alias: linked repeat (A)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
+    { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
+    { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
+    { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
+    { 'sync this pattern', key = 's', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
     -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
-    { 'Half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
-    { 'Double the length (x2)', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
-    { 'Length: a list of lengths (< N > in the corner)', key = 'l', g = 'length', fn = function() ctx.region_len_menu() end },
-    { 'Matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
+    { 'half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
+    { 'x2: double the length', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
+    { 'length: a list', key = 'l', g = 'length', fn = function() ctx.region_len_menu() end },
+    { 'matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
     -- 18 окт: секции — своим подменю (создать из выделенных слотов / time selection, меню секции этого слота)
-    { 'Section of this slot: menu (rclick on its strip)', key = 'm', g = 'section', fn = function() ctx.sec_cmd('') end },
-    { 'Section from the selected slots (Shift+J K on the names)', key = 's', g = 'section', fn = function() vim.open_prompt('section ', '') end },
-    { 'Section from the time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
+    { 'menu of this section', key = 'm', g = 'section', fn = function() ctx.sec_cmd('') end },
+    { 'section from selected slots', key = 's', g = 'section', fn = function() vim.open_prompt('section ', '') end },
+    { 'section from time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
   }
 end
 

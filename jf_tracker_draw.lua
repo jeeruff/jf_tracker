@@ -9886,8 +9886,38 @@ function D.popup(L, p, anchor)
         text(cx, ly + 1, ch[1], U.AMBER); text(cx + ms(ch[1]) + ms('W'), ly + 1, ch[2], U.TEXT)
         cx = cx + wd
       end
+    elseif p.kind == 'hydra' then
+      -- 20 окт: меню без заглавных (Queue → queue, REAPER / RS5K — как есть), буква клавиши — янтарём в самом слове
+      local tx0 = lx + L.pad + kw + 2 * L.pad + hcol
+      local t = fit(D.hydra_text(ln.text or ''), tw)
+      local col = ln.col or U.GREY
+      local at = D.hydra_mark(t, ln.key)
+      if at then
+        local pre = t:sub(1, at - 1)
+        text(tx0, ly + 1, pre, col)
+        local ch = t:sub(at, at)
+        local cx = tx0 + ms(pre)
+        text(cx, ly + 1, ch, U.AMBER)
+        set(U.AMBER); gfx.rect(cx, ly + L.rh - 2, ms(ch), 1, 1)
+        text(cx + ms(ch), ly + 1, t:sub(at + 1), col)
+      else text(tx0, ly + 1, t, col) end
     else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), (p.hl == i and p.kind == 'picker') and U.TEXT or (ln.col or U.GREY)) end
   end
+end
+-- 20 окт: подпись меню без заглавных — слово с заглавной и строчными дальше (Queue, Shift) → строчными;
+-- аббревиатуры (REAPER, RS5K, MIDI, A1) остаются
+function D.hydra_text(t)
+  return (t:gsub('%f[%w](%u)(%l)', function(a, b) return a:lower() .. b end))
+end
+-- позиция буквы клавиши в подписи: начало слова, потом где угодно; регистр — точно, потом любой
+function D.hydra_mark(t, key)
+  if not key or #key ~= 1 or not key:match('%w') then return nil end
+  local function find(k, ci)
+    local s = ci and t:lower() or t
+    local at = s:find('%f[%w]' .. k)
+    return at or s:find(k, 1, true)
+  end
+  return find(key, false) or find(key:lower(), true)
 end
 
 return D
