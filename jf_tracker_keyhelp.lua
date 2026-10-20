@@ -190,6 +190,7 @@ KH.PAGES = {
     { k = 'tn tc', d = 'track: rename / colour (list: palette, random, default, custom dialog)' },
     { k = 'ty', d = 'duplicate the cursor track (copy right after it)' },
     { k = 'ta ti', d = 'track: rec arm / input (list); 6ta - six tracks from the cursor, t135a - tracks 1 3 5 (REAPER numbers, 0 = 10)' },
+    { k = 'tA', d = 'autoarm on every track (the selected track records); again - off; the autoarm button over the row numbers too' },
     { k = 'tI', d = 'track input: the active source - play it within 0.6 s (a MIDI key -> that device and channel, else the audio input that started sounding last, stereo if its pair sounds too); your jf_smart_set_input.lua' },
     { k = 'tl tf', d = 'track: fixed lanes on / off / add fx (fzf)' },
     { k = 'tR', d = 'track routing: sends S, receives R, hw outs O (popup)' },

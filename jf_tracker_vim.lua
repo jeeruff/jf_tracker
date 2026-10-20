@@ -2764,6 +2764,7 @@ function V.key_impl(c)
         if ch == 'n' and ctx.rename_track_prompt then ctx.rename_track_prompt(); V.count = nil; return   -- режим cmd уже включён
         elseif ch == 'c' and ctx.track_colour then ctx.track_colour()
         elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm(V.count)   -- 16 окт: 6ta — шесть треков от курсора
+        elseif ch == 'A' and ctx.autoarm_all then ctx.autoarm_all()   -- 20 окт: tA — autoarm всех треков (кнопка autoarm)
         elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)
         elseif ch == 'I' and ctx.smart_input and col then ctx.smart_input(col)   -- 10 окт: tI — активный вход (jf_smart_set_input)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
