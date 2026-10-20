@@ -274,6 +274,7 @@ local state = {
   slicepitch0 = reaper.GetExtState(EXT, 'slicepitch0') == '6' and '6' or '1',
   shiftlisten = reaper.GetExtState(EXT, 'shiftlisten') == '1',
   hexfill = reaper.GetExtState(EXT, 'hexfill') == 'left' and 'left' or 'right',   -- 17 окт: Enter в недобранном hex
+  bigname = reaper.GetExtState(EXT, 'bigname') ~= '' and reaper.GetExtState(EXT, 'bigname') or 'off',   -- 20 окт: big trackname
   anpatch = flag('anpatch', false), aninst = flag('aninst', false), anitem = flag('anitem', false),   -- 20 окт: имя трека само (патч / инструмент / айтем)
   mfold = reaper.GetExtState(EXT, 'mfold') == '1', mfoldauto = reaper.GetExtState(EXT, 'mfoldauto') == '1',   -- 17 окт: мастер сложен / складывать сам   -- 17 окт: Shift+нота — прослушать (по умолчанию выкл)
   shadehue = tonumber(reaper.GetExtState(EXT, 'shadehue')) or 0,   -- 17 окт: оттенок shades (0 — акцент темы)   -- 17 окт: питч слайса от клавиши 1 или 6 (середина)
@@ -11688,6 +11689,7 @@ ctx = {
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
+      { key = 'bigname', label = 'big trackname', kind = 'cycle', values = { 'off', '1.5', '2' }, desc = 'the track name in its header bigger: x1.5 / x2 (the header grows by it)', get = function() return state.bigname or 'off' end, set = function(v) state.bigname = v; reaper.SetExtState(EXT, 'bigname', v, true); relayout() end },
       flag('anpatch', 'track autoname by patch', 'the track takes the name of the patch / preset of its instrument (Surge XT patch, REAPER preset); a name you typed yourself is kept'),
       flag('aninst', 'track autoname by dsp instrument', 'the track takes the name of its instrument in DSP (Surge XT, ReaSynth, drumrs5k ...); a name you typed yourself is kept'),
       flag('anitem', 'track autoname by item', 'the track takes the name of its first item (the sample / clip); a name you typed yourself is kept'),
@@ -11737,7 +11739,7 @@ ctx = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -21896,11 +21898,11 @@ local function frame()
         end
       end
       -- 11 окт: протяжка за имя — перенос трека (между колонками) или в папку (на середину колонки)
-      if gfx.mouse_y < L.header_y + L.rh and not hover.header_col.master and reaper.ValidatePtr(hover.header_col.track, 'MediaTrack*') then
+      if gfx.mouse_y < L.header_y + L.rh + (L.hname_x or 0) and not hover.header_col.master and reaper.ValidatePtr(hover.header_col.track, 'MediaTrack*') then
         ctx.hdr_drag = { track = hover.header_col.track, name = hover.header_col.name, x0 = gfx.mouse_x, y0 = gfx.mouse_y }
       end
       -- двойной клик по имени трека — переименовать (строка :tname с текущим именем)
-      if dbl and click.zone == 'header' and click.guid == hover.header_col.guid and gfx.mouse_y < L.header_y + L.rh then
+      if dbl and click.zone == 'header' and click.guid == hover.header_col.guid and gfx.mouse_y < L.header_y + L.rh + (L.hname_x or 0) then
         ctx.rename_track_prompt(hover.header_col)
       end
       click = { t = now2, zone = 'header', guid = hover.header_col.guid }

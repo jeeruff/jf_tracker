@@ -628,7 +628,10 @@ function D.layout(snap, state, nregions)
   -- 12 окт: подписи полей — вертикально обычным шрифтом (как имена дорожек): высота — самое длинное слово
   L.cap_rows = state.captions and math.max(1, math.ceil((ms('delay') + 6) / L.rh)) or 0
   L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows
-  L.header_h = L.header_rows * L.rh + 3
+  -- 20 окт: имя трека — чуть больше места (+2 px) и опция big trackname x1.5 / x2: шапка выше на запас, кнопки ниже
+  L.hname_k = tonumber(state.bigname) or 1
+  L.hname_x = math.floor((L.hname_k - 1) * (L.th or L.rh) + 0.5) + 2
+  L.header_h = L.header_rows * L.rh + 3 + L.hname_x
   L.btn_w = L.cw + 4                             -- кнопки M S R в шапке
   L.status_h = L.rh + 4                               -- статус внизу окна (15 окт: всегда)
   L.status_in = 0
@@ -5738,6 +5741,8 @@ function D.frame(L, snap, rows, state, info)
   -- заголовок
   local hy = L.header_y
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
+  local HX = L.hname_x or 0   -- 20 окт: запас строки имени — всё под именем ниже на HX
+  hy = hy + HX
   local trsel = info.trsel or {}
   -- master (9 окт): нижний микшер — полоса master под колонкой номеров строк
   -- (там было пусто); та же отрисовка, что у трека, без шапки
@@ -5760,8 +5765,8 @@ function D.frame(L, snap, rows, state, info)
     local nh = L.rh + 1                                    -- строка имени (кнопки — с hy + rh + 1)
     local hset = fill and rawset_col or set               -- цвет трека — и в mono
     if not c.master then
-      hset(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh, 1)
-      hset(nbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
+      hset(rbg); gfx.rect(c.x + 1, hy + nh, c.w - 1, L.header_h - 2 - nh - HX, 1)
+      hset(nbg); gfx.rect(c.x + 1, hy - HX, c.w - 1, nh + HX, 1)
     end
     -- фон светлее панели: текст шапки подтянуть по контрасту (на колонку)
     local T0, G0 = U.TEXT, U.GREY
@@ -5791,13 +5796,19 @@ function D.frame(L, snap, rows, state, info)
           fy0, fy1 = hy + 2 * L.rh + 1 + math.floor(L.mix_rows * L.rh / 3), hy + (2 + L.mix_rows) * L.rh - 2
         end
       end
-      local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5)
+      local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5 - HX)
       D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
       if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my, L) end   -- 11 окт: + мини-кноб панорамы
     elseif not c.master then
-      text(c.x + L.pad + indent, hy + 1, fit(nm, c.w - 2 * L.pad - indent), ncol)
+      -- 20 окт: big trackname — крупно (x1.5 / x2), по ширине колонки
+      local k = L.hname_k or 1
+      if k > 1 then
+        local s, aw = nm, c.w - 2 * L.pad - indent
+        while #s > 1 and D.big_measure(s, k) > aw do s = s:sub(1, -2) end
+        D.big_text(c.x + L.pad + indent, hy - HX + 1, s, ncol, k)
+      else text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent), ncol) end
     else
-      text(c.x + L.pad, hy + 1, fit('∑ master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
+      text(c.x + L.pad, hy - HX + 1 + math.floor(HX / 2), fit('∑ master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
       -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
       if c.mtrack then
         local fw = ms('fold') + 4

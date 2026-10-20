@@ -233,6 +233,11 @@ end
 
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
+  -- 20 окт: колонки выше окна — колесо мимо строки листает их
+  if O.masonry_on and (O.mover or 0) > 0 and not O.hover then
+    O.mscroll = math.max(0, math.min(O.mover, (O.mscroll or 0) - d * 3 * (O.rh or 16)))
+    return
+  end
   local it = O.items[O.hover or O.sel]
   -- список (хоткеи, действия, полоса прокрутки): колесо листает (5 окт)
   if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' or it.blockrow then
@@ -568,8 +573,18 @@ function O.masonry_plan(L, bx, y0, bw, ch)
   -- наименьшая высота колонок, при которой всё влезает (колонки ровнее, низ окна свободнее);
   -- с блоком справа колонки во всю высоту — ровнять незачем
   local lo, hi = 0, ch
-  if not pack(hi, maxc) then return nil end
-  if not wide then
+  -- 20 окт: не влезло по высоте — колонки всё равно на всю ширину (тёмное пустое не оставлять), выше окна;
+  -- лишнее — вертикальной прокруткой O.mscroll (колесо, курсор j k), а не одним столбцом
+  local over = 0
+  if not pack(hi, maxc) then
+    if wide then return nil end
+    local top = hi
+    while not pack(top, maxc) do top = top * 2; if top > 400000 then return nil end end
+    lo, hi = ch, top
+    for _ = 1, 24 do local mid = math.floor((lo + hi) / 2); if pack(mid, maxc) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
+    over = hi - ch
+  end
+  if not wide and over == 0 then
     for _ = 1, 20 do local mid = math.floor((lo + hi) / 2); if pack(mid, maxc) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
   end
   local cols = pack(hi, maxc)
@@ -588,7 +603,36 @@ function O.masonry_plan(L, bx, y0, bw, ch)
     frames[#frames + 1] = { x = x, y = y0, w = bx + bw - pad - x, h = ch, title = wide.sc.title, i0 = r[1], i1 = r[#r], block = wide.blk }
   end
   table.sort(place, function(a, b) return a.i < b.i end)
-  return { place = place, frames = frames, ncols = #cols }
+  if over > 0 then
+    O.mscroll = math.max(0, math.min(over, O.mscroll or 0))
+    -- выбранная строка — в окне
+    for _, pl in ipairs(place) do
+      if pl.i == O.sel then
+        local yv = pl.y - O.mscroll
+        if yv < y0 + rh then O.mscroll = math.max(0, pl.y - y0 - rh)
+        elseif yv + rh > y0 + ch then O.mscroll = math.min(over, pl.y + rh - y0 - ch) end
+        break
+      end
+    end
+    local sc0 = O.mscroll
+    local vis = {}
+    for _, pl in ipairs(place) do
+      pl.y = pl.y - sc0
+      if pl.y >= y0 and pl.y + rh <= y0 + ch then vis[#vis + 1] = pl end
+    end
+    place = vis
+    for _, fr in ipairs(frames) do
+      local a, b = fr.y - sc0, fr.y - sc0 + fr.h
+      fr.y, fr.h = math.max(a, y0 - math.floor(rh / 2)), math.min(b, y0 + ch) - math.max(a, y0 - math.floor(rh / 2))
+      if a < y0 - math.floor(rh / 2) then fr.title = nil end           -- заголовок уехал вверх — рамка без подписи
+      if fr.h <= rh then fr.h = 0 end
+    end
+    local fv = {}
+    for _, fr in ipairs(frames) do if fr.h > 0 then fv[#fv + 1] = fr end end
+    frames = fv
+  else O.mscroll = 0 end
+  O.mover = over
+  return { place = place, frames = frames, ncols = #cols, over = over }
 end
 
 function O.draw(L, W, H)

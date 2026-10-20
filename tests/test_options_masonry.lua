@@ -66,7 +66,8 @@ if plan3 then
   eq('split: every option placed', #plan3.place, want)
 end
 -- узкое окно / мало высоты — список со скроллом
-eq('too small: no plan', O.masonry_plan(L, 0, 0, 500, 10 * 16), nil)
+local small = O.masonry_plan(L, 0, 0, 500, 10 * 16)   -- 20 окт: не влезло — колонки с прокруткой, не список
+eq('too small: plan scrolls', small ~= nil and (small.over or 0) > 0, true)
 O.typing, O.query = false, 'opt'; O.rebuild()
 eq('search: list', O.masonry_plan(L, 0, 0, 2000, 800), nil)
 O.query = ''; O.rebuild()
