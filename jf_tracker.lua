@@ -285,6 +285,7 @@ local state = {
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom' or v == 'clips') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
   wzoom = 0,                                                       -- 7 окт: прежний зум 0/1/2 заменён уровнями wzlevel
   wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')),         -- общий уровень ширины треков (Cmd + гор. колесо), nil — как у трека
+  autozoom = reaper.GetExtState(EXT, 'autozoom') == '1' or nil,   -- 20 окт: ширина треков сама (кнопка autozoom)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
   curlead = tonumber(reaper.GetExtState(EXT, 'curlead')) or 15,
   notes_scale = tonumber(reaper.GetExtState(EXT, 'notesscale')) or 0,
@@ -768,6 +769,20 @@ local function relayout()
   draw.sroslash = state.sroslash and true or false   -- 16 окт: /// по умолчанию; выкл — буквы s r o
   draw.micro = (state.micro or model.seen_micro) and true or nil; draw.micro_tag = model.micro_tag   -- 16 окт: микротоны — шире колонка нот
   L = draw.layout(snap, state, #regions)
+  -- 20 окт: autozoom — общая ширина треков сама: самая широкая, при которой влезают все треки,
+  -- но не уже ноты и волны (уровень 1); ручной уровень (Cmd+колесо) — после выключения
+  if state.autozoom and not state.ptmode then
+    state.hscroll = 0
+    L = draw.layout(snap, state, #regions)
+    if L.cols_cut or L.hs_cut then
+      local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+      for lv = full, 1, -1 do
+        state.wzlevel = lv
+        L = draw.layout(snap, state, #regions)
+        if not (L.cols_cut or L.hs_cut) then break end
+      end
+    end
+  end
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
   if state.ptmode then
@@ -9330,7 +9345,8 @@ ctx = {
     metro = 'metronome on / off; click - the menu (pattern, pre-roll, settings)',
     beats = 'where the play position is: bar and beat; the squares are the beats of this bar',
     rate = 'project play rate (speed x tempo, pitch too): x1 - normal. Click - the list, wheel - +-0.05',
-    ratebar = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2',
+    ratebar = 'play rate: click - a slider (drag it; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2), double click - x1, wheel +-0.05',
+    ratepop = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2; a click elsewhere closes it',
     swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
     swingbar = 'swing amount: drag left / right from the middle',
     velbar = 'velocity of the inserted notes 1..127: drag; { } (qwerty: c C) - step 8',
@@ -15114,6 +15130,7 @@ local function hint_go(t)
   elseif t.kind == 'rgbtn' then ctx.region_btn(d)
   elseif t.kind == 'viewbtn' and d == 'fxparams' then
     state.fxparams = not state.fxparams; reaper.SetExtState(EXT, 'fxparams', state.fxparams and '1' or '0', true); ctx.hdr_cache = {}; relayout()
+  elseif t.kind == 'viewbtn' and d == 'autozoom' then ctx.autozoom_toggle()
   elseif t.kind == 'viewbtn' and d == 'markers' then ctx.markers_menu()
   elseif t.kind == 'tlist' then ctx.tlist_do(d.ci, d.what)   -- 11 окт: track list по f
   elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
@@ -15246,6 +15263,10 @@ function region_actions(rg)
     { 'Make unique: unlink this repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'Paste pattern copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
     { 'Sync this pattern', key = 's', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
+    -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
+    { 'Half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
+    { 'Double the length (x2)', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
+    { 'Length: a list of lengths (< N > in the corner)', key = 'l', g = 'length', fn = function() ctx.region_len_menu() end },
     { 'Matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
     -- 18 окт: секции — своим подменю (создать из выделенных слотов / time selection, меню секции этого слота)
     { 'Section of this slot: menu (rclick on its strip)', key = 'm', g = 'section', fn = function() ctx.sec_cmd('') end },
@@ -16951,7 +16972,12 @@ function ctrl_action(name, delta)
     end
   elseif name == 'stophere' then if delta == 0 then ctx.stop_here() end   -- 19 окт: |> — стоп на месте (как Esc)
   elseif name == 'ratebar' then
-    if delta == 0 then ctx.ratedrag = true else ctrl_action('rate', delta) end
+    -- 20 окт: клик по значению — всплывающий слайдер (тянуть по нему); есть слайдер в строке — тянуть его; двойной — x1
+    if delta ~= 0 then ctrl_action('rate', delta)
+    elseif draw.strip_cell and draw.strip_cell.ratebar_inline then ctx.ratedrag = true
+    else ctx.rate_pop = not ctx.rate_pop or nil end
+  elseif name == 'ratepop' then
+    if delta == 0 then ctx.ratedrag = 'pop' else ctrl_action('rate', delta) end
   elseif name == 'tp_pause' then reaper.Main_OnCommand(1008, 0)           -- Transport: Pause
   elseif name == 'slicepitch' then if delta == 0 then state.slicepitch = not state.slicepitch; vim.msg = state.slicepitch and '$pt on: the keys play the selected slice at their pitch (Shift+Option does it one-off)' or '$pt off: a key - a slice' end   -- 16 окт
   elseif name == 'pedal' then if delta == 0 then local W = ctx.wheels(); ctx.wheel_send('pedal', not W.pedal); vim.msg = 'pedal (sustain, CC64) ' .. (W.pedal and 'down' or 'up') end   -- 16 окт
@@ -17902,10 +17928,12 @@ local function frame()
     if f and f.ci and (state.hscroll or 1) > f.ci then state.hscroll = f.ci; relayout() end
   end
   -- 11 окт: протяжка слайдера скорости (точки-защёлки 0.25 0.5 0.75 1 1.5 2 — ближе 0.04 — прилипает)
+  -- 20 окт: всплывающий слайдер скорости закрывается щелчком мимо него и значения
+  if ctx.rate_pop and U.click and hover.ctrl ~= 'ratebar' and hover.ctrl ~= 'ratepop' then ctx.rate_pop = nil end
   if ctx.ratedrag then
-    local r0 = draw.strip_cell and draw.strip_cell.ratebar
+    local r0 = draw.strip_cell and (ctx.ratedrag == 'pop' and draw.strip_cell.ratepop or draw.strip_cell.ratebar)
     if gfx.mouse_cap & 1 == 1 and r0 then
-      local sw2 = 8 * L.cw
+      local sw2 = r0[3] and r0[3] >= 2 * L.cw and r0[3] or 8 * L.cw
       local r = 0.25 + math.max(0, math.min(1, (gfx.mouse_x - r0[1]) / math.max(1, sw2 - 1))) * 1.75
       for _, m in ipairs(draw.RATE_SNAPS) do if math.abs(r - m) < 0.04 then r = m end end
       if math.abs(r - reaper.Master_GetPlayRate(0)) > 1e-4 then reaper.CSurf_OnPlayRateChange(r); vim.msg = ('playrate x%.2f'):format(r) end
@@ -18322,7 +18350,10 @@ local function frame()
     cur_region_full = (function()
       local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
       if not rg then return nil end
-      return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) }
+      -- 20 окт: и секция строки курсора — во вертикальной шапке паттерна справа от мастера
+      local t, sec = edit.row_time(vim.cur.row, state.lpb, 0), nil
+      for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then sec = sc.name; break end end
+      return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color), sec = sec }
     end)(),
     cur_ci = (L.flat[vim.cur.fi] or {}).ci,
     vorder = vim.vorder,                            -- 10 окт: линейка прыжков по ячейкам
@@ -18433,7 +18464,7 @@ local function frame()
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
-      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
+      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
       slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
@@ -19554,6 +19585,8 @@ local function frame()
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - an o at the side of the cell (O - several), no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
+  elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
+  elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the track width by itself - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
   elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
@@ -21056,6 +21089,8 @@ local function frame()
       for i, m in ipairs(cur_col() and cur_col().mods or {}) do if m == hover.mod.m then modsel = i end end
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
+    elseif hover.viewbtn == 'autozoom' then ctx.autozoom_toggle()       -- 20 окт
+    elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'foldfast' then ctx.foldfast_toggle()      -- 19 окт: fold быстрых нот
     elseif hover.tlist_hdr then ctx.tlist_column(hover.tlist_hdr); click = { t = now2, zone = 'tlist' }   -- 11 окт: tracks — весь столбец
@@ -21629,10 +21664,14 @@ local function frame()
       if dbl and click.zone == 'bpm' then bpm_menu = nil; state.bpm_edit = ''
       else bpm_menu = bpm_menu and nil or { sel = 1 } end
       click = { t = now2, zone = 'bpm' }
+    elseif hover.ctrl == 'ratebar' and dbl and click.zone == 'ratebar' then
+      -- 20 окт: двойной клик по скорости — x1, слайдер закрыть
+      reaper.CSurf_OnPlayRateChange(1); ctx.rate_pop, ctx.ratedrag = nil, nil; vim.msg = 'playrate x1.00'
+      click = { t = 0, zone = 'ctrl' }
     elseif hover.ctrl then
       if hover.ctrl ~= 'beats' then state.ctrl_sel = hover.ctrl end     -- курсор клавиатуры — на нажатую ячейку
       ctrl_action(hover.ctrl, 0)
-      click = { t = now2, zone = 'ctrl' }
+      click = { t = now2, zone = (hover.ctrl == 'ratebar') and 'ratebar' or 'ctrl' }
     elseif hover.scopes_on then
       ctx.toggle_scopes(true); click = { t = now2, zone = 'scopes_on' }
     elseif hover.scope then
@@ -24682,6 +24721,23 @@ end
 MX.follow = reaper.GetExtState(EXT, 'mxfollow') ~= '0'
 -- 20 окт: мастер сложен (fold / auto) — peek раскрывает его, пока курсор на нём: клик по сложенному,
 -- Opt+W (∑), l с последнего поля. Курсор ушёл с мастера — сложить снова (ctx.master_peek_tick)
+-- 20 окт: autozoom (кнопка в уголке над номерами строк) — подбор общей ширины в relayout; выкл — уровень Cmd+колеса
+-- 20 окт: выпадашка команд паттерна строки курсора — от вертикальной шапки справа от мастера
+ctx.rg_head_menu = function()
+  local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+  if not rg then vim.msg = 'no pattern on this row'; return end
+  local items = {}
+  for _, a in ipairs(region_actions(rg)) do if a.key then items[#items + 1] = { key = a.key, label = (a[1]:gsub('^!', '')), fn = a.fn } end end
+  vim.open_hydra({ title = 'pattern ' .. tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), items = items })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
+ctx.autozoom_toggle = function()
+  state.autozoom = not state.autozoom or nil
+  reaper.SetExtState(EXT, 'autozoom', state.autozoom and '1' or '0', true)
+  if not state.autozoom then state.wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')) end
+  relayout()
+  vim.msg = state.autozoom and 'autozoom: all tracks fit (down to note + wave)' or 'autozoom off'
+end
 ctx.master_fi = function()
   local mc = snap and snap.master
   if not (mc and L) then return nil end

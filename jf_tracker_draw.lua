@@ -793,6 +793,7 @@ function D.layout(snap, state, nregions)
   L.flat, L.cols = {}, {}
   L.hs_full, L.hs_n, L.hs_before, L.hs_list = 0, 0, 0, {}
   L.hs_cut = nil
+  L.cols_cut = nil
   L.pt_n, L.pt_avail = 0, 0          -- PT-mode: показано / есть каналов (не больше 4)
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
@@ -891,6 +892,7 @@ function D.layout(snap, state, nregions)
       vis = false; L.hs_cut = true; lx = cx
     end
     if vis and c.x and c.x + c.w > L.cols_r - 2 then
+      L.cols_cut = true   -- 20 окт: autozoom — не влез целиком
       local lim = L.cols_r - 2
       c.w = math.max(0, lim - c.x)
       for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do
@@ -4344,11 +4346,27 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local sx2 = rx0 + ms(rl) + L.pad + dr
       local sw2 = rx0 + w2c - dr - sx2
       local r = math.max(0.25, math.min(2, rv))
-      if sw2 >= L.cw * 2 then U.dslider(sx2, ry + math.floor(L.rh / 2), sw2, (r - 0.25) / 1.75, false, rhot and U.AMBER or U.TEXT, rhot, L.rh)
+      local inline = sw2 >= L.cw * 2
+      if inline then U.dslider(sx2, ry + math.floor(L.rh / 2), sw2, (r - 0.25) / 1.75, false, rhot and U.AMBER or U.TEXT, rhot, L.rh)
       else sx2, sw2 = rx0, w2c end
       if rhot then hover.ctrl = 'ratebar' end
       hint('ctrl', rx0, ry, w2c, L.rh, 'ratebar')
       D.strip_cell.ratebar = { sx2, ry, sw2 }
+      D.strip_cell.ratebar_inline = inline or nil
+      -- 20 окт: узко — клик по значению открывает слайдер над ним (c.rate_pop), тянуть по нему
+      D.strip_cell.ratepop = nil
+      if c.rate_pop and not inline then
+        local pw2 = 14 * L.cw
+        local px2 = math.max(L.pad, math.min(gfx.w - pw2 - L.pad, rx0))
+        local py2 = ry - L.rh - 4
+        set(U.PANEL); gfx.rect(px2, py2, pw2, L.rh + 2, 1)
+        set(U.AMBER); gfx.rect(px2, py2, pw2, L.rh + 2, 0)
+        local ssx, ssw = px2 + dr + 2, pw2 - 2 * dr - 4
+        local phot = mx >= px2 and mx < px2 + pw2 and my >= py2 and my < py2 + L.rh + 2
+        U.dslider(ssx, py2 + 1 + math.floor(L.rh / 2), ssw, (r - 0.25) / 1.75, false, U.AMBER, phot, L.rh)
+        if phot then hover.ctrl = 'ratepop' end
+        D.strip_cell.ratepop = { ssx, py2, ssw }
+      end
       -- запись: с колонки после play до конца группы
       local ax, a1 = colx(pi3 + 1), bx0 + btot
       local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate },   -- 19 окт: короче (pun / slo)
@@ -5558,6 +5576,29 @@ end
 
 -- 17 окт: сложенный мастер — шапка M и кнопка (развернуть), в теле стерео-метр L R во всю высоту и красная полоса
 -- подавления сверху (максимум GainReduction_dB среди эффектов мастера: ReaComp, ReaLimit, плагины с этим полем)
+-- 20 окт: шапка паттерна / секции строки курсора — вертикально в пустом куске над правой линейкой регионов
+-- (справа от мастера): первый столбик — «номер имя» паттерна в его цвете, второй — секция; клик — выпадашка
+-- команд паттерна (как \\ p: очередь, alias, clone, /2 x2, длина …)
+function D.rg_head(L, info, hover)
+  if not L.ruler_right then return end
+  local x, w = L.win_w - L.rg_w, L.rg_w
+  local y, h = L.header_y, L.header_h
+  local rg = info.cur_region_full
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hot = mx >= x and mx < x + w and my >= y and my < y + h
+  set(hot and D.CURROW or D.HDR); gfx.rect(x + 1, y, w - 1, h, 1)
+  if not rg then
+    D.vtext(x + 3, y + 2, h - 4, 'no pattern', U.DIM, hot and D.CURROW or D.HDR, true)
+  else
+    local c = rg.rgb or U.LINE
+    local cw = L.th + 6
+    set(c); gfx.rect(x + 1, y, 2, h, 1)
+    local bg = hot and D.CURROW or D.HDR
+    D.vtext(x + 4, y + 2, h - 4, tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), hot and U.AMBER or U.TEXT, bg, true)
+    if rg.sec and rg.sec ~= '' and w >= 2 * cw then D.vtext(x + 4 + cw, y + 2, h - 4, rg.sec, U.GREY, bg, true) end
+  end
+  if hot then hover.rghead = true end
+end
 function D.mfold_draw(L, snap, hover)
   if not (L.mfold and snap.master and snap.master.track) then return end
   local tr = snap.master.track
@@ -5588,30 +5629,43 @@ function D.mfold_draw(L, snap, hover)
     local gs = ('-%.0f'):format(gr)
     if ms(gs) <= w - 2 then text(x + 1, by + L.rh, gs, U.RED) end
   end
-  -- 20 окт: метр — шкала треков (-60..+12, > 0 красный, > -6 янтарь): пики L R посередине,
+  -- 20 окт (2): метр — как у треков (их стиль meterstyle, высота 57.5 % тела, тусклее): пики L R посередине,
   -- RMS L R (Track_GetPeakInfo 1024 / 1025 — то, что показывает VU мастера) узкими столбиками по бокам
   local y0, h0 = L.body_y, L.body_h
   set(U.BG); gfx.rect(x, y0, w, h0, 1)
-  local function db(v) return v > 1e-6 and 20 * math.log(v, 10) or -150 end
-  local function frac(d) return math.max(0, math.min(1, (math.min(12, d) + 60) / 72)) end
-  local trk = U.mix(U.BG, U.LINE, 0.3)   -- подложка столбика — едва видна: в тишине не «полоски»
+  local pt = D.meterstyle == 'pt'
+  local ncell = math.max(1, math.floor(L.nrows * 0.575))
+  local maxh = pt and math.floor(h0 * 0.575) or ncell * L.rh
+  local by = pt and (y0 + h0) or (y0 + L.nrows * L.rh)
+  local function bar(bx, bw0, v, cyan)
+    v = math.max(0, math.min(1, v))
+    if pt then
+      local segs = cyan and { { 0, 1, U.CYAN } } or { { 0, 0.6, U.GREEN }, { 0.6, 0.85, U.AMBER }, { 0.85, 1, U.RED } }
+      for _, sg in ipairs(segs) do
+        local s0, s1 = math.floor(sg[1] * maxh), math.floor(math.min(v, sg[2]) * maxh)
+        if s1 > s0 then gfx.set(sg[3][1], sg[3][2], sg[3][3], 0.45); gfx.rect(bx, by - s1, bw0, s1 - s0, 1) end
+      end
+    else
+      local eighths, cell = math.floor(v * ncell * 8 + 0.5), 0
+      while eighths > 0 and cell < ncell do
+        local part = math.min(8, eighths)
+        local frac = (cell + 1) / ncell
+        local col = cyan and U.CYAN or (frac > 0.85 and U.RED or (frac > 0.6 and U.AMBER or U.GREEN))
+        local cy1 = by - cell * L.rh - 1
+        local hh2 = math.max(1, math.floor((L.rh - 2) * part / 8 + 0.5))
+        gfx.set(col[1], col[2], col[3], 0.5); gfx.rect(bx, cy1 - hh2, bw0, hh2, 1)
+        eighths = eighths - part; cell = cell + 1
+      end
+    end
+    gfx.a = 1
+  end
   local rw = math.max(2, math.floor(L.cw / 2))
   local pw = math.max(2, math.floor((w - 4 - 2 * rw - 3) / 2))
   local px0 = x + 2 + rw + 1
-  local xs = { rms = { x + 2, px0 + 2 * pw + 2 }, pk = { px0, px0 + pw + 1 } }
   for ch = 0, 1 do
-    local d = db(reaper.Track_GetPeakInfo(tr, ch))
-    local bx = xs.pk[ch + 1]
-    set(trk); gfx.rect(bx, y0, pw, h0, 1)
-    local hgt = math.floor(frac(d) * h0)
-    if d > -60 then set(d > 0 and U.RED or (d > -6 and U.AMBER or U.GREEN)); gfx.rect(bx, y0 + h0 - hgt, pw, hgt, 1) end
-    local r = db(reaper.Track_GetPeakInfo(tr, 1024 + ch))
-    local rx = xs.rms[ch + 1]
-    set(trk); gfx.rect(rx, y0, rw, h0, 1)
-    if r > -60 then local rh2 = math.floor(frac(r) * h0); set(U.CYAN); gfx.rect(rx, y0 + h0 - rh2, rw, rh2, 1) end
+    bar(px0 + ch * (pw + 1), pw, reaper.Track_GetPeakInfo(tr, ch), false)
+    bar(ch == 0 and (x + 2) or (px0 + 2 * pw + 2), rw, reaper.Track_GetPeakInfo(tr, 1024 + ch), true)
   end
-  -- риска 0 dB — по всей ширине, тусклая
-  set(U.DIM); gfx.rect(x + 1, y0 + h0 - math.floor(frac(0) * h0), w - 1, 1, 1)
   if mx >= x and mx < x + w and my >= y0 and my < y0 + h0 then hover.mfold_meter = gr end
   done()
 end
@@ -5620,6 +5674,7 @@ function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
+  D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
@@ -6790,66 +6845,55 @@ function D.frame(L, snap, rows, state, info)
         if xa + ms('aa') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'aa', all and 'off' or 'on', all, 'mautoarm') end
       end
     end
-    -- ряд 2: номер + имя (7 окт: на строку ниже — под session | router);
-    -- 9 окт: высокая шапка (микшер) — имя и кнопки внизу, прямо над длиной
-    -- «< N >» (регион одним блоком), не под session
-    -- 11 окт: длина «< N >» — на последней строке рядом с markers, поэтому имя
-    -- встаёт над ней (на 4-строчной шапке имя и число раньше ложились в одну строку)
-    local ny = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
-    if rg then
-      local c = rg.rgb or U.LINE
-      set(U.tint(c, 0.30)); gfx.rect(bx, ny, bw, L.rh, 1)
-      set(c); gfx.rect(bx, ny, 3, L.rh, 1)
-      -- номер региона REAPER всегда перед именем (2 окт): «1 intro», безымянный — «2»;
-      -- справа cln — независимая копия паттерна (3 окт), имя — до неё
-      -- справа als — связанный повтор (alias, как в Renoise), имя — до неё
-      text(bx + 5, ny, fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), bw - 7), U.TEXT)
-    else
-      text(bx + 5, ny, fit('no region', bw - 7), U.DIM)
-    end
-    -- ряд 2: /2 x2 dup
-    if rg then
-      local by2 = ny + L.rh
-      if by2 + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
-        -- 7 окт: /2 x2 слева, als cln — парой справа (копии паттерна рядом)
-        local x = bx
-        for _, bt in ipairs({ { 'half', '/2' }, { 'double', 'x2' } }) do x = small(x, by2, bt[2], bt[1], false, 'rgbtn') end
-        local pw = ms('als') + ms('cln') + 6
-        local px = bx + bw - pw
-        if px >= x then px = small(px, by2, 'als', 'alias', false, 'rgbtn'); small(px, by2, 'cln', 'clone', false, 'rgbtn')
-        elseif x + ms('cln') + 2 <= bx + bw then small(x, by2, 'cln', 'clone', false, 'rgbtn') end
-      end
-    end
+    -- 20 окт: имя паттерна и /2 x2 als cln — вертикальной шапкой справа от мастера (клик — выпадашка);
   end
-  -- последняя строка уголка (11 окт): «< N >» — длина региона курсора в шагах
-  -- (стрелки и колесо ±1 шаг, клик по числу — выпадашка длин), справа markers
-  -- (выпадашка: показ маркеров и регионов)
+  -- последняя строка уголка (20 окт): «< N >» — длина региона курсора в шагах (стрелки и колесо ±1 шаг,
+  -- клик по числу — выпадашка длин), справа x2 /2; строкой выше — autozoom и markers
   do
     local bx, y4 = tx0 + 3, hy + (L.header_rows - 1) * L.rh + 2
     local bw = L.label_w - 4
-    local aw = ms('<') + 2
-    local nmin = 2 * aw + ms('000') + 4                 -- поле длины не уже «< 000 >»
-    local lbl = (ms('markers') + 2 + nmin + 2 <= bw) and 'markers' or 'mk'
-    local w1 = ms(lbl) + 2
-    local mx0 = info.cur_region and (bx + bw - w1) or bx
-    local hot = mx >= mx0 and mx < mx0 + w1 and my >= y4 and my < y4 + L.rh
-    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(mx0, y4, w1, L.rh, 1)
-    set(hot and U.AMBER or U.LINE); gfx.rect(mx0, y4, w1, L.rh, 0)
-    text(mx0 + 1, y4, lbl, hot and U.AMBER or U.TEXT)
-    if hot then hover.viewbtn = 'markers' end
-    hint('viewbtn', mx0, y4, w1, L.rh, 'markers')
+    local function btn(x, y, label, kind, what, on)
+      local w1 = ms(label) + 2
+      local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
+      set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      if hot then hover[kind] = what end
+      hint(kind, x, y, w1, L.rh, what)
+      return w1
+    end
+    -- строка выше: autozoom слева, markers справа (не влезло слово — mk / az)
+    local ya = y4 - L.rh
+    if ya >= hy + 1 + 3 * L.rh - 1 then
+      local ml = (ms('autozoom') + ms('markers') + 8 <= bw) and 'markers' or 'mk'
+      local mw = ms(ml) + 2
+      btn(bx + bw - mw, ya, ml, 'viewbtn', 'markers')
+      local az = (ms('autozoom') + 2 + 2 <= bw - mw) and 'autozoom' or ((ms('az') + 4 <= bw - mw) and 'az' or nil)
+      if az then btn(bx, ya, az, 'viewbtn', 'autozoom', state.autozoom) end
+    else
+      btn(bx + bw - ms('mk') - 2, y4 - 0, 'mk', 'viewbtn', 'markers')   -- низкая шапка — markers на месте x2 /2
+    end
     D.rglen_at = nil
     if info.cur_region then
       local rg = info.cur_region
-      local s = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
-      local lw = mx0 - 2 - bx
+      local low = ya < hy + 1 + 3 * L.rh - 1
+      -- x2 /2 справа от длины (низкая шапка — там markers)
+      local rx = bx + bw
+      if not low then
+        rx = rx - (ms('/2') + 2); btn(rx, y4, '/2', 'rgbtn', 'half')
+        rx = rx - 2 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')
+        rx = rx - 2
+      else rx = rx - ms('mk') - 4 end
+      local aw = ms('<') + 2
+      local s2 = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
+      local lw = rx - bx
       local inb = my >= y4 and my < y4 + L.rh
       local hl = inb and mx >= bx and mx < bx + aw
       local hr = inb and mx >= bx + lw - aw and mx < bx + lw
       local hn = inb and not hl and not hr and mx >= bx and mx < bx + lw
       set(hn and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y4, lw, L.rh, 1)
       set(hn and U.AMBER or U.LINE); gfx.rect(bx, y4, lw, L.rh, 0)
-      text(bx + math.max(aw, math.floor((lw - ms(s)) / 2)), y4, fit(s, lw - 2 * aw), hn and U.AMBER or U.TEXT)
+      text(bx + math.max(aw, math.floor((lw - ms(s2)) / 2)), y4, fit(s2, lw - 2 * aw), hn and U.AMBER or U.TEXT)
       text(bx + 1, y4, '<', hl and U.AMBER or U.GREY)
       text(bx + lw - ms('>') - 1, y4, '>', hr and U.AMBER or U.GREY)
       if hl then hover.rglen = -1 elseif hr then hover.rglen = 1 elseif hn then hover.rglen = 0 end
@@ -7385,6 +7429,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
+  D.rg_head(L, info, hover)      -- 20 окт: шапка паттерна вертикально над правой линейкой
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
