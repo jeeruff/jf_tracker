@@ -240,7 +240,9 @@ function MX.width(L, nregions, ncols)
   -- 18 окт: секции — полоса их цвета с вертикальным именем слева от номеров тактов
   MX.sec_w = (MX.ruler and not MX.fold and MX.has_sec) and (L.th + 4) or 0
   -- 19 окт: stack — такт / размер / длина второй строкой под именем: линейка — только риски, колонок справа нет
-  local st = MX.stack and not MX.fold
+  -- 20 окт: самый мелкий зум (слот не выше двух строк) — stack в одну строку колонками: строка на паттерн, метка шире
+  local st = MX.stack and not MX.fold and math.floor(L.rh * MX.vz + 0.5) >= 2 * L.rh + 1
+  MX.st_on = st
   L.mx_ruler_w = (MX.ruler and not MX.fold) and ((st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) + MX.sec_w) or 0
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
   L.mx_dur_w = (MX.fold or st) and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
@@ -251,7 +253,7 @@ function MX.width(L, nregions, ncols)
   L.mx_bpm_w = (MX.fold or st or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
   L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_bpm_w + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
-  L.mx_row_h = math.max(st and (2 * L.rh + 1) or L.rh, math.floor(L.rh * MX.vz + 0.5))
+  L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
   -- кнопки шапки не выходят за рамку модуля: ширина — не меньше ряда кнопок
   local bw = L.pad
   for _, b in ipairs(btns()) do
@@ -651,7 +653,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local sc = sec_first[ri]
       local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)
       local _ = sc
-      if info.bar_label and not MX.stack then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
+      if info.bar_label and not MX.st_on then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
       if info.ticks then
         for _, tk in ipairs(info.ticks(rg)) do
           local ty = y + math.floor(tk.f * rh)
@@ -714,7 +716,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- 19 окт: stack — вторая строка под именем: такт · размер · длина (· темп); те же щелчки и курсор длины
-    if MX.stack and not MX.fold and nw > 0 then
+    if MX.st_on and nw > 0 then
       local y2 = y + L.rh
       -- 19 окт: такт — слева от линейки (под «< A1 >»), справа у края — темп, длина, размер (4/4 последним)
       local lx0, rx = xa, L.mx_label_w - L.pad
@@ -754,7 +756,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
     -- длительность: в тактах (по QN и размеру 4/4 проекта), дробь — до 0.5
-    if not (MX.stack and not MX.fold) then
+    if not MX.st_on then
       -- длина в шагах по LPB (просьба 1 окт: без тактов и секунд)
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local dx = L.mx_label_w - L.mx_dur_w

@@ -16012,7 +16012,7 @@ function ctx.context_items(hover)
     add((MX.fill and '!' or '') .. 'Fill: cells show their content (f)', function() MX.fill = not MX.fill end, 'f')
     add('Trim items to their regions (t)', function() ctx.mx_trim() end, 't')
     add((MX.ruler and '!' or '') .. 'Ruler (R)', function() ctx.mx_ruler_toggle() end, 'R')
-    add((MX.stack and '!' or '') .. 'Info under the name: bar, size, length (columns off - wider cells)', function()
+    add((MX.stack and '!' or '') .. 'Info under the name: bar, size, length (the smallest zoom - one line)', function()
       state.mxstack = not state.mxstack; MX.stack = state.mxstack; vim.msg = 'matrix: bar / size / length ' .. (MX.stack and 'under the name' or 'in columns')
     end, 'i')
     if MX.loops or (ctx.dev_on and ctx.dev_on()) then add((MX.loops and '!' or '') .. 'Loops layer (dev: Garden loops per cell)', function() ctx.mx_loops_toggle() end, 'l') end   -- 19 окт: непонятен — только dev, как в \\-меню
