@@ -1218,6 +1218,34 @@ ctx = {
   end,
   set_lpb = set_lpb,
   -- зум-аут (6 окт, вместо птичьего вида): LPB 1, повтор — прежний LPB
+  -- 20 окт: zu / :unfold — groups: { {доли нот одной сложенной ячейки}, … } от V.unfold_zoom; nil — назад
+  unfold_zoom = function(groups)
+    if not groups then
+      if state.lpb_before_unfold then set_lpb(state.lpb_before_unfold); state.lpb_before_unfold = nil; vim.msg = 'unfold back: LPB ' .. state.lpb end
+      return
+    end
+    if #groups == 0 then vim.msg = 'zu: nothing folded here (the cyan line under a row; select rows - v / V)'; return end
+    local need
+    for _, lp in ipairs(LPBS) do
+      if lp > state.lpb then
+        local ok = true
+        for _, g in ipairs(groups) do
+          local seen = {}
+          for _, q in ipairs(g) do
+            local r = math.floor(q * lp + 1e-6)
+            if seen[r] then ok = false; break end
+            seen[r] = true
+          end
+          if not ok then break end
+        end
+        if ok then need = lp; break end
+      end
+    end
+    local was = state.lpb
+    state.lpb_before_unfold = was
+    set_lpb(need or LPBS[#LPBS])
+    vim.msg = ('unfold: LPB %d -> %d%s (zu again - back)'):format(was, state.lpb, need and '' or ', still folded at the max')
+  end,
   zoom_out_toggle = function()
     state.macro = false
     if state.lpb_before_zoom then set_lpb(state.lpb_before_zoom); state.lpb_before_zoom = nil; vim.msg = 'zoom back: LPB ' .. state.lpb
