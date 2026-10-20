@@ -274,6 +274,7 @@ local state = {
   slicepitch0 = reaper.GetExtState(EXT, 'slicepitch0') == '6' and '6' or '1',
   shiftlisten = reaper.GetExtState(EXT, 'shiftlisten') == '1',
   hexfill = reaper.GetExtState(EXT, 'hexfill') == 'left' and 'left' or 'right',   -- 17 окт: Enter в недобранном hex
+  anpatch = flag('anpatch', false), aninst = flag('aninst', false), anitem = flag('anitem', false),   -- 20 окт: имя трека само (патч / инструмент / айтем)
   mfold = reaper.GetExtState(EXT, 'mfold') == '1', mfoldauto = reaper.GetExtState(EXT, 'mfoldauto') == '1',   -- 17 окт: мастер сложен / складывать сам   -- 17 окт: Shift+нота — прослушать (по умолчанию выкл)
   shadehue = tonumber(reaper.GetExtState(EXT, 'shadehue')) or 0,   -- 17 окт: оттенок shades (0 — акцент темы)   -- 17 окт: питч слайса от клавиши 1 или 6 (середина)
   panecol = ({ ['0'] = 'off', shades = 'shades' })[reaper.GetExtState(EXT, 'panecol')] or 'colours',   -- 17 окт: цвета панелей: colours — свой у каждой, shades — оттенки акцента темы, off
@@ -735,7 +736,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -11686,6 +11687,9 @@ ctx = {
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
+      flag('anpatch', 'track autoname by patch', 'the track takes the name of the patch / preset of its instrument (Surge XT patch, REAPER preset); a name you typed yourself is kept'),
+      flag('aninst', 'track autoname by dsp instrument', 'the track takes the name of its instrument in DSP (Surge XT, ReaSynth, drumrs5k ...); a name you typed yourself is kept'),
+      flag('anitem', 'track autoname by item', 'the track takes the name of its first item (the sample / clip); a name you typed yourself is kept'),
       flag('mfoldauto', 'auto fold master', 'the master column stays folded (a stereo meter, RMS at the sides) while the cursor is not on it; Opt+W, l from the last track or a click on it opens it; the same as the auto button in its header'),
       { key = 'shadehue', label = 'shades hue', kind = 'num', min = 0, max = 360, step = 10, fmt = '%d', desc = 'pane colours = shades: the colour the shades are made of - 0 = the theme accent, 1..360 - a hue on the colour wheel (30 orange, 120 green, 200 blue, 280 violet); Shift - fine', get = function() return state.shadehue or 0 end, set = function(v) state.shadehue = v end },
       { key = 'dimfocus', label = 'dim unfocused', kind = 'num', min = 0, max = 60, step = 2, fmt = '%d %%', desc = 'how much darker the modules without the keyboard focus are (0 = off; digits type the value)', get = function() return state.dimfocus or 0 end, set = function(v) state.dimfocus = v end },   -- 15 окт: слайдер
@@ -11732,7 +11736,7 @@ ctx = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'jumps', 'jrbg', 'rowjumps', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
+      { 'headers and mixer', { 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -12272,7 +12276,12 @@ ctx = {
     -- 16 окт: Surge XT — его патч (.fxp), загруженный из трекера; иначе — Init / свой
     if ctx.is_surge(f) and not t.take then
       local g = A.GetFXGUID(t.track, f.i)
-      local nm = ctx.surge_name[g or ''] or 'patches'
+      local nm = ctx.surge_name[g or '']
+      if not nm and g then   -- 20 окт: выбранный патч из трека (после рестарта)
+        local ok, v = reaper.GetSetMediaTrackInfo_String(t.track, 'P_EXT:jf_surge:' .. g, '', false)
+        if ok and v ~= '' then nm = v; ctx.surge_name[g] = v end
+      end
+      nm = nm or 'patches'
       return { name = nm, idx = 0, cnt = #ctx.surge_list(), none = false }
     end
     local idx, cnt = A.GetPresetIndex(t.track, f.i)
@@ -12545,6 +12554,7 @@ ctx = {
     if not nc then vim.msg = 'surge: its block was not found in the track'; return end
     edit.run('Surge patch ' .. e.name, function() reaper.SetTrackStateChunk(tr, nc, false) end)
     ctx.surge_name[g] = e.label
+    if g then reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_surge:' .. g, e.label, true) end   -- 20 окт: имя патча — в треке (переживает рестарт)
     model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
     vim.msg = 'Surge XT: ' .. e.label
   end,
@@ -17882,6 +17892,7 @@ local function frame()
   if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end
   pcall(ctx.master_peek_tick)   -- 20 окт: мастер складывается, когда курсор ушёл
   pcall(ctx.autozoom_tick)
+  pcall(ctx.autoname_tick)
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
@@ -24798,6 +24809,50 @@ ctx.master_jump = function()
   vim.msg = 'master (Opt+W): the cursor on the master columns' .. ((state.mfold or state.mfoldauto) and ' - it folds again when the cursor leaves' or '')
 end
 -- 20 окт: autozoom — курсор перешёл на другой трек: раскрыть его, ужать остальные (relayout)
+-- 20 окт: track autoname by patch / dsp instrument / item (опции, по умолчанию выкл): имя трека — от патча
+-- инструмента, самого инструмента или первого айтема (приоритет в этом порядке). Своё имя не трогаем: меняем,
+-- только если имя пустое или его поставил автоимя (P_EXT:jf_autoname); 2 раза в секунду
+ctx.autoname_t = 0
+ctx.autoname_tick = function()
+  if not (state.anpatch or state.aninst or state.anitem) then return end
+  local now = reaper.time_precise()
+  if now - ctx.autoname_t < 0.5 then return end
+  ctx.autoname_t = now
+  local function clean(n)
+    n = (n or ''):gsub('^[%w ]-i?: ', ''):gsub('%s*%b()%s*$', '')
+    return n
+  end
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, i)
+    local want
+    local ins = reaper.TrackFX_GetInstrument(tr)
+    if ins >= 0 and state.anpatch then
+      local g = reaper.TrackFX_GetFXGUID(tr, ins)
+      local nm = g and ctx.surge_name[g]
+      if not nm and g then local ok, v = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_surge:' .. g, '', false); if ok and v ~= '' then nm = v end end
+      if not nm then local ok, p = reaper.TrackFX_GetPreset(tr, ins, ''); if ok and p ~= '' then nm = p end end
+      if nm then want = nm:match('([^/]+)$'):gsub('%.fxp$', '') end
+    end
+    if not want and ins >= 0 and state.aninst then
+      local _, fn = reaper.TrackFX_GetFXName(tr, ins, '')
+      local _, rn = reaper.TrackFX_GetNamedConfigParm(tr, ins, 'renamed_name')
+      want = (rn and rn ~= '') and rn or clean(fn)
+    end
+    if not want and state.anitem and reaper.CountTrackMediaItems(tr) > 0 then
+      local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(tr, 0))
+      if tk then local _, tn = reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false); want = (tn or ''):gsub('%.%w+$', '') end
+    end
+    if want and want ~= '' then
+      local _, cur = reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
+      local _, auto = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_autoname', '', false)
+      if cur ~= want and (cur == '' or cur == auto) then
+        reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', want, true)
+        reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_autoname', want, true)
+        model.invalidate()
+      end
+    end
+  end
+end
 ctx.autozoom_tick = function()
   if not state.autozoom or not L then return end
   local f = L.flat[vim.cur.fi]
