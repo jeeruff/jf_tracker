@@ -11651,6 +11651,7 @@ ctx = {
       { label = 'install bundled fonts', kind = 'action', value = 'fonts/', desc = 'copies the pixel fonts that come with the tracker (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270) into your user fonts folder; authors and licences - fonts/README.md. A font not shown yet - restart REAPER', fn = function() vim.msg = ctx.fonts_install() end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
+      { key = 'kcfont', label = 'keycast font', kind = 'cycle', dropdown = true, values = (function() local v = { 'bitmap' }; for _, f in ipairs(ctx.MODEFONTS) do if f ~= 'off' then v[#v + 1] = f end end; return v end)(), desc = 'the font of the keycast (kcast): bitmap - the tracker font; any mode font (decorative); click - the list', get = function() return draw.kcfont or 'bitmap' end, set = function(v) ctx.kcfont_set(v) end, pick = function() ctx.kcfont_pick() end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
@@ -15214,6 +15215,20 @@ do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow'
 if reaper.GetExtState(EXT, 'hint_tabs15') ~= '1' then if state.hintpos == 'panes' then state.hintpos = 'tabs' end; reaper.SetExtState(EXT, 'hint_tabs15', '1', true) end   -- 15 окт: подсказки в строку вкладок — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
+-- 20 окт: шрифт keycast — bitmap (по умолчанию) или один из mode font; выбор — выпадашкой (options)
+draw.kcfont = (reaper.GetExtState(EXT, 'kcfont') ~= '' and reaper.GetExtState(EXT, 'kcfont')) or nil
+ctx.kcfont_set = function(v)
+  draw.kcfont = (v ~= 'bitmap' and v ~= 'off') and v or nil
+  reaper.SetExtState(EXT, 'kcfont', draw.kcfont or '', true)
+  vim.msg = 'keycast font: ' .. (draw.kcfont or 'bitmap')
+end
+ctx.kcfont_pick = function()
+  local items = { { key = 'b', label = (draw.kcfont and '' or '* ') .. 'bitmap (the tracker font)', fn = function() ctx.kcfont_set('bitmap') end } }
+  for _, f in ipairs(ctx.MODEFONTS) do
+    if f ~= 'off' then items[#items + 1] = { key = f:sub(1, 1):lower(), label = (draw.kcfont == f and '* ' or '') .. f, fn = function() ctx.kcfont_set(f) end } end
+  end
+  vim.open_hydra({ title = 'keycast font', items = items })
+end
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты

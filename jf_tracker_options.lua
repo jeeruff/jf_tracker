@@ -643,7 +643,7 @@ function O.draw(L, W, H)
   local lw, vw = L.cw * 22, L.cw * 12
   local dw = 0
   for _, it in ipairs(O.items) do
-    if it.kind == 'cycle' then
+    if it.kind == 'cycle' and not it.dropdown then   -- 20 окт: dropdown — значение и «v», ширину не раздувает
       local tot = 0
       for _, v in ipairs(it.values) do tot = tot + U.measure(tostring(v)) + 2 * L.pad + 2 end
       dw = math.max(dw, tot - vw)
@@ -891,7 +891,7 @@ function O.draw(L, W, H)
         local room = bx + bw - L.pad - vx
         local tot = 0
         for _, v in ipairs(it.values) do tot = tot + U.measure(tostring(v)) + 2 * L.pad + 2 end
-        if tot <= room then
+        if tot <= room and not it.dropdown then
           local cur = it.get()
           local x = vx
           for k, v in ipairs(it.values) do
@@ -907,7 +907,7 @@ function O.draw(L, W, H)
             x = x + w + 2
           end
         else
-          U.text(vx, y + 1, ctx.fit(vt, room), U.TEXT)
+          U.text(vx, y + 1, ctx.fit(vt .. (it.dropdown and '  v' or ''), room), U.TEXT)
         end
       elseif it.hk then
         -- хоткей (5 окт): модуль узкой колонкой, описание — своей колонкой до края

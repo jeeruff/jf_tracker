@@ -9532,8 +9532,18 @@ function D.frame(L, snap, rows, state, info)
           local y = yb - i * (krh + 2)
           if y < L.body_y then break end
           local lbl = e.label .. (e.n > 1 and (' x' .. e.n) or '')
-          local col = i == 0 and U.AMBER or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
-          text(kx1 - ms(lbl), y, fit(lbl, kx1 - kx0), col)
+          -- 20 окт: светлая тема — свежая клавиша основным (тёмным) текстом, янтарь на светлом не читался
+          local light = U.contrast(U.BG, { 0, 0, 0 }) > U.contrast(U.BG, { 1, 1, 1 })
+          local col = i == 0 and (light and U.TEXT or U.AMBER) or U.mix(U.TEXT, U.BG, math.min(0.8, 0.25 + age / 5))
+          if D.kcfont then
+            -- 20 окт: опция keycast font — свой шрифт (из mode font), высота строки keycast
+            gfx.setfont(5, D.kcfont, math.floor(krh * 1.1))
+            local lw = gfx.measurestr(lbl)
+            set(col); gfx.x, gfx.y = math.max(kx0, kx1 - lw), y - math.floor(krh * 0.05); gfx.drawstr(lbl)
+            gfx.setfont(D.font_id)
+          else
+            text(kx1 - ms(lbl), y, fit(lbl, kx1 - kx0), col)
+          end
           i = i + 1
         end
       end
