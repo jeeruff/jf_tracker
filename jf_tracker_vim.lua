@@ -2804,6 +2804,22 @@ function V.key_impl(c)
         else V.msg = 'dc: put the cursor on an automation column' end
         return
       end
+      -- 20 окт: dC — поле курсора (vol / delay / команда) очистить во всём треке (все подколонки, все регионы); ноты остаются
+      if p == 'd' and c == ('C'):byte() then
+        local f, fld = flat()[V.cur.fi], V.cur.field or 1
+        if not f or f.env or f.ml or fld < 2 then V.msg = 'dC: put the cursor on vol, delay or a command field'
+        else
+          local fa, fb = V.cur.fi, V.cur.fi
+          local function same(g) return g and g.col == f.col and not g.env and not g.ml end
+          while same(flat()[fa - 1]) do fa = fa - 1 end
+          while same(flat()[fb + 1]) do fb = fb + 1 end
+          local hs = V.heads_in(fa, fb, 0, math.max(0, ctx.snap().last_row or 0) + 1)
+          ctx.edit.run('clear field in the track', function() for _, h in ipairs(hs) do V.field_set(h, fld, nil) end end)
+          V.msg = ('dC: the field cleared on %d note(s) of the track'):format(#hs)
+          V.count = nil; finish_edit(); return
+        end
+        V.count = nil; finish_move(); return
+      end
       -- 13 окт: dw / dW внутри пустого MIDI-клипа (#) — удалить клип, как item
       if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
         local em = V.empty_midi_at(V.cur.fi, V.cur.row)
@@ -3509,7 +3525,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d row, nothing moves (3dd) | c automation column | w event | W whole item | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a e l j k h - to there | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d row, nothing moves (3dd) | c automation column | C the cursor field in the whole track | w event | W whole item | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a e l j k h - to there | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',

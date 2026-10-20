@@ -1141,5 +1141,10 @@ keysin('v'); eq('v again: whole track', V.vtrack, true); eq('field off', V.vfiel
 keysin('v'); eq('v third: off', V.mode, 'normal')
 V.cur.field = 1; keysin('v'); eq('v on a note: the subcolumn', V.vfield, nil); V.key(27)
 V.mode = 'normal'
+-- 20 окт: dC — поле курсора во всём треке (vol → 128 у каждой ноты трека), нота-поле — отказ
+reset(); V.cur = { fi = 1, row = 5, field = 2 }; local n0 = #calls; keysin('dC')
+local nv = 0; for i = n0 + 1, #calls do if calls[i]:match('^vol:') then nv = nv + 1 end end
+eq('dC clears vol of the track notes', nv > 0, true); eq('dC writes default 128', (calls[#calls] or ''):match(':128$') ~= nil, true)
+reset(); V.cur = { fi = 1, row = 0, field = 1 }; n0 = #calls; keysin('dC'); eq('dC on a note: nothing', #calls, n0)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
