@@ -19907,7 +19907,7 @@ local function frame()
   elseif type(hover.browser) == 'string' and hover.browser:match('^bm%d+$') then
     -- путь — во всплывашке у кнопки (5 окт), здесь только клавиши
     local i = tonumber(hover.browser:sub(3))
-    state.status = B.marks[i] and ('bookmark %d - click: go, Shift+click: set to this folder, Cmd+click: clear (key %d)'):format(i, i % 10)
+    state.status = B.marks[i] and ('bookmark %d - click: go, Shift+click: set to this folder, Opt+click: clear (key %d)'):format(i, i % 10)
       or ('bookmark %d empty - click: remember this folder (key %d)'):format(i, i % 10)
   elseif type(hover.browser) == 'string' and hover.browser:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(hover.browser:match('%d+'))]
@@ -25009,11 +25009,13 @@ end
 -- 20 окт: Shift+F в трекере — найти сэмпл для этого места: браузер db (база Media Explorer; нет — файлы) с поиском,
 -- курсор по списку слушает (preview on select), на канале — призрак: волна выбранного на её длину в строках;
 -- Enter — закончить набор, j k — выбрать (слушать), Enter — сэмпл на запомненное место (drop_to), Esc — отмена
-ctx.sample_find = function()
+ctx.sample_find = function(mode)
   local f = L and L.flat[vim.cur.fi]
   if not (f and f.col and not f.env and not f.ml) then vim.msg = 'sample find: put the cursor on a track column'; return end
   ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name }
-  if B.mode ~= 'db' and B.mode ~= 'files' then B.set_mode('db') end
+  -- 20 окт: Shift+F — база (Media Explorer), Shift+Opt+F — просто файлы (папка браузера)
+  local want = mode == 'files' and 'files' or 'db'
+  if B.mode ~= want then B.set_mode(want) end
   ctx.pane_focus('browser')
   B.start_find()
   vim.msg = ('sample find for %s @ %04d: type, Enter - done typing, j k - listen, Enter - put it there, Esc - cancel'):format(f.col.name ~= '' and f.col.name or 'track', vim.cur.row)

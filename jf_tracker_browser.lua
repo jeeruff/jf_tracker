@@ -795,7 +795,7 @@ function B.click(what)
   elseif what == 'mkdir' then if ctx.browser_mkdir_prompt then ctx.browser_mkdir_prompt() end
   elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
-    B.mark(tonumber(what:sub(3)), m.cmd and 'clear' or (m.shift and 'set' or nil))
+    B.mark(tonumber(what:sub(3)), m.alt and 'clear' or (m.shift and 'set' or nil))   -- 20 окт: Opt+клик — очистить (было Cmd)
   elseif what:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(what:match('%d+'))]
     if c then B.go(c.path) end
