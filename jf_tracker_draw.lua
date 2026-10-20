@@ -568,9 +568,13 @@ function D.layout(snap, state, nregions)
   -- линейка таймлайна между полосами регионов и номерами (3 окт, опция tlruler): метки REAPER
   -- на долях — beats (такт.доля), time (время), both
   local tlr = state.tlruler or 'off'
+  -- 20 окт: united stepruler — такт.доля в колонке номеров (beats там не нужен; both → только time)
+  L.united = state.unitedruler and true or false
+  if L.united and tlr == 'beats' then tlr = 'off' elseif L.united and tlr == 'both' then tlr = 'time' end
+  L.tlr = tlr
   L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
     or (tlr == 'both' and ms('999.4') + ms('0:00.000') + 2 * L.pad) or 0
-  L.num_w = ms('0000') + 2 * L.pad
+  L.num_w = math.max(ms('0000'), L.united and ms('999.4') or 0) + 2 * L.pad
   -- 13 окт: линейка (регионы / маркеры, прыжки) — слева от номеров или справа, у мастера (опция ruler side)
   L.ruler_right = state.rulerside == 'right' and L.rg_w > 0
   L.rl = L.ruler_right and L.jl_w or L.ruler_w   -- 13 окт: линейка прыжков всегда слева, у номеров;           -- что слева от номеров строк
@@ -7294,14 +7298,21 @@ function D.frame(L, snap, rows, state, info)
       -- 6 окт: кромки ещё раз после ячеек — серая ячейка курсора их закрывала
       if is_cur_row or r.row == cur then D.edge_lines = D.edge_lines or {}; D.edge_lines[#D.edge_lines + 1] = { lx, ly, W - lx, r.row == cur } end
     end
-    text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, is_cur_row and U.TEXT or ((r.acc or 5) <= 2 and D.EMPTY or U.GREY))   -- 15 окт: номер — яркостью акцента, как точки
+    -- 20 окт: united stepruler — на долях такт.доля (такт ярче), шаги под ней — номером чуть темнее
+    local ulab = L.united and (r.beat or r.bar) and not r.clip and info.tl_label and (info.tl_label(r.row))
+    if ulab then text(tx0 + L.rl + L.tl_w + L.pad, ty, ulab, (is_cur_row or r.bar) and U.TEXT or U.mix(U.TEXT, U.GREY, 0.5))
+    else
+      local nc = is_cur_row and U.TEXT or ((r.acc or 5) <= 2 and D.EMPTY or U.GREY)
+      if L.united and not is_cur_row then nc = U.mix(nc, U.BG, 0.2) end
+      text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, nc)   -- 15 окт: номер — яркостью акцента, как точки
+    end
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
     -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
     if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
       local b, t = info.tl_label(r.row)
       local tx = tx0 + L.rl + L.pad
       local tcol = r.bar and U.TEXT or U.GREY
-      local tlr = state.tlruler
+      local tlr = L.tlr or state.tlruler
       if tlr == 'beats' or tlr == 'both' then text(tx, ty, b, tcol); tx = tx + ms('999.4') + L.pad end
       if tlr == 'time' or tlr == 'both' then text(tx, ty, t, tlr == 'both' and U.GREY or tcol) end
     end
