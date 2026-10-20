@@ -408,10 +408,13 @@ end
 
 -- MIDI-item: ноты take → ячейки. Зацикленный item (B_LOOPSRC) разворачиваем:
 -- ноты повторяются через длину источника (в QN), пока не кончится item.
+local midi_n = 0   -- 20 окт: записей в кэше MIDI (сброс на 4000)
 local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   local guid = R.BR_GetMediaItemTakeGUID and R.BR_GetMediaItemTakeGUID(take) or tostring(take)
   local _, hash = R.MIDI_GetHash(take, false, '')
-  local key = guid .. '|' .. tostring(hash)
+  -- 20 окт: и где тейк на таймлайне (QN двух точек: позиция / offset / rate / темп) — хеш MIDI сдвиг item не меняет:
+  -- сдвинутый клип (вставка строки) отдавал ноты со старыми QN, они оказывались до начала item и пропадали
+  local key = guid .. '|' .. tostring(hash) .. ('|%.6f|%.6f'):format(R.MIDI_GetProjQNFromPPQPos(take, 0), R.MIDI_GetProjQNFromPPQPos(take, 9600))
   local notes = midi_cache[key]
   if not notes then
     local ok, buf = R.MIDI_GetAllEvts(take, '')
@@ -421,6 +424,9 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
       nt.qn = R.MIDI_GetProjQNFromPPQPos(take, nt.ppq)
       nt.qn_end = R.MIDI_GetProjQNFromPPQPos(take, nt.ppq_end)
     end
+    -- 20 окт: кэш не рос бесконечно (каждая правка / сдвиг — новый ключ)
+    midi_n = midi_n + 1
+    if midi_n > 4000 then for k in pairs(midi_cache) do midi_cache[k] = nil end; midi_n = 1 end
     midi_cache[key] = notes
   end
   local loop = R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1
