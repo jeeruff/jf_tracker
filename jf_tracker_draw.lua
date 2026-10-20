@@ -85,6 +85,8 @@ function D.init(u, peaks_fn, matrix)
   -- 15 окт: цвет режима — рамка поля и слово режима: NORMAL белый, INSERT красный, VISUAL янтарный, ввод команды голубой
   local function cp(c) return { c[1], c[2], c[3] } end   -- копия: своя запись в D.KEEP, не весь янтарь цветной в mono
   D.MODE_COL = { normal = { 1, 1, 1 }, insert = D.FOCUS_INS, visual = cp(U.AMBER), vline = nil, cmd = cp(U.CYAN), search = nil }
+  -- 20 окт: слово режима — читаемо к панели (светлые темы: белый NORMAL / KEYS пропадал — тянется к тёмному)
+  for k, c in pairs(D.MODE_COL) do if c then D.MODE_COL[k] = U.readable(c, U.PANEL, 4.5) end end
   D.MODE_COL.vline, D.MODE_COL.search = D.MODE_COL.visual, D.MODE_COL.cmd
   D.REC = cp(U.RED)                               -- 15 окт: O записи (rec, ^O) — красное и в mono
   D.ENVLINE = U.readable(U.CYAN, U.BG, 4.5)
@@ -3975,7 +3977,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local ds = tostring(p.octave or 4)
       lw = L.th + L.pad + math.max(D.big_measure(ds, 2), D.big_measure('9', 2)) + 2 * L.pad
       D.vtext(x + L.pad, ly, 2 * L.rh, 'oct', U.GREY, U.PANEL)
-      D.big_text(x + L.pad + L.th + L.pad, ly, ds, dim and U.GREY or U.AMBER, 2)
+      D.big_text(x + L.pad + L.th + L.pad, ly, ds, U.readable(dim and U.GREY or U.AMBER, U.PANEL, 4.5), 2)   -- 20 окт: читаемо и на светлых темах
     else
       text(x + L.pad, ly, lbl, dim and U.GREY or U.AMBER)
       text(x + L.pad, ly + L.rh, zx, U.GREY)
