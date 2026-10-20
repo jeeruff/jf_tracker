@@ -14038,6 +14038,7 @@ edit.inst_ref = function(it)
   local e = i and snap.pool and snap.pool[i]
   return e and e.item or nil
 end
+ctx.theme_list = function() return draw.themes.LIST end   -- 20 окт: :theme без аргумента — тот же список, что в меню (свои темы тоже)
 ctx.lpb = function() return state.lpb or 4 end   -- 15 окт: свойства — beatsync в строках
 SPROP.init(U, ctx)
 draw.tl_midi = ctx.tl_midi                                -- 13 окт: MIDI-клипы трека в дереве tracks
@@ -19245,6 +19246,11 @@ local function frame()
       if c.x and c.col then need = math.max(need, ctx.fx_stack(hover, c.col, c.x + 2, c.x + c.w - 2, y0 + 1, draw.fxrow_lines or 1, false, MAXL)) end
     end
     if need ~= (draw.fxrow_lines or 1) then draw.fxrow_lines = need; relayout() end
+    -- 20 окт: граница сложенного мастера — и через строку эффектов / линейку прыжков (они рисуются позже и её закрывали)
+    if L.mfold and draw.cols_edge then
+      local ex = draw.cols_edge(L)
+      if ex then U.set(U.LINE); gfx.rect(ex, L.fxrow_y, 1, L.body_y - L.fxrow_y, 1) end
+    end
   end
   -- session (7 окт) — 7 строк под шапками треков (шапки живые, тот же масштаб
   -- колонок), трекер виден ниже: строка подсказок и клипы. Tab — трекер ↔

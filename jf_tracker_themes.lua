@@ -3,7 +3,7 @@
 -- reaper (по умолчанию) — нативная палитра: цвета темы REAPER, ничего не
 -- подменяется. Остальные — для полноэкранной работы, где единство с REAPER
 -- не так важно, а эстетика — очень: modus vivendi / operandi (Протесилаос
--- Ставру), gruvbox dark, catppuccin mocha, mono — всё в оттенках серого,
+-- Ставру), solarized dark / light, gruvbox dark, catppuccin mocha, mono — всё в оттенках серого,
 -- кроме ячейки курсора; protracker — палитра ProTracker 2.
 --
 -- TH.apply(U, name) переписывает базовые цвета U (BG PANEL TEXT GREY DIM LINE
@@ -14,7 +14,7 @@
 
 local TH = {}
 
-TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'gruvbox', 'catppuccin', 'mono', 'protracker', 'impulse' }
+TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'solarized-dark', 'solarized-light', 'gruvbox', 'catppuccin', 'mono', 'protracker', 'impulse' }
 
 local function hex(s)
   local r, g, b = s:match('#?(%x%x)(%x%x)(%x%x)')
@@ -28,6 +28,13 @@ TH.PAL = {
     amber = '#fec43f', cyan = '#00d3d0', green = '#44bc44', red = '#ff5f59', hdr = '#303030', hdrsel = '#535353' },
   ['modus-operandi'] = { bg = '#ffffff', panel = '#f2f2f2', text = '#000000', grey = '#595959', dim = '#d0d0d0', line = '#9f9f9f',
     amber = '#884900', cyan = '#005e8b', green = '#006800', red = '#a60000', hdr = '#e0e0e0', hdrsel = '#c4c4c4' },
+  -- 20 окт: Solarized (Ethan Schoonover): base03..base3 и акценты как есть; текст на базу контрастнее канона
+  -- (base2 / base02 — правило 7:1), приглушённый — base1 / base01; светлая — акцент orange (yellow 3:1 не держит);
+  -- линии сетки — шаг от фона (своего тона в палитре нет)
+  ['solarized-dark'] = { bg = '#002b36', panel = '#073642', text = '#eee8d5', grey = '#93a1a1', dim = '#0d3f4b', line = '#586e75',
+    amber = '#b58900', cyan = '#2aa198', green = '#859900', red = '#dc322f', hdr = '#073642', hdrsel = '#1c4f5c' },
+  ['solarized-light'] = { bg = '#fdf6e3', panel = '#eee8d5', text = '#073642', grey = '#586e75', dim = '#e6dfca', line = '#93a1a1',
+    amber = '#cb4b16', cyan = '#2aa198', green = '#859900', red = '#dc322f', hdr = '#eee8d5', hdrsel = '#ddd6c1' },
   gruvbox = { bg = '#282828', panel = '#32302f', text = '#ebdbb2', grey = '#a89984', dim = '#3c3836', line = '#665c54',
     amber = '#fe8019', cyan = '#8ec07c', green = '#b8bb26', red = '#fb4934', hdr = '#3c3836', hdrsel = '#504945' },
   catppuccin = { bg = '#1e1e2e', panel = '#181825', text = '#cdd6f4', grey = '#a6adc8', dim = '#313244', line = '#585b70',
