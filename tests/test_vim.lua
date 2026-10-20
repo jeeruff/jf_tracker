@@ -165,7 +165,7 @@ local function reset()
     inst_rate = function(d) calls[#calls + 1] = 'rate:' .. d end,             -- 11 окт: Shift+Opt+H / L
     mcmd_set = function(row, text) calls[#calls + 1] = ('mcmd:%d:%s'):format(row, text) end,   -- 11 окт: колонка cmd мастера
     smart_open = function(p) calls[#calls + 1] = 'smart:' .. (p.title or ''); SMART_P = p; return true end,   -- 10 окт: zt
-    region_rows = function() return 0, 31 end,
+    region_rows = function() if RR then return RR[1], RR[2] end return 0, 31 end,
     matrix_move = function(dx, dy) calls[#calls + 1] = ('mx:%d,%d'):format(dx, dy) end,
     env_point_rows = function(e) return e.prows or {} end,
     envfmt = function() return TEST_ENVFMT or 'midi' end,
@@ -1155,5 +1155,13 @@ if hd then hd.delay = d0 end; E.retime = rt0
 -- 20 окт: auto capture — ^A на пустом поле команды ноты: команда ноты выше (kick 0PA0) +1
 reset(); V.cur = { fi = 1, row = 8, field = 4 }; V.key(1); eq('auto capture ^A', last(), 'fx:snare:0PA1')
 reset(); V.cur = { fi = 1, row = 8, field = 4 }; V.key(24); eq('auto capture ^X', last(), 'fx:snare:0P9F')
+-- 20 окт: gg proj/pat relative — в виде pattern gg / G на начало / конец паттерна (region_rows стаб 0..31 → 8..20)
+reset(); RR = { 8, 20 }
+V.cur = { fi = 1, row = 12, field = 1 }; keysin('gg'); eq('gg off: row 0', V.cur.row, 0)
+state.ggrel, state.view_reg = true, true
+V.cur = { fi = 1, row = 12, field = 1 }; keysin('gg'); eq('gg in pattern view: pattern start', V.cur.row, 8)
+keysin('G'); eq('G in pattern view: pattern end', V.cur.row, 20)
+state.view_reg = false; V.cur = { fi = 1, row = 12, field = 1 }; keysin('gg'); eq('gg in project view: row 0', V.cur.row, 0)
+state.ggrel = nil; RR = nil
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

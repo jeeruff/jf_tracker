@@ -668,7 +668,12 @@ function motion(c, n, op)
     local r = next_ev(cur.fi, bottom, -1)
     if not r then return nil end
     return { fi = cur.fi, row = event_end(cur.fi, r), linewise = true, exclusive = true }
-  elseif c == ('G'):byte() then return { fi = cur.fi, row = V.count and (n - 1) or last, linewise = true }
+  elseif c == ('G'):byte() then
+    -- 20 окт: gg proj/pat relative — в виде pattern G на последнюю строку паттерна
+    if not V.count and ctx.state.ggrel and ctx.state.view_reg and ctx.region_rows then
+      local _, r1 = ctx.region_rows(); if r1 then return { fi = cur.fi, row = r1, linewise = true } end
+    end
+    return { fi = cur.fi, row = V.count and (n - 1) or last, linewise = true }
   elseif c == ('{'):byte() or c == ('}'):byte() then
     local r = cur.row
     for _ = 1, n do
@@ -2596,6 +2601,10 @@ function V.key_impl(c)
       if c == ('g'):byte() then
         -- 10 окт: Ngg — строка N, как её подпись (0012 = 12gg); было N−1, как строки Vim с 1
         local t = { fi = V.cur.fi, row = V.count and n or 0, linewise = true }
+        -- 20 окт: опция gg proj/pat relative — в виде pattern gg ведёт на первую строку паттерна курсора
+        if not V.count and ctx.state.ggrel and ctx.state.view_reg and ctx.region_rows then
+          local r0 = ctx.region_rows(); if r0 then t.row = r0 end
+        end
         if V.op then
           local f0, f1, r0, r1 = range_or_event(V.op, t)
           local e = apply(V.op, f0, f1, r0, r1); V.op = nil; if e then finish_edit() else finish_move() end
