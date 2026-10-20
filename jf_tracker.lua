@@ -24565,11 +24565,17 @@ local function frame()
     -- debug: раз в 5 с — сводка jftop в лог (средние мс за кадр, по убыванию)
     ctx.jftop_logt = reaper.time_precise()
     local list = {}
-    for k, p in pairs(draw.prof) do list[#list + 1] = { k, p.ema, p.max } end
+    for k, p in pairs(draw.prof) do list[#list + 1] = { k, p.ema, p.max, p.kb or 0 } end
     table.sort(list, function(a, b) return a[2] > b[2] end)
     local parts = {}
     for i = 1, math.min(8, #list) do parts[#parts + 1] = ('%s %.2f (max %.1f)'):format(list[i][1], list[i][2], list[i][3]) end
     ctx.dlog('jftop ms/frame: ' .. table.concat(parts, ' | '))
+    -- 21 окт: и кто сорит — КБ на кадр по участкам, по убыванию
+    table.sort(list, function(a, b) return a[4] > b[4] end)
+    local kp, tot = {}, 0
+    for _, e in ipairs(list) do tot = tot + e[4] end
+    for i = 1, math.min(10, #list) do kp[#kp + 1] = ('%s %.0f'):format(list[i][1], list[i][4]) end
+    ctx.dlog(('jftop KB/frame %.0f: '):format(tot) .. table.concat(kp, ' | '))
   end
   local owner = reaper.GetExtState(EXT, 'owner')
   local taken = owner ~= '' and owner ~= MY_ID
@@ -24639,6 +24645,7 @@ frame = (function(inner)
   return function()
     local ok, e = xpcall(inner, debug.traceback)
     if ok then err_streak = 0; return end
+    collectgarbage('restart')   -- 21 окт: jftop останавливает сборщик на кадр — упавший кадр не оставляет его стоять
     err_streak = err_streak + 1
     local msg = tostring(e)
     if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg; pcall(ctx.dlog, 'ERROR ' .. msg) end

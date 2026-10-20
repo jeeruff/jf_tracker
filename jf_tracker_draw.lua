@@ -5235,19 +5235,25 @@ end
 -- участок и открывает новый, кадр делится на куски без пропусков; nil — закрыть.
 -- Пишет только при D.prof_on (открыт jftop или опция debug)
 D.prof, D.prof_on, D.prof_ord = {}, false, 0
-local pm_name, pm_t
+-- 21 окт: и память — сборщик стоит на время кадра (stop / restart), разница count между метками = КБ,
+-- выделенные участком (куча гуляла 310..540 МБ: ~0.5 МБ мусора за кадр — искать, кто)
+local pm_name, pm_t, pm_k
 function D.pmark(name)
-  if not D.prof_on then pm_name = nil; return end
+  if not D.prof_on then if pm_name then collectgarbage('restart') end; pm_name = nil; return end
   local t = reaper.time_precise()
+  local k = collectgarbage('count')
   if pm_name then
     local p = D.prof[pm_name]
-    if not p then D.prof_ord = D.prof_ord + 1; p = { n = 0, sum = 0, max = 0, ema = 0, ord = D.prof_ord }; D.prof[pm_name] = p end
+    if not p then D.prof_ord = D.prof_ord + 1; p = { n = 0, sum = 0, max = 0, ema = 0, kb = 0, ord = D.prof_ord }; D.prof[pm_name] = p end
     local dt = (t - pm_t) * 1000
     p.n = p.n + 1; p.sum = p.sum + dt; p.last = dt
     p.ema = p.n == 1 and dt or (p.ema * 0.95 + dt * 0.05)
+    local dk = math.max(0, k - pm_k)
+    p.kb = p.n == 1 and dk or (p.kb * 0.95 + dk * 0.05)
     if dt > p.max then p.max = dt end
-  end
-  pm_name, pm_t = name, t
+  elseif name then collectgarbage('stop') end
+  if not name then collectgarbage('restart') end
+  pm_name, pm_t, pm_k = name, t, collectgarbage('count')
 end
 
 -- шкала фейдера микшера (8 окт): амплитуда в степени 1/4 от +12 dB — верх
