@@ -208,7 +208,7 @@ local function place(lane, r0, r1, head, cont, tail, e1)
   if not sub and M.FOLD and r1 == r0 and head.kind == 'midi' and lane.subs[1] then
     for _, s in ipairs(lane.subs) do
       local c = s[r0]
-      if c then c.fold = c.fold or {}; c.fold[#c.fold + 1] = head; head.rows = 1; head.folded = true; return s end
+      if c then c.fold = c.fold or {}; c.fold[#c.fold + 1] = head; head.rows = 1; head.folded = true; lane.has_fold = true; return s end   -- 20 окт: has_fold — колонка +N только этому лейну
     end
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end

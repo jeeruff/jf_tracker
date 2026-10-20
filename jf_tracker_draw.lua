@@ -453,6 +453,18 @@ function D.layout(snap, state, nregions)
   -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево.
   -- L.kitG(G) — кит-вариант любой раскладки с полем слайса (обычная, уровни ширины GL), кэш на раскладку
   L.GKc = setmetatable({}, { __mode = 'k' })
+  -- 20 окт: лейн без сложенных нот — без колонки fold (место не резервируется); кэш на раскладку
+  L.GFc = setmetatable({}, { __mode = 'k' })
+  function L.nofoldG(G)
+    G = G or L
+    if not (G.x_fold and G.sub_w and G.x_fold < G.sub_w) then return G end
+    local k = L.GFc[G]
+    if not k then
+      k = setmetatable({ x_fold = false, sub_w = G.sub_w - (L.w_fold + 2 * L.pad) }, { __index = G })
+      L.GFc[G] = k
+    end
+    return k
+  end
   function L.kitG(G)
     G = G or L
     if not G.x_slc or G.notes_only then return G end
@@ -823,6 +835,7 @@ function D.layout(snap, state, nregions)
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
+          if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
