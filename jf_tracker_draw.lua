@@ -5871,6 +5871,9 @@ function D.frame(L, snap, rows, state, info)
         -- 16 окт: ø — просто буква, без кнопки-фона
         if b[4] == 'phase' then
           local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          -- 20 окт: в рамке, как соседние кнопки (включена — янтарная рамка)
+          set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
+          set((hot or on) and U.AMBER or U.DIM); gfx.rect(x, by, bwk, bh, 0)
           text(x + math.floor((bwk - ms('ø')) / 2), tyc, 'ø', (hot or on) and U.AMBER or BTXT)
           if hot then hover.trkio = { col = col, what = 'phase' } end
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
@@ -5880,6 +5883,8 @@ function D.frame(L, snap, rows, state, info)
         -- (≈ — будущий знак модуляции)
         if b[4] == 'auto' then
           local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)   -- 20 окт: в рамке
+          set(hot and U.AMBER or (env_shown and U.CYAN or U.DIM)); gfx.rect(x, by, bwk, bh, 0)
           text(x + math.floor((bwk - ms('~')) / 2), tyc, '~', hot and U.AMBER or (on and (env_shown and U.CYAN or U.TEXT) or U.GREY))
           if hot then hover.btn = { col = col, what = 'auto' } end
           hint('btn', x, by, bwk, bh + 2, { col = col, what = 'auto' })
@@ -5927,10 +5932,10 @@ function D.frame(L, snap, rows, state, info)
       local gap = L.pad
       -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
-      trim_w = ms('~') + 4; trim_x = c.x + c.w - L.pad - trim_w   -- 18 окт: ~ — знак, по своей ширине
+      trim_w = math.max(ms('~'), ms('ø')) + 7; trim_x = c.x + c.w - L.pad - trim_w   -- 20 окт: ~ и ø — в рамке, чуть шире
       local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
       by = by - 1
-      local phw = ms('ø') + 4
+      local phw = math.max(ms('~'), ms('ø')) + 7
       local ph_x = trim_x - 1 - phw
       -- 18 окт: узкий трек — r i m s сжимаются (до ширины буквы), чтобы /// влезли в первую строку
       do
@@ -5993,9 +5998,12 @@ function D.frame(L, snap, rows, state, info)
               local yy = ry + 2 + (i - 1) * seg
               x0, y0, x1, y1 = rx + 3, yy + seg - 2, rx + rw - 6, yy + 2
             else
-              local xx = rx + 2 + (i - 1) * seg
-              local sl = math.max(2, math.min(seg - 4, math.floor(seg * 0.45)))
-              x0, y0, x1, y1 = xx + 1, ry + rhh - 3, xx + 1 + sl, ry + 2
+              -- 20 окт: плотно — шаг = наклон + толщина + 1 px, тройка по центру рамки
+              local sl = math.max(2, math.floor((rhh - 5) * 0.45))
+              local step = sl + 4
+              while step > 4 and 3 * step + 1 > rw - 4 do step = step - 1; sl = math.max(2, step - 4) end
+              local xx = rx + math.floor((rw - (3 * step - 1)) / 2) + (i - 1) * step
+              x0, y0, x1, y1 = xx, ry + rhh - 3, xx + sl, ry + 2
             end
             if x1 > x0 then for t = 0, 2 do gfx.line(x0 + t, y0, x1 + t, y1) end end
           end
@@ -6026,7 +6034,7 @@ function D.frame(L, snap, rows, state, info)
         local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad)
         local lim = mixcol and (c.x + c.w - 1) or (ph_x - L.pad)
         local sw0 = ms(D.sroslash and '///' or 'sro') + 4               -- 16 окт: по настоящей ширине (было по заглавным SRO — не влезало между s и ø)
-        local rw = math.max(sw0, math.min(2 * sw0, lim - rx))   -- 12 окт: SRO шире, сколько влезает
+        local rw = D.sroslash ~= false and sw0 or math.max(sw0, math.min(2 * sw0, lim - rx))   -- 12 окт: SRO шире, сколько влезает; 20 окт: /// — плотно, не растягивать
         if not D.sro_col and rx + rw <= lim then sro(rx, by, rw, bhh, false)
         elseif not D.sro_col then
           -- 16 окт: вторая строка — ø под p (панорама), за ним sro; ~ — у правого края (draw_rest)
