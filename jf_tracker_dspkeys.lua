@@ -36,7 +36,7 @@ local HINT = {
   d = 'd: d delete fx (v: range) | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | Esc',
-  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | Esc',
+  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | F take fx on the note | Esc',
 }
 function DK.pending_hint() return DK.pending and HINT[DK.pending] or nil end
 

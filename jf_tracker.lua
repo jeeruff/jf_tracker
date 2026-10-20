@@ -2225,7 +2225,7 @@ ctx = {
         if pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
       end
     end)
-    vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'daw' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
+    vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'dT' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
   end,
   -- 17 окт: da + что — трек курсора в песне (=START..=END; lib за =LIB цела): e — вся автоматизация (точки и
@@ -6094,7 +6094,7 @@ ctx = {
     vim.open_hydra({ title = 'human - every inserted note a little different', items = {
       { key = '0', label = 'off' .. mark(0), fn = set(0) }, { key = '1', label = '25 %' .. mark(25), fn = set(25) },
       { key = '2', label = '50 %' .. mark(50), fn = set(50) }, { key = '4', label = '100 %' .. mark(100), fn = set(100) },
-      { key = 'h', label = 'humanizer - ranges, dsp variation points (gH)', fn = function() ctx.pane_focus('humanizer') end } } })
+      { key = 'h', label = 'humanizer - ranges, dsp variation points (Ctrl+W g H)', fn = function() ctx.pane_focus('humanizer') end } } })
     state.popup_at = { kind = 'strip', id = 'human' }
   end,
   ins_menu = function()
@@ -8923,6 +8923,7 @@ ctx = {
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
       -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
+      { key = 'm', label = 'minimize the pane (zm)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
     }
     if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops (dev): the cells show item loop periods, digits+Enter - loop N steps' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
     vim.open_hydra({ title = 'matrix view (z)', items = items })
@@ -16035,7 +16036,7 @@ function ctx.context_items(hover)
     end
     items[#items + 1] = { 'Bounce the notes to audio (selection / note / track in the region)', function() ctx.rd_notes() end, key = 'b', g = 'bounce' }
     items[#items + 1] = { 'Instrument of the track to a sampler …', function() ctx.rd_open('sampler') end, key = 's', g = 'bounce' }
-    items[#items + 1] = { 'Bouncer pane (gB)', function() ctx.rd_open() end, key = 'p', g = 'bounce' }
+    items[#items + 1] = { 'Bouncer pane (Ctrl+W g B)', function() ctx.rd_open() end, key = 'p', g = 'bounce' }
   elseif hover.matrix then
     -- 10 окт: пустое место матрицы — её собственное меню (раньше общий «view»)
     add('New slot at the end (+)', function() ctx.mx_add() end, '+')
@@ -20066,7 +20067,7 @@ local function frame()
     else state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick or click the waveform: item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
     end
   elseif hover.matrix and hover.matrix.btn then
-    state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
+    state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (z f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
   elseif hover.matrix and hover.matrix.ri then
     local slot = seq[hover.matrix.ri]
     local pname = slot and (slot.name ~= '' and slot.name or ('#' .. slot.idx)) or ''
@@ -24016,7 +24017,7 @@ local function frame()
     if m.ctrl then
       -- 10 окт: Ctrl+Tab по вкладкам — пока выключен (возвращал спрятанные панели и сыпал ими);
       -- вкладку — щелчком, F2-F6 или Ctrl+W + буква
-      vim.msg = 'Ctrl+Tab: off for now - click a tab, F2-F6 or Ctrl+W + panel letter'
+      vim.msg = 'Ctrl+Tab: off - Tab (next tab), gt, F4 or Ctrl+W + panel letter'
     elseif m.alt then
       ctx.toggle_focus(back and -1 or 1)
       vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
@@ -24412,6 +24413,7 @@ local function frame()
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
+          if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'f' then   -- 16 окт: zf — модули со страницами (Surge): все сразу ↔ по одной, вкладки справа
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
@@ -24420,7 +24422,7 @@ local function frame()
           end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages, s - pad size (s m l)'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
