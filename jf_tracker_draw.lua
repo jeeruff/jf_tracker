@@ -8244,7 +8244,7 @@ function D.frame(L, snap, rows, state, info)
           set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
           local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (flash and U.BG or (lit and U.AMBER or U.TEXT))
           if b[2] == 'delta' then
-            -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»
+            -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»; слот 5 — только её (20 окт: kcast 8, тема 9)
             local th = math.max(8, math.min(L.rh + 2, math.floor(TH() * 1.45)))   -- 20 окт: крупнее (∆ Menlo мелкий — не видно)
             if D.menlo_th ~= th then gfx.setfont(5, 'Menlo', th); D.menlo_th = th else gfx.setfont(5) end   -- шрифт с именем — один раз на размер
             local gw2 = gfx.measurestr('∆')
@@ -9546,9 +9546,9 @@ function D.frame(L, snap, rows, state, info)
             -- 20 окт: опция keycast font — свой шрифт (из mode font), высота строки keycast
             -- длинное слово — мельче, пока не влезет в зону (до полувысоты), потом — обрезка по символам
             local px = math.floor(krh * 1.1)
-            gfx.setfont(5, D.kcfont, px)
+            gfx.setfont(8, D.kcfont, px)   -- 20 окт: свой слот 8 — слот 5 кэширует Menlo для ∆ (kcast портил его: огромная ∆)
             local lw = gfx.measurestr(lbl)
-            while lw > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(5, D.kcfont, px); lw = gfx.measurestr(lbl) end
+            while lw > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(8, D.kcfont, px); lw = gfx.measurestr(lbl) end
             while lw > kx1 - kx0 and #lbl > 1 do lbl = lbl:sub(1, (utf8.offset(lbl, -1) or #lbl) - 1); lw = gfx.measurestr(lbl) end
             set(col); gfx.x, gfx.y = kx1 - lw, y + math.floor((krh - gfx.texth) / 2); gfx.drawstr(lbl)
             gfx.setfont(D.font_id)

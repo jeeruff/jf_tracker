@@ -84,7 +84,7 @@ local function font_img(fonts, pw, ph)
   for i, f in ipairs(fonts) do
     local y = (i - 1) * ph
     if f.face then
-      gfx.setfont(5, f.face, f.size); C(U.TEXT)
+      gfx.setfont(9, f.face, f.size); C(U.TEXT)
       gfx.x, gfx.y = 4, y + math.floor((ph - gfx.texth) / 2)
       gfx.drawstr(f.key .. '   C-4 01 7F  Abc 0123')
     else
@@ -206,7 +206,7 @@ function TT.draw(x, y, w, h, emb)
         C((nm == curm) and U.AMBER or U.LINE); gfx.rect(cx, cy, pw, mh, 0)
         if nm == 'off' then text(cx + pad, cy + 2, 'off - tracker font', U.GREY)
         else
-          gfx.setfont(5, nm, math.floor(2 * L.th * (ctx.mode_scale and ctx.mode_scale(nm) or 1)))
+          gfx.setfont(9, nm, math.floor(2 * L.th * (ctx.mode_scale and ctx.mode_scale(nm) or 1)))
           local wd = ctx.mode_word and ctx.mode_word(nm) or 'INSERT'   -- 15 окт: письменность — своим словом (插入, إدراج, ВСТАВКА, pIqaD)
           C(U.AMBER); gfx.x, gfx.y = cx + pad, cy + 1; gfx.drawstr(wd)
           local iw = gfx.measurestr(wd .. ' ')
