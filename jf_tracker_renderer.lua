@@ -164,7 +164,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
   if p.mode and yy + rh <= y + h then
     local pl = RD.plan(p)
     local tot = pl[#pl] and pl[#pl].t1 or 0
-    U.text(x + pad, yy, ('%d sample(s), %.0f s of audio, one RS5K each'):format(#pl, tot), U.DIM)
+    U.text(x + pad, yy, ('%d sample(s), %.0f s of audio, an RS5K each in one container'):format(#pl, tot), U.DIM)
     yy = yy + rh
   end
   if yy + rh + 2 <= y + h then

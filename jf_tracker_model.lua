@@ -1512,9 +1512,12 @@ function build_one(tr, fx, out)
       -- слайсов и свойства выбранного (draw.kit_sel), а не колонка на каждого
       local kit = #kids > 1
       for _, kid in ipairs(kids) do if not (kid.entry and kid.entry.rs5k) then kit = false; break end end
+      -- 20 окт: мультисэмпл bouncer («multisample …») — не кит: ноты хроматикой, RS5K по зонам и слоям velocity
+      local multi = short:lower():find('^multisample') ~= nil
+      if multi then kit = false end
       -- 16 окт: drumrs5k — пэд и подконтейнером [RS5K, эффекты пэда]; у пэда — его RS5K,
       -- файл, кусок a..b (доли файла), нота и категории эффектов (слоты)
-      if M.DR and M.DR.is_rack(kids) then
+      if not multi and M.DR and M.DR.is_rack(kids) then
         kit = true
         local chi = M.choke_fx(A, tr)
         for _, kid in ipairs(kids) do

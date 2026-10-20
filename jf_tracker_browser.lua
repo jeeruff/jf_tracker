@@ -1030,11 +1030,12 @@ function B.key(c)
       else local e = B.entries[B.cur]; if e and not e.dir and not e.pm and not e.db and not e.kit then fs[1] = B.full(e) end end
       return #fs > 0 and ctx.drum_browser_enter(fs)
     end)() then
+  elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
   elseif ch == ' ' then B.preview()
-  elseif c == 9 or c == 27 then ctx.toggle_focus()
+  elseif c == 9 or c == 27 then if c == 27 and ctx.sf_target then ctx.sf_target = nil; if ctx.msg then ctx.msg('sample find: cancelled') end end; ctx.toggle_focus()
   else return false end
   return true
 end

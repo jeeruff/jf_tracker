@@ -18477,6 +18477,7 @@ local function frame()
       local info2 = S and { n = #S.heads, target = S.code or 'vol' } or (ctx.rf_lastvis and { n = #vim.heads_in(ctx.rf_lastvis[1], ctx.rf_lastvis[2], ctx.rf_lastvis[3], ctx.rf_lastvis[4]), target = 'vol', pending = true }) or nil
       return ctx.RF.draw(U, Lx, ctx.rf_p, info2, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y)
     end,
+    sf_ghost = ctx.sf_ghost, file_peaks = ctx.file_peaks,   -- 20 окт: призрак Shift+F
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
@@ -24643,7 +24644,8 @@ ctx.rd_inst_name = function(tr)
   if ins < 0 then return nil, -1 end
   local _, rn = reaper.TrackFX_GetNamedConfigParm(tr, ins, 'renamed_name')
   local _, fn = reaper.TrackFX_GetFXName(tr, ins, '')
-  local nm = (rn and rn ~= '') and rn or (fn or ''):gsub('^[%w ]-i?: ', ''):gsub('%s*%b()%s*$', '')
+  local nm = (rn and rn ~= '') and rn or (fn or ''):gsub('^[%w ]-i?: ', '')
+  while nm:find('%s*%b()%s*$') do nm = nm:gsub('%s*%b()%s*$', '') end   -- 20 окт: «Surge XT (Surge Synth Team)» → Surge XT
   return nm, ins
 end
 -- копия трека без items (FX и маршрутизация — те же) сразу после него; выделения сохранены снаружи
@@ -24743,9 +24745,15 @@ ctx.rd_sampler = function()
     if not path or path == '' then back(); return end
     reaper.GetSetMediaTrackInfo_String(d, 'P_NAME', inst .. ' sampled', true)
     local function nrm(v) return math.max(0, math.min(1, (v + 80) / 160)) end
-    for _, e in ipairs(plan) do
-      local fx = reaper.TrackFX_AddByName(d, 'ReaSamplOmatic5000 (Cockos)', false, -1)
-      if fx >= 0 then
+    -- 20 окт: все RS5K — в одном контейнере «multisample <инструмент>» параллельно (было — десятки инструментов в lib)
+    local c = reaper.TrackFX_AddByName(d, 'Container', false, -1)
+    if not c or c < 0 then back(); return end
+    reaper.TrackFX_SetNamedConfigParm(d, c, 'renamed_name', 'multisample ' .. inst)
+    for k, e in ipairs(plan) do
+      local fx = 0x2000000 + k * (reaper.TrackFX_GetCount(d) + 1) + (c + 1)   -- адрес k-го ребёнка (REAPER 7)
+      local idx = reaper.TrackFX_AddByName(d, 'ReaSamplOmatic5000 (Cockos)', false, -1000 - fx)
+      if idx and idx >= 0 then
+        if k > 1 then reaper.TrackFX_SetNamedConfigParm(d, fx, 'parallel', '1') end
         reaper.TrackFX_SetNamedConfigParm(d, fx, 'FILE0', path); reaper.TrackFX_SetNamedConfigParm(d, fx, 'DONE', '')
         reaper.TrackFX_SetNamedConfigParm(d, fx, 'MODE', '2')                     -- note: высота от корня
         reaper.TrackFX_SetNamedConfigParm(d, fx, 'renamed_name', ('%s v%d'):format(ctx.RD.nname(e.note), e.vel))
@@ -24997,6 +25005,62 @@ ctx.rg_head_menu = function()
   for _, a in ipairs(region_actions(rg)) do if a.key then items[#items + 1] = { key = a.key, label = (a[1]:gsub('^!', '')), fn = a.fn } end end
   vim.open_hydra({ title = 'pattern ' .. tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), items = items })
   state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
+-- 20 окт: Shift+F в трекере — найти сэмпл для этого места: браузер db (база Media Explorer; нет — файлы) с поиском,
+-- курсор по списку слушает (preview on select), на канале — призрак: волна выбранного на её длину в строках;
+-- Enter — закончить набор, j k — выбрать (слушать), Enter — сэмпл на запомненное место (drop_to), Esc — отмена
+ctx.sample_find = function()
+  local f = L and L.flat[vim.cur.fi]
+  if not (f and f.col and not f.env and not f.ml) then vim.msg = 'sample find: put the cursor on a track column'; return end
+  ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name }
+  if B.mode ~= 'db' and B.mode ~= 'files' then B.set_mode('db') end
+  ctx.pane_focus('browser')
+  B.start_find()
+  vim.msg = ('sample find for %s @ %04d: type, Enter - done typing, j k - listen, Enter - put it there, Esc - cancel'):format(f.col.name ~= '' and f.col.name or 'track', vim.cur.row)
+end
+ctx.sf_path = function()
+  local e = B.entries and B.entries[B.cur]
+  if not e or e.dir or e.db or e.pm or e.trk or e.rgn or e.mark or e.kit or e.preset or e.prdir or e.empty then return nil end
+  local p = B.full(e)
+  if not p or p == '' then return nil end
+  local ext = (p:match('%.(%w+)$') or ''):lower()
+  if not ({ wav = 1, aif = 1, aiff = 1, flac = 1, mp3 = 1, ogg = 1, wv = 1, opus = 1, m4a = 1 })[ext] then return nil end
+  return p
+end
+ctx.sf_enter = function()
+  local t = ctx.sf_target
+  if not t then return false end
+  local p = ctx.sf_path()
+  if not p then return false end
+  local fi = t.fi
+  local f = L.flat[fi]
+  if not (f and f.col and f.col.guid == t.guid) then
+    fi = nil
+    for i, g in ipairs(L.flat) do if g.col and g.col.guid == t.guid and not g.env and not g.ml then fi = i; break end end
+  end
+  ctx.sf_target = nil
+  if not fi then vim.msg = 'sample find: the track is gone'; return true end
+  ctx.drop_to(fi, t.row, p)
+  vim.cur.fi, vim.cur.row = fi, t.row
+  ctx.set_focus('tracker')
+  return true
+end
+ctx.sf_len = {}
+ctx.sf_ghost = function()
+  local t = ctx.sf_target
+  if not t then return nil end
+  local p = ctx.sf_path()
+  if not p then return { fi = t.fi, row = t.row, rows = 1, name = '?' } end
+  local len = ctx.sf_len[p]
+  if len == nil then
+    local src = reaper.PCM_Source_CreateFromFile(p)
+    len = src and reaper.GetMediaSourceLength(src) or 0
+    if src then reaper.PCM_Source_Destroy(src) end
+    ctx.sf_len[p] = len
+  end
+  local t0 = edit.row_time(t.row, state.lpb, 0)
+  local rows = math.max(1, math.floor((reaper.TimeMap2_timeToQN(0, t0 + len) - reaper.TimeMap2_timeToQN(0, t0)) * state.lpb + 0.5))
+  return { fi = t.fi, row = t.row, rows = rows, path = p, name = p:match('[^/]+$') or p }
 end
 ctx.autozoom_toggle = function()
   state.autozoom = not state.autozoom or nil

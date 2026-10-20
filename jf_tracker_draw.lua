@@ -5607,6 +5607,40 @@ end
 
 -- 17 окт: сложенный мастер — шапка M и кнопка (развернуть), в теле стерео-метр L R во всю высоту и красная полоса
 -- подавления сверху (максимум GainReduction_dB среди эффектов мастера: ReaComp, ReaLimit, плагины с этим полем)
+-- 20 окт: Shift+F — что встанет на место: рамка на длину сэмпла в строках, волна сверху вниз (время — вниз), имя
+function D.sf_draw(L, info, state)
+  local g = info.sf_ghost and info.sf_ghost()
+  if not g then return end
+  local f = L.flat[g.fi]
+  if not (f and f.x and f.w) then return end
+  local row0 = state.row0 or 0
+  local y0 = L.body_y + (g.row - row0) * L.rh
+  local y1 = y0 + g.rows * L.rh
+  local top, bot = math.max(L.body_y, y0), math.min(L.body_y + L.body_h, y1)
+  if bot <= top then return end
+  local x, w = f.x + 1, f.w - 2
+  local keep = D.clip; D.clip = { x, x + w }
+  gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.14); gfx.rect(x, top, w, bot - top, 1); gfx.a = 1
+  if g.path and info.file_peaks then
+    local n = math.max(2, math.floor((y1 - y0) / 2))
+    local pk = info.file_peaks(g.path, n)
+    if pk and pk.n and pk.n > 0 then
+      local cx, hw = x + math.floor(w / 2), math.floor(w / 2) - 2
+      set(U.mix(U.AMBER, U.BG, 0.25))
+      for yy = top, bot - 1 do
+        local i = math.floor((yy - y0) / math.max(1, y1 - y0) * pk.n) + 1
+        local a, b = pk.min[i] or 0, pk.max[i] or 0
+        gfx.line(cx + a * hw, yy, cx + b * hw, yy)
+      end
+    end
+  end
+  set(U.AMBER); gfx.rect(x, top, w, bot - top, 0)
+  if y0 >= L.body_y then
+    set(U.BG); gfx.rect(x + 1, y0 + 1, math.min(w - 2, ms(g.name) + 2 * L.pad), L.rh - 1, 1)
+    text(x + L.pad, y0 + 1, g.name, U.AMBER)
+  end
+  D.clip = keep
+end
 function D.mfold_draw(L, snap, hover)
   if not (L.mfold and snap.master and snap.master.track) then return end
   local tr = snap.master.track
@@ -7470,6 +7504,7 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
+  D.sf_draw(L, info, state)      -- 20 окт: Shift+F — призрак сэмпла на месте вставки
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil

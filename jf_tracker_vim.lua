@@ -3061,7 +3061,7 @@ function V.key_impl(c)
   elseif ch == ']' then V.octave = math.min(8, V.octave + n)
   elseif ch == '(' then ctx.pool_select(V.inst - n)
   elseif ch == ')' then ctx.pool_select(V.inst + n)
-  elseif ch == 'F' then st.follow = not st.follow
+  elseif ch == 'F' then if ctx.sample_find then ctx.sample_find() else st.follow = not st.follow end   -- 20 окт: Shift+F — найти сэмпл для этого места (follow — кнопкой / опцией)
   elseif ch == ' ' then E.play_stop()
   elseif c == ENTER and ctx.mods and ctx.mods().shift and ctx.describe_cell then
     -- Shift+Enter (3 окт): что именно под курсором — исходник, номер, слайс, кусок файла
