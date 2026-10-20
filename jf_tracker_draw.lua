@@ -4841,17 +4841,20 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local tins = info.track_insts and info.track_insts(col) or {}
   -- 10 окт: инструменты — все проектные: свои (трека курсора) с номерами, чужие — с именем трека,
   -- щелчок переводит курсор на тот трек; automation и midi — своими секциями, как instruments
-  local others = {}
+  -- 20 окт: порядок — по трекам проекта, постоянный (свои больше не поднимаются наверх: список дёргался при смене трека)
+  local inst_rows, own_done = {}, false
+  local function add_own() for k, fi in ipairs(tins) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end; own_done = true end
   if info.track_insts then
     for _, c in ipairs(info.cols or {}) do
-      if c ~= col and c.track ~= (col and col.track) then
-        for _, fi in ipairs(info.track_insts(c)) do others[#others + 1] = { instfx = fi.fx, name = fi.name, kind = c.name or fi.kind, col = c } end
+      if c == col or c.track == (col and col.track) then if not own_done then add_own() end
+      else
+        for _, fi in ipairs(info.track_insts(c)) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = c.name or fi.kind, col = c } end
       end
     end
   end
-  if #tins + #others > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
-  for k, fi in ipairs(tins) do rows[#rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end
-  for _, o in ipairs(others) do rows[#rows + 1] = o end
+  if not own_done then add_own() end
+  if #inst_rows > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
+  for _, o in ipairs(inst_rows) do rows[#rows + 1] = o end
   rows[#rows + 1] = { hdr = 'automation', name = '' }
   rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент (5 окт)
   rows[#rows + 1] = { hdr = 'midi', name = '' }
