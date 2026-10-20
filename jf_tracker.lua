@@ -24788,6 +24788,15 @@ ctx.rd_render = function()
   if p.mode then ctx.rd_sampler() else ctx.rd_notes() end
 end
 ctx.rd_info = function()
+  -- 20 окт: кэш на кадр (снимок, курсор, режим, выделение) — без него каждый кадр перебирались ноты трека в регионе
+  local a = vim.anchor
+  local key = tostring(snap) .. '|' .. vim.cur.fi .. ':' .. vim.cur.row .. '|' .. vim.mode .. '|' .. (a and (a.fi .. ':' .. a.row) or '') .. '|' .. tostring(ctx.rd_load().mode)
+  if ctx.rd_ic and ctx.rd_ic.key == key then return ctx.rd_ic.v end
+  local v = ctx.rd_info0()
+  ctx.rd_ic = { key = key, v = v }
+  return v
+end
+ctx.rd_info0 = function()
   local col = cur_col()
   local inst = col and col.track and ctx.rd_inst_name(col.track)
   local n = 0

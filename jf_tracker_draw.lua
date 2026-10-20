@@ -5845,7 +5845,14 @@ function D.frame(L, snap, rows, state, info)
       local k = L.hname_k or 1
       if k > 1 then
         local s, aw = nm, c.w - 2 * L.pad - indent
-        while #s > 1 and D.big_measure(s, k) > aw do s = s:sub(1, -2) end
+        local bk = nm .. '|' .. aw .. '|' .. k                          -- 20 окт: обрезка по ширине — кэш (не мерить каждый кадр)
+        D.bign = D.bign or {}
+        if D.bign[bk] then s = D.bign[bk]
+        else
+          while #s > 1 and D.big_measure(s, k) > aw do s = s:sub(1, -2) end
+          D.bign_n = (D.bign_n or 0) + 1; if D.bign_n > 500 then D.bign, D.bign_n = {}, 0 end
+          D.bign[bk] = s
+        end
         D.big_text(c.x + L.pad + indent, hy - HX + 1, s, ncol, k)
       else text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent), ncol) end
     else

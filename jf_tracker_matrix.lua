@@ -878,7 +878,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           local rgb = g.ev[1] and g.ev[1].rgb or U.TEXT   -- схема в цвете первого item
           -- 20 окт: тёмный цвет трека (bass) на тёмном фоне не виден, короткая нота — 3x1 px: цвет читаемый,
           -- черта не уже четверти клетки и в 2 px
-          if U.readable then rgb = U.readable(rgb, U.BG, 3) end
+          if U.readable then   -- 20 окт: кэш по таблице цвета (клеток десятки на кадр)
+            MX.rdc = MX.rdc or setmetatable({}, { __mode = 'k' })
+            local r2 = MX.rdc[rgb]
+            if not r2 or MX.rdc_bg ~= U.BG then if MX.rdc_bg ~= U.BG then MX.rdc = setmetatable({}, { __mode = 'k' }); MX.rdc_bg = U.BG end; r2 = U.readable(rgb, U.BG, 3); MX.rdc[rgb] = r2 end
+            rgb = r2
+          end
           for k = 1, 4 do
             if q[k] > 0 then
               local ly = y + 2 + math.floor((k - 0.5) * gap)
