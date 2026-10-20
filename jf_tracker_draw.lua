@@ -9529,6 +9529,10 @@ function D.frame(L, snap, rows, state, info)
       else D.SCALE = kcs end
     end
     local krh = TH() + 2
+    -- 20 окт: справа нет места (треки во всю ширину, сложенный мастер) — поверх правых треков на подложке
+    -- (было: зона уже 6 знаков — keycast молча не рисовался, «невидим» в solarized)
+    local kback = false
+    if kx1 - kx0 < L.cw * 10 then kx0 = math.max((L.cols[1].x or 0) + L.cw * 4, kx1 - L.cw * 18); kback = true end
     if kx1 - kx0 >= L.cw * 6 then
       local yb = L.body_y + L.body_h - krh - 2
       local i = 0
@@ -9550,10 +9554,13 @@ function D.frame(L, snap, rows, state, info)
             local lw = gfx.measurestr(lbl)
             while lw > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(8, D.kcfont, px); lw = gfx.measurestr(lbl) end
             while lw > kx1 - kx0 and #lbl > 1 do lbl = lbl:sub(1, (utf8.offset(lbl, -1) or #lbl) - 1); lw = gfx.measurestr(lbl) end
+            if kback then set(U.BG); gfx.rect(kx1 - lw - L.pad, y, lw + 2 * L.pad, krh, 1) end
             set(col); gfx.x, gfx.y = kx1 - lw, y + math.floor((krh - gfx.texth) / 2); gfx.drawstr(lbl)
             gfx.setfont(D.font_id)
           else
-            text(kx1 - ms(lbl), y, fit(lbl, kx1 - kx0), col)
+            local fl = fit(lbl, kx1 - kx0)
+            if kback then set(U.BG); gfx.rect(kx1 - ms(fl) - L.pad, y, ms(fl) + 2 * L.pad, krh, 1) end
+            text(kx1 - ms(fl), y, fl, col)
           end
           i = i + 1
         end
