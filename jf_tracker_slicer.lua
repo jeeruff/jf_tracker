@@ -1461,10 +1461,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if lx + lw <= nx - 1 and lx >= lab_end + 2 and wh >= 3 * rh + 8 then
       local cc = hot and U.TEXT or (onkey and U.AMBER or U.CYAN)
       -- 11 окт: подписи на чёрной подложке — волна под ними не мешает читать
+      -- 20 окт: подложка на четверть светлее чёрного (к фону темы), цифры — до контраста 7:1 к ней (оттенок тот же)
+      local back = U.mix({ 0, 0, 0 }, U.BG, 0.25)
       local function lab(ty, str, col)
         if str == '' then return end
-        gfx.set(0, 0, 0, 1); gfx.rect(lx - 1, ty, U.measure(str) + 2, rh - 1, 1)
-        U.text(lx, ty, str, col)
+        U.set(back); gfx.rect(lx - 1, ty, U.measure(str) + 2, rh - 1, 1)
+        U.text(lx, ty, str, U.readable(col, back, 7))
       end
       lab(wy + 1, num, cc)
       local by = wy + wh - rh - 7                        -- над полосой переноса зоны
