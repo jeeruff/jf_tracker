@@ -13665,7 +13665,8 @@ ctx.SEC = model.SEC   -- 12 окт: коды паттернов / секции (
 model.SEC.style = state.patcode or 'hex'
 ctx.sections = function() return regions.sections or {} end
 -- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
-edit.start_at = function() if state.lock and vim and vim.cur then return edit.row_time(vim.cur.row, state.lpb, 0) end end
+-- 20 окт: Space играет с курсора трекера всегда (с выключенным lock стартовал с edit-курсора REAPER — «курсор на 1.1, играет 2.4»)
+edit.start_at = function() if vim and vim.cur and state.focus ~= 'matrix' then return edit.row_time(vim.cur.row, state.lpb, 0) end end
 alias.init(model, edit)
 CM.init(model)
 edit.cmds = CM
@@ -16999,7 +17000,9 @@ function ctrl_action(name, delta)
   elseif name == 'tp_rew' then reaper.Main_OnCommand(40084, 0)            -- Transport: Rewind a little bit
   elseif name == 'tp_fwd' then reaper.Main_OnCommand(40085, 0)            -- Transport: Fast forward a little bit
   elseif name == 'tp_play' and delta ~= 0 then ctrl_action('rate', delta)   -- 11 окт: колесо на play — скорость
-  elseif name == 'tp_play' then reaper.Main_OnCommand(reaper.GetPlayState() & 1 == 1 and 1016 or 1007, 0)   -- play / stop
+  elseif name == 'tp_play' then   -- play / stop; 20 окт: старт — с курсора трекера, как Space
+    if reaper.GetPlayState() & 1 == 1 then reaper.Main_OnCommand(1016, 0)
+    else local t = edit.start_at and edit.start_at(); if t then reaper.SetEditCurPos(t, false, false) end; reaper.Main_OnCommand(1007, 0) end
   -- 11 окт: вторая строка full-транспорта
   elseif name == 'tp_start' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to start of project') or 40042, 0) end
   elseif name == 'tp_end' then if delta == 0 then reaper.Main_OnCommand(ctx.cmd_exact('Transport: Go to end of project') or 40043, 0) end
