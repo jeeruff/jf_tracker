@@ -15231,7 +15231,7 @@ local function hint_go(t)
     if d.folder then FB.folder = d.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
     elseif d.star then local sel = FB.selected(); if sel then FB.toggle_fav(sel) end end
   elseif t.kind == 'fxbrow' then ctx.set_focus('fxb'); FB.cur = d
-  elseif t.kind == 'bar' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; state.row0 = math.max(0, math.min(state.row0, d.row))
+  elseif t.kind == 'bar' or t.kind == 'beat' or t.kind == 'note' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; vim.cur.sub = nil; state.row0 = math.max(0, math.min(state.row0, d.row))
   elseif t.kind == 'env' then ctx.set_focus('tracker'); vim.cur.fi = d; vim.cur.field = 1
   elseif t.kind == 'header' or t.kind == 'scope' then
     ctx.set_focus('tracker')

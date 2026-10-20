@@ -168,7 +168,7 @@ KH.PAGES = {
     { k = 'F1', d = 'the help (all modules): j k line by line through all sections, J K section, / search, o - the help in the browser; :tutorial - the tour' },
     { k = '^/ ⌥/ ⌘/', d = 'search: all effects / the DSP chain of the track / files' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
-    { k = 'f', d = 'hint labels: jump anywhere by two letters' },
+    { k = 'f', d = 'hint labels: jump anywhere by two letters; the tracker first - every note, every beat row (darker dots) of each track' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three)' },
     { k = 'Opt+F1 F2', d = 'transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise)' },
     { k = 'h (wave)', d = 'wave column (wave mode column): h from the note goes into the wave, l back; there s - cut the note at the row, S - a stretch marker at the row start (one in the row - snapped there), x - remove it, J K - pull the hit a row down / up (3J - three); the mouse drags the amber line too' },

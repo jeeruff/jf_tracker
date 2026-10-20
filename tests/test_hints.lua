@@ -43,4 +43,9 @@ H.add('btn', 0, 0, 10, 10, 'b1'); H.add('patcube', 100, 0, 10, 10, { i = 1, fixe
 H.start()
 eq('fixed a1', H.targets[2].label, 'a1'); eq('fixed aa', H.targets[3].label, 'aa'); eq('letter label skips aa', H.targets[1].label, 'as')
 H.key(('a'):byte()); local hc = H.key(('1'):byte()); eq('a1 -> pattern 1', type(hc) == 'table' and hc.data.i, 1)
+-- 20 окт: прыжки по трекеру (ноты, доли) — первыми буквами, раньше кнопок
+H.stop(); H.targets = {}
+H.add('btn', 0, 0, 10, 10, 'b'); H.add('note', 0, 100, 10, 10, { fi = 1, row = 4 }); H.add('beat', 0, 200, 10, 10, { fi = 1, row = 8 })
+H.start(); eq('note first', H.targets[2].label, 'aa'); eq('beat second', H.targets[3].label, 'as'); eq('button after', H.targets[1].label, 'ad')
+H.stop()
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

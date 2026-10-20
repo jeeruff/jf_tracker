@@ -7372,7 +7372,8 @@ function D.frame(L, snap, rows, state, info)
     if in_body and mx >= tx0 + L.rl and mx < tx0 + L.label_w then hover.rownum = r.row end
     for _, c in ipairs(L.cols) do
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
-      if r.bar and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
+      -- 20 окт: и на долях (строки с точками темнее) — приоритетные прыжки по трекеру (метки раньше кнопок)
+      if (r.bar or r.beat) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
           local fi = ln.f0 + si - 1
@@ -7415,6 +7416,8 @@ function D.frame(L, snap, rows, state, info)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else
               cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv)
+              -- 20 окт: метка-прыжок и на каждой ноте (её поле ноты)
+              if cell and (cell.kind == 'audio' or cell.kind == 'midi') then hint('note', x + ((f.G or L).x_note or 0), y, math.max(ms('aa'), (f.G or L).w_note or 0), L.rh, { fi = fi, row = r.row }) end
               local kw = kwmap and kwmap[fi] and kwmap[fi][r.row]
               if kw and not (cell and (cell.kind == 'audio' or (cell.kind == 'cont' and cell.of and cell.of.kind == 'audio'))) then draw_wave(f.G or L, kw[1], kw[2], x, y, kw[1].muted, false) end
             end
