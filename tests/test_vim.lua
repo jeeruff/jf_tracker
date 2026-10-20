@@ -929,6 +929,13 @@ keysin('w'); eq('cmd: w -> the marker after it', V.cur.row, 9)
 keysin('b'); eq('cmd: b -> back', V.cur.row, 2)
 V.cur = { fi = cfi, row = 0, field = 1 }; keysin('e'); eq('cmd: e -> the next marker', V.cur.row, 2)
 L.flat[cfi].ml.ev[9] = nil
+-- 20 окт: у MIDI-лейна (PB, CC …) нет волны — l не уводит в невидимое подполе (курсор «стоял на месте»)
+L.flat[cfi].G = { w_wave = 8 }
+V.cur = { fi = cfi, row = 0, field = 1 }; eq('ml: no wave subfield', V.wave_field_ok(), false)
+V.cur = { fi = cfi - 1, row = 0, field = V.last_field(cfi - 1), sub = ((V.last_field(cfi - 1) or 1) >= 4) and 'val' or nil }
+keysin('l'); eq('ml: l lands on the lane', V.cur.fi, cfi); eq('ml: not on a hidden wave', V.cur.sub, nil)
+V.cur = { fi = cfi, row = 0, field = 1, sub = 'wave' }; keysin('l'); eq('ml: a stale wave subfield is reset', V.cur.sub == 'wave', false)
+L.flat[cfi].G = nil
 -- вставка ноты обрывается следующим событием подколонки (E.cap_row на время вставки)
 reset()
 local CAP

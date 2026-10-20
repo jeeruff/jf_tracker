@@ -6907,15 +6907,16 @@ function D.frame(L, snap, rows, state, info)
       for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
       all = all and nt > 0
       local ay = hy + 1 + 2 * L.rh
-      local ny0 = math.max(hy + 1 + 2 * L.rh, hy + (L.header_rows - 3) * L.rh + 1)
-      if ny0 >= ay + L.rh then
-        local xf = small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'aa', all and 'off' or 'on', all, 'mautoarm')
+      D.cn_r1x = plb and (x2 + ms(plb) + 4) or x2   -- 20 окт: свободное место ряда 1 (az mk низкой шапки)
+      -- 20 окт: ряд autoarm / fold — на своём месте и в низкой шапке (микшер внизу): влезает над последним рядом
+      if ay + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
+        local xf = small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'arm', all and 'off' or 'on', all, 'mautoarm')
         -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
         local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
       else
-        local xa = plb and (x2 + ms(plb) + 4) or x2
-        if xa + ms('aa') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'aa', all and 'off' or 'on', all, 'mautoarm') end
+        local xa = D.cn_r1x
+        if xa + ms('arm') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'arm', all and 'off' or 'on', all, 'mautoarm'); D.cn_r1x = xa + ms('arm') + 4 end
       end
     end
     -- 20 окт: строка 3 — номер и имя паттерна курсора (и секция) в его цвете; клик — выпадашка команд паттерна
@@ -6961,19 +6962,23 @@ function D.frame(L, snap, rows, state, info)
       local az = (ms('autozoom') + 2 + 2 <= bw - mw) and 'autozoom' or ((ms('az') + 4 <= bw - mw) and 'az' or nil)
       if az then btn(bx, ya, az, 'viewbtn', 'autozoom', state.autozoom) end
     else
-      btn(bx + bw - ms('mk') - 2, y4 - 0, 'mk', 'viewbtn', 'markers')   -- низкая шапка — markers на месте x2 /2
+      -- 20 окт: низкая шапка — az mk в конце ряда 1 (за param), x2 /2 остаются на своём месте у длины
+      local xr = D.cn_r1x or bx
+      local yr = hy + 1 + L.rh
+      if xr + ms('mk') + 2 <= bx + bw then
+        local mw = ms('mk') + 2
+        btn(bx + bw - mw, yr, 'mk', 'viewbtn', 'markers')
+        if xr + ms('az') + 2 <= bx + bw - mw - 2 then btn(bx + bw - mw - 2 - (ms('az') + 2), yr, 'az', 'viewbtn', 'autozoom', state.autozoom) end
+      end
     end
     D.rglen_at = nil
     if info.cur_region then
       local rg = info.cur_region
-      local low = ya < hy + 1 + 3 * L.rh - 1
-      -- x2 /2 справа от длины (низкая шапка — там markers)
+      -- x2 /2 справа от длины — и в низкой шапке (20 окт: markers ушли в ряд 1)
       local rx = bx + bw
-      if not low then
-        rx = rx - (ms('/2') + 2); btn(rx, y4, '/2', 'rgbtn', 'half')
-        rx = rx - 2 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')
-        rx = rx - 2
-      else rx = rx - ms('mk') - 4 end
+      rx = rx - (ms('/2') + 2); btn(rx, y4, '/2', 'rgbtn', 'half')
+      rx = rx - 2 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')
+      rx = rx - 2
       local aw = ms('<') + 2
       local s2 = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))
       local lw = rx - bx

@@ -540,7 +540,8 @@ function motion(c, n, op)
   local cur = V.cur
   -- 20 окт: подполе, которого у колонки больше нет (кит без Sxx, лейн без инструмента), — сброс,
   -- иначе l из «slc» вело на громкость той же колонки и курсор стоял на месте
-  if (cur.sub == 'slc' and not V.slc_field_ok()) or (cur.sub == 'inst' and not V.inst_field_ok()) then cur.sub = nil end
+  if (cur.sub == 'slc' and not V.slc_field_ok()) or (cur.sub == 'inst' and not V.inst_field_ok())
+    or (cur.sub == 'wave' and not V.wave_field_ok()) or (cur.sub == 'pan' and not V.pan_field_ok()) then cur.sub = nil end
   local last = ctx.snap().last_row or 0
   local L = ctx.layout()
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
@@ -3921,7 +3922,7 @@ function V.pan_field_ok()
 end
 function V.wave_field_ok()   -- 16 окт: колонка волны есть у этой подколонки
   local f = flat()[V.cur.fi]
-  if not f or f.env or f.compact or f.folded then return false end
+  if not f or f.env or f.compact or f.folded or f.ml then return false end   -- 20 окт: MIDI-лейн (PB, CC …) — волны нет, l уводил в невидимое подполе
   local G = f.G or ctx.layout()
   return (G.w_wave or 0) > 0
 end

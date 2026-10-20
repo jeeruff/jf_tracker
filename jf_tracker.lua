@@ -10156,6 +10156,8 @@ ctx = {
     return by
   end,
   param_in_tcp = function(tr, fx, pi)
+    fx, pi = edit.tcp_target(tr, fx, pi, false)   -- 20 окт: вложенный FX — его проброс в контейнер
+    if not fx then return false end
     if reaper.CountTCPFXParms then
       for k = 0, reaper.CountTCPFXParms(0, tr) - 1 do
         local ok, f2, p2 = reaper.GetTCPFXParm(0, tr, k)

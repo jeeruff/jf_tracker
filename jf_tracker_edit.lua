@@ -3235,7 +3235,31 @@ end
 -- параметр в track controls REAPER (8 окт): API на запись нет — правка chunk
 -- трека: строка PARM_TCP после FXID эффекта (« N[:…]» на параметр; формат
 -- REAPER — число и необязательный хвост). on = nil — переключить
+-- 20 окт: FX внутри контейнера REAPER в TCP не показывает (PARM_TCP вложенного молча игнорируется) —
+-- параметр пробрасывается в контейнер (container_map.add, уровень за уровнем), в TCP — параметр контейнера
+-- верхнего уровня. add = false — только найти уже проброшенный (запрос «в TCP?» ничего не создаёт)
+function E.tcp_target(track, fx, param, add)
+  for _ = 1, 16 do
+    if fx < 0x2000000 then return fx, param end
+    local ok, par = R.TrackFX_GetNamedConfigParm(track, fx, 'parent_container')
+    par = ok and tonumber(par)
+    if not par then return nil end
+    local _, cnt = R.TrackFX_GetNamedConfigParm(track, par, 'container_count')
+    local li
+    for j = 0, (tonumber(cnt) or 0) - 1 do
+      local _, a = R.TrackFX_GetNamedConfigParm(track, par, 'container_item.' .. j)
+      if tonumber(a) == fx then li = j; break end
+    end
+    if not li then return nil end
+    local ok2, np = R.TrackFX_GetNamedConfigParm(track, par, ('container_map.%s.%d.%d'):format(add and 'add' or 'get', li, param))
+    np = ok2 and tonumber(np)
+    if not np or np < 0 then return nil end
+    fx, param = par, np
+  end
+end
 function E.fx_param_tcp(track, fx, param, on)
+  fx, param = E.tcp_target(track, fx, param, true)
+  if not fx then return false end
   local guid = R.TrackFX_GetFXGUID(track, fx)
   if not guid then return false end
   local ok, chunk = R.GetTrackStateChunk(track, '', false)
