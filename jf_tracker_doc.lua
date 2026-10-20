@@ -9,6 +9,7 @@
 -- (n N — следующее / предыдущее попадание), Esc / F1 — закрыть.
 -- Без reaper / gfx в разборе: tests/test_doc.lua.
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local DOC = { sec = 1, scroll = 0, query = nil, typing = false, hits = {}, hit = 0 }
 local U, ctx
 
@@ -127,8 +128,8 @@ function DOC.key(c)
   if DOC.typing then
     if c == 27 then DOC.typing = false; DOC.query = nil; DOC.hits = {}
     elseif c == 13 then DOC.typing = false
-    elseif c == 8 then DOC.query = (DOC.query or ''):sub(1, -2); DOC.hits = DOC.search(DOC.query); go_hit(1)
-    elseif c >= 32 and c < 127 then DOC.query = (DOC.query or '') .. ch; DOC.hits = DOC.search(DOC.query); go_hit(1)
+    elseif c == 8 then DOC.query = TX.bs(DOC.query); DOC.hits = DOC.search(DOC.query); go_hit(1)
+    elseif TX.char(c) then DOC.query = (DOC.query or '') .. TX.char(c); DOC.hits = DOC.search(DOC.query); go_hit(1)
     else return true end
     return true
   end

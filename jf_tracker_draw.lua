@@ -453,6 +453,25 @@ function D.layout(snap, state, nregions)
   -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево.
   -- L.kitG(G) — кит-вариант любой раскладки с полем слайса (обычная, уровни ширины GL), кэш на раскладку
   L.GKc = setmetatable({}, { __mode = 'k' })
+  -- 20 окт: лейн с take FX у нот — после ноты значок fx (зелёная рамка, как кнопка FX item в REAPER): поля правее
+  -- сдвинуты на его ширину; у остальных лейнов места не резервируется
+  L.w_tfx = ms('fx') + 4
+  L.GTc = setmetatable({}, { __mode = 'k' })
+  function L.tfxG(G)
+    G = G or L
+    if not G.x_inst or G.notes_only or G.narrow or G.wave_only then return G end
+    local k = L.GTc[G]
+    if k then return k end
+    local s0, d = G.x_note + (G.w_note or L.w_note), L.w_tfx + L.pad
+    local function sh(v) if v and v >= s0 then return v + d end return v end
+    local fx2 = {}
+    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
+    k = setmetatable({ x_tfx = s0 + L.pad, x_inst = sh(G.x_inst), x_slc = G.x_slc and sh(G.x_slc) or G.x_slc, x_vol = sh(G.x_vol),
+      x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del), x_fold = G.x_fold and sh(G.x_fold) or G.x_fold,
+      sub_w = G.sub_w + d }, { __index = G })
+    L.GTc[G] = k
+    return k
+  end
   -- 20 окт: лейн без сложенных нот — без колонки fold (место не резервируется); кэш на раскладку
   L.GFc = setmetatable({}, { __mode = 'k' })
   function L.nofoldG(G)
@@ -839,6 +858,7 @@ function D.layout(snap, state, nregions)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
+          if lane.has_tfx and not narrow then G = L.tfxG(G) end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -2176,6 +2196,12 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if D.cur_box then D.cur_box(); D.cur_box = nil end
   -- 19 окт: fold — сложенные быстрые ноты строки: линия в своё время внутри строки (белая — нота; под командами — цвет команд)
   -- 19 окт (2): линии поверх текста читались как зачёркивание — вместо них знак «o» сбоку ячейки (как колонка Orca)
+  -- 20 окт: take FX у ноты — значок fx после ноты (своё место: L.x_tfx есть только у таких лейнов)
+  if cell and cell.tfx and L.x_tfx and (cell.kind == 'audio' or cell.kind == 'midi') then
+    local bx, bw = x + L.x_tfx, L.w_tfx
+    set(U.GREEN); gfx.rect(bx, y + 1, bw, L.rh - 2, 0)
+    text(bx + 2, ty, 'fx', U.GREEN)
+  end
   if cell and cell.fold then
     -- 19 окт (3): мини-таймлайн строки (как ratchet на Hapax / Elektron): колонка — строка по горизонтали,
     -- чёрточка на месте каждой ноты (delay), высота — velocity; видимая — ярко, сложенные — светлее, команда — голубая точка
@@ -6826,7 +6852,8 @@ function D.frame(L, snap, rows, state, info)
     -- 20 окт: строка 3 — номер и имя паттерна курсора (и секция) в его цвете; клик — выпадашка команд паттерна
     -- (очередь, alias, clone, /2 x2, длина …); als cln — в ней. Вертикальная шапка справа от мастера — отменена
     local ny = hy + 1 + 3 * L.rh
-    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then
+    -- 20 окт (2): строка эффектов есть — имя паттерна в ней, под размером и кнопками (main, вместо подписи fx)
+    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 and not (state.fxrow and (L.fxrow_h or 0) > 0) then
       local rg = info.cur_region_full
       local nhot = mx >= bx and mx < bx + bw and my >= ny and my < ny + L.rh
       if rg then
@@ -8085,13 +8112,14 @@ function D.frame(L, snap, rows, state, info)
           local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
           -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
-          if b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 1 then lit = false end
-          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
-          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or U.LINE); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
-          local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY)
+          -- 20 окт: мигает ярко — сплошной янтарь и тёмная буква / обычный «горит» (было: тусклая подложка гасла — не видно)
+          local flash = b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0
+          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (flash and U.AMBER or (lit and U.tint(U.AMBER, 0.25) or U.BG))); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
+          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
+          local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (flash and U.BG or (lit and U.AMBER or U.TEXT))
           if b[2] == 'delta' then
             -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»
-            local th = math.max(8, math.floor(TH() * 1.05))
+            local th = math.max(8, math.min(L.rh + 2, math.floor(TH() * 1.45)))   -- 20 окт: крупнее (∆ Menlo мелкий — не видно)
             if D.menlo_th ~= th then gfx.setfont(5, 'Menlo', th); D.menlo_th = th else gfx.setfont(5) end   -- шрифт с именем — один раз на размер
             local gw2 = gfx.measurestr('∆')
             set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = by + 1 + math.floor((L.rh - 1 - gfx.texth) / 2)

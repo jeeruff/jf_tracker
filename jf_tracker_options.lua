@@ -9,6 +9,7 @@
 -- изменить (Shift ×10); 0 — сброс к min; Esc q — закрыть. Мышь: клик по
 -- строке — переключить (toggle/cycle) или выбрать (num), колесо — изменить.
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local O = { active = false, sel = 1, scroll = 0, items = {}, hover = nil, page = 'list', about = nil, ascroll = 0 }
 local U, ctx
 
@@ -189,10 +190,10 @@ function O.key(c)
   if O.typing then
     if c == 27 then O.typing = false; O.query = ''; O.rebuild()
     elseif c == 13 then O.typing = false
-    elseif c == 8 then O.query = O.query:sub(1, -2); O.sel = 1; O.rebuild()
+    elseif c == 8 then O.query = TX.bs(O.query); O.sel = 1; O.rebuild()
     elseif c == 1685026670 then O.sel = math.min(#O.items, O.sel + 1)
     elseif c == 30064 then O.sel = math.max(1, O.sel - 1)
-    elseif c >= 32 and c < 127 then O.query = O.query .. ch; O.sel = 1; O.rebuild() end
+    elseif TX.char(c) then O.query = O.query .. TX.char(c); O.sel = 1; O.rebuild() end
     return true
   end
   if ch == '/' or ch == 'f' then O.typing = true; O.query = ''; O.rebuild(); return true end

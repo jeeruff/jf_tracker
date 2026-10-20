@@ -20,6 +20,7 @@
 -- Чтение диска — EnumerateSubdirectories / EnumerateFiles / io.open; это не
 -- reaper.* проекта, модель не трогается.
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local B = {}
 local R = reaper
 local ctx
@@ -985,8 +986,8 @@ function B.key(c)
     elseif c == 13 then B.filtering = false; if B.filter_due then B.filter_due = nil; B.set_all(B.all) end
     elseif c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
     elseif c == 30064 then B.cur = math.max(1, B.cur - 1)
-    elseif c == 8 then B.filter = B.filter:sub(1, -2); B.cur = 1; B.refilter_soon()   -- 19 окт: ищем, когда набор замер на 0.25 с
-    elseif c >= 32 and c < 127 then B.filter = B.filter .. ch; B.cur = 1; B.refilter_soon()
+    elseif c == 8 then B.filter = TX.bs(B.filter); B.cur = 1; B.refilter_soon()   -- 19 окт: ищем, когда набор замер на 0.25 с
+    elseif TX.char(c) then B.filter = B.filter .. TX.char(c); B.cur = 1; B.refilter_soon()   -- 20 окт: и кириллица
     else return false end
     return true
   end

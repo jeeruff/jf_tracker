@@ -13,6 +13,7 @@
 --
 -- Без reaper.*: время приходит параметром, тестируется стабами.
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local KH = {}
 KH.query = ''
 KH.page = 'tracker'
@@ -948,13 +949,13 @@ function KH.key(c)
     if KH.query ~= '' then KH.query = ''; KH.scroll = 0; return true end
     KH.pinned = false
     return 'leave'
-  elseif c == 8 then KH.query = KH.query:sub(1, -2); KH.scroll = 0
+  elseif c == 8 then KH.query = TX.bs(KH.query); KH.scroll = 0
   elseif c == LEFT then KH.cycle(-1)
   elseif c == RIGHT then KH.cycle(1)
   elseif c == UP then KH.scroll = math.max(0, KH.scroll - 1)
   elseif c == DOWN then KH.scroll = KH.scroll + 1
   elseif c == 13 then KH.pinned = false; return 'leave'
-  elseif c >= 32 and c <= 126 then KH.query = KH.query .. string.char(c); KH.scroll = 0
+  elseif TX.char(c) then KH.query = KH.query .. TX.char(c); KH.scroll = 0   -- 20 окт: и кириллица
   else return false end
   return true
 end

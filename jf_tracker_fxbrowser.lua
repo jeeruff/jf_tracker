@@ -16,6 +16,7 @@
 -- с заголовками групп, rec — недавно добавленные. Данные из ini читает main
 -- (FB.set_tags). Набор текста в фокусе — браузер раскрывается всплывашкой.
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local FB = {}
 FB.list = {}           -- { label=, data= } от main
 FB.query = ''
@@ -203,8 +204,9 @@ function FB.key(c, mods)
   elseif c == 13 then return 'add'
   elseif c == DOWN or (mods.ctrl and c == 10) then FB.cur = math.min(math.max(1, n), FB.cur + 1); skip_hdr(1)
   elseif c == UP or (mods.ctrl and c == 11) then FB.cur = math.max(1, FB.cur - 1); skip_hdr(-1)
-  elseif c == 8 then FB.query = FB.query:sub(1, -2); FB.cur = 1; FB.scroll = 0; skip_hdr(1)
-  elseif c >= 32 and c <= 126 then FB.query = FB.query .. string.char(c); FB.cur = 1; FB.scroll = 0; skip_hdr(1)
+  elseif c == 8 then FB.query = TX.bs(FB.query); FB.cur = 1; FB.scroll = 0; skip_hdr(1)
+  elseif TX.char(c) then FB.query = FB.query .. TX.char(c);   -- 20 окт: и кириллица
+    FB.cur = 1; FB.scroll = 0; skip_hdr(1)
   else return false end
   return true
 end

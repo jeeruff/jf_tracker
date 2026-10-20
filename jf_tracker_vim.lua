@@ -42,6 +42,7 @@
 --   ⌘J ⌘L / ⌘K ⌘H  инструмент трека следующий / предыдущий
 --   :fx N :env :preview   колонки команд, огибающие, предпрослушивание
 
+local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_utf8.lua')   -- 20 окт: набор Юникодом (кириллица)
 local V = {}
 local ctx
 
@@ -1816,9 +1817,9 @@ function V.key_impl(c)
         local m = matches[V.cmd_cycle]
         V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
       end
-    elseif c == BS then V.cmdline = (V.cmdline or ''):sub(1, -2); V.cmd_cycle = nil
+    elseif c == BS then V.cmdline = TX.bs(V.cmdline); V.cmd_cycle = nil
     elseif c == 47 and ctx.name_suggest and ctx.name_suggest(V.cmdline or '') then V.cmd_cycle = nil   -- «/» в имени — подсказки
-    elseif c >= 32 and c < 127 then V.cmdline = (V.cmdline or '') .. string.char(c); V.cmd_cycle = nil end
+    elseif TX.char(c) then V.cmdline = (V.cmdline or '') .. TX.char(c); V.cmd_cycle = nil end   -- 20 окт: и кириллица
     return
   end
 
@@ -1829,8 +1830,8 @@ function V.key_impl(c)
     elseif c == ENTER then
       V.search = V.searchline; V.mode = back; V.searchline = nil
       V.find_next(1)
-    elseif c == BS then V.searchline = (V.searchline or ''):sub(1, -2)
-    elseif c >= 32 and c < 127 then V.searchline = (V.searchline or '') .. string.char(c) end
+    elseif c == BS then V.searchline = TX.bs(V.searchline)
+    elseif TX.char(c) then V.searchline = (V.searchline or '') .. TX.char(c) end
     return
   end
 
@@ -3272,7 +3273,7 @@ function V.picker_key(c)
     end
   end
   if pk.fresh and c == BS then pk.query, pk.fresh, pk.sel, pk.moved = '', nil, 1, nil; picker_filter(); return end      -- 18 окт: BS — имя стёрто
-  if pk.fresh and c >= 32 and c < 127 then pk.query, pk.fresh, pk.sel = '', nil, 1 end                   -- набор — заменяет
+  if pk.fresh and TX.char(c) then pk.query, pk.fresh, pk.sel = '', nil, 1 end                   -- набор — заменяет
   if c == ESC then V.picker = nil
   elseif c == ENTER and pk.free and pk.query == '' and not pk.fresh and pk.allow_empty and not pk.moved then   -- 18 окт: стрелками выбран пункт — берём его
     V.picker = nil
@@ -3281,10 +3282,10 @@ function V.picker_key(c)
     local it = pk.matches[pk.sel]
     V.picker = nil
     if it and pk.on_pick then local ok, e = pcall(pk.on_pick, it); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
-  elseif c == BS then pk.query = pk.query:sub(1, -2); picker_filter()
+  elseif c == BS then pk.query = TX.bs(pk.query); picker_filter()
   elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1); pk.moved = true
   elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1); pk.moved = true
-  elseif c >= 32 and c < 127 then pk.query = pk.query .. string.char(c); pk.typing = pk.tree and true or nil; picker_filter() end
+  elseif TX.char(c) then pk.query = pk.query .. TX.char(c); pk.typing = pk.tree and true or nil; picker_filter() end
 end
 
 -- ── hydra (which-key) ─────────────────────────────────────────────────────

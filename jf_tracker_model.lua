@@ -199,8 +199,15 @@ end
 -- 19 окт: fold (опция) — быстрая MIDI-нота в строку, которой нет свободной подколонки, не плодит лейн: ложится
 -- в ячейку строки списком cell.fold (рисуется линией в своё время внутри строки); зумом (LPB) — своей строкой
 M.FOLD = false
+-- 20 окт: take FX у ноты — значок fx рядом с нотой; лейн с такими нотами получает под него место (lane.has_tfx)
+M.tfx_memo = {}
 local function place(lane, r0, r1, head, cont, tail, e1)
   if r1 < r0 then r1 = r0; e1 = nil end
+  if head.take and R and R.TakeFX_GetCount then
+    local n = M.tfx_memo[head.take]
+    if n == nil then n = R.TakeFX_GetCount(head.take) or 0; M.tfx_memo[head.take] = n end
+    if n > 0 then head.tfx = true; lane.has_tfx = true end
+  end
   local sub
   for _, s in ipairs(lane.subs) do
     if sub_free(s, r0, r1, head.delay, e1) then sub = s; break end
@@ -521,6 +528,7 @@ function M.build(lpb)
   M.seen_micro = false   -- 16 окт: есть ноты с микротоном — трекер расширяет колонку нот
   pool_by_item = {}
   local snap = { lpb = lpb, cols = {}, last_row = 0 }
+  M.tfx_memo = {}   -- 20 окт: take FX — заново на каждую сборку
   local depot_tr
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)

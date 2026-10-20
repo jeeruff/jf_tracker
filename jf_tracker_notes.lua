@@ -105,8 +105,8 @@ function NT.key(c)
   elseif c == END then NT.c = #s
   elseif c >= 32 and c <= 126 then
     NT.lines[NT.l] = s:sub(1, NT.c) .. string.char(c) .. s:sub(NT.c + 1); NT.c = NT.c + 1; NT.dirty = true
-  elseif c > 126 and c < 0x110000 and utf8 then
-    local ch = utf8.char(c)
+  elseif ((c >= 0x75000000 and c < 0x76000000) or (c > 126 and c < 0x110000)) and utf8 then
+    local ch = utf8.char(c >= 0x75000000 and (c - 0x75000000) or c)   -- 20 окт: 'u'-префикс gfx.getchar (кириллица)
     NT.lines[NT.l] = s:sub(1, NT.c) .. ch .. s:sub(NT.c + 1); NT.c = NT.c + #ch; NT.dirty = true
   else return false end
   clamp()

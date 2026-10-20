@@ -965,6 +965,7 @@ local retro_current, retro_preview, retro_put, retro_loop
 local track_actions, region_actions, event_actions, view_actions, mono_request, ctrl_action
 local MONO_ID = 9             -- id мода трекера на шине jf_mono
 ctx = {
+  tx = dofile(DIR .. '/jf_tracker_utf8.lua'),   -- 20 окт: TX.char / TX.bs — Юникод в полях ввода
   model = model, edit = edit, state = state, piano = keys.piano,
   keys_frow = function() return keys.layout == 'frow' end,
   slicepitch_on = function() return state.slicepitch and true or false end,   -- 16 окт: кнопка $pitch
@@ -5326,8 +5327,8 @@ ctx = {
     if TL.typing then
       if c == 27 then TL.typing = false; TL.filter = ''
       elseif c == 13 then TL.typing = false
-      elseif c == 8 then TL.filter = TL.filter:sub(1, -2)
-      elseif c >= 32 and c < 127 then TL.filter = TL.filter .. ch; TL.cur = 1 end
+      elseif c == 8 then TL.filter = ctx.tx.bs(TL.filter)
+      elseif ctx.tx.char(c) then TL.filter = TL.filter .. ctx.tx.char(c); TL.cur = 1 end
       return true
     end
     -- 13 окт: как файловый менеджер lf — дерево трек → инструменты → слайсы / варианты, automation, lib.
@@ -15011,10 +15012,10 @@ ctx.act_key = function(c)
   if AC.typing then
     if c == 27 then AC.typing = false; if AC.query ~= '' then AC.query = '' end
     elseif c == 13 then AC.typing = false; AC.col = 'list'
-    elseif c == 8 then AC.query = AC.query:sub(1, -2); AC.sel, AC.scroll = 1, 0
+    elseif c == 8 then AC.query = ctx.tx.bs(AC.query); AC.sel, AC.scroll = 1, 0
     elseif c == keys.down then AC.sel = AC.sel + 1
     elseif c == keys.up then AC.sel = math.max(1, AC.sel - 1)
-    elseif c >= 32 and c < 127 then AC.query = AC.query .. ch; AC.sel, AC.scroll = 1, 0 end
+    elseif ctx.tx.char(c) then AC.query = AC.query .. ctx.tx.char(c); AC.sel, AC.scroll = 1, 0 end
     return true
   end
   local view, G, fav = ac_view()
@@ -19056,7 +19057,29 @@ local function frame()
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
     U.set(U.LINE); for _, c in ipairs(L.cols) do if c.x then gfx.rect(c.x, y0, 1, L.fxrow_h, 1) end end   -- 8 окт: разделители треков, как в теле
-    U.text(L.matrix_w + L.pad, y0 + 1, ctx.fit('fx', L.label_w - 2 * L.pad), U.GREY)
+    -- 20 окт: в уголке строки эффектов — номер и имя паттерна курсора (и секция) в его цвете; клик — команды паттерна
+    do
+      local rgf = (function()
+        local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+        if not rg then return nil end
+        local t, sec = edit.row_time(vim.cur.row, state.lpb, 0), nil
+        for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then sec = sc.name; break end end
+        return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color), sec = sec }
+      end)()
+      local bx, bw = L.matrix_w + 3, L.label_w - 4
+      local mx0, my0 = gfx.mouse_x, gfx.mouse_y
+      local nhot = mx0 >= bx and mx0 < bx + bw and my0 >= y0 and my0 < y0 + L.rh
+      if rgf then
+        local c = rgf.rgb or U.LINE
+        U.set(nhot and U.tint(U.AMBER, 0.3) or U.tint(c, 0.30)); gfx.rect(bx, y0 + 1, bw, L.rh, 1)
+        U.set(c); gfx.rect(bx, y0 + 1, 3, L.rh, 1)
+        local t = tostring(rgf.idx) .. (rgf.name ~= '' and (' ' .. rgf.name) or '') .. ((rgf.sec and rgf.sec ~= '') and (' / ' .. rgf.sec) or '')
+        U.text(bx + 5, y0 + 1, ctx.fit(t, bw - 7), nhot and U.AMBER or U.TEXT)
+      else
+        U.text(bx + 5, y0 + 1, ctx.fit('no pattern', bw - 7), U.DIM)
+      end
+      if nhot then hover.rghead = true end
+    end
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local MAXL = state.fxparams and 14 or 6
     local need = 1
