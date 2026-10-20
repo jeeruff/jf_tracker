@@ -176,6 +176,7 @@ KH.PAGES = {
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt', d = 'the cursor row to the top (as in Vim)' },
     { k = 'Opt+W', d = 'the cursor to the master columns (∑); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
+    { k = 'zp', d = 'view: only the pattern of the cursor / the whole project (the project | pattern buttons, :reg)' },
     { k = 'zu', d = 'unfold: the folded notes (cyan line under the row, +N) of the selection / cursor row - LPB rises to the smallest one that gives each its row (up to 128); zu again - the previous LPB (:unfold)' },
     { k = 'zw', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },
     { k = 'zZ', d = 'fixed cursor on / off: the cursor row stays in the middle, the pattern scrolls under it (zz - centre once)' },

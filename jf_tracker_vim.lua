@@ -2640,6 +2640,7 @@ function V.key_impl(c)
       if c == ('z'):byte() and ctx.zz_zoom and ctx.zz_zoom() then
       elseif c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
       elseif c == ('x'):byte() then if ctx.xfade_native then ctx.xfade_native(V.covering(V.cur.fi, V.cur.row)) end   -- 13 окт: zx — редактор кроссфейдов REAPER
+      elseif c == ('p'):byte() then if ctx.view_reg then ctx.view_reg() end   -- 20 окт: zp — вид: паттерн курсора / весь проект
       elseif c == ('u'):byte() then V.unfold_zoom()   -- 20 окт: zu — раскрыть сложенные ноты (LPB до 128), ещё раз — назад
       elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
@@ -3512,7 +3513,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g first row | s smart panel (values of the field, mouse) | w swap with next event | m metronome | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | u unfold rows | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | u unfold rows | p pattern / project | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: w all items | e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',

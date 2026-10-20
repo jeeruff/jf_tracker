@@ -6885,9 +6885,10 @@ function D.frame(L, snap, rows, state, info)
     end
     -- ряд 0: proj | region (5 окт: было all | reg); не влезает — region → rgn
     local x0 = bx
-    local lb = (ms('proj') + ms('region') + 4 * L.pad + 6 <= bw) and 'region' or 'rgn'
-    x0 = small(x0, hy + 1, 'proj', 'all', not info.view_reg, 'viewbtn')
-    small(x0, hy + 1, lb, 'reg', info.view_reg, 'viewbtn')
+    -- 20 окт: project | pattern (было proj | region); узко — proj | pat; zp переключает
+    local wide = ms('project') + ms('pattern') + 6 <= bw
+    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', not info.view_reg, 'viewbtn')
+    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', info.view_reg, 'viewbtn')
     -- ряд 1 (7 окт): session (клипы вместо строк трекера)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)

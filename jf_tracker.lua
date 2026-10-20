@@ -1472,7 +1472,7 @@ ctx = {
   view_reg = function(on)
     if on == nil then on = not state.view_reg end
     state.view_reg = on
-    vim.msg = on and 'view: region of the cursor only' or 'view: whole track'
+    vim.msg = on and 'view: the pattern of the cursor only (zp - the whole project)' or 'view: the whole project (zp - the pattern only)'
   end,
   -- браузер: * / :mkdir — новая папка в текущей
   browser_mkdir_prompt = function()
@@ -19686,7 +19686,7 @@ local function frame()
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
-  elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'region: view only the region of the cursor (the playhead one with follow) - :reg' or 'proj: view the whole project - :reg'
+  elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'pattern: view only the pattern of the cursor (the playing one with follow) - zp / :reg' or 'project: view the whole project - zp / :reg'
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.dsptrkname then state.status = ctx.hover_tip_dsptrk
   elseif hover.tlist_tip then state.status = 'tracks: ' .. hover.tlist_tip .. ' - click toggles, drag down the column sets the same, header - whole column'
