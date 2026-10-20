@@ -109,6 +109,7 @@ KH.PAGES = {
     { k = 'dal daj dak dah', d = 'delete notes of the cursor track: dal on the cursor row (every subcolumn), daj below it, dak above it, dah all but the cursor row' },
     { k = 'v v v', d = 'VISUAL: the first v - only the field under the cursor (vol, delay or a command column), v again - the whole track, again - off; in a field: y copies its values, d clears them (the notes stay), p puts them' },
     { k = 'yc', d = 'copy the field column under the cursor (vol / delay / command) of the whole pattern; p - into the notes from the cursor row' },
+    { k = 'Q', d = 'VISUAL: quantize the selection to the grid - every note to its nearest row (delay 0), lengths stay' },
     { k = 'gr', d = 'VISUAL: reform - the notes and automation points of the selection: time scale / curve / shift / redistribute, value ranges with a curve; live, Enter keeps, Esc reverts' },
     { k = 'gi', d = 'VISUAL: interpolate the field - linear, log, exp or sine (up and back); the notes in between get the value, no end value - pick it' },
     { k = 'Cmd+I', d = 'interpolate: in VISUAL the values of the field under the cursor (note, vol, delay or a command) go linearly from the first event to the last (:interp)' },

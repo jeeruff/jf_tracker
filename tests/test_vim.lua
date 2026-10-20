@@ -1146,5 +1146,11 @@ reset(); V.cur = { fi = 1, row = 5, field = 2 }; local n0 = #calls; keysin('dC')
 local nv = 0; for i = n0 + 1, #calls do if calls[i]:match('^vol:') then nv = nv + 1 end end
 eq('dC clears vol of the track notes', nv > 0, true); eq('dC writes default 128', (calls[#calls] or ''):match(':128$') ~= nil, true)
 reset(); V.cur = { fi = 1, row = 0, field = 1 }; n0 = #calls; keysin('dC'); eq('dC on a note: nothing', #calls, n0)
+-- 20 окт: Q в VISUAL — квантайз в сетку строк; ноты с delay — на ближайшую строку
+reset(); V.cur = { fi = 1, row = 0, field = 1 }
+local RT; local rt0 = E.retime; E.retime = function(hs, lpb, rows) RT = { n = #hs, r = rows[1] }; return #hs end
+local hd = V.heads_in(1, 1, 0, 3)[1]; local d0 = hd and hd.delay; if hd then hd.delay = 200 end
+keysin('vjjjQ'); eq('Q: back to NORMAL', V.mode, 'normal'); eq('Q: one note moved', RT and RT.n, 1); eq('Q: to the nearest row', RT and RT.r, hd and (hd.row0 + 1))
+if hd then hd.delay = d0 end; E.retime = rt0
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

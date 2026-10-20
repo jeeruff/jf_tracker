@@ -2959,6 +2959,20 @@ function V.key_impl(c)
       elseif not V.vtrack then V.vtrack = true; V.msg = 'visual: the whole track (v - off)'
       else V.vtrack = nil; V.mode = 'normal'; finish_move() end
       done = true
+    elseif c == ('Q'):byte() then
+      -- 20 окт: Q — квантайз выделения в сетку строк: каждая нота — на ближайшую строку (delay 0), длина не меняется
+      local hs, rows, n = V.heads_in(f0, f1, r0, r1), {}, 0
+      local list = {}
+      for _, h in ipairs(hs) do
+        if (h.kind == 'midi' or h.kind == 'audio') and h.row0 then
+          local d = tonumber(h.delay) or 0
+          local rr = math.floor(h.row0 + d / 256 + 0.5)
+          if d ~= 0 or rr ~= h.row0 then list[#list + 1] = h; rows[#list] = rr; n = n + 1 end
+        end
+      end
+      if n > 0 and ctx.edit.retime then ctx.edit.retime(list, lpb(), rows, nil, 'quantize to the grid'); finish_edit() else finish_move() end
+      V.msg = n > 0 and ('Q: %d note(s) to the nearest row (of %d)'):format(n, #hs) or ('Q: %d note(s), all on the grid already'):format(#hs)
+      V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; done = true
     elseif V.vfield and (c == ('y'):byte() or c == ('d'):byte() or c == ('x'):byte()) then
       -- 19 окт: поле-колонка: y — значения поля в регистр, d / x — очистить поле (ноты остаются)
       local fld = V.vfield
