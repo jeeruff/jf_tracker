@@ -405,7 +405,8 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
     -- 19 окт вечер: patterns + chain — своя панель над матрицей (один раз)
     if reaper.GetExtState(EXT, 'rf_tab') ~= '1' and draw.panes.keep_in(m, 'reform', 'help') then reaper.SetExtState(EXT, 'rf_tab', '1', true) end   -- 19 окт: reform — вкладкой у help
-    if reaper.GetExtState(EXT, 'hum_tab') ~= '1' and draw.panes.keep_in(m, 'humanizer', 'help') then reaper.SetExtState(EXT, 'hum_tab', '1', true) end   -- 19 окт: humanizer — вкладкой у help
+    if reaper.GetExtState(EXT, 'hum_tab') ~= '1' and draw.panes.keep_in(m, 'humanizer', 'help') then reaper.SetExtState(EXT, 'hum_tab', '1', true) end
+    if reaper.GetExtState(EXT, 'rd_tab') ~= '1' and draw.panes.keep_in(m, 'renderer', 'help') then reaper.SetExtState(EXT, 'rd_tab', '1', true) end   -- 20 окт: renderer — вкладкой у help   -- 19 окт: humanizer — вкладкой у help
     if reaper.GetExtState(EXT, 'pat_pane2') ~= '1' then draw.panes.split(m, 'matrix', 'patterns', 'u', 0.3); reaper.SetExtState(EXT, 'pat_pane2', '1', true) end
     if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
     return m
@@ -11652,7 +11653,7 @@ ctx = {
       flag('faderfocus', 'fader click focus', 'mixer: a click on a fader or pan knob also moves the tracker cursor to that channel (the track is selected in REAPER anyway)'),
       { key = 'pmpane', label = 'pm as a pane', kind = 'toggle', desc = 'pm (projects) as a pane of its own, stacked with the browser; off - a tab of the browser (fx is a pane either way)', get = function() return state.pmpane end, set = function(v) state.pmpane = v; ctx.pmpane_apply() end },
       flag('jrbg', 'jump ruler background', 'the jump ruler over the rows on a panel strip; off (default) - on the window background, only the numbers'),
-      flag('rowjumps', 'row jump ruler', 'a narrow column left of the region strip, like relativenumber in Vim: how many rows each one is from the cursor (cyan above - k, grey below - j); the region strip moves right by its width'),
+      flag('rowjumps', 'line number', 'line numbers (the ln button over them): a narrow column left of the region strip, like relativenumber in Vim: how many rows each one is from the cursor (cyan above - k, grey below - j); the region strip moves right by its width'),
       flag('jumps', 'jump ruler', 'a row over the track headers, like relativenumber in Vim: how many tracks away each one is (3 - 3L right, cyan 2 - 2H left), the cursor track shows its number'),
       flag('mixroute', 'mixer routing', 'bottom mixer: a strip on top with each track\'s sends and hardware outs (names vertical) and wires to the receiving track; click - routing menu, Option+click on a name or a wire - remove that routing'),
       flag('mxlaunch', 'matrix clips', 'experimental: matrix cells are session clips - dblclick launches a cell on its track at the quantize, the playing one is framed green with >, the waiting one blinks; the arrangement block has a clips button'),
@@ -15360,7 +15361,7 @@ function event_actions(hover)
     add('Delete ' .. what .. ' (x)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0); edit.delete(heads, lpb) end, 'x')
     add('Copy ' .. what .. ' (y)', function() vim.regs['"'] = edit.yank(heads, lpb, r0, f0) end, 'y')
     add('Mute ' .. what .. ' (M)', function() edit.mute(heads, lpb) end, 'm')
-    add('Transpose ... (Opt+F1 F2, F11 F12)', function() vim.transpose_smart() end, 't')   -- 12 окт: одна выпадашка вместо четырёх пунктов
+    add('Transpose ... (Opt+F1 F2, F11 F12)', function() vim.transpose_smart() end, 'T')   -- 20 окт: t — подменю трека   -- 12 окт: одна выпадашка вместо четырёх пунктов
   end
   add('Split at row (s)', function()
     local cov = {}
@@ -15382,7 +15383,7 @@ function event_actions(hover)
         if f.col.fixed and f.lane then reaper.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', f.lane.idx) end
       end)
     end
-  end, 'n')
+  end, 'b')   -- 20 окт: n — переименовать трек
   return out
 end
 
@@ -15736,6 +15737,11 @@ function ctx.context_items(hover)
     local col = cur_col()
     local i = hover.pool.i
     local e = col and i and col.pool[i]
+    -- 20 окт: инструмент-плагин (VSTi / RS5K / drumrs5k) — рендер в сэмплер (панель renderer)
+    if hover.pool.instfx then
+      local pc, fx = hover.pool.col, hover.pool.instfx
+      add('Render to a sampler … (renderer, gB): RS5K by note zones and velocity layers', function() ctx.inst_fx_pick(pc or cur_col(), fx); ctx.rd_open('sampler') end, 'R')
+    end
     if e then
       add('Select instrument', function() pool_select(i) end, 's')
       add('Preview', function() ctx.inst_preview(e, col.track) end, 'v')
@@ -15839,7 +15845,14 @@ function ctx.context_items(hover)
     vim.cur.fi, vim.cur.row = hover.fi, hover.row.row
     if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
     for _, a in ipairs(event_actions(hover)) do add(a[1], a.fn, a.key) end
-    if hover.col then for _, a in ipairs(track_actions(hover.col)) do add(a[1], a.fn, a.key) end end
+    -- 20 окт: меню ноты не простынёй — трек подменю t, рендер — r, переименовать трек — n
+    if hover.col then
+      add('Rename the track … (tn)', function() ctx.rename_track_prompt() end, 'n')
+      for _, a in ipairs(track_actions(hover.col)) do if a.key ~= 'n' then items[#items + 1] = { a[1], a.fn, key = a.key, g = 'track' } end end
+    end
+    items[#items + 1] = { 'Bounce the notes to audio (selection / note / track in the region)', function() ctx.rd_notes() end, key = 'b', g = 'render' }
+    items[#items + 1] = { 'Instrument of the track to a sampler …', function() ctx.rd_open('sampler') end, key = 's', g = 'render' }
+    items[#items + 1] = { 'Renderer pane (gB)', function() ctx.rd_open() end, key = 'p', g = 'render' }
   elseif hover.matrix then
     -- 10 окт: пустое место матрицы — её собственное меню (раньше общий «view»)
     add('New slot at the end (+)', function() ctx.mx_add() end, '+')
@@ -18462,6 +18475,7 @@ local function frame()
       local info2 = S and { n = #S.heads, target = S.code or 'vol' } or (ctx.rf_lastvis and { n = #vim.heads_in(ctx.rf_lastvis[1], ctx.rf_lastvis[2], ctx.rf_lastvis[3], ctx.rf_lastvis[4]), target = 'vol', pending = true }) or nil
       return ctx.RF.draw(U, Lx, ctx.rf_p, info2, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y)
     end,
+    rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
       ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
@@ -19079,6 +19093,24 @@ local function frame()
       end)()
       local bx, bw = L.matrix_w + 3, L.label_w - 4
       local mx0, my0 = gfx.mouse_x, gfx.mouse_y
+      -- 20 окт (3): ln — номера-прыжки строк вкл / выкл: над их колонкой (её нет — справа в строке);
+      -- имя — с полосы регионов линейки (цветная черта продолжается в линейку вниз)
+      local lnw = U.measure('ln') + 4
+      local lnx
+      if not L.ruler_right and (L.rg_w or 0) > 0 and (L.jl_w or 0) >= lnw + 2 then
+        lnx = L.matrix_w + 1 + math.floor((L.jl_w - lnw) / 2)
+        bx = L.matrix_w + L.jl_w + 3; bw = L.label_w - L.jl_w - 4
+      else
+        bw = bw - lnw - 2; lnx = bx + bw + 2
+      end
+      do
+        local on = state.rowjumps
+        local lh = mx0 >= lnx and mx0 < lnx + lnw and my0 >= y0 and my0 < y0 + L.rh
+        U.set(lh and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(lnx, y0 + 1, lnw, L.rh, 1)
+        U.set(lh and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(lnx, y0 + 1, lnw, L.rh, 0)
+        U.text(lnx + 2, y0 + 1, 'ln', lh and U.AMBER or (on and U.CYAN or U.TEXT))
+        if lh then hover.viewbtn = 'rowjumps' end
+      end
       local nhot = mx0 >= bx and mx0 < bx + bw and my0 >= y0 and my0 < y0 + L.rh
       if rgf then
         local c = rgf.rgb or U.LINE
@@ -19637,6 +19669,7 @@ local function frame()
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - an o at the side of the cell (O - several), no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
+  elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
@@ -20238,6 +20271,20 @@ local function frame()
       local now = reaper.time_precise()
       if now - (ctx.rf_t or 0) > 0.1 then ctx.rf_t = now; ctx.rf_apply() else ctx.rf_dirty = true end
     else ctx.rf_drag = nil; if ctx.rf_dirty then ctx.rf_dirty = nil; ctx.rf_apply() end end
+  end
+  -- 20 окт: панель renderer мышью: переключатели, слайдеры, render
+  if hover.rd and U.click then
+    local hr = hover.rd
+    ctx.set_focus('renderer')
+    local p = ctx.rd_load()
+    if hr.toggle then local r = ctx.RD.ROWS[hr.toggle]; p[r.k] = not p[r.k]; ctx.RD.sel = hr.toggle; ctx.rd_save()
+    elseif hr.render then ctx.rd_render()
+    elseif hr.slider then ctx.rd_drag = hr.slider; ctx.RD.sel = hr.slider.i
+    elseif hr.row then ctx.RD.sel = hr.row end
+  end
+  if ctx.rd_drag then
+    if gfx.mouse_cap & 1 == 1 then local dg = ctx.rd_drag; ctx.RD.set_from_x(ctx.rd_load(), dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w)); ctx.rd_dirty = true
+    else ctx.rd_drag = nil; if ctx.rd_dirty then ctx.rd_dirty = nil; ctx.rd_save() end end
   end
   -- 19 окт: панель humanizer мышью: галки, слайдеры (тянуть), insert, apply
   if hover.hum and U.click then
@@ -21141,6 +21188,7 @@ local function frame()
       ctx.mod_toggle(hover.mod.col, hover.mod.m, hover.mod.what)
       click = { t = now2, zone = 'mod' }
     elseif hover.viewbtn == 'autozoom' then ctx.autozoom_toggle()       -- 20 окт
+    elseif hover.viewbtn == 'rowjumps' then state.rowjumps = not state.rowjumps; relayout(); vim.msg = 'line numbers (row jumps) ' .. (state.rowjumps and 'on' or 'off')
     elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'foldfast' then ctx.foldfast_toggle()      -- 19 окт: fold быстрых нот
@@ -24089,6 +24137,13 @@ local function frame()
         elseif r == 'keep' then ctx.rf_close(true)
         elseif r == 'revert' then ctx.rf_close(false)
         elseif not r then return vim.key(c) end
+      elseif state.focus == 'renderer' then   -- 20 окт: панель renderer
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local r = ctx.RD.key(ctx.rd_load(), c, ctx.mods().shift)
+        if r == 'changed' then ctx.rd_save()
+        elseif r == 'render' then ctx.rd_render()
+        elseif r == 'leave' then ctx.set_focus('tracker')
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         ctx.hum_load()
@@ -24560,6 +24615,165 @@ end
 -- write — дописать после песни (повторы связанные, сокращённые — свой паттерн)
 ctx.PL = dofile(DIR .. '/jf_tracker_playlist.lua')
 ctx.SP = dofile(DIR .. '/jf_tracker_sigpick.lua')
+-- 20 окт: renderer (gB) — баунс нот и инструмент DSP → сэмплер (RS5K по зонам нот и слоям velocity).
+-- Рендер — нативный Apply track/take FX to items (40209) на копии трека (40062): копия без items, на ней
+-- один MIDI-клип; потом копия становится треком результата (FX сняты, аудио — свой take)
+ctx.RD = dofile(DIR .. '/jf_tracker_renderer.lua')
+ctx.rd_load = function()
+  if not ctx.rd_p then ctx.rd_p = ctx.RD.decode(reaper.GetExtState(EXT, 'rd')) end
+  return ctx.rd_p
+end
+ctx.rd_save = function() if ctx.rd_p then reaper.SetExtState(EXT, 'rd', ctx.RD.encode(ctx.rd_p), true) end end
+ctx.rd_open = function(mode)
+  local p = ctx.rd_load()
+  if mode ~= nil then p.mode = mode == 'sampler'; ctx.rd_save() end
+  ctx.pane_focus('renderer')
+end
+-- ноты для баунса: VISUAL; иначе нота под курсором; иначе трек в регионе
+ctx.rd_heads = function()
+  if vim.mode == 'visual' or vim.mode == 'vline' then return vim.hum_heads(true) end
+  local hs = vim.heads_in(vim.cur.fi, vim.cur.fi, vim.cur.row, vim.cur.row)
+  if #hs > 0 then return hs end
+  return vim.hum_heads(false)
+end
+ctx.rd_inst_name = function(tr)
+  local ins = tr and reaper.TrackFX_GetInstrument(tr) or -1
+  if ins < 0 then return nil, -1 end
+  local _, rn = reaper.TrackFX_GetNamedConfigParm(tr, ins, 'renamed_name')
+  local _, fn = reaper.TrackFX_GetFXName(tr, ins, '')
+  local nm = (rn and rn ~= '') and rn or (fn or ''):gsub('^[%w ]-i?: ', ''):gsub('%s*%b()%s*$', '')
+  return nm, ins
+end
+-- копия трека без items (FX и маршрутизация — те же) сразу после него; выделения сохранены снаружи
+ctx.rd_dup = function(tr)
+  reaper.SetOnlyTrackSelected(tr)
+  reaper.Main_OnCommand(40062, 0)                       -- Track: Duplicate tracks
+  local d = reaper.GetSelectedTrack(0, 0)
+  if not d or d == tr then return nil end
+  for i = reaper.CountTrackMediaItems(d) - 1, 0, -1 do reaper.DeleteTrackMediaItem(d, reaper.GetTrackMediaItem(d, i)) end
+  return d
+end
+-- MIDI-клип на треке: notes = { { t0, t1, pitch, vel, ch } } в секундах проекта
+ctx.rd_midi_item = function(tr, a, b, notes)
+  local it = reaper.CreateNewMIDIItemInProj(tr, a, b, false)
+  local tk = it and reaper.GetActiveTake(it)
+  if not tk then return nil end
+  for _, n in ipairs(notes) do
+    reaper.MIDI_InsertNote(tk, false, false, reaper.MIDI_GetPPQPosFromProjTime(tk, n[1]), reaper.MIDI_GetPPQPosFromProjTime(tk, n[2]), n[5] or 0, n[3], n[4], true)
+  end
+  reaper.MIDI_Sort(tk)
+  return it
+end
+-- рендер items трека через его FX (40209): аудио — активный take, MIDI-take убран (40131); → первый item
+ctx.rd_apply = function(tr)
+  reaper.SelectAllMediaItems(0, false)
+  for i = 0, reaper.CountTrackMediaItems(tr) - 1 do reaper.SetMediaItemSelected(reaper.GetTrackMediaItem(tr, i), true) end
+  reaper.Main_OnCommand(40209, 0)                       -- Item: Apply track/take FX to items
+  reaper.Main_OnCommand(40131, 0)                       -- Take: Crop to active take in items
+  for i = reaper.TrackFX_GetCount(tr) - 1, 0, -1 do reaper.TrackFX_Delete(tr, i) end   -- звук уже со звуком FX
+  return reaper.GetTrackMediaItem(tr, 0)
+end
+ctx.rd_keep_sel = function()
+  local ts, is = {}, {}
+  for i = 0, reaper.CountSelectedTracks(0) - 1 do ts[#ts + 1] = reaper.GetSelectedTrack(0, i) end
+  for i = 0, reaper.CountSelectedMediaItems(0) - 1 do is[#is + 1] = reaper.GetSelectedMediaItem(0, i) end
+  return function()
+    for i = 0, reaper.CountTracks(0) - 1 do reaper.SetTrackSelected(reaper.GetTrack(0, i), false) end
+    for _, t in ipairs(ts) do if reaper.ValidatePtr(t, 'MediaTrack*') then reaper.SetTrackSelected(t, true) end end
+    reaper.SelectAllMediaItems(0, false)
+    for _, x in ipairs(is) do if reaper.ValidatePtr(x, 'MediaItem*') then reaper.SetMediaItemSelected(x, true) end end
+  end
+end
+ctx.rd_notes = function()
+  local p = ctx.rd_load()
+  local col = cur_col(); if not (col and col.track) then vim.msg = 'renderer: no track'; return end
+  local notes, a, b, heads = {}, nil, nil, {}
+  for _, h in ipairs(ctx.rd_heads()) do
+    if h.kind == 'midi' and h.take then
+      local _, nt = edit.midi_note_of(h, state.lpb)
+      if nt then
+        local t0, t1 = reaper.MIDI_GetProjTimeFromPPQPos(h.take, nt.sppq), reaper.MIDI_GetProjTimeFromPPQPos(h.take, nt.eppq)
+        notes[#notes + 1] = { t0, t1, nt.pitch, nt.vel, nt.ch }
+        a = math.min(a or t0, t0); b = math.max(b or t1, t1); heads[#heads + 1] = h
+      end
+    end
+  end
+  if #notes == 0 then vim.msg = 'renderer: no MIDI notes here (select them - v / V)'; return end
+  local tr, out = col.track, nil
+  local back = ctx.rd_keep_sel()
+  edit.run('render notes', function()
+    local d = ctx.rd_dup(tr); if not d then return end
+    ctx.rd_midi_item(d, a, b + (p.tail or 0), notes)
+    out = ctx.rd_apply(d)
+    reaper.GetSetMediaTrackInfo_String(d, 'P_NAME', (col.name ~= '' and col.name or 'track') .. ' bounce', true)
+    if p.mute then edit.mute(heads, state.lpb, true) end
+    back()
+  end)
+  model.invalidate()
+  vim.msg = out and ('renderer: %d note(s) -> audio on "%s bounce" (tail %.1f s)%s'):format(#notes, col.name, p.tail or 0, p.mute and ', source muted' or '') or 'renderer: render failed'
+end
+-- RS5K: параметр по точному имени (как в модуле RS5K)
+ctx.rd_pidx = function(tr, fx)
+  local t = {}
+  for i = 0, reaper.TrackFX_GetNumParams(tr, fx) - 1 do local _, n = reaper.TrackFX_GetParamName(tr, fx, i, ''); t[(n or ''):lower()] = i end
+  return t
+end
+ctx.rd_sampler = function()
+  local p = ctx.rd_load()
+  local col = cur_col(); if not (col and col.track) then vim.msg = 'renderer: no track'; return end
+  local tr = col.track
+  local inst = ctx.rd_inst_name(tr)
+  if not inst then vim.msg = 'renderer: no instrument on ' .. (col.name or 'the track') .. ' (DSP)'; return end
+  local plan = ctx.RD.plan(p)
+  local t0 = reaper.GetProjectLength(0) + 4                 -- за концом проекта: ничего не мешает
+  local notes = {}
+  for _, e in ipairs(plan) do notes[#notes + 1] = { t0 + e.t0, t0 + e.t0 + p.len, e.note, e.vel, 0 } end
+  local total = plan[#plan].t1
+  local back = ctx.rd_keep_sel()
+  local path, made
+  edit.run('render instrument to sampler', function()
+    local d = ctx.rd_dup(tr); if not d then return end
+    ctx.rd_midi_item(d, t0, t0 + total, notes)
+    local it = ctx.rd_apply(d)
+    local tk = it and reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) then path = reaper.GetMediaSourceFileName(reaper.GetMediaItemTake_Source(tk), '') end
+    if it then reaper.DeleteTrackMediaItem(d, it) end
+    if not path or path == '' then back(); return end
+    reaper.GetSetMediaTrackInfo_String(d, 'P_NAME', inst .. ' sampled', true)
+    local function nrm(v) return math.max(0, math.min(1, (v + 80) / 160)) end
+    for _, e in ipairs(plan) do
+      local fx = reaper.TrackFX_AddByName(d, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+      if fx >= 0 then
+        reaper.TrackFX_SetNamedConfigParm(d, fx, 'FILE0', path); reaper.TrackFX_SetNamedConfigParm(d, fx, 'DONE', '')
+        reaper.TrackFX_SetNamedConfigParm(d, fx, 'MODE', '2')                     -- note: высота от корня
+        reaper.TrackFX_SetNamedConfigParm(d, fx, 'renamed_name', ('%s v%d'):format(ctx.RD.nname(e.note), e.vel))
+        local P = ctx.rd_pidx(d, fx)
+        local function set(name, v) if P[name] then reaper.TrackFX_SetParamNormalized(d, fx, P[name], v) end end
+        set('note range start', e.lo / 127); set('note range end', e.hi / 127)
+        set('pitch for start note', nrm(e.lo - e.note)); set('pitch for end note', nrm(e.hi - e.note))
+        set('minimum velocity', e.vlo / 127); set('maximum velocity', e.vhi / 127)
+        set('sample start offset', e.t0 / total); set('sample end offset', e.t1 / total)
+        set('obey note-offs', p.obey and 1 or 0)
+        made = (made or 0) + 1
+      end
+    end
+    back()
+  end)
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = made and ('renderer: %s -> "%s sampled": %d RS5K (%s..%s every %d st, %d vel layer(s)), one file %s'):format(inst, inst, made, ctx.RD.nname(p.lo), ctx.RD.nname(p.hi), p.step, p.layers, (path or ''):match('[^/]+$') or '')
+    or 'renderer: render failed'
+end
+ctx.rd_render = function()
+  local p = ctx.rd_load()
+  if p.mode then ctx.rd_sampler() else ctx.rd_notes() end
+end
+ctx.rd_info = function()
+  local col = cur_col()
+  local inst = col and col.track and ctx.rd_inst_name(col.track)
+  local n = 0
+  if not ctx.rd_load().mode then for _, h in ipairs(ctx.rd_heads()) do if h.kind == 'midi' then n = n + 1 end end end
+  return { track = col and col.name, inst = inst, n = n }
+end
 -- 19 окт: humanizer — диапазоны глобально (ExtState hum), точки вариации DSP — в проекте (humdsp)
 ctx.HU = dofile(DIR .. '/jf_tracker_humanizer.lua')
 ctx.hum_load = function()

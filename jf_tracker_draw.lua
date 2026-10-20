@@ -5470,6 +5470,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }
       local inside = mx >= ct.x and mx < ct.x + ct.w and my >= ct.y and my < ct.y + ct.h
       if id == 'reform' and info.rf_draw then hover.rf = info.rf_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'reform'); if not inside then hover.rf = nil end   -- 19 окт
+      elseif id == 'renderer' and info.rd_draw then hover.rd = info.rd_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'renderer'); if not inside then hover.rd = nil end   -- 20 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт
       elseif id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
       elseif id == 'patterns' then   -- 19 окт: палитра паттернов — своя панель (клетки — под треками матрицы)

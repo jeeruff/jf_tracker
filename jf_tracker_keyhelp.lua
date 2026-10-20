@@ -71,7 +71,7 @@ KH.PAGES = {
     { k = 'Ctrl+W', d = 'pane mode (sticky, Esc out): the keys below, the pane numbers on the borders' },
     { k = 'h j k l  H J K L', d = 'focus / move by direction' },
     { k = 'w W  1..9', d = 'next / previous pane, pane by number' },
-    { k = 'g + key', d = 'go to a panel (a hidden one appears): m matrix b browser l lib n main s slices o notes f fx d dsp r rec i item a automation M midi h harmonizer c scopes S master v video V visor k tracks y clipboard U undo A actions ? help H humanizer N note mod x mixer q macros H humanizer ? help e properties u modulation p pm C clips g grid' },
+    { k = 'g + key', d = 'go to a panel (a hidden one appears): m matrix b browser l lib n main s slices o notes f fx d dsp r rec i item a automation M midi h harmonizer c scopes S master v video V visor k tracks y clipboard U undo A actions ? help H humanizer B renderer N note mod x mixer q macros ? help e properties u modulation p pm C clips g grid' },
     { k = 's v + key', d = 'split below / right with that panel (it moves here)' },
     { k = 'T + key  B', d = 'that panel into this stack (a tab) / this tab out of the stack' },
     { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
@@ -328,6 +328,14 @@ KH.PAGES = {
     { k = 'x', d = 'remove the variation point under the cursor' },
     { k = 'Enter', d = 'apply: the notes (as :human) and the dsp points - to the selection, else the cursor track in the region (u - undo)' },
     { k = '0', d = 'the ranges back to the defaults' },
+    { k = 'Esc', d = 'back to the tracker' },
+  } },
+  renderer = { title = 'renderer - notes to audio, an instrument to a sampler (gB)', e = {
+    { k = 'Space', d = 'what: notes -> audio (the selection, else the note at the cursor, else the track in the region) / instrument -> sampler' },
+    { k = 'j k', d = 'row: tail, mute source; sampler - notes from / to, every N semitones, velocity layers, note length, note-offs' },
+    { k = 'h l', d = 'value (notes: an octave; Shift - fine / a semitone)' },
+    { k = 'Enter', d = 'render: notes - through the track FX onto a new track "<track> bounce"; sampler - one file, a new track "<instrument> sampled" with an RS5K per note zone and velocity layer (RS5K: Minimum / Maximum velocity)' },
+    { k = '0', d = 'the defaults' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
   perf = { title = 'performance - what takes the time (REAPER and the tracker)', e = {
