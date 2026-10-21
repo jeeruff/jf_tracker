@@ -83,7 +83,8 @@ MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкл
 local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
-MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')          -- подсказка второй клавиши в главном модуле (7 окт)
+MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')
+MX.SZ = dofile(DIR .. '/jf_tracker_szone.lua')          -- 21 окт: место зоны сессии (за песней)          -- подсказка второй клавиши в главном модуле (7 окт)
 MX.SS = dofile(DIR .. '/jf_tracker_session.lua')         -- session: клипы как в Ableton, zz в матрице (6 окт); полем MX: предел локальных
 MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
 MX.VZ = dofile(DIR .. '/jf_tracker_visor.lua')          -- 10 окт: панель visor — шейдеры ReaVisor (страница isf в браузере) из трекера
@@ -3250,10 +3251,15 @@ ctx = {
           local last = 0
           for dr = 1, clip.nr do if tgt[dr] and tgt[dr].rgnend > last then last = tgt[dr].rgnend end end
           if last > zone.pos + 1e-6 then
-            local _, meas = reaper.TimeMap2_timeToBeats(0, last - 1e-6)
-            local z0 = reaper.TimeMap2_beatsToTime(0, 0, math.floor(meas) + 2)
+            -- 21 окт: за всё (ss_zone_home), и едут только клипы зоны (jf_session): было — все items диапазона,
+            -- а зона посреди песни утаскивала куски песни (бесхозные «?» в матрице)
+            local z0 = ctx.ss_zone_home(last)
             local dt = z0 - zone.pos
-            for k = #zitems, 1, -1 do local it = zitems[k]; reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + dt) end
+            for k = #zitems, 1, -1 do
+              local it = zitems[k]
+              local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+              if tag ~= '' then reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + dt) end
+            end
             reaper.SetProjectMarker3(0, zone.idx, true, zone.pos + dt, zone.rgnend + dt, model.SESSION_REGION, zone.col or 0)
             state.ss_zone_new = nil
             vim.msg = 'session zone moved after the new patterns'
@@ -10057,26 +10063,42 @@ ctx = {
     return state.ss_zone_new
   end,
   -- начало новой зоны: через такт после всего проекта
-  ss_zone_home = function(skip)
-    local t = math.max(reaper.GetProjectLength(0), regions.end_pos or 0)
-    for _, rg in ipairs(regions) do if rg.rgnend > t and not rg.session then t = rg.rgnend end end
-    if skip then t = math.max(t, skip) end
-    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
-    return reaper.TimeMap2_beatsToTime(0, 0, meas + 2)
-  end,
-  -- 18 окт: зона наехала на регион песни (паттерны выросли, темп, перенос) — клипы садились поверх нот
-  -- и сдвинутыми (зона не на такте). Зона с её items (только P_EXT:jf_session) — уезжает за проект
-  ss_zone_clear_song = function(z)
-    local hit
+  -- 21 окт: песня для расчёта места зоны (jf_tracker_szone): =END напрямую (не кэш regions), регионы кроме зоны,
+  -- items с меткой jf_session или без — всё из проекта сейчас
+  ss_song = function()
+    local song = { end_pos = model.marker_pos(model.END_MARKER), regions = {}, items = {} }
     local i = 0
     while true do
       local ret, isr, p, e, nm = reaper.EnumProjectMarkers3(0, i)
       if not ret or ret == 0 then break end
-      if isr and nm ~= model.SESSION_REGION and not nm:match('^=') and p < z.rgnend - 1e-6 and e > z.pos + 1e-6 then hit = nm; break end
+      if isr and nm ~= model.SESSION_REGION then song.regions[#song.regions + 1] = { pos = p, rgnend = e, name = nm } end
       i = i + 1
     end
-    if not hit then return z end
-    if playing() then return z end                       -- не дёргать под играющим транспортом: уедет после стопа
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+        song.items[#song.items + 1] = { pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), tagged = tag ~= '' }
+      end
+    end
+    return song
+  end,
+  -- начало новой зоны: за всем, что не зона (=END, регионы — и библиотечные, items песни), через SZ.GAP_BARS тактов
+  ss_zone_home = function(skip)
+    local t = MX.SZ.after(ctx.ss_song())
+    if skip then t = math.max(t, skip) end
+    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
+    return reaper.TimeMap2_beatsToTime(0, 0, math.floor(meas) + MX.SZ.GAP_BARS)
+  end,
+  -- 18 окт: зона наехала на регион песни (паттерны выросли, темп, перенос) — клипы садились поверх нот
+  -- и сдвинутыми (зона не на такте). Зона с её items (только P_EXT:jf_session) — уезжает за проект
+  -- 21 окт: «в песне» — и до =END, и поверх items песни (было: только поверх обычного региона — зона на 5.7 с
+  -- в пустых тактах песни не замечалась); под играющим транспортом — флаг, переезд после стопа (ss_zone_tick)
+  ss_zone_clear_song = function(z)
+    local hit = MX.SZ.in_song(z, ctx.ss_song())
+    if not hit then ctx.ss_zone_bad = nil; return z end
+    if playing() then ctx.ss_zone_bad = true; return z end
     local q0 = reaper.TimeMap2_timeToQN(0, z.pos)
     local qlen = reaper.TimeMap2_timeToQN(0, z.rgnend) - q0
     local nz0 = ctx.ss_zone_home(z.rgnend)
@@ -10113,6 +10135,7 @@ ctx = {
     local old_end, new_end = z.rgnend, reaper.TimeMap2_QNToTime(0, q0 + need)
     reaper.SetProjectMarker3(0, z.idx, true, z.pos, new_end, model.SESSION_REGION, 0)
     z.rgnend = new_end
+    if MX.SZ.in_song(z, ctx.ss_song()) then ctx.ss_zone_bad = true end   -- 21 окт: выросла в песню / библиотеку — переедет на стопе
     state.ss_zone_new = { pos = z.pos, rgnend = new_end, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = z.idx }
     local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
     if math.abs(l0 - z.pos) < 1e-4 then reaper.GetSet_LoopTimeRange(true, true, z.pos, new_end, false) end
@@ -23460,6 +23483,7 @@ local function frame()
   ctx.mod_tick(c)
   ctx.pedal_tick()   -- 21 окт: ` отпущен — педаль вверх
   ctx.focus_back_tick()   -- 21 окт: мышь вернулась с окна плагина — клавиатура трекеру
+  ctx.ss_zone_tick()      -- 21 окт: зона сессии не стоит в песне
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
   if ctx.hold_len then
@@ -25096,6 +25120,21 @@ ctx.mx_to_visual = function()
   vim.anchor = { fi = f0, row = math.floor(a.r0 + 1e-6) }
   vim.cur.fi, vim.cur.row = f1, math.max(math.floor(a.r0 + 1e-6), math.ceil(b.r1 - 1e-6) - 1)
   ctx.rf_lastvis = { f0, f1, vim.anchor.row, vim.cur.row, nil }
+end
+-- 21 окт: зона сессии на стопе — раз в 2 с (и сразу после стопа, если помечена): оказалась в песне — уезжает за неё
+ctx.ss_zone_tick = function()
+  if reaper.GetPlayState() & 5 ~= 0 then return end
+  local now = reaper.time_precise()
+  if not ctx.ss_zone_bad and now - (ctx.ss_zone_chk or 0) < 2 then return end
+  ctx.ss_zone_chk = now
+  local i = 0
+  while true do
+    local ret, isr, p, e, nm, idx = reaper.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if isr and nm == model.SESSION_REGION then ctx.ss_zone_clear_song({ pos = p, rgnend = e, session = true, name = nm, idx = idx }); return end
+    i = i + 1
+  end
+  ctx.ss_zone_bad = nil
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
