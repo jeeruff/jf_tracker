@@ -2431,7 +2431,7 @@ function V.key_impl(c)
       if how ~= 'beside' then
         local cell = f0.sub and f0.sub[V.cur.row]
         if cell and cell.kind == 'cont' and cell.of and not tx then E.note_off({ cell.of }, lpb(), V.cur.row)
-        elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
+        elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil end   -- 21 окт: перезапись — клип остаётся
       end
       if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end
       if ctx.auto_pattern then ctx.auto_pattern(V.cur.row) end   -- 21 окт: свободный такт — сначала паттерн
@@ -2510,7 +2510,7 @@ function V.key_impl(c)
             -- новая нота — в ту же подколонку
             E.note_off({ cell.of }, lpb(), V.cur.row)
           elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then
-            E.delete({ cell }, lpb())       -- строка с названием — перезапись
+            E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil   -- строка с названием — перезапись (21 окт: клип остаётся)
           end
         end
         local stp = V.step_auto and 1 or V.step

@@ -394,6 +394,18 @@ local function midi_note(head, lpb)
 end
 
 -- ── удаление ──────────────────────────────────────────────────────────────
+-- 21 окт: MIDI item, где после правки нет ни нот, ни CC, ни sysex, — удалить (пустые «µ»-клипы в строку копились)
+local function drop_empty_midi(it)
+  if E.keep_empty or not (it and R.ValidatePtr(it, 'MediaItem*')) then return end   -- keep_empty: перезапись ноты (новая — в этот клип)
+  local tk = R.GetActiveTake(it)
+  if not (tk and R.TakeIsMIDI(tk)) then return end
+  local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
+  if nn == 0 and ncc == 0 and ntx == 0 then
+    local _, sx = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+    if sx == '' then R.DeleteTrackMediaItem(R.GetMediaItem_Track(it), it) end
+  end
+end
+E.drop_empty_midi = drop_empty_midi
 function E.delete(heads, lpb)
   if #heads == 0 then return end
   run('delete ' .. #heads, function()
@@ -416,6 +428,7 @@ function E.delete(heads, lpb)
       R.MIDI_DisableSort(take)
       for _, i in ipairs(idx) do R.MIDI_DeleteNote(take, i) end
       R.MIDI_Sort(take)
+      drop_empty_midi(R.GetMediaItemTake_Item(take))
     end
   end)
 end
@@ -3607,7 +3620,7 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             local nfin = (fin >= t1) and (fin - dt) or t0
             if keepend and fin >= limit - EPS then nfin = math.min(fin, limit) end   -- 19 окт: до конца паттерна — длина та же, пустые строки в конце
             if nfin <= math.max(pos, t0) + EPS and pos >= t0 - EPS then R.DeleteTrackMediaItem(tr, it)
-            else R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(EPS, nfin - pos)) end
+            else R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(EPS, nfin - pos)); drop_empty_midi(it) end
           elseif pos < t0 - EPS and fin > t1 + EPS then
             local right = R.SplitMediaItem(it, t1)
             local mid = R.SplitMediaItem(it, t0)
