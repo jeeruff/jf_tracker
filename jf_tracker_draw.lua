@@ -7364,6 +7364,17 @@ function D.frame(L, snap, rows, state, info)
       local e1 = rgedge[rg.r1] or {}; e1.prv = rg.rgb or D.BAR; rgedge[rg.r1] = e1
     end
   end
+  -- 21 окт: граница паттерна — линия 2 px цвета линий темы (явнее линии такта), граница секции — 2 px её цветом поверх
+  local patb, secb = {}, {}
+  if state.rgedges ~= false then
+    for _, rg in ipairs(info.ruler and info.ruler.regions or {}) do
+      patb[math.floor(rg.r0 + 0.5)] = true; patb[math.floor(rg.r1 + 0.5)] = true
+    end
+    for _, sc in ipairs(info.sections or {}) do
+      local c = (info.region_rgb and sc.color and sc.color ~= 0 and info.region_rgb(sc.color)) or U.CYAN
+      secb[math.floor(sc.r0 + 0.5)] = c; secb[math.floor(sc.r1 + 0.5)] = c
+    end
+  end
   -- 13 окт: линии маркеров через все треки (опция marker lines) — цвет маркера, у верха его строки
   local mkline = {}
   if info.ruler and info.ruler.markers and state.mkedges then
@@ -7432,6 +7443,8 @@ function D.frame(L, snap, rows, state, info)
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
+    if secb[r.row] then set(secb[r.row]); gfx.rect(tx0, y, W - tx0, 2, 1)
+    elseif patb[r.row] then set(U.LINE); gfx.rect(tx0, y, W - tx0, 2, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)

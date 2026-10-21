@@ -18663,7 +18663,7 @@ local function frame()
       return reaper.time_precise() - t, ctx.midi_in_v and ctx.midi_in_v[col.guid]
     end,   -- 19 окт: индикатор входа   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     wheels = ctx.wheels,   -- 16 окт: pitch / mod / pedal — вход MIDI и мышь
