@@ -122,7 +122,7 @@ local function val_text(it)
   local v = it.get()
   if it.kind == 'toggle' then return v and 'on' or 'off' end
   if it.kind == 'cycle' then return tostring(v) end
-  if it.fmt then return it.fmt:format(v) end
+  if it.fmt then return it.fmt:format(it.fmt:find('%%d') and math.floor(v + 0.5) or v) end   -- 21 окт: дробное с %d ронялo кадр
   return tostring(v)
 end
 

@@ -128,7 +128,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     local v = s.v[r.k] or r.def
     local hot = mx >= sx - 2 and mx < sx + sw + 2 and my >= yy and my < yy + rh
     U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / math.max(1e-9, r.max - r.min), false, (hot or cur) and U.AMBER or (on and U.TEXT or U.DIM), hot, rh)
-    local vs = r.fmt:format(v)
+    local vs = r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v)   -- 21 окт: мелкий шаг (10.2) с %d ронял кадр
     U.text(x + w - pad - U.measure(vs), yy, vs, on and U.GREY or U.DIM)
     if hot then hv.slider = { i = i, x0 = sx, w = sw } end
     if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end

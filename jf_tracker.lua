@@ -11942,8 +11942,8 @@ ctx = {
               return { title = it.label, items = vs }
             end }
           elseif it.kind == 'num' then
-            items[#items + 1] = { key = k, label = it.label .. ': ' .. (it.fmt and it.fmt:format(cur) or tostring(cur)), sub = function()
-              local function step(d) local v = math.max(it.min or -math.huge, math.min(it.max or math.huge, (it.get() or 0) + d * (it.step or 1))); it.set(v); vim.msg = it.label .. ': ' .. (it.fmt and it.fmt:format(v) or tostring(v)) end
+            items[#items + 1] = { key = k, label = it.label .. ': ' .. (it.fmt and it.fmt:format(it.fmt:find('%%d') and math.floor(cur + 0.5) or cur) or tostring(cur)), sub = function()
+              local function step(d) local v = math.max(it.min or -math.huge, math.min(it.max or math.huge, (it.get() or 0) + d * (it.step or 1))); it.set(v); vim.msg = it.label .. ': ' .. (it.fmt and it.fmt:format(it.fmt:find('%%d') and math.floor(v + 0.5) or v) or tostring(v)) end
               return { title = it.label, items = { { key = '+', label = 'more', fn = function() step(1) end }, { key = '-', label = 'less', fn = function() step(-1) end },
                 { key = '=', label = 'more x10', fn = function() step(10) end }, { key = '_', label = 'less x10', fn = function() step(-10) end } } }
             end }

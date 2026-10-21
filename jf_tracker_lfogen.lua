@@ -318,7 +318,7 @@ local function field_text(f)
     if LG.type == 'follow' and LG.fsrc == 'env' then return LG.src_env or 'Enter: pick envelope' end
     return LG.src_names[LG.src_i] or '(no tracks)'
   end
-  return f.fmt:format(LG[f.key])
+  return f.fmt:format(f.fmt:find('%%d') and math.floor(LG[f.key] + 0.5) or LG[f.key])   -- 21 окт: дробное с %d
 end
 
 -- отрисовка в (x, y, w, h); hover = { field = i } | { preview = true }

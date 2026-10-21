@@ -153,7 +153,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
         local sw = math.max(4 * L.cw, x + w - pad - vwn - pad - sx)
         local v = p[r.k] or r.def
         U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), false, (hot or cur) and U.AMBER or U.TEXT, hot, rh)
-        local vs = r.note and nname(v) or r.fmt:format(v)
+        local vs = r.note and nname(v) or (r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v))   -- 21 окт: дробное с %d
         U.text(x + w - pad - U.measure(vs), yy, vs, U.GREY)
         if hot then hv.slider = { i = i, x0 = sx, w = sw } end
       end

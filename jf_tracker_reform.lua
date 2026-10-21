@@ -139,7 +139,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       local v = p[r.k] or r.def
       local dim = (r.k == 'lo' or r.k == 'hi' or r.k == 'vcurve') and not p.vals
       U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), r.min < 0, (hot or cur) and U.AMBER or (dim and U.DIM or U.TEXT), hot, rh)
-      local vs = r.fmt:format(v)
+      local vs = r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v)   -- 21 окт: дробное с %d — не ронять кадр
       U.text(x + w - pad - U.measure(vs), yy, vs, dim and U.DIM or U.GREY)
       if hot then hv.slider = { i = i, x0 = sx, w = sw } end
     end

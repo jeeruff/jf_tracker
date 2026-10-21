@@ -56,7 +56,7 @@ local function cell_text(r, c)
     return r.link_name or ('%d.%d'):format(r.v['plink.effect'], r.v['plink.param'] or 0)
   end
   if v == nil then return '.' end
-  return (c.fmt):format(v)
+  return (c.fmt):format(c.fmt:find('%%d') and math.floor(v + 0.5) or v)   -- 21 окт: дробное с %d
 end
 
 -- активна ли группа ячейки (числа L1 тусклые, если L1 выкл)

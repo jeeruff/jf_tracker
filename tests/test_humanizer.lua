@@ -18,4 +18,9 @@ HU.set_from_x(s, 2, 0.5); eq('from x', s.v.time, 25)
 s.dsp = { { name = 'Surge cutoff', range = 5 } }; HU.sel = #HU.ROWS + 1
 HU.key(s, ('l'):byte()); eq('dsp range', s.dsp[1].range, 6); HU.key(s, (' '):byte()); eq('dsp off', s.dsp[1].off, true)
 eq('a add', HU.key(s, ('a'):byte()), 'add'); HU.key(s, ('x'):byte()); eq('dsp removed', #s.dsp, 0)
+-- 21 окт: мелкий шаг даёт 10.2 — подпись '%d ms' не роняет отрисовку
+_G.gfx = _G.gfx or { rect = function() end, mouse_x = 0, mouse_y = 0 }
+local U = setmetatable({ measure = function(t) return #t * 8 end, text = function() end, dslider = function() end }, { __index = function() return function(c) return c end end })
+s.v.time = 10.2
+eq('fractional %d draws', (pcall(HU.draw, U, { rh = 16, pad = 4, cw = 8 }, s, 0, 0, 600, 400, true, 0, 0, function(t) return t end)), true)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
