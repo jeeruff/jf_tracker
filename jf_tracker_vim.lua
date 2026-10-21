@@ -2534,7 +2534,9 @@ function V.key_impl(c)
       if ctx.toggle_piano then ctx.toggle_piano() else V.piano = not V.piano end
       return
     end
-    if V.piano then
+    -- 21 окт: в VISUAL клавиатура не перехватывает префиксы и метки (g gt gg, f) — выделение их ждёт
+    if V.piano and (V.mode == 'visual' or V.mode == 'vline') and (c == ('g'):byte() or c == ('f'):byte()) then
+    elseif V.piano then
       if V.mode == 'normal' and ((c == 13 and ctx.esc_vim and ctx.esc_vim()) or (c == ESC and not (ctx.esc_vim and ctx.esc_vim()))) then V.mode = 'insert';   -- Esc mode vim: вход только Enter / i (12 окт: иначе Enter — смарт-панель)
       V.msg = (ctx.hints_on and ctx.hints_on()) and 'INSERT with the keyboard: the note keys write notes' or ''; return end   -- описание — только с хинтами (5 окт)
       local rn = (ctx.keys_renoise and ctx.keys_renoise()) or (ctx.keys_frow and ctx.keys_frow())   -- 13 окт: renoise — z x ноты, октава [ ]; 16 окт: frow — так же
