@@ -3843,7 +3843,12 @@ function V.smart()
       local e = f.col.pool[it.v]
       if e and e.item and ctx.preview then ctx.preview(f.col.track, ctx.model_base_note or 60, e.item, row, 1) end
     end
-    pick = function(it) if ctx.set_inst then ctx.set_inst(heads(), it.v) end; V.inst = it.v; done() end
+    local old = h1 and ni or nil
+    pick = function(it)
+      if ctx.set_inst then ctx.set_inst(heads(), it.v) end; V.inst = it.v; done()
+      -- 21 окт: и остальные ноты трека с прежним инструментом — в паттерне / на всём треке (меню)
+      if old and old ~= it.v and ctx.inst_ask_all then ctx.inst_ask_all(f.col, old, it.v) end
+    end
     if not h1 then V.msg = 'smart: an empty row - the instrument is chosen for the next notes' end
   elseif fld == 1 then
     local h1 = heads()[1]

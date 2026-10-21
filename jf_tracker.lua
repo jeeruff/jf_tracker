@@ -24890,6 +24890,34 @@ ctx.fxb_tree_pick = function(idx)
   FB.skip_hdr(1)
   vim.msg = ('fx: %s - %d (j k, h - the tree, / - find, Enter - add)'):format(r.label, r.n or 0)
 end
+-- 21 окт: поменял инструмент ноты (Enter на колонке инструмента) — и все ноты трека с прежним: в паттерне / весь трек
+ctx.inst_ask_all = function(col, old, new)
+  local function heads_with(scope)
+    local fi0, fi1
+    for i, f in ipairs(L.flat) do if f.col == col and not f.env then fi0 = fi0 or i; fi1 = i end end
+    if not fi0 then return {} end
+    local r0, r1 = 0, math.huge
+    if scope == 'pattern' then r0, r1 = ctx.region_rows(); if not r0 then return {} end end
+    if r1 == math.huge then r1 = 0; for i = fi0, fi1 do for r in pairs(L.flat[i].sub or {}) do if type(r) == 'number' and r > r1 then r1 = r end end end end
+    local out = {}
+    for _, h in ipairs(vim.heads_in(fi0, fi1, r0, r1)) do
+      local n = (h.kind == 'midi' and ctx.midi_inst_num and ctx.midi_inst_num(h.item, h.pitch)) or (h.item and snap.inst_of and snap.inst_of[h.item])
+      if n == old then out[#out + 1] = h end
+    end
+    return out
+  end
+  local function go(scope)
+    local hs = heads_with(scope)
+    if #hs == 0 then vim.msg = ('instrument %02d: no other notes with it %s'):format(ctx.inst_disp(col, old), scope == 'pattern' and 'in the pattern' or 'on the track'); return end
+    ctx.set_inst(hs, new)
+    vim.msg = ('instrument %02d -> %02d: %d note(s) %s (u - undo)'):format(ctx.inst_disp(col, old), ctx.inst_disp(col, new), #hs, scope == 'pattern' and 'in the pattern' or 'on the track')
+  end
+  vim.open_hydra({ title = ('instrument %02d -> %02d: the other notes too?'):format(ctx.inst_disp(col, old), ctx.inst_disp(col, new)), items = {
+    { key = 'p', label = 'in this pattern', fn = function() go('pattern') end },
+    { key = 't', label = 'on the whole track', fn = function() go('track') end },
+    { key = 'n', label = 'no - only this note', fn = function() vim.msg = 'instrument: only this note' end },
+  } })
+end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
 draw.wave_pref = function(col)
