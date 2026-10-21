@@ -2851,6 +2851,23 @@ function V.key_impl(c)
         end
         V.count = nil; finish_move(); return
       end
+      -- 21 окт: опция treat OFF as event — dw изнутри ноты / на её OFF: удалить этот OFF (нота до следующего события / конца паттерна)
+      if p == 'd' and c == ('w'):byte() and ctx.state.offevent then
+        local f = flat()[V.cur.fi]
+        local cell = f and f.sub and f.sub[V.cur.row]
+        local h = cell and (cell.kind == 'off' or cell.kind == 'cont') and cell.of
+        if h and (h.kind == 'midi' or h.kind == 'audio') then
+          local endr = (h.row0 or 0) + math.max(1, h.rows or 1)
+          local nx
+          for r, cl in pairs(f.sub) do if type(r) == 'number' and r >= endr and (cl.kind == 'midi' or cl.kind == 'audio' or (cl.kind == 'off' and cl.of ~= h)) and (not nx or r < nx) then nx = r end end
+          if not nx and ctx.region_rows then local _, r1 = ctx.region_rows(); if r1 then nx = r1 + 1 end end
+          if nx and nx > endr - 1 then
+            ctx.edit.note_off({ h }, lpb(), nx - (ctx.edit.OFF_END and 1 or 0))
+            V.msg = ('OFF removed: the note sounds to row %04d'):format(nx)
+            V.count = nil; finish_edit(); return
+          end
+        end
+      end
       -- 13 окт: dw / dW внутри пустого MIDI-клипа (#) — удалить клип, как item
       if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
         local em = V.empty_midi_at(V.cur.fi, V.cur.row)
