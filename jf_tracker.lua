@@ -23403,9 +23403,11 @@ local function frame()
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
   if ctx.hold_len then
     local lm = ctx.hold_len
-    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(lm.t_press)   -- отпускания с нажатия этой ноты
+    -- отпущена = физически не нажата (JS_VKeys_GetState): окно отпусканий GetUp иногда ошибалось — удержание
+    -- обрывалось, следующий повтор становился второй нотой
     local vk = ctx.note_key_last and keys.vk_of(ctx.note_key_last.c) or 0
-    if not up or (vk > 0 and up:byte(vk) ~= 0) then
+    local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(-1)
+    if not st or vk == 0 or st:byte(vk) == 0 then
       ctx.hold_len = nil
       edit.last_midi = nil
       reaper.Undo_OnStateChange2(0, 'jf_tracker: note length (held key)')
@@ -23897,7 +23899,11 @@ local function frame()
     -- прошлого нажатия (медленный кадр) и не попадало в окно. Окно отпусканий
     -- начинается за длительность того кадра (+20 мс) до обработки
     local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - (nk.dt or 0) - 0.02)
-    if up and up:byte(vk) == 0 and now - nk.t < 3 then
+    -- 21 окт: нота уже тянется удержанием, клавиша физически нажата — повтор, даже если окно отпусканий ошиблось
+    -- (короткое удержание давало вторую ноту: один повтор проходил как нажатие)
+    local st = ctx.hold_len and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(-1)
+    local still = st and st:byte(vk) ~= 0
+    if still or (up and up:byte(vk) == 0 and now - nk.t < 3) then
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
       -- 21 окт: держат клавишу ноты в INSERT — длина вставленной MIDI-ноты по времени удержания (тап — до следующего события)
