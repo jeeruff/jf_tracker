@@ -12,6 +12,16 @@ local P = {}
 local R = reaper
 local cur                     -- текущий CF_Preview
 local stop_at, restore_cur    -- MIDI-превью через транспорт
+-- 21 окт: выделение времени / луп на время превью строки сняты (с повтором REAPER играл с начала выделения, не с курсора)
+local restore_ts
+local function restore_all()
+  if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end
+  if restore_ts then
+    R.GetSet_LoopTimeRange(true, false, restore_ts[1], restore_ts[2], false)
+    R.GetSet_LoopTimeRange(true, true, restore_ts[3], restore_ts[4], false)
+    restore_ts = nil
+  end
+end
 
 function P.available() return R.CF_CreatePreview ~= nil end
 -- 13 окт: все превью — с проектом, где созданы. Сменилась / закрылась вкладка — сразу стоп:
@@ -322,9 +332,15 @@ end
 -- MIDI: транспорт от t0 до t1
 function P.midi(t0, t1)
   -- своё превью через транспорт (step listen, 4 окт) — оборвать и начать новое
-  if stop_at then stop_at = nil; R.OnStopButton(); if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end end
+  if stop_at then stop_at = nil; R.OnStopButton(); restore_all() end
   if R.GetPlayState() & 1 == 1 then return false end
   restore_cur = R.GetCursorPosition()
+  local ts0, ts1 = R.GetSet_LoopTimeRange(false, false, 0, 0, false)
+  local l0, l1 = R.GetSet_LoopTimeRange(false, true, 0, 0, false)
+  if ts1 > ts0 + 1e-9 or l1 > l0 + 1e-9 then
+    restore_ts = { ts0, ts1, l0, l1 }
+    R.GetSet_LoopTimeRange(true, false, 0, 0, false); R.GetSet_LoopTimeRange(true, true, 0, 0, false)
+  end
   R.SetEditCurPos(t0, false, false)
   R.OnPlayButton()
   -- 12 окт: стоп — когда позиция воспроизведения дошла до t1, а не по часам: REAPER до ~180 мс готовит звук
@@ -380,7 +396,7 @@ function P.tick()
   if stop_at and R.time_precise() >= stop_at then
     stop_at = nil; P.tstop_pos = nil
     R.OnStopButton()
-    if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end
+    restore_all()
   end
 end
 
@@ -388,7 +404,7 @@ function P.stop()
   stop_audio()
   voices_stop()
   P.stop_pos, P.tstop_pos = nil, nil
-  if stop_at then stop_at = nil; R.OnStopButton(); if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end end
+  if stop_at then stop_at = nil; R.OnStopButton(); restore_all() end
 end
 
 return P
