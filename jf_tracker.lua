@@ -23406,7 +23406,7 @@ local function frame()
     -- отпущена = физически не нажата (JS_VKeys_GetState): окно отпусканий GetUp иногда ошибалось — удержание
     -- обрывалось, следующий повтор становился второй нотой
     local vk = ctx.note_key_last and keys.vk_of(ctx.note_key_last.c) or 0
-    local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(-1)
+    local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(lm.t_press - 0.5)   -- KEYDOWN с нажатия без KEYUP = держится
     if not st or vk == 0 or st:byte(vk) == 0 then
       ctx.hold_len = nil
       edit.last_midi = nil
@@ -23901,7 +23901,7 @@ local function frame()
     local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - (nk.dt or 0) - 0.02)
     -- 21 окт: нота уже тянется удержанием, клавиша физически нажата — повтор, даже если окно отпусканий ошиблось
     -- (короткое удержание давало вторую ноту: один повтор проходил как нажатие)
-    local st = ctx.hold_len and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(-1)
+    local st = ctx.hold_len and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(nk.t - 0.5)
     local still = st and st:byte(vk) ~= 0
     if still or (up and up:byte(vk) == 0 and now - nk.t < 3) then
       c = 0
@@ -24850,12 +24850,12 @@ end
 ctx.pedal_key = function()
   if ctx.ped_key then return end   -- автоповтор, пока держат
   ctx.wheel_send('pedal', true)
-  if reaper.JS_VKeys_GetState then ctx.ped_key = true; vim.msg = 'pedal down (let go of ` - up)'
+  if reaper.JS_VKeys_GetState then ctx.ped_key = true; ctx.ped_t = reaper.time_precise(); vim.msg = 'pedal down (let go of ` - up)'
   else vim.msg = 'pedal down (` again - up)'; ctx.ped_toggle = not ctx.ped_toggle; if not ctx.ped_toggle then ctx.wheel_send('pedal', false); vim.msg = 'pedal up' end end
 end
 ctx.pedal_tick = function()
   if not ctx.ped_key then return end
-  local st = reaper.JS_VKeys_GetState(-1)
+  local st = reaper.JS_VKeys_GetState((ctx.ped_t or reaper.time_precise()) - 0.5)   -- KEYDOWN с нажатия ` без KEYUP = держится
   if st and st:byte(keys.vk_of(96) or 0xC0) == 0 then ctx.ped_key = nil; ctx.wheel_send('pedal', false); vim.msg = 'pedal up' end
 end
 -- 21 окт: нота в свободном такте (нет паттерна, внутри песни =START..=END) — сначала свободный паттерн на этот такт
