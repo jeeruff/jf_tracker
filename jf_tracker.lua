@@ -20251,7 +20251,10 @@ local function frame()
         if not d.moved then MX.anchor = MX.anchor or { ri = d.ri, ci = d.ci }; d.moved = true end
         MX.cur.ri, MX.cur.ci = h.ri, h.ci
       end
-    else ctx.mx_cdrag = nil end
+    else
+      if ctx.mx_cdrag.moved then ctx.mx_to_visual() end   -- 21 окт: протянутый блок — и в трекере
+      ctx.mx_cdrag = nil
+    end
   end
   -- протяжка клетки матрицы за край (9 окт): каждый новый слот на пути — копия
   if ctx.mx_rep then
@@ -21751,6 +21754,19 @@ local function frame()
         local k = hover.matrix.ri .. ':' .. hover.matrix.ci
         if not next(MX.picks) and not MX.anchor then MX.picks[MX.cur.ri .. ':' .. MX.cur.ci] = { ri = MX.cur.ri, ci = MX.cur.ci } end
         MX.picks[k] = (not MX.picks[k]) and { ri = hover.matrix.ri, ci = hover.matrix.ci } or nil
+      elseif gfx.mouse_cap & 8 == 8 and not MX.anchor then
+        -- 21 окт: Shift+щелчок (блока ещё нет) — весь канал: все паттерны песни на этом треке
+        local first, last
+        for i, rg in ipairs(seq) do if not rg.gap then first = first or i; last = i end end
+        MX.picks = {}
+        if first then
+          MX.anchor = { ri = first, ci = hover.matrix.ci }
+          MX.goto_cell(seq, snap, last, hover.matrix.ci)
+          ctx.mx_to_visual()
+          vim.msg = ('channel %s: every pattern selected (Shift+click another cell - a block from here)'):format((snap.cols[hover.matrix.ci] or {}).name or '')
+          click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
+          goto mx_click_done
+        end
       elseif gfx.mouse_cap & 8 == 8 then MX.anchor = MX.anchor or { ri = MX.cur.ri, ci = MX.cur.ci }; MX.picks = {}
       else MX.anchor = nil; MX.picks = {} end
       MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci)
@@ -21772,6 +21788,8 @@ local function frame()
       end
       click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
       if gfx.mouse_cap & 4 == 0 then ctx.mx_cdrag = { ri = hover.matrix.ri, ci = hover.matrix.ci } end   -- протяжка по клеткам = блок (9 окт)
+      if MX.anchor then ctx.mx_to_visual() end   -- 21 окт: блок матрицы — и выделение в трекере
+      ::mx_click_done::
     elseif hover.browser == 'pvvol' and dbl and click.zone == 'pvvol' then
       ctx.preview_set_vol(1); vim.msg = 'preview volume 0 dB'
     elseif type(hover.browser) == 'string' then
@@ -25019,6 +25037,23 @@ ctx.legato_join = function()
   end)
   model.invalidate()
   vim.msg = ('legato on: %d note(s) of the pattern joined to the next (u - undo)'):format(n)
+end
+-- 21 окт: блок матрицы → VISUAL трекера: строки паттернов блока (от первого до конца последнего) × колонки его треков;
+-- reform / humanizer / d / y дальше работают по нему (фокус остаётся в матрице)
+ctx.mx_to_visual = function()
+  if not (MX.anchor and L and L.flat) then return end
+  local r0, r1, c0, c1 = MX.block()
+  local a, b = seq[r0], seq[r1]
+  if not (a and b) then return end
+  local f0, f1
+  for i, f in ipairs(L.flat) do
+    if f.ci and f.ci >= c0 and f.ci <= c1 and not f.env then f0 = f0 or i; f1 = i end
+  end
+  if not f0 then return end
+  vim.mode = 'vline'
+  vim.anchor = { fi = f0, row = math.floor(a.r0 + 1e-6) }
+  vim.cur.fi, vim.cur.row = f1, math.max(math.floor(a.r0 + 1e-6), math.ceil(b.r1 - 1e-6) - 1)
+  ctx.rf_lastvis = { f0, f1, vim.anchor.row, vim.cur.row, nil }
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
