@@ -2509,7 +2509,7 @@ function V.key_impl(c)
         local stp = V.step_auto and 1 or V.step
         if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end
         local newpat = ctx.auto_pattern and ctx.auto_pattern(V.cur.row)   -- 21 окт: свободный такт — сначала паттерн
-        local sr = V.sustain_row(f.sub, V.cur.row)
+        local sr = ctx.state.notesus and V.sustain_row(f.sub, V.cur.row) or nil   -- 21 окт: опция note until OFF (выкл по умолчанию)
         E.sus_t = sr and ctx.row_time and ctx.row_time(sr) or nil
         local okN, errN = pcall(E.insert_note,f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
         E.cap_row, E.sus_t = nil, nil
