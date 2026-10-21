@@ -276,6 +276,7 @@ KH.PAGES = {
     { k = 'Ctrl+Shift+F1 F2', m = 'transpose column', g = 'transpose', d = 'transpose the column (subcolumn) in the pattern -1 / +1; + F11 F12 - an octave' },
     { k = 'Cmd+F1 F2', m = 'microtone', g = 'transpose', d = 'microtone 1/6 tone down / up: the selection (else the note of the row); Cmd+Shift - the track' },
     { k = ':transpose', m = 'transpose popup', g = 'transpose', d = 'popup -24..+24 and where (selection / column / track / pattern); :transpose N - the selection by N' },
+    { k = 'BS', m = 'delete note / row', d = 'INSERT, the note field: on a note - delete the note; on an empty row - delete the row (below moves up; Shift - all tracks)' },
     { k = 'F1', d = 'the whole help (with frow F1 is a note in INSERT - Esc first; ? - REAPER actions)' },
   } },
   matrix = { title = 'matrix of regions (slots)', e = {
