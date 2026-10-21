@@ -24747,6 +24747,93 @@ ctx.retro_insert = function()
   if not made then vim.msg = 'R: nothing in the retro buffer of this track (it records while armed - play something first)'; return end
   local _, nn = reaper.MIDI_CountEvts(reaper.GetActiveTake(made))
   vim.msg = ('R: %d note(s) of the last played - from row %04d (u - undo)'):format(nn or 0, vim.cur.row)
+  ctx.retro_overflow(made, f.col, t_row)
+end
+-- 21 окт: сыгранное длиннее паттерна — меню: дублировать паттерн (хвост — в копию), хвост — в следующий паттерн,
+-- обрезать по концу, сжать (ноты по времени) в этот паттерн
+ctx.retro_overflow = function(it, col, t_row)
+  local rg = alias.region_at(regions, t_row)
+  local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+  if not (rg and tk) then return end
+  local last = 0
+  local _, nn = reaper.MIDI_CountEvts(tk)
+  for k = 0, nn - 1 do
+    local _, _, _, _, ep = reaper.MIDI_GetNote(tk, k)
+    last = math.max(last, reaper.MIDI_GetProjTimeFromPPQPos(tk, ep))
+  end
+  if last <= rg.rgnend + 1e-3 then return end
+  local over = model.row_of_time(last, state.lpb) - model.row_of_time(rg.rgnend, state.lpb)
+  local items = {
+    { label = 'duplicate the pattern - the rest goes into the copy', v = 'dup' },
+    { label = 'the rest into the next pattern', v = 'next' },
+    { label = 'cut at the pattern end', v = 'cut' },
+    { label = 'squeeze into this pattern', v = 'fit' },
+    { label = 'leave it as is', v = 'keep' },
+  }
+  local function split_tail()
+    if reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') <= rg.rgnend + 1e-6 then
+      reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', last - reaper.GetMediaItemInfo_Value(it, 'D_POSITION'))   -- item короче нот — дотянуть
+    end
+    return reaper.SplitMediaItem(it, rg.rgnend)
+  end
+  ctx.smart_at = { x = gfx.mouse_x + 4, y = gfx.mouse_y, top = gfx.mouse_y }
+  ctx.smart_open({ title = ('played %.0f row(s) past %s'):format(over, rg.name or 'the pattern'), items = items, cols = 1, sel = 1, on_pick = function(pk)
+    if not (reaper.ValidatePtr(it, 'MediaItem*')) then return end
+    if pk.v == 'keep' then vim.msg = 'R: left as played'; return end
+    if pk.v == 'next' then
+      edit.run('R: the rest into the next pattern', function() split_tail() end)
+      vim.msg = 'R: split at the end of ' .. (rg.name or 'the pattern') .. ' - the rest is in the next one'
+    elseif pk.v == 'cut' then
+      edit.run('R: cut at the pattern end', function()
+        local tail = split_tail()
+        if tail then reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(tail), tail) end
+      end)
+      vim.msg = 'R: cut at the end of ' .. (rg.name or 'the pattern')
+    elseif pk.v == 'fit' then
+      local k = (rg.rgnend - t_row) / math.max(1e-6, last - t_row)
+      edit.run('R: squeeze into the pattern', function()
+        local function map(ppq) local t = reaper.MIDI_GetProjTimeFromPPQPos(tk, ppq); return reaper.MIDI_GetPPQPosFromProjTime(tk, t_row + (t - t_row) * k) end
+        local _, n2, ncc = reaper.MIDI_CountEvts(tk)
+        local notes, ccs = {}, {}
+        for i = 0, n2 - 1 do local r = { reaper.MIDI_GetNote(tk, i) }; notes[#notes + 1] = { i, map(r[4]), map(r[5]) } end
+        for i = 0, (ncc or 0) - 1 do local r = { reaper.MIDI_GetCC(tk, i) }; ccs[#ccs + 1] = { i, map(r[4]) } end
+        for _, n in ipairs(notes) do reaper.MIDI_SetNote(tk, n[1], nil, nil, n[2], n[3], nil, nil, nil, true) end
+        for _, c in ipairs(ccs) do reaper.MIDI_SetCC(tk, c[1], nil, nil, c[2], nil, nil, nil, nil, true) end
+        reaper.MIDI_Sort(tk)
+        reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', rg.rgnend - reaper.GetMediaItemInfo_Value(it, 'D_POSITION'))
+      end)
+      vim.msg = ('R: squeezed x%.2f into %s'):format(k, rg.name or 'the pattern')
+    elseif pk.v == 'dup' then
+      local ri
+      for i, r in ipairs(seq) do if not r.gap and r.idx == rg.idx and math.abs(r.pos - rg.pos) < 1e-6 then ri = i end end
+      local ci
+      for i, c in ipairs(snap.cols) do if c == col or c.guid == col.guid then ci = i end end
+      if not (ri and ci) then vim.msg = 'R: the pattern is not in the song'; return end
+      ctx.slot_op('R: duplicate the pattern for the rest', function()
+        local tail = split_tail()
+        local tchunk
+        if tail then
+          local ok, c = reaper.GetItemStateChunk(tail, '', false)
+          tchunk = ok and edit.strip_guids(c) or nil
+          reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(tail), tail)
+        end
+        local sl = alias.slot_snapshot(seq, snap, ri)
+        if not sl then return end
+        sl.name = alias.free_name(regions, sl.name)
+        local hrel = reaper.GetMediaItemInfo_Value(it, 'D_POSITION') - rg.pos   -- сыгранное в копии — только хвост, не повтор головы
+        local list = sl.clip and sl.clip.cells[1] and sl.clip.cells[1][ci]
+        if list then for j = #list, 1, -1 do if math.abs((list[j].rel or 0) - hrel) < 1e-6 then table.remove(list, j) end end end
+        alias.put_slot(snap, rg.rgnend, sl)
+        if tchunk then
+          local ni = reaper.AddMediaItemToTrack(col.track)
+          reaper.SetItemStateChunk(ni, tchunk, false)
+          reaper.SetMediaItemInfo_Value(ni, 'D_POSITION', rg.rgnend)
+        end
+      end)
+      vim.msg = 'R: ' .. (rg.name or 'the pattern') .. ' duplicated after itself - the rest of the phrase is in the copy (u - undo)'
+    end
+    model.invalidate()
+  end })
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
