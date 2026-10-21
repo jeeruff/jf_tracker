@@ -4015,7 +4015,7 @@ function V.wave_field_ok()   -- 16 окт: колонка волны есть у
 end
 function V.inst_field_ok()
   local f = flat()[V.cur.fi]
-  if not f or f.env or f.compact or f.folded or f.ml then return false end   -- 20 окт: и MIDI-лейн (h загонял туда «slice»)
+  if not f or f.env or f.folded or f.ml then return false end   -- 20 окт: и MIDI-лейн (h загонял туда «slice»); 21 окт: свёрнутый — по раскладке (GCM — есть, GC — нет)
   local G = f.G or ctx.layout()
   return G.x_inst and true or false   -- 11 окт: false у узких подколонок — поля нет
 end
