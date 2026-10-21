@@ -1216,7 +1216,7 @@ function E.set_fx(heads, lpb, cmd, xx, off)
       elseif h.kind == 'midi' and cmd == '0S' and E.kit_pad and h.item and E.kit_pad(R.GetMediaItem_Track(h.item), h.pitch) then
         E.kit_soff_set(h, lpb, xx)   -- 19 окт: нота кита — сдвиг окна пэда
       elseif h.kind == 'midi' then   -- 19 окт: команды item (0S, SI, SO, SL …) — только у аудио; MIDI молча не писал
-        E.skip_msg = cmd .. 'xx: a MIDI note cannot take it (audio notes only' .. (cmd == '0S' and '; drumrs5k: the slice column picks the pad, a start offset - later in jf_slixer)' or ')')
+        E.skip_msg = cmd .. 'xx: a MIDI note cannot take it (audio notes only' .. (cmd == '0S' and '; drumrs5k: the note picks the pad, a start offset - later in jf_slixer)' or ')')
       else
         apply_fx(h, lpb, cmd, xx)
       end

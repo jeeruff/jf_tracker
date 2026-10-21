@@ -3971,7 +3971,7 @@ function V.smart()
     local midi = h1 and h1.kind == 'midi'
     local kitn = midi and E.kit_pad and h1.item and h1.pitch and E.kit_pad(reaper.GetMediaItem_Track(h1.item), h1.pitch)
     items, cols, sel = SM.fx_letters(midi and function(code) return (E.cmds and E.cmds.CODES[code]) or (code == '0S' and kitn) end or nil)   -- нота кита: 0S — сдвиг окна пэда
-    title = 'command  ' .. where .. (midi and '  (MIDI note: 0S offset and item commands - audio only; drumrs5k: the slice column picks the pad)' or '')
+    title = 'command  ' .. where .. (midi and '  (MIDI note: 0S offset and item commands - audio only; drumrs5k: the note picks the pad)' or '')
     pick = function(it) return vals(it.v, nil) end
   end
   return ctx.smart_open({ title = title, items = items, cols = cols, sel = sel, on_pick = pick, on_sel = listen, cell_rows = crows, cell_w = cellw })

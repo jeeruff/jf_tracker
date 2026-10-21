@@ -445,9 +445,10 @@ function D.layout(snap, state, nregions)
   L.w_inst = ms('00')
   L.x_inst = L.x_note + L.w_note + L.pad
   -- 11 окт: номер слайса — своё поле после инструмента (нота | инструмент | слайс | vol), hex как в списке слайсов
+  -- 21 окт: отдельной колонки слайса нет — слайс это команда 0Sxx в колонке fx (как в Renoise); показ — draw_cell
   L.w_slc = ms('S00')
-  L.x_slc = L.x_inst + L.w_inst + L.pad
-  L.x_vol = L.x_slc + L.w_slc + L.pad
+  L.x_slc = false
+  L.x_vol = L.x_inst + L.w_inst + L.pad
   -- порядок: волна | нота | инстр. | vol | fx1..n | delay (просьба 1 окт)
   -- 14 окт: колонка пана (опция pan column) — сразу за громкостью, hex 00..FF, 80 — центр
   L.w_pan = ms('00')
@@ -2344,8 +2345,16 @@ local function draw_cell(L, cell, x, y, ty, inv)
     elseif cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.RN_DELAY))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     local fx = cell.fx or DCS.NOFX
+    -- 21 окт: слайс аудио-ноты — 0Sxx в первой свободной колонке команд (своей 0S нет)
+    local vs_i
+    if k == 'audio' and cell.slice and L.nfx > 0 then
+      local has = false
+      for i = 1, L.nfx do if fx[i] and fx[i]:sub(1, 2) == '0S' then has = true end end
+      if not has then for i = 1, L.nfx do if not fx[i] then vs_i = i; break end end end
+    end
     for i = 1, L.nfx do
-      if fx[i] then
+      if i == vs_i then text(x + L.x_fx[i], ty, '0S' .. D.HEX2[cell.slice % 256], c(3 + i, muted and U.GREY or (D.FX_COL['0S'] or D.RN_OTHER)))
+      elseif fx[i] then
         -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
         local col = D.FX_COL[fx[i]:sub(1, 2)] or (fx[i]:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER
         text(x + L.x_fx[i], ty, fx[i], c(3 + i, muted and U.GREY or col))
