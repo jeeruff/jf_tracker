@@ -205,7 +205,9 @@ local state = {
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
   notesus = flag('notesus', false),
-  chordlane = flag('chordlane', false),   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
+  chordlane = flag('chordlane', false),
+  keymark = flag('keymark', true),     -- 21 окт: ноты вне лада (:key) — красноватые
+  keysnap = flag('keysnap', false),    -- 21 окт: набор в ладу — клавиша вне лада к ближайшей ступени   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -10477,7 +10479,7 @@ ctx = {
   end,
   harm_info = function()
     local col = cur_col()
-    local inf = { col_name = col and col.name, lane = col and state.folds[col.guid] == 'chord', list = {} }
+    local inf = { col_name = col and col.name, lane = col and state.folds[col.guid] == 'chord', list = {}, keymark = state.keymark, keysnap = state.keysnap }
     if not col then return inf end
     local _, here = ctx.chord_heads(col, vim.cur.row)
     inf.here = #here > 0 and MMX.CH.name(here) or nil
@@ -10503,7 +10505,9 @@ ctx = {
   harm_do = function(r)
     if r == 'leave' then ctx.set_focus('tracker'); return end
     if type(r) == 'table' then
-      if r.write then ctx.chord_cmd(r.write) elseif r.lane then ctx.chord_cmd('') end
+      if r.write then ctx.chord_cmd(r.write) elseif r.lane then ctx.chord_cmd('')
+      elseif r.keyauto then ctx.key_cmd('') elseif r.key then ctx.key_cmd(r.key) end   -- 21 окт
+      if r.keyauto or r.key then return end
     end
     reaper.SetExtState('jf_tracker', 'harmroot', tostring(MMX.HM.root), true)
     reaper.SetExtState('jf_tracker', 'harmminor', MMX.HM.minor and '1' or '0', true)
@@ -16356,6 +16360,7 @@ end
 ctx.chord_pub = { cc = -1, src = nil }
 -- 21 окт: лад песни (ProjExtState jf_tracker/key «9 minor»); нет — по нотам (TH.detect)
 MMX.TH = dofile(DIR .. '/jf_tracker_theory.lua'); MMX.TH.init(MMX.CH)
+ctx.TH, ctx.CH_NAMES = MMX.TH, MMX.CH.NAMES   -- 21 окт: vim (диатонический транспоз)
 ctx.song_notes = function(t0, t1)
   local notes = {}
   for _, c in ipairs(snap and snap.cols or {}) do
@@ -16386,14 +16391,50 @@ ctx.key_get = function()
   if r then return tonumber(r), id end
   return nil
 end
+-- 21 окт: лад сейчас: лад проекта (:key), иначе — панели harmonizer
+ctx.key_now = function()
+  local r, id = ctx.key_get()
+  if r then return r, id end
+  return nil
+end
+ctx.key_snap = function(p)
+  if not state.keysnap then return p end
+  local r, id = ctx.key_now()
+  if not r then return p end
+  return MMX.TH.snap(p, r, id)
+end
+-- классы нот лада для отрисовки (draw.key_pcs): раз в 0.5 с и сразу после :key
+ctx.key_tick = function(force)
+  local now = reaper.time_precise()
+  if not force and ctx.key_t and now - ctx.key_t < 0.5 then return end
+  ctx.key_t = now
+  local r, id = nil, nil
+  if state.keymark then r, id = ctx.key_now() end
+  local k = r and (r .. id) or nil
+  if k == ctx.key_k then return end
+  ctx.key_k = k
+  if not r then draw.key_pcs = nil; return end
+  local set = {}
+  for _, pc in ipairs(MMX.TH.pcs(r, id)) do set[pc] = true end
+  draw.key_pcs = set
+end
 ctx.key_set = function(root, id)
   reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
+  ctx.key_t = nil
   if root and MMX.HM then MMX.HM.root = root; MMX.HM.minor = (id == 'minor' or id == 'harmmin' or id == 'melmin' or id == 'dorian' or id == 'phrygian' or id == 'locrian') end
 end
 -- :key — лад песни по нотам (MIDI всех треков, кроме китов и сессии; вес — длительность); :key Am / :key D dorian — задать
 ctx.key_cmd = function(arg)
   arg = (arg or ''):match('^%s*(.-)%s*$')
   local TH = MMX.TH
+  -- 21 окт: :key mark / snap / off — подсветка нот вне лада, набор в ладу, лад проекта снять
+  if arg == 'mark' or arg == 'snap' then
+    local k = arg == 'mark' and 'keymark' or 'keysnap'
+    state[k] = not state[k]; reaper.SetExtState(EXT, k, state[k] and '1' or '0', true); ctx.key_t = nil
+    vim.msg = arg == 'mark' and ('notes out of the key: ' .. (state[k] and 'marked red' or 'plain')) or ('typing in the key: ' .. (state[k] and 'on (a key off the scale - the nearest degree)' or 'off'))
+    return
+  end
+  if arg == 'off' then ctx.key_set(nil); vim.msg = 'key of the song: none'; return end
   if arg ~= '' then
     local l, acc, rest = arg:match('^([A-Ga-g])([#b]?)(.*)$')
     if not l then vim.msg = ':key Am | C | D dorian | (empty - from the notes)'; return end
@@ -18474,7 +18515,7 @@ local function frame()
   end
   -- 11 окт: протяжка слайдера скорости (точки-защёлки 0.25 0.5 0.75 1 1.5 2 — ближе 0.04 — прилипает)
   -- 20 окт: всплывающий слайдер скорости закрывается щелчком мимо него и значения
-  if ctx.rate_pop and U.click and hover.ctrl ~= 'ratebar' and hover.ctrl ~= 'ratepop' then ctx.rate_pop = nil end
+  do local hv = ctx.hover_prev or {}; if ctx.rate_pop and U.click and hv.ctrl ~= 'ratebar' and hv.ctrl ~= 'ratepop' then ctx.rate_pop = nil end end   -- 21 окт: hover здесь ещё не объявлен (local ниже) — был nil-глобал, чёрный экран
   if ctx.ratedrag then
     local r0 = draw.strip_cell and (ctx.ratedrag == 'pop' and draw.strip_cell.ratepop or draw.strip_cell.ratebar)
     if gfx.mouse_cap & 1 == 1 and r0 then
@@ -18808,6 +18849,7 @@ local function frame()
   end
   draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Ctrl+Cmd)
   draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
+  ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
@@ -19528,6 +19570,7 @@ local function frame()
       return hv
     end or nil,
   })
+  ctx.hover_prev = hover   -- 21 окт: для проверок в начале следующего кадра (rate_pop)
   -- 19 окт: панель patterns — её hover там же, где палитра в матрице (щелчки и статус — одним кодом)
   if hover.patpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.patpane) do hover.matrix[k] = v end end
   -- 19 окт: list рэка — колесо над значением меняет параметр пэда, щелчок — пэд выбран, параметр — в DSP
@@ -24001,7 +24044,9 @@ local function frame()
     end
     if TK[c] and not m.cmd and (m.alt or m.shift or m.ctrl) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local scope = m.alt and 'sel' or ((m.shift and m.ctrl) and 'col' or (m.shift and 'track' or 'pattern'))
-      if vim.transpose_scope(scope, TK[c]) then model.invalidate() end
+      -- 21 окт: Opt+Shift+F1 F2 — по ступеням лада (:key); F11 F12 — октава как была
+      local diat = m.alt and m.shift and not m.ctrl and (c == 26161 or c == 26162)
+      if vim.transpose_scope(scope, TK[c], nil, diat) then model.invalidate() end
       c = 0
     end
   end

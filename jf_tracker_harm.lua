@@ -172,6 +172,9 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   cx = btn(cx, y, bw_of('staff'), 'staff', HM.show_staff, { kind = 'staff' })
   cx = btn(cx, y, bw_of('tab'), 'tab', HM.show_tab, { kind = 'tab' })
   cx = btn(cx, y, bw_of('just'), 'just', HM.ji, { kind = 'ji' })   -- 16 окт: натуральный строй микротонами (j)
+  -- 21 окт: лад в трекере — ноты вне лада красноватые (o), набор в ладу (i)
+  cx = btn(cx, y, bw_of('out'), 'out', info.keymark, { kind = 'kmark' })
+  cx = btn(cx, y, bw_of('in key'), 'in key', info.keysnap, { kind = 'ksnap' })
   if info.col_name then U.text(cx + L.pad, y, fit(info.col_name .. (info.here and ('  now: ' .. info.here) or '  now: -'), x + w - cx - L.pad), info.here and U.TEXT or U.GREY) end
   -- строки 2..3: ступени — одна ширина на все (по самой длинной подписи)
   local roman = true
@@ -226,7 +229,9 @@ function HM.click(d, pitches)
   if not d then return nil end
   if d.kind == 'root' then HM.root = (HM.root + d.d) % 12; return true
   elseif d.kind == 'mode' then HM.minor = not HM.minor; return true
-  elseif d.kind == 'auto' then local r, m = HM.detect(pitches); if r then HM.root, HM.minor = r, m end; return true
+  elseif d.kind == 'auto' then return { keyauto = true }   -- 21 окт: лад песни по всем трекам (:key), все лады
+  elseif d.kind == 'kmark' then return { key = 'mark' }
+  elseif d.kind == 'ksnap' then return { key = 'snap' }
   elseif d.kind == 'lane' then return { lane = true }
   elseif d.kind == 'staff' then HM.show_staff = not HM.show_staff; return true
   elseif d.kind == 'tab' then HM.show_tab = not HM.show_tab; return true
@@ -248,6 +253,8 @@ function HM.key(c, pitches)
   if ch == 's' then return HM.click({ kind = 'staff' }) end
   if ch == 't' then return HM.click({ kind = 'tab' }) end
   if ch == 'j' then return HM.click({ kind = 'ji' }) end
+  if ch == 'o' then return HM.click({ kind = 'kmark' }) end
+  if ch == 'i' then return HM.click({ kind = 'ksnap' }) end
   return nil
 end
 

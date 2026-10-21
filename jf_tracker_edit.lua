@@ -564,11 +564,23 @@ local function inst_base(it)
 end
 E.inst_base = inst_base
 
-function E.transpose(heads, lpb, semis)
-  if #heads == 0 or semis == 0 then return end
-  run(('transpose %+d'):format(semis), function()
+-- 21 окт: map(pitch) → новая высота у каждой ноты своя (диатонический транспоз по ладу)
+function E.transpose_map(heads, lpb, map, label)
+  if #heads == 0 then return end
+  E.transpose(heads, lpb, 0, map, label)
+end
+function E.transpose(heads, lpb, semis, map, label)
+  if #heads == 0 or (semis == 0 and not map) then return end
+  run(label or ('transpose %+d'):format(semis), function()
     local mic = {}
     for _, h in ipairs(heads) do
+      if map then   -- сдвиг этой ноты: от её высоты
+        local p0
+        if h.kind == 'midi' then local _, n = midi_note(h, lpb); p0 = n and n.pitch
+        elseif h.kind == 'audio' and h.take then p0 = 60 + audio_semis(h) end
+        semis = p0 and (map(p0) - p0) or 0
+      end
+      if semis == 0 then goto next_head end
       local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
       if h.kind == 'audio' and h.take and tonumber(slk) then
         -- 15 окт: слайс — его высота (как E.set_pitch): D_PITCH от базы инструмента; раньше шло через rate
@@ -587,6 +599,7 @@ function E.transpose(heads, lpb, semis)
           mic[h.take] = mic[h.take] or {}; mic[h.take][('%d:%d:%d'):format(n.ch, math.floor(n.sppq + 0.5), p)] = h.micro or 0   -- 16 окт: микротон едет с нотой
         end
       end
+      ::next_head::
     end
     for tk, over in pairs(mic) do E.micro_sync(tk, over) end
   end)

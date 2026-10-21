@@ -127,6 +127,7 @@ function D.init(u, peaks_fn, matrix)
   D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true,
              [D.MODE_COL.visual] = true, [D.MODE_COL.cmd] = true, [D.REC] = true }   -- 15 окт: цвета режимов и O записи
   D.CURCELL = U.MONO_CURSOR or U.TEXT
+  D.OFFKEY = U.readable(U.mix(U.RED, U.TEXT, 0.35), U.BG, 4.0)   -- 21 окт: нота вне лада (с проверкой контраста)
   U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
 
@@ -988,6 +989,7 @@ function D.layout(snap, state, nregions)
         end
       end
       for _, ev in ipairs(c.envs) do if ev.x >= lim then ev.x = lim; ev.w = 0 elseif ev.x + ev.w > lim then ev.w = lim - ev.x end end
+      for _, ln in ipairs(c.lanes) do if ln.x and ln.w and ln.x + ln.w > lim then ln.w = math.max(0, lim - ln.x) end end   -- 21 окт: кнопки −+ / a+ шапки — от обрезанной ширины
       for k = #c.mls, 1, -1 do   -- 21 окт: PB лез на Tempo мастера — за краем лейна нет, у края обрезан
         local ml = c.mls[k]
         if ml.x >= lim - L.pad then table.remove(c.mls, k) elseif ml.x + ml.w > lim then ml.w = lim - ml.x end
@@ -2349,7 +2351,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
   draw_inst()
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
-    text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or U.TEXT)))   -- видео-событие (9 окт)
+    local offkey = D.key_pcs and cell.pitch and not cell.video and not D.key_pcs[math.floor(cell.pitch + 0.5) % 12]   -- 21 окт: нота вне лада (:key mark)
+    text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))))   -- видео-событие (9 окт)
     if cell.micro and D.micro and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
@@ -5610,7 +5613,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'matrix' then
         if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
-            return MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+            return MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks, view = D.mx_view,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
           end)
           if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
@@ -6971,7 +6974,7 @@ function D.frame(L, snap, rows, state, info)
           local cx = p.f.x + (fx or 0)
           local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
           local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
-          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= W and (lx > last_r + 1 or d == 0) then
+          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= ((p.f.x < L.cols_r) and L.cols_r or W) and (lx > last_r + 1 or d == 0) then   -- 21 окт: поле трека у мастера — не дальше его границы
             text(lx, jy, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
             last_r = lx + ms(lab)
           end
@@ -7493,6 +7496,14 @@ function D.frame(L, snap, rows, state, info)
     -- номера шагов (2 окт): протяжка = time selection REAPER
     if in_body and mx >= tx0 + L.rl and mx < tx0 + L.label_w then hover.rownum = r.row end
     for _, c in ipairs(L.cols) do
+      -- 21 окт: трек уходит под мастер — его текст не дальше границы мастера
+      local clip_k = D.clip
+      if not c.master then   -- пересечение с клипом кадра
+        local tc = D.trk_clip or {}; D.trk_clip = tc
+        tc[1], tc[2] = clip_k and clip_k[1] or 0, math.min(clip_k and clip_k[2] or 1e9, L.cols_r - 1)
+        tc[3], tc[4] = clip_k and clip_k[3], clip_k and clip_k[4]
+        D.clip = tc
+      end
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       -- 20 окт: и на долях (строки с точками темнее) — приоритетные прыжки по трекеру (метки раньше кнопок)
       if (r.bar or r.beat) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
@@ -7649,6 +7660,7 @@ function D.frame(L, snap, rows, state, info)
         end
         ::ml_next::
       end
+      D.clip = clip_k
     end
   end
   D.EMPTY, D.EMPTY_UNDER = empty0, under0
@@ -7928,6 +7940,15 @@ function D.frame(L, snap, rows, state, info)
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
   D.pmark('draw: matrix / performance')
+  -- 21 окт: что видно в трекере (строки тела, треки) — матрица подсвечивает эту зону светло-серым
+  do
+    local V = D.mx_view or { cols = {} }; D.mx_view = V
+    local v0, v1
+    for _, r in ipairs(rows) do if r.row and not r.clip then if not v0 or r.row < v0 then v0 = r.row end; if not v1 or r.row + 1 > v1 then v1 = r.row + 1 end end end
+    for k in pairs(V.cols) do V.cols[k] = nil end
+    for _, c in ipairs(L.cols or {}) do if c.ci and not c.master and c.x and (c.w or 0) > 0 then V.cols[c.ci] = true end end
+    V.r0, V.r1 = v0, v1
+  end
   if L.pn then D.panes_frame(L, snap, state, info, hover, ph)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and info.perf_draw then
     -- производительность (6 окт): на месте матрицы, пока открыта
@@ -7935,7 +7956,7 @@ function D.frame(L, snap, rows, state, info)
     local y1 = L.mx_bot or (L.body_y + L.body_h + (L.low_h or 0))
     info.perf_draw(L, 0, y0, L.matrix_w - D.SEPW, y1 - y0)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
-    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks,
+    hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks, view = D.mx_view,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
     -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
     -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)
