@@ -605,7 +605,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
   end
   MX.row_y, MX.row_h = {}, rh   -- 18 окт: свежие на кадр (MX.row_at — протяжка выделения)
-  for i = 1, nvis do
+  -- 21 окт: внизу место — неполный ряд следующего паттерна (видно, что ниже есть куда листать); низ срезается фоном
+  local ndraw = nvis
+  if bottom - top - nvis * rh > 2 and regions[MX.scroll + nvis + 1] then ndraw = nvis + 1 end
+  for i = 1, ndraw do
     local ri = MX.scroll + i
     local rg = regions[ri]
     if not rg then break end
@@ -960,7 +963,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- 17 окт: секция — рамка её цвета вокруг всех её слотов (номер, имя, ячейки треков)
   do
     local box = {}
-    for i = 1, nvis do
+    for i = 1, ndraw do
       local ri = MX.scroll + i
       local sc = sec_of[ri]
       if sc then
@@ -1049,6 +1052,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local last = math.min(#regions, MX.scroll + nvis)
     local ye = top + (last - MX.scroll) * rh
     if show_mk and last == #regions and ye + L.rh <= ybot then mark_row(mk_stop, ye, 'end') end
+  end
+  if ndraw > nvis then   -- 21 окт: неполный ряд — срезать ниже своей зоны, полосу прокрутки вбок вернуть
+    U.set(U.PANEL); gfx.rect(0, bottom, W, ybot - bottom, 1)
+    if hbar_h > 0 and ctx.hbar then ctx.hbar('matrixh', L.mx_label_w, ybot - 4, ncv * L.mx_cell_w, 3, MX.hs, ncv, ncols) end
   end
   if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
   return hover

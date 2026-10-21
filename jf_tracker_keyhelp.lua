@@ -182,6 +182,7 @@ KH.PAGES = {
     { k = 'Tf To', t = { 'T' }, m = 'take fx: add / open', d = 'T f - add a take fx to the note under the cursor, T o - its take fx chain in DSP' },
     { k = 'tT', m = 'track from template', d = 'a track from a template after the cursor track' },
     { k = 'tF', m = 'into left folder', d = 'the cursor track goes into the folder of the track to the left' },
+    { k = 'tw', m = 'wave column of track', d = 'the wave column of the cursor track: show / hide; again - auto (only with audio or a drumrs5k kit with samples)' },
     { k = 'g12 Enter', t = {}, m = 'go to row number', d = 'go to row 0012 (also 12gg)' },
     { k = 'Opt+W', d = 'the cursor to the master columns (∑); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
     { k = 'zp', d = 'view: only the pattern of the cursor / the whole project (the project | pattern buttons, :reg)' },

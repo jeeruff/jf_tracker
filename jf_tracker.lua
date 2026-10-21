@@ -367,7 +367,8 @@ local state = {
   -- сетка карточек jf_pm с превью, big — на всё окно (jf_tracker_pm.lua)
   -- модуля карточек нет в релизе (не отгружается) — без файла опции нет и с .dev
   pm_ok = reaper.file_exists(DIR .. '/jf_tracker_pm.lua'),
-  pmgrid = reaper.file_exists(DIR .. '/.dev') and reaper.file_exists(DIR .. '/jf_tracker_pm.lua') and flag('pmgrid', true) or false,
+  -- 21 окт: карточки pm — и в релизе, если установлен jf_pm (есть его индекс); без него вкладки нет
+  pmgrid = reaper.file_exists(DIR .. '/jf_tracker_pm.lua') and (reaper.file_exists(DIR .. '/.dev') or reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_pm/jf_pm_index.json')) and flag('pmgrid', true) or false,
   pmthumb = flag('pmthumb', true), pmicon = flag('pmicon', true),   -- превью / метка DAW на карточках pm
   keepsamples = flag('keepsamples', true),       -- страховка сэмплов (edit.keep_samples), по умолчанию вкл
   copymedia = flag('copymedia', true),
@@ -11850,7 +11851,7 @@ ctx = {
     local byk, used = {}, {}
     for _, it in ipairs(ctx.option_items()) do
       -- 11 окт: тема, шрифт и его размер — только во вкладке theme (там с примерами), здесь не дублируются
-      if not it.sep and it.key ~= 'theme' and it.key ~= 'ttf' and it.key ~= 'fontscale' and (state.dev or (it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
+      if not it.sep and it.key ~= 'theme' and it.key ~= 'ttf' and it.key ~= 'fontscale' and (state.dev or ctx.pm_installed() or (it.key ~= 'pmgrid' and it.key ~= 'pmshape' and it.key ~= 'pmthumb' and it.key ~= 'pmicon')) then byk[#byk + 1] = it end
     end
     local function add_sect(title, keys)
       local first = true
@@ -11888,7 +11889,7 @@ ctx = {
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
       local page = KH.PAGES[pg]
-      if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca' and pg ~= 'pm')) then
+      if page and pg ~= 'intro' and (state.dev or (pg ~= 'grid' and pg ~= 'orca' and (pg ~= 'pm' or ctx.pm_installed()))) then
         local mod = (page.title or pg):gsub('%s*%-.*$', '')
         for _, en in ipairs(page.e or {}) do
           if en.k and en.d then items[#items + 1] = { label = en.k, kind = 'action', value = mod, key = mod, desc = en.d, hk = true } end
@@ -24687,6 +24688,43 @@ ctx.mem = function()
   reaper.SetExtState(EXT, 'mem', rep, false)
   if ctx.dlog then pcall(ctx.dlog, 'mem: ' .. rep) end
   vim.msg = rep
+end
+-- 21 окт: jf_pm установлен (есть индекс) — карточки pm и их опции и без dev
+ctx.pm_installed = function()
+  if ctx.pm_inst == nil then ctx.pm_inst = reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_pm/jf_pm_index.json') end
+  return ctx.pm_inst
+end
+-- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
+ctx.wave_pref_c = {}
+draw.wave_pref = function(col)
+  local g = col and col.guid
+  if not g then return nil end
+  local v = ctx.wave_pref_c[g]
+  if v == nil then
+    v = 'auto'
+    if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+      local _, s = reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_wave', '', false)
+      if s == '1' then v = true elseif s == '0' then v = false end
+    end
+    ctx.wave_pref_c[g] = v
+  end
+  if v == 'auto' then return nil end
+  return v
+end
+ctx.track_wave = function(col)
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
+  local cur = draw.wave_pref(col)
+  local nv
+  if cur == nil then
+    -- авто сейчас: показана, если есть аудио / кит — тогда «убрать», иначе «показать»
+    local has = draw.col_is_kit(col)
+    for _, ln in ipairs(col.lanes or {}) do if ln.audio_sub then has = true end end
+    nv = has and '0' or '1'
+  end
+  reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_wave', nv or '', true)
+  ctx.wave_pref_c[col.guid] = nil
+  model.invalidate(); ctx.relayout()
+  vim.msg = ('%s: wave column %s'):format(col.name ~= '' and col.name or 'track', nv == '1' and 'shown (tw again - auto)' or (nv == '0' and 'hidden (tw again - auto)' or 'auto - only with audio or a kit'))
 end
 -- 21 окт: :memprof [сек] — строки кода, которые выделяют больше всего (выборка хуком), отчёт в debug log и ExtState memprof
 ctx.memprof = function(sec)

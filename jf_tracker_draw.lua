@@ -913,7 +913,14 @@ function D.layout(snap, state, nregions)
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
-          if not narrow and not lane.audio_sub and not (col.pool and #col.pool > 0) and not D.col_is_kit(col) then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
+          -- 21 окт: волна — только когда есть что показать (аудио в лейне или кит с сэмплами); tw — выбор трека (D.wave_pref:
+          -- true / false / nil = авто). Пул lib общий на все треки — по нему не судить (так колонка не уходила никогда)
+          if not narrow then
+            local pref = D.wave_pref and D.wave_pref(col)
+            local show = lane.audio_sub ~= nil or D.col_is_kit(col)
+            if pref ~= nil then show = pref end
+            if not show then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
+          end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
