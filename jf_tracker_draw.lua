@@ -255,8 +255,15 @@ end
 -- Разбор без исключений: utf8.codes бросает ошибку на битой UTF-8 (имя,
 -- обрезанное посреди символа, cp1251 из чужих проектов) — так скрипт и падал.
 -- gmatch по utf8.charpattern не бросает; одиночный «хвостовой» байт — пропуск.
+-- 21 окт: память — гибридный шрифт режет строку с глифами на каждый text() каждый кадр (заметный мусор)
+local SEGC, SEGN = {}, 0
 local function segments(str)
+  local hit = SEGC[str]
+  if hit then return hit end
+  if SEGN > 4000 then SEGC, SEGN = {}, 0 end
+  SEGN = SEGN + 1
   local out, ascii = {}, {}
+  SEGC[str] = out
   for ch in str:gmatch('[%z\1-\127\194-\253][\128-\191]*') do
     if #ch == 1 then ascii[#ascii + 1] = ch
     else
@@ -465,6 +472,13 @@ function D.layout(snap, state, nregions)
   L.sub_w_compact_n = L.pad + L.w_note + L.pad
   L.GCN = setmetatable({ notes_only = true, narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = false, x_slc = false, x_pan = false, x_fx = {},
     x_vol = L.pad, x_del = L.pad, sub_w = L.sub_w_compact_n }, { __index = L })
+  -- 21 окт: свёрнутый чистый MIDI-трек — вместо пустой колонки волны номер инструмента и громкость: нота | инстр. | vol
+  do
+    local xi = L.pad + L.w_note + L.pad
+    local xv = xi + L.w_inst + L.pad
+    L.GCM = setmetatable({ narrow = true, w_wave = 0, nfx = 0, x_wave = L.pad, x_note = L.pad, x_inst = xi, x_slc = false, x_pan = false, x_fx = {},
+      x_vol = xv, x_del = xv, x_fold = false, nfields = 2, sub_w = xv + L.w_vol + L.pad }, { __index = L })
+  end
   -- 19 окт: трек кита drumrs5k — без поля Sxx (пэд = нота): поля правее него сдвинуты влево.
   -- L.kitG(G) — кит-вариант любой раскладки с полем слайса (обычная, уровни ширины GL), кэш на раскладку
   L.GKc = setmetatable({}, { __mode = 'k' })
@@ -899,7 +913,7 @@ function D.layout(snap, state, nregions)
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
-          if not narrow and not lane.audio_sub and not (col.pool and #col.pool > 0) and not D.col_is_kit(col) then G = L.nowaveG(G) end
+          if not narrow and not lane.audio_sub and not (col.pool and #col.pool > 0) and not D.col_is_kit(col) then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))

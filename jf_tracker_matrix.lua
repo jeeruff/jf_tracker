@@ -842,7 +842,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           -- полоска с событиями — цветом item, у играющего слота доля под плейхедом горит, как счётчик метронома
           local n = 4
           if info.sig_at and not rg.gap then n = math.max(1, math.min(8, (info.sig_at(rg.pos)) or 4)) end
-          local q = {}
+          MX.q8 = MX.q8 or {}                 -- 21 окт: одна таблица на все клетки (была новая на клетку в кадре)
+          local q = MX.q8
           for k = 1, n do q[k] = 0 end
           for _, e in ipairs(g.ev) do
             local a, b = e.pos, e.pos + e.len
@@ -867,7 +868,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           end
         else
           -- схема: четыре четверти региона сверху вниз — линия там, где есть события
-          local q = { 0, 0, 0, 0 }
+          MX.q4 = MX.q4 or {}
+          local q = MX.q4
+          q[1], q[2], q[3], q[4] = 0, 0, 0, 0
           for _, e in ipairs(g.ev) do
             local a, b = e.pos, e.pos + e.len
             for k = 1, 4 do

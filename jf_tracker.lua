@@ -1538,7 +1538,7 @@ ctx = {
     end)
     -- слайсер — на обрезанный сэмпл (огибающая заново)
     local old_len = e.len or b
-    e.offs = (e.offs or 0) + a * rate; e.len = b - a; e.slices = sl
+    e.offs = (e.offs or 0) + a * rate; e.len = b - a; e.slices = sl; e._pk_n = nil   -- 21 окт: ключ пиков (model.peaks) — заново
     if SL.entry == e then SL.open(e, col and col.track) end
     model.invalidate()
     reselect_item = e.item
@@ -3686,11 +3686,20 @@ ctx = {
     if ctx.qgen_cache and now - ctx.qgen_t < 0.5 and ctx.qgen_key == ctx.quick_str() then return ctx.qgen_cache end
     ctx.qgen_t, ctx.qgen_key, ctx.qgen_cache = now, ctx.quick_str(), out
     ctx.qitems = ctx.qitems or {}
-    for _, it in ipairs(ctx.option_items()) do
-      if it.key and need[it.key] then
-        ctx.qitems[it.key] = it
+    -- 21 окт: список Options (сотни замыканий) — только если нужного пункта ещё нет; найденные живут в ctx.qitems
+    -- (их get читает state напрямую); раньше весь список строился дважды в секунду
+    local missing = false
+    for k in pairs(need) do if not ctx.qitems[k] and not (ctx.qmiss or {})[k] then missing = true; break end end
+    if missing then
+      ctx.qmiss = {}
+      for k in pairs(need) do ctx.qmiss[k] = true end
+      for _, it in ipairs(ctx.option_items()) do if it.key and need[it.key] then ctx.qitems[it.key] = it; ctx.qmiss[it.key] = nil end end
+    end
+    for k in pairs(need) do
+      local it = ctx.qitems[k]
+      if it then
         local v = it.get and it.get()
-        out[it.key] = { label = it.label, on = it.kind == 'toggle' and v and true or (it.kind ~= 'toggle' and v ~= nil and v ~= 'off' and v ~= false) }
+        out[k] = { label = it.label, on = it.kind == 'toggle' and v and true or (it.kind ~= 'toggle' and v ~= nil and v ~= 'off' and v ~= false) }
       end
     end
     return out

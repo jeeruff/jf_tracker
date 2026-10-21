@@ -35,7 +35,7 @@ for _, sc in ipairs({ 1, 2, 4 }) do
   if ok2 then
     eq(L2.flat[2].compact, true, 'compact sub x' .. sc)
     local envf; for _, f in ipairs(L2.flat) do if f.env then envf = f end end
-    eq(envf ~= nil and envf.w == L2.env_cw, true, 'compact env narrow x' .. sc)
+    eq(envf ~= nil and envf.w <= L2.env_cw, true, 'compact env narrow x' .. sc)   -- 21 окт: у края окна (x4) — обрезана, но не шире узкой
     eq(L2.env_cw < L2.env_w, true, 'compact env thinner x' .. sc)
   end
   state.folds = { B = 'mini' }

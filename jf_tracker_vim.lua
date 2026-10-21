@@ -121,7 +121,7 @@ local function nfields(fi)
     if f.compact or (f.w and Lx and Lx.env_w and f.w < Lx.env_w) then return 1 end
     return 2
   end
-  if f.compact then return 1 end           -- свёрнутый трек: только нота
+  if f.compact then return (f.G and f.G.nfields) or 1 end   -- свёрнутый трек: только нота (21 окт: свёрнутый MIDI — нота и vol)
   if f.G and f.G.nfields then return f.G.nfields end   -- уровень ширины (7 окт): свои поля
   if f.narrow then return 2 end            -- узкая подколонка ноты аккорда: нота, velocity
   return 3 + (ctx.state.fxcols or 0)
