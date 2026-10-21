@@ -7620,6 +7620,8 @@ ctx = {
         end
       end
     end
+    -- 21 окт: V (строками) — и выделение времени REAPER по строкам (как items выше); v — только items
+    if vim.mode == 'vline' then reaper.GetSet_LoopTimeRange(true, false, t0, t1, false) end
     reaper.PreventUIRefresh(-1)
     reaper.UpdateArrange()
   end,
