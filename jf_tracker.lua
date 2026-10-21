@@ -23396,6 +23396,7 @@ local function frame()
   local c = gfx.getchar()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   ctx.mod_tick(c)
+  ctx.pedal_tick()   -- 21 окт: ` отпущен — педаль вверх
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
   if ctx.hold_len then
@@ -24834,6 +24835,19 @@ ctx.retro_overflow = function(it, col, t_row)
     end
     model.invalidate()
   end })
+end
+-- 21 окт: ` в NORMAL (клавиатура KEYS) — педаль сустейна (CC64), пока держишь: отпустил — вверх (JS_VKeys_GetState
+-- каждый кадр, ctx.pedal_tick); без JS — переключатель
+ctx.pedal_key = function()
+  if ctx.ped_key then return end   -- автоповтор, пока держат
+  ctx.wheel_send('pedal', true)
+  if reaper.JS_VKeys_GetState then ctx.ped_key = true; vim.msg = 'pedal down (let go of ` - up)'
+  else vim.msg = 'pedal down (` again - up)'; ctx.ped_toggle = not ctx.ped_toggle; if not ctx.ped_toggle then ctx.wheel_send('pedal', false); vim.msg = 'pedal up' end end
+end
+ctx.pedal_tick = function()
+  if not ctx.ped_key then return end
+  local st = reaper.JS_VKeys_GetState(-1)
+  if st and st:byte(keys.vk_of(96) or 0xC0) == 0 then ctx.ped_key = nil; ctx.wheel_send('pedal', false); vim.msg = 'pedal up' end
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}

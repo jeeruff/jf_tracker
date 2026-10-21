@@ -210,7 +210,7 @@ KH.PAGES = {
     { k = 'Ctrl+Opt+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another; + Cmd: the whole window is a pan pad for that track - sideways pan / balance, up wider, middle 0, down narrower / reversed (dual pan: L and R apart up, crossed down)' },
     { k = 'Cmd+Shift+1..9', d = 'select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)' },
     { k = 'Cmd+F11', d = 'fullscreen <-> docked (quick option title: title bar on / off); F11 alone is a note (frow)' },
-    { k = '`', d = 'NORMAL (and KEYS): play the whole sample of the instrument (was jump back - use the harpoon / Ctrl+O); INSERT: ` is note-off, the whole sample there is Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice to the end)' },
+    { k = '`', m = 'pedal / note-off', d = 'NORMAL with the keyboard (KEYS): the sustain pedal (CC64) while you hold it; INSERT: note-off (under an ended note - stretches it here); the whole sample: Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice)' },
     { k = 'm', d = 'KEYS on / off (the keyboard; the mode word shows KEYS): on - it has priority, 1 f1 2 f2 3 ... play notes (layout qwerty: q 2 w 3 e), [ ] octave (qwerty: z x), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'zm', d = 'minimize the pane in focus to its tab row (any pane but the tracker; in the matrix - z then m); again, a click on its tab or focusing it - open' },
     { k = 'zx', d = 'crossfade editor of REAPER: the note under the cursor and the notes of the track overlapping it' },

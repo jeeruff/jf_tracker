@@ -2539,7 +2539,7 @@ function V.key_impl(c)
       if (rn and (c == 123 or c == 125)) or (not rn and (c == 99 or c == 67)) then
         V.vel = math.max(1, math.min(127, (V.vel or 100) + ((c == 125 or c == 67) and 8 or -8))); V.msg = 'velocity ' .. V.vel; return
       end
-      if c == ('`'):byte() and V.mode == 'normal' then V.play_whole(); return end
+      if c == ('`'):byte() and V.mode == 'normal' and ctx.pedal_key then ctx.pedal_key(); return end   -- 21 окт: ` — педаль (держать), было: весь сэмпл
       -- 16 окт: Option+Shift+2 (€) — панель макросов и при клавиатуре в NORMAL; Shift+2 (@) снова прослушивает ноту
       if V.is_mac_key(c) and V.mode == 'normal' and ctx.mac_panel then ctx.mac_panel(V.count or 1); V.count = nil; return end
       local mods = ctx.mods and ctx.mods() or {}

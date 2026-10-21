@@ -68,6 +68,7 @@ local VK = { [','] = 0xBC, ['.'] = 0xBE, [';'] = 0xBA, ['/'] = 0xBF }
 function keys.vk(ch) return VK[ch] or ch:upper():byte() end
 -- 16 окт: код клавиши gfx.getchar → JS_VKeys: символ — как выше, F1..F12 (26161.. / 6697264..) — 0x70..0x7B
 VK['-'], VK['='] = 0xBD, 0xBB
+VK['`'] = 0xC0   -- 21 окт: ` — педаль в NORMAL (отпускание через JS_VKeys)
 -- имя клавиши по коду gfx.getchar: символ, F-ряд — f1 … f12 (строчными, узко)
 function keys.name(code)
   if code >= 26161 and code <= 26169 then return 'f' .. (code - 26160) end
