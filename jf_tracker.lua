@@ -23310,7 +23310,10 @@ local function frame()
     gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
   end
   if gfx.mouse_wheel ~= 0 and hover.fxb then
-    FB.cur = math.max(1, math.min(#FB.results(), FB.cur + (gfx.mouse_wheel > 0 and -3 or 3)))
+    -- 21 окт: над деревом — листается дерево, над списком — список (выбор не прыгает)
+    local d = gfx.mouse_wheel > 0 and -3 or 3
+    if FB.tree_x1 and gfx.mouse_x < FB.tree_x1 then FB.tree_scroll = math.max(0, math.min(math.max(0, #FB.tree() - 1), (FB.tree_scroll or 0) + d))
+    else FB.scroll = math.max(0, math.min(math.max(0, #FB.results() - 1), (FB.scroll or 0) + d)) end
     gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover.browser == 'pvvol' then

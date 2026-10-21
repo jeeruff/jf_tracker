@@ -1601,3 +1601,4 @@
 - [ ] 21 окт: reform — внизу панели подсказка строки под мышью / выбранной (что делает scale, curve, anchor …)
 - [ ] 21 окт: humanizer / reform / bouncer — строка клавиш внизу (j k, h l, H L, Space, 0, Enter, Esc, f …) при hints; humanizer — подсказка строки под мышью / выбранной (и «не для MIDI» у гашёных)
 - [ ] 21 окт: reform / humanizer / bouncer — буква строки янтарём (scale s, curve c, anchor a, value mode m …), нажал — курсор на строку
+- [ ] 21 окт: fx list — колесо над деревом листает дерево, над списком — список (выбор не прыгает)

@@ -308,14 +308,19 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   local was = FB.tree_on
   FB.tree_on = w >= L.cw * 34
   if FB.tree_on ~= was then FB.cur = 1; FB.scroll = 0 end
+  FB.tree_x1 = nil
   if FB.tree_on then
     local tw = math.max(L.cw * 14, math.min(L.cw * 24, math.floor(w * 0.4)))
     local rows = FB.tree()
     local top = y + 3
     local nvis = math.max(1, math.floor((h - 6) / L.rh))
     FB.tree_cur = math.max(1, math.min(#rows, FB.tree_cur))
-    if FB.tree_cur - 1 < FB.tree_scroll then FB.tree_scroll = FB.tree_cur - 1 end
-    if FB.tree_cur - 1 >= FB.tree_scroll + nvis then FB.tree_scroll = FB.tree_cur - nvis end
+    if FB.tree_seen ~= FB.tree_cur then   -- 21 окт: за курсором — только когда он сдвинулся (колесо листает свободно)
+      FB.tree_seen = FB.tree_cur
+      if FB.tree_cur - 1 < FB.tree_scroll then FB.tree_scroll = FB.tree_cur - 1 end
+      if FB.tree_cur - 1 >= FB.tree_scroll + nvis then FB.tree_scroll = FB.tree_cur - nvis end
+    end
+    FB.tree_scroll = math.max(0, math.min(FB.tree_scroll, math.max(0, #rows - nvis)))
     for i = 1, nvis do
       local idx = FB.tree_scroll + i
       local r = rows[idx]
@@ -336,6 +341,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     end
     if U.vbar then U.vbar('fxbtree', x, top, tw, nvis * L.rh, FB.tree_scroll, nvis, #rows) end
     U.set(U.LINE); gfx.rect(x + tw, y, 1, h, 1)
+    FB.tree_x1 = x + tw   -- 21 окт: колесо левее — дерево
     x, w = x + tw + 1, w - tw - 1
   end
   -- папки (как нативный браузер) и * — избранное для выбранного
@@ -388,8 +394,12 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   local top = sy + L.rh + 3
   local nvis = math.max(1, math.floor((y + h - top - 2) / L.rh))
   if FB.cur > #res then FB.cur = math.max(1, #res) end
-  if FB.cur - 1 < FB.scroll then FB.scroll = FB.cur - 1 end
-  if FB.cur - 1 >= FB.scroll + nvis then FB.scroll = FB.cur - nvis end
+  if FB.cur_seen ~= FB.cur then   -- 21 окт: за курсором — только когда он сдвинулся
+    FB.cur_seen = FB.cur
+    if FB.cur - 1 < FB.scroll then FB.scroll = FB.cur - 1 end
+    if FB.cur - 1 >= FB.scroll + nvis then FB.scroll = FB.cur - nvis end
+  end
+  FB.scroll = math.max(0, math.min(FB.scroll, math.max(0, #res - nvis)))
   for i = 1, nvis do
     local idx = FB.scroll + i
     local r = res[idx]
