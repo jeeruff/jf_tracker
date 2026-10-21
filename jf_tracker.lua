@@ -16551,6 +16551,29 @@ ctx.harmonize_cmd = function(arg)
   for _, p in ipairs(picks) do t[#t + 1] = p.sym .. (p.alt and ('(' .. p.alt .. ')') or '') end
   vim.msg = ('harmonize %s in %s %s: %s - chord lane (in brackets - the next best; Enter on the chord column - other chords)'):format(col.name, MMX.CH.NAMES[r + 1], MMX.TH.BY[id].name, table.concat(t, ' '))
 end
+-- 21 окт: :transcribe — соло аудио → MIDI: айтем под курсором выбирается, запускается jf_transcribe.lua
+-- (экшен REAPER; aubionotes он зовёт сам — по этой явной команде; трекер процессов не порождает)
+ctx.transcribe_cmd = function()
+  local col = cur_col()
+  if not (col and col.track) then vim.msg = 'transcribe: no track under the cursor'; return end
+  local t, tn = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
+  local hit
+  for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+    local it = reaper.GetTrackMediaItem(col.track, i)
+    local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local tk = reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) and p < tn - 1e-6 and p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > t + 1e-6 then hit = it; break end   -- айтем в строке (с задержкой — тоже)
+  end
+  if not hit then vim.msg = 'transcribe: no audio item on the cursor row of ' .. col.name; return end
+  local cmd = 0
+  for _, id in ipairs({ '_RS7fc792ae122ec2e77fd84f0da820f5affa7598b9' }) do cmd = reaper.NamedCommandLookup(id); if cmd ~= 0 then break end end
+  if cmd == 0 then vim.msg = 'transcribe: jf_transcribe.lua is not in the action list (Actions > Load ReaScript: ~/code/reascript/jf_transcribe.lua)'; return end
+  reaper.Main_OnCommand(40289, 0)                -- снять выделение айтемов
+  reaper.SetMediaItemSelected(hit, true)
+  reaper.UpdateArrange()
+  reaper.Main_OnCommand(cmd, 0)
+  vim.msg = 'transcribe: jf_transcribe opened on the item under the cursor - Transcribe, tune, Apply (the MIDI lands on a new track under ' .. col.name .. ')'
+end
 -- :bass [fifth] — бас по колонке chord мастера (маркеры ch:) на трек курсора: корень на аккорд (fifth — корень, потом квинта)
 ctx.bass_cmd = function(arg)
   local fifth = (arg or ''):match('fifth') ~= nil
