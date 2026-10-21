@@ -17166,6 +17166,7 @@ function ctrl_action(name, delta)
   elseif name == 'legato' then
     edit.step_legato = not edit.step_legato; reaper.SetExtState(EXT, 'steplegato', edit.step_legato and '1' or '0', true)
     vim.msg = 'legato ' .. (edit.step_legato and 'on: an inserted note and the one before it last to the next note, not stretched (the instrument loop plays on)' or 'off')
+    if edit.step_legato and ctx.legato_join then ctx.legato_join() end   -- 21 окт: включил — и уже написанные ноты паттерна соединяются
   elseif name == 'inst' then pool_select(vim.inst + (delta ~= 0 and delta or 1))
   elseif name == 'follow' then state.follow = not state.follow
   elseif name == 'lock' then state.lock = not state.lock; lock_sync = {}; vim.msg = 'lock to REAPER cursor: ' .. (state.lock and 'on' or 'off')
@@ -24984,6 +24985,31 @@ ctx.wheel_owner = function()
     end
   end
   return best
+end
+-- 21 окт: legato на написанное: MIDI-ноты трека курсора в паттерне — каждая до следующей ноты своей подколонки
+-- (OFF прямо перед ней: строкой выше; с OFF в конце строки — на строку ниже); последняя — как была. Один undo
+ctx.legato_join = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not (f and f.col) then return end
+  local r0, r1 = ctx.region_rows()
+  if not r0 then vim.msg = 'legato: the cursor is not in a pattern'; return end
+  local n = 0
+  edit.run('legato: join notes', function()
+    for _, g in ipairs(L.flat) do
+      if g.col and g.col.guid == f.col.guid and not g.env and g.sub then
+        local hs = {}
+        for r, cl in pairs(g.sub) do if type(r) == 'number' and r >= r0 and r <= r1 and cl.kind == 'midi' then hs[#hs + 1] = { r = r, h = cl } end end
+        table.sort(hs, function(a, b) return a.r < b.r end)
+        for k = 1, #hs - 1 do
+          local nx = hs[k + 1].r
+          edit.note_off({ hs[k].h }, state.lpb, nx - (edit.OFF_END and 1 or 0))
+          n = n + 1
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('legato on: %d note(s) of the pattern joined to the next (u - undo)'):format(n)
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
