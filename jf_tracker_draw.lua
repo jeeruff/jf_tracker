@@ -9629,7 +9629,8 @@ function D.frame(L, snap, rows, state, info)
     for k = #L.cols, 1, -1 do if not L.cols[k].master then lc = L.cols[k]; break end end
     local kx0 = (lc.x or 0) + (lc.w or 0) + 2 * L.pad
     -- 11 окт: мастер справа (колонка Tempo у края) — keycast до него, а не до края окна
-    local kx1 = ((L.master_right or L.mfold) and L.cols_r or W) - L.pad   -- 20 окт: и сложенный мастер — до его полосы
+    local kx1 = (L.master_right and not L.mfold and L.cols_r or W) - L.pad   -- 21 окт: сложенный мастер — к стенке окна, поверх его узкой полосы (на подложке)
+    local kfold = L.mfold and true or false
     local now = info.now or 0
     -- свой масштаб (4 окт: keys - / keys + в главном модуле)
     local s0, kcs = D.SCALE, (info.keycast_scale or 0) > 0 and info.keycast_scale or nil
@@ -9640,7 +9641,7 @@ function D.frame(L, snap, rows, state, info)
     local krh = TH() + 2
     -- 20 окт: справа нет места (треки во всю ширину, сложенный мастер) — поверх правых треков на подложке
     -- (было: зона уже 6 знаков — keycast молча не рисовался, «невидим» в solarized)
-    local kback = false
+    local kback = kfold   -- 21 окт: над полосой сложенного мастера — на подложке
     -- 21 окт: на подложке — вплотную к правой линии треков (D.cols_edge), не через неё в зазор у мастера
     if kx1 - kx0 < L.cw * 10 then
       kx1 = math.min(kx1, (D.cols_edge(L) or (kx1 + L.pad)) - L.pad)
