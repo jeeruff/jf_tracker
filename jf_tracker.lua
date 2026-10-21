@@ -19575,9 +19575,9 @@ local function frame()
     end
   end
   local pop = vim.popup()
-  local mpop = not state.pane_mode and ctx.mod_pop() or nil   -- 21 окт: и панель help (KH.mod_view) — без опции whichkey
+  local mpop = not state.pane_mode and ctx.mod_pop() or nil   -- 21 окт: панель help (KH.mod_view) — без опции whichkey
   if not mpop then KH.mod_view = nil end
-  if not pop and state.whichkey then pop = mpop end   -- 21 окт: держишь модификатор — что он даёт здесь
+  -- 21 окт: всплывашка у курсора не нужна — список только в панели help (пользователь)   -- 21 окт: держишь модификатор — что он даёт здесь
   if not pop and (state.whichkey or state.pane_mode) then
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))

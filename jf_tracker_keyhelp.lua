@@ -235,7 +235,7 @@ KH.PAGES = {
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
     { k = 'F1', d = 'manual' },
-    { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - a list at the module: what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere (option whichkey)' },
+    { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - the help pane lists what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere' },
     { k = 'F2', d = 'back to the tracker from anywhere (closes the routing diagram, big router / chain); the item tab is in the F4 circle' },
     { k = 'F3', d = 'mixer on / off (in its routing strip Option+click on a routing name or a wire removes it)' },
     { k = 'F4', d = 'the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)' },
@@ -769,7 +769,7 @@ KH.PAGES = {
     { k = 'BS', d = 'erase search' },
     { k = 'Esc', d = 'clear search / back to module' },
     { k = 'F1', d = 'the whole help' },
-    { k = 'hold Shift Ctrl Opt Cmd', t = {}, d = 'hold a modifier (or two) half a second, no key - a list at the module: what it does here and everywhere (option whichkey)' },
+    { k = 'hold Shift Ctrl Opt Cmd', t = {}, d = 'hold a modifier (or two) half a second, no key - the help pane lists what it does here and everywhere' },
   } },
 }
 -- строка подсказок под модулем (опция hints, 2 окт): самое нужное в одну
