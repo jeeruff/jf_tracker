@@ -23525,6 +23525,17 @@ local function frame()
   -- 11 окт: auto instrument — трек / клип под курсором сменились: инструмент lib — его
   -- (аудио: клип под курсором или последний выше; без аудио — плагин-инструмент трека);
   -- ручной выбор держится, пока курсор не дошёл до другого клипа или трека
+  -- 21 окт: курсор пришёл на трек с плагином-инструментом (VSTi / VST3i / AUi / CLAPi / JSFX-инструмент) —
+  -- в стеке нижних вкладок открывается dsp (фокус остаётся в трекере)
+  if state.focus == 'tracker' and L and L.flat and snap then
+    local fc = L.flat[vim.cur.fi]
+    local col = fc and fc.col
+    if col and col.guid and ctx.dspauto_trk ~= col.guid then
+      ctx.dspauto_trk = col.guid
+      local ti = ctx.track_insts(col)
+      if ti[1] and ti[1].fx and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
+    end
+  end
   local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
   -- 13 окт: clipboard — каждый новый yank в историю (последний сверху, до 40)
   do
