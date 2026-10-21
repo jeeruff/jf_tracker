@@ -17160,7 +17160,16 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
-  elseif name == 'human' then ctx.human_menu()   -- 15 окт: human — выпадашка процентов
+  elseif name == 'human' then   -- 21 окт: щелчок — вкл / выкл (каждая вставленная нота чуть другая); колесо — проценты меню
+    if delta ~= 0 then ctx.human_menu()
+    else
+      local hs = ctx.hum_load()
+      if hs.ins and (hs.v.amt or 0) > 0 then hs.ins = false
+      else hs.ins = true; if (hs.v.amt or 0) <= 0 then hs.v.amt = hs.amt_last or 50 end end
+      if (hs.v.amt or 0) > 0 then hs.amt_last = hs.v.amt end
+      ctx.hum_save()
+      vim.msg = hs.ins and ('human on %d%%: every inserted note varies (time / velocity / length; the ranges and DSP points - humanizer, gtH; wheel - percent)'):format(hs.v.amt) or 'human off'
+    end
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
   elseif name == 'legato' then
