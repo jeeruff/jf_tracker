@@ -24340,7 +24340,8 @@ local function frame()
         if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render, arrows / [ ] - other rows, Esc - off (letters are cells now, c too)'; return end
         if MX.spl_focus and ctx.spl_kb(c) then return end   -- 19 окт: строка секций плейлиста с клавиатуры
         if c == ('C'):byte() and not MX.pal_kb and not MX.pending then ctx.pl_edit(); return end   -- 19 окт: C — набрать chain
-        if c == ('s'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: s (song) — строка секций над плейлистом
+        if c == ('s'):byte() and not MX.pal_kb and not MX.pending then ctx.mx_sec_menu(); return end   -- 21 окт: s — подменю секций
+        if c == ('S'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: строка секций над плейлистом; 21 окт: S (song) — s отдан подменю секций
           MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
         end
         if c == 32 and ctx.mods().ctrl and not ctx.mods().shift and #MX.sketch > 0 then ctx.sketch_play(); return end   -- 21 окт: Ctrl+Space — слушать эскиз
@@ -26715,7 +26716,7 @@ ctx.spl_draw = function(Lx, x, y, w)
   for _, s2 in ipairs(regions.sections or {}) do col[s2.name:gsub('%s+', '_')] = s2.color end
   local bx = x
   local tail = (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 6
-  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: click a section above (s - keys) - the song order', w - tail), U.DIM) end
+  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: click a section above (S - keys) - the song order', w - tail), U.DIM) end
   for k, wd in ipairs(words) do
     local lab = wd:gsub('_', ' ')
     local bw = U.measure(lab) + 2 * Lx.pad
@@ -27728,6 +27729,19 @@ ctx.ask_prompt = function(pre, text)
   ctx.choice_pick(title, text or '', labels, function(v) vim.run_cmd(pre .. v) end)
 end
 -- :sec … — секция слота курсора матрицы
+-- 21 окт: s в матрице — подменю секций слота курсора (те же пункты, что группа section меню матрицы)
+ctx.mx_sec_menu = function()
+  local rg = seq[MX.cur.ri]
+  local items = {}
+  for _, a in ipairs(region_actions(rg)) do
+    if a.g == 'section' then
+      local lab, hk = a[1]:match('^(.-)%s*%(([^()]+)%)$')
+      items[#items + 1] = { key = a.key, label = lab or a[1], hk = hk, fn = a.fn }
+    end
+  end
+  if #items == 0 then vim.msg = 'section: no slot under the cursor'; return end
+  vim.open_hydra({ title = 'section', items = items })
+end
 ctx.sec_cmd = function(arg)
   local rg = seq[MX.cur.ri]
   local sc

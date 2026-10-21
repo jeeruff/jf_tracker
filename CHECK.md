@@ -1590,3 +1590,4 @@
 - [ ] 21 окт: меню матрицы (ПКМ / \): s — подменю section (new из слотов / Tr, duplicate, linked, launch, show, loop, rename, remove); sync → pattern r (resync copies); группы подменю (pattern, length, section) — и при ПКМ; хоткеи пунктов (Space, yp, A, Tr …) колонкой
 - [ ] 21 окт: удалил последнюю ноту клипа (x / dd / BS / удаление строк) — пустой MIDI item тоже уходит; перезапись ноты клип не трогает
 - [ ] 21 окт: строка секций под матрицей (s) берёт только h l, цифры, Enter, x, Space, Esc — любая другая клавиша или щелчок отпускают её (раньше держала всю клавиатуру)
+- [ ] 21 окт: матрица s — подменю секций (new / duplicate / linked / launch / show / loop / rename / remove, хоткеи колонкой); S — строка песни (playlist секций)
