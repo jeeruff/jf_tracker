@@ -2304,6 +2304,8 @@ function V.key_impl(c)
           return
         end
       end
+      -- 21 окт: Shift+S / Shift+M — соло / mute трека и в колонке команд (строчные s / m — коды: SI…, 0M)
+      if (c == 83 or c == 77) and (V.hexbuf or '') == '' and ctx.track_toggle then ctx.track_toggle(c == 77 and 'mute' or 'solo'); return end
       local b0, m0 = V.hexbuf, V.msg
       local he = hex_entry(c, fld, heads)
       if he == 'none' then return end

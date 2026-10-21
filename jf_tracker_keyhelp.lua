@@ -264,7 +264,7 @@ KH.PAGES = {
     { k = 's', d = 'select from here (visual; the edit returns to INSERT); Shift+hjkl extends' },
     { k = '⌥s', d = 'step: type rows (:step N)' },
     { k = 'd', d = 'Vim delete operator (d3w, dd), back to INSERT after' },
-    { k = 'qwerty: M S', t = { 'M', 'S' }, d = 'mute / solo the cursor track' },
+    { k = 'qwerty: M S', t = { 'M', 'S' }, d = 'mute / solo the cursor track - on any column, the fx column too (there lowercase s / m start the codes SI ... / 0M)' },
     { k = 'qwerty: f', t = { 'f' }, d = 'next fx field (note > fx1 > fx2 ...)' },
     { k = '` ~ C-~', d = 'note-off: ` this subcolumn, ~ (Shift+`) every track (Shift = all tracks, as Shift+BS), Ctrl+~ the whole track; :off / :off all; on the command field ` stops what runs there (dim) - 0D.. -> 0D00' },
     { k = 'Esc', d = 'back to NORMAL' },
