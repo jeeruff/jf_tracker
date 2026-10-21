@@ -69,11 +69,14 @@ eq(FB.short('VST3: Pro-Q 3 (FabFilter)'), 'Pro-Q 3 (FabFilter)', 'fx short name'
 FB.list = { { label = 'VST: ReaEQ (Cockos)', data = 'ReaEQ' }, { label = 'JS: jf_tracker_scope', data = 'js1' },
   { label = 'VST3: Pro-Q 3 (FabFilter)', data = 'pq' }, { label = 'AU: AUDelay (Apple)', data = 'aud' } }
 FB.query = ''; eq(#FB.results(), 4, 'fx all')
-for ch in ('eq'):gmatch('.') do FB.key(ch:byte()) end
+for ch in ('/eq'):gmatch('.') do FB.key(ch:byte()) end   -- 21 окт: поиск — после /
 eq(FB.results()[1] and FB.results()[1].it.data, 'ReaEQ', 'fx eq: ReaEQ first (word start)')
 FB.key(27); eq(FB.query, '', 'fx esc clears'); eq(FB.key(27), 'leave', 'fx esc leaves')
-for ch in ('del !apple'):gmatch('.') do FB.key(ch:byte()) end
+for ch in ('/del !apple'):gmatch('.') do FB.key(ch:byte()) end
 eq(#FB.results(), 0, 'fx negation')
+FB.key(27); FB.key(27)
+eq(FB.key(('j'):byte()), true, 'fx j moves (not search)'); eq(FB.query, '', 'fx j not typed')
+eq(FB.key(('g'):byte()), true, 'fx g waits'); eq(FB.key(('t'):byte()), 'gt', 'fx gt - modules')
 FB.query = ''; FB.cur = 1; FB.key(1685026670); eq(FB.cur, 2, 'fx down'); eq(FB.key(13), 'add', 'fx enter adds')
 -- DSP-грамматика (2 окт)
 local DK = dofile(DIR .. '/jf_tracker_dspkeys.lua')

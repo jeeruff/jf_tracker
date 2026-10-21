@@ -87,6 +87,60 @@ function FB.short(label)
   return label, ''
 end
 
+-- 21 окт: две колонки, как в REAPER: слева дерево (All / Favorites / Recently used / Instruments, типы, категории,
+-- разработчики) с числом эффектов, справа список узла. Узел — FB.node = { k = all|fav|rec|inst|type|cat|dev, v = }.
+-- Клавиши: j k — строка, h l — колонка (FB.col 1 дерево / 2 список), Enter — узел / добавить, / — поиск, gt gT — модули
+FB.node = { k = 'all' }
+FB.col = 2
+FB.tree_cur, FB.tree_scroll = 1, 0
+FB.tree_on = false           -- ставит draw: колонка дерева видна (широко)
+FB.typing = false            -- поиск только после /
+local TYPE_ORDER = { 'VST', 'VSTi', 'VST3', 'VST3i', 'AU', 'AUi', 'LV2', 'LV2i', 'CLAP', 'CLAPi', 'JS', 'DX', 'DXi' }
+local function raw_kind(it) return (it.label or ''):match('^(%w+):') or 'other' end
+local tree_c = {}
+function FB.tree()
+  if tree_c.list == FB.list and tree_c.gen == FB.gen then return tree_c.rows end
+  local nt, nc, nd, nfav, ninst = {}, {}, {}, 0, 0
+  for _, it in ipairs(FB.list) do
+    local k = raw_kind(it)
+    nt[k] = (nt[k] or 0) + 1
+    if k:match('i$') then ninst = ninst + 1 end
+    if FB.is_fav(it) then nfav = nfav + 1 end
+    for c in (FB.cat(it) .. '|'):gmatch('([^|]*)|') do if c ~= '' and c ~= '?' then nc[c] = (nc[c] or 0) + 1 end end
+    local d = FB.dev(it); if d ~= '?' then nd[d] = (nd[d] or 0) + 1 end
+  end
+  local rows = {}
+  local function add(label, node, n, depth) rows[#rows + 1] = { label = label, node = node, n = n, depth = depth or 1 } end
+  local function hdr(label) rows[#rows + 1] = { label = label, hdr = true } end
+  add('all plugins', { k = 'all' }, #FB.list, 0)
+  add('favorites', { k = 'fav' }, nfav, 0)
+  add('recently used', { k = 'rec' }, #FB.recent, 0)
+  add('instruments', { k = 'inst' }, ninst, 0)
+  hdr('types')
+  local seen = {}
+  for _, k in ipairs(TYPE_ORDER) do if nt[k] then add(k, { k = 'type', v = k }, nt[k]); seen[k] = true end end
+  for k, n in pairs(nt) do if not seen[k] then add(k, { k = 'type', v = k }, n) end end
+  local function sorted(t) local o = {}; for k in pairs(t) do o[#o + 1] = k end; table.sort(o, function(a, b) return a:lower() < b:lower() end); return o end
+  local cs = sorted(nc)
+  if #cs > 0 then hdr('categories'); for _, c in ipairs(cs) do add(c, { k = 'cat', v = c }, nc[c]) end end
+  local ds = sorted(nd)
+  if #ds > 0 then hdr('developers'); for _, d in ipairs(ds) do add(d, { k = 'dev', v = d }, nd[d]) end end
+  tree_c.list, tree_c.gen, tree_c.rows = FB.list, FB.gen, rows
+  return rows
+end
+local function node_ok(it, nd, rec_i)
+  local k = nd.k
+  if k == 'all' then return true
+  elseif k == 'fav' then return FB.is_fav(it)
+  elseif k == 'rec' then return rec_i[it.label] ~= nil
+  elseif k == 'inst' then return raw_kind(it):match('i$') ~= nil
+  elseif k == 'type' then return raw_kind(it) == nd.v
+  elseif k == 'cat' then return ('|' .. FB.cat(it) .. '|'):find('|' .. nd.v .. '|', 1, true) ~= nil
+  elseif k == 'dev' then return FB.dev(it) == nd.v end
+  return true
+end
+FB.node_ok = node_ok
+
 local function score(hay, term)
   local neg = term:sub(1, 1) == '!'
   if neg then return not hay:find(term:sub(2), 1, true) and 0 or nil end
@@ -128,22 +182,26 @@ local function group_of(it)
 end
 -- строки списка: { it = } и заголовки групп { hdr = } (dev / type / cat)
 function FB.results()
-  if cache.q == FB.query and cache.list == FB.list and cache.folder == FB.folder and cache.gen == FB.gen then return cache.res end
+  local fkey = FB.tree_on and ('node:' .. FB.node.k .. ':' .. tostring(FB.node.v)) or FB.folder
+  if cache.q == FB.query and cache.list == FB.list and cache.folder == fkey and cache.gen == FB.gen then return cache.res end
+  local tree = FB.tree_on
+  local folder = tree and (FB.node.k == 'rec' and 'rec' or 'tree') or FB.folder
   local res = {}
   local terms = {}
   for t in FB.query:lower():gmatch('%S+') do terms[#terms + 1] = t end
   local rec_i = {}
-  if FB.folder == 'rec' then for i, l in ipairs(FB.recent) do rec_i[l] = i end end
+  if folder == 'rec' then for i, l in ipairs(FB.recent) do rec_i[l] = i end end
   -- 9 окт: запрос дописан (старый — его начало, та же папка / список) —
   -- искать только среди прошлых результатов
   local src = FB.list
   if cache.res and cache.q and cache.q ~= '' and FB.query:sub(1, #cache.q) == cache.q and not FB.query:find('!', 1, true)
-     and cache.list == FB.list and cache.folder == FB.folder and cache.gen == FB.gen then
+     and cache.list == FB.list and cache.folder == fkey and cache.gen == FB.gen then
     src = {}
     for _, r in ipairs(cache.res) do if r.it then src[#src + 1] = r.it end end
   end
   for _, it in ipairs(src) do
-    if (FB.folder == 'fav' and not FB.is_fav(it)) or (FB.folder == 'rec' and not rec_i[it.label]) then goto skip end
+    if tree then if not node_ok(it, FB.node, rec_i) then goto skip end
+    elseif (folder == 'fav' and not FB.is_fav(it)) or (folder == 'rec' and not rec_i[it.label]) then goto skip end
     do
     local hay, lab, name = hay_of(it)
     local total, ok = 0, true
@@ -152,12 +210,13 @@ function FB.results()
       if not s then ok = false; break end
       total = total + s
     end
-    if ok then res[#res + 1] = { it = it, s = total, name = hay, g = group_of(it), r = rec_i[it.label] } end
+    if ok then res[#res + 1] = { it = it, s = total, name = hay, g = (not tree) and group_of(it) or nil, r = rec_i[it.label] } end
     end
     ::skip::
   end
-  if FB.folder == 'rec' then table.sort(res, function(a, b) return a.r < b.r end)
-  elseif FB.folder == 'dev' or FB.folder == 'type' or FB.folder == 'cat' then
+  if folder == 'rec' then table.sort(res, function(a, b) return a.r < b.r end)
+  elseif tree then table.sort(res, function(a, b) if #terms > 0 and a.s ~= b.s then return a.s > b.s end return a.name < b.name end)
+  elseif folder == 'dev' or folder == 'type' or folder == 'cat' then
     table.sort(res, function(a, b)
       if a.g ~= b.g then if a.g == '?' then return false elseif b.g == '?' then return true end return a.g:lower() < b.g:lower() end
       if #terms > 0 and a.s ~= b.s then return a.s > b.s end
@@ -171,7 +230,7 @@ function FB.results()
     end
     res = out
   elseif #terms > 0 then table.sort(res, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.name < b.name end) end
-  cache.q, cache.list, cache.res, cache.folder, cache.gen = FB.query, FB.list, res, FB.folder, FB.gen
+  cache.q, cache.list, cache.res, cache.folder, cache.gen = FB.query, FB.list, res, fkey, FB.gen
   return res
 end
 
@@ -198,6 +257,34 @@ FB.skip_hdr = skip_hdr
 function FB.key(c, mods)
   mods = mods or {}
   local n = #FB.results()
+  -- 21 окт: без / — навигация (буквы не в поиск): j k h l, G, Enter, * избранное, g t / g T — модули ('gt' / 'gT')
+  if not FB.typing then
+    local ch = c > 0 and c < 256 and string.char(c) or ''
+    if FB.gpend then FB.gpend = nil; if ch == 't' then return 'gt' elseif ch == 'T' then return 'gT' elseif ch == 'g' then if FB.col == 1 and FB.tree_on then FB.tree_cur = 1 else FB.cur = 1; skip_hdr(1) end; return true end end
+    if ch == '/' then FB.typing = true; return true end
+    if ch == 'g' then FB.gpend = true; return true end
+    local tree = FB.tree_on and FB.col == 1
+    local rows = tree and FB.tree() or nil
+    local function tstep(d)
+      local i = FB.tree_cur
+      repeat i = i + d until not rows[i] or not rows[i].hdr
+      if rows[i] then FB.tree_cur = i end
+    end
+    if ch == 'j' or c == DOWN then if tree then tstep(1) else FB.cur = math.min(math.max(1, n), FB.cur + 1); skip_hdr(1) end; return true end
+    if ch == 'k' or c == UP then if tree then tstep(-1) else FB.cur = math.max(1, FB.cur - 1); skip_hdr(-1) end; return true end
+    if ch == 'G' then if tree then FB.tree_cur = #rows else FB.cur = math.max(1, n); skip_hdr(-1) end; return true end
+    if (ch == 'h' or c == 1818584692) and FB.tree_on then FB.col = 1; return true end
+    if (ch == 'l' or c == 1919379572) and FB.tree_on then FB.col = 2; return true end
+    if ch == '*' then FB.toggle_fav(FB.selected()); return true end
+    if c == 13 then
+      if tree then local r = rows[FB.tree_cur]; if r and r.node then FB.node = r.node; FB.cur = 1; FB.scroll = 0; FB.col = 2; skip_hdr(1) end; return true end
+      return 'add'
+    end
+    if c == 27 then if FB.query ~= '' then FB.query = ''; FB.cur = 1; FB.scroll = 0; return true end; return 'leave' end
+    return false
+  end
+  if c == 13 then FB.typing = false; return 'add' end   -- поиск: Enter — добавить найденное (и из набора)
+  if c == 27 then FB.typing = false end
   if c == 27 then
     if FB.query ~= '' then FB.query = ''; FB.cur = 1; FB.scroll = 0; return true end
     return 'leave'
@@ -217,8 +304,42 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   local hover
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.LINE); gfx.rect(x + w - 1, y, 1, h, 1)
+  -- 21 окт: широко — дерево слева (как в REAPER), список справа; узко — прежние кнопки папок
+  local was = FB.tree_on
+  FB.tree_on = w >= L.cw * 34
+  if FB.tree_on ~= was then FB.cur = 1; FB.scroll = 0 end
+  if FB.tree_on then
+    local tw = math.max(L.cw * 14, math.min(L.cw * 24, math.floor(w * 0.4)))
+    local rows = FB.tree()
+    local top = y + 3
+    local nvis = math.max(1, math.floor((h - 6) / L.rh))
+    FB.tree_cur = math.max(1, math.min(#rows, FB.tree_cur))
+    if FB.tree_cur - 1 < FB.tree_scroll then FB.tree_scroll = FB.tree_cur - 1 end
+    if FB.tree_cur - 1 >= FB.tree_scroll + nvis then FB.tree_scroll = FB.tree_cur - nvis end
+    for i = 1, nvis do
+      local idx = FB.tree_scroll + i
+      local r = rows[idx]
+      if not r then break end
+      local ry = top + (i - 1) * L.rh
+      if r.hdr then U.text(x + L.pad, ry + 1, fit(r.label, tw - 2 * L.pad), U.AMBER)
+      else
+        local on = FB.node.k == r.node.k and FB.node.v == r.node.v
+        local sel = focused and FB.col == 1 and idx == FB.tree_cur
+        if sel then U.list_cursor(x + 1, ry, tw - 3, L.rh, true) elseif on then U.set(U.tint(U.CYAN, 0.18)); gfx.rect(x + 1, ry, tw - 3, L.rh, 1) end
+        local cnt = tostring(r.n or 0)
+        local ix = x + L.pad + (r.depth or 1) * L.cw
+        U.text(ix, ry + 1, fit(r.label, x + tw - 2 * L.pad - U.measure(cnt) - ix), on and U.CYAN or U.TEXT)
+        U.text(x + tw - L.pad - U.measure(cnt), ry + 1, cnt, U.DIM)
+        if mx >= x and mx < x + tw and my >= ry and my < ry + L.rh then hover = { tree = idx } end
+        if FB.hint then FB.hint('fxbtree', x + 1, ry, tw - 3, L.rh, idx) end
+      end
+    end
+    if U.vbar then U.vbar('fxbtree', x, top, tw, nvis * L.rh, FB.tree_scroll, nvis, #rows) end
+    U.set(U.LINE); gfx.rect(x + tw, y, 1, h, 1)
+    x, w = x + tw + 1, w - tw - 1
+  end
   -- папки (как нативный браузер) и * — избранное для выбранного
-  do
+  if not FB.tree_on then
     local bx = x + L.pad
     local by = y + 2
     local rows = 1
@@ -256,10 +377,10 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   local sy = y + 3
   U.set(U.BG); gfx.rect(x + L.pad, sy, w - 2 * L.pad - 1, L.rh, 1)
   U.set(focused and U.AMBER or U.LINE); gfx.rect(x + L.pad, sy, w - 2 * L.pad - 1, L.rh, 0)
-  local q = FB.query ~= '' and FB.query or (focused and '' or 'fx: type to find')
+  local q = FB.query ~= '' and FB.query or ((focused and FB.typing) and '' or (focused and '/ - find, j k h l, Enter - add' or 'fx: / to find'))
   local cnt = ('%d'):format(#res)
   local cw = U.measure(cnt) + L.pad
-  U.text(x + 2 * L.pad, sy + 1, fit((FB.query ~= '' and '/' or '') .. q .. (focused and '_' or ''), w - 4 * L.pad - cw), FB.query ~= '' and U.TEXT or U.GREY)
+  U.text(x + 2 * L.pad, sy + 1, fit(((FB.query ~= '' or FB.typing) and '/' or '') .. q .. ((focused and FB.typing) and '_' or ''), w - 4 * L.pad - cw), FB.query ~= '' and U.TEXT or U.GREY)
   U.text(x + w - L.pad - cw, sy + 1, cnt, U.GREY)
   if mx >= x and mx < x + w and my >= sy and my < sy + L.rh then hover = 'search' end
   if FB.hint then FB.hint('fxbbtn', x + L.pad, sy, w - 2 * L.pad, L.rh, { search = true }) end
@@ -282,7 +403,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     end
     do
     local sel = idx == FB.cur
-    local curc = sel and U.list_cursor(x + 1, ry, w - 3, L.rh, focused)   -- 10 окт: курсор как в lib
+    local curc = sel and U.list_cursor(x + 1, ry, w - 3, L.rh, focused and (FB.col == 2 or not FB.tree_on))   -- 10 окт: курсор как в lib
     local name, kind = FB.short(r.it.label)
     if FB.is_fav(r.it) then name = '* ' .. name end          -- избранное видно в любой папке
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0

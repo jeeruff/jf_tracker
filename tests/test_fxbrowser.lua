@@ -49,5 +49,17 @@ eq('rec order', res[1].it.label, 'VST: ADT (airwindows)')
 FB.folder = 'all'; FB.query = 'pro'
 eq('search inside folder', #FB.results(), 1)
 
+-- 21 окт: дерево (широкая панель): узлы типов / категорий / разработчиков, фильтр по узлу
+FB.query = ''; FB.tree_on = true
+local tr = FB.tree()
+local found = {}
+for _, r in ipairs(tr) do if r.node then found[r.node.k .. ':' .. tostring(r.node.v)] = r.n end end
+eq('tree: all', found['all:nil'], 4)
+eq('tree: VST3 type', found['type:VST3'], 1)
+eq('tree: category Delay', found['cat:Delay'], 1)
+eq('tree: developer airwindows', found['dev:airwindows'], 1)
+FB.node = { k = 'type', v = 'JS' }; eq('tree filter JS', #FB.results(), 1)
+FB.node = { k = 'cat', v = 'Modulation' }; eq('tree filter category (second tag)', #FB.results(), 1)
+FB.node = { k = 'all' }; FB.tree_on = false
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

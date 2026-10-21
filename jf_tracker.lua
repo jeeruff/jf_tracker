@@ -15292,6 +15292,7 @@ local function hint_go(t)
     if d.folder then FB.folder = d.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
     elseif d.star then local sel = FB.selected(); if sel then FB.toggle_fav(sel) end end
   elseif t.kind == 'fxbrow' then ctx.set_focus('fxb'); FB.cur = d
+  elseif t.kind == 'fxbtree' then ctx.set_focus('fxb'); ctx.fxb_tree_pick(d)   -- 21 окт: узел дерева fx
   elseif t.kind == 'bar' or t.kind == 'beat' or t.kind == 'note' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.row = d.fi, d.row; vim.cur.field = 1; vim.cur.sub = nil; state.row0 = math.max(0, math.min(state.row0, d.row))
   elseif t.kind == 'env' then ctx.set_focus('tracker'); vim.cur.fi = d; vim.cur.field = 1
   elseif t.kind == 'header' or t.kind == 'scope' then
@@ -19974,7 +19975,7 @@ local function frame()
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
   elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
-  elseif hover.fxb then state.status = 'fx list - type to search, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
+  elseif hover.fxb then state.status = 'fx list - / to find, j k h l, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
   elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes == 'drag' and 'notes: drag the header to move the window' or hover.notes == 'resize' and 'notes: drag the corner to resize' or hover.notes:match('^zoom') and 'notes text size' or hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
@@ -21788,7 +21789,8 @@ local function frame()
       click = { t = now2, zone = 'notes' }
     elseif hover.fxb then
       ctx.set_focus('fxb')
-      if type(hover.fxb) == 'table' and hover.fxb.folder then
+      if type(hover.fxb) == 'table' and hover.fxb.tree then ctx.fxb_tree_pick(hover.fxb.tree)   -- 21 окт: дерево слева
+      elseif type(hover.fxb) == 'table' and hover.fxb.folder then
         FB.folder = hover.fxb.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
         vim.msg = 'fx: ' .. FB.folder .. ({ all = ' - every installed fx', fav = ' - favourites (REAPER Favorites + * here)', dev = ' - by developer', type = ' - by type', cat = ' - by category (REAPER fx tags)', rec = ' - recently added' })[FB.folder]
       elseif type(hover.fxb) == 'table' and hover.fxb.star then
@@ -24421,6 +24423,8 @@ local function frame()
         if c == 58 and FB.query == '' then return vim.key(c) end   -- 18 окт: : в пустом поиске — строка команды (тест набрал :pane в поиск и Enter добавил эффект)
         local r = FB.key(c, ctx.mods())
         if r == 'add' then ctx.fxb_add()
+        elseif r == 'gt' then ctx.tab_menu()        -- 21 окт: gt / gT — к модулям и вкладкам проектов и из fx list
+        elseif r == 'gT' then ctx.project_menu()
         elseif r == 'leave' then ctx.toggle_focus() end
       elseif state.focus == 'dsp' and state.dsp and not state.khelp then
         -- DSP — своя грамматика по эффектам (jf_tracker_dspkeys.lua, 2 окт);
@@ -24877,6 +24881,14 @@ ctx.focus_back_tick = function()
   if not fx then return end
   ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
   if ctx.my_hwnd then reaper.JS_Window_SetFocus(ctx.my_hwnd) end
+end
+-- 21 окт: узел дерева fx list (щелчок / метка f): список справа — его эффекты, курсор туда
+ctx.fxb_tree_pick = function(idx)
+  local r = FB.tree()[idx]
+  if not (r and r.node) then return end
+  FB.tree_cur, FB.node, FB.cur, FB.scroll, FB.col = idx, r.node, 1, 0, 2
+  FB.skip_hdr(1)
+  vim.msg = ('fx: %s - %d (j k, h - the tree, / - find, Enter - add)'):format(r.label, r.n or 0)
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
