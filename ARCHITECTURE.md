@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 27461 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 27573 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2408 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 4841 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 848 | алиасы паттернов (этап 6). |
@@ -116,7 +116,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_vim.lua` | 3991 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 128 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 70 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1214 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1216 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 161 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 101 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 146 | клавиши DSP-панели в духе Vim (2 окт). |
@@ -132,7 +132,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_png.lua` | 78 | PNG без внешних программ (8 окт, снимки measure). |
 | `jf_tracker_logo.lua` | 517 | логотип JFTRACKER для about (главный модуль, 3 окт). |
 | **панели и вкладки** | | |
-| `jf_tracker_matrix.lua` | 1313 | матрица паттернов (этап 3). |
+| `jf_tracker_matrix.lua` | 1321 | матрица паттернов (этап 3). |
 | `jf_tracker_session.lua` | 1027 | session: клипы как в Ableton поверх линейного таймлайна REAPER (6 окт). |
 | `jf_tracker_browser.lua` | 1343 | сайдбар-браузер (справа от трекера). |
 | `jf_tracker_fxbrowser.lua` | 300 | браузер эффектов слева от DSP-панели (2 окт). |

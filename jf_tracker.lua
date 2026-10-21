@@ -21700,12 +21700,14 @@ local function frame()
     elseif hover.matrix and hover.matrix.sketchbtn then
       local b = hover.matrix.sketchbtn
       if b == 'after' or b == 'before' then ctx.sketch_insert(b == 'before')
+      elseif b == 'play' then ctx.sketch_play()   -- 21 окт: > — слушать (= Ctrl+Space)
+      elseif b == 'edit' then ctx.sketch_edit()
       else
         local ks = ctx.sketch_order()
         table.sort(ks, function(a2, b2) return a2 > b2 end)
         for _, k in ipairs(ks) do table.remove(MX.sketch, k) end
         for k, sk in ipairs(MX.sketch) do sk.name = 'X' .. k end
-        MX.sk_sel = {}; vim.msg = ('sketch: %d removed'):format(#ks)
+        MX.sk_sel = {}; ctx.sketch_save(); vim.msg = ('sketch: %d removed'):format(#ks)
       end
       click = { t = now2, zone = 'sketchbtn' }
     elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
@@ -24268,7 +24270,9 @@ local function frame()
         if c == ('s'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: s (song) — строка секций над плейлистом
           MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
         end
+        if c == 32 and ctx.mods().ctrl and #MX.sketch > 0 then ctx.sketch_play(); return end   -- 21 окт: Ctrl+Space — слушать эскиз
         if MX.pal_kb and c == 13 then ctx.sketch_add(); return end   -- 19 окт: набранное — эскизом в sketchpad (render — p там)
+        if MX.pal_kb and c == 27 and MX.sk_edit then MX.sk_edit = nil end   -- 21 окт: Esc — правка эскиза отменена
         if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
@@ -25896,17 +25900,100 @@ end
 -- Эскизы — строкой над слотами: щелчок — звучит, Shift+щелчок — в последовательность (несколько — подряд, лупом),
 -- p — вставить последовательность в песню после слота курсора (P — перед), x — удалить эскиз. В памяти сессии
 MX.sketch = MX.sketch or {}
+-- 21 окт: клетка эскиза — паттерн трека целиком или его часть k/n (part[ci] = { k, n }: 2/4 — вторая четверть);
+-- e — эскиз обратно в набор clipkb (правка: Shift — клетки, Ctrl+Shift — часть), Enter — в тот же эскиз; эскизы в проекте
 ctx.sketch_add = function()
-  local cells, n, len = {}, 0, 0
-  for _, pk in pairs(MX.pal_pick or {}) do cells[pk.ci] = pk.p.src; n = n + 1; len = math.max(len, pk.p.src.rgnend - pk.p.src.pos) end
+  local cells, part, n = {}, {}, 0
+  for _, pk in pairs(MX.pal_pick or {}) do cells[pk.ci] = pk.p.src; part[pk.ci] = pk.part; n = n + 1 end
   if n == 0 then vim.msg = 'sketch: pick cells first (Shift + clipkb keys)'; return end
-  local k = #MX.sketch + 1
-  MX.sketch[k] = { name = 'X' .. k, cells = cells, n = n }
+  local k = MX.sk_edit and MX.sketch[MX.sk_edit] and MX.sk_edit or (#MX.sketch + 1)
+  local was = MX.sk_edit == k
+  MX.sketch[k] = { name = 'X' .. k, cells = cells, part = part, n = n }
   MX.sk_sel = { [k] = true }
   MX.pal_pick = {}
-  vim.msg = ('sketch X%d: %d track(s) - click hears it, Shift+click lines several up, p puts them after the slot'):format(k, n)
+  MX.sk_edit = nil
+  ctx.sketch_save()
+  vim.msg = ('sketch X%d %s: %d track(s) - Ctrl+Space / > hears it, Shift+click lines several up, p puts them after the slot, e edits'):format(k, was and 'changed' or 'made', n)
 end
-ctx.sk_len = function(sk) local l = 0; for _, src in pairs(sk.cells) do l = math.max(l, src.rgnend - src.pos) end; return l end   -- поле ctx: предел 200 local
+-- отрезок источника клетки (часть паттерна или весь)
+ctx.sk_seg = function(sk, ci)
+  local src = sk.cells[ci]
+  if not src then return nil end
+  local pt = sk.part and sk.part[ci]
+  if not pt then return src.pos, src.rgnend end
+  local len = src.rgnend - src.pos
+  return src.pos + (pt[1] - 1) * len / pt[2], src.pos + pt[1] * len / pt[2]
+end
+ctx.sk_len = function(sk)   -- поле ctx: предел 200 local
+  local l = 0
+  for ci in pairs(sk.cells) do local a, b = ctx.sk_seg(sk, ci); l = math.max(l, b - a) end
+  return l
+end
+-- e: эскиз — обратно в набор clipkb (голубые рамки на его клетках), Enter — сохранить в него же
+ctx.sketch_edit = function()
+  local k = ctx.sketch_order()[1]
+  local sk = k and MX.sketch[k]
+  if not sk then vim.msg = 'sketch: pick one to edit (click X1 ...)'; return end
+  MX.pal_kb = true
+  MX.pal_pick = {}
+  for ci, src in pairs(sk.cells) do
+    local key = (src.name or '') .. '@' .. src.pos
+    MX.pal_pick[key .. ':' .. ci] = { p = { name = src.name, src = src, key = key }, ci = ci, part = sk.part and sk.part[ci] }
+  end
+  MX.sk_edit = k
+  ctx.set_focus('matrix')
+  vim.msg = ('sketch %s: edit - Shift + keys cells, Ctrl+Shift + key - a part (1/2 2/2 1/4 ...), Enter - keep, Esc - cancel'):format(sk.name)
+end
+-- в проекте: строка на эскиз «Xn|guid=имя@pos/k/n;…»
+ctx.sketch_save = function()
+  local out = {}
+  for _, sk in ipairs(MX.sketch) do
+    local parts = {}
+    for ci, src in pairs(sk.cells) do
+      local col = snap and snap.cols[ci]
+      if col and col.guid then
+        local pt = sk.part and sk.part[ci]
+        parts[#parts + 1] = ('%s=%s@%.6f/%d/%d'):format(col.guid, src.name or '', src.pos, pt and pt[1] or 1, pt and pt[2] or 1)
+      end
+    end
+    out[#out + 1] = sk.name .. '|' .. table.concat(parts, ';')
+  end
+  reaper.SetProjExtState(0, 'jf_tracker', 'sketch', table.concat(out, '\n'))
+end
+ctx.sketch_ensure = function()
+  local proj = reaper.EnumProjects(-1)
+  if MX.sk_proj == proj or not (snap and seq) then return end
+  MX.sk_proj = proj
+  MX.sketch, MX.sk_sel, MX.sk_edit = {}, {}, nil
+  local _, raw = reaper.GetProjExtState(0, 'jf_tracker', 'sketch')
+  local ci_of = {}
+  for ci, col in ipairs(snap.cols) do if col.guid then ci_of[col.guid] = ci end end
+  for line in (raw or ''):gmatch('[^\n]+') do
+    local nm, rest = line:match('^([^|]*)|(.*)$')
+    if nm then
+      local sk = { name = 'X' .. (#MX.sketch + 1), cells = {}, part = {}, n = 0 }
+      for g, pat, pos, k, n in rest:gmatch('([^=;]+)=([^@;]*)@([%d%.%-]+)/(%d+)/(%d+)') do
+        local ci = ci_of[g]
+        local src
+        for _, rg in ipairs(seq) do if not rg.gap and rg.name == pat and math.abs(rg.pos - tonumber(pos)) < 1e-4 then src = rg; break end end
+        if not src then for _, rg in ipairs(seq) do if not rg.gap and rg.name == pat then src = rg; break end end end
+        if ci and src then
+          sk.cells[ci] = src; sk.n = sk.n + 1
+          if tonumber(n) > 1 then sk.part[ci] = { tonumber(k), tonumber(n) } end
+        end
+      end
+      if sk.n > 0 then MX.sketch[#MX.sketch + 1] = sk end
+    end
+  end
+end
+-- Ctrl+Shift + клавиша clipkb: часть клетки по кругу — целиком, 1/2, 2/2, 1/4 … 4/4 (клетка берётся в набор)
+ctx.SK_PARTS = { false, { 1, 2 }, { 2, 2 }, { 1, 4 }, { 2, 4 }, { 3, 4 }, { 4, 4 } }
+ctx.sketch_part_step = function(pk)
+  local i = 1
+  for j, pt in ipairs(ctx.SK_PARTS) do if pt and pk.part and pt[1] == pk.part[1] and pt[2] == pk.part[2] then i = j end end
+  pk.part = ctx.SK_PARTS[i % #ctx.SK_PARTS + 1] or nil
+  return pk.part and (pk.part[1] .. '/' .. pk.part[2]) or 'whole'
+end
 ctx.sketch_order = function()
   local out = {}
   for k = 1, #MX.sketch do if (MX.sk_sel or {})[k] then out[#out + 1] = k end end
@@ -25915,6 +26002,7 @@ end
 -- эскизы подряд в зоне =SESSION, лупом (как «вместе» палитры; стоп — palette_mix_stop)
 ctx.sketch_play = function(ks)
   ks = ks or ctx.sketch_order()
+  if #ks == 0 and #MX.sketch > 0 then ks = { #MX.sketch } end   -- 21 окт: ничего не выбрано — последний
   if #ks == 0 then vim.msg = 'sketch: pick one'; return end
   if reaper.GetPlayState() & 1 == 1 and not ctx.pal_mix then vim.msg = 'sketch: the transport plays - stop it to hear'; return end
   if ctx.mx_solo then ctx.mx_cell_preview_end() end
@@ -25937,7 +26025,9 @@ ctx.sketch_play = function(ks)
       local a, b = reaper.TimeMap2_QNToTime(0, q0), reaper.TimeMap2_QNToTime(0, q0 + dq)
       for ci, src in pairs(sk.cells) do
         local col = snap.cols[ci]
-        if col and col.track then alias.session_plant(col.track, src, a, b, a, nil, 'pal:' .. ci) end
+        local s0, s1 = ctx.sk_seg(sk, ci)
+        local pt = sk.part and sk.part[ci]
+        if col and col.track then alias.session_plant(col.track, src, a, b, a, nil, 'pal:' .. ci, nil, pt and { seg = { s0, s1 } } or nil) end   -- 21 окт: часть — отрезком, повторами до длины эскиза
       end
       q0 = q0 + dq
     end
@@ -25965,8 +26055,22 @@ ctx.sketch_insert = function(before)
     if ri and seq[ri] then
       edit.run('sketch into the song', function()
         for ci, src in pairs(sk.cells) do
-          local clip = alias.cells_copy({ src }, snap, 1, 1, ci, ci, true)
-          alias.cells_paste(seq, snap, ri, ci, clip, true)
+          local pt = sk.part and sk.part[ci]
+          local col = snap.cols[ci]
+          if pt and col and col.track then
+            -- 21 окт: часть паттерна — копии отрезка (повторами до конца нового паттерна), не алиасы; метка сессии снимается
+            local rg2 = seq[ri]
+            local s0, s1 = ctx.sk_seg(sk, ci)
+            alias.session_plant(col.track, src, rg2.pos, rg2.rgnend, rg2.pos, nil, 'skins', nil, { seg = { s0, s1 } })
+            for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+              local it = reaper.GetTrackMediaItem(col.track, i)
+              local _, tg = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+              if tg == 'skins' then reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', true) end
+            end
+          else
+            local clip = alias.cells_copy({ src }, snap, 1, 1, ci, ci, true)
+            alias.cells_paste(seq, snap, ri, ci, clip, true)
+          end
         end
       end)
       ctx.mx_refresh()
@@ -25982,13 +26086,14 @@ ctx.sketch_insert = function(before)
 end
 ctx.sketch_draw = function(Lx, x, y, w)
   local hv = {}
+  ctx.sketch_ensure()   -- 21 окт: эскизы проекта (после рестарта / смены вкладки)
   if #MX.sketch == 0 then return 0, hv end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.text(x + Lx.pad, y, 'sketch', U.GREY)
   local bx = x + Lx.pad + U.measure('sketch ') + Lx.pad
   for k, sk in ipairs(MX.sketch) do
     local bw = U.measure(sk.name) + 2 * Lx.pad
-    if bx + bw > x + w - U.measure('P p x') - 4 * Lx.pad then break end
+    if bx + bw > x + w - U.measure('> e P p x') - 6 * Lx.pad then break end
     local on = (MX.sk_sel or {})[k]
     local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
     U.set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
@@ -25997,7 +26102,7 @@ ctx.sketch_draw = function(Lx, x, y, w)
     if hot then hv.sketch = k end
     bx = bx + bw + 2
   end
-  for _, b in ipairs({ { 'P', 'before' }, { 'p', 'after' }, { 'x', 'del' } }) do
+  for _, b in ipairs({ { '>', 'play' }, { 'e', 'edit' }, { 'P', 'before' }, { 'p', 'after' }, { 'x', 'del' } }) do
     local bw = U.measure(b[1]) + 2 * Lx.pad
     local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
@@ -26360,6 +26465,13 @@ ctx.palette_key = function(c)
   end
   if not p or not (snap and snap.cols[ci]) then vim.msg = 'palette: nothing on this key'; return true end
   local key = (p.key or p.name) .. ':' .. ci
+  if m.ctrl and shift then   -- 21 окт: Ctrl+Shift — часть клетки (время — Ctrl, набор — Shift)
+    MX.pal_pick = MX.pal_pick or {}
+    local pk = MX.pal_pick[key]
+    if not pk then pk = { p = p, ci = ci }; MX.pal_pick[key] = pk end
+    vim.msg = ('palette: %s of %s on track %d - Ctrl+Shift again: the next part; Enter - sketch'):format(ctx.sketch_part_step(pk), p.name or '?', ci)
+    return true
+  end
   if m.ctrl then ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
   if shift then
     MX.pal_pick = MX.pal_pick or {}

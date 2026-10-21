@@ -808,7 +808,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       -- 19 окт: clipkb в матрице — набранная клетка голубой рамкой, буква клавиши (1qaz… столбец = трек, ряд = видимый слот)
       if MX.pal_kb and not rg.gap then
         local pk = MX.pal_pick and MX.pal_pick[(rg.name or '') .. '@' .. rg.pos .. ':' .. ci]
-        if pk then U.set(U.CYAN); gfx.rect(x, y, L.mx_cell_w, rh - 1, 0); gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 3, 0) end
+        if pk then
+          U.set(U.CYAN); gfx.rect(x, y, L.mx_cell_w, rh - 1, 0)
+          if pk.part then   -- 21 окт: часть паттерна — рамка на своём отрезке (время сверху вниз) и k/n в углу
+            local y0 = y + math.floor((pk.part[1] - 1) * (rh - 1) / pk.part[2])
+            local y1 = y + math.floor(pk.part[1] * (rh - 1) / pk.part[2])
+            gfx.rect(x + 1, y0 + 1, L.mx_cell_w - 2, math.max(2, y1 - y0 - 2), 0)
+            U.text(x + 3, y + 1, pk.part[1] .. '/' .. pk.part[2], U.CYAN)
+          else gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 3, 0) end
+        end
         local r = ri - MX.scroll
         local colk = MX.SS and MX.SS.KEYCOLS and MX.SS.KEYCOLS[ci - MX.hs]
         local kl = r >= 1 and r <= 4 and colk and colk:sub(r, r)
