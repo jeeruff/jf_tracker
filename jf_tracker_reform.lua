@@ -11,16 +11,16 @@
 local RF = { sel = 1 }
 
 RF.ROWS = {
-  { k = 'scale', tip = 'stretch / squeeze the times of the notes from the anchor (x1 - as they are)',  label = 'scale',      min = 0.25, max = 4,  step = 0.05, fmt = 'x%.2f', def = 1 },
-  { k = 'curve', tip = 'bend the timing: + slow then fast (notes bunch at the start), - the other way',  label = 'curve',      min = -1,   max = 1,  step = 0.05, fmt = '%+.2f', def = 0 },
-  { k = 'shift', tip = 'move every note by rows (+ later, - earlier)',  label = 'shift',      min = -64,  max = 64, step = 1,    fmt = '%+d rows', def = 0 },
-  { k = 'redist', tip = 'spread the notes evenly between the first and the last (ignores their old timing)', label = 'redistribute', toggle = true, def = false },
-  { k = 'anchor', tip = 'what scale and curve stretch from: notes - the first to the last note, selection - the whole box', label = 'anchor',     toggle = true, def = false, on = 'selection', off = 'notes' },
-  { k = 'vals', tip = 'also rewrite the values (velocity or the fx command of the column) into the range below',   label = 'values',     toggle = true, def = false },
-  { k = 'lo', tip = 'lowest value after remap (hex)',     label = 'value from', min = 0, max = 255, step = 1, fmt = '%02X', def = 0 },
-  { k = 'hi', tip = 'highest value after remap (hex)',     label = 'value to',   min = 0, max = 255, step = 1, fmt = '%02X', def = 255 },
-  { k = 'vcurve', tip = 'bend the value ramp: + gentle then steep, - the other way', label = 'value curve', min = -1, max = 1, step = 0.05, fmt = '%+.2f', def = 0 },
-  { k = 'even', tip = 'remap - keep the order of the old values, even - ramp by note order (first lo, last hi)',   label = 'value mode', toggle = true, def = false, on = 'even', off = 'remap' },
+  { k = 'scale', key = 's', tip = 'stretch / squeeze the times of the notes from the anchor (x1 - as they are)',  label = 'scale',      min = 0.25, max = 4,  step = 0.05, fmt = 'x%.2f', def = 1 },
+  { k = 'curve', key = 'c', tip = 'bend the timing: + slow then fast (notes bunch at the start), - the other way',  label = 'curve',      min = -1,   max = 1,  step = 0.05, fmt = '%+.2f', def = 0 },
+  { k = 'shift', key = 'i', tip = 'move every note by rows (+ later, - earlier)',  label = 'shift',      min = -64,  max = 64, step = 1,    fmt = '%+d rows', def = 0 },
+  { k = 'redist', key = 'r', tip = 'spread the notes evenly between the first and the last (ignores their old timing)', label = 'redistribute', toggle = true, def = false },
+  { k = 'anchor', key = 'a', tip = 'what scale and curve stretch from: notes - the first to the last note, selection - the whole box', label = 'anchor',     toggle = true, def = false, on = 'selection', off = 'notes' },
+  { k = 'vals', key = 'v', tip = 'also rewrite the values (velocity or the fx command of the column) into the range below',   label = 'values',     toggle = true, def = false },
+  { k = 'lo', key = 'o', tip = 'lowest value after remap (hex)',     label = 'value from', min = 0, max = 255, step = 1, fmt = '%02X', def = 0 },
+  { k = 'hi', key = 't', tip = 'highest value after remap (hex)',     label = 'value to',   min = 0, max = 255, step = 1, fmt = '%02X', def = 255 },
+  { k = 'vcurve', key = 'u', tip = 'bend the value ramp: + gentle then steep, - the other way', label = 'value curve', min = -1, max = 1, step = 0.05, fmt = '%+.2f', def = 0 },
+  { k = 'even', key = 'm', tip = 'remap - keep the order of the old values, even - ramp by note order (first lo, last hi)',   label = 'value mode', toggle = true, def = false, on = 'even', off = 'remap' },
 }
 
 function RF.defaults()
@@ -72,12 +72,25 @@ function RF.compute(ev, r0, r1, p)
   return out
 end
 
+-- 21 окт: буква строки (прыжок на строку) — в подписи янтарём с чертой
+local function label_key(U, x, y, label, key, col)
+  U.text(x, y, label, col)
+  if not key then return end
+  local at = label:lower():find(key, 1, true)
+  if not at then return end
+  local pre = label:sub(1, at - 1)
+  local cx = x + U.measure(pre .. '.') - U.measure('.')
+  local ch = label:sub(at, at)
+  U.text(cx, y, ch, U.AMBER)
+  U.set(U.AMBER); gfx.rect(cx, y + (U.texth and U.texth() or 12) + 2, U.measure(ch), 1, 1)
+end
 local function clamp(r, v) return math.max(r.min, math.min(r.max, v)) end
 
 -- клавиша → 'changed' | 'keep' | 'revert' | true | false
 function RF.key(p, c, shift)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local r = RF.ROWS[RF.sel]
+  for i, rr in ipairs(RF.ROWS) do if rr.key and ch == rr.key then RF.sel = i; return true end end   -- 21 окт: буква — на строку
   if ch == 'j' or c == 1685026670 then RF.sel = math.min(#RF.ROWS, RF.sel + 1); return true end
   if ch == 'k' or c == 30064 then RF.sel = math.max(1, RF.sel - 1); return true end
   if ch == 'g' then RF.sel = 1; return true end
@@ -123,7 +136,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
     if yy + rh > y + h then break end
     local cur = focus and i == RF.sel
     local lx = x + pad
-    U.text(lx, yy, r.label, cur and U.AMBER or U.TEXT)
+    label_key(U, lx, yy, r.label, r.key, cur and U.AMBER or U.TEXT)
     if RF.hint then RF.hint('rf', lx, yy, lw, rh, { row = i }) end   -- 21 окт: метки f (RF.hint = ctx.hint)
     local sx = lx + lw + pad
     local hot = mx >= sx and mx < x + w - pad and my >= yy and my < yy + rh

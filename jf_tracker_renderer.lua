@@ -16,15 +16,15 @@ local function nname(n) n = math.floor(n + 0.5); return NN[n % 12 + 1] .. (n // 
 RD.nname = nname
 
 RD.ROWS = {
-  { k = 'mode',   label = 'what',       toggle = true, def = false, on = 'instrument -> sampler', off = 'notes -> audio' },
-  { k = 'tail',   label = 'tail',       min = 0,   max = 8,   step = 0.1, fmt = '%.1f s', def = 1.0 },
-  { k = 'mute',   label = 'mute source', toggle = true, def = false, only = 'notes' },
-  { k = 'lo',     label = 'notes from', min = 0,   max = 127, step = 1,   note = true, def = 36, only = 'sampler' },
-  { k = 'hi',     label = 'notes to',   min = 0,   max = 127, step = 1,   note = true, def = 84, only = 'sampler' },
-  { k = 'step',   label = 'every',      min = 1,   max = 24,  step = 1,   fmt = '%d st', def = 3, only = 'sampler' },
-  { k = 'layers', label = 'vel layers', min = 1,   max = 8,   step = 1,   fmt = '%d', def = 2, only = 'sampler' },
-  { k = 'len',    label = 'note length', min = 0.1, max = 8,  step = 0.1, fmt = '%.1f s', def = 1.5, only = 'sampler' },
-  { k = 'obey',   label = 'note-offs',  toggle = true, def = false, on = 'obey (sustain)', off = 'one shot', only = 'sampler' },
+  { k = 'mode', key = 'w',   label = 'what',       toggle = true, def = false, on = 'instrument -> sampler', off = 'notes -> audio' },
+  { k = 'tail', key = 't',   label = 'tail',       min = 0,   max = 8,   step = 0.1, fmt = '%.1f s', def = 1.0 },
+  { k = 'mute', key = 'u',   label = 'mute source', toggle = true, def = false, only = 'notes' },
+  { k = 'lo', key = 'r',     label = 'notes from', min = 0,   max = 127, step = 1,   note = true, def = 36, only = 'sampler' },
+  { k = 'hi', key = 'o',     label = 'notes to',   min = 0,   max = 127, step = 1,   note = true, def = 84, only = 'sampler' },
+  { k = 'step', key = 'e',   label = 'every',      min = 1,   max = 24,  step = 1,   fmt = '%d st', def = 3, only = 'sampler' },
+  { k = 'layers', key = 'y', label = 'vel layers', min = 1,   max = 8,   step = 1,   fmt = '%d', def = 2, only = 'sampler' },
+  { k = 'len', key = 'n',    label = 'note length', min = 0.1, max = 8,  step = 0.1, fmt = '%.1f s', def = 1.5, only = 'sampler' },
+  { k = 'obey', key = 's',   label = 'note-offs',  toggle = true, def = false, on = 'obey (sustain)', off = 'one shot', only = 'sampler' },
 }
 
 function RD.defaults()
@@ -79,6 +79,18 @@ function RD.plan(p)
   return out
 end
 
+-- 21 окт: буква строки (прыжок на строку) — в подписи янтарём с чертой
+local function label_key(U, x, y, label, key, col)
+  U.text(x, y, label, col)
+  if not key then return end
+  local at = label:lower():find(key, 1, true)
+  if not at then return end
+  local pre = label:sub(1, at - 1)
+  local cx = x + U.measure(pre .. '.') - U.measure('.')
+  local ch = label:sub(at, at)
+  U.text(cx, y, ch, U.AMBER)
+  U.set(U.AMBER); gfx.rect(cx, y + (U.texth and U.texth() or 12) + 2, U.measure(ch), 1, 1)
+end
 local function clamp(r, v) return math.max(r.min, math.min(r.max, v)) end
 
 -- клавиша → 'render' | 'changed' | 'leave' | true | false
@@ -90,6 +102,7 @@ function RD.key(p, c, shift)
     if RD.row_on(p, RD.ROWS[i]) then RD.sel = i end
   end
   if not RD.row_on(p, RD.ROWS[RD.sel]) then RD.sel = 1 end
+  for i, rr in ipairs(RD.ROWS) do if rr.key and ch == rr.key and RD.row_on(p, rr) then RD.sel = i; return true end end   -- 21 окт: буква — на строку
   local r = RD.ROWS[RD.sel]
   if ch == 'j' or c == 1685026670 then move(1); return true end
   if ch == 'k' or c == 30064 then move(-1); return true end
@@ -138,7 +151,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       if yy + rh > y + h then break end
       local cur = focus and i == RD.sel
       local lx = x + pad
-      U.text(lx, yy, r.label, cur and U.AMBER or U.TEXT)
+      label_key(U, lx, yy, r.label, r.key, cur and U.AMBER or U.TEXT)
       if RD.hint then RD.hint('rd', lx, yy, lw, rh, { row = i }) end   -- 21 окт: метки f (RD.hint = ctx.hint)
       local sx = lx + lw + pad
       local hot = mx >= sx and mx < x + w - pad and my >= yy and my < yy + rh

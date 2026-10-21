@@ -9,15 +9,15 @@
 local HU = {}
 
 HU.ROWS = {
-  { k = 'amt',    label = 'amount',     min = 0, max = 100, step = 5,   fmt = '%d %%',     def = 0, noon = true },
-  { k = 'time',   label = 'time ±',     min = 0, max = 50,  step = 1,   fmt = '%d ms',     def = 10 },
-  { k = 'vel',    label = 'velocity ±', min = 0, max = 64,  step = 1,   fmt = '%d',        def = 12 },
-  { k = 'vol',    label = 'volume ±',   min = 0, max = 6,   step = 0.1, fmt = '%.1f dB',   def = 1.5 },
-  { k = 'pitch',  label = 'pitch ±',    min = 0, max = 50,  step = 1,   fmt = '%d ct',     def = 8 },
-  { k = 'rate',   label = 'speed ±',    min = 0, max = 2,   step = 0.1, fmt = '%.1f %%',   def = 0.3 },
-  { k = 'pan',    label = 'pan ±',      min = 0, max = 50,  step = 1,   fmt = '%d %%',     def = 10 },
-  { k = 'attack', label = 'attack',     min = 0, max = 30,  step = 1,   fmt = '%d ms',     def = 6 },
-  { k = 'len',    label = 'length ±',   min = 0, max = 20,  step = 1,   fmt = '%d %%',     def = 4 },
+  { k = 'amt', key = 'm',    label = 'amount',     min = 0, max = 100, step = 5,   fmt = '%d %%',     def = 0, noon = true },
+  { k = 'time', key = 't',   label = 'time ±',     min = 0, max = 50,  step = 1,   fmt = '%d ms',     def = 10 },
+  { k = 'vel', key = 'v',    label = 'velocity ±', min = 0, max = 64,  step = 1,   fmt = '%d',        def = 12 },
+  { k = 'vol', key = 'o',    label = 'volume ±',   min = 0, max = 6,   step = 0.1, fmt = '%.1f dB',   def = 1.5 },
+  { k = 'pitch', key = 'p',  label = 'pitch ±',    min = 0, max = 50,  step = 1,   fmt = '%d ct',     def = 8 },
+  { k = 'rate', key = 's',   label = 'speed ±',    min = 0, max = 2,   step = 0.1, fmt = '%.1f %%',   def = 0.3 },
+  { k = 'pan', key = 'n',    label = 'pan ±',      min = 0, max = 50,  step = 1,   fmt = '%d %%',     def = 10 },
+  { k = 'attack', key = 'c', label = 'attack',     min = 0, max = 30,  step = 1,   fmt = '%d ms',     def = 6 },
+  { k = 'len', key = 'e',    label = 'length ±',   min = 0, max = 20,  step = 1,   fmt = '%d %%',     def = 4 },
 }
 HU.sel = 1
 
@@ -45,6 +45,18 @@ function HU.decode(str)
   return s
 end
 
+-- 21 окт: буква строки (прыжок на строку) — в подписи янтарём с чертой
+local function label_key(U, x, y, label, key, col)
+  U.text(x, y, label, col)
+  if not key then return end
+  local at = label:lower():find(key, 1, true)
+  if not at then return end
+  local pre = label:sub(1, at - 1)
+  local cx = x + U.measure(pre .. '.') - U.measure('.')
+  local ch = label:sub(at, at)
+  U.text(cx, y, ch, U.AMBER)
+  U.set(U.AMBER); gfx.rect(cx, y + (U.texth and U.texth() or 12) + 2, U.measure(ch), 1, 1)
+end
 local function clamp(r, v) return math.max(r.min, math.min(r.max, v)) end
 local function round(r, v) local q = 5 / r.step; return math.floor(v * q + 0.5) / q end   -- до мелкого шага (step / 5)
 
@@ -54,6 +66,7 @@ function HU.nrows(s) return #HU.ROWS + #(s.dsp or {}) end
 function HU.key(s, c, shift)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local di = HU.sel - #HU.ROWS
+  for i, rr in ipairs(HU.ROWS) do if rr.key and ch == rr.key then HU.sel = i; return true end end   -- 21 окт: буква — на строку
   if ch == 'a' then return 'add' end
   if di >= 1 and s.dsp[di] then
     local t = s.dsp[di]
@@ -128,7 +141,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
       if HU.hint then HU.hint('hum', bx, yy, bw, rh, { toggle = i }) end
     end
     local lx = bx + bw + pad
-    U.text(lx, yy, r.label, cur and U.AMBER or (on and U.TEXT or U.GREY))
+    label_key(U, lx, yy, r.label, r.key, cur and U.AMBER or (on and U.TEXT or U.GREY))
     if HU.hint then HU.hint('hum', lx, yy, lw, rh, { row = i }) end
     local sx = lx + lw + pad
     local sw = math.max(4 * L.cw, x + w - pad - vw - pad - sx)
