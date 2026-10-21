@@ -913,13 +913,18 @@ local function pool_select(n)
   -- 9 окт: сквозная нумерация lib — сэмплы (и пустые слоты), за ними
   -- плагины-инструменты трека, последним — automation
   local nsamp = #pool + draw.empty_slots(#pool)
-  local insts = (col and ctx and ctx.track_insts) and ctx.track_insts(col) or {}
-  n = math.max(1, math.min(nsamp + #insts + 1, n))
+  -- 21 окт: плагины-инструменты — сквозная нумерация по трекам проекта (как в REAPER: любой трек — любой инструмент);
+  -- номер чужого инструмента — курсор на его трек
+  local total = (ctx and ctx.inst_total) and ctx.inst_total() or 0
+  n = math.max(1, math.min(nsamp + total + 1, n))
   if n > nsamp then
     vim.inst = n
-    local k = n - nsamp
-    if insts[k] then ctx.inst_fx_pick(col, insts[k].fx, false, true)
-    else if ctx and ctx.auto_select then ctx.auto_select() end end
+    local g = n - nsamp
+    local oc, k = ctx.inst_owner(g)
+    if oc then
+      if col and oc.guid ~= col.guid then ctx.goto_track(oc) end
+      ctx.inst_fx_pick(oc, ctx.track_insts(oc)[k].fx, false, true)
+    elseif ctx and ctx.auto_select then ctx.auto_select() end
     return
   end
   -- слайсы в lib не показываются (3 окт): шаг на слайс — дальше, к следующему
@@ -1933,7 +1938,7 @@ ctx = {
           -- 11 окт: MIDI-нота кита (контейнер RS5K) — слайс k = нота k-го RS5K
           local pool = col.pool or {}
           local mi = ctx.midi_inst_num(h.item, h.pitch)
-          local kit = mi and ctx.track_insts(col)[mi - #pool - draw.empty_slots(#pool)]
+          local kit = mi and ctx.track_insts(col)[mi - #pool - draw.empty_slots(#pool) - ctx.inst_off(col)]
           if not (kit and kit.kids) then why = 'MIDI note: not a kit (RS5K container)'
           elseif k == 0 then why = 'kit: no whole sample (S01..)'
           elseif not kit.kids[k] then why = ('kit has %d slices'):format(#kit.kids)
@@ -1968,7 +1973,7 @@ ctx = {
     local E = draw.empty_slots(#pool)
     if d <= nr + E then return #pool + (d - nr) end
     local base = #pool + E
-    if d > base and d - base <= #ctx.track_insts(col) then return d end
+    if d > base and d - base <= ctx.inst_total() then return d end   -- 21 окт: сквозные номера инструментов
     return nil
   end,
   empty_slots = function(n) return draw.empty_slots(n) end,
@@ -1991,7 +1996,7 @@ ctx = {
     local e = pool[n]
     local base = #pool + draw.empty_slots(#pool)
     local insts = ctx.track_insts(col)
-    local pi = n > base and insts[n - base] or nil
+    local pi = n > base and insts[n - base - ctx.inst_off(col)] or nil   -- 21 окт: сквозной номер → свой k
     if not (e and e.item) and not pi then vim.msg = ('no instrument %02d on this track'):format(ctx.inst_disp(col, n)); return end
     local function inr(x, pitch) return x.lo and x.hi and pitch >= math.min(x.lo, x.hi) and pitch <= math.max(x.lo, x.hi) end
     local done = 0
@@ -4205,7 +4210,7 @@ ctx = {
     local c = cur_col()                                 -- 9 окт: номер automation — последний в lib
     if c then
       if state.instfx then state.instfx[c.guid] = nil end
-      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + #ctx.track_insts(c) + 1
+      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + ctx.inst_total() + 1   -- 21 окт: после всех инструментов проекта
     end
     local n = #ctx.ai_list()
     vim.msg = n > 0 and ('automation: %d item(s) of the track - pick one in the slices list, a note key inserts it (C-4 = x1)'):format(n) or 'automation: no automation items on this track yet'
@@ -4225,7 +4230,7 @@ ctx = {
     local c = cur_col()
     if c then
       if state.instfx then state.instfx[c.guid] = nil end
-      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + #ctx.track_insts(c) + 2
+      vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + ctx.inst_total() + 2
     end
     local n = #ctx.mc_list()
     vim.msg = n > 0 and ('midi: %d clip(s) (%s) - pick one in the slices list, a note key inserts it (C-4 = as is), a - track / project'):format(n, ctx.mc_scope)
@@ -4973,7 +4978,7 @@ ctx = {
     local col = tr and mc.cols[tr]
     if col then
       local insts = ctx.track_insts(col)
-      local base = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
+      local base = #(col.pool or {}) + draw.empty_slots(#(col.pool or {})) + ctx.inst_off(col)   -- 21 окт: сквозные номера
       local only
       local function hit(e) return e.lo and e.hi and pitch >= math.min(e.lo, e.hi) and pitch <= math.max(e.lo, e.hi) end
       for k, fi in ipairs(insts) do
@@ -6552,7 +6557,7 @@ ctx = {
     state.midi_inst = false
     -- номер в сквозной нумерации lib (vim.inst) — чтобы , . / Cmd+J K шли дальше от него
     do
-      local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {}))
+      local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {})) + ctx.inst_off(col)   -- 21 окт: сквозные номера
       for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then vim.inst = nsamp + k end end
     end
     if dbl then edit.fx_show(col.track, fx); return end
@@ -23486,9 +23491,9 @@ local function frame()
         local pe = n and pool[n]
         if pe and pe.parent then for i, e in ipairs(pool) do if e == pe.parent then n = i; break end end end
         if not n and #ctx.track_insts(col) > 0 then
-          n = #pool + draw.empty_slots(#pool) + 1
+          n = #pool + draw.empty_slots(#pool) + ctx.inst_off(col) + 1
           local fx = ctx.inst_fx(col)
-          for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then n = #pool + draw.empty_slots(#pool) + k end end
+          for k, fi in ipairs(ctx.track_insts(col)) do if fi.fx == fx then n = #pool + draw.empty_slots(#pool) + ctx.inst_off(col) + k end end
         end
         if n and n ~= vim.inst then
           local pp = state.poolprev; state.poolprev = false   -- без прослушки: курсор просто ходит
@@ -24919,6 +24924,33 @@ ctx.inst_ask_all = function(col, old, new)
     { key = 't', label = 'on the whole track', fn = function() go('track') end },
     { key = 'n', label = 'no - only this note', fn = function() vim.msg = 'instrument: only this note' end },
   } })
+end
+-- 21 окт: сквозные номера плагинов-инструментов: после сэмплов lib — инструменты всех треков проекта по порядку треков
+ctx.inst_num_c = {}
+function ctx.inst_map()
+  local c = ctx.inst_num_c
+  if c.snap == snap then return c end
+  c = { snap = snap, off = {}, list = {} }
+  local n = 0
+  for _, col in ipairs(snap and snap.cols or {}) do
+    if col.guid then
+      c.off[col.guid] = n
+      for k in ipairs(ctx.track_insts(col)) do n = n + 1; c.list[n] = { col = col, k = k } end
+    end
+  end
+  c.total = n
+  ctx.inst_num_c = c
+  return c
+end
+ctx.inst_off = function(col) return (col and ctx.inst_map().off[col.guid]) or 0 end
+ctx.inst_total = function() return ctx.inst_map().total or 0 end
+ctx.inst_owner = function(g) local e = ctx.inst_map().list[g]; if e then return e.col, e.k end end
+-- курсор трекера на трек (первая его подколонка), вид — туда
+ctx.goto_track = function(col)
+  for i, f in ipairs(L.flat or {}) do
+    if f.col and f.col.guid == col.guid and not f.env then vim.cur.fi = i; vim.cur.field = 1; vim.cur.sub = nil; if vim.ensure_visible then vim.ensure_visible() end; return true end
+  end
+  return false
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}

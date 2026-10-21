@@ -3843,7 +3843,7 @@ function V.smart()
     table.sort(items, function(a, b) return a.v < b.v end)
     -- 11 окт: и плагины-инструменты трека (VSTi / AUi / RS5K) — номером из lib
     local pool0 = f.col.pool or {}
-    local base = #pool0 + (ctx.empty_slots and ctx.empty_slots(#pool0) or 0)
+    local base = #pool0 + (ctx.empty_slots and ctx.empty_slots(#pool0) or 0) + (ctx.inst_off and ctx.inst_off(f.col) or 0)   -- 21 окт: сквозные номера
     for k, fi2 in ipairs(ctx.track_insts and ctx.track_insts(f.col) or {}) do
       items[#items + 1] = { label = ('%02d %s'):format(base + k, fi2.name or 'instrument'), v = base + k, tip = (fi2.name or '') .. '  (plugin - the note becomes MIDI)' }
     end

@@ -4937,13 +4937,15 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 10 окт: инструменты — все проектные: свои (трека курсора) с номерами, чужие — с именем трека,
   -- щелчок переводит курсор на тот трек; automation и midi — своими секциями, как instruments
   -- 20 окт: порядок — по трекам проекта, постоянный (свои больше не поднимаются наверх: список дёргался при смене трека)
+  -- 21 окт: номера — сквозные по трекам проекта (и у чужих: номер ведёт курсор на их трек), как в REAPER
   local inst_rows, own_done = {}, false
-  local function add_own() for k, fi in ipairs(tins) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + k } end; own_done = true end
+  local gn = 0
+  local function add_own() for k, fi in ipairs(tins) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + gn + k } end; gn = gn + #tins; own_done = true end
   if info.track_insts then
     for _, c in ipairs(info.cols or {}) do
       if c == col or c.track == (col and col.track) then if not own_done then add_own() end
       else
-        for _, fi in ipairs(info.track_insts(c)) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = c.name or fi.kind, col = c } end
+        for _, fi in ipairs(info.track_insts(c)) do gn = gn + 1; inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = c.name or fi.kind, col = c, num = nsamp + gn } end
       end
     end
   end
@@ -4951,9 +4953,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if #inst_rows > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
   for _, o in ipairs(inst_rows) do rows[#rows + 1] = o end
   rows[#rows + 1] = { hdr = 'automation', name = '' }
-  rows[#rows + 1] = { auto = true, num = nsamp + #tins + 1 }   -- automation как инструмент (5 окт)
+  rows[#rows + 1] = { auto = true, num = nsamp + gn + 1 }   -- automation как инструмент (5 окт); 21 окт: после всех инструментов проекта
   rows[#rows + 1] = { hdr = 'midi', name = '' }
-  rows[#rows + 1] = { midi = true, num = nsamp + #tins + 2 }   -- MIDI-клипы трека / проекта (10 окт)
+  rows[#rows + 1] = { midi = true, num = nsamp + gn + 2 }   -- MIDI-клипы трека / проекта (10 окт)
   -- 10 окт: секции audio / instruments / automation / midi; опция lib tabs — вкладками (F4),
   -- иначе разделителями с пустой строкой перед каждой
   local SECS = { instruments = true, automation = true, midi = true }
