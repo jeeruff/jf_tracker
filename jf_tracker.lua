@@ -12276,6 +12276,23 @@ ctx = {
     ctx.rec_arm_list(nums)
   end,
   -- 16 окт: t123a — запись у треков с этими номерами (как в REAPER); все — в одно положение: вкл, если первый выкл
+  -- 21 окт: t23s / t23m — соло / mute треков по номерам (как t123a); первый решает: вкл или выкл
+  tracks_flag = function(nums, key)
+    local trs = {}
+    for _, k in ipairs(nums) do local tr = reaper.GetTrack(0, k - 1); if tr then trs[#trs + 1] = tr end end
+    if #trs == 0 then vim.msg = 'no such tracks'; return end
+    local on = reaper.GetMediaTrackInfo_Value(trs[1], key) == 0 and 1 or 0
+    edit.run((key == 'I_SOLO' and 'solo ' or 'mute ') .. #trs, function() for _, tr in ipairs(trs) do reaper.SetMediaTrackInfo_Value(tr, key, on) end end)
+    model.invalidate()
+    vim.msg = ('%s %s: tracks %s'):format(key == 'I_SOLO' and 'solo' or 'mute', on == 1 and 'on' or 'off', table.concat(nums, ' '))
+  end,
+  unsolo_all = function()
+    edit.run('unsolo / unmute all', function()
+      for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', 0); reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', 0) end
+    end)
+    model.invalidate()
+    vim.msg = 'every track: solo and mute off (u - undo)'
+  end,
   rec_arm_list = function(nums)
     local trs = {}
     for _, k in ipairs(nums) do local tr = reaper.GetTrack(0, k - 1); if tr then trs[#trs + 1] = tr end end

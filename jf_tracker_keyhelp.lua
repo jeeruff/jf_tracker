@@ -184,6 +184,8 @@ KH.PAGES = {
     { k = 'tT', m = 'track from template', d = 'a track from a template after the cursor track' },
     { k = 'tF', m = 'into left folder', d = 'the cursor track goes into the folder of the track to the left' },
     { k = 'R', m = 'insert last played', d = 'the last phrase you played on the armed cursor track (REAPER retro MIDI buffer - it records while armed, even stopped) goes in from the cursor row: the first note on the row, the silence before it cut; longer than the pattern - a menu: duplicate the pattern (the rest goes into the copy), the rest into the next pattern, cut, squeeze in' },
+    { k = 'tm  t23m t23s', m = 'mute / solo tracks', d = 'tm - mute the cursor track; t + track numbers + m / s - mute / solo those tracks (0 = 10), as t135a arms them' },
+    { k = 'tu', m = 'unsolo / unmute all', d = 'every track: solo and mute off' },
     { k = 'tw', m = 'wave column of track', d = 'the wave column of the cursor track: show / hide; again - auto (only with audio or a drumrs5k kit with samples)' },
     { k = 'g12 Enter', t = {}, m = 'go to row number', d = 'go to row 0012 (also 12gg)' },
     { k = 'Opt+W', d = 'the cursor to the master columns (∑); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
