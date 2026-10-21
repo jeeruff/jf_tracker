@@ -19408,29 +19408,7 @@ local function frame()
       end
     end
   end
-  -- полиметрия в строках (7 окт): зона сессии видна — в колонке каждого играющего
-  -- клипа янтарная линия на начале его цикла (у 4/4 и 5/4 — свои швы)
-  if model.SHOW_ZONE and not big_on and L.body_h > 0 and snap and L.cols then
-    local r0 = state.row0 or 0
-    local t_top, t_bot = edit.row_time(r0, state.lpb, 0), edit.row_time(r0 + (L.nrows or 0), state.lpb, 0)
-    for _, c in ipairs(L.cols) do
-      local l = c.x and MX.SS.live[c.ci]
-      if l and l.len and l.len > 0.01 then
-        local k = math.ceil((t_top - l.phase) / l.len)
-        local t = l.phase + k * l.len
-        local guard = 0
-        while t < t_bot and guard < 64 do
-          local row = model.row_of_time(t, state.lpb)
-          local y = L.body_y + math.floor((row - r0) * L.rh)
-          if y >= L.body_y and y < L.body_y + L.body_h then
-            U.set(U.AMBER); gfx.rect(c.x, y, c.w - 1, 1, 1)
-            U.text(c.x + c.w - L.pad - U.measure('L'), y + 1, 'L', U.AMBER)
-          end
-          t = t + l.len; guard = guard + 1
-        end
-      end
-    end
-  end
+  -- 21 окт: янтарная линия «L» шва лупа клипа сессии убрана (глючила: рисовалась под концом трека, по устаревшему клипу)
   -- большой роутер (7 окт, zR): на всё окно поверх всего
   -- 7 окт: верхняя панель (вкладка автоматизации) и шапки треков остаются —
   -- роутер занимает матрицу, тело трекера, DSP, lib и браузер под шапками
@@ -23419,6 +23397,19 @@ local function frame()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   ctx.mod_tick(c)
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
+  -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
+  if ctx.hold_len then
+    local lm = ctx.hold_len
+    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(lm.t_press)   -- отпускания с нажатия этой ноты
+    local vk = ctx.note_key_last and keys.vk_of(ctx.note_key_last.c) or 0
+    if not up or (vk > 0 and up:byte(vk) ~= 0) then
+      ctx.hold_len = nil
+      edit.last_midi = nil
+      reaper.Undo_OnStateChange2(0, 'jf_tracker: note length (held key)')
+      model.invalidate()
+      vim.msg = ('note length: %.2f s (held)'):format(reaper.time_precise() - lm.t_press)
+    end
+  end
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
@@ -23906,6 +23897,11 @@ local function frame()
     if up and up:byte(vk) == 0 and now - nk.t < 3 then
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
+      -- 21 окт: держат клавишу ноты в INSERT — длина вставленной MIDI-ноты по времени удержания (тап — до следующего события)
+      local lm = edit.last_midi
+      if vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(now - lm.t_press) then
+        ctx.hold_len = lm; reaper.UpdateArrange()
+      end
     else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) } end
   end
   -- журнал клавиш (4 окт): сырой код → после раскладки и фильтров, режим, фокус;
@@ -24696,6 +24692,61 @@ end
 ctx.pm_installed = function()
   if ctx.pm_inst == nil then ctx.pm_inst = reaper.file_exists(reaper.GetResourcePath() .. '/Scripts/jf_pm/jf_pm_index.json') end
   return ctx.pm_inst
+end
+-- 21 окт: R — умный ввод из ретро-буфера MIDI REAPER (пишет всегда, пока трек взведён, и без транспорта): последняя
+-- сыгранная фраза — на трек курсора, первая нота — ровно на строку курсора (тишина до неё срезана). Действие 40211
+-- (взведённые и выделенные) — на время только этот трек выделен; выделение и курсор REAPER — как были
+ctx.retro_insert = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  local tr = f and f.col and f.col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'R: a track under the cursor'; return end
+  if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') ~= 1 then vim.msg = 'R: the track is not armed - arm it (ta), play, then R puts what you played here'; return end
+  local before = {}
+  for i = 0, reaper.CountTrackMediaItems(tr) - 1 do before[reaper.GetTrackMediaItem(tr, i)] = true end
+  local sel = {}
+  for i = 0, reaper.CountTracks(0) - 1 do local t = reaper.GetTrack(0, i); if reaper.IsTrackSelected(t) then sel[#sel + 1] = t end end
+  local cur0 = reaper.GetCursorPosition()
+  local t_row = edit.row_time(vim.cur.row, state.lpb, 0)
+  local made
+  edit.run('R: last played (retro MIDI)', function()
+    reaper.SetOnlyTrackSelected(tr)
+    reaper.SetEditCurPos(t_row, false, false)
+    reaper.Main_OnCommand(40211, 0)
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, i)
+      if not before[it] then made = it end
+    end
+    if made then
+      local tk = reaper.GetActiveTake(made)
+      local first
+      if tk then
+        local _, nn = reaper.MIDI_CountEvts(tk)
+        for k = 0, nn - 1 do
+          local _, _, _, sp = reaper.MIDI_GetNote(tk, k)
+          local t = reaper.MIDI_GetProjTimeFromPPQPos(tk, sp)
+          if not first or t < first then first = t end
+        end
+      end
+      if first then
+        local pos = reaper.GetMediaItemInfo_Value(made, 'D_POSITION')
+        local lead = first - pos
+        if lead > 1e-4 then   -- тишина до первой ноты — срезать: item начинается с неё
+          reaper.SetMediaItemInfo_Value(made, 'D_POSITION', first)
+          reaper.SetMediaItemInfo_Value(made, 'D_LENGTH', reaper.GetMediaItemInfo_Value(made, 'D_LENGTH') - lead)
+          reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + lead)
+        end
+        reaper.SetMediaItemInfo_Value(made, 'D_POSITION', t_row)
+      end
+      if f.col.fixed and f.lane and f.lane.idx and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then reaper.SetMediaItemInfo_Value(made, 'I_FIXEDLANE', f.lane.idx) end
+    end
+    for i = 0, reaper.CountTracks(0) - 1 do reaper.SetTrackSelected(reaper.GetTrack(0, i), false) end
+    for _, t in ipairs(sel) do reaper.SetTrackSelected(t, true) end
+    reaper.SetEditCurPos(cur0, false, false)
+  end)
+  model.invalidate()
+  if not made then vim.msg = 'R: nothing in the retro buffer of this track (it records while armed - play something first)'; return end
+  local _, nn = reaper.MIDI_CountEvts(reaper.GetActiveTake(made))
+  vim.msg = ('R: %d note(s) of the last played - from row %04d (u - undo)'):format(nn or 0, vim.cur.row)
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}

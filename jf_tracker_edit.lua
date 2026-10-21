@@ -1357,13 +1357,38 @@ local function new_midi_item(track, lane_idx, t)
   return it, R.GetActiveTake(it)
 end
 
+-- 21 окт: E.sus_t (ставит vim) — нота звучит до следующего события подколонки / OFF / конца паттерна, как в трекерах
+-- (было — один шаг); не дальше конца своего MIDI item
 local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted)
   local it, tk = midi_item_at(track, lane_idx, t0)
   if not it then it, tk = new_midi_item(track, lane_idx, t0) end
+  if E.sus_t and E.sus_t > t1 + 1e-6 then
+    local ie = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    t1 = math.max(t1, math.min(E.sus_t, ie))
+  end
   local p0 = R.MIDI_GetPPQPosFromProjTime(tk, t0)
   local p1 = R.MIDI_GetPPQPosFromProjTime(tk, t1)
   R.MIDI_InsertNote(tk, false, muted or false, p0, p1, ch or 0, pitch, vel or 100, false)
+  E.last_midi = { item = it, take = tk, pitch = pitch, p0 = p0, t0 = t0, t_press = R.time_precise() }   -- 21 окт: удержание клавиши — длина (main)
   return it
+end
+-- 21 окт: клавишу ноты держат (автоповтор macOS) — длина последней вставленной ноты = время удержания (sec),
+-- от её начала, не дальше конца item; без undo на каждый шаг (одним — на отпускании, main)
+function E.hold_length(sec)
+  local lm = E.last_midi
+  if not (lm and lm.take and R.ValidatePtr(lm.take, 'MediaItem_Take*')) then return false end
+  local tk = lm.take
+  local ie = R.GetMediaItemInfo_Value(lm.item, 'D_POSITION') + R.GetMediaItemInfo_Value(lm.item, 'D_LENGTH')
+  local te = math.min(ie, lm.t0 + math.max(0.02, sec))
+  local _, nn = R.MIDI_CountEvts(tk)
+  for i = 0, nn - 1 do
+    local _, sel, mu, sp, ep, ch, p, v = R.MIDI_GetNote(tk, i)
+    if p == lm.pitch and math.abs(sp - lm.p0) < 1 then
+      R.MIDI_SetNote(tk, i, sel, mu, sp, R.MIDI_GetPPQPosFromProjTime(tk, te), ch, p, v, false)
+      return true
+    end
+  end
+  return false
 end
 
 -- ── x-fade вставленных нот ─────────────────────────────────────────────

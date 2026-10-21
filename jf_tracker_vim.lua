@@ -977,6 +977,10 @@ function V.note_off_scope(scope)
       for _, h in ipairs(V.covering(i, V.cur.row)) do heads[#heads + 1] = h end
     end
   end
+  if #heads == 0 and scope == 'sub' and cur and cur.sub then   -- 21 окт: тонкая нота выше — дотянуть её до этого OFF
+    local h = V.head_above(cur.sub, V.cur.row)
+    if h then heads[1] = h end
+  end
   ctx.edit.note_off(heads, lpb(), V.cur.row)          -- пусто — note_off ничего не делает
   V.msg = ('note off (%s): %d'):format(scope == 'all' and 'all tracks' or (scope == 'track' and 'track' or 'subcolumn'), #heads)
   return #heads
@@ -2503,8 +2507,10 @@ function V.key_impl(c)
         end
         local stp = V.step_auto and 1 or V.step
         if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end
+        local sr = V.sustain_row(f.sub, V.cur.row)
+        E.sus_t = sr and ctx.row_time and ctx.row_time(sr) or nil
         local okN, errN = pcall(E.insert_note,f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
-        E.cap_row = nil
+        E.cap_row, E.sus_t = nil, nil
         if not okN then E.beside = false; error(errN, 0) end
         E.beside = false
         if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
@@ -3061,6 +3067,7 @@ function V.key_impl(c)
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
+  elseif ch == 'R' and V.mode == 'normal' and ctx.retro_insert then ctx.retro_insert(); V.count = nil; return   -- 21 окт: R — последнее сыгранное (ретро-буфер MIDI REAPER) с курсора
   elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
   elseif V.is_mac_key(c) and V.mode ~= 'insert' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: Option+Shift+2 — большая панель макросов у курсора (@a — регистр, как в Vim)
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
@@ -3954,6 +3961,26 @@ function V.slq_snap(rf, q, cur)
   return r
 end
 -- 11 окт: строка следующего события (голова ноты / item) в подколонке ниже row — новая нота обрывается на ней
+-- 21 окт: где кончится новая MIDI-нота: следующее событие подколонки (нота или OFF), иначе конец паттерна курсора
+function V.sustain_row(sub, row)
+  local best
+  for r, cell in pairs(sub or {}) do
+    if r > row and (cell.kind == 'audio' or cell.kind == 'midi' or cell.kind == 'off') and (not best or r < best) then best = r end
+  end
+  if not best and ctx.region_rows then local _, r1 = ctx.region_rows(); if r1 and r1 >= row then best = r1 + 1 end end
+  return best
+end
+-- 21 окт: ` под тонкой нотой (уже кончилась выше) — её голова выше по подколонке, без OFF / событий между
+function V.head_above(sub, row)
+  for r = row - 1, math.max(0, row - 4096), -1 do
+    local cell = sub and sub[r]
+    if cell then
+      if cell.kind == 'midi' then return cell end
+      if cell.kind == 'cont' and cell.of and cell.of.kind == 'midi' then return cell.of end
+      return nil
+    end
+  end
+end
 function V.next_event_row(sub, row)
   local best
   for r, cell in pairs(sub or {}) do
