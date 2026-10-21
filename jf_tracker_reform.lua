@@ -124,6 +124,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
     local cur = focus and i == RF.sel
     local lx = x + pad
     U.text(lx, yy, r.label, cur and U.AMBER or U.TEXT)
+    if RF.hint then RF.hint('rf', lx, yy, lw, rh, { row = i }) end   -- 21 окт: метки f (RF.hint = ctx.hint)
     local sx = lx + lw + pad
     local hot = mx >= sx and mx < x + w - pad and my >= yy and my < yy + rh
     if r.toggle then
@@ -134,6 +135,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       U.set(on and U.CYAN or U.LINE); gfx.rect(sx, yy, bw, rh - 1, 0)
       U.text(sx + pad, yy, lab, hot and U.AMBER or (on and U.CYAN or U.GREY))
       if hot then hv.toggle = i end
+      if RF.hint then RF.hint('rf', sx, yy, bw, rh, { toggle = i }) end
     else
       local sw = math.max(4 * L.cw, x + w - pad - vw - pad - sx)
       local v = p[r.k] or r.def
@@ -155,6 +157,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       U.set(bh and U.AMBER or U.LINE); gfx.rect(bx, yy + 2, bw, rh - 1, 0)
       U.text(bx + pad, yy + 2, b[1], bh and U.AMBER or U.TEXT)
       if bh then hv.btn = b[2] end
+      if RF.hint then RF.hint('rf', bx, yy + 2, bw, rh, { btn = b[2] }) end
       bx = bx + bw + pad
     end
   end

@@ -110,6 +110,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
   U.set(s.ins and U.CYAN or U.LINE); gfx.rect(ix, yy, iw, rh - 1, 0)
   U.text(ix + pad, yy, ins, ihot and U.AMBER or (s.ins and U.CYAN or U.GREY))
   if ihot then hv.ins = true end
+  if HU.hint then HU.hint('hum', ix, yy, iw, rh, { ins = true }) end   -- 21 окт: метки f (HU.hint = ctx.hint)
   yy = yy + rh + 2
   for i, r in ipairs(HU.ROWS) do
     if yy + rh > y + h then break end
@@ -120,9 +121,11 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
       local bhot = mx >= bx and mx < bx + bw and my >= yy and my < yy + rh
       U.text(bx, yy, on and '[x]' or '[ ]', bhot and U.AMBER or (on and U.TEXT or U.DIM))
       if bhot then hv.toggle = i end
+      if HU.hint then HU.hint('hum', bx, yy, bw, rh, { toggle = i }) end
     end
     local lx = bx + bw + pad
     U.text(lx, yy, r.label, cur and U.AMBER or (on and U.TEXT or U.GREY))
+    if HU.hint then HU.hint('hum', lx, yy, lw, rh, { row = i }) end
     local sx = lx + lw + pad
     local sw = math.max(4 * L.cw, x + w - pad - vw - pad - sx)
     local v = s.v[r.k] or r.def
@@ -146,6 +149,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     local bhot = mx >= bx and mx < bx + bw and my >= yy and my < yy + rh
     U.text(bx, yy, t.off and '[ ]' or '[x]', bhot and U.AMBER or (t.off and U.DIM or U.TEXT))
     if bhot then hv.dtoggle = di end
+    if HU.hint then HU.hint('hum', bx, yy, bw, rh, { dtoggle = di }) end
     local vs = ('±%.1f %%'):format(t.range or 5)
     local nx = bx + bw + pad
     U.text(nx, yy, ctx_fit and ctx_fit(t.name or '?', x + w - pad - U.measure(vs) - pad - nx) or (t.name or '?'), cur and U.AMBER or (t.off and U.GREY or U.TEXT))
@@ -161,6 +165,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     U.set(ahot and U.AMBER or U.LINE); gfx.rect(x + pad, yy + 2, aw, rh - 1, 0)
     U.text(x + 2 * pad, yy + 2, ap, ahot and U.AMBER or U.TEXT)
     if ahot then hv.apply = true end
+    if HU.hint then HU.hint('hum', x + pad, yy + 2, aw, rh, { apply = true }) end
     local hint = 'to the selection, else the track in the region'
     if x + 3 * pad + aw + U.measure(hint) <= x + w then U.text(x + 3 * pad + aw, yy + 2, hint, U.DIM) end
   end

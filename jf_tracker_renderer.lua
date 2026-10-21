@@ -139,6 +139,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       local cur = focus and i == RD.sel
       local lx = x + pad
       U.text(lx, yy, r.label, cur and U.AMBER or U.TEXT)
+      if RD.hint then RD.hint('rd', lx, yy, lw, rh, { row = i }) end   -- 21 окт: метки f (RD.hint = ctx.hint)
       local sx = lx + lw + pad
       local hot = mx >= sx and mx < x + w - pad and my >= yy and my < yy + rh
       if r.toggle then
@@ -149,6 +150,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
         U.set(on and U.CYAN or U.LINE); gfx.rect(sx, yy, bw, rh - 1, 0)
         U.text(sx + pad, yy, lab, hot and U.AMBER or (on and U.CYAN or U.GREY))
         if hot then hv.toggle = i end
+        if RD.hint then RD.hint('rd', sx, yy, bw, rh, { toggle = i }) end
       else
         local sw = math.max(4 * L.cw, x + w - pad - vwn - pad - sx)
         local v = p[r.k] or r.def
@@ -175,6 +177,7 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
     U.set(bh and U.AMBER or U.LINE); gfx.rect(x + pad, yy + 2, bw, rh - 1, 0)
     U.text(x + 2 * pad, yy + 2, lab, bh and U.AMBER or U.TEXT)
     if bh then hv.render = true end
+    if RD.hint then RD.hint('rd', x + pad, yy + 2, bw, rh, { render = true }) end
   end
   local _ = vw
   return hv

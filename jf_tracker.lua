@@ -15418,6 +15418,9 @@ local function hint_go(t)
   elseif t.kind == 'dsptrkname' then ctx.dsptrack_toggle()
   elseif t.kind == 'tmpl' then ctx.tmpl_do(d)
   elseif t.kind == 'kgroup' or t.kind == 'kchoke' then ctx.pad_group_menu(d.kid, t.kind == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
+  elseif t.kind == 'hum' then ctx.hum_click(d)   -- 21 окт: метки f панели humanizer
+  elseif t.kind == 'rf' then ctx.rf_click(d)
+  elseif t.kind == 'rd' then ctx.rd_click(d)
   elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)
   end
@@ -20471,14 +20474,7 @@ local function frame()
   -- 11 окт: + на стыке / = под узлом — эффект туда (выпадашка fzf)
   if U.click and hover.dbgain then ctx.gain_toggle(); U.click = false end   -- 18 окт: измерители между эффектами
   -- 19 окт: панель reform мышью: переключатели, слайдеры (тянуть — применяется не чаще 10 раз в секунду), keep / revert
-  if hover.rf and U.click then
-    local hh = hover.rf
-    ctx.set_focus('reform')
-    if hh.toggle then local r = ctx.RF.ROWS[hh.toggle]; ctx.rf_p[r.k] = not ctx.rf_p[r.k]; ctx.rf_apply()
-    elseif hh.btn then ctx.rf_close(hh.btn == 'keep')
-    elseif hh.slider then ctx.rf_drag = hh.slider; ctx.RF.sel = hh.slider.i
-    elseif hh.row then ctx.RF.sel = hh.row end
-  end
+  if hover.rf and U.click then ctx.rf_click(hover.rf) end
   if ctx.rf_drag then
     local dg = ctx.rf_drag
     if gfx.mouse_cap & 1 == 1 then
@@ -20488,30 +20484,13 @@ local function frame()
     else ctx.rf_drag = nil; if ctx.rf_dirty then ctx.rf_dirty = nil; ctx.rf_apply() end end
   end
   -- 20 окт: панель renderer мышью: переключатели, слайдеры, render
-  if hover.rd and U.click then
-    local hr = hover.rd
-    ctx.set_focus('renderer')
-    local p = ctx.rd_load()
-    if hr.toggle then local r = ctx.RD.ROWS[hr.toggle]; p[r.k] = not p[r.k]; ctx.RD.sel = hr.toggle; ctx.rd_save()
-    elseif hr.render then ctx.rd_render()
-    elseif hr.slider then ctx.rd_drag = hr.slider; ctx.RD.sel = hr.slider.i
-    elseif hr.row then ctx.RD.sel = hr.row end
-  end
+  if hover.rd and U.click then ctx.rd_click(hover.rd) end
   if ctx.rd_drag then
     if gfx.mouse_cap & 1 == 1 then local dg = ctx.rd_drag; ctx.RD.set_from_x(ctx.rd_load(), dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w)); ctx.rd_dirty = true
     else ctx.rd_drag = nil; if ctx.rd_dirty then ctx.rd_dirty = nil; ctx.rd_save() end end
   end
   -- 19 окт: панель humanizer мышью: галки, слайдеры (тянуть), insert, apply
-  if hover.hum and U.click then
-    local hh = hover.hum
-    ctx.hum_load(); ctx.set_focus('humanizer')
-    if hh.toggle then local r = ctx.HU.ROWS[hh.toggle]; ctx.hum_s.on[r.k] = not (ctx.hum_s.on[r.k] ~= false); ctx.hum_save()
-    elseif hh.dtoggle then local t = ctx.hum_s.dsp[hh.dtoggle]; t.off = not t.off; ctx.hum_save()
-    elseif hh.ins then ctx.hum_s.ins = not ctx.hum_s.ins; ctx.hum_save()
-    elseif hh.apply then ctx.hum_apply()
-    elseif hh.slider then ctx.hum_drag = hh.slider; ctx.HU.sel = hh.slider.i
-    elseif hh.row then ctx.HU.sel = hh.row end
-  end
+  if hover.hum and U.click then ctx.hum_click(hover.hum) end
   if ctx.hum_drag then
     if gfx.mouse_cap & 1 == 1 then local dg = ctx.hum_drag; ctx.HU.set_from_x(ctx.hum_s, dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w)); ctx.hum_dirty = true
     else ctx.hum_drag = nil; if ctx.hum_dirty then ctx.hum_dirty = nil; ctx.hum_save() end end
@@ -25117,6 +25096,7 @@ ctx.SP = dofile(DIR .. '/jf_tracker_sigpick.lua')
 -- Рендер — нативный Apply track/take FX to items (40209) на копии трека (40062): копия без items, на ней
 -- один MIDI-клип; потом копия становится треком результата (FX сняты, аудио — свой take)
 ctx.RD = dofile(DIR .. '/jf_tracker_renderer.lua')
+ctx.RD.hint = function(...) return ctx.hint(...) end   -- 21 окт: метки f в панели
 ctx.rd_load = function()
   if not ctx.rd_p then ctx.rd_p = ctx.RD.decode(reaper.GetExtState(EXT, 'rd')) end
   return ctx.rd_p
@@ -25290,6 +25270,33 @@ ctx.rd_info0 = function()
 end
 -- 19 окт: humanizer — диапазоны глобально (ExtState hum), точки вариации DSP — в проекте (humdsp)
 ctx.HU = dofile(DIR .. '/jf_tracker_humanizer.lua')
+ctx.HU.hint = function(...) return ctx.hint(...) end   -- 21 окт: метки f в панели
+-- 21 окт: reform и bouncer — щелчок и метка f одним действием
+ctx.rf_click = function(hh)
+  ctx.set_focus('reform')
+  if hh.toggle then local r = ctx.RF.ROWS[hh.toggle]; ctx.rf_p[r.k] = not ctx.rf_p[r.k]; ctx.rf_apply()
+  elseif hh.btn then ctx.rf_close(hh.btn == 'keep')
+  elseif hh.slider then ctx.rf_drag = hh.slider; ctx.RF.sel = hh.slider.i
+  elseif hh.row then ctx.RF.sel = hh.row; vim.msg = 'reform: h l - the value (Shift - fine), Enter keep, Esc revert' end
+end
+ctx.rd_click = function(hr)
+  ctx.set_focus('renderer')
+  local p = ctx.rd_load()
+  if hr.toggle then local r = ctx.RD.ROWS[hr.toggle]; p[r.k] = not p[r.k]; ctx.RD.sel = hr.toggle; ctx.rd_save()
+  elseif hr.render then ctx.rd_render()
+  elseif hr.slider then ctx.rd_drag = hr.slider; ctx.RD.sel = hr.slider.i
+  elseif hr.row then ctx.RD.sel = hr.row; vim.msg = 'bouncer: h l - the value (Shift - fine), Enter - bounce' end
+end
+-- 21 окт: щелчок и метка f — одно действие (галка, insert, apply, слайдер — тянуть, строка — выбрать: дальше h l)
+ctx.hum_click = function(hh)
+  ctx.hum_load(); ctx.set_focus('humanizer')
+  if hh.toggle then local r = ctx.HU.ROWS[hh.toggle]; ctx.hum_s.on[r.k] = not (ctx.hum_s.on[r.k] ~= false); ctx.hum_save()
+  elseif hh.dtoggle then local t = ctx.hum_s.dsp[hh.dtoggle]; t.off = not t.off; ctx.hum_save()
+  elseif hh.ins then ctx.hum_s.ins = not ctx.hum_s.ins; ctx.hum_save()
+  elseif hh.apply then ctx.hum_apply()
+  elseif hh.slider then ctx.hum_drag = hh.slider; ctx.HU.sel = hh.slider.i
+  elseif hh.row then ctx.HU.sel = hh.row; vim.msg = 'humanizer: h l - the value (Shift - fine), Space - on / off, Enter - apply' end
+end
 ctx.hum_load = function()
   if not ctx.hum_s then
     ctx.hum_s = ctx.HU.decode(reaper.GetExtState(EXT, 'hum'))
@@ -25374,6 +25381,7 @@ ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)
 -- 19 окт: reform (идея — Reform для Renoise, https://www.aqu.surf/reform): gr в VISUAL — снимок выделенных нот;
 -- каждое изменение — откат прошлого шага (undo) и применение заново от снимка одним undo; Enter — оставить, Esc — вернуть
 ctx.RF = dofile(DIR .. '/jf_tracker_reform.lua')
+ctx.RF.hint = function(...) return ctx.hint(...) end   -- 21 окт: метки f в панели
 ctx.rf_p = ctx.RF.defaults()
 ctx.rf_open = function(auto)
   -- 19 окт: панель без gr — последнее выделение трекера (запоминается каждый кадр VISUAL)
