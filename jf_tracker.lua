@@ -24894,7 +24894,7 @@ end
 ctx.inst_ask_all = function(col, old, new)
   local function heads_with(scope)
     local fi0, fi1
-    for i, f in ipairs(L.flat) do if f.col == col and not f.env then fi0 = fi0 or i; fi1 = i end end
+    for i, f in ipairs(L.flat) do if f.col and f.col.guid == col.guid and not f.env then fi0 = fi0 or i; fi1 = i end end   -- по GUID: после правки колонки — новые таблицы
     if not fi0 then return {} end
     local r0, r1 = 0, math.huge
     if scope == 'pattern' then r0, r1 = ctx.region_rows(); if not r0 then return {} end end

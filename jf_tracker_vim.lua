@@ -3983,7 +3983,7 @@ function V.head_above(sub, row)
     local cell = sub and sub[r]
     if cell then
       if cell.kind == 'midi' then return cell end
-      if cell.kind == 'cont' and cell.of and cell.of.kind == 'midi' then return cell.of end
+      if (cell.kind == 'cont' or cell.kind == 'off') and cell.of and cell.of.kind == 'midi' then return cell.of end   -- 21 окт: и за её OFF — перенести OFF ниже
       return nil
     end
   end
