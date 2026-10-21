@@ -1378,9 +1378,12 @@ end
 
 -- 21 окт: E.sus_t (ставит vim) — нота звучит до следующего события подколонки / OFF / конца паттерна, как в трекерах
 -- (было — один шаг); не дальше конца своего MIDI item
-local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted)
-  local it, tk = midi_item_at(track, lane_idx, t0)
-  if not it then it, tk = new_midi_item(track, lane_idx, t0) end
+local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted, t_row)
+  -- 21 окт: item — по строке ноты (t_row), не по сдвинутому human-ом t0: на первой строке паттерна сдвиг «раньше»
+  -- попадал в item прошлого паттерна, нота ложилась туда обрезанной его концом; сдвиг — не раньше начала item
+  local it, tk = midi_item_at(track, lane_idx, t_row or t0)
+  if not it then it, tk = new_midi_item(track, lane_idx, t_row or t0) end
+  t0 = math.max(t0, R.GetMediaItemInfo_Value(it, 'D_POSITION'))
   if E.sus_t and E.sus_t > t1 + 1e-6 then
     local ie = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
     t1 = math.max(t1, math.min(E.sus_t, ie))
@@ -1397,8 +1400,23 @@ function E.hold_length(sec)
   local lm = E.last_midi
   if not (lm and lm.take and R.ValidatePtr(lm.take, 'MediaItem_Take*')) then return false end
   local tk = lm.take
-  local ie = R.GetMediaItemInfo_Value(lm.item, 'D_POSITION') + R.GetMediaItemInfo_Value(lm.item, 'D_LENGTH')
-  local te = math.min(ie, lm.t0 + math.max(0.02, sec))
+  local ip = R.GetMediaItemInfo_Value(lm.item, 'D_POSITION')
+  local ie = ip + R.GetMediaItemInfo_Value(lm.item, 'D_LENGTH')
+  local te = lm.t0 + math.max(0.02, sec)
+  if te > ie + 1e-6 and R.MIDI_SetItemExtents then
+    -- 21 окт: держат дольше конца клипа (паттерна) — клип тянется, пока дальше на треке (этом лейне) пусто
+    local tr = R.GetMediaItem_Track(lm.item)
+    local lane = R.GetMediaItemInfo_Value(lm.item, 'I_FIXEDLANE')
+    local lim = math.huge
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local o = R.GetTrackMediaItem(tr, i)
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      if o ~= lm.item and op >= ie - 1e-6 and op < lim and R.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane then lim = op end
+    end
+    local ne = math.min(te, lim)
+    if ne > ie + 1e-6 then R.MIDI_SetItemExtents(lm.item, R.TimeMap2_timeToQN(0, ip), R.TimeMap2_timeToQN(0, ne)); ie = ne end
+  end
+  te = math.min(ie, te)
   local _, nn = R.MIDI_CountEvts(tk)
   for i = 0, nn - 1 do
     local _, sel, mu, sp, ep, ch, p, v = R.MIDI_GetNote(tk, i)
@@ -2411,11 +2429,12 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
     elseif mit or force_midi or (not has_audio and not depot_item) then
       -- 15 окт: human — и у MIDI-нот: тайминг ±10 мс, velocity ±12 (при 100 %)
       local hh = (E.human or 0) / 100
+      local t_row = t0
       if hh > 0 then
         t0 = math.max(0, t0 + (math.random() * 2 - 1) * hh * E.hum_v('time', 10) / 1000)
         vel = math.max(1, math.min(127, math.floor((vel or 100) + (math.random() * 2 - 1) * hh * E.hum_v('vel', 12) + 0.5)))
       end
-      insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false)
+      insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false, t_row)
     elseif depot_item then
       E.ensure_iid(depot_item)                          -- копия унесёт метку в чанке
       local ok, chunk = R.GetItemStateChunk(depot_item, '', false)
