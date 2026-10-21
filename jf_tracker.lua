@@ -10523,6 +10523,7 @@ ctx = {
     if arg == 'lane' then state.chordlane = not state.chordlane; reaper.SetExtState(EXT, 'chordlane', state.chordlane and '1' or '0', true); relayout()
       vim.msg = 'chord lane on the master ' .. (state.chordlane and 'on (Enter - chords of the key, :chord read - from the notes)' or 'off (it stays while it has chords)'); return end
     if arg == 'read' or arg:match('^read ') then ctx.chord_read(arg:match('^read%s+(%S+)')); return end
+    if arg == 'hear' or arg:match('^hear ') then ctx.chord_hear(arg:match('^hear%s+(%S+)')); return end   -- 21 окт: по звуку
     local col = cur_col(); if not col then vim.msg = 'chord: no track under the cursor'; return end
     if arg == '' or arg == 'off' then
       local on = state.folds[col.guid] == 'chord'
@@ -16664,6 +16665,60 @@ ctx.key_cmd = function(arg)
   vim.msg = ('key of the song: %s %s (from the notes; :key Am to set it by hand)'):format(MMX.CH.NAMES[r + 1], TH.BY[id].name)
 end
 -- :chord read [beat] — аккорды песни по нотам: по тактам (beat — по долям) → маркеры ch: колонки мастера
+-- 21 окт: :chord hear [beat] — аккорды по звуку трека курсора (хрома Goertzel, как jf_chorddetect; без процессов):
+-- V-выделение, иначе вся песня (START..END) → маркеры ch: колонки мастера
+ctx.chord_hear = function(unit)
+  local col = cur_col()
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then vim.msg = 'chord hear: no track under the cursor'; return end
+  local t0, t1
+  if vim.mode == 'visual' or vim.mode == 'vline' then t0, t1 = ctx.harm_span() end
+  t0 = t0 or model.marker_pos(model.START_MARKER) or 0
+  t1 = t1 or model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0)
+  local TH = MMX.TH
+  local quals = { '', 'm', '7', 'maj7', 'm7', 'sus4', 'dim' }
+  local cuts = {}
+  local q0, q1 = reaper.TimeMap2_timeToQN(0, t0), reaper.TimeMap2_timeToQN(0, t1)
+  local q = q0
+  while q < q1 - 1e-6 and #cuts < 2048 do
+    cuts[#cuts + 1] = reaper.TimeMap2_QNToTime(0, q)
+    if unit == 'beat' then q = q + 1
+    else local _, qs, qe = reaper.TimeMap_QNToMeasures(0, q + 1e-6); q = (qe and qe > q + 1e-6) and qe or q + 4 end
+  end
+  cuts[#cuts + 1] = t1
+  local acc = reaper.CreateTrackAudioAccessor(col.track)
+  local SR, MAXN = TH.SR, 6000
+  local buf = reaper.new_array(MAXN * 2)
+  local mono = {}
+  local out, last, heard = {}, nil, 0
+  for i = 1, #cuts - 1 do
+    local a, b = cuts[i], cuts[i + 1]
+    local N = math.min(MAXN, math.floor((b - a) * SR))
+    local sym
+    if N > 256 then
+      buf.clear()
+      reaper.GetAudioAccessorSamples(acc, SR, 2, a, N, buf)
+      local t = buf.table(1, N * 2)
+      for k = 1, N do mono[k] = 0.5 * ((t[2 * k - 1] or 0) + (t[2 * k] or 0)) end
+      local chroma = TH.window_chroma(mono, N)
+      if chroma then sym = TH.best_chord(chroma, quals); heard = heard + 1 end
+    end
+    if sym and sym ~= last then out[#out + 1] = { t = a, sym = sym }; last = sym end
+  end
+  reaper.DestroyAudioAccessor(acc)
+  if #out == 0 then vim.msg = 'chord hear: ' .. col.name .. ' has no audio here (it hears the audio items of the track, before its FX; MIDI - :chord read)'; return end
+  edit.run('chord hear', function()
+    local i = 0
+    while true do
+      local ret, isrgn, pos, _, nm, idx = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and (nm or ''):match('^ch:') and pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteProjectMarker(0, idx, false) else i = i + 1 end
+    end
+    for _, e in ipairs(out) do reaper.AddProjectMarker2(0, false, e.t, 0, 'ch:' .. e.sym, -1, 0) end
+  end)
+  state.chordlane = true
+  model.invalidate(); ctx.chord_pub.cc = -1; relayout()
+  vim.msg = ('chord hear: %d chord(s) from the sound of %s (%d %s heard) - the chord column of the master (u - undo)'):format(#out, col.name, heard, unit == 'beat' and 'beats' or 'bars')
+end
 ctx.chord_read = function(unit)
   local t0 = model.marker_pos(model.START_MARKER) or 0
   local t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0)
