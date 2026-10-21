@@ -254,6 +254,7 @@ local state = {
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
+  focusback = flag('focusback', true),   -- 21 окт: мышь вернулась с окна плагина — клавиатура снова у трекера
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
   transpos = 'tracker',                            -- 15 окт: полоса транспорта — под трекером, опции нет
@@ -743,7 +744,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -11776,6 +11777,7 @@ ctx = {
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
+      flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
       { key = 'zoommods', label = 'zoom with', kind = 'cycle', values = { 'cmd', 'split' }, desc = 'tracker and matrix the same: cmd - Cmd + multiscroll zooms both ways (up/down - rows, left/right - width); split - as in REAPER: Cmd + wheel zooms horizontally, Option + wheel vertically. Without modifiers the wheel scrolls rows, the horizontal wheel scrolls columns', get = function() return state.zoommods or 'cmd' end, set = function(v) state.zoommods = v end },
@@ -11843,7 +11845,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'notesus', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'notesus', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
@@ -23380,6 +23382,7 @@ local function frame()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   ctx.mod_tick(c)
   ctx.pedal_tick()   -- 21 окт: ` отпущен — педаль вверх
+  ctx.focus_back_tick()   -- 21 окт: мышь вернулась с окна плагина — клавиатура трекеру
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
   if ctx.hold_len then
@@ -24854,6 +24857,26 @@ ctx.auto_pattern = function(row)
     end
   end
   return false
+end
+-- 21 окт: фокус назад с окна плагина: трекер без клавиатуры, мышь над ним 0.25 с без кнопок, а клавиатура — у окна FX
+-- (заголовок «VSTi: … - Track 4 …», «FX: Track …», CLAP / AU / JS) — забрать её (JS_Window_SetFocus). Диалоги REAPER,
+-- браузеры, текстовые поля — не трогаются (заголовок не FX)
+ctx.focus_back_tick = function()
+  if not state.focusback or not (reaper.JS_Window_GetForeground and reaper.JS_Window_SetFocus and reaper.JS_Window_GetTitle) then return end
+  local wf = gfx.getchar(65536)
+  local focused = (wf & 1) == 1 and (wf & 2) ~= 0
+  local inside = gfx.mouse_x >= 0 and gfx.mouse_y >= 0 and gfx.mouse_x < gfx.w and gfx.mouse_y < gfx.h   -- 4 в маске — «видно», не «мышь»
+  if focused or not inside or (gfx.mouse_cap & (1 | 2 | 64)) ~= 0 then ctx.fb_t = nil; return end
+  local now = reaper.time_precise()
+  if not ctx.fb_t then ctx.fb_t = now; return end
+  if now - ctx.fb_t < 0.25 then return end
+  ctx.fb_t = nil
+  local fg = reaper.JS_Window_GetForeground()
+  local title = fg and reaper.JS_Window_GetTitle(fg) or ''
+  local fx = title:match('^%u+i?: .* %- Track %d') or title:match('^FX: ') or title:match('^%u+i?: .* %- Master')
+  if not fx then return end
+  ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
+  if ctx.my_hwnd then reaper.JS_Window_SetFocus(ctx.my_hwnd) end
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
