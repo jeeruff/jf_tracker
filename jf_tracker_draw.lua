@@ -8110,8 +8110,12 @@ function D.frame(L, snap, rows, state, info)
       if f.kit and D.DR and f.kids then
         local np = 0
         for _, p in ipairs(f.params or {}) do if p.kid == 1 and not p.macro then np = np + 1 end end
+        -- 21 окт: тот же счёт, что в раскладке (rmax, строка слотов + волна WR): было rows - 6 — на строку меньше,
+        -- и при 25 параметрах выходила пустая четвёртая колонка справа
         local rows = math.max(2, math.floor((bh0 - L.rh - 2) / L.rh) - 2)
-        local first = math.max(1, rows - 6)                -- первая колонка: под слотами и волной
+        local avail = math.floor((bh0 - 3 * L.rh) / L.rh)
+        local WR = avail >= 14 and 4 or (avail >= 9 and 3 or 0)
+        local first = math.max(1, rows - 1 - WR)           -- первая колонка: под слотами и волной
         local extra = np > first and math.ceil((np - first) / rows) or 0
         return math.min(5, 2 + extra)
       end
