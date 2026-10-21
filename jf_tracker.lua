@@ -15500,16 +15500,23 @@ function region_actions(rg)
     { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
-    { 'sync this pattern', key = 's', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },
+    { 'resync copies: this pattern to its repeats', key = 'r', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },   -- 21 окт: r (s — секции)
     -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
     { 'half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
     { 'x2: double the length', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
     { 'length: a list', key = 'l', g = 'length', fn = function() ctx.region_len_menu() end },
     { 'matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
     -- 18 окт: секции — своим подменю (создать из выделенных слотов / time selection, меню секции этого слота)
-    { 'menu of this section', key = 'm', g = 'section', fn = function() ctx.sec_cmd('') end },
-    { 'section from selected slots', key = 's', g = 'section', fn = function() vim.open_prompt('section ', '') end },
-    { 'section from time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
+    -- 21 окт: s — подменю секций целиком: новая (из слотов / выделения времени) и все команды секции этого слота
+    { 'new: from selected slots', key = 'n', g = 'section', fn = function() vim.open_prompt('section ', '') end },
+    { 'new: from time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
+    { 'duplicate (new patterns)', key = 'd', g = 'section', fn = function() ctx.sec_cmd('copy') end },
+    { 'duplicate linked (same patterns)', key = 'l', g = 'section', fn = function() ctx.sec_cmd('repeat') end },
+    { 'launch (quantized)', key = 'q', g = 'section', fn = function() ctx.sec_cmd('launch') end },
+    { 'show in the tracker', key = 's', g = 'section', fn = function() ctx.sec_cmd('show') end },
+    { 'loop it', key = 'o', g = 'section', fn = function() ctx.sec_cmd('loop') end },
+    { 'rename', key = 'r', g = 'section', fn = function() ctx.sec_cmd('name') end },
+    { 'remove the section (patterns stay)', key = 'x', g = 'section', fn = function() ctx.sec_cmd('del') end },
   }
 end
 
@@ -15697,12 +15704,12 @@ local function context_menu(hover, anchor)
   local used, hitems, have = { ['?'] = true }, {}, {}
   -- 18 окт: подменю по смыслу: g у пункта действия / строки справки → { name = { items } } по порядку
   local mg, mgo = {}, {}
-  ctx.mgroup_add = function(g, key, label, fn)
+  ctx.mgroup_add = function(g, key, label, fn, hk)
     if not mg[g] then mg[g] = { used = {} }; mgo[#mgo + 1] = g end
     local G = mg[g]
     local k = key and not G.used[key] and key or nil
     if not k then for ch in label:lower():gmatch('%a') do if not G.used[ch] then k = ch; break end end end
-    if k then G.used[k] = true; G[#G + 1] = { key = k, label = label, fn = fn } end
+    if k then G.used[k] = true; G[#G + 1] = { key = k, label = label, fn = fn, hk = (hk ~= k) and hk or nil } end   -- 21 окт: хоткей — колонкой
   end
   local function pick_key(want, label)
     local k = want and not used[want] and want or nil
@@ -15729,7 +15736,7 @@ local function context_menu(hover, anchor)
       else hk = nil end
       if hk then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end end
       if it.g then   -- 18 окт: группа — своё подменю (меню не простыней)
-        ctx.mgroup_add(it.g, it.key, label .. (on and '  (on)' or ''), it[2])
+        ctx.mgroup_add(it.g, it.key, label .. (on and '  (on)' or ''), it[2], hk)
       else
       local k = pick_key(it.key, label)
       if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
@@ -15779,7 +15786,7 @@ local function context_menu(hover, anchor)
         end
         -- 13 окт: клавиша из двух букв (zt, ts) — в подменю своей первой буквы, внутри вторая:
         -- в меню те же клавиши, что в трекере (раньше — подставные цифры 1..9)
-        if e.g then ctx.mgroup_add(e.g, #first == 1 and first or nil, lbl, run_it)
+        if e.g then ctx.mgroup_add(e.g, #first == 1 and first or nil, lbl, run_it, e.k)
         elseif #first == 2 and first:match('^%a%a$') then
           local p1 = first:sub(1, 1)
           groups = groups or {}
@@ -15810,15 +15817,15 @@ local function context_menu(hover, anchor)
       local names = {}
       for i = 1, math.min(3, #list) do names[#names + 1] = (list[i].label:match('^(%S+)') or ''):lower() end
       local sub = { title = g, items = {} }
-      for _, it in ipairs(list) do sub.items[#sub.items + 1] = { key = it.key, label = it.label, fn = it.fn } end
+      for _, it in ipairs(list) do sub.items[#sub.items + 1] = { key = it.key, label = it.label, fn = it.fn, hk = it.hk } end
       hitems[#hitems + 1] = { key = k, label = g .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return sub end }
     end
   end
   -- 10 окт: быстрое меню модуля (\ в модуле) — последним пунктом \ главное меню
   if anchor and anchor.quick and ctx.main_menu then hitems[#hitems + 1] = { key = '\\', label = 'main menu …', fn = function() ctx.main_menu() end } end
   if #hitems == 0 then return end
-  -- 5 окт: двойные хоткеи — нет; пока только жёлтые буквы, без колонки клавиш
-  for _, it in ipairs(hitems) do it.hk = nil end
+  -- 21 окт: хоткей пункта (Space, yp, A …) — колонкой справа от буквы: то же без меню (просьба; было скрыто с 5 окт)
+  for _, it in ipairs(hitems) do if it.hk == it.key then it.hk = nil end end
   vim.open_hydra({ title = own or (page and ('menu: ' .. (P and P.title or page))) or 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
@@ -15826,7 +15833,7 @@ ctx.open_context = context_menu          -- для \ из ctx.context_key (об�
 function ctx.context_items(hover)
   local items = {}
   -- rp (10 окт): пункт делает что-то в окнах REAPER — уходит в подменю «in REAPER …»
-  local function add(label, fn, key, rp) items[#items + 1] = { label, fn, key = key, reaper = rp } end
+  local function add(label, fn, key, rp, g) items[#items + 1] = { label, fn, key = key, reaper = rp, g = g } end   -- 21 окт: g — подменю
   local sel = vim.mode == 'visual' or vim.mode == 'vline'
   local lpb = state.lpb
   -- 11 окт: меню записи — ПКМ по R (шапка трека, полоса микшера): арм, режим, мониторинг, вход
@@ -15939,7 +15946,7 @@ function ctx.context_items(hover)
     end
   elseif hover.matrix and hover.matrix.ri then
     MX.goto_cell(seq, snap, hover.matrix.ri, hover.matrix.ci or MX.cur.ci)
-    for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key) end
+    for _, a in ipairs(region_actions(seq[hover.matrix.ri])) do add(a[1], a.fn, a.key, nil, a.g) end   -- 21 окт: с группами (было простынёй)
   elseif type(hover.browser) == 'number' and B.mode == 'pm' and B.entries[hover.browser] and B.entries[hover.browser].pm then
     -- карточка / строка проекта pm (6 окт): своё меню
     local e = B.entries[hover.browser]
@@ -27727,6 +27734,7 @@ ctx.sec_cmd = function(arg)
   n = tonumber(n)
   if w == 'launch' then ctx.sec_launch(sc) elseif w == 'show' then ctx.sec_show(sc) elseif w == 'repeat' then ctx.sec_repeat(sc, true) elseif w == 'copy' then ctx.sec_repeat(sc, false)
   elseif w == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend)
+  elseif w == 'name' then ctx.sec_rename(sc) elseif w == 'del' then ctx.sec_remove(sc)   -- 21 окт: из подменю s
   elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif w == 'aliasto' and n then ctx.sec_move(sc, n, 'alias')
   else ctx.sec_menu(sc) end
 end

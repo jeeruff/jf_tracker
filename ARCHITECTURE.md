@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 27979 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 27991 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2408 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 4872 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 848 | алиасы паттернов (этап 6). |
@@ -123,7 +123,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 10036 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 10037 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 851 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 256 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 109 | темы трекера (3 окт). |

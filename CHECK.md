@@ -1587,3 +1587,4 @@
 - [ ] 21 окт: игра x0.5 — Shift+Ctrl+Space (Ctrl+Cmd+Space съедал режим SLIDER); Ctrl+Space в матрице — по-прежнему эскиз
 - [ ] 21 окт: транспорт — колонка << / |<< / mark на символ уже (черта |<< торчит влево, не раздувает)
 - [ ] 21 окт: keycast при свёрнутом мастере — у правой стенки окна (поверх полосы мастера, на подложке)
+- [ ] 21 окт: меню матрицы (ПКМ / \): s — подменю section (new из слотов / Tr, duplicate, linked, launch, show, loop, rename, remove); sync → pattern r (resync copies); группы подменю (pattern, length, section) — и при ПКМ; хоткеи пунктов (Space, yp, A, Tr …) колонкой
