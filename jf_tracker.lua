@@ -18717,7 +18717,15 @@ local function frame()
     end,
     sf_ghost = ctx.sf_ghost, file_peaks = ctx.file_peaks,   -- 20 окт: призрак Shift+F
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
-    hum_draw = function(Lx, x, y, w, h, foc) ctx.hum_load(); return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 19 окт
+    hum_draw = function(Lx, x, y, w, h, foc)
+      ctx.hum_load()
+      -- 21 окт: трек курсора без аудио в лейнах — MIDI: панель гасит то, чего у MIDI-нот нет
+      local col = cur_col()
+      local midi = col and true or false
+      for _, ln in ipairs(col and col.lanes or {}) do if ln.audio_sub then midi = false end end
+      ctx.hum_s.midi = midi
+      return ctx.HU.draw(U, Lx, ctx.hum_s, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit)
+    end,   -- 19 окт
     perf_pane = function(Lx, x, y, w, h)   -- 18 окт: панель perf — рисует, пока видна (active — для профиля кадра jftop)
       ctx.PERF = ctx.PERF or dofile(DIR .. '/jf_tracker_perf.lua')
       ctx.PERF.active = true; ctx.PERF.seen = reaper.time_precise()

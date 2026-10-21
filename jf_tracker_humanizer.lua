@@ -87,6 +87,7 @@ function HU.key(s, c, shift)
 end
 
 -- значение строки по x мыши на слайдере
+HU.MIDI_NA = { vol = true, pitch = true, rate = true, pan = true, attack = true }   -- 21 окт: у MIDI-ноты этого нет (это свойства аудио-item)
 function HU.set_from_x(s, i, frac)
   local r = HU.ROWS[i]; if not r then return end
   s.v[r.k] = round(r, clamp(r, r.min + math.max(0, math.min(1, frac)) * (r.max - r.min)))
@@ -101,7 +102,9 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
   local vw = U.measure('00.0 dB')
   local bw = U.measure('[x]')
   local yy = y + 2
-  U.text(x + pad, yy, 'humanizer', U.GREY)
+  -- 21 окт: MIDI-трек (s.midi ставит main) — у MIDI-нот только время, длина и velocity; прочее — параметром DSP (a)
+  local NA = s.midi and HU.MIDI_NA or nil
+  U.text(x + pad, yy, s.midi and (ctx_fit and ctx_fit('humanizer  MIDI track: time, velocity, length - the rest: a adds a DSP parameter', w - 2 * pad - U.measure('insert off') - 3 * pad) or 'humanizer (MIDI)') or 'humanizer', U.GREY)
   local ins = 'insert ' .. (s.ins and 'on' or 'off')
   local iw = U.measure(ins) + 2 * pad
   local ix = x + w - pad - iw
@@ -114,7 +117,7 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
   yy = yy + rh + 2
   for i, r in ipairs(HU.ROWS) do
     if yy + rh > y + h then break end
-    local on = r.noon or s.on[r.k] ~= false
+    local on = (r.noon or s.on[r.k] ~= false) and not (NA and NA[r.k])
     local cur = focus and i == HU.sel
     local bx = x + pad
     if not r.noon then
