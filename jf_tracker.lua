@@ -15517,6 +15517,7 @@ function region_actions(rg)
     { 'loop it', key = 'o', g = 'section', fn = function() ctx.sec_cmd('loop') end },
     { 'rename', key = 'r', g = 'section', fn = function() ctx.sec_cmd('name') end },
     { 'remove the section (patterns stay)', key = 'x', g = 'section', fn = function() ctx.sec_cmd('del') end },
+    { 'remove the section and its patterns', key = 'X', g = 'section', fn = function() ctx.sec_cmd('delall') end },
   }
 end
 
@@ -27626,14 +27627,24 @@ ctx.sec_free_name = function(name)
 end
 -- вставить паттерны секции в t: alias — связанные повторы, иначе свободные копии (новые имена); → конец вставки
 ctx.sec_insert = function(sc, t, linked)
-  local t1 = t
-  for _, e in ipairs(ctx.sec_pats(sc)) do
+  -- 21 окт: каждая вставка раздвигает время; исходник правее точки вставки уезжает на её длину — источник
+  -- следующего паттерна берётся со сдвигом (было: по старым позициям — копировалось не то, рядом мусор).
+  -- Снимки (copy) — все заранее, до первой вставки
+  local pats = ctx.sec_pats(sc)
+  local snaps = {}
+  if not linked then for k, e in ipairs(pats) do snaps[k] = alias.slot_snapshot(seq, snap, e.ri) end end
+  local t1, shift = t, 0
+  for k, e in ipairs(pats) do
     local len = e.rg.rgnend - e.rg.pos
-    if linked then alias.put_alias(e.rg, t1)
+    if linked then
+      local src = e.rg
+      if shift > 0 then src = setmetatable({ pos = e.rg.pos + shift, rgnend = e.rg.rgnend + shift }, { __index = e.rg }) end
+      alias.put_alias(src, t1)
     else
-      local sl = alias.slot_snapshot(seq, snap, e.ri)
+      local sl = snaps[k]
       if sl then sl.name = alias.free_name(regions, sl.name); alias.put_slot(snap, t1, sl) end
     end
+    if e.rg.pos + shift >= t1 - 1e-6 then shift = shift + len end   -- исходник был правее вставки — уехал
     t1 = t1 + len
   end
   return t1
@@ -27751,7 +27762,7 @@ ctx.sec_cmd = function(arg)
   n = tonumber(n)
   if w == 'launch' then ctx.sec_launch(sc) elseif w == 'show' then ctx.sec_show(sc) elseif w == 'repeat' then ctx.sec_repeat(sc, true) elseif w == 'copy' then ctx.sec_repeat(sc, false)
   elseif w == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend)
-  elseif w == 'name' then ctx.sec_rename(sc) elseif w == 'del' then ctx.sec_remove(sc)   -- 21 окт: из подменю s
+  elseif w == 'name' then ctx.sec_rename(sc) elseif w == 'del' then ctx.sec_remove(sc) elseif w == 'delall' then ctx.sec_remove_all(sc)   -- 21 окт: из подменю s
   elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif w == 'aliasto' and n then ctx.sec_move(sc, n, 'alias')
   else ctx.sec_menu(sc) end
 end
@@ -27790,6 +27801,23 @@ ctx.sec_remove = function(sc)
   MX.cur.sec = nil
   vim.msg = 'section ' .. (sc.name or '') .. ' removed - its patterns stay'
 end
+-- 21 окт: секция вместе с паттернами: регионы внутри (и сама секция) удаляются, время закрывается (как dd по слотам)
+ctx.sec_remove_all = function(sc)
+  local p0, p1 = sc.pos, sc.rgnend
+  ctx.slot_op('section remove with patterns ' .. (sc.name or ''), function()
+    local i = 0
+    while true do
+      local ret, isrgn, pos, rend, name = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isrgn and pos >= p0 - 1e-6 and rend <= p1 + 1e-6 and name ~= model.SESSION_REGION then reaper.DeleteProjectMarkerByIndex(0, i)
+      else i = i + 1 end
+    end
+    alias.delete_slot({ pos = p0, rgnend = p1, gap = true })
+  end)
+  ctx.mx_refresh()
+  MX.cur.sec = nil
+  vim.msg = ('section %s removed with its patterns (u - undo)'):format(sc.name or '')
+end
 ctx.sec_menu = function(sc)
   local items = {
     -- 20 окт: duplicate — этим словом и наверх (искали «дублировать», а было «copy after it»); набор букв меню: d — duplicate
@@ -27800,6 +27828,7 @@ ctx.sec_menu = function(sc)
     { label = 'loop it', v = 'loop' },
     { label = 'rename', v = 'name' },
     { label = 'remove the section (patterns stay)', v = 'del' },
+    { label = 'remove the section and its patterns', v = 'delall' },   -- 21 окт
   }
   ctx.smart_at = { x = gfx.mouse_x + 4, y = gfx.mouse_y, top = gfx.mouse_y }
   ctx.smart_open({ title = 'section ' .. (sc.name or ''), items = items, cols = 1, sel = 1, on_pick = function(it)
@@ -27810,6 +27839,7 @@ ctx.sec_menu = function(sc)
     elseif it.v == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
     elseif it.v == 'name' then ctx.sec_rename(sc)
     elseif it.v == 'del' then ctx.sec_remove(sc)
+    elseif it.v == 'delall' then ctx.sec_remove_all(sc)
     end
   end })
 end
