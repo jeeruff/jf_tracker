@@ -1,0 +1,301 @@
+-- jf_tracker_theory.lua — 21 окт: теория для harmonizer (чистый Lua, тест tests/test_theory.lua).
+--
+-- Из скриптов пользователя (без reaper.*):
+--   лады и scale_pitches  — jf_chordcheat.lua (SCALES, 14 + гармонический / натуральный минор, блюз)
+--   chroma / best_chord / сегменты — jf_chorddetect.lua (Goertzel-банк → 12 бинов, шаблоны аккордов)
+--   parse_prog («Am 2 | F 2 | G7 1», и ступенями «I V vi IV») — jf_chordcheat.lua, ступени — новое
+-- Плюс: лад по нотам по всем ладам, голосоведение (минимальное движение голосов), гармонизация мелодии.
+-- Шаблоны аккордов — из jf_tracker_chord.lua (CH.T): одна таблица на MIDI и аудио.
+
+local TH = {}
+local CH
+
+function TH.init(ch) CH = ch end
+
+-- ── лады: шаги (полутоны) ─────────────────────────────────────────────────
+TH.SCALES = {
+  { id = 'major',     name = 'major',             iv = { 2, 2, 1, 2, 2, 2, 1 } },
+  { id = 'minor',     name = 'minor',             iv = { 2, 1, 2, 2, 1, 2, 2 } },
+  { id = 'dorian',    name = 'dorian',            iv = { 2, 1, 2, 2, 2, 1, 2 } },
+  { id = 'phrygian',  name = 'phrygian',          iv = { 1, 2, 2, 2, 1, 2, 2 } },
+  { id = 'lydian',    name = 'lydian',            iv = { 2, 2, 2, 1, 2, 2, 1 } },
+  { id = 'mixo',      name = 'mixolydian',        iv = { 2, 2, 1, 2, 2, 1, 2 } },
+  { id = 'locrian',   name = 'locrian',           iv = { 1, 2, 2, 1, 2, 2, 2 } },
+  { id = 'harmmin',   name = 'harmonic minor',    iv = { 2, 1, 2, 2, 1, 3, 1 } },
+  { id = 'melmin',    name = 'melodic minor',     iv = { 2, 1, 2, 2, 2, 2, 1 } },
+  { id = 'phrygdom',  name = 'phrygian dominant', iv = { 1, 3, 1, 2, 1, 2, 2 } },
+  { id = 'majpent',   name = 'major pentatonic',  iv = { 2, 2, 3, 2, 3 } },
+  { id = 'minpent',   name = 'minor pentatonic',  iv = { 3, 2, 2, 3, 2 } },
+  { id = 'blues',     name = 'blues',             iv = { 3, 2, 1, 1, 3, 2 } },
+  { id = 'wholetone', name = 'whole tone',        iv = { 2, 2, 2, 2, 2, 2 } },
+  { id = 'octatonic', name = 'octatonic',         iv = { 1, 2, 1, 2, 1, 2, 1, 2 } },
+}
+TH.BY = {}
+for i, sc in ipairs(TH.SCALES) do TH.BY[sc.id] = sc; sc.i = i end
+
+-- классы ступеней лада от тоники root: { pc … } (первая — тоника)
+function TH.pcs(root, id)
+  local sc = TH.BY[id] or TH.BY.major
+  local out, c = { root % 12 }, root
+  for k = 1, #sc.iv - 1 do c = c + sc.iv[k]; out[#out + 1] = c % 12 end
+  return out
+end
+function TH.in_scale(p, root, id)
+  for _, pc in ipairs(TH.pcs(root, id)) do if p % 12 == pc then return true end end
+  return false
+end
+-- ближайшая ступень лада (равно — вниз)
+function TH.snap(p, root, id)
+  if TH.in_scale(p, root, id) then return p end
+  for d = 1, 6 do
+    if TH.in_scale(p - d, root, id) then return p - d end
+    if TH.in_scale(p + d, root, id) then return p + d end
+  end
+  return p
+end
+-- сдвиг по ступеням лада (диатонический транспоз): нота вне лада — сначала к ступени
+function TH.step(p, n, root, id)
+  local pcs = TH.pcs(root, id)
+  p = TH.snap(p, root, id)
+  local oct, idx = math.floor((p - root) / 12), nil
+  for k, pc in ipairs(pcs) do if (p - root) % 12 == (pc - root) % 12 then idx = k end end
+  if not idx then return p + n end
+  local m = #pcs
+  local j = idx - 1 + n
+  local o2 = oct + math.floor(j / m)
+  local k2 = j % m + 1
+  return root + o2 * 12 + (pcs[k2] - root) % 12
+end
+-- ноты лада в диапазоне (как scale_pitches в jf_chordcheat)
+function TH.scale_pitches(root, id, lo, hi)
+  local out = {}
+  for p = lo, hi do if TH.in_scale(p, root, id) then out[#out + 1] = p end end
+  return out
+end
+
+-- лад по нотам: лучший по всем ладам (вес тоники и квинты ×1.3, 7-ступенные впереди при равенстве);
+-- ids — какие лады пробовать (по умолчанию все 7-ступенные)
+function TH.detect(pitches, ids)
+  local cnt = {}
+  for i = 0, 11 do cnt[i] = 0 end
+  for _, p in ipairs(pitches or {}) do cnt[p % 12] = cnt[p % 12] + 1 end
+  ids = ids or { 'major', 'minor', 'dorian', 'mixo', 'phrygian', 'lydian', 'harmmin', 'melmin' }
+  local best, br, bid = 0, nil, nil
+  for _, id in ipairs(ids) do
+    for r = 0, 11 do
+      local s, pcs = 0, TH.pcs(r, id)
+      for k, pc in ipairs(pcs) do s = s + cnt[pc] * ((k == 1 or k == 5) and 1.3 or 1) end
+      local miss = 0
+      for pc = 0, 11 do if cnt[pc] > 0 and not TH.in_scale(pc, r, id) then miss = miss + cnt[pc] end end
+      s = s - 1.5 * miss
+      s = s + 0.05 * cnt[r]   -- равенство множеств (A minor = D dorian …) — за тоникой, что звучит чаще
+      if s > best + 1e-9 then best, br, bid = s, r, id end
+    end
+  end
+  return br, bid
+end
+
+-- ── аккорды ступеней лада ─────────────────────────────────────────────────
+-- аккорд ступени k (1..): терции лада от ступени; seventh — с септимой → имя по CH.name
+function TH.degree_chord(root, id, k, seventh)
+  local pcs = TH.pcs(root, id)
+  local m = #pcs
+  local notes = {}
+  local base = 60 + (pcs[(k - 1) % m + 1] - 60) % 12
+  local prev = base - 1
+  for t = 0, (seventh and 3 or 2) do
+    local pc = pcs[(k - 1 + 2 * t) % m + 1]
+    local p = prev + 1 + (pc - (prev + 1)) % 12
+    notes[#notes + 1] = p; prev = p
+  end
+  return CH.name(notes), notes
+end
+local ROMAN = { i = 1, ii = 2, iii = 3, iv = 4, v = 5, vi = 6, vii = 7 }
+-- «vi», «V7», «iv», «bVII», «ii°» → имя аккорда в ладу
+function TH.roman(tok, root, id)
+  local acc, rn, suf = tok:match('^([b#]?)([IViv]+)(.*)$')
+  if not rn then return nil end
+  local k = ROMAN[rn:lower()]
+  if not k then return nil end
+  local seventh = suf:match('7') ~= nil
+  local nm = TH.degree_chord(root, id, k, seventh)
+  if acc ~= '' or rn ~= rn:lower() and rn:upper() ~= rn then return nil end
+  -- регистр: прописные — мажор, строчные — минор (как пишут): поправить качество, если лад дал другое
+  local c = CH.parse(nm)
+  if not c then return nm end
+  local pc = (c.root + (acc == 'b' and -1 or (acc == '#' and 1 or 0))) % 12
+  local q
+  if suf:match('[°o]') then q = seventh and 'm7b5' or 'dim'
+  elseif rn == rn:upper() then q = seventh and (suf:match('maj') and 'maj7' or '7') or ''
+  else q = seventh and 'm7' or 'm' end
+  return CH.NAMES[pc + 1] .. q
+end
+-- прогрессия: «Am 2 | F 2 | G7 1» или «I V vi IV» (длина — в тактах, нет — 1) →
+-- { { sym, dur, at } … }, общая длина; ошибка — nil, текст
+function TH.parse_prog(s, root, id)
+  local steps = {}
+  for tok in (s or ''):gmatch('[^|,]+') do
+    for word, dur in tok:gmatch('(%S+)%s*([%d%.]*)') do
+      if not tonumber(word) then
+        local sym = (CH.parse(word) and word) or (root and TH.roman(word, root, id or 'major'))
+        if not sym then return nil, ('not a chord: %s'):format(word) end
+        steps[#steps + 1] = { sym = sym, dur = tonumber(dur) or 1 }
+      elseif #steps > 0 then steps[#steps].dur = tonumber(word) end
+    end
+  end
+  if #steps == 0 then return nil, 'empty' end
+  local t = 0
+  for _, st in ipairs(steps) do st.at = t; t = t + st.dur end
+  return steps, t
+end
+
+-- ── голосоведение ─────────────────────────────────────────────────────────
+-- ноты аккорда sym ближе всего к prev (сумма движений голосов): перебор обращений и октав вокруг центра;
+-- style: 'close' (по умолчанию) | 'open' (drop-2) ; bass — отдельный бас корнем ниже
+function TH.voice_lead(sym, prev, center, style)
+  local c = CH.parse(sym)
+  if not c then return nil end
+  center = center or 60
+  local pcs = {}
+  for _, iv in ipairs(c.ints) do pcs[#pcs + 1] = (c.root + iv) % 12 end
+  local n = #pcs
+  local best, bc
+  for inv = 0, n - 1 do
+    for oct = -2, 2 do
+      local v, prevp = {}, nil
+      for k = 0, n - 1 do
+        local pc = pcs[(inv + k) % n + 1]
+        local p
+        if not prevp then p = center + oct * 12 + (pc - center) % 12 - 12 + (pc - (center - 12)) % 12 - (pc - center) % 12
+          p = (center + oct * 12) - (center % 12) + pc
+        else p = prevp + 1 + (pc - (prevp + 1)) % 12 end
+        v[#v + 1] = p; prevp = p
+      end
+      if style == 'open' and #v >= 3 then v[#v - 1] = v[#v - 1] - 12; table.sort(v) end
+      local cost = 0
+      if prev and #prev > 0 then
+        local sp = {}
+        for _, p in ipairs(prev) do sp[#sp + 1] = p end
+        table.sort(sp)
+        for k = 1, #v do
+          local q = sp[math.min(#sp, k)]
+          cost = cost + math.abs(v[k] - q)
+        end
+      else
+        local mid = 0; for _, p in ipairs(v) do mid = mid + p end
+        cost = math.abs(mid / #v - center)
+      end
+      if not bc or cost < bc then best, bc = v, cost end
+    end
+  end
+  if c.bass and c.bass ~= c.root then
+    local b = best[1] - ((best[1] - c.bass) % 12)
+    if b >= best[1] then b = b - 12 end
+    table.insert(best, 1, b)
+  end
+  return best
+end
+
+-- ── хрома из аудио (jf_chorddetect) ──────────────────────────────────────
+TH.SR = 4000
+TH.NOTE_LO, TH.NOTE_HI = 45, 80
+TH.SILENCE = 0.0015
+local COEFF = {}
+for n = TH.NOTE_LO, TH.NOTE_HI do COEFF[n] = 2 * math.cos(2 * math.pi * 440 * 2 ^ ((n - 69) / 12) / TH.SR) end
+-- моно-окно (отсчёты при TH.SR) → хрома 12 бинов (сумма 1) или nil (тишина)
+function TH.window_chroma(mono, N)
+  N = N or #mono
+  local acc = 0
+  for i = 1, N do acc = acc + math.abs(mono[i]) end
+  if N == 0 or acc / N < TH.SILENCE then return nil end
+  local chroma = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+  for n = TH.NOTE_LO, TH.NOTE_HI do
+    local coeff, s1, s2 = COEFF[n], 0, 0
+    for i = 1, N do local s0 = mono[i] + coeff * s1 - s2; s2 = s1; s1 = s0 end
+    local mag = math.sqrt(math.max(0, s1 * s1 + s2 * s2 - coeff * s1 * s2))
+    chroma[n % 12 + 1] = chroma[n % 12 + 1] + math.log(1 + mag)
+  end
+  local sum = 0
+  for i = 1, 12 do sum = sum + chroma[i] end
+  if sum <= 0 then return nil end
+  for i = 1, 12 do chroma[i] = chroma[i] / sum end
+  return chroma
+end
+-- лучший аккорд по хроме: шаблоны CH.T (первые maxq качеств — простые раньше), бонус корню
+TH.CHROMA_Q = { '', 'm', '7', 'maj7', 'm7', 'sus4', 'dim' }
+function TH.best_chord(chroma, quals)
+  local best, bs
+  for root = 0, 11 do
+    for _, q in ipairs(quals or TH.CHROMA_Q) do
+      local c = CH.parse(CH.NAMES[root + 1] .. q)
+      if c then
+        local s = 0.15 * chroma[root + 1]
+        for _, iv in ipairs(c.ints) do s = s + chroma[(root + iv) % 12 + 1] end
+        s = s / math.sqrt(#c.ints)
+        if not bs or s > bs then bs, best = s, CH.NAMES[root + 1] .. q end
+      end
+    end
+  end
+  return best, bs
+end
+-- метки окон → сегменты { s, e, lab } (индексы окон); короче min_dur секунд — в соседа (jf_chorddetect)
+function TH.segments(labels, hop, min_dur)
+  local segs = {}
+  for i, lab in ipairs(labels) do
+    local last = segs[#segs]
+    if last and last.lab == lab then last.e = i else segs[#segs + 1] = { s = i, e = i, lab = lab } end
+  end
+  for _ = 1, 10 do
+    local changed, i = false, 1
+    while i <= #segs do
+      local seg = segs[i]
+      if (seg.e - seg.s + 1) * hop < (min_dur or 0) and #segs > 1 then
+        local prev, nxt = segs[i - 1], segs[i + 1]
+        local eat = (prev and (not nxt or (prev.e - prev.s) >= (nxt.e - nxt.s))) and prev or nxt
+        eat.s = math.min(eat.s, seg.s); eat.e = math.max(eat.e, seg.e)
+        table.remove(segs, i); changed = true
+      else i = i + 1 end
+    end
+    local j = 2
+    while j <= #segs do
+      if segs[j].lab == segs[j - 1].lab then segs[j - 1].e = segs[j].e; table.remove(segs, j) else j = j + 1 end
+    end
+    if not changed then break end
+  end
+  return segs
+end
+
+-- ── гармонизация мелодии ─────────────────────────────────────────────────
+-- melody: { { pitch, w } … } (w — вес: длина / сильная доля) одного отрезка → кандидаты аккордов лада
+-- по убыванию оценки: { { sym, score } … } (ступени с септимой и без)
+function TH.harmonize(melody, root, id, prev_sym)
+  local out = {}
+  local m = #TH.pcs(root, id)
+  for k = 1, math.min(7, m) do
+    for _, sev in ipairs({ false, true }) do
+      local sym, notes = TH.degree_chord(root, id, k, sev)
+      local set = {}
+      for _, p in ipairs(notes) do set[p % 12] = true end
+      local s, tot = 0, 0
+      for _, mn in ipairs(melody) do
+        tot = tot + mn.w
+        if set[mn.pitch % 12] then s = s + mn.w elseif not TH.in_scale(mn.pitch, root, id) then s = s - 0.5 * mn.w else s = s - 0.25 * mn.w end
+      end
+      local sc = tot > 0 and s / tot or 0
+      if k == 1 or k == 4 or k == 5 then sc = sc + 0.08 end          -- опорные функции
+      if sev then sc = sc - 0.05 end                                  -- септаккорд — если заслужил
+      if prev_sym and sym == prev_sym then sc = sc - 0.1 end          -- смена гармонии предпочтительнее
+      out[#out + 1] = { sym = sym, score = sc, degree = k, seventh = sev }
+    end
+  end
+  table.sort(out, function(a, b) return a.score > b.score end)
+  return out
+end
+-- второй голос: терция (3) / секста (6) в ладу выше (+) / ниже (−)
+function TH.second_voice(p, interval, root, id)
+  local n = (interval == 6 or interval == -6) and 5 or 2
+  if interval < 0 then n = -n end
+  return TH.step(p, n, root, id)
+end
+
+return TH
