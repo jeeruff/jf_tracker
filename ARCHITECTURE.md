@@ -113,10 +113,10 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_chord.lua` | 202 | аккорды (8 окт): анализатор и гармонайзер. |
 | `jf_tracker_import.lua` | 184 | импорт нарезанных инструментов (2 окт). |
 | **клавиши и команды** | | |
-| `jf_tracker_vim.lua` | 4018 | Vim-слой трекера: режимы, движения, операторы. |
+| `jf_tracker_vim.lua` | 4017 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 128 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 70 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1217 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1216 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 161 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 101 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 146 | клавиши DSP-панели в духе Vim (2 окт). |
@@ -264,5 +264,5 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `r` | r - replace | `key` |
 | `t` | t - track | `t` `d` `x` `p` `s` `r` `n` `c` `y` `a` `A` `i` `I` `l` `w` `f` `R` `T` `F` `j k` |
 | `y` | y - copy | `y` `c` |
-| `z` | z - view | `z` `Z` `w` `t` `b` `a` `c` `o` `e` `C` `f` `M` `m` `> <` `. ,` `s` `x` `u` `p` `r` `R` |
+| `z` | z - view | `z` `Z` `w` `t` `b` `a` `c` `o` `e` `C` `f` `M` `m` `> <` `. ,` `x` `u` `p` `r` `R` |
 <!-- keys:end -->

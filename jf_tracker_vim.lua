@@ -2670,7 +2670,6 @@ function V.key_impl(c)
       elseif c == ('x'):byte() then if ctx.xfade_native then ctx.xfade_native(V.covering(V.cur.fi, V.cur.row)) end   -- 13 окт: zx — редактор кроссфейдов REAPER
       elseif c == ('p'):byte() then if ctx.view_reg then ctx.view_reg() end   -- 20 окт: zp — вид: паттерн курсора / весь проект
       elseif c == ('u'):byte() then V.unfold_zoom()   -- 20 окт: zu — раскрыть сложенные ноты (LPB до 128), ещё раз — назад
-      elseif c == ('s'):byte() then if ctx.clips_toggle then ctx.clips_toggle() end   -- zs: клипы сессии в теле трекера (6 окт)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
       elseif c == ('e'):byte() then if ctx.env_view then ctx.env_view() end   -- 12 окт: ze — вид колонки огибающей: значения / кривая

@@ -178,7 +178,6 @@ KH.PAGES = {
     { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MTS sysex before the notes (MTS-ESP Master on the track before Surge XT), audio items - fractional pitch; Shift - the track' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern; Ctrl - the whole pattern, Shift+Ctrl - the column; F11 F12 - by octave' },
     { k = 'zt zb', d = 'the cursor row to the top / to the bottom (as in Vim)' },
-    { k = 'zs', m = 'session clips in tracker', d = 'session: the clips in the tracker body' },
     { k = 'Tf To', t = { 'T' }, m = 'take fx: add / open', d = 'T f - add a take fx to the note under the cursor, T o - its take fx chain in DSP' },
     { k = 'tT', m = 'track from template', d = 'a track from a template after the cursor track' },
     { k = 'tF', m = 'into left folder', d = 'the cursor track goes into the folder of the track to the left' },
