@@ -570,6 +570,7 @@ function M.build(lpb)
     ms.envs = M.track_envs(mt, lpb)   -- 11 окт: колонка мастера в трекере — его огибающие (темп, громкость …)
     ms.cmd = M.cmd_lane(lpb)          -- 11 окт: колонка cmd мастера — маркеры проекта
     ms.vis = M.vis_lane(lpb)          -- 11 окт: колонка visor — маркеры v:
+    ms.chd = M.chord_lane(lpb)        -- 21 окт: колонка chord — маркеры ch:
     snap.master = ms
   end
   for ti = 0, R.CountTracks(0) - 1 do
@@ -1813,7 +1814,7 @@ function M.cmd_lane(lpb)
     local ret, isrgn, pos, _, name, idx = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
     name = name or ''
-    if not isrgn and not name:match('^=') and not name:match('^v:') then   -- 11 окт: v: — колонка visor
+    if not isrgn and not name:match('^=') and not name:match('^v:') and not name:match('^ch:') then   -- 11 окт: v: — колонка visor; 21 окт: ch: — аккорды
       local r = M.row_of_qn(R.TimeMap2_timeToQN(0, pos), lpb)
       local e = ml.ev[r]
       if e then e.n = e.n + 1; e.text = e.text .. ' ' .. name; e.idx[#e.idx + 1] = idx
@@ -1827,6 +1828,24 @@ end
 
 -- 11 окт: колонка visor мастера — маркеры «v:<сцена или пресет ReaVisor>»: в строке
 -- маркера visor переключается на эту сцену (игра проходит строку)
+-- 21 окт: колонка chord мастера — маркеры «ch:Am7»: аккорды песни (chord lane), читают chordfollow и harmonizer
+function M.chord_lane(lpb)
+  local ml = { kind = 'chd', name = 'chord', ev = {}, rows = {} }
+  local i = 0
+  while true do
+    local ret, isrgn, pos, _, name, idx = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    local nm = not isrgn and (name or ''):match('^ch:%s*(.-)%s*$')
+    if nm then
+      local r = M.row_of_qn(R.TimeMap2_timeToQN(0, pos), lpb)
+      if not ml.ev[r] then ml.ev[r] = { text = nm, n = 1, idx = { idx }, pos = pos }; ml.rows[#ml.rows + 1] = r
+      else ml.ev[r].n = ml.ev[r].n + 1; ml.ev[r].idx[#ml.ev[r].idx + 1] = idx end
+    end
+    i = i + 1
+  end
+  table.sort(ml.rows)
+  return ml
+end
 function M.vis_lane(lpb)
   local ml = { kind = 'vis', name = 'visor', ev = {}, rows = {} }
   local i = 0

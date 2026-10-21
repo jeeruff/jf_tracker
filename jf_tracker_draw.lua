@@ -850,12 +850,14 @@ function D.layout(snap, state, nregions)
     -- 11 окт: колонка visor (маркеры v:) — когда visor включён или в песне есть его события
     local mv = snap.master.vis
     L.vis_w = (mv and (#mv.rows > 0 or state.visor_on)) and (2 * L.pad + ms('WWWWWWW')) or 0
+    local mcd = snap.master.chd   -- 21 окт: колонка chord — когда включена или в песне есть аккорды
+    L.chd_w = (mcd and (#mcd.rows > 0 or state.chordlane)) and (2 * L.pad + ms('WWWWWW')) or 0
     local function mew(e) local m = state.envvals and state.envvals[(snap.master.guid or '') .. '/' .. (e.name or '')]; return (m == nil or m == 'vals') and L.menv_w or L.env_w end
     L.menv_of = mew
     local ew = 0
     for _, e in ipairs(snap.master.envs or {}) do ew = ew + mew(e) + 1 end
     if #(snap.master.envs or {}) == 0 then ew = L.env_w + 1 end
-    L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0))
+    L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0) + ((L.chd_w or 0) > 0 and (L.chd_w + 1) or 0))
   end
   -- 17 окт: мастер сложен (кнопка fold в его шапке; опция auto fold master — сам, когда треки не влезают):
   -- два символа — стерео-метр и подавление компрессора / лимитера мастера, колонок нет
@@ -1011,6 +1013,11 @@ function D.layout(snap, state, nregions)
       L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.cmd, sub = {}, x = lx, w = L.cmd_w }
       c.mls[#c.mls + 1] = { ml = mc.cmd, x = lx, w = L.cmd_w, fi = #L.flat }
       lx = lx + L.cmd_w + 1
+    end
+    if mc.chd and (L.chd_w or 0) > 0 then   -- 21 окт: chord lane — первой из колонок событий мастера
+      L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.chd, sub = {}, x = lx, w = L.chd_w }
+      c.mls[#c.mls + 1] = { ml = mc.chd, x = lx, w = L.chd_w, fi = #L.flat }
+      lx = lx + L.chd_w + 1
     end
     if mc.vis and L.vis_w > 0 then
       L.flat[#L.flat + 1] = { ci = ci, col = mc, ml = mc.vis, sub = {}, x = lx, w = L.vis_w }
@@ -7622,7 +7629,7 @@ function D.frame(L, snap, rows, state, info)
             end
           end
           if e then
-            local txt = ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis'
+            local txt = ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis' or ml.kind == 'chd'
             local t = txt and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
             -- 13 окт: visor / cmd — текст команды строкой (без картинок поверх строк), секции через пробел:
             -- первое слово (сцена / команда) ярко, аргументы тусклее
@@ -7633,7 +7640,7 @@ function D.frame(L, snap, rows, state, info)
               ctext(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
               if hw < m.w - L.pad - L.cw then ctext(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
             else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN) end
-          else ctext(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis') and '....' or '..', D.EMPTY) end
+          else ctext(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis' or ml.kind == 'chd') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
         ::ml_next::

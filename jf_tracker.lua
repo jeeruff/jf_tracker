@@ -205,6 +205,7 @@ local state = {
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
   notesus = flag('notesus', false),
+  chordlane = flag('chordlane', false),   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -4429,6 +4430,27 @@ ctx = {
   end,
   -- 11 окт: колонка cmd мастера — маркер проекта в строке row: текст ставит / меняет,
   -- пустой удаляет. «!<номер или _имя действия>» REAPER исполняет при проигрывании
+  -- 21 окт: аккорд на строке колонки chord мастера (маркер ch:); пусто — убрать
+  chd_set = function(row, name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if name ~= '' and not MMX.CH.parse(name) then vim.msg = 'chord: not a chord name - ' .. name .. ' (Am7, F#maj9/A#, Bbsus4 ...)'; return end
+    local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    local found, i = {}, 0
+    while true do
+      local ret, isrgn, pos, _, nm, idx, color = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and (nm or ''):match('^ch:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
+      i = i + 1
+    end
+    if name == '' and #found == 0 then vim.msg = 'chord: nothing on this row'; return end
+    edit.run(name == '' and 'chord delete' or ('chord ' .. name), function()
+      if name == '' then for _, f in ipairs(found) do reaper.DeleteProjectMarker(0, f.idx, false) end
+      elseif #found > 0 then reaper.SetProjectMarker3(0, found[1].idx, false, found[1].pos, 0, 'ch:' .. name, found[1].color or 0)
+      else reaper.AddProjectMarker2(0, false, t0, 0, 'ch:' .. name, -1, 0) end
+    end)
+    model.invalidate(); ctx.chord_pub.cc = -1
+    vim.msg = name == '' and ('chord removed on row %04d'):format(row) or ('chord %s on row %04d (chordfollow tracks follow it)'):format(name, row)
+  end,
   mcmd_set = function(row, text)
     text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
     local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
@@ -10491,8 +10513,12 @@ ctx = {
     if r == true then vim.msg = 'harmonizer: ' .. MMX.HM.key_name() end
   end,
   chord_cmd = function(arg)
-    local col = cur_col(); if not col then vim.msg = 'chord: no track under the cursor'; return end
     arg = (arg or ''):match('^%s*(.-)%s*$')
+    -- 21 окт: :chord lane — колонка аккордов мастера вкл / выкл; :chord read — заполнить её по нотам песни
+    if arg == 'lane' then state.chordlane = not state.chordlane; reaper.SetExtState(EXT, 'chordlane', state.chordlane and '1' or '0', true); relayout()
+      vim.msg = 'chord lane on the master ' .. (state.chordlane and 'on (Enter - chords of the key, :chord read - from the notes)' or 'off (it stays while it has chords)'); return end
+    if arg == 'read' or arg:match('^read ') then ctx.chord_read(arg:match('^read%s+(%S+)')); return end
+    local col = cur_col(); if not col then vim.msg = 'chord: no track under the cursor'; return end
     if arg == '' or arg == 'off' then
       local on = state.folds[col.guid] == 'chord'
       if arg == 'off' then on = true end
@@ -16323,11 +16349,135 @@ end
 -- его заголовке). Пишется, когда меняется проект или трек-источник; без
 -- источника n = 0 — эффект пропускает ноты как есть
 ctx.chord_pub = { cc = -1, src = nil }
+-- 21 окт: лад песни (ProjExtState jf_tracker/key «9 minor»); нет — по нотам (TH.detect)
+MMX.TH = dofile(DIR .. '/jf_tracker_theory.lua'); MMX.TH.init(MMX.CH)
+ctx.song_notes = function(t0, t1)
+  local notes = {}
+  for _, c in ipairs(snap and snap.cols or {}) do
+    if c.track and reaper.ValidatePtr(c.track, 'MediaTrack*') and not draw.col_is_kit(c) and reaper.GetMediaTrackInfo_Value(c.track, 'B_MUTE') == 0 then
+      for ii = 0, reaper.CountTrackMediaItems(c.track) - 1 do
+        local it = reaper.GetTrackMediaItem(c.track, ii)
+        local tk = reaper.GetActiveTake(it)
+        local _, sx = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
+        if tk and reaper.TakeIsMIDI(tk) and sx == '' and reaper.GetMediaItemInfo_Value(it, 'B_MUTE') == 0 then
+          local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local p1 = p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+          local _, nn = reaper.MIDI_CountEvts(tk)
+          for k = 0, nn - 1 do
+            local _, _, mu, sp, ep, _, pitch = reaper.MIDI_GetNote(tk, k)
+            local a = reaper.MIDI_GetProjTimeFromPPQPos(tk, sp)
+            local b = math.min(p1, reaper.MIDI_GetProjTimeFromPPQPos(tk, ep))
+            if not mu and a >= p0 - 1e-6 and a < p1 and b > a and (not t0 or (b > t0 and a < t1)) then notes[#notes + 1] = { a, b, pitch } end
+          end
+        end
+      end
+    end
+  end
+  return notes
+end
+ctx.key_get = function()
+  local _, s = reaper.GetProjExtState(0, EXT, 'key')
+  local r, id = (s or ''):match('^(%d+)%s+(%S+)$')
+  if r then return tonumber(r), id end
+  return nil
+end
+ctx.key_set = function(root, id)
+  reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
+  if root and MMX.HM then MMX.HM.root = root; MMX.HM.minor = (id == 'minor' or id == 'harmmin' or id == 'melmin' or id == 'dorian' or id == 'phrygian' or id == 'locrian') end
+end
+-- :key — лад песни по нотам (MIDI всех треков, кроме китов и сессии; вес — длительность); :key Am / :key D dorian — задать
+ctx.key_cmd = function(arg)
+  arg = (arg or ''):match('^%s*(.-)%s*$')
+  local TH = MMX.TH
+  if arg ~= '' then
+    local l, acc, rest = arg:match('^([A-Ga-g])([#b]?)(.*)$')
+    if not l then vim.msg = ':key Am | C | D dorian | (empty - from the notes)'; return end
+    local pc = ({ c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11 })[l:lower()] + (acc == '#' and 1 or (acc == 'b' and -1 or 0))
+    rest = rest:gsub('^%s+', '')
+    local id = (rest == 'm' or rest == 'min' or rest == 'minor') and 'minor' or (rest == '' and 'major') or rest
+    if not TH.BY[id] then vim.msg = 'key: modes - ' .. (function() local t = {}; for _, sc in ipairs(TH.SCALES) do t[#t + 1] = sc.id end; return table.concat(t, ' ') end)(); return end
+    ctx.key_set(pc % 12, id); vim.msg = ('key: %s %s (set)'):format(MMX.CH.NAMES[pc % 12 + 1], TH.BY[id].name); return
+  end
+  local ps = {}
+  for _, n in ipairs(ctx.song_notes()) do
+    local w = math.max(1, math.floor((n[2] - n[1]) * 8 + 0.5))   -- длина ≈ вес
+    for _ = 1, math.min(16, w) do ps[#ps + 1] = n[3] end
+  end
+  if #ps == 0 then vim.msg = 'key: no MIDI notes in the song (audio - later: chroma)'; return end
+  local r, id = TH.detect(ps)
+  if not r then vim.msg = 'key: not sure'; return end
+  ctx.key_set(r, id)
+  vim.msg = ('key of the song: %s %s (from the notes; :key Am to set it by hand)'):format(MMX.CH.NAMES[r + 1], TH.BY[id].name)
+end
+-- :chord read [beat] — аккорды песни по нотам: по тактам (beat — по долям) → маркеры ch: колонки мастера
+ctx.chord_read = function(unit)
+  local t0 = model.marker_pos(model.START_MARKER) or 0
+  local t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0)
+  local notes = ctx.song_notes(t0, t1)
+  if #notes == 0 then vim.msg = 'chord read: no MIDI notes in the song'; return end
+  local TH = MMX.TH
+  local quals = { '', 'm', '7', 'maj7', 'm7', 'sus4', 'sus2', 'dim', '6', 'm6', 'm7b5' }
+  local cuts = {}
+  local q0, q1 = reaper.TimeMap2_timeToQN(0, t0), reaper.TimeMap2_timeToQN(0, t1)
+  local q = q0
+  while q < q1 - 1e-6 and #cuts < 4096 do
+    local tq = reaper.TimeMap2_QNToTime(0, q)
+    cuts[#cuts + 1] = tq
+    if unit == 'beat' then q = q + 1
+    else local _, qs, qe = reaper.TimeMap_QNToMeasures(0, q + 1e-6); q = (qe and qe > q + 1e-6) and qe or q + 4 end
+  end
+  cuts[#cuts + 1] = t1
+  local out, last = {}, nil
+  for i = 1, #cuts - 1 do
+    local a, b = cuts[i], cuts[i + 1]
+    local ch = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    local tot, lo = 0, nil
+    for _, n in ipairs(notes) do
+      local ov = math.min(b, n[2]) - math.max(a, n[1])
+      if ov > 0 then ch[n[3] % 12 + 1] = ch[n[3] % 12 + 1] + ov; tot = tot + ov; if not lo or n[3] < lo then lo = n[3] end end
+    end
+    local sym
+    if tot > 0 then
+      for k = 1, 12 do ch[k] = ch[k] / tot end
+      if lo then ch[lo % 12 + 1] = ch[lo % 12 + 1] + 0.1 end   -- бас — к корню
+      sym = TH.best_chord(ch, quals)
+    end
+    if sym and sym ~= last then out[#out + 1] = { t = a, sym = sym }; last = sym end
+  end
+  edit.run('chord read', function()
+    local i = 0
+    while true do
+      local ret, isrgn, pos, _, nm, idx = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and (nm or ''):match('^ch:') and pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteProjectMarker(0, idx, false) else i = i + 1 end
+    end
+    for _, e in ipairs(out) do reaper.AddProjectMarker2(0, false, e.t, 0, 'ch:' .. e.sym, -1, 0) end
+  end)
+  state.chordlane = true
+  model.invalidate(); ctx.chord_pub.cc = -1; relayout()
+  vim.msg = ('chord read: %d chord(s) by %s from the notes - the chord column of the master (u - undo)'):format(#out, unit == 'beat' and 'beat' or 'bar')
+end
+-- Enter на колонке chord — аккорды лада ступенями (трезвучия и септаккорды)
+ctx.chd_pick = function(row)
+  local TH = MMX.TH
+  local r, id = ctx.key_get()
+  if not r then r, id = MMX.HM.root or 0, MMX.HM.minor and 'minor' or 'major' end
+  local items, ROM = {}, { 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII' }
+  for k = 1, math.min(7, #TH.pcs(r, id)) do
+    local s3 = TH.degree_chord(r, id, k, false)
+    local s7 = TH.degree_chord(r, id, k, true)
+    items[#items + 1] = { key = tostring(k), label = ROM[k] .. '  ' .. s3, fn = function() ctx.chd_set(row, s3) end }
+    items[#items + 1] = { key = ({ '!', '@', '#', '$', '%', '^', '&' })[k], label = ROM[k] .. '7  ' .. s7, fn = function() ctx.chd_set(row, s7) end }
+  end
+  items[#items + 1] = { key = 'x', label = 'remove the chord', fn = function() ctx.chd_set(row, '') end }
+  items[#items + 1] = { key = 'c', label = 'type a chord name', fn = function() vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'chd ' end }
+  vim.open_hydra({ title = ('chord - key %s %s (:key to change)'):format(MMX.CH.NAMES[r + 1], TH.BY[id].name), items = items })
+end
 ctx.chord_publish = function()
   local cc = reaper.GetProjectStateChangeCount(0)
   local src
   for _, c in ipairs(snap and snap.cols or {}) do if state.folds[c.guid] == 'chord' and c.track then src = c; break end end
-  local key = src and src.guid or ''
+  local key = (src and src.guid or '') .. ':' .. tostring(snap and snap.master and snap.master.chd and #snap.master.chd.rows or 0)
   -- раз в секунду: пространство gmem живёт, пока к нему привязан эффект
   -- (память gmem-attach) — добавили эффект позже / все удалили → таблица
   -- пуста, а аккорды есть: записать заново
@@ -16360,6 +16510,20 @@ ctx.chord_publish = function()
     end
   end
   local tl = MMX.CH.timeline(notes)
+  -- 21 окт: колонка chord мастера (маркеры ch:) — главнее трека-лейна
+  local mcd = snap and snap.master and snap.master.chd
+  if mcd and #mcd.rows > 0 then
+    tl = {}
+    for _, r in ipairs(mcd.rows) do
+      local e = mcd.ev[r]
+      local c = MMX.CH.parse(e.text)
+      if c then
+        local mask = 0
+        for _, iv in ipairs(c.ints) do mask = mask | (1 << ((c.root + iv) % 12)) end
+        tl[#tl + 1] = { pos = e.pos, mask = mask, root = c.root }
+      end
+    end
+  end
   with_ns('jf_tracker_chord', function()
     local n = math.min(#tl, 8000)
     for i = 1, n do
