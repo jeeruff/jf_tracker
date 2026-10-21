@@ -5473,7 +5473,6 @@ ctx = {
       reaper.SetExtState(EXT, 'rulerside', state.rulerside, true)
       relayout(); vim.msg = 'region / marker strip: ' .. state.rulerside
     end }
-    tog('mxregion', 'x', 'region of the cursor over the matrix')
     tog('mxmarks', 's', '=START / =END rows in the matrix')
     for k, v in ipairs({ 'off', 'beats', 'time', 'both' }) do
       items[#items + 1] = { key = tostring(k), label = 'timeline ruler: ' .. v .. ((state.tlruler or 'off') == v and '  (on)' or ''), fn = function()
@@ -26087,7 +26086,10 @@ end
 ctx.sketch_draw = function(Lx, x, y, w)
   local hv = {}
   ctx.sketch_ensure()   -- 21 окт: эскизы проекта (после рестарта / смены вкладки)
-  if #MX.sketch == 0 then return 0, hv end
+  if #MX.sketch == 0 then   -- 21 окт: строка видна и пустой — с подсказкой, как начать (её не находили)
+    U.text(x + Lx.pad, y, ctx.fit('sketch  c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch', w - 2 * Lx.pad), U.DIM)
+    return Lx.rh + 2, hv
+  end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.text(x + Lx.pad, y, 'sketch', U.GREY)
   local bx = x + Lx.pad + U.measure('sketch ') + Lx.pad

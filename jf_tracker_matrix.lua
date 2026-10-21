@@ -484,7 +484,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if nrow >= 1 and ax1 - ax0 >= 8 * L.cw then
       local rows = {}
       -- 11 окт: регион курсора — как в уголке трекера (кнопка markers: region over the matrix)
-      local rgv = not (ctx.state and ctx.state.mxregion == false)
+      local rgv = false   -- 21 окт: строка региона курсора внизу блока убрана совсем (пользователь); регион — в матрице и линейке
       if nrow >= (rgv and 4 or 3) then rows[#rows + 1] = 'title' end
       rows[#rows + 1] = 'name'
       if nrow >= 2 then rows[#rows + 1] = 'ops' end
