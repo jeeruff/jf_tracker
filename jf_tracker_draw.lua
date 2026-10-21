@@ -4348,13 +4348,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     for i, b in ipairs(blist) do
       local w2 = ms(b[5] or b[2])
       local sb = sub0[i]
-      if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 2 * L.pad + 4) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[2])) end
+      if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 2 * L.pad + 4) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[1] == 'tp_start' and '<<' or sb[2])) end   -- 21 окт: |<< — черта торчит влево, ширину по <<
       TW[i] = w2 + 2 * L.pad
       if b[1] == 'tp_play' then pi = i end
     end
     local need = 0
     if c.tpfull then   -- 19 окт: mark под <<, rate под play, тоглы записи — правее play
-      TW[1] = math.max(TW[1], ms('mark') + 2 * L.pad)
+      TW[1] = math.max(TW[1], ms('mark') + L.pad)   -- 21 окт: на символ уже (подпись mark — без полного отступа)
       if pi then TW[pi] = math.max(TW[pi], ms('x1.10') + 2 * L.pad) end
       need = ms('pun') + ms('pre') + ms('slo*') + ms('rip*') + 8 * L.pad
       local pre = -2
