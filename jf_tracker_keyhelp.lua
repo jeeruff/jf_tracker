@@ -205,6 +205,7 @@ KH.PAGES = {
     { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped; the mark typed in CAPITALS (Shift) dips: there in the first half, back in the second (no count - 1 bar)' },
     { k = 'Ctrl+mouse', d = 'hold Control and move the mouse: the selected params / faders change (else the one under the mouse, else the keyboard slider); up = more, Shift fine; two selected = XY. Cmd+click: add / remove, Shift+click: a range of params of one effect, Esc: clear' },
     { k = 'Ctrl+Cmd+mouse', d = 'SLIDER: a bank of up to 8 sliders nearest the mouse is framed (fx parameters in a track header, v / p of a track, a DSP device column, mixer faders, an XY pad); horizontal sliders - up / down picks, sideways changes; vertical faders - sideways picks, up / down changes; XY - both; it moves only after a clear move along its axis (Shift fine); let go - one undo' },
+    { k = 'Ctrl+Opt+Cmd+mouse', m = 'reform gestures', d = 'REFORM gestures over selected notes (v / V): mouse up / down - shift by rows, two fingers up / down or a pinch - scale, two fingers sideways - curve, Shift fine; let go - kept (u - undo)' },
     { k = 'Ctrl+Opt+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another; + Cmd: the whole window is a pan pad for that track - sideways pan / balance, up wider, middle 0, down narrower / reversed (dual pan: L and R apart up, crossed down)' },
     { k = 'Cmd+Shift+1..9', d = 'select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)' },
     { k = 'Cmd+F11', d = 'fullscreen <-> docked (quick option title: title bar on / off); F11 alone is a note (frow)' },
@@ -1112,6 +1113,16 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
   end
   U.text(qx, y + 3, fit(qs, math.max(0, qend - qx)), qc)
   local rows = KH.rows()
+  -- 21 окт: держат модификатор — его сочетания здесь и везде (main кладёт KH.mod_view = { title, lines })
+  local mv = KH.mod_view
+  if mv then
+    rows = {}
+    for _, ln in ipairs(mv.lines) do rows[#rows + 1] = { page = '', i = 0, e = { k = ln.key, d = ln.text } } end
+    U.set(U.BG); gfx.rect(qx, y + 2, math.max(0, qend - qx), L.rh, 1)
+    U.text(qx, y + 3, fit(mv.title, math.max(0, qend - qx)), U.AMBER)
+  end
+  local keep_scroll = KH.scroll
+  if mv then KH.scroll = 0 end
   local top = y + 3 + L.rh + 2
   local nr = math.max(1, math.floor((y + h - top - 2) / L.rh))
   -- ширина колонок: ключ (до 14 знаков) + описание
@@ -1190,6 +1201,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
       end
     end
   end
+  if mv then KH.scroll = keep_scroll; hover = nil end
   return hover
 end
 

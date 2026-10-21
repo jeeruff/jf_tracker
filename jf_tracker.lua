@@ -6526,7 +6526,11 @@ ctx = {
   -- что пишет нота: 'midi' — выбран плагин-инструмент, иначе item сэмпла
   inst_src = function(col, inst)
     if ctx.inst_fx(col) then return 'midi' end
-    return inst and inst.item
+    if inst and inst.item then return inst.item end
+    -- 21 окт: сэмпла в слоте нет, а на треке плагин-инструмент (Surge XT и т. п.) — нота MIDI, не «пустой слот»
+    local ti = ctx.track_insts(col)
+    if ti[1] and ti[1].fx then return 'midi' end
+    return nil
   end,
   inst_fx_pick = function(col, fx, dbl, keys)     -- keys: выбор номером (клавиатура) — фокус не уводить
     if not col then return end
@@ -11672,7 +11676,7 @@ ctx = {
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
-      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Ctrl+Cmd (SLIDER, + Option - pan), Ctrl+Opt+Cmd over an item (ITEMS: move / volume). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
+      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Ctrl+Cmd (SLIDER, + Option - pan), Ctrl+Opt+Cmd over selected notes (REFORM gestures). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -12372,6 +12376,17 @@ ctx = {
         local ok, v = reaper.GetSetMediaTrackInfo_String(t.track, 'P_EXT:jf_surge:' .. g, '', false)
         if ok and v ~= '' then nm = v; ctx.surge_name[g] = v end
       end
+      -- 21 окт: патч не из трекера — имя из состояния самого плагина (один раз на плагин и смену цепочки)
+      if not nm and g then
+        local key = g .. ':' .. (model.fx_gen or 0)
+        ctx.surge_tried = ctx.surge_tried or {}
+        if ctx.surge_tried[g] ~= key then
+          ctx.surge_tried[g] = key
+          local _, tc = reaper.GetTrackStateChunk(t.track, '', false)
+          local pn = MMX.SRG.name_in_track(tc or '', g)
+          if pn and pn ~= '' then nm = pn; ctx.surge_name[g] = pn end
+        end
+      end
       nm = nm or 'patches'
       return { name = nm, idx = 0, cnt = #ctx.surge_list(), none = false }
     end
@@ -12636,12 +12651,14 @@ ctx = {
     local g = reaper.TrackFX_GetFXGUID(tr, fxi)
     local _, tc = reaper.GetTrackStateChunk(tr, '', false)
     -- блок этого Surge — последний <VST перед его FXID (и внутри контейнера)
-    local nth, cnt = nil, 0
+    -- 21 окт: и CLAP (блок <CLAP …>, его <STATE> — сам патч): тип — у последнего блока плагина перед FXID
+    local nth, cnt, kind = nil, { VST = 0, CLAP = 0 }, nil
     for l in tc:gmatch('[^\n]+') do
-      if l:match('^%s*<VST ') then cnt = cnt + 1 end
-      if g and l:find('FXID ' .. g, 1, true) then nth = cnt; break end
+      local b = l:match('^%s*<(%u+) ')
+      if b == 'VST' or b == 'CLAP' then cnt[b] = cnt[b] + 1; kind = b end
+      if g and l:find('FXID ' .. g, 1, true) then nth = kind and cnt[kind]; break end
     end
-    local nc = nth and MMX.SRG.patch_track_chunk(tc, nth, ch)
+    local nc = nth and (kind == 'CLAP' and MMX.SRG.patch_clap_chunk(tc, nth, ch) or MMX.SRG.patch_track_chunk(tc, nth, ch))
     if not nc then vim.msg = 'surge: its block was not found in the track'; return end
     edit.run('Surge patch ' .. e.name, function() reaper.SetTrackStateChunk(tr, nc, false) end)
     ctx.surge_name[g] = e.label
@@ -15583,9 +15600,19 @@ function ctx.mod_tick(c)
   if sig == 0 then ctx.mod_t0, ctx.mod_sig, ctx.mod_used = nil, nil, nil; return end      -- отпустил — заново
   if c > 0 or cap & (1 | 2 | 64) ~= 0 or (gfx.getchar(65536) & 2) == 0 then ctx.mod_t0, ctx.mod_used = nil, sig; return end   -- клавиша / мышь с ним — пока держишь, не мешать
   if ctx.mod_used == sig then return end
-  if ctx.mod_sig ~= sig or not ctx.mod_t0 then ctx.mod_sig, ctx.mod_t0 = sig, reaper.time_precise() end
+  if ctx.mod_sig ~= sig or not ctx.mod_t0 then
+    ctx.mod_sig, ctx.mod_t0 = sig, reaper.time_precise()
+    if state.debug then ctx.dlog(('mods held %d (cap %d) - help in 0.45 s'):format(sig, cap)) end
+  end
 end
+-- 21 окт: и в панели help — те же строки вместо страницы, пока держишь (KH.mod_view)
 function ctx.mod_pop()
+  local p = ctx.mod_pop_build()
+  KH.mod_view = p
+  if p and state.debug and ctx.mod_logged ~= ctx.mod_t0 then ctx.mod_logged = ctx.mod_t0; ctx.dlog(('mods help: %s, %d line(s)'):format(p.title, #p.lines)) end
+  return p
+end
+function ctx.mod_pop_build()
   if not ctx.mod_t0 or reaper.time_precise() - ctx.mod_t0 < 0.45 then return nil end
   local held = {}
   for _, b in ipairs(ctx.MOD_BITS) do if ctx.mod_sig & b[1] ~= 0 then held[b[2]] = true end end
@@ -19548,7 +19575,9 @@ local function frame()
     end
   end
   local pop = vim.popup()
-  if not pop and state.whichkey and not state.pane_mode then pop = ctx.mod_pop() end   -- 21 окт: держишь модификатор — что он даёт здесь
+  local mpop = not state.pane_mode and ctx.mod_pop() or nil   -- 21 окт: и панель help (KH.mod_view) — без опции whichkey
+  if not mpop then KH.mod_view = nil end
+  if not pop and state.whichkey then pop = mpop end   -- 21 окт: держишь модификатор — что он даёт здесь
   if not pop and (state.whichkey or state.pane_mode) then
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
@@ -20657,37 +20686,48 @@ local function frame()
     -- движения по своей оси (> 10 px); Shift мелко; отпустил — один undo
     -- 16 окт: + Option к уже держимому Ctrl+Cmd — пан выбранного канала (вбок); не путать с жестом
     -- треков Ctrl+Option (+ Cmd — пан-пэд): тот начинается с Option, этот — с Cmd
-    -- 16 окт (эксперимент): ITEMS — Ctrl+Opt+Cmd разом над айтемом в трекере: вбок — по строкам, вверх-вниз —
-    -- громкость айтема (Shift — мелко); отпустил — один undo. Над фейдером при начатом SLIDER — пан (ниже)
+    -- 21 окт: вместо ITEMS — жесты reform: Ctrl+Opt+Cmd разом над трекером при выделении нот (VISUAL или
+    -- последнее): мышь вверх-вниз — сдвиг по строкам (время в трекере идёт вниз), двумя пальцами вверх-вниз
+    -- или щипок — растянуть / сжать, двумя пальцами вбок — кривая; Shift — мелко; отпустил — оставить (u — отмена)
     local three = gfx.mouse_cap & 52 == 52
     if three and not ctx.sl and not ctx.cm_gest then
-      local im = ctx.im
-      if not im then
-        local cell = hover.cell
-        if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
-        local it = cell and cell.item
-        if it and reaper.ValidatePtr(it, 'MediaItem*') then
-          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-          im = { item = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, row0 = math.floor(model.row_of_time(pos, state.lpb) + 0.5), vol0 = reaper.GetMediaItemInfo_Value(it, 'D_VOL'), name = cell.name or 'item' }
-        else im = { none = true } end
-        ctx.im = im
+      local g = ctx.im
+      if not g then
+        g = { x0 = gfx.mouse_x, y0 = gfx.mouse_y, sc = 1, cv = 0 }
+        if (vim.mode == 'visual' or vim.mode == 'vline' or ctx.rf_lastvis) and (hover.cell or hover.row) then
+          ctx.rf_p = ctx.RF.defaults(); ctx.RFS = nil
+          ctx.rf_open(true)
+        end
+        g.none = not ctx.RFS
+        ctx.im = g
       end
-      if im.none then state.status = '-- ITEMS -- (experimental) hold Ctrl+Opt+Cmd over an item in the tracker: sideways - move by rows, up / down - its volume'
-      elseif reaper.ValidatePtr(im.item, 'MediaItem*') then
+      if g.none then state.status = '-- REFORM -- select notes (v / V), then hold Ctrl+Opt+Cmd over the tracker: up / down - shift, two fingers or pinch - scale, sideways - curve'
+      else
         local fine = gfx.mouse_cap & 8 == 8
-        local dr = math.floor((gfx.mouse_x - im.x0) / (fine and (L.cw * 4) or (L.cw * 1.5)) + 0.5)
-        local ddb = (im.y0 - gfx.mouse_y) * (fine and 0.05 or 0.25)
-        local db0 = im.vol0 > 0 and 20 * math.log(im.vol0, 10) or -60
-        local db = math.max(-60, math.min(12, db0 + ddb))
-        local r = math.max(0, im.row0 + dr)
-        if r ~= im.row_set then reaper.SetMediaItemInfo_Value(im.item, 'D_POSITION', edit.row_time(r, state.lpb, 0)); im.row_set = r; im.moved = true end
-        if math.abs(ddb) > 0.01 then reaper.SetMediaItemInfo_Value(im.item, 'D_VOL', 10 ^ (db / 20)); im.moved = true end
-        reaper.UpdateArrange()
-        state.status = ('-- ITEMS -- (experimental) %s  row %04d (%+d)  vol %+.1f dB   (sideways: rows, up / down: volume, Shift fine; let go - done)'):format(im.name, r, dr, db)
+        local wv, wh = gfx.mouse_wheel or 0, gfx.mouse_hwheel or 0
+        if (wv ~= 0 or wh ~= 0) and draw.prof_on then ctx.dlog(('reform gesture wheel %d hwheel %d cap %d'):format(wv, wh, gfx.mouse_cap)) end
+        g.sc = math.max(0.25, math.min(4, g.sc * 2 ^ (wv / (fine and 4800 or 1200))))
+        g.cv = math.max(-1, math.min(1, g.cv + wh / (fine and 9600 or 2400)))
+        gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
+        local P = ctx.rf_p
+        local sh = math.floor((gfx.mouse_y - g.y0) / (fine and 3 * L.rh or L.rh) + 0.5)
+        local nsc = math.floor(g.sc / 0.05 + 0.5) * 0.05
+        local ncv = math.floor(g.cv / 0.05 + 0.5) * 0.05
+        if sh ~= P.shift or math.abs(nsc - P.scale) > 1e-6 or math.abs(ncv - P.curve) > 1e-6 then
+          P.shift, P.scale, P.curve = math.max(-64, math.min(64, sh)), nsc, ncv
+          g.dirty = true
+        end
+        local now = reaper.time_precise()
+        if g.dirty and now - (g.t or 0) > 0.1 then g.t = now; g.dirty = nil; g.moved = true; ctx.rf_apply() end
+        state.status = ('-- REFORM -- shift %+d rows  scale x%.2f  curve %+.2f   (up / down: shift, two fingers / pinch: scale, two fingers sideways: curve, Shift fine; let go - keep)'):format(P.shift, P.scale, P.curve)
       end
       U.click, U.rclick = false, false
     elseif ctx.im then
-      if ctx.im.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: move / gain item (ctrl+opt+cmd)'); model.invalidate() end
+      local g = ctx.im
+      if not g.none then
+        if g.dirty then ctx.rf_apply() end
+        if g.moved or g.dirty then ctx.rf_close(true) else ctx.RFS = nil end
+      end
       ctx.im = nil
     end
     local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
@@ -20852,10 +20892,10 @@ local function frame()
       if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: slider'); model.invalidate() end
       ctx.sl = nil
     end
-    local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS (Ctrl+Opt+Cmd) — не жест треков
+    local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS, 21 окт: REFORM (Ctrl+Opt+Cmd) — не жест треков
     if gest_raw then ctx.cm_g0 = ctx.cm_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.cm_g0 = nil end
     local gest = gest_raw and (ctx.cm_gest ~= nil or math.abs(gfx.mouse_x - ctx.cm_g0[1]) + math.abs(gfx.mouse_y - ctx.cm_g0[2]) > 6)
-    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw and not ctx.im   -- 16 окт: ITEMS — без Ctrl-мыши
+    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw and not ctx.im   -- 21 окт: REFORM — без Ctrl-мыши
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}

@@ -492,6 +492,23 @@ function D.layout(snap, state, nregions)
     end
     return k
   end
+  -- 21 окт: чистый MIDI-трек (ни аудио в лейне, ни сэмплов в lib, не кит) — без колонки волны: поля левее на её ширину
+  L.GWc = setmetatable({}, { __mode = 'k' })
+  function L.nowaveG(G)
+    G = G or L
+    if not ((G.w_wave or 0) > 0) or G.wave_only then return G end
+    local k = L.GWc[G]
+    if k then return k end
+    local d = G.w_wave + L.pad
+    local function sh(v) if v then return v - d end return v end
+    local fx2 = {}
+    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
+    k = setmetatable({ w_wave = 0, x_note = sh(G.x_note), x_inst = G.x_inst and sh(G.x_inst) or false, x_slc = G.x_slc and sh(G.x_slc) or false,
+      x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or false, x_fx = fx2, x_del = sh(G.x_del),
+      x_fold = G.x_fold and sh(G.x_fold) or G.x_fold, x_tfx = G.x_tfx and sh(G.x_tfx) or G.x_tfx, sub_w = G.sub_w - d }, { __index = G })
+    L.GWc[G] = k
+    return k
+  end
   function L.kitG(G)
     G = G or L
     if not G.x_slc or G.notes_only then return G end
@@ -875,6 +892,7 @@ function D.layout(snap, state, nregions)
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
+          if not narrow and not lane.audio_sub and not (col.pool and #col.pool > 0) and not D.col_is_kit(col) then G = L.nowaveG(G) end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -7992,8 +8010,9 @@ function D.frame(L, snap, rows, state, info)
         hint('dsptrkname', hx, dy + 2, nw, L.rh, true)
         hx = hx + nw + L.pad
       end
-      -- 11 окт: справа в шапке — шаблоны треков «< имя >»: стрелки листают, щелчок по
-      -- имени — выпадашка (fzf), выбор вставляет трек(и) после трека курсора
+      -- 11 окт: шаблоны треков «< имя >»: стрелки листают, щелчок по имени — выпадашка (fzf),
+      -- выбор вставляет трек(и) после трека курсора; 21 окт: сразу за именем трека (слева) — справа
+      -- над эффектом стоит «< патч >» синта, рядом их путали
       local tr_right = DR - L.pad
       local items = info.presets and info.presets() or {}
       if #items > 0 then
@@ -8003,8 +8022,8 @@ function D.frame(L, snap, rows, state, info)
         local nm = items[PR.cur].name
         local nw = math.min(L.cw * 22, math.max(L.cw * 10, ms(nm) + 2 * L.pad))
         local tw = 2 * aw + nw
-        local tx = DR - L.pad - tw
-        if tx > hx + L.cw * 12 then
+        local tx = hx
+        if tx + tw < DR - L.pad - L.cw * 4 then
           local yb = dy + 2
           for i, part in ipairs({ { '<', -1, tx, aw }, { nm, 0, tx + aw, nw }, { '>', 1, tx + aw + nw, aw } }) do
             local px, pw2 = part[3], part[4]
@@ -8016,7 +8035,7 @@ function D.frame(L, snap, rows, state, info)
             if hot then hover.tmpl = part[2] end
             hint('tmpl', px, yb, pw2, L.rh, part[2])
           end
-          tr_right = tx - L.pad
+          hx = tx + tw + L.pad
         end
       end
       -- имя трека уже слева от кнопок; здесь — имя take (цепочка take) и подсказка
@@ -9538,7 +9557,11 @@ function D.frame(L, snap, rows, state, info)
     -- 20 окт: справа нет места (треки во всю ширину, сложенный мастер) — поверх правых треков на подложке
     -- (было: зона уже 6 знаков — keycast молча не рисовался, «невидим» в solarized)
     local kback = false
-    if kx1 - kx0 < L.cw * 10 then kx0 = math.max((L.cols[1].x or 0) + L.cw * 4, kx1 - L.cw * 18); kback = true end
+    -- 21 окт: на подложке — вплотную к правой линии треков (D.cols_edge), не через неё в зазор у мастера
+    if kx1 - kx0 < L.cw * 10 then
+      kx1 = math.min(kx1, (D.cols_edge(L) or (kx1 + L.pad)) - L.pad)
+      kx0 = math.max((L.cols[1].x or 0) + L.cw * 4, kx1 - L.cw * 18); kback = true
+    end
     if kx1 - kx0 >= L.cw * 6 then
       local yb = L.body_y + L.body_h - krh - 2
       local i = 0

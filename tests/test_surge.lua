@@ -39,6 +39,22 @@ local nd2 = table.concat(got):sub(1, -7)          -- без строки име�
 eq('chunk carries the patch', S.patch_name(nd2), 'Attacky')
 eq('header size updated', string.unpack('<I4', got.hdr, #got.hdr - 11), #nd2)
 eq('no such block', S.patch_track_chunk(table.concat(lines, '\n'), 2, blk), nil)
+-- 21 окт: CLAP — <STATE> = ровно блок sub3
+local cl = { '<TRACK', '  <FXCHAIN', '    <CLAP "CLAPi: Surge XT" org.surge-synth-team.surge-xt ""', '      CFG 4 1358 855 ""', '      <OUT_PINS', '      >', '      <STATE' }
+for i = 1, #old, 210 do cl[#cl + 1] = '        ' .. S.b64enc(old:sub(i, i + 209)) end
+cl[#cl + 1] = '      >'; cl[#cl + 1] = '    >'; cl[#cl + 1] = '>'
+local ctc = S.patch_clap_chunk(table.concat(cl, '\n'), 1, blk)
+eq('clap patched', ctc ~= nil, true)
+local cst = (ctc or ''):match('<STATE\n(.-)\n%s*>')
+local cb = {}; for l in (cst or ''):gmatch('[^\n]+') do cb[#cb + 1] = S.b64dec(l) end
+eq('clap state is the patch', table.concat(cb), blk)
+eq('clap keeps pins', (ctc or ''):find('<OUT_PINS', 1, true) ~= nil, true)
+eq('clap no block', S.patch_clap_chunk(table.concat(cl, '\n'), 2, blk), nil)
+local wt = 'sub3' .. string.pack('<I4', 3) .. string.pack('<I4', 5) .. string.rep('\0', 20) .. 'xmlWAVES'
+eq('sub3 len with wavetables', S.sub3_len(wt .. 'tail', 1), #wt)
+eq('name in clap track', S.name_in_track(table.concat(cl, '\n') .. '\n    FXID {G1}', '{G1}'), 'Init Saw')
+eq('name in vst3 track', S.name_in_track(table.concat(lines, '\n') .. '\n    FXID {G2}', '{G2}'), 'Init Saw')
+eq('name no fxid', S.name_in_track(table.concat(cl, '\n'), '{G9}'), nil)
 local c, nm = S.label('/R/Basses/Attacky.fxp', '/R')
 eq('label cat', c, 'Basses'); eq('label name', nm, 'Attacky')
 c = S.label('/R/A.Liv/Basses/X.fxp', '/R'); eq('label nested', c, 'A.Liv / Basses')

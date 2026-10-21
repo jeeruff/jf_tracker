@@ -55,6 +55,13 @@ end
 -- имя патча из XML блока
 function S.patch_name(chunk) return (chunk or ''):match('<meta name="([^"]*)"') end
 
+-- 21 окт: длина блока «sub3» с позиции i: 32 байта заголовка (sub3, длина XML, 6 длин волновых таблиц) + XML + таблицы
+function S.sub3_len(d, i)
+  local n = 32 + u32le(d, i + 4)
+  for k = 0, 5 do n = n + u32le(d, i + 8 + 4 * k) end
+  return n
+end
+
 -- данные состояния: новый блок «sub3» на место старого; nil — не Surge
 function S.replace_state(data, chunk)
   if #(data or '') < 16 then return nil end
@@ -62,8 +69,7 @@ function S.replace_state(data, chunk)
   local comp = data:sub(5, 4 + csz)
   local ctl = data:sub(5 + csz)
   if comp:sub(5, 8) ~= 'sub3' then return nil end
-  local xs = u32le(comp, 9)
-  local tail = comp:sub(5 + 32 + xs)
+  local tail = comp:sub(5 + S.sub3_len(comp, 5))   -- 21 окт: и волновые таблицы осцилляторов (размеры в заголовке)
   local nc = comp:sub(1, 4) .. chunk .. tail
   return string.pack('<I4', #nc) .. nc .. ctl
 end
@@ -97,6 +103,58 @@ function S.patch_track_chunk(tc, nth, chunk)
   for i = e - 1, #lines do out[#out + 1] = lines[i] end
   if out[#out] == '' then out[#out] = nil end
   return table.concat(out, '\n')
+end
+
+-- 21 окт: CLAP-версия Surge: в <CLAP …> блок <STATE …> — base64 ровно блока «sub3» (без обёрток VST3);
+-- заменить его в блоке CLAP номер nth (по порядку блоков <CLAP, с 1); новый чанк или nil
+function S.patch_clap_chunk(tc, nth, chunk)
+  local lines = {}
+  for l in (tc .. '\n'):gmatch('([^\n]*)\n') do lines[#lines + 1] = l end
+  local k, cnt = nil, 0
+  for i, l in ipairs(lines) do
+    if l:match('^%s*<CLAP ') then cnt = cnt + 1; if cnt == nth then k = i; break end end
+  end
+  if not k then return nil end
+  local s0, depth
+  depth = 0
+  for i = k + 1, #lines do
+    local l = lines[i]
+    if l:match('^%s*<STATE') and depth == 0 then s0 = i; break end
+    if l:match('^%s*<') then depth = depth + 1 elseif l:match('^%s*>%s*$') then if depth == 0 then break end; depth = depth - 1 end
+  end
+  if not s0 then return nil end
+  local e
+  for i = s0 + 1, #lines do if lines[i]:match('^%s*>%s*$') then e = i; break end end
+  if not e then return nil end
+  local old = {}
+  for i = s0 + 1, e - 1 do old[#old + 1] = S.b64dec(lines[i]) end
+  if table.concat(old):sub(1, 4) ~= 'sub3' then return nil end
+  local ind = (lines[s0 + 1] or ''):match('^(%s*)') or ''
+  local out = {}
+  for i = 1, s0 do out[#out + 1] = lines[i] end
+  for i = 1, #chunk, 210 do out[#out + 1] = ind .. S.b64enc(chunk:sub(i, i + 209)) end
+  for i = e, #lines do out[#out + 1] = lines[i] end
+  if out[#out] == '' then out[#out] = nil end
+  return table.concat(out, '\n')
+end
+
+-- 21 окт: имя патча, который сейчас в плагине: блок плагина (VST3 или CLAP) с этим FXID в чанке трека,
+-- его base64-строки (каждая кодирована отдельно) → <meta name=…>; nil — не нашлось
+function S.name_in_track(tc, guid)
+  local lines = {}
+  for l in (tc .. '\n'):gmatch('([^\n]*)\n') do lines[#lines + 1] = l end
+  local fi
+  for i, l in ipairs(lines) do if l:find('FXID ' .. guid, 1, true) then fi = i; break end end
+  if not fi then return nil end
+  local k
+  for i = fi - 1, 1, -1 do if lines[i]:match('^%s*<VST ') or lines[i]:match('^%s*<CLAP ') then k = i; break end end
+  if not k then return nil end
+  local parts = {}
+  for i = k + 1, fi - 1 do
+    local l = lines[i]:match('^%s*([%w+/=]+)%s*$')
+    if l and #l >= 8 then parts[#parts + 1] = S.b64dec(l) end
+  end
+  return S.patch_name(table.concat(parts))
 end
 
 -- категория и имя из пути: …/patches_factory/Basses/Attacky.fxp → Basses, Attacky
