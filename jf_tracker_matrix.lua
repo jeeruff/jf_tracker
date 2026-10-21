@@ -109,6 +109,7 @@ end
 local function cell_of(col, lanes, rg, rgb_of, model, idx)
       local span = math.max(1, rg.r1 - rg.r0)
       local has, all_muted, covered, ev = false, true, 0, {}
+      local xin, xout = false, false   -- 21 окт: нота пришла из прошлого паттерна / уходит в следующий
       idx = idx or col_index(lanes)
       local list = idx.list
       for k = first_ge(list, rg.r0 - idx.maxlen + 1), first_ge(list, rg.r1) - 1 do
@@ -120,6 +121,8 @@ local function cell_of(col, lanes, rg, rgb_of, model, idx)
               if r < rg.r1 and r1 >= rg.r0 then
                 has = true
                 if not cell.muted then all_muted = false end
+                if r < rg.r0 then xin = true end
+                if r1 >= rg.r1 then xout = true end
                 local a, b = math.max(r, rg.r0), math.min(r1 + 1, rg.r1)
                 covered = covered + (b - a)
                 -- цвет события: цвет item (аудио — в голове, MIDI — по item), иначе трека
@@ -142,7 +145,7 @@ local function cell_of(col, lanes, rg, rgb_of, model, idx)
       -- сетка строится на весь проект после каждой пересборки, и десятки
       -- Envelope_Evaluate на огибающую в каждой клетке давали пик ~110 мс
       local envsrc = (model and model.env_samples and col.envs and #col.envs > 0) and { col = col, pos = rg.pos, e1 = rg.rgnend } or nil
-      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envsrc = envsrc }
+      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envsrc = envsrc, xin = xin, xout = xout }
 end
 
 function MX.cell_envs(g)
@@ -805,6 +808,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local g = grid[ri][ci]
       local col = snap.cols[ci]
       U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+      -- 21 окт: нота через границу паттерна — янтарный уголок: внизу справа — уходит в следующий, вверху слева — пришла из прошлого
+      if g.xout then U.set(U.AMBER); gfx.triangle(x + L.mx_cell_w - 2, y + rh - 2, x + L.mx_cell_w - 7, y + rh - 2, x + L.mx_cell_w - 2, y + rh - 7) end
+      if g.xin then U.set(U.AMBER); gfx.triangle(x + 1, y + 1, x + 6, y + 1, x + 1, y + 6) end
       -- 19 окт: clipkb в матрице — набранная клетка голубой рамкой, буква клавиши (1qaz… столбец = трек, ряд = видимый слот)
       if MX.pal_kb and not rg.gap then
         local pk = MX.pal_pick and MX.pal_pick[(rg.name or '') .. '@' .. rg.pos .. ':' .. ci]

@@ -289,6 +289,7 @@ KH.PAGES = {
     { k = 'playlist row', t = {}, d = 'over the arrangement: the section names of the song on top, the playlist (song order) under them; a click on a section above - it goes to the end of the playlist; s - keys there: h l pick, Enter adds (3 Enter - three times), x drops the last one, Space plays, Esc back; a click on a playlist word - play from it, > - play all, x - clear' },
     { k = 'f a1', m = 'hints: jump to pattern', d = 'hints: every pattern cube is labelled by its own code - f then a1, bc ... jumps to that pattern in the tracker' },
     { k = 'C', m = 'chain: type the order', d = 'chain: type the pattern order (A1 A1 B1x2 C1:16 D1-8, Tab completes); a click on the chain text - the same' },
+    { k = 'amber corners', t = {}, d = 'a note crosses the pattern edge: bottom right - it runs into the next pattern, top left - it came from the previous one; deleting a pattern trims such audio notes, no tails left' },
     { k = 's', m = 'section menu', d = 'section menu of the cursor slot: new (from selected slots / time selection), duplicate, linked, launch, show, loop, rename, remove' },
     { k = 'S', m = 'song: section row', d = 'song: the section row above the playlist (h l, Enter, 3 Enter, x, Space, Esc; any other key - back to the matrix)' },
     { k = 'buttons', t = {}, d = 'menu view sync trim patternkb timesel follow + live in the empty corner over the slot numbers (follow - the matrix cursor goes with the tracker cursor, on by default) (left of the track names); folded / clips - a row on top' },

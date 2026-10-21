@@ -3641,15 +3641,34 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             if nfin <= math.max(pos, t0) + EPS and pos >= t0 - EPS then R.DeleteTrackMediaItem(tr, it)
             else R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(EPS, nfin - pos)); drop_empty_midi(it) end
           elseif pos < t0 - EPS and fin > t1 + EPS then
-            local right = R.SplitMediaItem(it, t1)
-            local mid = R.SplitMediaItem(it, t0)
-            if mid then R.DeleteTrackMediaItem(tr, mid) end
-            if right then R.SetMediaItemInfo_Value(right, 'D_POSITION', t1 - dt) end
+            -- 21 окт: аудио-нота (одно событие) через удаляемое — до ножа, без хвоста-призрака справа;
+            -- MIDI-клип — режется, как раньше (ноты после ножа нужны)
+            if tk and not R.TakeIsMIDI(tk) then R.SetMediaItemInfo_Value(it, 'D_LENGTH', t0 - pos)
+            else
+              local right = R.SplitMediaItem(it, t1)
+              local mid = R.SplitMediaItem(it, t0)
+              if mid then R.DeleteTrackMediaItem(tr, mid) end
+              if right then R.SetMediaItemInfo_Value(right, 'D_POSITION', t1 - dt) end
+            end
           elseif pos < t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_LENGTH', t0 - pos)
           elseif fin > t1 + EPS then
-            local right = R.SplitMediaItem(it, t1)
-            R.DeleteTrackMediaItem(tr, it)
-            if right then R.SetMediaItemInfo_Value(right, 'D_POSITION', t1 - dt) end
+            -- 21 окт: начинается в удаляемом и уходит дальше: аудио — удаляется целиком (хвост без головы — призрак),
+            -- MIDI — правый кусок остаётся (ноты после ножа), ноты, что начались до ножа, — убираются из него
+            if tk and not R.TakeIsMIDI(tk) then R.DeleteTrackMediaItem(tr, it)
+            else
+              local right = R.SplitMediaItem(it, t1)
+              R.DeleteTrackMediaItem(tr, it)
+              if right then
+                local rtk = R.GetActiveTake(right)
+                if rtk and R.TakeIsMIDI(rtk) then
+                  local p1 = R.MIDI_GetPPQPosFromProjTime(rtk, t1)
+                  local _, nn = R.MIDI_CountEvts(rtk)
+                  for k = nn - 1, 0, -1 do local _, _, _, a0 = R.MIDI_GetNote(rtk, k); if a0 < p1 - 1 then R.MIDI_DeleteNote(rtk, k) end end
+                end
+                R.SetMediaItemInfo_Value(right, 'D_POSITION', t1 - dt)
+                drop_empty_midi(right)
+              end
+            end
           else R.DeleteTrackMediaItem(tr, it) end
         end
       end
