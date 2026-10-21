@@ -794,6 +794,10 @@ KH.PAGES = {
 -- строка подсказок под модулем (опция hints, 2 окт): самое нужное в одну
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
+  -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
+  humanizer = { { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
+  reform = { { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { '0', 'reset' }, { 'Space', 'listen' }, { 'Enter', 'keep' }, { 'Esc', 'revert' }, { 'f', 'jump' } },
+  renderer = { { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'Space', 'toggle' }, { '0', 'defaults' }, { 'Enter', 'bounce' }, { 'Esc', 'back' }, { 'f', 'jump' } },
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' }, { 'F1', 'help' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },

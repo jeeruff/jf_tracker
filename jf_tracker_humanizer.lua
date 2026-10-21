@@ -94,6 +94,7 @@ function HU.set_from_x(s, i, frac)
 end
 
 -- рисование: U — палитра (text / measure / dslider / set / tint), L — сетка (rh, pad, cw); возвращает hover
+HU.TIPS = { amt = 'how strong all of it is: 0 - off, 100 - the full ranges below', time = 'each note earlier / later by up to this', vel = 'velocity up / down by up to this', vol = 'audio notes: item volume up / down', pitch = 'audio notes: pitch in cents', rate = 'audio notes: playrate', pan = 'audio notes: pan', attack = 'audio notes: a fade-in up to this long', len = 'length longer / shorter by up to this' }
 function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
   local hv = {}
   local rh, pad = L.rh, L.pad
@@ -159,6 +160,15 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     U.text(x + w - pad - U.measure(vs), yy, vs, t.off and U.DIM or U.GREY)
     if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end
     yy = yy + rh
+  end
+  -- 21 окт: подсказка строки под мышью (иначе выбранной) — внизу панели
+  do
+    local r = HU.ROWS[hv.row or (focus and HU.sel) or 0]
+    local t = r and HU.TIPS[r.k]
+    if t and yy + 2 * rh + 4 <= y + h then
+      local line = r.label .. ': ' .. t .. ((s.midi and HU.MIDI_NA[r.k]) and ' (not for MIDI notes - a DSP parameter instead: a)' or '')
+      U.text(x + pad, y + h - rh - 2, ctx_fit and ctx_fit(line, w - 2 * pad) or line, U.GREY)
+    end
   end
   if yy + rh <= y + h then
     local ap = 'apply (Enter)'
