@@ -9473,7 +9473,7 @@ ctx = {
     loop = 'loop on / off: playback repeats the time selection (the loop)',
     tp_start = 'to the project start', tp_end = 'to the project end',
     freeze = 'freeze: a short loop around the play position, like a DJ repeater. f + its label - the lengths (1/32 .. 2 bars, digits pick), wheel - shorter / longer; while playing a new length starts when the current loop ends. Click - on / off (back as it was)',
-    slowplay = 'play at /2 - half speed (Ctrl+Cmd+Space); again or Space - stop, x1 back',
+    slowplay = 'play at /2 - half speed (Shift+Ctrl+Space); again or Space - stop, x1 back',
     fastplay = 'play at x2 - double speed; again or Space - stop, x1 back',
     shiftrec = 'shift rec: waits for a MIDI note, then records from the cursor row at the project rate (record slow at x0.5 - it plays back fast); again - cancel',
     stophere = '|>: stop where it plays - the cursor stays there (as Esc while playing)',
@@ -23651,9 +23651,13 @@ local function frame()
   end
   -- 17 окт: Ctrl+Cmd+Space — игра x0.5; Opt+Cmd+Space — listen step вкл / выкл (строка курсора на треке курсора),
   -- Shift+Cmd+Space — listen line (строка, все треки); x2 — кнопкой под play (было Opt+Cmd+Space)
+  -- 21 окт: x0.5 — Shift+Ctrl+Space (Ctrl+Cmd — режим SLIDER, Space с ним не доходил)
+  if (c == 32 or c == 160) and ctx.mods().ctrl and ctx.mods().shift and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    ctx.half_play(0.5); c = 0
+  end
   if (c == 32 or c == 160) and ctx.mods().cmd and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local m = ctx.mods()
-    if m.ctrl and not m.alt and not m.shift then ctx.half_play(0.5); c = 0
+    if false then
     elseif m.alt and not m.ctrl and not m.shift then ctrl_action('ls_step', 0); c = 0
     elseif m.shift and not m.ctrl and not m.alt then ctrl_action('ls_line', 0); c = 0 end
   end
@@ -24331,7 +24335,7 @@ local function frame()
         if c == ('s'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: s (song) — строка секций над плейлистом
           MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
         end
-        if c == 32 and ctx.mods().ctrl and #MX.sketch > 0 then ctx.sketch_play(); return end   -- 21 окт: Ctrl+Space — слушать эскиз
+        if c == 32 and ctx.mods().ctrl and not ctx.mods().shift and #MX.sketch > 0 then ctx.sketch_play(); return end   -- 21 окт: Ctrl+Space — слушать эскиз
         if MX.pal_kb and c == 13 then ctx.sketch_add(); return end   -- 19 окт: набранное — эскизом в sketchpad (render — p там)
         if MX.pal_kb and c == 27 and MX.sk_edit then MX.sk_edit = nil end   -- 21 окт: Esc — правка эскиза отменена
         if MX.pal_kb and ctx.palette_key(c) then return end

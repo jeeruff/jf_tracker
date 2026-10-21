@@ -222,7 +222,7 @@ KH.PAGES = {
     { k = 'Opt+note', d = 'chord typing on a not sliced sound (on a sliced one Option+note = the selected slice at that pitch, Option+Shift - listen): the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },
     { k = 'keys button', d = 'keyboard on / off (also m; quick options keys): on - it has priority, 1 f1 2 f2 3 ... play notes, [ ] octave (qwerty: q 2 w 3 e ..., z x octave), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'Space', d = 'play / stop' },
-    { k = 'C-⌘Space', d = 'play at x0.5 (x2 - the button under play); again or Space - stop, x1 comes back' },
+    { k = 'Shift+Ctrl+Space', m = 'play at /2', d = 'play at x0.5 (x2 - the button under play); again or Space - stop, x1 comes back (Ctrl+Cmd is the SLIDER mode)' },
     { k = '⌥⌘Space ⇧⌘Space', d = 'listen step on / off (the row the cursor lands on plays on the cursor track) / listen line on / off (the row, all tracks)' },
     { k = 'Shift+Ctrl+F', d = 'sample find for this place - into the sampler (the lib of the track + a note), not an audio item as F' },
     { k = 'Shift+Opt+F', d = 'sample find for this place: pick the database first (it is remembered), then as F' },
