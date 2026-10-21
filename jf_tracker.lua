@@ -21195,6 +21195,7 @@ local function frame()
   ctx.click_guard = U.click and state.focusclick ~= 'click' and not ctx.mods().alt or nil
   if U.click and state.kslider then state.kslider = nil end                -- клик — выход из режима слайдера
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
+  if U.click or U.rclick then MX.spl_focus = nil end   -- 21 окт: строка секций — клавиатура отпускается щелчком
   if U.click then
     local now2 = reaper.time_precise()
     local dbl = (now2 - click.t) < 0.4
@@ -26700,7 +26701,9 @@ ctx.spl_kb = function(c)
   if c == 13 and secs[MX.spl_i or 1] then ctx.spl_add(secs[MX.spl_i or 1].name, tonumber(MX.spl_cnt or '1')); MX.spl_cnt = nil; return true end
   if ch == 'x' then ctx.spl_set((ctx.spl_text():gsub('%s*%S+%s*$', ''))); vim.msg = 'playlist: the last one removed'; return true end
   if ch == ' ' then ctx.spl_play(); return true end
-  return true
+  -- 21 окт: прочее (j k, буквы матрицы) — строка секций отпускает клавиатуру, клавиша идёт матрице (держала всё)
+  MX.spl_focus, MX.spl_cnt = nil, nil
+  return false
 end
 ctx.spl_draw = function(Lx, x, y, w)
   -- 19 окт: только имена секций в ряд (цветом секции); щелчок — играть с неё, + — добавить, x — убрать последнюю (Shift — все)
