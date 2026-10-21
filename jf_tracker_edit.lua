@@ -1283,6 +1283,12 @@ function E.note_off(heads, lpb, row)
         local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
         if t > pos + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end
       elseif h.kind == 'midi' then
+        -- 21 окт: OFF за концом MIDI item (item короче паттерна, напр. после ⌫) — item дотягивается (MIDI_SetItemExtents:
+        -- без повтора источника); иначе нота резалась по item, и OFF вставал строкой-двумя выше
+        local ip = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+        if t > ip + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 and R.MIDI_SetItemExtents then
+          R.MIDI_SetItemExtents(h.item, R.TimeMap2_timeToQN(0, ip), R.TimeMap2_timeToQN(0, t))
+        end
         local i, n = midi_note(h, lpb)
         if i then
           local ppq = R.MIDI_GetPPQPosFromProjTime(h.take, t)
