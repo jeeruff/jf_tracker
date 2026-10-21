@@ -100,9 +100,29 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
   end
+  -- 21 окт: число на параметре: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 23 Enter — значение 23
+  -- (в единицах параметра), 023 Enter — 0.23; цифры — когда параметр в фокусе (слайдер) или клавиатура не играет
+  if (ch:match('^%d$') or (ch == '.' and DK.num)) and (DK.pslider or not DK.digits_play) then
+    DK.num = (DK.num or '') .. ch
+    ctx.msg(('%s - h l: step x%s, j k: %s params, Enter: set the value, Esc: cancel'):format(DK.num, DK.num, DK.num)); return true
+  end
+  local num = DK.num; DK.num = nil
+  if num and c == 27 then ctx.msg('number cancelled'); return true end
+  local cnt = num and tonumber(num) or nil
+  if num and c == 13 then
+    local v = (num:match('^0%d') and not num:find('.', 1, true)) and tonumber('0.' .. num:sub(2)) or tonumber(num)
+    if v and ctx.dsp_type_value then ctx.dsp_type_value(sel.fx, sel.param, v) end
+    return true
+  end
+  if cnt and (ch == 'j' or c == DOWN or ch == 'k' or c == UP) then
+    sel.param = math.max(1, math.min(math.max(1, np), sel.param + ((ch == 'j' or c == DOWN) and cnt or -cnt))); return true
+  end
   -- 8 окт: режим слайдера параметра (f на параметр / щелчок): h l — значение
   -- (H L крупно), j k — соседний параметр, Esc — обратно к эффектам
   if DK.pslider then
+    if cnt and (ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT) then
+      ctx.dsp_value(sel.fx, sel.param, ((ch == 'h' or ch == 'H' or c == LEFT) and -1 or 1) * cnt, ch == 'H' or ch == 'L'); return true
+    end
     if c == 27 then
       DK.pslider = nil
       if DK.pads_back then DK.pads_back = nil; DK.pads = true; ctx.msg('pads again: h l j k move'); return true end   -- 19 окт: из параметра пэда — к пэдам
@@ -119,8 +139,8 @@ function DK.key(c, sel, n, np, mods)
   if ch == 'd' or ch == 'y' or ch == 'c' or ch == 'a' then
     DK.pending = ch; ctx.msg(ch .. '...'); return true
   end
-  if ch == 'h' or c == LEFT then sel.fx = math.max(1, sel.fx - 1); sel.param = 1
-  elseif ch == 'l' or c == RIGHT then sel.fx = math.min(math.max(1, n), sel.fx + 1); sel.param = 1
+  if ch == 'h' or c == LEFT then sel.fx = math.max(1, sel.fx - (cnt or 1)); sel.param = 1
+  elseif ch == 'l' or c == RIGHT then sel.fx = math.min(math.max(1, n), sel.fx + (cnt or 1)); sel.param = 1
   elseif ch == 'j' or c == DOWN then sel.param = math.min(math.max(1, np), sel.param + 1)
   elseif ch == 'k' or c == UP then sel.param = math.max(1, sel.param - 1)
   elseif ch == 'g' then sel.param = 1

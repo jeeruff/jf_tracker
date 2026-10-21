@@ -1794,6 +1794,40 @@ ctx = {
     else ctx.fx_write(col.track, f, p, v + d * (coarse and 0.1 or 0.02)) end
     model.invalidate()
   end,
+  -- 21 окт: набрать значение параметра числом (в его единицах: 23 → «23» Гц / дБ / % по показу плагина): бисекция по
+  -- нормализованному; показ не число — 0..1 как есть, больше — проценты
+  dsp_type_value = function(k, pi, v)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then return end
+    local A = model.fxapi(col.track)
+    local id = p.fx or f.i
+    local function disp(x)
+      local old = A.GetParamNormalized(col.track, id, p.i)
+      A.SetParamNormalized(col.track, id, p.i, x)
+      local _, s2 = A.GetFormattedParamValue(col.track, id, p.i, '')
+      A.SetParamNormalized(col.track, id, p.i, old)
+      return tonumber((s2 or ''):match('[-+]?%d+%.?%d*')), s2
+    end
+    local old = A.GetParamNormalized(col.track, id, p.i)
+    local d0, d1 = disp(0), disp(1)
+    local x
+    if d0 and d1 and d0 ~= d1 then
+      local lo, hi = 0, 1
+      local up = d1 > d0
+      for _ = 1, 30 do
+        local mid = (lo + hi) / 2
+        local dm = disp(mid) or d0
+        if (dm < v) == up then lo = mid else hi = mid end
+      end
+      x = (lo + hi) / 2
+    else x = v <= 1 and v or v / 100 end
+    edit.run('fx value ' .. (p.name or ''), function() ctx.fx_write(col.track, f, p, x) end)
+    model.invalidate()
+    local _, shown = A.GetFormattedParamValue(col.track, id, p.i, '')
+    vim.msg = ('%s = %s (u - undo)'):format(p.name or 'param', shown or tostring(v))
+    local _ = old
+  end,
   dsp_enter = function(k, pi)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
@@ -24568,7 +24602,10 @@ local function frame()
           return
         end
         -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
-        if not DK.pending and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
+        -- 21 окт: цифры — числу параметра, когда параметр в фокусе (слайдер) или набор числа уже идёт; иначе — нотам клавиатуры
+        DK.digits_play = vim.piano or vim.mode == 'insert'
+        local numkey = (DK.pslider or DK.num) and ch:match('^[%d%.]$')
+        if not DK.pending and not numkey and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()
           if root and MX.DB.key(c, root, o) then return end
