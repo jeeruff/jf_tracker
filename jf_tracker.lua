@@ -3173,7 +3173,9 @@ ctx = {
     local limit = rg and rg.rgnend or reaper.GetProjectLength(0) + 60
     -- 19 окт: опция BS mode: pattern (по умолчанию, как Renoise) — в регионе, клип до конца паттерна держит длину;
     -- track — по всей дорожке до =LIB (клипы следующих регионов подтягиваются)
-    local trackwide = state.bsmode == 'track'
+    -- 21 окт: что вижу, то и получаю — вид project (zp) — по всей дорожке, ноты переходят границы паттернов; вид pattern — в паттерне,
+    -- вытолкнутое за его конец удаляется (как Renoise). Опция BS mode = track — по всей дорожке всегда
+    local trackwide = state.bsmode == 'track' or not state.view_reg
     -- 19 окт: граница — =END (маркера =LIB с 8 окт нет: по дорожке сдвигалась бы и библиотека паттернов за =END)
     if trackwide then rg = nil; limit = model.marker_pos(model.END_MARKER) or (reaper.GetProjectLength(0) + 60) end
     if t1 > limit then t1 = limit end
@@ -11746,7 +11748,7 @@ ctx = {
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
       { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - an o in a narrow column at the side of the cell (O - several) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
-      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows): pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =END (the pattern library after =END stays), the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
+      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows); 21 Oct: the view decides - project view (zp) moves notes across patterns up to =END, pattern view keeps it in the pattern (pushed out - deleted); track - across patterns always. pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =END (the pattern library after =END stays), the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
       flag('hdrmeter', 'header meter', 'a thin meter under v in the track header (armed audio - the input level; MIDI on the track input - a yellow flash); the yellow MIDI bar on the track itself stays'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
       { key = 'armsel', label = 'rec follows selection', kind = 'toggle', desc = 'record arm follows the selected tracks: REAPER auto record-arm (track menu: Automatic record-arm when track selected) on every track, new ones too; off - removed from all tracks', get = function() return state.armsel end, set = function(v) state.armsel = v; ctx.armsel_apply(v) end },
@@ -25663,6 +25665,7 @@ ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)
 -- каждое изменение — откат прошлого шага (undo) и применение заново от снимка одним undo; Enter — оставить, Esc — вернуть
 ctx.RF = dofile(DIR .. '/jf_tracker_reform.lua')
 ctx.RF.hint = function(...) return ctx.hint(...) end   -- 21 окт: метки f в панели
+ctx.RF.fit = function(t, w) return ctx.fit(t, w) end   -- 21 окт: подсказка строки reform
 ctx.rf_p = ctx.RF.defaults()
 ctx.rf_open = function(auto)
   -- 19 окт: панель без gr — последнее выделение трекера (запоминается каждый кадр VISUAL)
