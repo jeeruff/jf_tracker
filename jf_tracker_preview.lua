@@ -16,9 +16,11 @@ local stop_at, restore_cur    -- MIDI-превью через транспорт
 local restore_ts
 local function restore_all()
   if restore_cur then R.SetEditCurPos(restore_cur, false, false); restore_cur = nil end
-  if restore_ts then
-    R.GetSet_LoopTimeRange(true, false, restore_ts[1], restore_ts[2], false)
-    R.GetSet_LoopTimeRange(true, true, restore_ts[3], restore_ts[4], false)
+  if restore_ts then   -- вернуть, только если за превью никто не поставил своё (V двигает выделение и во время него)
+    local c0, c1 = R.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    if c1 - c0 < 1e-9 then R.GetSet_LoopTimeRange(true, false, restore_ts[1], restore_ts[2], false) end
+    local d0, d1 = R.GetSet_LoopTimeRange(false, true, 0, 0, false)
+    if d1 - d0 < 1e-9 then R.GetSet_LoopTimeRange(true, true, restore_ts[3], restore_ts[4], false) end
     restore_ts = nil
   end
 end
