@@ -7,6 +7,7 @@
 -- Без reaper.* — тест tests/test_humanizer.lua; хранение и применение — main (HU.encode / decode, ctx.hum_apply).
 
 local HU = {}
+local NK = dofile((debug.getinfo(1, 'S').source:match('^@(.*[/\\])') or './') .. 'jf_tracker_numkeys.lua')   -- 21 окт: число перед клавишей
 
 HU.ROWS = {
   { k = 'amt', key = 'm',    label = 'amount',     min = 0, max = 100, step = 5,   fmt = '%d %%',     def = 0, noon = true },
@@ -66,6 +67,17 @@ function HU.nrows(s) return #HU.ROWS + #(s.dsp or {}) end
 function HU.key(s, c, shift)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local di = HU.sel - #HU.ROWS
+  local nk = NK.key(HU, s, c)   -- 21 окт: N h l / N j k / N Enter
+  if nk == 'eaten' then return true elseif nk == 'changed' then return 'changed'
+  elseif nk and nk.op == 'set' then
+    if di >= 1 and s.dsp[di] then s.dsp[di].range = math.max(0, math.min(50, nk.v))
+    else local r = HU.ROWS[HU.sel]; s.v[r.k] = round(r, clamp(r, nk.v)) end
+    return 'changed'
+  elseif nk then
+    local res = true
+    for _ = 1, nk.n do res = HU.key(s, c, shift) end
+    return res
+  end
   for i, rr in ipairs(HU.ROWS) do if rr.key and ch == rr.key then HU.sel = i; return true end end   -- 21 окт: буква — на строку
   if ch == 'a' then return 'add' end
   if di >= 1 and s.dsp[di] then
@@ -149,7 +161,8 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     local hot = mx >= sx - 2 and mx < sx + sw + 2 and my >= yy and my < yy + rh
     U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / math.max(1e-9, r.max - r.min), false, (hot or cur) and U.AMBER or (on and U.TEXT or U.DIM), hot, rh)
     local vs = r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v)   -- 21 окт: мелкий шаг (10.2) с %d ронял кадр
-    U.text(x + w - pad - U.measure(vs), yy, vs, on and U.GREY or U.DIM)
+    local nb = focus and i == HU.sel and NK.show(HU)
+    U.text(x + w - pad - U.measure(nb or vs), yy, nb or vs, nb and U.AMBER or (on and U.GREY or U.DIM))
     if hot then hv.slider = { i = i, x0 = sx, w = sw } end
     if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end
     yy = yy + rh
@@ -170,7 +183,8 @@ function HU.draw(U, L, s, x, y, w, h, focus, mx, my, ctx_fit)
     local vs = ('±%.1f %%'):format(t.range or 5)
     local nx = bx + bw + pad
     U.text(nx, yy, ctx_fit and ctx_fit(t.name or '?', x + w - pad - U.measure(vs) - pad - nx) or (t.name or '?'), cur and U.AMBER or (t.off and U.GREY or U.TEXT))
-    U.text(x + w - pad - U.measure(vs), yy, vs, t.off and U.DIM or U.GREY)
+    local nb = cur and NK.show(HU)
+    U.text(x + w - pad - U.measure(nb or vs), yy, nb or vs, nb and U.AMBER or (t.off and U.DIM or U.GREY))
     if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end
     yy = yy + rh
   end

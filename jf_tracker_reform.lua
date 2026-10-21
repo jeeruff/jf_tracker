@@ -9,6 +9,7 @@
 -- Enter — оставить, Esc — вернуть как было. Без reaper.* — тест tests/test_reform.lua; применение — main.
 
 local RF = { sel = 1 }
+local NK = dofile((debug.getinfo(1, 'S').source:match('^@(.*[/\\])') or './') .. 'jf_tracker_numkeys.lua')   -- 21 окт: число перед клавишей
 
 RF.ROWS = {
   { k = 'scale', key = 's', tip = 'stretch / squeeze the times of the notes from the anchor (x1 - as they are)',  label = 'scale',      min = 0.25, max = 4,  step = 0.05, fmt = 'x%.2f', def = 1 },
@@ -90,6 +91,17 @@ local function clamp(r, v) return math.max(r.min, math.min(r.max, v)) end
 function RF.key(p, c, shift)
   local ch = c > 0 and c < 256 and string.char(c) or ''
   local r = RF.ROWS[RF.sel]
+  local nk = NK.key(RF, p, c)   -- 21 окт: N h l / N j k / N Enter
+  if nk == 'eaten' then return true elseif nk == 'changed' then return 'changed'
+  elseif nk and nk.op == 'set' then
+    if r.toggle then p[r.k] = nk.v ~= 0 else p[r.k] = clamp(r, nk.v) end
+    if r.k == 'lo' or r.k == 'hi' or r.k == 'vcurve' then p.vals = true end
+    return 'changed'
+  elseif nk then
+    local res = true
+    for _ = 1, nk.n do res = RF.key(p, c, shift) end
+    return res
+  end
   for i, rr in ipairs(RF.ROWS) do if rr.key and ch == rr.key then RF.sel = i; return true end end   -- 21 окт: буква — на строку
   if ch == 'j' or c == 1685026670 then RF.sel = math.min(#RF.ROWS, RF.sel + 1); return true end
   if ch == 'k' or c == 30064 then RF.sel = math.max(1, RF.sel - 1); return true end
@@ -155,7 +167,8 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       local dim = (r.k == 'lo' or r.k == 'hi' or r.k == 'vcurve') and not p.vals
       U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), r.min < 0, (hot or cur) and U.AMBER or (dim and U.DIM or U.TEXT), hot, rh)
       local vs = r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v)   -- 21 окт: дробное с %d — не ронять кадр
-      U.text(x + w - pad - U.measure(vs), yy, vs, dim and U.DIM or U.GREY)
+      local nb = cur and NK.show(RF)
+      U.text(x + w - pad - U.measure(nb or vs), yy, nb or vs, nb and U.AMBER or (dim and U.DIM or U.GREY))
       if hot then hv.slider = { i = i, x0 = sx, w = sw } end
     end
     if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end

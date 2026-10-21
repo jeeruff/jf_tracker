@@ -10,6 +10,7 @@
 -- 0 — умолчания. Без reaper.* — тест tests/test_renderer.lua; рендер — main (ctx.rd_render).
 
 local RD = { sel = 1 }
+local NK = dofile((debug.getinfo(1, 'S').source:match('^@(.*[/\\])') or './') .. 'jf_tracker_numkeys.lua')   -- 21 окт: число перед клавишей
 
 local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
 local function nname(n) n = math.floor(n + 0.5); return NN[n % 12 + 1] .. (n // 12 - 1) end
@@ -104,6 +105,17 @@ function RD.key(p, c, shift)
   if not RD.row_on(p, RD.ROWS[RD.sel]) then RD.sel = 1 end
   for i, rr in ipairs(RD.ROWS) do if rr.key and ch == rr.key and RD.row_on(p, rr) then RD.sel = i; return true end end   -- 21 окт: буква — на строку
   local r = RD.ROWS[RD.sel]
+  local nk = NK.key(RD, p, c)   -- 21 окт: N h l / N j k / N Enter
+  if nk == 'eaten' then return true elseif nk == 'changed' then return 'changed'
+  elseif nk and nk.op == 'set' then
+    if r.toggle then p[r.k] = nk.v ~= 0
+    else local v = clamp(r, nk.v); if r.step >= 1 then v = math.floor(v + 0.5) end; p[r.k] = v end
+    return 'changed'
+  elseif nk then
+    local res = true
+    for _ = 1, nk.n do res = RD.key(p, c, shift) end
+    return res
+  end
   if ch == 'j' or c == 1685026670 then move(1); return true end
   if ch == 'k' or c == 30064 then move(-1); return true end
   if ch == 'g' then RD.sel = 1; return true end
@@ -169,7 +181,8 @@ function RD.draw(U, L, p, info, x, y, w, h, focus, mx, my)
         local v = p[r.k] or r.def
         U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), false, (hot or cur) and U.AMBER or U.TEXT, hot, rh)
         local vs = r.note and nname(v) or (r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v))   -- 21 окт: дробное с %d
-        U.text(x + w - pad - U.measure(vs), yy, vs, U.GREY)
+        local nb = cur and NK.show(RD)
+        U.text(x + w - pad - U.measure(nb or vs), yy, nb or vs, nb and U.AMBER or U.GREY)
         if hot then hv.slider = { i = i, x0 = sx, w = sw } end
       end
       if mx >= x and mx < x + w and my >= yy and my < yy + rh then hv.row = i end
