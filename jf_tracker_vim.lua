@@ -3845,7 +3845,7 @@ function V.smart()
     local pool0 = f.col.pool or {}
     local base = #pool0 + (ctx.empty_slots and ctx.empty_slots(#pool0) or 0) + (ctx.inst_off and ctx.inst_off(f.col) or 0)   -- 21 окт: сквозные номера
     for k, fi2 in ipairs(ctx.track_insts and ctx.track_insts(f.col) or {}) do
-      items[#items + 1] = { label = ('%02d %s'):format(base + k, fi2.name or 'instrument'), v = base + k, tip = (fi2.name or '') .. '  (plugin - the note becomes MIDI)' }
+      items[#items + 1] = { label = ('%02d %s'):format(ctx.inst_disp and ctx.inst_disp(f.col, base + k) or (base + k), fi2.name or 'instrument'), v = base + k, tip = (fi2.name or '') .. '  (plugin - the note becomes MIDI)' }
     end
     if #items == 0 then V.msg = 'smart: no instruments on this track (lib)'; return false end
     -- выбран инструмент ноты под курсором (слайс — его исходник), иначе текущий

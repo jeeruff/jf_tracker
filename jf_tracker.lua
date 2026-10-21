@@ -1972,8 +1972,9 @@ ctx = {
     end
     local E = draw.empty_slots(#pool)
     if d <= nr + E then return #pool + (d - nr) end
-    local base = #pool + E
-    if d > base and d - base <= ctx.inst_total() then return d end   -- 21 окт: сквозные номера инструментов
+    -- 21 окт: инструменты — сразу за видимыми сэмплами и пустыми слотами (без дыры на скрытые слайсы пула)
+    local g = d - nr - E
+    if g >= 1 and g <= ctx.inst_total() then return #pool + E + g end
     return nil
   end,
   empty_slots = function(n) return draw.empty_slots(n) end,
@@ -1985,7 +1986,7 @@ ctx = {
     local nr = 0
     for _, e2 in ipairs(pool) do if not e2.parent then nr = nr + 1 end end
     if i <= #pool + draw.empty_slots(#pool) then return nr + (i - #pool) end
-    return i
+    return nr + (i - #pool)   -- 21 окт: инструменты / automation / midi — подряд за слотами (пустые слоты — в i - #pool)
   end,
   -- поле inst (5 окт; 11 окт — и MIDI): номер из lib. Сэмпл — нота становится аудио
   -- (MIDI-нота тоже); плагин — нота становится MIDI, у RS5K / кита высота — в его диапазон
@@ -6564,7 +6565,7 @@ ctx = {
     if keys then
       for k, f in ipairs(col.fx or {}) do if f.i == fx then dsp_sel.fx = k; dsp_sel.param = 1; break end end
       local _, nm = reaper.TrackFX_GetFXName(col.track, fx, '')
-      vim.msg = ('inst %d: %s (plugin - note keys write MIDI)'):format(vim.inst or 0, (nm or ''):gsub('^[^:]*: ', ''))
+      vim.msg = ('inst %02d: %s (plugin - note keys write MIDI)'):format(ctx.inst_disp(col, vim.inst or 0), (nm or ''):gsub('^[^:]*: ', ''))
       return
     end
     -- DSP — на этот эффект
@@ -15284,7 +15285,7 @@ MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка 
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
-draw.midi_inst = function(it, p) return ctx.midi_inst_num(it, p) end   -- 11 окт: номер инструмента у MIDI-нот
+draw.midi_inst = function(it, p) local n = ctx.midi_inst_num(it, p); return n and snap and snap.cols[1] and ctx.inst_disp(snap.cols[1], n) or n end   -- 21 окт: показ — подряд за сэмплами   -- 11 окт: номер инструмента у MIDI-нот
 draw.midi_slice = function(it, p) return ctx.midi_kit_slice(it, p) end   -- 19 окт: пэд drumrs5k — Sxx у MIDI-ноты
 
 -- ── прыжок по подсказке (f + метка) ───────────────────────────────────────
@@ -23283,7 +23284,10 @@ local function frame()
   -- (0 как у треков, 1 все компактно, 2 все полоской)
   -- зум трекера (5 окт): те же модификаторы, что у матрицы (ctx.zoom_axes) —
   -- вертикаль = LPB, горизонталь = ширина треков; трекпад копится до щелчка
-  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and not hover.dsp and not hover.browser and not hover.fxb and not OPT.active then
+  -- 21 окт: колесо листает модуль под мышью, а не весь трекер: зум / прокрутка трекера — только над ним
+  local wo = (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and ctx.wheel_owner() or nil
+  local w_trk = wo == nil or wo == 'tracker'
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and w_trk and not hover.dsp and not hover.browser and not hover.fxb and not OPT.active then
     local zv, zh = ctx.zoom_axes(gfx.mouse_wheel, gfx.mouse_hwheel or 0)
     if zv and gfx.mouse_cap & 8 == 8 then zh, zv = (zh ~= 0 and zh or zv), 0 end   -- 8 окт: Shift — колесо по ширине (выделенных треков)
     if zv then
@@ -23299,7 +23303,7 @@ local function frame()
   if (gfx.mouse_hwheel or 0) ~= 0 then
     local d = gfx.mouse_hwheel > 0 and 1 or -1
     if false then
-    elseif not hover.dsp and not hover.browser and not hover.fxb then
+    elseif w_trk and not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
       state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll
     end
@@ -23317,6 +23321,8 @@ local function frame()
     elseif type(hover.browser) == 'number' and B.mode == 'pm' and B.grid and not B.pmproj and state.pmgrid then B.pm_scroll.v = math.max(0, B.pm_scroll.v + (step > 0 and 1 or -1)); B.pm_scroll.wheel = true
     elseif type(hover.browser) == 'number' and B.wscroll then B.scroll = math.max(0, B.scroll + (step > 0 and 3 or -3))   -- 11 окт: кнопка scroll — листает, курсор стоит
     elseif type(hover.browser) == 'number' then B.cur = math.max(1, math.min(#B.entries, B.cur + (step > 0 and 1 or -1)))
+    elseif wo == 'help' or wo == 'khelp' then KH.scroll = math.max(0, (KH.scroll or 0) + (step > 0 and 3 or -3))   -- 21 окт: панель help — своя прокрутка
+    elseif not w_trk then   -- 21 окт: другой модуль под мышью — трекер не листается
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
     else
@@ -24951,6 +24957,20 @@ ctx.goto_track = function(col)
     if f.col and f.col.guid == col.guid and not f.env then vim.cur.fi = i; vim.cur.field = 1; vim.cur.sub = nil; if vim.ensure_visible then vim.ensure_visible() end; return true end
   end
   return false
+end
+-- 21 окт: модуль под мышью для колеса — по прямоугольникам модулей (панели: листы); несколько — самый маленький
+ctx.wheel_owner = function()
+  local R = draw.module_rects
+  if not R then return nil end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local best, ba
+  for k, r in pairs(R) do
+    if type(r) == 'table' and r[3] and mx >= r[1] and mx < r[1] + r[3] and my >= r[2] and my < r[2] + r[4] then
+      local a = r[3] * r[4]
+      if not ba or a < ba then best, ba = k, a end
+    end
+  end
+  return best
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}

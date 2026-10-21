@@ -4937,7 +4937,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 10 окт: инструменты — все проектные: свои (трека курсора) с номерами, чужие — с именем трека,
   -- щелчок переводит курсор на тот трек; automation и midi — своими секциями, как instruments
   -- 20 окт: порядок — по трекам проекта, постоянный (свои больше не поднимаются наверх: список дёргался при смене трека)
-  -- 21 окт: номера — сквозные по трекам проекта (и у чужих: номер ведёт курсор на их трек), как в REAPER
+  -- 21 окт: номера — сквозные по трекам проекта (и у чужих: номер ведёт курсор на их трек), как в REAPER;
+  -- показ — подряд за видимыми сэмплами и пустыми слотами (скрытые слайсы пула номеров не занимают)
+  do local nr = 0; for _, e in ipairs(pool) do if not e.parent then nr = nr + 1 end end; nsamp = nr + D.empty_slots(#pool) end
   local inst_rows, own_done = {}, false
   local gn = 0
   local function add_own() for k, fi in ipairs(tins) do inst_rows[#inst_rows + 1] = { instfx = fi.fx, name = fi.name, kind = fi.kind, num = nsamp + gn + k } end; gn = gn + #tins; own_done = true end
