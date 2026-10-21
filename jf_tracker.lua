@@ -23902,6 +23902,11 @@ local function frame()
     -- (короткое удержание давало вторую ноту: один повтор проходил как нажатие)
     local st = ctx.hold_len and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(nk.t - 0.5)
     local still = st and st:byte(vk) ~= 0
+    -- 21 окт: повтор из очереди, обработанный уже после отпускания (окно отпусканий его видит) — по темпу: та же клавиша
+    -- меньше чем через 0.12 с после прошлого её события (повторы macOS идут через 30 мс; руками так не переударить)
+    local la = ctx.nk_any
+    if la and la.c == c and now - la.t < 0.12 then still = true end
+    ctx.nk_any = { c = c, t = now }
     if still or (up and up:byte(vk) == 0 and now - nk.t < 3) then
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
