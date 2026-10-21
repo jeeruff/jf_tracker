@@ -207,7 +207,8 @@ local state = {
   notesus = flag('notesus', false),
   chordlane = flag('chordlane', false),
   keymark = flag('keymark', true),     -- 21 окт: ноты вне лада (:key) — красноватые
-  keysnap = flag('keysnap', false),    -- 21 окт: набор в ладу — клавиша вне лада к ближайшей ступени   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
+  keysnap = flag('keysnap', false),
+  chordlead = flag('chordlead', true), -- 21 окт: аккорд пишется с голосоведением от прошлого аккорда трека (:chord lead)    -- 21 окт: набор в ладу — клавиша вне лада к ближайшей ступени   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -10531,9 +10532,16 @@ ctx = {
       vim.msg = col.name .. (on and ': notes again' or ': one chord lane - names from the notes; :chord Cm7 writes a chord at the cursor')
       return
     end
+    if arg == 'lead' then state.chordlead = not state.chordlead; reaper.SetExtState(EXT, 'chordlead', state.chordlead and '1' or '0', true)
+      vim.msg = 'chords: ' .. (state.chordlead and 'voice leading from the previous chord of the track (the nearest inversion)' or 'root position stacks'); return end
     local pitches = MMX.CH.voicing(arg, math.max(1, math.min(7, (vim.octave or 4))))
     if not pitches then vim.msg = 'chord: what is ' .. arg .. '? (C Cm C7 Cmaj7 Cm7 Cdim Caug Csus4 C6 C9 ... /bass)'; return end
     local row = vim.cur.row
+    -- 21 окт: голосоведение — обращение ближе всего к прошлому аккорду трека (до 4 тактов выше)
+    if state.chordlead then
+      local prev = ctx.chord_prev(col, row)
+      if prev then pitches = MMX.TH.voice_lead(arg, prev, (math.max(1, math.min(7, vim.octave or 4)) + 1) * 12) or pitches end
+    end
     local heads = ctx.chord_heads(col, row)
     local rows
     for _, h in ipairs(heads) do rows = math.max(rows or 0, h.rows or 1) end
@@ -10547,7 +10555,7 @@ ctx = {
     local mts_new
     edit.run('chord ' .. arg, function()
       if #heads > 0 then edit.delete(heads, state.lpb) end
-      for _, p in ipairs(pitches) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, rows) end
+      for _, p in ipairs(pitches) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, rows, 'midi') end   -- 21 окт: аккорд — MIDI и там, где клипа нет
       if jm and next(jm) then edit.micro_set_at(col.track, row, state.lpb, jm); mts_new = edit.mts_master(col.track) end
     end)
     model.invalidate()
@@ -16417,6 +16425,65 @@ ctx.key_tick = function(force)
   local set = {}
   for _, pc in ipairs(MMX.TH.pcs(r, id)) do set[pc] = true end
   draw.key_pcs = set
+end
+-- 21 окт: прошлый аккорд трека (2+ нот в строке) до 4 тактов выше row → высоты или nil
+ctx.chord_prev = function(col, row)
+  for r = row - 1, math.max(0, row - 16 * state.lpb), -1 do
+    local _, ps = ctx.chord_heads(col, r)
+    if #ps >= 2 then return ps end
+  end
+  return nil
+end
+-- 21 окт: :prog I V vi IV | Am 2 | F 2 | G7 — прогрессия от такта курсора (длины в тактах) → маркеры ch: мастера;
+-- :prog notes … — и ноты на трек курсора, с голосоведением
+ctx.prog_cmd = function(arg)
+  arg = (arg or ''):match('^%s*(.-)%s*$')
+  local notes = false
+  if arg:match('^notes%s') then notes = true; arg = arg:gsub('^notes%s+', '') end
+  if arg == '' then vim.msg = ':prog I V vi IV | :prog Am 2 | F 2 | G7 1 (bars) | :prog notes ... - and the notes on the cursor track'; return end
+  local r, id = ctx.key_now()
+  local steps, total = MMX.TH.parse_prog(arg, r, id)
+  if not steps then vim.msg = 'prog: ' .. tostring(total) .. ((not r and arg:match('^[ivIV]')) and ' (roman numerals need a key - :key)' or ''); return end
+  local col = notes and cur_col() or nil
+  if notes and not (col and col.track) then vim.msg = 'prog notes: no track under the cursor'; return end
+  local t_cur = edit.row_time(vim.cur.row, state.lpb, 0)
+  local _, m0 = reaper.TimeMap2_timeToBeats(0, t_cur)
+  local function bar_time(at)   -- такт m0 + at (дробный) → время
+    local m = m0 + math.floor(at)
+    local _, qs, qe = reaper.TimeMap_GetMeasureInfo(0, m)
+    return reaper.TimeMap2_QNToTime(0, qs + (at - math.floor(at)) * (qe - qs))
+  end
+  local ta, tb = bar_time(0), bar_time(total)
+  local oct = (math.max(1, math.min(7, vim.octave or 4)) + 1) * 12
+  edit.run('prog ' .. arg, function()
+    local i, kill = 0, {}
+    while true do
+      local ret, isrgn, pos, _, nm, idx = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and pos >= ta - 1e-6 and pos < tb - 1e-6 and (nm or ''):match('^ch:') then kill[#kill + 1] = idx end
+      i = i + 1
+    end
+    for k = #kill, 1, -1 do reaper.DeleteProjectMarker(0, kill[k], false) end
+    local prev = col and ctx.chord_prev(col, math.floor(model.row_of_time(ta, state.lpb) + 0.5))
+    for _, st in ipairs(steps) do
+      local t0 = bar_time(st.at)
+      reaper.AddProjectMarker2(0, false, t0, 0, 'ch:' .. st.sym, -1, 0)
+      if col then
+        local row = math.floor(model.row_of_time(t0, state.lpb) + 0.5)
+        local row1 = math.floor(model.row_of_time(bar_time(st.at + st.dur), state.lpb) + 0.5)
+        local heads = ctx.chord_heads(col, row)
+        if #heads > 0 then edit.delete(heads, state.lpb) end
+        local ps = (state.chordlead and prev and MMX.TH.voice_lead(st.sym, prev, oct)) or MMX.CH.voicing(st.sym, math.max(1, math.min(7, vim.octave or 4)))
+        for _, p in ipairs(ps or {}) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, math.max(1, row1 - row), 'midi') end   -- 'midi': и где клипа нет
+        prev = ps
+      end
+    end
+  end)
+  model.invalidate(); ctx.chord_pub.cc = -1
+  if not state.chordlane then state.chordlane = true; relayout() end
+  local names = {}
+  for _, st in ipairs(steps) do names[#names + 1] = st.sym .. (st.dur ~= 1 and (' ' .. st.dur) or '') end
+  vim.msg = ('prog: %s - %g bar(s) into the chord lane%s'):format(table.concat(names, ' | '), total, col and (' and notes on ' .. col.name) or '')
 end
 ctx.key_set = function(root, id)
   reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
