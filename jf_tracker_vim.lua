@@ -2427,6 +2427,7 @@ function V.key_impl(c)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.delete({ cell }, lpb()) end
       end
       if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end
+      if ctx.auto_pattern then ctx.auto_pattern(V.cur.row) end   -- 21 окт: свободный такт — сначала паттерн
       E.thru_once = thru
       local okI, it = pcall(E.insert_slice, f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
       E.cap_row, E.thru_once = nil, nil
@@ -2507,6 +2508,7 @@ function V.key_impl(c)
         end
         local stp = V.step_auto and 1 or V.step
         if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end
+        local newpat = ctx.auto_pattern and ctx.auto_pattern(V.cur.row)   -- 21 окт: свободный такт — сначала паттерн
         local sr = V.sustain_row(f.sub, V.cur.row)
         E.sus_t = sr and ctx.row_time and ctx.row_time(sr) or nil
         local okN, errN = pcall(E.insert_note,f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
@@ -2514,6 +2516,7 @@ function V.key_impl(c)
         if not okN then E.beside = false; error(errN, 0) end
         E.beside = false
         if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
+        if newpat and ctx.auto_pat_msg then V.msg = ctx.auto_pat_msg end
         V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
       end
     end

@@ -24702,6 +24702,7 @@ ctx.retro_insert = function()
   local tr = f and f.col and f.col.track
   if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'R: a track under the cursor'; return end
   if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') ~= 1 then vim.msg = 'R: the track is not armed - arm it (ta), play, then R puts what you played here'; return end
+  ctx.auto_pattern(vim.cur.row)   -- 21 окт: свободный такт — паттерн под сыгранное
   local before = {}
   for i = 0, reaper.CountTrackMediaItems(tr) - 1 do before[reaper.GetTrackMediaItem(tr, i)] = true end
   local sel = {}
@@ -24848,6 +24849,22 @@ ctx.pedal_tick = function()
   if not ctx.ped_key then return end
   local st = reaper.JS_VKeys_GetState(-1)
   if st and st:byte(keys.vk_of(96) or 0xC0) == 0 then ctx.ped_key = nil; ctx.wheel_send('pedal', false); vim.msg = 'pedal up' end
+end
+-- 21 окт: нота в свободном такте (нет паттерна, внутри песни =START..=END) — сначала свободный паттерн на этот такт
+-- (следующая буква с 1, как у длины такта в матрице), потом нота — она в нём
+ctx.auto_pattern = function(row)
+  local t = edit.row_time(row, state.lpb, 0)
+  if alias.region_at(regions, t) then return false end
+  for _, rg in ipairs(seq or {}) do
+    if rg.gap and t >= rg.pos - 1e-9 and t < rg.rgnend - 1e-9 then
+      local code = model.SEC.next_family(regions)
+      edit.run('new pattern ' .. code, function() reaper.AddProjectMarker2(0, true, rg.pos, rg.rgnend, code, -1, 0) end)
+      ctx.mx_refresh()
+      ctx.auto_pat_msg = 'new pattern ' .. code .. ' for this bar (u - undo)'
+      return true
+    end
+  end
+  return false
 end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
