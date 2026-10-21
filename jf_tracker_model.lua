@@ -489,6 +489,16 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
           end)(),
         }
         if head.micro then M.seen_micro = true end
+        -- 21 окт: команды строк внутри MIDI-ноты (токен @ смещения внутри неё) — rowfx, как у аудио
+        if k == 0 and #midi_cmds > 0 then
+          local o0, o1 = nt.qn - qn0, nt.qn_end - qn0
+          for _, c in ipairs(midi_cmds) do
+            if not c.first and c.off > o0 + 0.5 / math.max(1, lpb) and c.off < o1 - 1e-6 then
+              local r = math.floor((c.off - o0) * lpb + 0.5)
+              if r > 0 then head.rowfx = head.rowfx or {}; head.rowfx[r] = head.rowfx[r] or {}; table.insert(head.rowfx[r], c.t) end
+            end
+          end
+        end
         local tail = { kind = 'off', of = head, delay = d1 }
         -- note-off ровно на границе строки — OFF стоит в этой строке с delay 0;
         -- если конец в той же строке, что и начало, OFF не помещается: нота

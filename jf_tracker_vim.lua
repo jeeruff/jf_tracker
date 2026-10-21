@@ -307,8 +307,8 @@ function V.fx_cell(fi, row)
     if c and (c.kind == 'audio' or c.kind == 'midi') then return { head = c, off = 0, fx = c.fx or {} } end
     if c and c.kind == 'cont' and c.of then
       local h = c.of
-      if h.kind == 'midi' then return { head = h, off = 0, fx = h.fx or {}, midi = true } end
-      return { head = h, off = (row - (h.row0 or row)) / lpb(), fx = c.fx or {}, run = c.run }
+      -- 21 окт: и у MIDI-ноты своя команда строки (смещение от её начала; было — всегда первая строка)
+      return { head = h, off = (row - (h.row0 or row)) / lpb(), fx = c.fx or {}, run = c.run, midi = h.kind == 'midi' or nil }
     end
   end
   return nil
@@ -901,7 +901,7 @@ local function hex_entry(c, fld, heads)
     local code, val = buf:sub(1, 2), tonumber(buf:sub(3), 16)
     local fc = V.fx_cell(V.cur.fi, V.cur.row)
     local rowable = V.fx_rowable(code)
-    if fc and fc.off > 0 and not fc.midi then
+    if fc and fc.off > 0 then
       local old = fc.fx[fld - 3]
       if rowable then
         if old and old:sub(1, 2) ~= code then ctx.edit.clear_fx({ fc.head }, lpb(), old:sub(1, 2), fc.off) end
@@ -3691,7 +3691,13 @@ function V.field_paste(reg, fi, row)
   local n = 0
   ctx.edit.run('paste field', function()
     for _, e in ipairs(reg.vals) do
-      for _, h in ipairs(V.heads_in(fi, fi, row + e.dr, row + e.dr)) do field_set(h, fld, e.v); n = n + 1 end
+      local hs = V.heads_in(fi, fi, row + e.dr, row + e.dr)
+      for _, h in ipairs(hs) do field_set(h, fld, e.v); n = n + 1 end
+      -- 21 окт: команда на строку внутри ноты (не её голова) — командой этой строки
+      if #hs == 0 and fld >= 4 and type(e.v) == 'string' and #e.v == 4 then
+        local fc = V.fx_cell(fi, row + e.dr)
+        if fc and fc.off > 0 and V.fx_rowable(e.v:sub(1, 2)) then ctx.edit.set_fx({ fc.head }, lpb(), e.v:sub(1, 2), tonumber(e.v:sub(3), 16), fc.off); n = n + 1 end
+      end
     end
   end)
   return n
