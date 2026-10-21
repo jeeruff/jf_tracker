@@ -149,9 +149,12 @@ local function tc_alloc()
   if next_img > IMG_LAST then next_img = IMG_FIRST end
   if next_img == IMG_FIRST or next_img == IMG_MID then
     local lo, hi = next_img, (next_img == IMG_FIRST) and (IMG_MID - 1) or IMG_LAST
-    for k, v in pairs(tcache) do
-      if v.id >= lo and v.id <= hi then tcache[k] = nil
-      elseif v.ov and v.ov >= lo and v.ov <= hi then v.ov = nil end
+    for str, t in pairs(tcache) do
+      for k, v in pairs(t) do
+        if v.id >= lo and v.id <= hi then t[k] = nil
+        elseif v.ov and v.ov >= lo and v.ov <= hi then v.ov = nil end
+      end
+      if next(t) == nil then tcache[str] = nil end
     end
   end
   local id = next_img; next_img = next_img + 1
@@ -305,9 +308,12 @@ D.measure, D.texth = ms, TH
 
 -- строка → offscreen-картинка (один раз на строку+цвет+фон)
 local function txt_img(str, col, bg)
-  local key = str .. '|' .. math.floor(col[1] * 255) .. ',' .. math.floor(col[2] * 255) .. ',' .. math.floor(col[3] * 255)
-    .. '|' .. (bg and (math.floor(bg[1] * 255) .. ',' .. math.floor(bg[2] * 255) .. ',' .. math.floor(bg[3] * 255)) or (D.light_bg and 'a' or ''))
-  local e = tcache[key]
+  -- 21 окт: ключ — строка, затем число цвета и фона (24 бита каждый): склейка строки-ключа на каждый text()
+  -- была главным мусором кадра (сотни строк × 6 чисел в строки)
+  local c24 = math.floor(col[1] * 255) * 65536 + math.floor(col[2] * 255) * 256 + math.floor(col[3] * 255)
+  local key = c24 * 67108864 + (bg and (math.floor(bg[1] * 255) * 65536 + math.floor(bg[2] * 255) * 256 + math.floor(bg[3] * 255)) or (16777216 + (D.light_bg and 1 or 0)))
+  local ts = tcache[str]
+  local e = ts and ts[key]
   if e then return e end
   gfx.setfont(D.font_id)
   local w, h = measure_raw(str) + 2, gfx.texth            -- +2 (6 окт): при ×1.5 правый столбец буквы (O) срезался
@@ -341,7 +347,8 @@ local function txt_img(str, col, bg)
   end
   gfx.dest = old
   e = { id = id, w = w, h = hi, clear = clear }
-  tcache[key] = e
+  if not ts then ts = {}; tcache[str] = ts end
+  ts[key] = e
   return e
 end
 
@@ -1148,16 +1155,31 @@ function D.adsr_line(pts, bg, hot_i)
   end
 end
 
+-- 21 окт: обрезка — мемо (ширина → строка → результат, сброс по объёму и при смене шрифта) и старт с оценки
+-- по пропорции ширин: было по символу с конца, подстрока на каждый шаг — сотни строк мусора на длинной подписи
+local FITC, FITN, FITS, FITF = {}, 0, nil, nil
 local function fit(s, w)
-  if ms(s) <= w then return s end
-  local n = #s
-  while n > 0 do
-    -- граница символа: следующий байт не «хвостовой» (10xxxxxx)
-    local nb = s:byte(n + 1)
-    if not (nb and nb >= 128 and nb < 192) and ms(s:sub(1, n)) <= w then break end
-    n = n - 1
+  if FITS ~= D.SCALE or FITF ~= D.font_id then FITC, FITN, FITS, FITF = {}, 0, D.SCALE, D.font_id end
+  local fw = FITC[w]
+  local r = fw and fw[s]
+  if r then return r end
+  local full = ms(s)
+  if full <= w then r = s
+  else
+    local n = math.min(#s, math.floor(#s * w / math.max(1, full)) + 1)
+    while n < #s and ms(s:sub(1, n + 1)) <= w do n = n + 1 end
+    while n > 0 do
+      local nb = s:byte(n + 1)
+      if not (nb and nb >= 128 and nb < 192) and ms(s:sub(1, n)) <= w then break end
+      n = n - 1
+    end
+    r = s:sub(1, n)
   end
-  return s:sub(1, n)
+  if not fw then fw = {}; FITC[w] = fw end
+  fw[s] = r
+  FITN = FITN + 1
+  if FITN > 6000 then FITC, FITN = {}, 0 end
+  return r
 end
 D.fit = fit
 -- 8 окт: короткое имя для тесных мест (эффекты сбоку фейдера) — не влезает,
