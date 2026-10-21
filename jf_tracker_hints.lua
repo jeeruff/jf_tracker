@@ -23,7 +23,15 @@ local ALPHA = 'asdfghjklqweruiopzxcvnmtyb'
 
 -- кадр: новый список целей; во время набора метки — заморожен (5 окт: reset
 -- чистил его каждый кадр, и после f меток не было вовсе)
-function H.reset() if not H.active then H.targets = {} end end
+-- 21 окт: цели — из пула (таблица на цель каждый кадр была главным мусором кадра: сотни целей × 33 fps);
+-- массив тоже свой, чистится на месте. Пока идёт набор (H.active) — список заморожен, пул не трогается
+H.pool, H.pn, H.arr = {}, 0, {}
+function H.reset()
+  if H.active then return end
+  local a = H.arr
+  for i = #a, 1, -1 do a[i] = nil end
+  H.targets, H.pn = a, 0
+end
 
 H.ALT = { dspbtn = true }
 H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1, dspbtn = 1,
@@ -31,7 +39,12 @@ H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn
             mx = 3, trsmark = 3, sess = 3, mxname = 3, mxdur = 3, fxbrow = 3 }
 function H.add(kind, x, y, w, h, data)
   if H.active then return end        -- во время набора список заморожен
-  H.targets[#H.targets + 1] = { kind = kind, x = x, y = y, w = w, h = h, data = data }
+  local n = H.pn + 1
+  H.pn = n
+  local t = H.pool[n]
+  if not t then t = {}; H.pool[n] = t end
+  t.kind, t.x, t.y, t.w, t.h, t.data, t.label, t.picked = kind, x, y, w, h, data, nil, nil
+  H.targets[#H.targets + 1] = t
 end
 
 -- назначить метки: aa, as, ad … (первая буква — «страница»)

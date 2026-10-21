@@ -24679,10 +24679,23 @@ ctx.mem = function()
   if ctx.dlog then pcall(ctx.dlog, 'mem: ' .. rep) end
   vim.msg = rep
 end
+-- 21 окт: :memprof [сек] — строки кода, которые выделяют больше всего (выборка хуком), отчёт в debug log и ExtState memprof
+ctx.memprof = function(sec)
+  ctx.MEMP = ctx.MEMP or dofile(DIR .. '/jf_tracker_mem.lua')
+  local MEM = ctx.MEMP
+  sec = math.max(1, math.min(30, tonumber(sec) or 5))
+  vim.msg = ('memprof: %d s - work as usual'):format(sec)
+  MEM.prof_start(sec, reaper.time_precise, function(rep)
+    reaper.SetExtState(EXT, 'memprof', rep, false)
+    if ctx.dlog then pcall(ctx.dlog, rep) end
+    vim.msg = rep
+  end)
+end
 ctx.frame_inner = frame          -- сам кадр (ниже frame — обёртка xpcall)
 local err_streak, err_last = 0, nil
 frame = (function(inner)
   return function()
+    if ctx.MEMP and ctx.MEMP.P then ctx.MEMP.prof_tick() end   -- 21 окт: :memprof — хук на каждый кадр заново
     local ok, e = xpcall(inner, debug.traceback)
     if ok then err_streak = 0; return end
     collectgarbage('restart')   -- 21 окт: jftop останавливает сборщик на кадр — упавший кадр не оставляет его стоять

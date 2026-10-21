@@ -23,8 +23,21 @@ local function theme(key, fallback)
   return { r/255, g/255, b/255 }
 end
 
+-- 21 окт: память по числовому ключу (8 бит на канал, t до 1/1000) — mix зовут сотни раз за кадр, каждый раз
+-- новая таблица цвета была заметной частью мусора кадра; результат не меняют на месте (проверено grep)
+local MXC, MXN = {}, 0
 local function mix(a, b, t)
-  return { a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t, a[3] + (b[3]-a[3])*t }
+  local ka = (math.floor(a[1] * 255 + 0.5) << 16) | (math.floor(a[2] * 255 + 0.5) << 8) | math.floor(a[3] * 255 + 0.5)
+  local kb = (math.floor(b[1] * 255 + 0.5) << 16) | (math.floor(b[2] * 255 + 0.5) << 8) | math.floor(b[3] * 255 + 0.5)
+  local k = ((ka << 24) | kb) * 1024 + math.floor(t * 1000 + 0.5)
+  if t < 0 or t > 1 then return { a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t, a[3] + (b[3]-a[3])*t } end
+  local r = MXC[k]
+  if r then return r end
+  if MXN > 4096 then MXC, MXN = {}, 0 end
+  MXN = MXN + 1
+  r = { a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t, a[3] + (b[3]-a[3])*t }
+  MXC[k] = r
+  return r
 end
 
 -- относительная яркость по WCAG

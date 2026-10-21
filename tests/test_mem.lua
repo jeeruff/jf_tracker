@@ -14,4 +14,8 @@ eq('shared counted once', list[3].tables, 0)
 eq('small has its tables', list[2].tables, 2)
 eq('fmt MB', MEM.fmt(3 * 1048576), '3.0MB')
 eq('report', MEM.report(list, 1):match('^fn ') ~= nil, true)
+-- 21 окт: memprof — отчёт по строкам, по убыванию
+local rep = MEM.prof_report({ ['@/a/x.lua'] = { [10] = 100, [20] = 300 }, ['@/b/y.lua'] = { [5] = 50 } }, 2)
+eq('memprof total KB/s', rep:match('^memprof (%d+)'), '225')
+eq('memprof top line first', rep:match(': (%S+)'), 'x.lua:20')
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

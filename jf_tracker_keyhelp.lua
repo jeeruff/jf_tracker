@@ -1012,8 +1012,13 @@ end
 function KH.rows()
   local out = {}
   if KH.query == '' then
+    -- 21 окт: без поиска — список страницы один раз (был новый на каждый кадр)
     local P = KH.PAGES[KH.page] or KH.PAGES.tracker
+    KH.rows_c = KH.rows_c or {}
+    local rc = KH.rows_c[KH.page]
+    if rc and rc.n == #P.e then return rc.rows end
     for i, e in ipairs(P.e) do out[#out + 1] = { page = KH.page, i = i, e = e } end
+    KH.rows_c[KH.page] = { n = #P.e, rows = out }
     return out
   end
   local function add(pg)

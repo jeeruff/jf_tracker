@@ -2175,6 +2175,47 @@ function D.dot_col(fld, col)
   if not r then r = U.mix(col, fc, 0.5); m[fc] = r end
   return r
 end
+-- 21 окт: помощники ячейки — один раз на файл (были замыканиями внутри draw_cell: 3 на ячейку × тысяча ячеек
+-- за кадр — главный мусор строк); состояние текущей ячейки — в полях DCS
+local DCS = { NOFX = {} }
+function DCS.c(fld, col)
+  return (DCS.inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or (DCS.ghost and U.DIM or D.dot_col(fld, col))
+end
+-- инверсное поле: текст с непрозрачной подложкой цвета заливки
+-- 12 окт: курсор на половине поля команды (код | значение): инверсна только эта половина
+function DCS.text(tx, tyy, str, col)
+  local hx, inv = DCS.hx, DCS.inv
+  if hx and tx == hx and #str == 4 then
+    local w2, a, b = ms('00'), str:sub(1, 2), str:sub(3, 4)
+    if D.fx_half == 'val' then text(tx, tyy, a, col); text(tx + w2, tyy, b, U.BG, D.inv_bg or U.TEXT)
+    else text(tx, tyy, a, U.BG, D.inv_bg or U.TEXT); text(tx + w2, tyy, b, col) end
+    return
+  end
+  if inv and col == U.BG then text(tx, tyy, str, col, D.inv_bg or U.TEXT) else text(tx, tyy, str, col) end
+end
+-- поле инструмента: номер на строке ноты; пустое — точки. Рисуется ПОСЛЕ
+-- волны (4 окт: волна фоном закрашивала зелёный номер)
+function DCS.inst()
+  local L, cell, x, ty = DCS.L, DCS.cell, DCS.x, DCS.ty
+  local text, c = DCS.text, DCS.c
+  if not (L.x_inst and not DCS.name_row) then return end
+  local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
+  if not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
+  if n then text(x + L.x_inst, ty, D.DEC2[n % 100], c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
+  else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+  if L.x_slc then
+    local sk = cell and ((cell.kind == 'audio' and cell.slice) or (cell.kind == 'midi' and D.midi_slice and D.midi_slice(cell.item, cell.pitch)))   -- 19 окт: пэд кита — Sxx
+    if sk then text(x + L.x_slc, ty, D.SHEX[sk % 256], c('slc', cell.muted and U.GREY or D.RN_OTHER))   -- своё поле: курсор инструмента его не красит
+    else text(x + L.x_slc, ty, '...', c('slc',  (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+  end
+  if L.x_pan then
+    local pv = cell and cell.kind == 'audio' and cell.pan
+    if pv then text(x + L.x_pan, ty, pv, c('pan', cell.muted and U.GREY or (D.RN_PAN or U.CYAN)))
+    else text(x + L.x_pan, ty, '..', c('pan', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
+  end
+end
+D.DEC2, D.SHEX, D.HEX2 = {}, {}, {}
+for i = 0, 255 do D.DEC2[i] = ('%02d'):format(i % 100); D.SHEX[i] = ('S%02X'):format(i); D.HEX2[i] = ('%02X'):format(i) end
 local function draw_cell(L, cell, x, y, ty, inv)
   -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
   if L.wave_only then
@@ -2185,42 +2226,12 @@ local function draw_cell(L, cell, x, y, ty, inv)
     else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
     return
   end
-  local ghost = cell and cell.ghost   -- 15 окт: ghost-слайс (playthru + q) — бледно, как подсказка
-  local function c(fld, col) return (inv == fld and not (D.fx_half and type(fld) == 'number' and fld >= 4)) and U.BG or (ghost and U.DIM or D.dot_col(fld, col)) end
-  -- инверсное поле: текст с непрозрачной подложкой цвета заливки
-  local text_ = text
-  -- 12 окт: курсор на половине поля команды (код | значение): инверсна только эта половина
-  local hx = D.fx_half and type(inv) == 'number' and inv >= 4 and L.x_fx and L.x_fx[inv - 3] and (x + L.x_fx[inv - 3])
-  local function text(tx, tyy, str, col)
-    if hx and tx == hx and #str == 4 then
-      local w2, a, b = ms('00'), str:sub(1, 2), str:sub(3, 4)
-      if D.fx_half == 'val' then text_(tx, tyy, a, col); text_(tx + w2, tyy, b, U.BG, D.inv_bg or U.TEXT)
-      else text_(tx, tyy, a, U.BG, D.inv_bg or U.TEXT); text_(tx + w2, tyy, b, col) end
-      return
-    end
-    if inv and col == U.BG then text_(tx, tyy, str, col, D.inv_bg or U.TEXT) else text_(tx, tyy, str, col) end
-  end
+  DCS.L, DCS.cell, DCS.x, DCS.ty, DCS.inv, DCS.ghost = L, cell, x, ty, inv, cell and cell.ghost   -- 15 окт: ghost-слайс (playthru + q) — бледно, как подсказка
+  DCS.hx = D.fx_half and type(inv) == 'number' and inv >= 4 and L.x_fx and L.x_fx[inv - 3] and (x + L.x_fx[inv - 3])
+  local c, text, draw_inst = DCS.c, DCS.text, DCS.inst
   local nf = L.notes_only and 1 or (L.narrow and 2 or (3 + L.nfx))
   local name_row = cell and cell.kind == 'cont' and cell.i == 1 and cell.of.kind == 'audio' and D.itemnames and cell.of.name ~= ''
-  -- поле инструмента: номер на строке ноты; пустое — точки. Рисуется ПОСЛЕ
-  -- волны (4 окт: волна фоном закрашивала зелёный номер)
-  local function draw_inst()
-    if not (L.x_inst and not name_row) then return end
-    local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
-    if not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
-    if n then text(x + L.x_inst, ty, ('%02d'):format(n % 100), c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
-    else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
-    if L.x_slc then
-      local sk = cell and ((cell.kind == 'audio' and cell.slice) or (cell.kind == 'midi' and D.midi_slice and D.midi_slice(cell.item, cell.pitch)))   -- 19 окт: пэд кита — Sxx
-      if sk then text(x + L.x_slc, ty, ('S%02X'):format(sk % 256), c('slc', cell.muted and U.GREY or D.RN_OTHER))   -- своё поле: курсор инструмента его не красит
-      else text(x + L.x_slc, ty, '...', c('slc',  (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
-    end
-    if L.x_pan then
-      local pv = cell and cell.kind == 'audio' and cell.pan
-      if pv then text(x + L.x_pan, ty, pv, c('pan', cell.muted and U.GREY or (D.RN_PAN or U.CYAN)))
-      else text(x + L.x_pan, ty, '..', c('pan', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
-    end
-  end
+  DCS.name_row = name_row
   if not cell then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
     draw_inst()
@@ -2309,9 +2320,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if cell.micro and D.micro and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
-    elseif cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.RN_DELAY))
+    elseif cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.RN_DELAY))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
-    local fx = cell.fx or {}
+    local fx = cell.fx or DCS.NOFX
     for i = 1, L.nfx do
       if fx[i] then
         -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
@@ -2323,7 +2334,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     text(x + L.x_note, ty, D.OFF_TXT or 'OFF', c(1, D.CONT))   -- 8 окт: опция note OFF glyph — «|» вместо OFF
     if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
     if L.narrow or L.notes_only then
-    elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, string.format('%02X', cell.delay), c(3, D.CONT))
+    elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.CONT))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     for i = 1, L.nfx do text(x + L.x_fx[i], ty, '....', c(3 + i, D.EMPTY)) end
   elseif k == 'cont' then
