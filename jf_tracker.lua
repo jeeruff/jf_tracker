@@ -13579,6 +13579,11 @@ ctx = {
       -- панели (9 окт): фокус — только на видимую панель дерева (вкладки — 'top' + toptab)
       -- скрытая панель при переходе в неё появляется (F-клавиши, Ctrl+Tab, / …), как open в tmux
       local id = f == 'top' and state.toptab or f
+      -- 21 окт: фокус пришёл на свёрнутую (zm) — развернуть (Cmd+hjkl, щелчок, F-клавиши — не только вкладка)
+      if f ~= state.focus and draw.panes.BY[id] then
+        local lf = draw.panes.find(state.panes, id)
+        if lf and lf.min then lf.min = nil; state.panes.v = (state.panes.v or 1) + 1 end   -- v — ключ мемо раскладки
+      end
       -- 9 окт: щелчок в панели pm — фокус pm (её рисует модуль браузера)
       if f == 'browser' and not state.pm_big and L and L.pn and L.pn.by_panel and L.pn.by_panel.pm then
         local r = L.pn.by_panel.pm.content

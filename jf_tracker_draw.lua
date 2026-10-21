@@ -988,6 +988,10 @@ function D.layout(snap, state, nregions)
         end
       end
       for _, ev in ipairs(c.envs) do if ev.x >= lim then ev.x = lim; ev.w = 0 elseif ev.x + ev.w > lim then ev.w = lim - ev.x end end
+      for k = #c.mls, 1, -1 do   -- 21 окт: PB лез на Tempo мастера — за краем лейна нет, у края обрезан
+        local ml = c.mls[k]
+        if ml.x >= lim - L.pad then table.remove(c.mls, k) elseif ml.x + ml.w > lim then ml.w = lim - ml.x end
+      end
     end
     if vis then L.cols[#L.cols + 1] = c; cx = lx; if lx <= L.cols_r then L.hs_full = (L.hs_full or 0) + 1; if state.ptmode then L.pt_n = L.pt_n + 1 end end end
     if not hidden then L.hs_n = (L.hs_n or 0) + 1; L.hs_list[L.hs_n] = ci; if ci < first then L.hs_before = (L.hs_before or 0) + 1 end end
@@ -7826,6 +7830,17 @@ function D.frame(L, snap, rows, state, info)
     end
     for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
     for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
+  end
+  -- 21 окт: треки не влезли — уходят под мастер: виньетка у правого края (мастер не рисуется поверх)
+  if L.cols_cut or L.hs_cut then
+    local ex = D.cols_edge(L)
+    if ex then
+      local vw = math.min(3 * L.cw, 24)
+      local n = math.max(1, vw // 2)
+      local y0, y1 = L.header_y, L.body_y + L.body_h
+      for k = 1, n do set(U.BG, 0.85 * k / n); gfx.rect(ex - (n - k + 1) * 2, y0, 2, y1 - y0, 1) end
+      gfx.a = 1
+    end
   end
   -- линейка (2 окт): регионы и маркеры вертикальным текстом вдоль своих строк
   local rx0 = L.ruler_right and (L.win_w - L.rg_w - L.jl_w) or tx0   -- 13 окт: справа — у мастера (без линейки прыжков)
