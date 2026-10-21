@@ -16369,10 +16369,10 @@ ctx.chord_pub = { cc = -1, src = nil }
 -- 21 окт: лад песни (ProjExtState jf_tracker/key «9 minor»); нет — по нотам (TH.detect)
 MMX.TH = dofile(DIR .. '/jf_tracker_theory.lua'); MMX.TH.init(MMX.CH)
 ctx.TH, ctx.CH_NAMES = MMX.TH, MMX.CH.NAMES   -- 21 окт: vim (диатонический транспоз)
-ctx.song_notes = function(t0, t1)
+ctx.song_notes = function(t0, t1, only)   -- 21 окт: only — один трек (мелодия для :harmonize)
   local notes = {}
   for _, c in ipairs(snap and snap.cols or {}) do
-    if c.track and reaper.ValidatePtr(c.track, 'MediaTrack*') and not draw.col_is_kit(c) and reaper.GetMediaTrackInfo_Value(c.track, 'B_MUTE') == 0 then
+    if c.track and (not only or c.track == only) and reaper.ValidatePtr(c.track, 'MediaTrack*') and not draw.col_is_kit(c) and reaper.GetMediaTrackInfo_Value(c.track, 'B_MUTE') == 0 then
       for ii = 0, reaper.CountTrackMediaItems(c.track) - 1 do
         local it = reaper.GetTrackMediaItem(c.track, ii)
         local tk = reaper.GetActiveTake(it)
@@ -16484,6 +16484,147 @@ ctx.prog_cmd = function(arg)
   local names = {}
   for _, st in ipairs(steps) do names[#names + 1] = st.sym .. (st.dur ~= 1 and (' ' .. st.dur) or '') end
   vim.msg = ('prog: %s - %g bar(s) into the chord lane%s'):format(table.concat(names, ' | '), total, col and (' and notes on ' .. col.name) or '')
+end
+-- 21 окт: диапазон для гармонизации: выделение VISUAL (строки) или паттерн курсора → t0, t1
+ctx.harm_span = function()
+  local r0, r1
+  if vim.mode == 'visual' or vim.mode == 'vline' then local _, _, a, b = vim.visual_range(); r0, r1 = a, b + 1
+  else local a, b = ctx.region_rows(); r0, r1 = a, b end
+  if not r0 then return nil end
+  return edit.row_time(r0, state.lpb, 0), edit.row_time(r1, state.lpb, 0)
+end
+-- :harmonize [beat|half] — мелодия трека курсора → аккорд лада на каждый такт (долю / полтакта) → колонка chord мастера
+ctx.harmonize_cmd = function(arg)
+  arg = (arg or ''):match('^%s*(.-)%s*$')
+  local r, id = ctx.key_now()
+  if not r then vim.msg = 'harmonize: no key - :key (from the notes) or :key Am first'; return end
+  local col = cur_col()
+  if not (col and col.track) then vim.msg = 'harmonize: no track under the cursor'; return end
+  local t0, t1 = ctx.harm_span()
+  if not t0 then vim.msg = 'harmonize: no pattern under the cursor (or select rows with V)'; return end
+  local mel = ctx.song_notes(t0, t1, col.track)
+  if #mel == 0 then vim.msg = 'harmonize: no MIDI notes of ' .. col.name .. ' here'; return end
+  local per = arg == 'beat' and 'beat' or (arg == 'half' and 'half' or 'bar')
+  -- отрезки: такты (доли / половины) от такта начала
+  local segs = {}
+  local _, m = reaper.TimeMap2_timeToBeats(0, t0 + 1e-6)
+  while true do
+    local _, qs, qe, num = reaper.TimeMap_GetMeasureInfo(0, m)
+    local n = per == 'beat' and math.max(1, num or 4) or (per == 'half' and 2 or 1)
+    for k = 0, n - 1 do
+      local a = reaper.TimeMap2_QNToTime(0, qs + k * (qe - qs) / n)
+      local b = reaper.TimeMap2_QNToTime(0, qs + (k + 1) * (qe - qs) / n)
+      if b > t0 + 1e-6 and a < t1 - 1e-6 then segs[#segs + 1] = { a = math.max(a, t0), b = math.min(b, t1) } end
+    end
+    if reaper.TimeMap2_QNToTime(0, qe) >= t1 - 1e-6 or m > 100000 then break end
+    m = m + 1
+  end
+  local picks, prev = {}, nil
+  for _, sg in ipairs(segs) do
+    local seg = {}
+    for _, n in ipairs(mel) do
+      local ov = math.min(n[2], sg.b) - math.max(n[1], sg.a)
+      if ov > 1e-6 then seg[#seg + 1] = { pitch = n[3], w = ov + ((math.abs(n[1] - sg.a) < 0.02) and 0.5 * (sg.b - sg.a) or 0) } end   -- сильная доля — весомее
+    end
+    if #seg > 0 then
+      local cand = MMX.TH.harmonize(seg, r, id, prev)
+      if cand[1] then picks[#picks + 1] = { t = sg.a, sym = cand[1].sym, alt = cand[2] and cand[2].sym }; prev = cand[1].sym end
+    end
+  end
+  if #picks == 0 then vim.msg = 'harmonize: nothing to harmonize'; return end
+  edit.run('harmonize ' .. col.name, function()
+    local i, kill = 0, {}
+    while true do
+      local ret, isrgn, pos, _, nm, idx = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and (nm or ''):match('^ch:') then kill[#kill + 1] = idx end
+      i = i + 1
+    end
+    for k = #kill, 1, -1 do reaper.DeleteProjectMarker(0, kill[k], false) end
+    local last
+    for _, p in ipairs(picks) do if p.sym ~= last then reaper.AddProjectMarker2(0, false, p.t, 0, 'ch:' .. p.sym, -1, 0); last = p.sym end end
+  end)
+  model.invalidate(); ctx.chord_pub.cc = -1
+  if not state.chordlane then state.chordlane = true; relayout() end
+  local t = {}
+  for _, p in ipairs(picks) do t[#t + 1] = p.sym .. (p.alt and ('(' .. p.alt .. ')') or '') end
+  vim.msg = ('harmonize %s in %s %s: %s - chord lane (in brackets - the next best; Enter on the chord column - other chords)'):format(col.name, MMX.CH.NAMES[r + 1], MMX.TH.BY[id].name, table.concat(t, ' '))
+end
+-- :bass [fifth] — бас по колонке chord мастера (маркеры ch:) на трек курсора: корень на аккорд (fifth — корень, потом квинта)
+ctx.bass_cmd = function(arg)
+  local fifth = (arg or ''):match('fifth') ~= nil
+  local col = cur_col()
+  if not (col and col.track) then vim.msg = 'bass: no track under the cursor'; return end
+  local t0, t1 = ctx.harm_span()
+  if not t0 then vim.msg = 'bass: no pattern under the cursor (or select rows with V)'; return end
+  local chs, i = {}, 0
+  while true do
+    local ret, isrgn, pos, _, nm = reaper.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    local sym = not isrgn and (nm or ''):match('^ch:(.+)$')
+    if sym and pos < t1 - 1e-6 then chs[#chs + 1] = { t = pos, sym = sym } end
+    i = i + 1
+  end
+  table.sort(chs, function(a, b) return a.t < b.t end)
+  -- аккорд, звучащий на t0 (маркер раньше), — тоже
+  local segs = {}
+  for k, c in ipairs(chs) do
+    local a, b = c.t, chs[k + 1] and chs[k + 1].t or t1
+    if b > t0 + 1e-6 then segs[#segs + 1] = { a = math.max(a, t0), b = math.min(b, t1), sym = c.sym } end
+  end
+  if #segs == 0 then vim.msg = 'bass: no chords in the chord lane here (:chord read, :prog, :harmonize)'; return end
+  local base = (math.max(1, math.min(7, (vim.octave or 4) - 2)) + 1) * 12   -- две октавы ниже октавы ввода
+  local n = 0
+  edit.run('bass from the chords', function()
+    for _, sg in ipairs(segs) do
+      local c = MMX.CH.parse(sg.sym)
+      if c then
+        local root = base + ((c.bass or c.root) - base) % 12
+        local ra = math.floor(model.row_of_time(sg.a, state.lpb) + 0.5)
+        local rb = math.max(ra + 1, math.floor(model.row_of_time(sg.b, state.lpb) + 0.5))
+        local heads = ctx.chord_heads(col, ra)
+        if #heads > 0 then edit.delete(heads, state.lpb) end
+        if fifth and rb - ra >= 2 then
+          local mid = ra + (rb - ra) // 2
+          edit.insert_note(col.track, nil, state.lpb, ra, root, vim.vel or 100, mid - ra, 'midi')
+          edit.insert_note(col.track, nil, state.lpb, mid, root + 7, vim.vel or 100, rb - mid, 'midi')
+          n = n + 2
+        else edit.insert_note(col.track, nil, state.lpb, ra, root, vim.vel or 100, rb - ra, 'midi'); n = n + 1 end
+      end
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('bass on %s: %d note(s) from %d chord(s)%s'):format(col.name, n, #segs, fifth and ' (root, then fifth)' or ' (roots; :bass fifth - root + fifth)')
+end
+-- :voice2 3|6|-3|-6 — второй голос в ладу к нотам выделения (или строки): терция / секста выше (+) / ниже (−)
+ctx.voice2_cmd = function(arg)
+  local iv = tonumber((arg or ''):match('^%s*(%-?%d+)')) or 3
+  if math.abs(iv) ~= 3 and math.abs(iv) ~= 6 then vim.msg = ':voice2 3 | 6 | -3 | -6 (a third / sixth in the key above / below)'; return end
+  local r, id = ctx.key_now()
+  if not r then vim.msg = 'voice2: no key - :key first'; return end
+  local f0, f1, r0, r1
+  if vim.mode == 'visual' or vim.mode == 'vline' then f0, f1, r0, r1 = vim.visual_range() else f0, f1, r0, r1 = vim.cur.fi, vim.cur.fi, vim.cur.row, vim.cur.row end
+  local heads = vim.heads_in(f0, f1, r0, r1)
+  local n = 0
+  edit.run(('second voice %+d'):format(iv), function()
+    local touched = {}
+    for _, h in ipairs(heads) do
+      if h.kind == 'midi' and h.take and h.pitch then
+        local _, nn = reaper.MIDI_CountEvts(h.take)
+        for k = 0, nn - 1 do
+          local _, _, mu, sp, ep, ch, pitch, vel = reaper.MIDI_GetNote(h.take, k)
+          if pitch == h.pitch and math.abs(sp - (h.ppq or sp)) < 1 then
+            reaper.MIDI_InsertNote(h.take, false, mu, sp, ep, ch, math.max(0, math.min(127, MMX.TH.second_voice(pitch, iv, r, id))), vel, true)
+            touched[h.take] = true; n = n + 1
+            break
+          end
+        end
+      end
+    end
+    for tk in pairs(touched) do reaper.MIDI_Sort(tk) end
+  end)
+  model.invalidate()
+  vim.msg = n > 0 and ('second voice: %d note(s), a %s %s in %s %s'):format(n, math.abs(iv) == 3 and 'third' or 'sixth', iv > 0 and 'above' or 'below', MMX.CH.NAMES[r + 1], MMX.TH.BY[id].name) or 'voice2: no MIDI notes here (select with v / V)'
 end
 ctx.key_set = function(root, id)
   reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
