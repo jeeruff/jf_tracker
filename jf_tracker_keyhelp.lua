@@ -533,7 +533,7 @@ KH.PAGES = {
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
     { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },
-    { k = 'Cmd+1..0', d = 'module 1..10 of the chain (in the tracker Cmd+digit is a channel: the N-th thing of the focused module)' },
+    { k = '^ $ N|', d = 'the first / last module, module N (3| - the third), as columns in Vim; Cmd+1..0 - a track, as in the tracker' },
     { k = 'dw db', d = 'delete modules: d3w - three from the cursor forward, db - the one before, d2b - two before (3dw too)' },
     { k = 'Shift / Cmd+click', d = 'on a module (its name or empty space): Shift - pick from the selected one to it, Cmd - add / remove it (apart is fine); then x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick' },
     { k = 'i', d = 'INSERT the parameter: it and the module frame go red - type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)' },

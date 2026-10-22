@@ -63,8 +63,10 @@ end
 do
   DK.init({ msg = function() end })
   local s5 = { fx = 1, param = 4 }
-  DK.key(('3'):byte(), s5, 6, 3, { cmd = true }); eq('Cmd+3: module 3', s5.fx, 3); eq('…param 1', s5.param, 1)
-  DK.key(('9'):byte(), s5, 6, 3, { cmd = true }); eq('Cmd+9 past the chain: stays', s5.fx, 3)
-  eq('Cmd+digit is not a count', DK.num, nil)
+  eq('Cmd+3 is not DSP (a track)', DK.key(('3'):byte(), s5, 6, 3, { cmd = true }), false); eq('…module stays', s5.fx, 1)
+  DK.key(('$'):byte(), s5, 6, 3, {}); eq('$: last module', s5.fx, 6); eq('…param 1', s5.param, 1)
+  DK.key(('^'):byte(), s5, 6, 3, {}); eq('^: first module', s5.fx, 1)
+  for _, ch in ipairs({ '4', '|' }) do DK.key(ch:byte(), s5, 6, 3, {}) end; eq('4|: module 4', s5.fx, 4)
+  for _, ch in ipairs({ '9', '|' }) do DK.key(ch:byte(), s5, 6, 3, {}) end; eq('9| past the chain: stays', s5.fx, 4)
 end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)

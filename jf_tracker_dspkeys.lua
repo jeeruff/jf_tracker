@@ -129,10 +129,13 @@ function DK.key(c, sel, n, np, mods)
     ctx.msg('-- INSERT parameter --  type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter - set, Esc - cancel')
     return true
   end
-  -- 22 окт: Cmd+1..0 — модуль 1..10 (в трекере Cmd+цифра — канал: везде N-й элемент модуля в фокусе)
-  if mods.cmd and ch:match('^%d$') and not DK.pads then
-    local k = ch == '0' and 10 or tonumber(ch)
-    if k <= n then sel.fx = k; sel.param = 1; DK.pslider = nil; DK.num = nil else ctx.msg(('Cmd+%s: the chain has %d modules'):format(ch, n)) end
+  -- 22 окт: Cmd+1..0 — канал трекера (выбор трека), DSP его не берёт
+  if mods.cmd and ch:match('^%d$') then return false end
+  -- 22 окт: модуль по номеру — как столбец в Vim: ^ первый, $ последний, N| — модуль N
+  if (ch == '^' or ch == '$' or ch == '|') and not DK.pads and n > 0 then
+    local k = ch == '^' and 1 or (ch == '$' and n or (tonumber(DK.num or '') or 1))
+    DK.num = nil; DK.pslider = nil
+    if k <= n then sel.fx = k; sel.param = 1 else ctx.msg(('%d|: the chain has %d modules'):format(k, n)) end
     return true
   end
   -- 22 окт: w / W — следующий / предыдущий модуль (как w в трекере — к следующему событию), по кругу, N w;

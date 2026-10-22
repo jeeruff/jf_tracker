@@ -25206,6 +25206,7 @@ local function frame()
         if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
+        if ctx.mods().cmd and c >= 48 and c <= 57 then return vim.key(c) end   -- 22 окт: Cmd+1..0 — выбор трека и из DSP (модуль — ^ $ N|)
         -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
         if state.dsp_zs and not DK.pending then
           state.dsp_zs = nil
