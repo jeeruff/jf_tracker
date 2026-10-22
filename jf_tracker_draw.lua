@@ -9586,11 +9586,17 @@ function D.frame(L, snap, rows, state, info)
             if direct then step_direct = true end
           end
         else
+          local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
+          if info.param_bipolar and info.param_bipolar(f, p) then
+            -- 22 окт: ноль посередине (pan, pitch, детюн) — ромбик от центра, как пан в шапке трека
+            local ispan = (p.name or ''):lower():match('pan') ~= nil
+            U.dslider(wx0, cy, ww, v.n, true, cc or acc, psel, L.rh, ispan)
+          else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
           -- цвет категории (громкость / фильтр / время …) — заливкой слайдера,
           -- не полоской у имени (3 окт: полоска липла к первой букве)
-          local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
+          end
         end
         text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), pins and U.RED or (psel and U.AMBER or U.TEXT))
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)

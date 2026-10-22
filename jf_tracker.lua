@@ -19309,7 +19309,12 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsp_ins = state.focus == 'dsp' and DK.ins or nil, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs,
+    param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
+      local col = dsp_target()
+      if not (col and col.track) then return false end
+      return model.param_bipolar(col.track, p.fx or f.i, p.i, p.name, (f.fxname or f.name or '?') .. '|' .. tostring(p.fx and ('k' .. p.fx) or '') .. '|' .. p.i)
+    end, dsp_ins = state.focus == 'dsp' and DK.ins or nil, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
     kit_wave = ctx.kit_wave,
     midi_in_age = function(col)   -- 19 окт: метр MIDI: возраст события и velocity последней ноты
       local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]

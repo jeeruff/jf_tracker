@@ -1278,7 +1278,7 @@ end
 local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
   'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
   'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent', 'SetNamedConfigParm',
-  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings', 'GetFloatingWindow' }   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
+  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings', 'GetFloatingWindow', 'FormatParamValueNormalized' }   -- 22 окт: Format… — текст значения без записи в плагин (ноль в центре)   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
 local function fx_table(prefix)
   local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
   for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end
@@ -1290,6 +1290,31 @@ function M.fxapi(obj) if M.is_take(obj) then return M.FXK end return M.FXT end
 -- цепочка take (те же записи, что у трека)
 function M.take_fx(take) return M.track_fx(take) end
 
+-- 22 окт: параметр «ноль посередине» (pan, pitch, детюн, ±dB): по тексту крайних значений — отрицательное
+-- и положительное, почти симметрично (−24 … +24 да; −inf … +12 dB нет). Имя pan / balance — всегда
+function M.bipolar_of(name, s0, s1)
+  local n = (name or ''):lower()
+  if n:match('%f[%a]pan%f[%A]') or n:match('balance') then return true end   -- pan словом (не panic)
+  local a = tonumber((s0 or ''):match('^%s*([-+]?%d+%.?%d*)'))
+  local b = tonumber((s1 or ''):match('^%s*([-+]?%d+%.?%d*)'))
+  return (a and b and a < 0 and b > 0 and math.abs(a + b) <= 0.1 * math.max(-a, b)) and true or false
+end
+local bip_cache = {}
+-- key — тип плагина и номер параметра: одна и та же раскладка у всех копий
+function M.param_bipolar(tr, fx, pi, name, key)
+  local c = bip_cache[key]
+  if c ~= nil then return c end
+  local A = M.fxapi(tr)
+  local s0, s1
+  if A.FormatParamValueNormalized then
+    local ok0, t0 = A.FormatParamValueNormalized(tr, fx, pi, 0, '')
+    local ok1, t1 = A.FormatParamValueNormalized(tr, fx, pi, 1, '')
+    s0, s1 = ok0 and t0 or nil, ok1 and t1 or nil
+  end
+  c = M.bipolar_of(name, s0, s1)
+  bip_cache[key] = c
+  return c
+end
 local function param_entry(tr, fx, pi, label)
   local A = M.fxapi(tr)
   local _, pname = A.GetParamName(tr, fx, pi, '')
