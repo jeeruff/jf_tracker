@@ -19440,7 +19440,7 @@ local function frame()
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
-    status_left = state.kslider and ('-- FADE %s --  h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: SLIDER → FADE (fademode), SLIDER — жест по параметрам
+    status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: SLIDER → FADE (fademode), SLIDER — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, win_focus = ctx.win_focus, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
