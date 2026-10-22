@@ -2176,7 +2176,8 @@ ctx = {
     local row = vim.cur.row
     local t = ctx.row_time(row)
     local n = edit.snap_points(col.track, only, ctx.snap_fxmap(col.track), t, 'XY ' .. (what or 'morph') .. ' -> automation')
-    vim.msg = ('INSERT: %s -> automation at row %d - %d envelope points (u - undo)'):format(what or 'XY', row, n)
+    if n > 0 and vim.step_advance then vim.step_advance() end   -- 22 окт: курсор шагает на step, как после ноты
+    vim.msg = ('INSERT: %s -> automation at row %d - %d envelope points, cursor + step (u - undo)'):format(what or 'XY', row, n)
   end,
   snap_clear = function(col, i)
     local e = ctx.snaps_of(col); e.snaps[i] = nil; ctx.snaps_write(col, e)

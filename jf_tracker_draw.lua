@@ -7044,6 +7044,11 @@ function D.frame(L, snap, rows, state, info)
         hold.clip = hold.max > 0
         local now = reaper.time_precise()
         local mw = math.max(2, math.floor((bw0 - 10) / 2))
+        -- 22 окт: где-то solo — у остальных каналов метр тусклее и маленькая яркая s! (их не слышно)
+        local muted_by_solo = false
+        if not col.solo and not col.master then
+          for _, c2 in ipairs(L.cols or {}) do if c2.col and c2.col.solo then muted_by_solo = true; break end end
+        end
         for k2 = 1, 2 do
           local pk = 0
           if info.peaks then local pl, pr = info.peaks(col); pk = (k2 == 1 and pl or pr) or 0 end
@@ -7054,13 +7059,22 @@ function D.frame(L, snap, rows, state, info)
           local mx0 = bx0 + 4 + (k2 - 1) * (mw + 2)
           set(U.mix(dark, U.TEXT, 0.12)); gfx.rect(mx0, ty0, mw, th, 0)
           if pdb > -60 then
-            local function seg(d0, d1, c3) local ya, yb = ypos(math.min(pdb, d1)), ypos(d0); if yb > ya then set(c3); gfx.rect(mx0 + 1, ya, mw - 2, yb - ya, 1) end end
+            local function seg(d0, d1, c3) local ya, yb = ypos(math.min(pdb, d1)), ypos(d0); if yb > ya then set(muted_by_solo and U.mix(c3, dark, 0.55) or c3); gfx.rect(mx0 + 1, ya, mw - 2, yb - ya, 1) end end
             seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
           end
           if hk.db > -60 then
             set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)); gfx.rect(mx0 + 1, ypos(hk.db), mw - 2, 1, 1)
           end
           if hold.clip then set(U.RED); gfx.rect(mx0 + 1, ty0 - 2, mw - 2, 1, 1); gfx.rect(mx0 + 1, ty0 - 4, mw - 2, 1, 1) end
+        end
+        if muted_by_solo then
+          local sw2 = D.small_measure('s!')
+          local sh2 = math.max(4, math.floor((L.th or L.rh) * D.SMALL))
+          if sw2 <= bw0 - 2 then
+            local sx2, sy2 = bx0 + math.floor((bw0 - sw2) / 2), ty0 + th - sh2 - 2
+            set(dark); gfx.rect(sx2 - 1, sy2 - 1, sw2 + 2, sh2 + 2, 1)          -- подложка: метки и метр под s! не просвечивают
+            D.small_text(sx2, sy2, 's!', U.AMBER)
+          end
         end
         -- 9 окт: макс. пик — строкой сразу над коробкой, приглушённо; нет
         -- сигнала — пусто (без -inf)

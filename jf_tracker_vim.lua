@@ -364,6 +364,8 @@ function V.fx_continue(d)
   else V.msg = 'continue (Ctrl+Option + -): on the volume or a command column'; return end
   V.cur.row = V.cur.row + step_rows(); ensure_visible()
 end
+-- 22 окт: шаг курсора после записи не из клавиш (XY-пресет → автоматизация в INSERT)
+function V.step_advance() V.cur.row = V.cur.row + step_rows(); ensure_visible() end
 -- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
 function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
 
