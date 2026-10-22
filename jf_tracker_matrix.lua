@@ -807,7 +807,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if ci > MX.hs then
       local g = grid[ri][ci]
       local col = snap.cols[ci]
-      -- 21 окт: зона, видная в трекере, — светло-серая подложка (часть слота, если трекер показывает его кусок)
+      -- 21 окт: зона, видная в трекере, — серая подложка (часть слота, если трекер показывает его кусок); 22 окт: темнее и тише
       local V = info.view
       if V and V.r0 and V.cols[ci] and not rg.gap then
         local a, b = math.max(V.r0, rg.r0), math.min(V.r1, rg.r1)
@@ -815,7 +815,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           local span = math.max(1, rg.r1 - rg.r0)
           local y0 = y + math.floor((a - rg.r0) / span * rh)
           local y1 = y + math.floor((b - rg.r0) / span * rh + 0.5)
-          U.set(U.mix(U.BG, U.TEXT, 0.30)); gfx.rect(x, y0, L.mx_cell_w, math.max(2, y1 - y0), 1)
+          U.set(U.mix(U.BG, U.TEXT, 0.14)); gfx.rect(x, y0, L.mx_cell_w, math.max(2, y1 - y0), 1)
         end
       end
       U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
