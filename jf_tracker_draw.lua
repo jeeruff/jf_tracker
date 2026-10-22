@@ -9589,7 +9589,28 @@ function D.frame(L, snap, rows, state, info)
           end
         else
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
-          if info.param_bipolar and info.param_bipolar(f, p) then
+          local notep = (p.show == 'note' or p.show == 'root') and tonumber(v.s)
+          if notep then
+            -- 22 окт: параметр-нота (note lo / hi, root) — мини-клавиатура октавы, нота — янтарём, октава — в значении
+            local pc = p.show == 'root' and nil or (math.floor(notep + 0.5) % 12)
+            if p.show == 'root' then
+              local lo = 0
+              for pi2, p2 in ipairs(f.params) do if p2.show == 'note' and p2.name == 'note lo' then lo = tonumber((vals[pi2] or {}).s) or 0 end end
+              pc = math.floor(lo - notep + 0.5) % 12
+            end
+            local WH = { 0, 2, 4, 5, 7, 9, 11 }
+            local kw = math.max(2, math.floor(ww / 7))
+            local ky, kh = py + 2, L.rh - 4
+            for wi, wpc in ipairs(WH) do
+              local kx = wx0 + (wi - 1) * kw
+              set(wpc == pc and U.AMBER or U.mix(U.TEXT, U.BG, 0.25)); gfx.rect(kx, ky, kw - 1, kh, 1)
+            end
+            local BL = { [1] = 1, [3] = 2, [6] = 4, [8] = 5, [10] = 6 }   -- чёрная → после какой белой
+            for bpc, after in pairs(BL) do
+              local kx = wx0 + after * kw - math.floor(kw / 3)
+              set(bpc == pc and U.AMBER or U.BG); gfx.rect(kx, ky, math.max(1, math.floor(kw * 2 / 3)), math.floor(kh * 0.6), 1)
+            end
+          elseif info.param_bipolar and info.param_bipolar(f, p) then
             -- 22 окт: ноль посередине (pan, pitch, детюн) — ромбик от центра, как пан в шапке трека
             local ispan = (p.name or ''):lower():match('pan') ~= nil
             U.dslider(wx0, cy, ww, v.n, true, cc or acc, psel, L.rh, ispan)

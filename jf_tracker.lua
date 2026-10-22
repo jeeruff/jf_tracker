@@ -19321,7 +19321,7 @@ local function frame()
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs,
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
-      if not (col and col.track) then return false end
+      if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
       return model.param_bipolar(col.track, p.fx or f.i, p.i, p.name, (f.fxname or f.name or '?') .. '|' .. tostring(p.fx and ('k' .. p.fx) or '') .. '|' .. p.i)
     end, dsp_ins = state.focus == 'dsp' and DK.ins or nil, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
     kit_wave = ctx.kit_wave,
