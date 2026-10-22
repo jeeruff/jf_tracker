@@ -4461,7 +4461,7 @@ ctx = {
     while true do
       local ret, isrgn, pos, _, name, idx, color = reaper.EnumProjectMarkers3(0, i)
       if not ret or ret == 0 then break end
-      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') and not (name or ''):match('^v:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end
+      if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') and not (name or ''):match('^v:') and not (name or ''):match('^ch:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end   -- 22 окт: ch: — аккорды, не команды
       i = i + 1
     end
     if text == '' and #found == 0 then vim.msg = 'cmd: no command on this row'; return end
@@ -28559,7 +28559,7 @@ ctx.mx_menu = function(pick)
       while true do
         local ret, isr, pos, _, nm = reaper.EnumProjectMarkers3(0, i)
         if not ret or ret == 0 then break end
-        if not isr and not (nm or ''):match('^=') and not (nm or ''):match('^v:') then cuts[#cuts + 1] = pos end
+        if not isr and not (nm or ''):match('^=') and not (nm or ''):match('^v:') and not (nm or ''):match('^ch:') then cuts[#cuts + 1] = pos end
         i = i + 1
       end
       ctx.patternize(cuts, 'by markers')
