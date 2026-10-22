@@ -4750,6 +4750,33 @@ end
 D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
+-- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
+-- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)
+function D.param_rows(p, nfit)
+  local n = p and p.kind == 'steps' and p.nsteps or 0
+  return (n >= 5 and n <= 8 and n <= (nfit or 0)) and n or 1
+end
+-- поток параметров по колонкам с учётом высоты и секций (heads[pi] — заголовок перед параметром: своя строка,
+-- секция целиком переносится в новую колонку, если в ней помещается) → spos[pi] = { col, row, rows },
+-- spos.heads[pi] = { col, row }; второе — число колонок
+function D.param_flow(params, heads, nfit, col0)
+  local spos, col, row = { heads = {} }, col0 or 0, 0
+  for pi = 1, #params do
+    if heads and heads[pi] then
+      local n, j = D.param_rows(params[pi], nfit), 1
+      while params[pi + j] and not heads[pi + j] do n = n + D.param_rows(params[pi + j], nfit); j = j + 1 end
+      -- заголовок не остаётся внизу без своего первого параметра (столбик кнопок — тоже)
+      if row > 0 and (row >= nfit - 1 or (row + 1 + n > nfit and 1 + n <= nfit) or row + 1 + D.param_rows(params[pi], nfit) > nfit) then col, row = col + 1, 0 end
+      spos.heads[pi] = { col, row }
+      row = row + 1
+    end
+    local hp = D.param_rows(params[pi], nfit)
+    if row > 0 and row + hp > nfit then col, row = col + 1, 0 end
+    spos[pi] = { col, row, hp }
+    row = row + hp
+  end
+  return spos, col + 1 - (col0 or 0)
+end
 -- 22 окт: имя колонки под курсором (инфо у клавиатуры): MIDI-лейн (PB, CC74, cmd, chord, visor) и сложенный
 -- трек — своим именем; было — по номеру поля, и курсор на PB показывал «note»
 function D.cursor_field_name(f, vc)
@@ -8257,23 +8284,14 @@ function D.frame(L, snap, rows, state, info)
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
-        return math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
+        local _, nc = D.param_flow(f.params, nil, rows_fit, 0)   -- 22 окт: с высотой столбиков кнопок
+        return math.max(1, math.min(3, nc))
       end
       -- 16 окт: секции потоком (f.heads) — колонок столько, сколько займёт поток при этой высоте
       if f.heads and not f.container then
         local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
-        local col, row = 0, 0
-        for pi = 1, #f.params do
-          if f.heads[pi] then
-            local n = 1
-            while f.params[pi + n] and not f.heads[pi + n] do n = n + 1 end
-            if row > 0 and (row >= nfit2 - 1 or (row + 1 + n > nfit2 and 1 + n <= nfit2)) then col, row = col + 1, 0 end
-            row = row + 1
-          end
-          if row >= nfit2 then col, row = col + 1, 0 end
-          row = row + 1
-        end
-        return col + 1
+        local _, nc = D.param_flow(f.params, f.heads, nfit2, 0)   -- 22 окт: тот же поток, что в раскладке
+        return nc
       end
       return f.cols or 1
     end
@@ -9343,26 +9361,17 @@ function D.frame(L, snap, rows, state, info)
       -- 13 окт: секции (f.heads[pi] — заголовок перед параметром): поток по колонкам, заголовок —
       -- своя строка (янтарь + линия), внизу колонки не остаётся — переносится с секцией
       local spos
-      if f.heads and not cl and not grp then
-        spos = {}
-        local col, row = pcol0, 0
-        for pi = 1, #f.params do
-          if f.heads[pi] then
-            -- секция целиком (заголовок + её параметры) не влезает в остаток колонки, а в целую влезает — с новой колонки
-            local n = 1
-            while f.params[pi + n] and not f.heads[pi + n] do n = n + 1 end
-            if row > 0 and (row >= nfit - 1 or (row + 1 + n > nfit and 1 + n <= nfit)) then col, row = col + 1, 0 end
-            local hy = by + L.rh + 1 + aw_off + row * L.rh
-            if col < ncol and nfit >= 2 then
-              local hx = bx + col * bw1 + L.pad
-              set(U.LINE); gfx.rect(hx, hy + L.rh - 2, pw, 1, 1)
-              text(hx, hy, fit(f.heads[pi], pw), U.AMBER)
-            end
-            row = row + 1
+      local tall = false   -- 22 окт: есть параметр-столбик (5..8 положений) — поток с высотой
+      for _, p0 in ipairs(f.params) do if D.param_rows(p0, nfit) > 1 then tall = true; break end end
+      if (f.heads or tall) and not cl and not grp then
+        spos = D.param_flow(f.params, f.heads, nfit, pcol0)
+        for pi, hp in pairs(spos.heads) do
+          local hy = by + L.rh + 1 + aw_off + hp[2] * L.rh
+          if hp[1] < ncol and nfit >= 2 then
+            local hx = bx + hp[1] * bw1 + L.pad
+            set(U.LINE); gfx.rect(hx, hy + L.rh - 2, pw, 1, 1)
+            text(hx, hy, fit(f.heads[pi], pw), U.AMBER)
           end
-          if row >= nfit then col, row = col + 1, 0 end
-          spos[pi] = { col, row }
-          row = row + 1
         end
       end
       for pi, p in ipairs(f.params) do
@@ -9391,6 +9400,31 @@ function D.frame(L, snap, rows, state, info)
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
         local acc = pins and U.RED or (psel and U.AMBER or U.TEXT)
+        -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
+        local tallh = spos and spos[pi] and spos[pi][3] or 1
+        if tallh > 1 then
+          local labs = (info.step_labels and info.step_labels(f, p)) or {}
+          local cur = math.floor(v.n * (p.nsteps - 1) + 0.5)
+          local x0 = bxc + L.pad
+          local nmh = tallh * L.rh
+          local ncol_c = pins and U.RED or (psel and U.AMBER or U.TEXT)
+          D.vtext(x0, py + 1, nmh - 2, p.name or '', ncol_c, U.BG)
+          local bx2 = x0 + L.th + L.pad
+          local bw2 = bxc + L.pad + pw - bx2
+          for kk = 0, p.nsteps - 1 do
+            local yy = py + kk * L.rh
+            local on = kk == cur
+            local hot = not drag and mx >= bx2 and mx < bx2 + bw2 and my >= yy and my < yy + L.rh
+            set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 1)
+            set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 0)
+            local lab = (pins and on) and (info.dsp_ins.buf .. '_') or (labs[kk + 1] or tostring(kk + 1))
+            text(bx2 + L.pad, yy, fit(lab, bw2 - 2 * L.pad), (pins and on) and U.RED or (hot and U.AMBER or (on and U.CYAN or U.GREY)))
+            if hot then hover.dsp = { fx = k, f = f, param = pi, sv = kk / math.max(1, p.nsteps - 1), onwidget = true } end
+          end
+          if not drag and not hover.dsp and mx >= x0 and mx < bx2 and my >= py and my < py + nmh then hover.dsp = { fx = k, f = f, param = pi } end
+          hint('dspparam', x0, py, pw, nmh, { fx = k, param = pi })
+          goto next_param
+        end
         local nw = math.floor(pw * 0.40)
         local wx0 = bxc + L.pad + nw
         local ww = math.floor(pw * 0.34)
