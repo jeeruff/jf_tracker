@@ -22317,6 +22317,25 @@ local function frame()
     U.click, U.rclick = false, false
   end
   if U.click and draw.sendpop and not hover.sendpop_in and not (hover.trkio and hover.trkio.what == 'sends') then draw.sendpop = nil end
+  -- 22 окт: Option+щелчок по stretch-маркеру в колонке волны — удалить (как в REAPER); раньше всех веток щелчка:
+  -- Option+щелчок ловили ветки выше в цепочке, и до маркера он не доходил
+  if U.click and draw.smk_hot and gfx.mouse_cap & 16 == 16 then
+    local sh = draw.smk_hot
+    local tk = reaper.ValidatePtr(sh.item, 'MediaItem*') and reaper.GetActiveTake(sh.item)
+    if tk then
+      local len, best, bd = reaper.GetMediaItemInfo_Value(sh.item, 'D_LENGTH'), nil, nil
+      for i = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+        local _, p = reaper.GetTakeStretchMarker(tk, i)
+        local d = math.abs(p - sh.frac * len)
+        if not bd or d < bd then best, bd = i, d end
+      end
+      if best then
+        edit.run('stretch marker delete', function() reaper.DeleteTakeStretchMarkers(tk, best, 1); reaper.UpdateItemInProject(sh.item) end)
+        edit.note_modified(sh.item); vim.msg = 'stretch marker removed (Option+click, as in REAPER)'; model.invalidate()
+      end
+    end
+    U.click = false
+  end
   ctx.click_guard = U.click and state.focusclick ~= 'click' and not ctx.mods().alt or nil
   if U.click and state.kslider then state.kslider = nil end                -- клик — выход из режима слайдера
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end

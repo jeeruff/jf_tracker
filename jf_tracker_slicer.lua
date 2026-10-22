@@ -1638,7 +1638,18 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         U.set(hot and U.AMBER or U.mix(U.AMBER, U.BG, 0.3)); gfx.rect(gx, zy, hot and 2 or 1, ZH, 1)
         U.set(rc(m.up)); gfx.triangle(gx, zc2 - hz, gx - hz, zc2, gx, zc2 + hz)
         U.set(rc(m.dn)); gfx.triangle(gx + 1, zc2 - hz, gx + 1 + hz, zc2, gx + 1, zc2 + hz)
-        if pressz and hot and not S.zsmk_drag and ctx.edit then
+        if pressz and hot and not S.zsmk_drag and ctx.edit and (gfx.mouse_cap & 16) == 16 then
+          -- 22 окт: Option+щелчок — удалить маркер (как в REAPER и в колонке волны трекера)
+          local it = zgrid.item
+          local tk = it and R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
+          if tk then
+            ctx.edit.run('stretch marker delete', function() R.DeleteTakeStretchMarkers(tk, m.idx, 1); R.UpdateItemInProject(it) end)
+            if ctx.edit.note_modified then ctx.edit.note_modified(it) end
+            S.msg = 'stretch marker removed (Option+click)'
+            if ctx.model then ctx.model.invalidate() end
+          end
+          pressz = false
+        elseif pressz and hot and not S.zsmk_drag and ctx.edit then
           S.zsmk_drag = { idx = m.idx, p0 = m.p, x0 = mxz, lo = m.lo, hi = m.hi, item = zgrid.item, spp = 2 * W2 / w * zgrid.k, active = false }
         end
       end
@@ -1685,7 +1696,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
           if dg.active then ctx.edit.note_modified(dg.item); ctx.edit.item_drag_end() end
           S.zsmk_drag = nil
         end
-      elseif S.zsmk_hot then S.msg = 'stretch marker - drag: move it (fine, no snap); in the tracker: drag the amber line, S / x / J K' end
+      elseif S.zsmk_hot then S.msg = 'stretch marker - drag: move it (fine, no snap), Option+click: delete; in the tracker: drag the amber line, S / x / J K' end
     end
     U.set(U.AMBER); gfx.rect(x + math.floor(w / 2), zy, 2, ZH, 1)
     trail_rect(t0, t0 + 2 * W2, x, w, zy, ZH)
