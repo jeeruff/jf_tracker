@@ -47,6 +47,18 @@ function DK.range(sel)
   local a = DK.anchor or sel.fx
   return math.min(a, sel.fx), math.max(a, sel.fx)
 end
+-- 22 окт: выбранные модули списком по порядку: Cmd-щелчки (DK.marks, вразброс), иначе диапазон (v / Shift-щелчок), иначе nil
+DK.marks = nil
+function DK.picked(sel)
+  if DK.marks and next(DK.marks) then
+    local out = {}
+    for k in pairs(DK.marks) do out[#out + 1] = k end
+    table.sort(out); return out
+  end
+  if DK.anchor then local r0, r1 = DK.range(sel); local out = {}; for k = r0, r1 do out[#out + 1] = k end; return out end
+end
+local function contiguous(l) for i = 2, #l do if l[i] ~= l[i - 1] + 1 then return false end end; return true end
+function DK.clear_pick() DK.anchor, DK.marks = nil, nil end
 
 -- c — код клавиши; sel = { fx=, param= } (меняется на месте); n — число
 -- эффектов; np — число параметров выбранного; mods — модификаторы.
@@ -79,10 +91,18 @@ function DK.key(c, sel, n, np, mods)
     else ctx.msg(op .. ch .. ': not a DSP command (? - help)') end
     return true
   end
-  -- в диапазоне (v) d / x / c действуют сразу
-  if DK.anchor and (ch == 'd' or ch == 'x') then local r0, r1 = DK.range(sel); ctx.dsp_delete(r0, r1); DK.anchor = nil; return true end
-  if DK.anchor and ch == 'c' then local r0, r1 = DK.range(sel); ctx.dsp_pack(r0, r1); DK.anchor = nil; return true end
-  if DK.anchor and ch == 'y' then ctx.dsp_yank(sel.fx); DK.anchor = nil; return true end
+  -- в диапазоне (v / Shift-щелчок) и при Cmd-выборе d / x / c / b действуют сразу на все выбранные
+  local pk = DK.picked(sel)
+  if pk and (ch == 'd' or ch == 'x') then
+    if contiguous(pk) then ctx.dsp_delete(pk[1], pk[#pk]) elseif ctx.dsp_delete_list then ctx.dsp_delete_list(pk) end
+    DK.clear_pick(); return true
+  end
+  if pk and ch == 'c' then
+    if contiguous(pk) then ctx.dsp_pack(pk[1], pk[#pk]) else ctx.msg('cc: pack needs modules side by side (Shift-click / v), not Cmd-picked apart') end
+    DK.clear_pick(); return true
+  end
+  if pk and ch == 'b' and ctx.dsp_bypass then for _, k in ipairs(pk) do ctx.dsp_bypass(k) end; return true end
+  if pk and ch == 'y' then ctx.dsp_yank(sel.fx); DK.clear_pick(); return true end
   -- 22 окт: INSERT параметра (i): набор числа или начала имени значения, Enter — записать, Esc — отмена;
   -- вне него цифры и буквы — ноты KEYS (DSP их не перехватывает)
   if DK.ins then
@@ -153,7 +173,7 @@ function DK.key(c, sel, n, np, mods)
     end
   end
   if c == 27 then
-    if DK.anchor then DK.anchor = nil; return true end
+    if DK.anchor or DK.marks then DK.clear_pick(); return true end
     return 'leave'
   end
   if ch == 'd' or ch == 'y' or ch == 'c' or ch == 'a' then

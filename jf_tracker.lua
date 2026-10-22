@@ -1592,6 +1592,19 @@ ctx = {
     dsp_sel.fx = math.max(1, k0 - 1); dsp_sel.param = 1
     vim.msg = 'fx cut: ' .. table.concat(names, ', ') .. ' - p / P pastes it (u undo)'
   end,
+  -- 22 окт: удалить модули вразброс (Cmd-выбор): с конца, чтобы номера не съезжали; текст — в регистр
+  dsp_delete_list = function(list)
+    local col = dsp_target(); local fxs = col and col.fx or {}
+    local names, segs = {}, {}
+    if not col.take then for _, k in ipairs(list) do local sg = fxs[k] and edit.fx_cut_chunk(col.track, fxs[k].i); if sg then segs[#segs + 1] = sg end end end
+    if #segs > 0 then state.fx_reg = { chunk = table.concat(segs, '\n'), name = fxs[list[1]].name .. (#segs > 1 and (' +' .. (#segs - 1)) or '') } end
+    edit.run('fx delete', function()
+      for i = #list, 1, -1 do local f = fxs[list[i]]; if f then names[#names + 1] = f.name; model.fxapi(col.track).Delete(col.track, f.i) end end
+    end)
+    model.invalidate()
+    dsp_sel.fx = math.max(1, list[1] - 1); dsp_sel.param = 1
+    vim.msg = 'fx cut: ' .. table.concat(names, ', ') .. ' - p / P pastes them (u undo)'
+  end,
   dsp_yank = function(k)
     local col, f = ctx.dsp_fx(k)
     if not f then vim.msg = 'dsp: no fx'; return end
@@ -19396,6 +19409,7 @@ local function frame()
     ctrl_sel = state.ctrl_sel,
     dsp_learn = dsp_learn and dsp_learn.k or nil,
     dsp_range = (state.focus == 'dsp' and DK.anchor) and { DK.range(dsp_sel) } or nil,
+    dsp_marks = state.focus == 'dsp' and DK.marks or nil,   -- 22 окт: Cmd-выбор модулей
     fx_values = function(f) local col = dsp_target(); if not col then return {} end
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
     dsp_fxs = (function() local t = dsp_target(); return t and t.fx or {} end)(),
@@ -22633,8 +22647,24 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
       dspwave_drag = { f = hover.dspwave.f, edge = hover.dspwave.edge, x = hover.dspwave.x, w = hover.dspwave.w }
       click = { t = now2, zone = 'dspwave' }
+    elseif hover.dsp and not hover.dsp.param and (ctx.mods().shift or ctx.mods().cmd) then
+      -- 22 окт: несколько модулей: Shift-щелчок — диапазон от выбранного, Cmd-щелчок — добавить / убрать (вразброс)
+      ctx.set_focus('dsp')
+      local k = hover.dsp.fx
+      if ctx.mods().cmd then
+        if not DK.marks then DK.marks = {}; if DK.anchor then local r0, r1 = DK.range(dsp_sel); for i = r0, r1 do DK.marks[i] = true end else DK.marks[dsp_sel.fx] = true end end
+        DK.anchor = nil
+        DK.marks[k] = (not DK.marks[k]) or nil
+      else
+        DK.marks = nil; DK.anchor = DK.anchor or dsp_sel.fx
+      end
+      dsp_sel.fx = k; dsp_sel.param = 1
+      local pk = DK.picked(dsp_sel) or {}
+      vim.msg = ('%d modules picked - x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick'):format(#pk)
+      click = { t = now2, zone = 'dsppick' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
+      if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
@@ -25210,6 +25240,7 @@ local function frame()
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
             vim.msg = model.dsp_fold and 'zP: Surge pages folded - one page, tabs along the bottom of the module' or 'zP: Surge pages unfolded - all of them in one pane'
+          elseif ch == 'f' and DK.picked(dsp_sel) then for _, k in ipairs(DK.picked(dsp_sel)) do ctx.dsp_mfold(k) end; DK.clear_pick()   -- 22 окт: выбранные модули
           elseif ch == 'f' or ch == 'F' then ctx.dsp_mfold(ch == 'F' and 'all' or dsp_sel.fx)   -- 22 окт: сложить модуль / все
           end
           return

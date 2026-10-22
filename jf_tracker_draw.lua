@@ -8321,7 +8321,8 @@ function D.frame(L, snap, rows, state, info)
         nshown = nshown + 1
         local is_sel = sel.fx == k
         blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, cont = f.container }
-        set(U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
+        local picked = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
+        set(picked and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
         set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, boxy, fw, bh0, 0)
         local yy, on_btn = boxy + 1, false
         for _, b in ipairs({ { 'x', 'del' }, { 'B', 'bypass' } }) do
@@ -8378,7 +8379,7 @@ function D.frame(L, snap, rows, state, info)
       nshown = nshown + 1
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
-      local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
+      local in_rng = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)

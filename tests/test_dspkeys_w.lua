@@ -28,4 +28,22 @@ do
   local r = DK.key(('5'):byte(), s2, 4, 9, {}); eq('KEYS on: a digit is not captured', r, false); eq('…no count', DK.num, nil)
   DK.digits_play = false; DK.pslider = nil
 end
+-- 22 окт: несколько модулей (Shift / Cmd-щелчок)
+do
+  local calls = {}
+  DK.init({ msg = function() end, dsp_delete = function(a, b) calls[#calls + 1] = 'del ' .. a .. '-' .. b end,
+    dsp_delete_list = function(l) calls[#calls + 1] = 'dellist ' .. table.concat(l, ',') end,
+    dsp_bypass = function(k) calls[#calls + 1] = 'byp ' .. k end, dsp_pack = function(a, b) calls[#calls + 1] = 'pack ' .. a .. '-' .. b end })
+  local s3 = { fx = 4, param = 1 }
+  DK.marks = { [1] = true, [4] = true }
+  eq('picked: Cmd marks in order', table.concat(DK.picked(s3), ','), '1,4')
+  DK.key(('b'):byte(), s3, 6, 3, {}); eq('b bypasses every picked', calls[#calls - 1] .. ' / ' .. calls[#calls], 'byp 1 / byp 4')
+  DK.key(('c'):byte(), s3, 6, 3, {}); eq('cc on picks apart: no pack', #calls, 2); eq('…pick dropped', DK.marks, nil)
+  DK.marks = { [2] = true, [5] = true }
+  DK.key(('x'):byte(), s3, 6, 3, {}); eq('x deletes picks apart as a list', calls[#calls], 'dellist 2,5')
+  DK.anchor = 2; s3.fx = 4
+  eq('picked: Shift range', table.concat(DK.picked(s3), ','), '2,3,4')
+  DK.key(('x'):byte(), s3, 6, 3, {}); eq('x on a range: one delete', calls[#calls], 'del 2-4'); eq('…range dropped', DK.anchor, nil)
+  DK.marks = { [3] = true }; DK.key(27, s3, 6, 3, {}); eq('Esc drops the pick', DK.marks, nil)
+end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
