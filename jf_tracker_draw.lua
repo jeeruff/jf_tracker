@@ -7678,7 +7678,12 @@ function D.frame(L, snap, rows, state, info)
             -- держится ли значение: последнее событие до строки
             local held
             for k = #ml.rows, 1, -1 do if ml.rows[k] <= r.row then held = ml.ev[ml.rows[k]].v; break end end
-            if held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
+            if held and ml.kind == 'pb' then
+              -- 22 окт: бенд — от центра (64 = без бенда — пусто; было — полоска на полширины в каждой строке)
+              local cx0, half = m.x + math.floor(m.w / 2), math.floor((m.w - 2) / 2)
+              local d = math.floor((held - 64) / 64 * half + 0.5)
+              if d ~= 0 then set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(d > 0 and cx0 or cx0 + d, y + L.rh - 4, math.abs(d), 3, 1) end
+            elseif held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat') then
               set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
             end
           end

@@ -15855,7 +15855,7 @@ function ctx.ctx_page(hover)
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
   if hover.btn and hover.btn.what == 'arm' then return nil end   -- 11 окт: меню записи — только своё
   if hover.only then return nil end
-  if hover.pool then return 'inst' elseif hover.matrix then return 'matrix' elseif hover.dsp then return 'dsp'   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
+  if hover.pool then return 'inst' elseif hover.dsp then return 'dsp' elseif type(hover.matrix) == 'table' and hover.matrix.inside then return 'matrix'   -- 22 окт: hover.matrix почти всегда {} (истина) — над DSP было меню матрицы   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
   local f = state.focus

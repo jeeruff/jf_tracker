@@ -35,7 +35,7 @@ local LEFT, RIGHT, UP, DOWN = 1818584692, 1919379572, 30064, 1685026670
 function DK.init(c) ctx = c end
 
 local HINT = {
-  d = 'd: d delete fx (v: range) | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
+  d = 'd: d delete fx (v: range) | w delete forward (d3w - three) | b delete the one before | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | Esc',
   a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | F take fx on the note | Esc',
@@ -68,7 +68,18 @@ function DK.key(c, sel, n, np, mods)
   local ch = c < 256 and string.char(c) or ''
   if DK.pending then
     local op = DK.pending
-    DK.pending = nil
+    -- 22 окт: d + движение: d3w — три модуля вперёд (с текущим), db — предыдущий; счёт и до d (3dw)
+    if op == 'd' and ch:match('^%d$') and not DK.digits_play then DK.pcount = ((DK.pcount or '') .. ch):sub(-3); ctx.msg('d' .. DK.pcount .. '...'); return true end
+    if op == 'd' and (ch == 'w' or ch == 'b') and not DK.pads then
+      local cnt = (tonumber(DK.pcount or '') or 1) * (tonumber(DK.dcount or '') or 1)
+      DK.pending, DK.pcount, DK.dcount = nil, nil, nil
+      local k0, k1
+      if ch == 'w' then k0, k1 = sel.fx, math.min(math.max(1, n), sel.fx + cnt - 1)
+      else k0, k1 = math.max(1, sel.fx - cnt), sel.fx - 1 end
+      if k1 >= k0 and n > 0 then ctx.dsp_delete(k0, k1) else ctx.msg('db: no module before this one') end
+      return true
+    end
+    DK.pending, DK.pcount, DK.dcount = nil, nil, nil
     if c == 27 then return true end
     if DK.pads and op == 'y' then
       if ch == 'y' then ctx.pad_yank(sel.fx) elseif ch == 'p' then ctx.pad_dup(sel.fx) end
@@ -116,6 +127,12 @@ function DK.key(c, sel, n, np, mods)
   if ch == 'i' and not DK.pads and np > 0 then
     DK.ins = { buf = '' }; DK.pslider = true; DK.num = nil
     ctx.msg('-- INSERT parameter --  type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter - set, Esc - cancel')
+    return true
+  end
+  -- 22 окт: Cmd+1..0 — модуль 1..10 (в трекере Cmd+цифра — канал: везде N-й элемент модуля в фокусе)
+  if mods.cmd and ch:match('^%d$') and not DK.pads then
+    local k = ch == '0' and 10 or tonumber(ch)
+    if k <= n then sel.fx = k; sel.param = 1; DK.pslider = nil; DK.num = nil else ctx.msg(('Cmd+%s: the chain has %d modules'):format(ch, n)) end
     return true
   end
   -- 22 окт: w / W — следующий / предыдущий модуль (как w в трекере — к следующему событию), по кругу, N w;
@@ -177,7 +194,7 @@ function DK.key(c, sel, n, np, mods)
     return 'leave'
   end
   if ch == 'd' or ch == 'y' or ch == 'c' or ch == 'a' then
-    DK.pending = ch; ctx.msg(ch .. '...'); return true
+    DK.pending = ch; DK.dcount = num; ctx.msg((num or '') .. ch .. '...'); return true   -- 22 окт: 3dw — счёт до оператора
   end
   if ch == 'h' or c == LEFT then sel.fx = math.max(1, sel.fx - (cnt or 1)); sel.param = 1
   elseif ch == 'l' or c == RIGHT then sel.fx = math.min(math.max(1, n), sel.fx + (cnt or 1)); sel.param = 1

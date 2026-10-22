@@ -46,4 +46,25 @@ do
   DK.key(('x'):byte(), s3, 6, 3, {}); eq('x on a range: one delete', calls[#calls], 'del 2-4'); eq('…range dropped', DK.anchor, nil)
   DK.marks = { [3] = true }; DK.key(27, s3, 6, 3, {}); eq('Esc drops the pick', DK.marks, nil)
 end
+-- 22 окт: d + движение
+do
+  local got
+  DK.init({ msg = function() end, dsp_delete = function(a, b) got = a .. '-' .. b end })
+  DK.digits_play = false; DK.marks, DK.anchor = nil, nil
+  local s4 = { fx = 2, param = 1 }
+  local function k4(str) for ch in str:gmatch('.') do DK.key(ch:byte(), s4, 6, 3, {}) end end
+  k4('d3w'); eq('d3w: three forward from the cursor', got, '2-4')
+  s4.fx = 3; k4('db'); eq('db: the one before', got, '2-2')
+  s4.fx = 1; got = nil; k4('db'); eq('db on the first: nothing', got, nil)
+  s4.fx = 5; k4('d5w'); eq('d5w clipped to the chain end', got, '5-6')
+  s4.fx = 1; k4('2dw'); eq('2dw: count before d', got, '1-2')
+  s4.fx = 4; k4('d2b'); eq('d2b: two before', got, '2-3')
+end
+do
+  DK.init({ msg = function() end })
+  local s5 = { fx = 1, param = 4 }
+  DK.key(('3'):byte(), s5, 6, 3, { cmd = true }); eq('Cmd+3: module 3', s5.fx, 3); eq('…param 1', s5.param, 1)
+  DK.key(('9'):byte(), s5, 6, 3, { cmd = true }); eq('Cmd+9 past the chain: stays', s5.fx, 3)
+  eq('Cmd+digit is not a count', DK.num, nil)
+end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
