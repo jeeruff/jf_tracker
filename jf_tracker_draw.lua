@@ -8288,13 +8288,13 @@ function D.frame(L, snap, rows, state, info)
       end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
-        local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
+        local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page and (info.dsptabs or 'bottom') ~= 'right') and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
         local _, nc = D.param_flow(f.params, nil, rows_fit, 0)   -- 22 окт: с высотой столбиков кнопок
         return math.max(1, math.min(3, nc))
       end
       -- 16 окт: секции потоком (f.heads) — колонок столько, сколько займёт поток при этой высоте
       if f.heads and not f.container then
-        local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
+        local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page and (info.dsptabs or 'bottom') ~= 'right') and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
         local _, nc = D.param_flow(f.params, f.heads, nfit2, 0)   -- 22 окт: тот же поток, что в раскладке
         return nc
       end
@@ -8396,8 +8396,11 @@ function D.frame(L, snap, rows, state, info)
         if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
       end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
-      -- 22 окт: вкладки страниц (zp) — строкой снизу модуля, не колонкой справа (место по ширине)
-      local htab = (f.pages and f.page) and L.rh or 0
+      -- 22 окт: вкладки страниц — опция dsptabs: bottom (строкой снизу) / top (строкой под шапкой) / right (колонкой справа)
+      local tabpos = info.dsptabs or 'bottom'
+      local htab = (f.pages and f.page and tabpos ~= 'right') and L.rh or 0
+      local vtw = (f.pages and f.page and tabpos == 'right') and (L.th + 2 * L.pad + 2) or 0
+      bw = bw + vtw
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
       local is_sel = sel.fx == k
@@ -8407,9 +8410,25 @@ function D.frame(L, snap, rows, state, info)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)
       if info.dsp_learn == k or ins_here then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
+      if vtw > 0 then
+        local tx0, ty = bx + bw - vtw, by + L.rh + 2
+        set(U.LINE); gfx.rect(tx0, by + L.rh + 1, 1, bh - L.rh - 3, 1)
+        for pi2, pn in ipairs(f.pages) do
+          local th2 = ms(pn) + 2 * L.pad
+          if ty + th2 > by + bh - 2 then break end
+          local on = pi2 == f.page
+          local hot = not drag and mx >= tx0 and mx < bx + bw - 1 and my >= ty and my < ty + th2
+          set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx0 + 1, ty, vtw - 3, th2 - 1, 1)
+          D.vtext(tx0 + L.pad, ty, th2, pn, on and U.AMBER or (hot and U.TEXT or U.GREY), on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG))
+          if hot then hover.dspbtn = { fx = k, f = f, what = 'kpage', page = pi2 } end
+          ty = ty + th2 + 1
+        end
+      end
+      local tab_top = 0
       if htab > 0 then
         local tx, ty = bx + 1, by + bh - htab - 1
-        set(U.LINE); gfx.rect(bx + 1, ty - 1, bw - 2, 1, 1)
+        if tabpos == 'top' then ty = by + L.rh + 1; tab_top = htab + 1 end
+        set(U.LINE); gfx.rect(bx + 1, tabpos == 'top' and (ty + htab) or (ty - 1), bw - 2, 1, 1)
         for pi2, pn in ipairs(f.pages) do
           local tw2 = ms(pn) + 2 * L.pad
           if tx + tw2 > bx + bw - 1 then break end
@@ -8536,6 +8555,7 @@ function D.frame(L, snap, rows, state, info)
       end
       local grp = f.groups and f.rows and nfit - 1 >= f.rows
       if grp then nfit = f.rows; aw_off = wtop + L.rh end
+      aw_off = aw_off + tab_top   -- 22 окт: вкладки сверху — параметры ниже них
       if awi then
         -- 11 окт: строки «[категория]» в блоке нет — категория и описание только в
         -- статусе внизу (под мышью или выбранный блок), блок — под параметры
@@ -9544,7 +9564,7 @@ function D.frame(L, snap, rows, state, info)
         local tw = math.max(12, math.floor(w * math.max(1, nshown) / n))
         local tx = x0 + math.floor((w - tw) * ((first - 1) / math.max(1, n - math.max(1, nshown))))
         tx = math.max(x0, math.min(tx, x0 + w - tw))
-        local inbar = mx >= x0 and mx < x0 + w and my >= sy - L.rh and my < sy + h + 6   -- 22 окт: зона шире полоски (щелчок на 5 px выше мимо)
+        local inbar = not hover.dspbtn and mx >= x0 and mx < x0 + w and my >= sy - 5 and my < sy + h + 6   -- 22 окт: зона шире полоски, но не над вкладками / кнопками (строка вкладок снизу — щелчок уходил в полосу)
         local onthumb = inbar and mx >= tx and mx < tx + tw
         set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x0, sy + math.floor(h / 2), w, 1, 1)
         set((onthumb or D.dsphsb_drag) and U.AMBER or U.GREY); gfx.rect(tx, sy, tw, h, 1)
