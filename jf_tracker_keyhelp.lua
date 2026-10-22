@@ -536,7 +536,7 @@ KH.PAGES = {
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
     { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },
     { k = 'snapshots', d = 'mixer, empty place on the left: SWS Snapshots 1..12 - click recalls, Shift+click saves as that number, right click - save / recall / the SWS Snapshots window (what they store: volume, pan, mute, fx ...); filled - cyan, the last recalled - amber' },
-    { k = 'macros', d = 'Macro 1..8 of a plugin (Surge M1..M8, Vital, Serum ...) - vertical faders on the left of its module: drag up / down; Ctrl+Cmd SLIDER over the module takes them first' },
+    { k = 'macros', d = 'Macro 1..8 of a plugin (Surge M1..M8, Vital, Serum ...) - the MACRO column on the left of its module, horizontal sliders; a click on MACRO folds it into a strip (click again - open); Ctrl+Cmd SLIDER over the module takes them first' },
     { k = 'XY presets', d = 'under the track block (option slim DSP track header off): 4 corners 1..4 - snapshots of every fx parameter of the track; click an empty corner - save, a filled one - recall, Shift+click - overwrite, right click - save / recall / clear; drag the pad - morph between the corners (one undo)' },
     { k = 'Ctrl+Enter', d = 'the dropdown of the parameter: a note (note lo / hi, root) - a keyboard of all octaves, a switch - the list of its values (a click on it - the same)' },
     { k = '^ $ N|', d = 'the first / last module, module N (3| - the third), as columns in Vim; Cmd+1..0 - a track, as in the tracker' },

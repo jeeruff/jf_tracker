@@ -8614,8 +8614,10 @@ function D.frame(L, snap, rows, state, info)
       local htab = (f.pages and f.page and tabpos ~= 'right') and L.rh or 0
       local vtw = (f.pages and f.page and tabpos == 'right') and (L.th + 2 * L.pad + 2) or 0
       bw = bw + vtw
-      -- 22 окт: макросы (Macro 1..8) — вертикальные фейдеры слева в модуле: ширина — по 1.5 знака на фейдер
-      local mw = (f.nmacro and not f.container) and (f.nmacro * math.max(8, math.floor(L.cw * 1.5)) + 2 * L.pad) or 0
+      -- 22 окт: макросы (Macro 1..8) — колонка MACRO слева в модуле: горизонтальные слайдеры; щелчок по заголовку —
+      -- свернуть в узкую полосу с вертикальной подписью (info.macfold по имени плагина)
+      local macfold = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
+      local mw = (f.nmacro and not f.container) and (macfold and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
       bw = bw + mw
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
@@ -8719,30 +8721,40 @@ function D.frame(L, snap, rows, state, info)
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
       if mw > 0 then
-        -- фейдеры макросов: дорожка, заливка снизу, ручка поперёк, номер под фейдером; щелчок / протяжка вверх-вниз
-        local fx0, fy0 = bx + L.pad, by + L.rh + 3
-        local fh = bh - 2 * L.rh - 6
-        local fwid = math.floor((mw - 2 * L.pad) / f.nmacro)
-        local mi = 0
-        for pi, p in ipairs(f.params) do
-          if p.mfader then
-            mi = mi + 1
-            local x0 = fx0 + (mi - 1) * fwid
-            local v = vals[pi] or { n = 0, s = '' }
-            local psel = is_sel and sel.param == pi
-            local hot = not drag and mx >= x0 and mx < x0 + fwid and my >= fy0 and my < fy0 + fh + L.rh
-            local mid = x0 + math.floor(fwid / 2)
-            set(U.DIM); gfx.rect(mid - 1, fy0, 2, fh, 1)
-            local ky = fy0 + fh - 1 - math.floor(math.max(0, math.min(1, v.n)) * (fh - 1) + 0.5)
-            set((hot or psel) and U.AMBER or U.CYAN, 0.7); gfx.rect(mid - 1, ky, 2, fy0 + fh - ky, 1)
-            set((hot or psel) and U.AMBER or U.TEXT); gfx.rect(x0 + 1, ky - 1, fwid - 2, 3, 1)
-            local lab = tostring(mi)
-            text(mid - math.floor(ms(lab) / 2), fy0 + fh + 2, lab, (hot or psel) and U.AMBER or U.GREY)
-            if hot then
-              hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (fy0 + fh - my) / math.max(1, fh))), onwidget = my < fy0 + fh }
+        local hy = by + L.rh + 2
+        if macfold then
+          -- свёрнуто: полоса с вертикальной подписью macro, щелчок — развернуть
+          local hot = not drag and mx >= bx and mx < bx + mw and my >= hy and my < by + bh
+          D.vtext(bx + L.pad, hy + 2, bh - L.rh - 8, 'macro ' .. f.nmacro, hot and U.AMBER or U.AMBER, U.BG)
+          if hot then hover.dspbtn = { fx = k, f = f, what = 'macfold' } end
+          hint('dspbtn', bx, hy, mw, bh - L.rh - 4, { fx = k, what = 'macfold' })
+        else
+          local hx, hw = bx + L.pad, mw - 2 * L.pad
+          local hot_h = not drag and mx >= hx and mx < hx + hw and my >= hy and my < hy + L.rh
+          set(U.LINE); gfx.rect(hx, hy + L.rh - 2, hw, 1, 1)
+          text(hx, hy, fit('MACRO', hw), hot_h and U.TEXT or U.AMBER)
+          if hot_h then hover.dspbtn = { fx = k, f = f, what = 'macfold' } end
+          hint('dspbtn', hx, hy, hw, L.rh, { fx = k, what = 'macfold' })
+          local mi = 0
+          for pi, p in ipairs(f.params) do
+            if p.mfader then
+              mi = mi + 1
+              local py = hy + mi * L.rh
+              if py + L.rh > by + bh - 2 then break end
+              local v = vals[pi] or { n = 0, s = '' }
+              local psel = is_sel and sel.param == pi
+              local lab = (p.name and not p.name:match('^%s*[Mm]%d') and not p.name:lower():match('^%s*macro')) and p.name or tostring(mi)
+              local lw = math.max(ms('8') + L.pad, math.min(math.floor(hw * 0.4), ms(lab) + L.pad))
+              local wx0, ww = hx + lw, hw - lw
+              local hot = not drag and mx >= hx and mx < hx + hw and my >= py and my < py + L.rh
+              text(hx, py, fit(lab, lw - 2), (hot or psel) and U.AMBER or U.TEXT)
+              local cy = py + math.floor(L.rh / 2)
+              set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)
+              set((hot or psel) and U.AMBER or U.CYAN); gfx.rect(wx0, py + 4, math.max(1, math.floor(math.max(0, math.min(1, v.n)) * ww + 0.5)), L.rh - 8, 1)
+              if hot then hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 } end
+              hint('dspparam', hx, py, hw, L.rh, { fx = k, param = pi })
+              if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, x = wx0, y = py, w = ww, h = L.rh } end
             end
-            hint('dspparam', x0, fy0, fwid, fh + L.rh, { fx = k, param = pi })
-            if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, ori = 'v', fx = p.fx or f.i, p = p.i, name = p.name, x = x0, y = fy0, w = fwid, h = fh } end
           end
         end
         set(U.LINE); gfx.rect(bx + mw - 2, by + L.rh + 2, 1, bh - L.rh - 4, 1)

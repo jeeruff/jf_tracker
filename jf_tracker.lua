@@ -19446,6 +19446,7 @@ local function frame()
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
+    macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
       if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
@@ -22718,6 +22719,9 @@ local function frame()
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
       elseif hover.dspbtn.what == 'ksize' then ctx.drum_size_menu()   -- 19 окт: размер пэдов
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
+      elseif hover.dspbtn.what == 'macfold' then   -- 22 окт: MACRO — свернуть / развернуть
+        local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
+        state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 22 окт: сложенный модуль — развернуть
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
