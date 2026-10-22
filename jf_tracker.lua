@@ -14656,6 +14656,7 @@ if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
 draw.step_index = model.step_index   -- 22 окт: ступени, распознанные по тексту (середины участков)
+draw.FP = dofile(DIR .. '/jf_tracker_fxparse.lua')   -- 22 окт: PLAN_DSP 2 — короткие значения и имена параметров DSP, когда не влезают
 -- Theme Adjuster / смена темы (2 окт): раз в секунду подпись темы; изменилась —
 -- палитра перечитывается (jf_looper_ui не трогаем: свежая копия, поля в U),
 -- draw заново выводит свои цвета, кэши картинок текста и цветов сброшены

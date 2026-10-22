@@ -10269,7 +10269,9 @@ function D.frame(L, snap, rows, state, info)
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
           end
         end
-        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), pins and U.RED or (psel and U.AMBER or U.TEXT))
+        local pnm, pnw = p.name or '', nw - L.pad - ms(p.mk or '')
+        if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
+        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and U.AMBER or U.TEXT))
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix
@@ -10301,6 +10303,7 @@ function D.frame(L, snap, rows, state, info)
             vs = nname(lo - tonumber(v.s))                 -- нота оригинала; сдвиг — в статусе
           elseif p.show == 'chan' then vs = (v.s == '0') and 'all' or v.s
           elseif p.labels and #p.labels == 2 then vs = p.labels[(v.n >= 0.5) and 2 or 1] end
+          if D.FP and ms(vs) > vw then vs = D.FP.compact(vs) end   -- 22 окт: не влезает — короткий вид (25087.71 Hz → 25.1k, 353.6 ms → 354ms)
           text(vx, py, fit(vs, vw), U.GREY)
         end
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
