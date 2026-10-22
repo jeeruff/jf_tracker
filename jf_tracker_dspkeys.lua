@@ -2,6 +2,7 @@
 --
 -- Объект — эффект (блок) цепочки трека курсора, внутри — параметр.
 --   h l          эффект влево / вправо      j k        параметр
+--   w W          следующий / предыдущий модуль (по кругу, N w; и из слайдера параметра)
 --   + - ^A ^X    значение (Shift — грубо)   Enter b    тоггл / bypass
 --   dd           удалить эффект (v — диапазон)
 --   dc           распаковать контейнер (дети в цепочку, контейнер долой)
@@ -81,6 +82,14 @@ function DK.key(c, sel, n, np, mods)
   if DK.anchor and (ch == 'd' or ch == 'x') then local r0, r1 = DK.range(sel); ctx.dsp_delete(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'c' then local r0, r1 = DK.range(sel); ctx.dsp_pack(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'y' then ctx.dsp_yank(sel.fx); DK.anchor = nil; return true end
+  -- 22 окт: w / W — следующий / предыдущий модуль (как w в трекере — к следующему событию), по кругу, N w;
+  -- из слайдера параметра тоже (он закрывается); в режиме пэдов w — буква параметра vel lo
+  if (ch == 'w' or ch == 'W') and not DK.pads then
+    local cnt0 = tonumber(DK.num or '') or 1; DK.num = nil; DK.pslider = nil; DK.pads_back = nil
+    local m = math.max(1, n)
+    sel.fx = ((sel.fx - 1 + (ch == 'W' and -cnt0 or cnt0)) % m) + 1; sel.param = 1
+    return true
+  end
   -- 19 окт: режим пэдов drumrs5k
   if DK.pads and ctx.pad_param_key and ctx.pad_param_key(sel, ch) then DK.pads = nil; DK.pslider = true; DK.pads_back = true; return true end   -- буква параметра — к нему (h l значение)
   if DK.pads then
