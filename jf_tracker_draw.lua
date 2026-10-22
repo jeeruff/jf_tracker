@@ -8897,7 +8897,15 @@ function D.frame(L, snap, rows, state, info)
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
       local room = right
-      if ncol > 1 and bx + bw1 * ncol > room and bx + bw1 <= room then ncol = math.max(1, math.floor((room - bx) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
+      -- 22 окт: колонка MACRO и вкладки справа — тоже место: считать их до подгонки колонок (иначе Surge
+      -- «не влезал» целиком и пропадал, хотя справа было пусто); один столбец не влез — столбец уже, до 10 знаков
+      local tabpos0 = info.dsptabs or 'bottom'
+      local vtw0 = (f.pages and f.page and tabpos0 == 'right') and (L.th + 2 * L.pad + 2) or 0
+      local macfold0 = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
+      local mw0 = (f.nmacro and not f.container) and (macfold0 and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
+      local extra = vtw0 + mw0
+      if ncol > 1 and bx + bw1 * ncol + extra > room and bx + bw1 + extra <= room then ncol = math.max(1, math.floor((room - bx - extra) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
+      if ncol == 1 and bx + bw1 + extra > room and room - bx - extra - L.pad >= L.cw * 10 then bw1 = room - bx - extra - L.pad end
       local bw = bw1 * ncol
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
       if f.kit and D.DR then
