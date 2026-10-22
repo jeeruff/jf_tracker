@@ -3249,7 +3249,7 @@ local function btn_row(L, x, w, yy, list, hover, col, enabled)
     set((hb or b[4]) and U.AMBER or (b[3] and U.CYAN or U.DIM)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 0)
     text(bx + L.pad, yy, b[2], enabled and ((hb or b[4]) and U.AMBER or (b[3] and U.TEXT or U.GREY)) or U.DIM)
     if hb then hover.trkmod = { col = col, what = b[1], tab = b[5], v = b[5] } end
-    hint('trkmod', bx, yy, bw, L.rh, { what = b[1] })
+    hint('trkmod', bx, yy, bw, L.rh, { what = b[1], tab = b[5], v = b[5] })
     bx = bx + bw + 2
   end
   return yy + L.rh

@@ -16050,6 +16050,24 @@ local function hint_go(t)
   elseif t.kind == 'tmpl' then ctx.tmpl_do(d)
   elseif t.kind == 'kgroup' or t.kind == 'kchoke' then ctx.pad_group_menu(d.kid, t.kind == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
   elseif t.kind == 'hum' then ctx.hum_click(d)   -- 21 окт: метки f панели humanizer
+  -- 22 окт: метки без прыжка (нашлись сверкой «hint(вид» ↔ эта функция) — делают то же, что щелчок
+  elseif t.kind == 'trkmod' then
+    local col = dsp_target()
+    if col and d and d.what and d.what ~= 'sl' and d.what ~= 'cv' and d.what ~= 'row' then ctx.set_focus('dsp'); ctx.trkmod_do({ col = col, what = d.what, tab = d.tab, v = d.v }) end
+  elseif t.kind == 'snapc' then local col = dsp_target(); if col and d then ctx.snap_recall(col, d.i) end
+  elseif t.kind == 'mixsnap' then if d then ctx.mixsnap_do(d.i, false) end
+  elseif t.kind == 'libtab' then state.libtab = d; ctx.set_focus('inst'); vim.msg = 'lib: ' .. tostring(d) .. ' (F4)'
+  elseif t.kind == 'mxbpm' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.bpm_prompt(seq[d]) end
+  elseif t.kind == 'mxsig' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.sig_prompt(seq[d]) end
+  elseif t.kind == 'mxvis' then local rg = d and seq[d.ri]; if rg then ctx.visor_pick(math.floor(rg.r0 + 0.5)) end
+  elseif t.kind == 'mlane' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.field, vim.cur.sub = d, 1, nil
+  elseif t.kind == 'arcring' then ctx.arc_assign(d)
+  elseif t.kind == 'macro' then state.focus = 'top'; MX.MR.sel = d; MX.MR.incol = 'list'   -- строка списка макросов (Enter — запуск)
+  elseif t.kind == 'slicebtn' then   -- 22 окт: кнопки слайсера (playthru, transients, 4 / 16 …) — прыжок f нажимает, как щелчок
+    ctx.set_focus('top'); state.toptab = 'sample'
+    local e = SL.entry or (cur_col() and (cur_col().pool or {})[vim.inst])
+    if e and e.item and not (SL.active and SL.entry and SL.entry.item == e.item) then SL.open(e, cur_col() and cur_col().track) end
+    SL.button(d)
   elseif t.kind == 'rf' then ctx.rf_click(d)
   elseif t.kind == 'rd' then ctx.rd_click(d)
   elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
