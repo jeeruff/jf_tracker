@@ -14345,7 +14345,8 @@ ctx = {
         local ar = ctx.arm_tmp
         if not (ar and ar.track == track) then
           if ar then ctx.arm_restore() end
-          ar = { track = track, inp = reaper.GetMediaTrackInfo_Value(track, 'I_RECINPUT'), mon = reaper.GetMediaTrackInfo_Value(track, 'I_RECMON') }
+          ar = { track = track, inp = reaper.GetMediaTrackInfo_Value(track, 'I_RECINPUT'), mon = reaper.GetMediaTrackInfo_Value(track, 'I_RECMON'),
+                 aa = reaper.GetMediaTrackInfo_Value(track, 'B_AUTO_RECARM') }   -- 22 окт: auto-arm — вернуть (арм вручную его снимает)
           ctx.arm_tmp = ar
           if ar.inp < 4096 then reaper.SetMediaTrackInfo_Value(track, 'I_RECINPUT', 4096 | (63 << 5)) end
           if ar.mon == 0 then reaper.SetMediaTrackInfo_Value(track, 'I_RECMON', 1) end
@@ -28689,6 +28690,7 @@ ctx.arm_restore = function()
   if not (state.armsel and cc and cc.track == ar.track) then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECARM', 0) end
   if ar.inp then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECINPUT', ar.inp) end
   if ar.mon then reaper.SetMediaTrackInfo_Value(ar.track, 'I_RECMON', ar.mon) end
+  if ar.aa == 1 and reaper.GetMediaTrackInfo_Value(ar.track, 'B_AUTO_RECARM') ~= 1 then reaper.SetMediaTrackInfo_Value(ar.track, 'B_AUTO_RECARM', 1) end   -- 22 окт: autoarm не пропадает после прослушки
 end
 -- 19 окт: кнопка drum плеера браузера — выбранный файл на лету в активный пэд рэка трека DSP (без undo на каждый),
 -- выкл drum — выбор фиксируется одним undo (откат вернёт прежний сэмпл пэда)
