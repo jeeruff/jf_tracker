@@ -2955,11 +2955,12 @@ function D.track_block_v(L, info, col, x, y, h, hover, rawc)
   local rem = y + h - yy
   local ioh = math.max(ms('out') + 2 * L.pad, math.floor(rem * 0.38))
   local smh = info.smart_ok and L.rh or 0
-  local fh = rem - ioh - L.rh - smh - 6
+  local fh = rem - ioh - 2 * L.rh - smh - 6   -- 22 окт: значения vol и pan — двумя строками под фейдерами (в одну слипались «-7.C»)
   local cw2 = math.floor((w - 3 * L.pad) / 2)
   local vol = lv('vol', col.vol or 1)
   local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
   local pan = lv('pan', col.pan or 0)
+  local vrow = 0
   local function fader(cx, what, frac, centered, label, val)
     if fh < 2 * L.rh then return end
     local tx = cx + L.th + 2                                 -- дорожка — справа от вертикальной подписи
@@ -2973,13 +2974,13 @@ function D.track_block_v(L, info, col, x, y, h, hover, rawc)
     if centered then local cy = yy + math.floor(fh / 2); gfx.rect(mid - 1, math.min(cy, ky), 2, math.abs(ky - cy) + 1, 1)
     else gfx.rect(mid - 1, ky, 2, yy + fh - ky, 1) end
     set(hot and U.AMBER or U.TEXT); gfx.rect(tx, ky - 1, tw2, 3, 1)  -- ручка поперёк дорожки
-    text(cx, yy + fh + 2, fit(val, cw2 + L.pad), U.GREY)
+    text(x + L.pad, yy + fh + 2 + vrow * L.rh, fit(label .. ' ' .. val, w - 2 * L.pad), U.GREY); vrow = vrow + 1
     if hot then hover.trs = { col = col, what = what, vert = true, strip = true, y0 = yy + fh, h = fh, sv = math.max(0, math.min(1, (yy + fh - my) / math.max(1, fh))) } end
     if D.csel_on(col.guid, what) then csel_frame(cx - 1, yy, cw2 + 2, fh) end
   end
   fader(x + L.pad, 'vol', D.fader_pos(db), false, 'vol', db <= -60 and '-inf' or ('%+.1f'):format(db))
   fader(x + 2 * L.pad + cw2, 'pan', (pan + 1) / 2, true, 'pan', math.abs(pan) < 0.005 and 'C' or ((pan < 0 and 'L' or 'R') .. math.floor(math.abs(pan) * 100 + 0.5)))
-  yy = yy + math.max(0, fh) + L.rh + 4
+  yy = yy + math.max(0, fh) + 2 * L.rh + 4
   if smh > 0 then
     local hot = mx >= x + L.pad and mx < x + w - L.pad and my >= yy and my < yy + L.rh
     set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x + L.pad, yy + 1, w - 2 * L.pad, L.rh - 2, 1)
