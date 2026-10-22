@@ -611,6 +611,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- 21 окт: внизу место — неполный ряд следующего паттерна (видно, что ниже есть куда листать); низ срезается фоном
   local ndraw = nvis
   if bottom - top - nvis * rh > 2 and regions[MX.scroll + nvis + 1] then ndraw = nvis + 1 end
+  MX.viewbox = nil
   for i = 1, ndraw do
     local ri = MX.scroll + i
     local rg = regions[ri]
@@ -815,7 +816,9 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           local span = math.max(1, rg.r1 - rg.r0)
           local y0 = y + math.floor((a - rg.r0) / span * rh)
           local y1 = y + math.floor((b - rg.r0) / span * rh + 0.5)
-          U.set(U.mix(U.BG, U.TEXT, 0.14)); gfx.rect(x, y0, L.mx_cell_w, math.max(2, y1 - y0), 1)
+          local vb = MX.viewbox      -- 22 окт: не заливка (похоже на выделение), а одна тонкая рамка вокруг всей зоны — после строк
+          if not vb then vb = { x0 = x, x1 = x + L.mx_cell_w, y0 = y0, y1 = y1 }; MX.viewbox = vb end
+          vb.x0 = math.min(vb.x0, x); vb.x1 = math.max(vb.x1, x + L.mx_cell_w); vb.y0 = math.min(vb.y0, y0); vb.y1 = math.max(vb.y1, math.max(y0 + 2, y1))
         end
       end
       U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
@@ -1078,6 +1081,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local ye = top + (last - MX.scroll) * rh
     if show_mk and last == #regions and ye + L.rh <= ybot then mark_row(mk_stop, ye, 'end') end
   end
+  local vb = MX.viewbox     -- зона, видная в трекере: тонкая рамка поверх клеток
+  if vb then U.set(U.mix(U.BG, U.TEXT, 0.55)); gfx.rect(vb.x0 - 1, vb.y0, vb.x1 - vb.x0 + 1, math.min(vb.y1, bottom) - vb.y0, 0) end
   if ndraw > nvis then   -- 21 окт: неполный ряд — срезать ниже своей зоны, полосу прокрутки вбок вернуть
     U.set(U.PANEL); gfx.rect(0, bottom, W, ybot - bottom, 1)
     if hbar_h > 0 and ctx.hbar then ctx.hbar('matrixh', L.mx_label_w, ybot - 4, ncv * L.mx_cell_w, 3, MX.hs, ncv, ncols) end
