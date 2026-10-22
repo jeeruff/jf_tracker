@@ -14081,6 +14081,23 @@ ctx.theme_tab.init(U, {
   font_id = function() return draw.font_id or 0 end,
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
   modefonts = function() return ctx.MODEFONTS end,
+  -- 22 окт: zf — модуль DSP сложен в полосу (имя вертикально + x B), zF — все модули (есть развёрнутые — сложить все, иначе развернуть)
+  dsp_mfold = function(which)
+    state.dsp_mfold = state.dsp_mfold or {}
+    local col = dsp_target(); local fxs = col and col.fx or {}
+    local function key(f) return tostring(f.fguid or f.i) end
+    if which == 'all' then
+      local any = false
+      for _, f in ipairs(fxs) do if not state.dsp_mfold[key(f)] then any = true end end
+      for _, f in ipairs(fxs) do state.dsp_mfold[key(f)] = any or nil end
+      vim.msg = any and ('zF: all %d modules folded (zF - unfold)'):format(#fxs) or 'zF: all modules unfolded'
+    else
+      local f = fxs[which]
+      if not f then vim.msg = 'zf: no module'; return end
+      state.dsp_mfold[key(f)] = (not state.dsp_mfold[key(f)]) or nil
+      vim.msg = state.dsp_mfold[key(f)] and ('zf: %s folded (zf or a click on it - unfold)'):format(f.name) or ('zf: %s unfolded'):format(f.name)
+    end
+  end,
   mode_word = function(f) local t = draw.MODE_SCRIPT[f]; return t and t.INSERT or 'INSERT' end,
   mode_scale = function(f) return draw.MODE_FONT_SCALE[f] or 1 end,
   modefont_get = function() return ctx.modefont_get() end,
@@ -19243,7 +19260,7 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
     kit_wave = ctx.kit_wave,
     midi_in_age = function(col)   -- 19 окт: метр MIDI: возраст события и velocity последней ноты
       local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]
@@ -22473,6 +22490,7 @@ local function frame()
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
       elseif hover.dspbtn.what == 'ksize' then ctx.drum_size_menu()   -- 19 окт: размер пэдов
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
+      elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 22 окт: сложенный модуль — развернуть
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
@@ -25149,14 +25167,15 @@ local function frame()
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
-          elseif ch == 'f' then   -- 16 окт: zf — модули со страницами (Surge): все сразу ↔ по одной, вкладки справа
+          elseif ch == 'p' then   -- 16 окт: модули со страницами (Surge): все сразу ↔ по одной; 22 окт: zp (было zf), вкладки строкой снизу
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-            vim.msg = model.dsp_fold and 'zf: pages folded - one page, tabs on the right of the module' or 'zf: pages unfolded - all of them in one pane'
+            vim.msg = model.dsp_fold and 'zp: pages folded - one page, tabs along the bottom of the module' or 'zp: pages unfolded - all of them in one pane'
+          elseif ch == 'f' or ch == 'F' then ctx.dsp_mfold(ch == 'F' and 'all' or dsp_sel.fx)   -- 22 окт: сложить модуль / все
           end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold / unfold module pages, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold the module, F - fold / unfold all, p - module pages, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

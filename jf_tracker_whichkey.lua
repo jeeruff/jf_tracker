@@ -38,7 +38,7 @@ local T = {
   r = { title = 'r - replace', items = { { 'key', 'the field under the cursor gets this value' } } },
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' }, { 'Opt+Shift+2', 'big panel' } } },
-  dsp_z = { title = 'z - router / pages', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'f', 'fold / unfold module pages (Surge: all in one pane / one page, tabs on the right)' }, { 's', 'size of the drumrs5k pads: s m l' }, { 'm', 'minimize the pane' } } },
+  dsp_z = { title = 'z - router / pages', items = { { 'z r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'f', 'fold the module (a strip: name vertically, x B)' }, { 'F', 'fold / unfold all modules' }, { 'p', 'module pages (Surge: all in one pane / one page, tabs below)' }, { 's', 'size of the drumrs5k pads: s m l' }, { 'm', 'minimize the pane' } } },
   dsp_zs = { title = 'zs - pad size', items = { { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4 (default)' } } },
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
         { 'a', 'automate the parameter' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },

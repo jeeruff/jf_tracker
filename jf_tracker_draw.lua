@@ -8250,7 +8250,7 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 16 окт: секции потоком (f.heads) — колонок столько, сколько займёт поток при этой высоте
       if f.heads and not f.container then
-        local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2) / L.rh))
+        local nfit2 = math.max(2, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
         local col, row = 0, 0
         for pi = 1, #f.params do
           if f.heads[pi] then
@@ -8302,6 +8302,40 @@ function D.frame(L, snap, rows, state, info)
     for k, f in ipairs(fxs) do
       if k < first then goto next_block end
       do
+      -- 22 окт: модуль сложен (zf / zF) — узкая полоса во всю высоту: кнопки x B сверху, имя вертикально (щелчок — развернуть)
+      if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
+        local kb = ms('O') + 2 * L.pad
+        local fw = math.max(kb, L.th + 2 * L.pad) + 2
+        if bx + fw > right and nshown > 0 then break end
+        nshown = nshown + 1
+        local is_sel = sel.fx == k
+        blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, cont = f.container }
+        set(U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
+        set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, boxy, fw, bh0, 0)
+        local yy, on_btn = boxy + 1, false
+        for _, b in ipairs({ { 'x', 'del' }, { 'B', 'bypass' } }) do
+          local kx = bx + math.floor((fw - kb) / 2)
+          local hot = not drag and mx >= kx and mx < kx + kb and my >= yy and my < yy + L.rh - 1
+          local lit = b[2] == 'bypass' and not f.enabled
+          local hc = b[2] == 'del' and U.RED or U.AMBER
+          set(hot and U.tint(hc, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, yy, kb, L.rh - 1, 1)
+          set(hot and hc or (lit and U.AMBER or U.LINE)); gfx.rect(kx, yy, kb, L.rh - 1, 0)
+          text(kx + L.pad, yy, b[1], hot and hc or (lit and U.AMBER or U.TEXT))
+          if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
+          hint('dspbtn', kx, yy, kb, L.rh - 1, { fx = k, what = b[2] })
+          yy = yy + L.rh
+        end
+        local nh = boxy + bh0 - yy - 2
+        local hot = not drag and not on_btn and mx >= bx and mx < bx + fw and my >= yy and my < boxy + bh0
+        if nh > L.cw then
+          D.vtext(bx + math.floor((fw - L.th) / 2), yy + 1, nh, (f.enabled and '' or '(off) ') .. (f.name or ''),
+            (hot or is_sel) and U.AMBER or (f.enabled and U.TEXT or U.GREY), U.BG)
+        end
+        if hot then hover.dspbtn = { fx = k, f = f, what = 'mfold' } end
+        hint('dspbtn', bx, yy, fw, math.max(1, nh), { fx = k, what = 'mfold' })
+        bx = bx + fw + L.pad
+        goto next_block
+      end
       local ncol = ncol_of(f)
       -- ширина колонки: 22 знака; тесно — оставшиеся блоки делят место
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
@@ -8327,8 +8361,8 @@ function D.frame(L, snap, rows, state, info)
         if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
       end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
-      local vtw = (f.pages and f.page) and (L.th + 2 * L.pad + 2) or 0
-      bw = bw + vtw
+      -- 22 окт: вкладки страниц (zp) — строкой снизу модуля, не колонкой справа (место по ширине)
+      local htab = (f.pages and f.page) and L.rh or 0
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
       local is_sel = sel.fx == k
@@ -8337,19 +8371,20 @@ function D.frame(L, snap, rows, state, info)
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
       if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
-      if vtw > 0 then
-        local tx0, ty = bx + bw - vtw, by + L.rh + 2
-        set(U.LINE); gfx.rect(tx0, by + L.rh + 1, 1, bh - L.rh - 3, 1)
+      if htab > 0 then
+        local tx, ty = bx + 1, by + bh - htab - 1
+        set(U.LINE); gfx.rect(bx + 1, ty - 1, bw - 2, 1, 1)
         for pi2, pn in ipairs(f.pages) do
-          local th2 = ms(pn) + 2 * L.pad
-          if ty + th2 > by + bh - 2 then break end
+          local tw2 = ms(pn) + 2 * L.pad
+          if tx + tw2 > bx + bw - 1 then break end
           local on = pi2 == f.page
-          local hot = not drag and mx >= tx0 and mx < bx + bw - 1 and my >= ty and my < ty + th2
-          set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx0 + 1, ty, vtw - 3, th2 - 1, 1)
-          D.vtext(tx0 + L.pad, ty, th2, pn, on and U.AMBER or (hot and U.TEXT or U.GREY), on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG))
+          local hot = not drag and mx >= tx and mx < tx + tw2 and my >= ty and my < ty + htab
+          set(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx, ty, tw2 - 1, htab, 1)
+          text(tx + L.pad, ty, pn, on and U.AMBER or (hot and U.TEXT or U.GREY))
           if hot then hover.dspbtn = { fx = k, f = f, what = 'kpage', page = pi2 } end
-          ty = ty + th2 + 1
+          tx = tx + tw2
         end
+        bh = bh - htab - 1
       end
       -- кнопки блока (2 окт): O — окно, B — bypass, x в правом углу — удалить
       local kb = ms('O') + 2 * L.pad
