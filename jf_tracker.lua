@@ -7083,6 +7083,10 @@ ctx = {
     local function rg_at(pos) for ri, rg in ipairs(seq) do if not rg.gap and math.abs(rg.pos - pos) < 1e-3 then return rg, ri end end end
     local function fx_of(c, fg)                                      -- эффект трека по GUID: k (номер в DSP), f
       for k, f in ipairs(c and c.fx or {}) do if reaper.TrackFX_GetFXGUID(c.track, f.i) == fg then return k, f end end
+      -- 22 окт: плагин внутри контейнера / пэда — по GUID ребёнка (p.fx)
+      for k, f in ipairs(c and c.fx or {}) do
+        for _, p in ipairs(f.params or {}) do if p.fx and reaper.TrackFX_GetFXGUID(c.track, p.fx) == fg then return k, f, p.fx end end
+      end
     end
     local function name(e)
       local c = col_of(e.guid)
@@ -7091,9 +7095,9 @@ ctx = {
         local rg = rg_at(e.pos)
         return ('mx   %s · %s'):format(rg and (rg.name ~= '' and rg.name or ('#' .. rg.idx)) or '(gone slot)', tn)
       elseif e.k == 'dsp' then
-        local _, f = fx_of(c, e.fx)
         local pn = '?'
-        if f then local _, n = reaper.TrackFX_GetParamName(c.track, f.i, e.p, ''); pn = n end
+        local _, f, kid = fx_of(c, e.fx)
+        if f then local _, n = reaper.TrackFX_GetParamName(c.track, kid or f.i, e.p, ''); pn = n end
         return ('dsp  %s · %s · %s'):format(tn, f and f.name or '(gone fx)', pn)
       end
       return ('trk  %s @ %04d'):format(tn, e.row)
@@ -7113,11 +7117,25 @@ ctx = {
         if state.panes_ui and L and L.pn then ctx.pane_focus('matrix') end
         MX.goto_cell(seq, snap, ri, ci); ctx.set_focus('matrix')
       elseif e.k == 'dsp' then
-        local k, f = fx_of(c, e.fx)
+        local k, f, kid = fx_of(c, e.fx)
         if not k then vim.msg = 'harpoon: the fx is gone (' .. name(e) .. ')'; return end
         to_track(e.guid); state.dsp_take = nil
-        dsp_sel.fx = k; dsp_sel.param = 1
-        for pi, p in ipairs(f.params or {}) do if p.i == e.p and not p.fx then dsp_sel.param = pi; break end end
+        dsp_sel.fx = k; dsp_sel.param = 1; DK.pslider = true
+        -- 22 окт: модуль сложен — развернуть; параметр на другой странице — открыть её
+        if state.dsp_mfold then state.dsp_mfold[tostring(f.fguid or f.i)] = nil end
+        local function find(ff) for pi, p in ipairs(ff.params or {}) do if p.i == e.p and ((kid and p.fx == kid) or (not kid and not p.fx)) then return pi end end end
+        local pi = find(f)
+        if not pi and f.pages then
+          local key = f.fxname or f.name
+          for pg = 1, #f.pages do
+            model.dsp_page[key] = pg; model.fx_gen = (model.fx_gen or 0) + 1
+            local fresh = model.track_fx(c.track)
+            for _, f2 in ipairs(fresh) do if f2.i == f.i then pi = find(f2) end end
+            if pi then break end
+          end
+          model.invalidate()
+        end
+        if pi then dsp_sel.param = pi else vim.msg = 'harpoon: the parameter is not shown in the module - open the plugin window (o)'; DK.pslider = nil end
         if state.panes_ui and L and L.pn then ctx.pane_focus('dsp') else state.dsp = true end
         ctx.set_focus('dsp')
       else
@@ -7135,10 +7153,18 @@ ctx = {
       local t = dsp_target()
       local f = t and not t.take and t.fx[dsp_sel.fx]
       local p = f and f.params and f.params[dsp_sel.param]
-      if p and not p.fx then here = { k = 'dsp', guid = t.col.guid, fx = reaper.TrackFX_GetFXGUID(t.track, f.i), p = p.i } end
+      if p then here = { k = 'dsp', guid = t.col.guid, fx = reaper.TrackFX_GetFXGUID(t.track, p.fx or f.i), p = p.i } end   -- 22 окт: и ребёнок контейнера / пэда
     else
       local f = L.flat[vim.cur.fi]
       if f and f.col then here = { k = 'trk', guid = f.col.guid, row = vim.cur.row } end
+    end
+    -- 22 окт: 'A — последний тронутый параметр (крутил в окне плагина, в DSP, в шапке) — откуда угодно
+    if ch == 'A' then
+      local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+      local tr = ok and ((tn == 0) and reaper.GetMasterTrack(0) or reaper.GetTrack(0, tn - 1))
+      if not (tr and fxn and fxn >= 0 and (fxn & 0x1000000) == 0) then vim.msg = "harpoon 'A: no last touched track fx parameter (move a knob in a plugin)"; return end
+      here = { k = 'dsp', guid = reaper.GetTrackGUID(tr), fx = reaper.TrackFX_GetFXGUID(tr, fxn), p = pn }
+      ch = 'a'
     end
     if ch == 'a' then
       if not here then vim.msg = 'harpoon: nothing to pin here (a track row, a matrix cell or a DSP parameter)'; return end
