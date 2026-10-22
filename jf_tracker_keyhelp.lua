@@ -518,6 +518,7 @@ KH.PAGES = {
     { k = 'Esc Opt+Tab', d = 'leave (saved) / next pane; also saved a second after typing' },
   } },
   fxb = { title = 'fx list (left of DSP)', e = {
+    { k = 'a A n', d = 'add the effect: a - to the cursor track (= Enter), A - to the selected tracks (Shift - the selected), n - on a new track' },
     { k = '/', d = "find (fzf): words, ^start, end$, 'exact, !not; Enter adds what is found, Esc clears" },
     { k = 'j k h l', m = 'move / tree', d = 'move in the list; h l - the tree of groups on the left (as REAPER: all, favorites, recent, instruments, types, categories, developers) and the list, Enter on the tree - that group', t = { 'j', 'k', 'h', 'l' } },
     { k = 'gt gT', d = 'go to a module / a project tab (as everywhere)' },

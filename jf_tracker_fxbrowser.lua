@@ -276,6 +276,8 @@ function FB.key(c, mods)
     if (ch == 'h' or c == 1818584692) and FB.tree_on then FB.col = 1; return true end
     if (ch == 'l' or c == 1919379572) and FB.tree_on then FB.col = 2; return true end
     if ch == '*' then FB.toggle_fav(FB.selected()); return true end
+    -- 22 окт: a — к треку курсора, A (Shift = выбранные) — к выбранным трекам, n — на новый трек
+    if ch == 'a' then return 'add' elseif ch == 'A' then return 'addsel' elseif ch == 'n' then return 'addnew' end
     if c == 13 then
       if tree then local r = rows[FB.tree_cur]; if r and r.node then FB.node = r.node; FB.cur = 1; FB.scroll = 0; FB.col = 2; skip_hdr(1) end; return true end
       return 'add'

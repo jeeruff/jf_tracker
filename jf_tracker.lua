@@ -1848,6 +1848,29 @@ ctx = {
   end,
   -- 22 окт: INSERT параметра (i, Enter): число — как dsp_type_value (023 = 0.23), иначе — начало имени значения
   -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
+  -- 22 окт: fx list — A (Shift = выбранные) к выбранным трекам, n — на новый трек
+  fxb_add_sel = function(it)
+    it = it or FB.selected(); if not it then return end
+    local nsel = reaper.CountSelectedTracks(0)
+    if nsel == 0 then vim.msg = 'A: no tracks selected in REAPER (Option+1..9 or click the names)'; return end
+    edit.run('fx add selected', function()
+      for i = 0, nsel - 1 do reaper.TrackFX_AddByName(reaper.GetSelectedTrack(0, i), it.data, false, -1) end
+    end)
+    FB.push_recent(it); ctx.fxb_save(); model.invalidate()
+    vim.msg = ('%s added to %d selected tracks (u - undo)'):format(FB.short(it.label), nsel)
+  end,
+  fxb_add_new = function(it)
+    it = it or FB.selected(); if not it then return end
+    edit.run('fx new track', function()
+      local n = reaper.CountTracks(0)
+      reaper.InsertTrackAtIndex(n, true)
+      local tr = reaper.GetTrack(0, n)
+      reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', (FB.short(it.label)), true)
+      reaper.TrackFX_AddByName(tr, it.data, false, -1)
+    end)
+    FB.push_recent(it); ctx.fxb_save(); model.invalidate()
+    vim.msg = FB.short(it.label) .. ' on a new track (u - undo)'
+  end,
   dsp_type_entry = function(k, pi, buf)
     local num = buf:match('^%s*([-+]?[%d%.]+)%s*$')
     if num and tonumber(num) then
@@ -16077,23 +16100,9 @@ function ctx.context_items(hover)
     local it = FB.selected()
     if it then
       local t = dsp_target()
-      add('Add to ' .. (t and (t.take and ('take FX of ' .. t.name) or t.name) or 'cursor track'), function() ctx.fxb_add(it) end)
-      add('Add to selected tracks', function()
-        edit.run('fx add selected', function()
-          for i = 0, reaper.CountSelectedTracks(0) - 1 do reaper.TrackFX_AddByName(reaper.GetSelectedTrack(0, i), it.data, false, -1) end
-        end)
-        FB.push_recent(it); ctx.fxb_save(); model.invalidate()
-      end)
-      add('Add on a new track', function()
-        edit.run('fx new track', function()
-          local n = reaper.CountTracks(0)
-          reaper.InsertTrackAtIndex(n, true)
-          local tr = reaper.GetTrack(0, n)
-          reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', (FB.short(it.label)), true)
-          reaper.TrackFX_AddByName(tr, it.data, false, -1)
-        end)
-        FB.push_recent(it); ctx.fxb_save(); model.invalidate()
-      end)
+      add('Add to ' .. (t and (t.take and ('take FX of ' .. t.name) or t.name) or 'cursor track'), function() ctx.fxb_add(it) end, 'a')
+      add('Add to selected tracks', function() ctx.fxb_add_sel(it) end, 'A')   -- 22 окт: A — Shift = выбранные
+      add('Add on a new track', function() ctx.fxb_add_new(it) end, 'n')
       add((FB.is_fav(it) and '!' or '') .. 'Favourite', function() FB.toggle_fav(it); ctx.fxb_save() end)
       add('FX browser in REAPER', function() reaper.Main_OnCommand(40271, 0) end, nil, true)
     end
@@ -25200,6 +25209,8 @@ local function frame()
         if c == 58 and FB.query == '' then return vim.key(c) end   -- 18 окт: : в пустом поиске — строка команды (тест набрал :pane в поиск и Enter добавил эффект)
         local r = FB.key(c, ctx.mods())
         if r == 'add' then ctx.fxb_add()
+        elseif r == 'addsel' then ctx.fxb_add_sel()   -- 22 окт
+        elseif r == 'addnew' then ctx.fxb_add_new()
         elseif r == 'gt' then ctx.tab_menu()        -- 21 окт: gt / gT — к модулям и вкладкам проектов и из fx list
         elseif r == 'gT' then ctx.project_menu()
         elseif r == 'leave' then ctx.toggle_focus() end
