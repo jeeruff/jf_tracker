@@ -673,6 +673,28 @@ function PN.drag_grip(model, lay, grip, dpx)
   local d = dpx / size
   d = math.max(-(p.fr[i] - 0.05), math.min(p.fr[i + 1] - 0.05, d))
   p.fr[i], p.fr[i + 1] = p.fr[i] + d, p.fr[i + 1] - d
+  -- 22 окт: сосед по ручке — узел той же оси (трекер над микшером в одном узле): сдвиг получает только его
+  -- лист у ручки, остальные внутри стоят на месте (было: делился по долям — тянешь низ микшера, едет его верх)
+  local px = d * size
+  local function keep(n, delta, last)
+    if not n or is_leaf(n) or n.ax ~= grip.ax then return end
+    local ids, sz, fs, tot = {}, {}, 0, 0
+    for k, kid in ipairs(n.kids) do
+      local r2 = lay.nodes[kid]
+      if r2 then ids[#ids + 1] = k; sz[#sz + 1] = grip.ax == 'h' and r2.w or r2.h; fs = fs + n.fr[k]; tot = tot + sz[#sz] end
+    end
+    if #ids < 2 or tot <= 0 then return end
+    local e = last and #ids or 1
+    sz[e] = math.max(1, sz[e] + delta)
+    local t2 = 0; for _, v in ipairs(sz) do t2 = t2 + v end
+    for j, k in ipairs(ids) do n.fr[k] = sz[j] / t2 * fs end
+    keep(n.kids[ids[e]], delta, last)
+  end
+  if math.abs(px) >= 0.5 then
+    local k1, k2 = grip.kid or p.kids[i], grip.next or p.kids[i + 1]
+    keep(k1, px, true)       -- сторона до ручки: растёт / сжимается её последний лист
+    keep(k2, -px, false)     -- после ручки: первый
+  end
   return bump(model)
 end
 function PN.equalize(model, id)

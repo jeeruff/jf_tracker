@@ -357,5 +357,38 @@ do
   eq('dsp is not hidden', m8.hidden.dsp, nil)
   tiling('after unspan', m8, 1600, 900)
 end
+-- 22 окт: любая ручка двигает только свою границу: у соседних листов меняется лишь край у ручки, остальные края
+-- всех модулей на месте (было: низ микшера тянул — ехал его верх, трекер над ним менялся)
+do
+  local function edges(lay)
+    local t = {}
+    for id, c in pairs(lay.by_panel) do t[id] = { c.x, c.y, c.x + c.w, c.y + c.h } end
+    return t
+  end
+  local base = PN.DEFAULT()
+  local lay0 = PN.layout(base, 1600, 1000, M)
+  for gi = 1, #lay0.grips do
+    for _, dpx in ipairs({ 20, -20 }) do
+      local m8 = PN.decode(PN.encode(base))
+      local l1 = PN.layout(m8, 1600, 1000, M)
+      local g = l1.grips[gi]
+      local pos = g.ax == 'v' and (g.y + (g.h - M.sep) // 2) or (g.x + (g.w - M.sep) // 2)
+      local e0 = edges(l1)
+      PN.drag_grip(m8, l1, g, dpx)
+      local e1 = edges(PN.layout(m8, 1600, 1000, M))
+      local ok = true
+      for id, a0 in pairs(e0) do
+        local a1 = e1[id]
+        for k = 1, 4 do
+          local axk = (k == 2 or k == 4) and 'v' or 'h'
+          local moved = math.abs(a1[k] - a0[k]) > 1
+          local at_grip = axk == g.ax and (math.abs(a0[k] - pos) <= 2 or math.abs(a0[k] - pos - M.sep) <= 2)
+          if moved and not at_grip then ok = false; print(('  grip %d (%s, %+d): %s edge %d %d -> %d'):format(gi, g.ax, dpx, id, k, a0[k], a1[k])) end
+        end
+      end
+      eq('grip ' .. gi .. ' ' .. dpx .. ': only its own edge moves', ok, true)
+    end
+  end
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
