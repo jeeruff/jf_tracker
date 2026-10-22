@@ -9060,18 +9060,27 @@ function D.frame(L, snap, rows, state, info)
           if hot_h then hover.dspbtn = { fx = k, f = f, what = 'macfold' } end
           hint('dspbtn', hx, hy, hw, L.rh, { fx = k, what = 'macfold' })
           local mi = 0
+          -- 22 окт: имена макросов из плагина (p.mlabel) — строкой над слайдером, если по высоте влезают все
+          -- (номер + имя, слайдер во всю ширину); не влезают — как раньше: номер слева, имя — в статусе
+          local named = false
+          for _, p in ipairs(f.params) do if p.mfader and p.mlabel then named = true; break end end
+          local two = named and (hy + (1 + 2 * f.nmacro) * L.rh <= by + bh - 2)
           for pi, p in ipairs(f.params) do
             if p.mfader then
               mi = mi + 1
-              local py = hy + mi * L.rh
-              if py + L.rh > by + bh - 2 then break end
+              local py = two and (hy + L.rh + (mi - 1) * 2 * L.rh) or (hy + mi * L.rh)
+              if py + (two and 2 or 1) * L.rh > by + bh - 2 then break end
               local v = vals[pi] or { n = 0, s = '' }
               local psel = is_sel and sel.param == pi
-              local lab = (p.name and not p.name:match('^%s*[Mm]%d') and not p.name:lower():match('^%s*macro')) and p.name or tostring(mi)
-              local lw = math.max(ms('8') + L.pad, math.min(math.floor(hw * 0.4), ms(lab) + L.pad))
+              local hot = not drag and mx >= hx and mx < hx + hw and my >= py and my < py + (two and 2 or 1) * L.rh
+              if two then
+                text(hx, py, fit(mi .. ' ' .. (p.mlabel or '-'), hw), (hot or psel) and U.AMBER or (p.mlabel and U.TEXT or U.GREY))
+                py = py + L.rh
+              end
+              local lab = two and '' or tostring(mi)
+              local lw = two and 0 or (ms('8') + L.pad)
               local wx0, ww = hx + lw, hw - lw
-              local hot = not drag and mx >= hx and mx < hx + hw and my >= py and my < py + L.rh
-              text(hx, py, fit(lab, lw - 2), (hot or psel) and U.AMBER or U.TEXT)
+              if lw > 0 then text(hx, py, fit(lab, lw - 2), (hot or psel) and U.AMBER or U.TEXT) end
               local cy = py + math.floor(L.rh / 2)
               set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)
               set((hot or psel) and U.AMBER or U.CYAN); gfx.rect(wx0, py + 4, math.max(1, math.floor(math.max(0, math.min(1, v.n)) * ww + 0.5)), L.rh - 8, 1)

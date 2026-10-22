@@ -1402,6 +1402,30 @@ function M.macroize(out, tr)
     end
   end
 end
+-- 22 окт: имя макроса из плагина (живое: пресет переименовывает) — «M1: Brightness» → Brightness,
+-- «Macro 3» / «M2: -» / пусто — без имени (nil). Чистое: M.macro_label(имя параметра)
+function M.macro_label(name)
+  name = name or ''
+  local lab = name:match('^%s*[Mm]%d+%s*:%s*(.-)%s*$') or name:match('^%s*[Mm]acro%s*%d+%s*:%s*(.-)%s*$')
+  if not lab then
+    if M.is_macro_name(name) then return nil end
+    lab = name:match('^%s*(.-)%s*$')
+  end
+  if lab == '' or lab:match('^[%-%s]+$') then return nil end
+  return lab
+end
+-- имена макросов модулей — заново при каждой сборке (кэш цепочки имён не ловит), 8 вызовов на модуль
+function M.macro_labels(tr, out)
+  local A = M.fxapi(tr)
+  if not A.GetParamName then return end
+  for _, e in ipairs(out) do
+    if e.nmacro then
+      for _, p in ipairs(e.params) do
+        if p.mfader then local _, nm = A.GetParamName(tr, p.fx or e.i, p.i, ''); p.mlabel = M.macro_label(nm) end
+      end
+    end
+  end
+end
 -- индекс ступени по значению 0..1: у «распознанных» — ближайшая середина участка
 function M.step_index(p, v)
   if p.stepnorm then
@@ -1580,6 +1604,7 @@ function M.track_fx(tr)
       end
     end
     mark_params(tr, A, c.out)
+    M.macro_labels(tr, c.out)
     return c.out
   end
   local out = build_track_fx(tr)
@@ -1588,6 +1613,7 @@ function M.track_fx(tr)
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
   mark_params(tr, A, out)
+  M.macro_labels(tr, out)
   return out
 end
 

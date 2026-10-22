@@ -17,4 +17,11 @@ local one = { params = { { name = 'Macro 1' }, { name = 'x' } } }
 M.macroize({ one }); eq(one.nmacro, nil, 'one macro - not a bank')
 local kit = { kit = true, params = { { name = 'Macro 1' }, { name = 'Macro 2' } } }
 M.macroize({ kit }); eq(kit.nmacro, nil, 'kits keep their own macros')
+-- 22 окт: имя макроса из плагина
+eq(M.macro_label('M1: Brightness'), 'Brightness', 'surge named macro')
+eq(M.macro_label('M3: -'), nil, 'surge unnamed macro')
+eq(M.macro_label('M2:   '), nil, 'empty name')
+eq(M.macro_label('Macro 4'), nil, 'generic Macro N - no name')
+eq(M.macro_label('Macro 5: Drive'), 'Drive', 'Macro N: name')
+eq(M.macro_label('Wobble'), 'Wobble', 'a plain name stays')
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
