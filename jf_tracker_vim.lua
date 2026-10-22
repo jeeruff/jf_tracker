@@ -2526,6 +2526,17 @@ function V.key_impl(c)
             -- продолжение события: обрезать его в этой строке (как note-off),
             -- новая нота — в ту же подколонку
             E.note_off({ cell.of }, lpb(), V.cur.row)
+          elseif cell and cell.kind == 'midi' and cell.pitch then
+            -- 22 окт: MIDI-нота поверх MIDI-ноты — меняется только высота: длина и OFF остаются (было: удаление
+            -- и новая нота длиной в шаг — OFF срезался)
+            local src = ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)
+            if src == nil or src == 'midi' then
+              E.set_pitch({ cell }, lpb(), pitch)
+              if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, src, V.cur.row, V.step_auto and 1 or V.step) end
+              V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
+              return
+            end
+            E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil
           elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then
             E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil   -- строка с названием — перезапись (21 окт: клип остаётся)
           end
