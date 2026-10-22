@@ -3130,60 +3130,6 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   if D.sendpop == col.guid then
     D.late_send = function() D.draw_sendpop(L, info, col, io, x, ry0, hover) end
   end
-  -- 22 окт: мини-панель mod · auto — модуляции и автоматизация параметров трека (быстрое назначение):
-  -- заголовок — свернуть; строка — к параметру (ПКМ — его меню); снизу кнопки для выбранного в DSP параметра
-  local tm = info.trk_mods and info.trk_mods(col)
-  if tm and yy + L.rh <= y + h then
-    local hot = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
-    set(U.LINE); gfx.rect(x + L.pad, yy + L.rh - 2, w - 2 * L.pad, 1, 1)
-    text(x + L.pad, yy, fit((tm.folded and '+ ' or '- ') .. 'mod · auto  ' .. #tm.rows, w - 2 * L.pad), hot and U.AMBER or U.AMBER)
-    if hot then hover.trkmod = { col = col, what = 'fold' } end
-    hint('trkmod', x, yy, w, L.rh, { what = 'fold' })
-    yy = yy + L.rh
-    if not tm.folded then
-      -- 22 окт: XY-пэд снизу не вытеснять — место под него (4 строки) оставить, строк панели не больше 6
-      local xyres = info.track_snaps and (4 * L.rh + 8) or 0
-      local room2 = y + h - yy - 2 * L.rh - 4 - xyres
-      local nshow = math.max(0, math.min(#tm.rows, 6, math.floor(room2 / L.rh)))
-      local more = #tm.rows > nshow and nshow > 0
-      if more then nshow = nshow - 1 end            -- последняя строка — «+N more», не поверх параметра
-      local FL = { { 'lfo', 'L', U.CYAN }, { 'acs', 'A', U.GREEN }, { 'lnk', 'K', U.AMBER }, { 'env', 'E', U.TEXT } }
-      local flw = ms('LAKE') + L.pad
-      for r = 1, nshow do
-        local row = tm.rows[r]
-        local rh2 = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
-        if rh2 then set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, yy, w - 2, L.rh, 1); hover.trkmod = { col = col, what = 'row', r = r } end
-        text(x + L.pad, yy, fit(row.label, w - 2 * L.pad - flw), row.sel and U.AMBER or U.TEXT)
-        local fx0 = x + w - L.pad - flw + L.pad
-        for _, fl in ipairs(FL) do
-          if row[fl[1]] then text(fx0, yy, fl[2], fl[3]) end
-          fx0 = fx0 + ms(fl[2])
-        end
-        yy = yy + L.rh
-      end
-      if more then text(x + L.pad, yy, fit(('+%d more - automation tab'):format(#tm.rows - nshow), w - 2 * L.pad), U.GREY); yy = yy + L.rh end
-      -- выбранный параметр DSP и кнопки назначения
-      if yy + 2 * L.rh <= y + h then
-        text(x + L.pad, yy, fit(tm.sel and ('> ' .. tm.sel) or '> pick a parameter in DSP', w - 2 * L.pad), tm.sel and U.TEXT or U.GREY)
-        yy = yy + L.rh
-        local B = { { 'lfo', 'lfo' }, { 'acs', 'acs' }, { 'lnk', 'link' }, { 'env', 'env' }, { 'side', 'side' } }
-        local bx2 = x + L.pad
-        for _, b in ipairs(B) do
-          local bw2 = ms(b[2]) + 2 * L.pad
-          if bx2 + bw2 > x + w - L.pad then break end
-          local on = tm.selflags and tm.selflags[b[1]]
-          local hb = tm.sel and mx >= bx2 and mx < bx2 + bw2 and my >= yy and my < yy + L.rh
-          set(hb and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 1)
-          set(hb and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 0)
-          text(bx2 + L.pad, yy, b[2], tm.sel and (hb and U.AMBER or (on and U.TEXT or U.GREY)) or U.DIM)
-          if hb then hover.trkmod = { col = col, what = b[1] } end
-          hint('trkmod', bx2, yy, bw2, L.rh, { what = b[1] })
-          bx2 = bx2 + bw2 + 2
-        end
-        yy = yy + L.rh + 2
-      end
-    end
-  end
   -- 22 окт: быстрые пресеты трека — XY-пэд на пустом месте, в углах снапшоты 1..4 (все параметры FX трека),
   -- шайба — морф между ними; щелчок по пустому углу — запомнить, по полному — вызвать, Shift — перезаписать
   local sinfo = info.track_snaps and info.track_snaps(col)
@@ -3217,9 +3163,142 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     end
     if onpad and not oncorner then hover.snappad = { col = col, x0 = px0, y0 = py0, side = side } end
   end
+  -- 22 окт: mod · auto — вертикальной кнопкой у правого края блока; раскрытая — блок вдвое шире,
+  -- справа панель: модулированные / автоматизированные параметры трека (LFO и кривые — графикой),
+  -- кнопки назначения для выбранного в DSP параметра и podkat (anticipate: кривая до ноты)
+  local tm = info.trk_mods and info.trk_mods(col)
+  local extra = 0
+  if tm then
+    local sw = L.th + 6
+    local sx = x + w
+    local hot = mx >= sx and mx < sx + sw and my >= y and my < y + h
+    local on = tm.wide
+    set(on and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)); gfx.rect(sx, y, sw, h, 1)
+    set((on or hot) and U.AMBER or U.LINE); gfx.rect(sx, y, sw, h, 0)
+    local lbl = 'mod · auto ' .. #tm.rows
+    if ms(lbl) > h - 6 then lbl = 'mod ' .. #tm.rows end
+    local tl = math.min(ms(lbl), h - 6)
+    D.vtext(sx + math.floor((sw - L.th) / 2), y + 3, tl, lbl, (on or hot) and U.AMBER or (#tm.rows > 0 and U.TEXT or U.GREY), on and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg), true)
+    if hot then hover.trkmod = { col = col, what = 'wide' } end
+    hint('trkmod', sx, y, sw, h, { what = 'wide' })
+    extra = sw
+    if on then
+      local pw = w
+      local px = sx + sw
+      fill(rbg); gfx.rect(px, y, pw, h, 1)
+      extra = extra + pw
+      D.modauto_panel(L, info, col, tm, px, y, pw, h, hover)
+      set(U.LINE); gfx.rect(px, y, pw, h, 0)
+    end
+  end
   U.TEXT, U.GREY = T0, G0
   set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
-  return w
+  return w + extra
+end
+
+-- 22 окт: LFO REAPER графикой — значение 0..1 формы shape в точке t (два периода на ширину)
+function D.lfo_val(shape, t)
+  local f = (2 * t) % 1
+  if shape == 1 then return f < 0.5 and 1 or 0
+  elseif shape == 2 then return 1 - f
+  elseif shape == 3 then return f
+  elseif shape == 4 then return 1 - math.abs(2 * f - 1)
+  elseif shape == 5 then local k = math.floor(t * 8); local v = math.sin(k * 12.9898 + 4.1) * 43758.5453; return v - math.floor(v)
+  end
+  return 0.5 + 0.5 * math.sin(2 * math.pi * 2 * t)
+end
+
+-- мини-график строки панели: LFO — волна (циан), иначе кривая огибающей по песне
+local function mod_graph(x, y, w, h, r, col)
+  if w < 6 or h < 3 then return end
+  set(U.mix(U.LINE, U.BG, 0.4)); gfx.rect(x, y + h - 1, w, 1, 1)
+  set(col)
+  local px, py
+  for i = 0, w - 1 do
+    local t = i / math.max(1, w - 1)
+    local v
+    if r.lfoshape then v = 0.5 + (D.lfo_val(r.lfoshape, t) - 0.5) * math.max(0.15, math.min(1, r.lfostr or 1))
+    elseif r.pts then
+      local f = t * (#r.pts - 1)
+      local a = math.floor(f)
+      local p0, p1 = r.pts[a + 1], r.pts[math.min(#r.pts, a + 2)]
+      v = p0[2] + (p1[2] - p0[2]) * (f - a)
+    else return end
+    local cy = y + h - 1 - math.floor(v * (h - 1) + 0.5)
+    if px then gfx.line(px, py, x + i, cy) end
+    px, py = x + i, cy
+  end
+end
+
+local PK_PRE = { [0.25] = '1/16', [0.5] = '1/8', [1] = '1/4', [2] = '1/2', [4] = '1 bar', [8] = '2 bars' }
+
+function D.modauto_panel(L, info, col, tm, x, y, w, h, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local yy = y + 3
+  text(x + L.pad, yy, fit('mod · auto  ' .. #tm.rows, w - 2 * L.pad), U.AMBER)
+  set(U.LINE); gfx.rect(x + L.pad, yy + L.rh - 2, w - 2 * L.pad, 1, 1)
+  yy = yy + L.rh
+  -- кнопки снизу: раскладка заранее (сколько строк займут), строки параметров — над ними
+  local function btn_rows(list)
+    local rows, bx, n = 1, x + L.pad, 0
+    for _, b in ipairs(list) do
+      local bw = ms(b[2]) + 2 * L.pad
+      if bx + bw > x + w - L.pad and n > 0 then rows = rows + 1; bx = x + L.pad end
+      bx = bx + bw + 2; n = n + 1
+    end
+    return rows
+  end
+  local B = { { 'lfo', 'lfo' }, { 'acs', 'acs' }, { 'lnk', 'link' }, { 'env', 'env' }, { 'side', 'side' }, { 'pk', 'podkat' } }
+  local pc = tm.selpk
+  local PB = pc and { { 'pkpre', 'pre ' .. (PK_PRE[pc.pre] or ('%g'):format(pc.pre)) }, { 'pkkey', 'key' }, { 'pkvel', 'vel' },
+    { 'pkhum', 'hum ' .. (pc.hum or 0) .. '%' }, { 'pkedit', 'curve' } } or nil
+  local nb = 1 + btn_rows(B) + (PB and btn_rows(PB) or 0)
+  local bottom = y + h - nb * L.rh - 4
+  local FL = { { 'lfo', 'L', U.CYAN }, { 'acs', 'A', U.GREEN }, { 'lnk', 'K', U.AMBER }, { 'env', 'E', U.TEXT }, { 'pk', 'P', U.MAGENTA or U.AMBER } }
+  local flw = ms('LAKEP') + L.pad
+  local gw = math.floor(w * 0.3)
+  local nfit = math.max(0, math.floor((bottom - yy) / L.rh))
+  local more = #tm.rows > nfit and nfit > 0
+  local nshow = math.min(#tm.rows, more and nfit - 1 or nfit)
+  if #tm.rows == 0 and nfit > 0 then text(x + L.pad, yy, fit('nothing modulated or automated yet', w - 2 * L.pad), U.GREY); yy = yy + L.rh end
+  for r = 1, nshow do
+    local row = tm.rows[r]
+    local hot = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
+    if hot or row.sel then set(U.tint(U.AMBER, row.sel and 0.25 or 0.15)); gfx.rect(x + 1, yy, w - 2, L.rh, 1) end
+    if hot then hover.trkmod = { col = col, what = 'row', r = r } end
+    local gx = x + w - L.pad - gw
+    local fx0 = gx - L.pad - flw
+    text(x + L.pad, yy, fit(row.label, fx0 - x - 2 * L.pad), row.sel and U.AMBER or U.TEXT)
+    for _, fl in ipairs(FL) do
+      if row[fl[1]] then text(fx0, yy, fl[2], fl[3]) end
+      fx0 = fx0 + ms(fl[2])
+    end
+    mod_graph(gx, yy + 2, gw, L.rh - 4, row, row.lfoshape and U.CYAN or (hot and U.AMBER or U.GREY))
+    yy = yy + L.rh
+  end
+  if more then text(x + L.pad, yy, fit(('+%d more - automation tab'):format(#tm.rows - nshow), w - 2 * L.pad), U.GREY) end
+  -- выбранный параметр и кнопки
+  yy = bottom
+  text(x + L.pad, yy, fit(tm.sel and ('> ' .. tm.sel) or '> pick a parameter in DSP', w - 2 * L.pad), tm.sel and U.TEXT or U.GREY)
+  yy = yy + L.rh
+  local function buttons(list, flags)
+    local bx = x + L.pad
+    for n, b in ipairs(list) do
+      local bw = ms(b[2]) + 2 * L.pad
+      if bx + bw > x + w - L.pad and n > 1 then bx = x + L.pad; yy = yy + L.rh end
+      local on = flags and flags[b[1]]
+      local hb = tm.sel and mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh
+      set(hb and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 1)
+      set(hb and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 0)
+      text(bx + L.pad, yy, b[2], tm.sel and (hb and U.AMBER or (on and U.TEXT or U.GREY)) or U.DIM)
+      if hb then hover.trkmod = { col = col, what = b[1] } end
+      hint('trkmod', bx, yy, bw, L.rh, { what = b[1] })
+      bx = bx + bw + 2
+    end
+    yy = yy + L.rh
+  end
+  buttons(B, tm.selflags)
+  if PB then buttons(PB, { pkkey = pc.key, pkvel = pc.vel, pkhum = (pc.hum or 0) > 0 }) end
 end
 
 -- панель сендов трека (3 окт): над строкой sends блока трека DSP (не влезает —

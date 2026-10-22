@@ -1859,13 +1859,34 @@ ctx = {
     local c = ctx.tmod[col]
     if not c then
       c = { rows = {} }
-      local function flag(id, pi, what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s.active'):format(pi, what)); return ok and v == '1' end
+      local function cfg(id, pi, what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s'):format(pi, what)); return ok and v or nil end
+      local function flag(id, pi, what) return cfg(id, pi, what .. '.active') == '1' end
+      -- 22 окт: podkat (anticipate) трека — по ключу fx:GUID:параметр (как note mod)
+      local pks = {}
+      for i, pc in ipairs(edit.pk_get(col.track)) do pks[pc.env] = i end
+      c.pk = edit.pk_get(col.track)
+      local plen = reaper.GetProjectLength(0)
       for k, f in ipairs(col.fx or {}) do
+        local guid = not f.kids and reaper.TrackFX_GetFXGUID(col.track, f.i) or nil
         for pi, p in ipairs(f.params or {}) do
-          if p.auto or p.mod then
+          local pkey = guid and not p.fx and ('fx:%s:%d'):format(guid, p.i) or nil
+          if p.auto or p.mod or (pkey and pks[pkey]) then
             local id = p.fx or f.i
-            c.rows[#c.rows + 1] = { k = k, pi = pi, label = (p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8), env = p.auto,
+            local r = { k = k, pi = pi, label = (p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8), env = p.auto, pkey = pkey, pk = pkey and pks[pkey],
               lfo = p.mod and flag(id, p.i, 'lfo'), acs = p.mod and flag(id, p.i, 'acs'), lnk = p.mod and flag(id, p.i, 'plink') }
+            -- LFO — графикой: форма (0 sine 1 square 2 saw L 3 saw R 4 tri 5 random), сила
+            if r.lfo then r.lfoshape = tonumber(cfg(id, p.i, 'lfo.shape') or '0'); r.lfostr = tonumber(cfg(id, p.i, 'lfo.strength') or '1') or 1 end
+            -- автоматизация — мини-кривая огибающей по всей песне (ссылка: щелчок — огибающая)
+            local env = p.auto and reaper.GetFXEnvelope(col.track, id, p.i, false)
+            if env and plen > 0 then
+              local pts, mode = {}, reaper.GetEnvelopeScalingMode(env)
+              for s2 = 0, 31 do
+                local _, v = reaper.Envelope_Evaluate(env, plen * s2 / 31, 44100, 0)
+                pts[#pts + 1] = { s2 / 31, math.max(0, math.min(1, reaper.ScaleFromEnvelopeMode(mode, v))) }
+              end
+              r.pts = pts
+            end
+            c.rows[#c.rows + 1] = r
           end
         end
       end
@@ -1874,10 +1895,19 @@ ctx = {
     local t = dsp_target()
     local f = t and t.col == col and (col.fx or {})[dsp_sel.fx]
     local p = f and f.params and f.params[dsp_sel.param]
-    c.folded = state.dsp_modfold
+    c.wide = state.dsp_modwide
     c.sel = p and ((p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8)) or nil
     c.selflags = nil
     for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
+    -- podkat выбранного параметра: его запись (настройки — строкой кнопок)
+    c.selpk = nil
+    if p and not f.kids and not p.fx then
+      local key = ('fx:%s:%d'):format(reaper.TrackFX_GetFXGUID(col.track, f.i), p.i)
+      for i, pc in ipairs(c.pk or {}) do if pc.env == key then c.selpk = pc; c.selpki = i end end
+      c.selkey = key
+    else c.selkey = nil end
+    c.selflags = c.selflags or {}
+    c.selflags.pk = c.selpk ~= nil
     return c
   end,
   -- 22 окт: зависимость от другого канала — сайдчейн: посыл с трека-источника в каналы 3/4 этого трека и ACS
@@ -1901,7 +1931,7 @@ ctx = {
   end,
   trkmod_do = function(h, rclick)
     local col = h.col
-    if h.what == 'fold' then state.dsp_modfold = not state.dsp_modfold; return end
+    if h.what == 'wide' then state.dsp_modwide = not state.dsp_modwide; return end
     local c = ctx.trk_mods(col)
     if h.what == 'row' then
       local r = c and c.rows[h.r]; if not r then return end
@@ -1916,7 +1946,48 @@ ctx = {
     if h.what == 'lfo' or h.what == 'acs' then edit.mod_set(col.track, id, p.i, h.what)
     elseif h.what == 'lnk' then if ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
     elseif h.what == 'env' then edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate()
-    elseif h.what == 'side' then ctx.mod_sidechain(col, id, p.i, p.name) end
+    elseif h.what == 'side' then ctx.mod_sidechain(col, id, p.i, p.name)
+    elseif h.what == 'pk' then ctx.podkat_do(col, c, f, p, rclick and 'menu' or 'toggle')
+    elseif h.what:match('^pk') then ctx.podkat_do(col, c, f, p, h.what) end
+  end,
+  -- 22 окт: podkat (функция anticipate) — кривая автоматизации ДО каждой ноты трека (как клипы автоматизации FL),
+  -- нативно: pooled automation items на огибающей параметра, edit.pk_* (jf_tracker_podkat.lua)
+  podkat_do = function(col, c, f, p, what)
+    if not c.selkey then vim.msg = 'podkat: parameters of an fx inside a container - not yet'; return end
+    local tr, i, pc = col.track, c.selpki, c.selpk
+    local function done() ctx.tmod = nil; model.invalidate() end
+    if what == 'toggle' then
+      if pc then edit.pk_remove(tr, i); vim.msg = 'podkat off: ' .. (p.name or '') .. ' - its automation items removed'
+      else
+        local ok, why = edit.pk_add(tr, c.selkey, p.name)
+        vim.msg = ok and ('podkat: %s - a curve before every note of the track (1 beat; rclick podkat - length, keytrack, humanize; pkedit - the curve)'):format(p.name or '') or ('podkat: ' .. (why or 'failed'))
+      end
+      return done()
+    end
+    if not pc then vim.msg = 'podkat: turn it on first (podkat button)'; return end
+    if what == 'pkkey' then edit.pk_change(tr, i, function(x) x.key = not x.key end, 'podkat keytrack'); vim.msg = 'podkat keytrack ' .. (pc.key and 'off' or 'on - higher notes: shorter, faster')
+    elseif what == 'pkvel' then edit.pk_change(tr, i, function(x) x.vel = not x.vel end, 'podkat velocity'); vim.msg = 'podkat velocity ' .. (pc.vel and 'off' or 'on - note velocity scales the curve')
+    elseif what == 'pkpre' or what == 'menu' then
+      local items = {}
+      for _, q in ipairs({ { 0.25, '1/16' }, { 0.5, '1/8' }, { 1, '1/4 (a beat)' }, { 2, '1/2' }, { 4, '1 bar' }, { 8, '2 bars' } }) do items[#items + 1] = { label = 'length ' .. q[2], data = q[1] } end
+      vim.open_picker('podkat: length before the note', items, function(it) edit.pk_change(tr, i, function(x) x.pre = it.data end, 'podkat length'); done() end)
+    elseif what == 'pkhum' then
+      local items = {}
+      for _, v in ipairs({ 0, 5, 10, 25, 50, 100 }) do items[#items + 1] = { label = ('humanize %d %%'):format(v) .. (v == 0 and ' (off)' or ' - timing, depth, shape'), data = v } end
+      vim.open_picker('podkat: humanize', items, function(it) edit.pk_change(tr, i, function(x) x.hum = it.data end, 'podkat humanize'); done() end)
+    elseif what == 'pkedit' then
+      -- кривая — в пуле: правится в первом AI (все экземпляры следом); окно REAPER: огибающая видна, AI выделен
+      local env = edit.NM.env(tr, pc.env, false)
+      if env then
+        for k = 0, reaper.CountAutomationItems(env) - 1 do
+          local mine = math.floor(reaper.GetSetAutomationItemInfo(env, k, 'D_POOL_ID', 0, false) + 0.5) == pc.pool
+          reaper.GetSetAutomationItemInfo(env, k, 'D_UISEL', mine and 1 or 0, true)
+        end
+        state.envs = true
+        vim.msg = 'podkat: the curve is pooled - edit any of its automation items in REAPER, all follow (selected)'
+      end
+    end
+    done()
   end,
   -- 22 окт: снапшоты микшера — SWS Snapshots 1..12 (нативные: «SWS: Save as / Recall snapshot N», окно Snapshots);
   -- какие слоты заполнены, SWS не отдаёт — отметка в ProjExtState jf_tracker/mixsnaps (только подсветка кнопок)
@@ -23670,7 +23741,7 @@ local function frame()
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
-  elseif U.rclick and hover.trkmod and hover.trkmod.what == 'row' then
+  elseif U.rclick and hover.trkmod and (hover.trkmod.what == 'row' or hover.trkmod.what == 'pk') then   -- pk: меню длины подката
     ctx.trkmod_do(hover.trkmod, true); U.rclick = false
   elseif U.rclick and hover.mixsnap then
     local i = hover.mixsnap

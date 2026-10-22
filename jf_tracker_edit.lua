@@ -21,6 +21,7 @@ local model
 local DIR = (debug.getinfo(1, 'S').source:sub(2):match('(.*)/') or '.')
 E.NM = dofile(DIR .. '/jf_tracker_notemod.lua')
 E.LY = dofile(DIR .. '/jf_tracker_layers.lua')   -- 19 окт: слоёный инструмент (¥)
+E.PK = dofile(DIR .. '/jf_tracker_podkat.lua')   -- 22 окт: podkat / anticipate — кривая до ноты
 function E.init(m) model = m; m.LY = E.LY; E.NM.init(E, m) end
 
 -- ── связь копий с инструментом (3 окт): метка P_EXT:jf_iid ─────────────
@@ -291,6 +292,7 @@ local function run(desc, fn)
   if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
+  if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: podkat — за нотами трека
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
@@ -4934,5 +4936,165 @@ function E.layers_set(root_it, list)
   end)
 end
 function E.layer_item(guid) local _, srcs = E.layer_roots(); return srcs[guid] end
+
+-- ── podkat / anticipate (22 окт): кривая автоматизации до каждой ноты трека ──
+-- Настройки — P_EXT:jf_podkat трека (jf_tracker_podkat.lua); AI одного пула на
+-- огибающей параметра, каждый кончается на ноте. Сверка — в run после каждой правки
+-- (ноты сдвинули / добавили / удалили — подкаты за ними), только если что-то поменялось.
+do
+  local PKEXT = 'P_EXT:jf_podkat'
+  local PKDEL = 42086                       -- Envelope: Delete automation items
+  function E.pk_get(tr)
+    local _, v = R.GetSetMediaTrackInfo_String(tr, PKEXT, '', false)
+    return E.PK.parse(v)
+  end
+  local function pk_set(tr, list)
+    R.GetSetMediaTrackInfo_String(tr, PKEXT, E.PK.encode(list), true)
+    if #list > 0 then R.SetProjExtState(0, 'jf_tracker', 'podkat', '1') end
+  end
+  -- ноты трека в QN: MIDI-ноты незаглушённых items и аудио-ноты (items без MIDI)
+  function E.pk_notes(tr)
+    local out = {}
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local tk = R.GetActiveTake(it)
+      if tk and R.GetMediaItemInfo_Value(it, 'B_MUTE') == 0 then
+        local ipos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        if R.TakeIsMIDI(tk) then
+          local iend = ipos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+          local _, nn = R.MIDI_CountEvts(tk)
+          for k = 0, nn - 1 do
+            local _, _, muted, sp, _, _, pitch, vel = R.MIDI_GetNote(tk, k)
+            local t = not muted and R.MIDI_GetProjTimeFromPPQPos(tk, sp)
+            if t and t >= ipos - 1e-6 and t < iend then out[#out + 1] = { qn = R.TimeMap2_timeToQN(0, t), pitch = pitch, vel = vel } end
+          end
+        else
+          local semis = model and model.take_semitones and model.take_semitones(R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH'),
+            R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), R.GetMediaItemTakeInfo_Value(tk, 'B_PPITCH') == 1) or 0
+          out[#out + 1] = { qn = R.TimeMap2_timeToQN(0, ipos), pitch = 60 + math.floor(semis + 0.5), vel = math.max(1, math.min(127, math.floor(100 * R.GetMediaItemInfo_Value(it, 'D_VOL') + 0.5))) }
+        end
+      end
+    end
+    return out
+  end
+  -- AI пула на огибающей: { idx, qn, len, rate, amp, base } по времени
+  local function pk_have(env, pool)
+    local out = {}
+    for k = 0, R.CountAutomationItems(env) - 1 do
+      if math.floor(R.GetSetAutomationItemInfo(env, k, 'D_POOL_ID', 0, false) + 0.5) == pool then
+        local pos = R.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false)
+        local q0 = R.TimeMap2_timeToQN(0, pos)
+        out[#out + 1] = { idx = k, qn = q0, len = R.TimeMap2_timeToQN(0, pos + R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false)) - q0,
+          rate = R.GetSetAutomationItemInfo(env, k, 'D_PLAYRATE', 0, false), amp = R.GetSetAutomationItemInfo(env, k, 'D_AMPLITUDE', 0, false),
+          base = R.GetSetAutomationItemInfo(env, k, 'D_BASELINE', 0, false) }
+      end
+    end
+    table.sort(out, function(a, b) return a.qn < b.qn end)
+    return out
+  end
+  -- удалить AI (API удаления нет): выделить только их и действие REAPER
+  local function pk_del(env, idxs)
+    if #idxs == 0 then return end
+    for ti = -1, R.CountTracks(0) - 1 do
+      local tr = ti < 0 and R.GetMasterTrack(0) or R.GetTrack(0, ti)
+      for e = 0, R.CountTrackEnvelopes(tr) - 1 do
+        local en = R.GetTrackEnvelope(tr, e)
+        for k = 0, R.CountAutomationItems(en) - 1 do R.GetSetAutomationItemInfo(en, k, 'D_UISEL', 0, true) end
+      end
+    end
+    for _, k in ipairs(idxs) do R.GetSetAutomationItemInfo(env, k, 'D_UISEL', 1, true) end
+    R.Main_OnCommand(PKDEL, 0)
+  end
+  local function pk_put(env, idx, w)
+    local pos = R.TimeMap2_QNToTime(0, w.qn)
+    R.GetSetAutomationItemInfo(env, idx, 'D_POSITION', pos, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_LENGTH', R.TimeMap2_QNToTime(0, w.qn + w.len) - pos, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_STARTOFFS', 0, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_LOOPSRC', 0, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_PLAYRATE', w.rate, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_AMPLITUDE', w.amp, true)
+    R.GetSetAutomationItemInfo(env, idx, 'D_BASELINE', w.base, true)
+  end
+  -- расставить подкаты одной записи c трека tr; возвращает число AI (0 — уже так)
+  function E.pk_apply(tr, c)
+    local env = E.NM.env(tr, c.env, false)
+    if not env then return 0 end
+    local have = pk_have(env, c.pool)
+    if #have == 0 then return 0 end                 -- пул без экземпляров: копировать нечего
+    local poolqn = R.GetSetAutomationItemInfo(env, have[1].idx, 'D_POOL_QNLEN', 0, false)
+    local want = E.PK.places(E.pk_notes(tr), c, poolqn)
+    if #want == 0 or E.PK.same(have, want) then return 0 end
+    local extra = {}
+    for i = 2, #have do extra[#extra + 1] = have[i].idx end
+    pk_del(env, extra)
+    local first = pk_have(env, c.pool)[1]
+    if not first then return 0 end
+    pk_put(env, first.idx, want[1])
+    for i = 2, #want do
+      local idx = R.InsertAutomationItem(env, c.pool, R.TimeMap2_QNToTime(0, want[i].qn), 0.1)
+      if idx and idx >= 0 then pk_put(env, idx, want[i]) end
+    end
+    return #want
+  end
+  function E.pk_sync()
+    local _, on = R.GetProjExtState(0, 'jf_tracker', 'podkat')
+    if on ~= '1' then return end
+    for ti = 0, R.CountTracks(0) - 1 do
+      local tr = R.GetTrack(0, ti)
+      local _, v = R.GetSetMediaTrackInfo_String(tr, PKEXT, '', false)
+      if v ~= '' then for _, c in ipairs(E.PK.parse(v)) do E.pk_apply(tr, c) end end
+    end
+  end
+  -- новый подкат на параметр: пул с кривой-затравкой (подъём 0 → 1 к ноте), дальше расставит сверка
+  function E.pk_add(tr, key, label)
+    local list = E.pk_get(tr)
+    for _, c in ipairs(list) do if c.env == key then return nil, 'already has podkat' end end
+    local notes = E.pk_notes(tr)
+    local q = R.TimeMap2_timeToQN(0, R.GetCursorPosition())
+    for _, n in ipairs(notes) do if n.qn < q or q < 1 then q = n.qn end end
+    q = math.max(1, q)
+    local ok
+    run('podkat: ' .. (label or key), function()
+      local env = E.NM.env(tr, key, true)
+      if not env then error('no envelope for ' .. key, 0) end
+      R.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true)
+      R.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true)
+      local pos = R.TimeMap2_QNToTime(0, q - 1)
+      local len = R.TimeMap2_QNToTime(0, q) - pos
+      local idx = R.InsertAutomationItem(env, -1, pos, len)
+      if not idx or idx < 0 then error('REAPER did not make the automation item', 0) end
+      R.DeleteEnvelopePointRangeEx(env, idx, pos - 1, pos + len + 1)
+      local mode = R.GetEnvelopeScalingMode(env)
+      R.InsertEnvelopePointEx(env, idx, pos, R.ScaleToEnvelopeMode(mode, 0), 2, 0, false, true)
+      R.InsertEnvelopePointEx(env, idx, pos + len, R.ScaleToEnvelopeMode(mode, 1), 0, 0, false, true)
+      R.Envelope_SortPointsEx(env, idx)
+      list[#list + 1] = { env = key, pool = math.floor(R.GetSetAutomationItemInfo(env, idx, 'D_POOL_ID', 0, false) + 0.5), pre = 1, hum = 0, label = label }
+      pk_set(tr, list)
+      ok = true
+    end)
+    if model then model.invalidate() end
+    return ok
+  end
+  -- поменять настройки записи i (fn(c)) — сверка в run переставит подкаты
+  function E.pk_change(tr, i, fn, desc)
+    local list = E.pk_get(tr)
+    if not list[i] then return end
+    run(desc or 'podkat', function() fn(list[i]); pk_set(tr, list) end)
+    if model then model.invalidate() end
+  end
+  -- снять подкат: все его AI и запись
+  function E.pk_remove(tr, i)
+    local list = E.pk_get(tr)
+    local c = list[i]
+    if not c then return end
+    run('podkat off: ' .. (c.label or ''), function()
+      local env = E.NM.env(tr, c.env, false)
+      if env then local d = {}; for _, h in ipairs(pk_have(env, c.pool)) do d[#d + 1] = h.idx end; pk_del(env, d) end
+      table.remove(list, i)
+      pk_set(tr, list)
+    end)
+    if model then model.invalidate() end
+  end
+end
 
 return E
