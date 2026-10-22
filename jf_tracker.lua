@@ -18947,6 +18947,13 @@ local function frame()
   -- строка звучит (все треки, с FX) на длину строки, как play line в Renoise
   -- 12 окт: listen line (step listen) — строка под курсором, все треки; listen step — та же строка, только трек курсора
   if gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0 then ctx.wheel_t = reaper.time_precise() end   -- 19 окт: колесо — листание, не шаг
+  -- 22 окт: колесо над открытой всплывашкой — только ей: панели под ней (справка и др.) его не видят до обработки всплывашки
+  do
+    local pr = (vim.picker or vim.hydra) and draw.popup_rect
+    if pr and gfx.mouse_wheel ~= 0 and gfx.mouse_x >= pr[1] and gfx.mouse_x < pr[1] + pr[3] and gfx.mouse_y >= pr[2] and gfx.mouse_y < pr[2] + pr[4] then
+      ctx.popup_wheel = gfx.mouse_wheel; gfx.mouse_wheel = 0; gfx.mouse_hwheel = 0
+    end
+  end
   if (state.steplisten or state.trklisten) and state.focus == 'tracker' and not vim.picker and not vim.hydra and not (sel_drag and sel_drag.active) then   -- протяжка мышью — не шаг
     local r = vim.cur.row
     local cf = L and L.flat[vim.cur.fi]
@@ -20951,6 +20958,7 @@ local function frame()
   end
   -- пикер мышью (10 окт): щелчок по строке — выбрать (как Enter), мимо или ПКМ —
   -- закрыть (как Esc), колесо над ним — выбор вверх / вниз
+  if ctx.popup_wheel then gfx.mouse_wheel = vim.picker and ctx.popup_wheel or 0; ctx.popup_wheel = nil end   -- гидра колесом не листается: съедено
   if vim.picker and not OPT.active then
     local r = draw.popup_rect
     local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
