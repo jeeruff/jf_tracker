@@ -14700,19 +14700,24 @@ edit.inst_ref = function(it)
   local e = i and snap.pool and snap.pool[i]
   return e and e.item or nil
 end
--- 20 окт: autoarm всех треков (кнопка уголка, tA): on = nil — переключить (у всех уже — снять, иначе — всем)
+-- 20 окт: autoarm всех треков (кнопка уголка, tA); 22 окт: арм ВСЕХ треков сразу (а не auto-arm REAPER — тот армил
+-- только выделенный): on = nil — переключить (у всех уже — снять, иначе — всем); флаг auto-arm снимается
 ctx.autoarm_all = function(on)
   local nt = reaper.CountTracks(0)
   if on == nil then
     local all = nt > 0
-    for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
+    for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'I_RECARM') ~= 1 then all = false; break end end
     on = not all
   end
-  edit.run('auto-arm all tracks ' .. (on and 'on' or 'off'), function()
-    for i = 0, nt - 1 do reaper.SetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM', on and 1 or 0) end
+  edit.run('arm all tracks ' .. (on and 'on' or 'off'), function()
+    for i = 0, nt - 1 do
+      local tr = reaper.GetTrack(0, i)
+      reaper.SetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM', 0)
+      reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', on and 1 or 0)
+    end
   end)
   model.invalidate()
-  vim.msg = on and 'auto-arm on every track: the selected track records (tA / the autoarm button again - off)' or 'auto-arm off on every track'
+  vim.msg = on and ('every track armed (%d) - each records its input (tA / arm all again - off)'):format(nt) or 'every track disarmed'
 end
 ctx.theme_list = function() return draw.themes.LIST end   -- 20 окт: :theme без аргумента — тот же список, что в меню (свои темы тоже)
 ctx.lpb = function() return state.lpb or 4 end   -- 15 окт: свойства — beatsync в строках
@@ -20954,7 +20959,7 @@ local function frame()
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
-  elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm') .. ' (tA)'
+  elseif hover.mautoarm then state.status = 'arm all: ' .. (hover.mautoarm == 'on' and 'arm every track for recording (each records its input)' or 'disarm every track') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
   elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
   elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
