@@ -4682,7 +4682,7 @@ local MW = {
   SAMPLER    = { 'СЭМПЛЕРЪ',        '采样器',     'مُعيِّن',            'wab' },   -- 16 окт: вкладка item в фокусе
   LIB        = { 'КНИЖНИЦА',        '库',         'مكتبة',            'paq' },
   MACROS     = { 'МАКРОСЫ',         '宏',         'وحدات',            'ra\'mey' },
-  MAIN       = { 'ГЛАВА',           '主页',       'رئيسي',            "wa'DIch" },
+  VIPER      = { 'ГАДЮКА',          '蝰蛇',       'أفعى',             'ghargh' },   -- 22 окт: панель main — режим VIPER (просьба)
   MASTER     = { 'ВЛАДЫКА',         '总线',       'الإخراج',          'pIn' },
   MATRIX     = { 'МАТРИЦА',         '矩阵',       'مصفوفة',           'mIr' },
   MIDI       = { 'МИДИ',            '迷笛',       'ميدي',             'QIn' },
@@ -4756,6 +4756,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
   if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
+  if mode == 'MAIN' then mode = 'VIPER' end   -- 22 окт: MAIN → VIPER mode
   local reap0 = mode:match('^REAPER') ~= nil                -- 16 окт: до обрезки по месту (REAP… тоже REAPER)
   -- 15 окт: цвет режима (D.MODE_COL), как у рамки поля; модуль в фокусе (LIB, UNDO…) — янтарный
   local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal', KEYS = 'normal' }
