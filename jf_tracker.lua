@@ -21533,6 +21533,18 @@ local function frame()
           end
           if b2 then best = b2 end
         end
+        -- 22 окт: модуль с макросами — SLIDER первым берёт его фейдеры макросов (главные ручки плагина)
+        local mk = best and best.dsp and (best.g or ''):match('^dsp:(%d+):')
+        if mk then
+          local b3, d3
+          for _, r in ipairs(draw.slr or {}) do
+            if r.g == 'dspmacro:' .. mk then
+              local d = (r.x + r.w / 2 - gfx.mouse_x) ^ 2 + (r.y + r.h / 2 - gfx.mouse_y) ^ 2
+              if not d3 or d < d3 then b3, d3 = r, d end
+            end
+          end
+          if b3 then best = b3 end
+        end
         if best then
           -- 16 окт: до 8 БЛИЖАЙШИХ к мыши той же ориентации, по оси выбора по порядку; первым выбран
           -- ближайший, выбор — от точки нажатия. 22 окт: только своей семьи (группа не разлетается по экрану)

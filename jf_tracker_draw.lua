@@ -4931,6 +4931,7 @@ end
 -- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
 -- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)
 function D.param_rows(p, nfit)
+  if p and p.mfader then return 0 end   -- 22 окт: макрос — фейдером слева, строк не занимает
   local n = p and p.kind == 'steps' and p.nsteps or 0
   return (n >= 5 and n <= 8 and n <= (nfit or 0)) and n or 1
 end
@@ -6462,7 +6463,7 @@ function D.frame(L, snap, rows, state, info)
         -- кнопку-букву; клик — всплывающий слайдер под ней (D.trspop), повтор — закрыть
         -- 22 окт: порог — дорожка с местом под значение уже 5 знаков (было: без значения, меньше 3 — мелкий слайдер оставался)
         local vres0 = noval and 0 or (math.max(ms(what == 'vol' and '-00.0' or (what == 'width' and '100' or 'R100')), ms(val or '')) + L.pad)
-        if not in_pop and sw - ms(label) - 2 * L.pad - vres0 < ms('00000') then
+        if not in_pop and sw - ms(label) - 2 * L.pad - vres0 < ms('000') then   -- 22 окт: 3 знака (5 сворачивал и нормальные слайдеры)
           local bw = math.min(sw, math.max(L.btn_w, ms(label) + 4))
           local open = D.trspop and D.trspop.guid == col.guid and D.trspop.what == what
           local off_default = centered and math.abs(frac - 0.5) > 0.003 or (not centered and math.abs(frac - 60 / 72) > 0.003)
@@ -8582,6 +8583,9 @@ function D.frame(L, snap, rows, state, info)
       local htab = (f.pages and f.page and tabpos ~= 'right') and L.rh or 0
       local vtw = (f.pages and f.page and tabpos == 'right') and (L.th + 2 * L.pad + 2) or 0
       bw = bw + vtw
+      -- 22 окт: макросы (Macro 1..8) — вертикальные фейдеры слева в модуле: ширина — по 1.5 знака на фейдер
+      local mw = (f.nmacro and not f.container) and (f.nmacro * math.max(8, math.floor(L.cw * 1.5)) + 2 * L.pad) or 0
+      bw = bw + mw
       if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
       nshown = nshown + 1
       local is_sel = sel.fx == k
@@ -8683,6 +8687,36 @@ function D.frame(L, snap, rows, state, info)
       if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
+      if mw > 0 then
+        -- фейдеры макросов: дорожка, заливка снизу, ручка поперёк, номер под фейдером; щелчок / протяжка вверх-вниз
+        local fx0, fy0 = bx + L.pad, by + L.rh + 3
+        local fh = bh - 2 * L.rh - 6
+        local fwid = math.floor((mw - 2 * L.pad) / f.nmacro)
+        local mi = 0
+        for pi, p in ipairs(f.params) do
+          if p.mfader then
+            mi = mi + 1
+            local x0 = fx0 + (mi - 1) * fwid
+            local v = vals[pi] or { n = 0, s = '' }
+            local psel = is_sel and sel.param == pi
+            local hot = not drag and mx >= x0 and mx < x0 + fwid and my >= fy0 and my < fy0 + fh + L.rh
+            local mid = x0 + math.floor(fwid / 2)
+            set(U.DIM); gfx.rect(mid - 1, fy0, 2, fh, 1)
+            local ky = fy0 + fh - 1 - math.floor(math.max(0, math.min(1, v.n)) * (fh - 1) + 0.5)
+            set((hot or psel) and U.AMBER or U.CYAN, 0.7); gfx.rect(mid - 1, ky, 2, fy0 + fh - ky, 1)
+            set((hot or psel) and U.AMBER or U.TEXT); gfx.rect(x0 + 1, ky - 1, fwid - 2, 3, 1)
+            local lab = tostring(mi)
+            text(mid - math.floor(ms(lab) / 2), fy0 + fh + 2, lab, (hot or psel) and U.AMBER or U.GREY)
+            if hot then
+              hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (fy0 + fh - my) / math.max(1, fh))), onwidget = my < fy0 + fh }
+            end
+            hint('dspparam', x0, fy0, fwid, fh + L.rh, { fx = k, param = pi })
+            if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, ori = 'v', fx = p.fx or f.i, p = p.i, name = p.name, x = x0, y = fy0, w = fwid, h = fh } end
+          end
+        end
+        set(U.LINE); gfx.rect(bx + mw - 2, by + L.rh + 2, 1, bh - L.rh - 4, 1)
+        bx, bw = bx + mw, bw - mw   -- параметры — правее фейдеров (вернуть в конце блока)
+      end
       local pw = bw1 - 2 * L.pad
       local nfit = math.floor((bh - L.rh - 2) / L.rh)
       -- Airwindows (4 окт): строка под именем — категория цветом и описание
@@ -9597,6 +9631,7 @@ function D.frame(L, snap, rows, state, info)
       end
       for pi, p in ipairs(f.params) do
         if eq_only then break end
+        if p.mfader and mw > 0 then goto next_param end   -- 22 окт: макрос — фейдером слева
         if spos then if spos[pi][1] >= ncol then break end
         elseif not cl and pi > nfit * (ncol - pcol0) then break end
         local colk = spos and spos[pi][1] or (pcol0 + math.floor((pi - 1) / nfit))
@@ -9807,6 +9842,7 @@ function D.frame(L, snap, rows, state, info)
       end
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
       if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
+      if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов
       bx = bx + bw + L.pad
       end
       ::next_block::

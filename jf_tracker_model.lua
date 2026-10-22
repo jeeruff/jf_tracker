@@ -1356,6 +1356,52 @@ function M.discretize(tr, out)
   end
   for _, e in ipairs(out) do for _, p in ipairs(e.params or {}) do one(e, p) end end
 end
+-- 22 окт: макро-параметры плагина (Macro 1..8, «M1», «Macro A») — главные ручки: в конец списка с пометкой
+-- mfader (раскладка не даёт им строк — их рисуют фейдеры слева в модуле), e.nmacro — сколько (≤ 8, от 2)
+function M.is_macro_name(name)
+  local n = (name or ''):lower()
+  return n:match('^%s*macro%s*%d') ~= nil or n:match('^%s*macro%s+%a$') ~= nil or n:match('^%s*m%d%s*$') ~= nil or n:match('^%s*m%d%s*:') ~= nil or n:match('^%s*mc%s*%d') ~= nil   -- m1: имя — Surge XT
+end
+-- кураторский модуль (Surge) — его список без макросов: дополнить из первых 64 параметров плагина
+local function macro_scan(tr, e)
+  local A = M.fxapi(tr)
+  local have, n = {}, 0
+  for _, p in ipairs(e.params) do if not p.fx then have[p.i] = true end; if M.is_macro_name(p.name) then n = n + 1 end end
+  if n >= 2 or not (A.GetNumParams and A.GetParamName) then return end
+  local np = A.GetNumParams(tr, e.i) or 0
+  for pi = 0, math.min(np, 64) - 1 do
+    if not have[pi] then
+      local _, pn = A.GetParamName(tr, e.i, pi, '')
+      if M.is_macro_name(pn) then
+        local nm = pn:match('^%s*[Mm]%d%s*:%s*(.-)%s*$')
+        e.params[#e.params + 1] = { i = pi, name = (nm and nm ~= '' and nm ~= '-') and nm or pn:gsub(':%s*%-?%s*$', ''), kind = 'slider' }
+      end
+    end
+  end
+end
+function M.macroize(out, tr)
+  for _, e in ipairs(out) do
+    if tr and not e.container and not e.kit and e.params and e.i then macro_scan(tr, e) end
+    if not e.container and not e.kit and e.params then
+      local mac, rest = {}, {}
+      for _, p in ipairs(e.params) do
+        if #mac < 8 and not p.head and M.is_macro_name(p.name) then mac[#mac + 1] = p else rest[#rest + 1] = p end
+      end
+      if #mac >= 2 then
+        for _, p in ipairs(mac) do p.mfader = true; rest[#rest + 1] = p end
+        -- heads (секции) — по номеру параметра: сдвиг из-за переноса макросов в конец
+        if e.heads then
+          local idx = {}
+          for k, p in ipairs(e.params) do idx[p] = k end
+          local nh = {}
+          for k, p in ipairs(rest) do local h = e.heads[idx[p]]; if h and not p.mfader then nh[k] = h end end
+          e.heads = next(nh) and nh or nil
+        end
+        e.params, e.nmacro = rest, #mac
+      end
+    end
+  end
+end
 -- индекс ступени по значению 0..1: у «распознанных» — ближайшая середина участка
 function M.step_index(p, v)
   if p.stepnorm then
@@ -1538,6 +1584,7 @@ function M.track_fx(tr)
   end
   local out = build_track_fx(tr)
   M.discretize(tr, out)   -- 22 окт: «непрерывные» с 2..8 подписями (Surge subtype) — ступени
+  M.macroize(out, tr)    -- 22 окт: Macro 1..8 — фейдерами слева в модуле, в конце списка
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
   mark_params(tr, A, out)
