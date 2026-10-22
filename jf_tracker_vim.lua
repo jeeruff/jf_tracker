@@ -478,7 +478,19 @@ end
 local function empty_start(f, r)
   if not (f and f.col) or f.env or f.ml then return false end
   local lane = f.lane or f.col.lanes[1]
-  for _, it in ipairs(lane and lane.items or {}) do if it.empty and math.floor(it.r0 + 1e-6) == r then return true end end
+  for _, it in ipairs(lane and lane.items or {}) do
+    if math.floor(it.r0 + 1e-6) == r then
+      if it.empty then return true end
+      -- 22 окт: и клип без видимых нот (ноты за его концом) — как у x / dw (V.empty_midi_at): w b на нём встают
+      local a0, a1 = r, math.max(r, math.ceil(it.r1 - 1e-6) - 1)
+      local any = false
+      for _, sub in ipairs(lane.subs or {}) do
+        for rr = a0, a1 do local c = sub[rr]; if c and (c.kind == 'midi' or c.kind == 'audio' or c.kind == 'cont' or c.kind == 'off') then any = true; break end end
+        if any then break end
+      end
+      if not any then return true end
+    end
+  end
   return false
 end
 local function track_event(f, r, strict)
