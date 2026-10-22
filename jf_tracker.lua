@@ -22266,18 +22266,18 @@ local function frame()
         edit.track_value(t.col.track, TRS_KEY[t.what], TRS_RESET[t.what]); edit.track_undo('track ' .. t.what .. ' reset'); model.invalidate()
         trs_drag = nil
       else
-        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, my0 = gfx.mouse_y, mx0 = gfx.mouse_x, f0 = t.sv }
+        trs_drag = { col = t.col, what = t.what, x0 = t.x0, w = t.w, vert = t.vert, y0 = t.y0, h = t.h, knob = t.knob, strip = t.strip, my0 = gfx.mouse_y, mx0 = gfx.mouse_x, f0 = t.sv }
       end
       -- 9 окт: щелчок по полосе микшера всегда выделяет трек в REAPER; с опцией
       -- fader click focus — ещё и курсор трекера на этот канал
-      if ((t.vert and t.what == 'vol') or t.knob) and t.col.track and reaper.ValidatePtr(t.col.track, 'MediaTrack*') then
+      if ((t.vert and t.what == 'vol') or t.knob) and not t.strip and t.col.track and reaper.ValidatePtr(t.col.track, 'MediaTrack*') then   -- 22 окт: фейдер в DSP — не микшер
         reaper.SetOnlyTrackSelected(t.col.track)
         if state.faderfocus ~= false then
           for i, f in ipairs(L.flat) do if f.col == t.col then vim.cur.fi = i; vim.ensure_visible(); break end end
         end
       end
       -- 8 окт: щелчок по фейдеру микшера — клавиатура на нём (как f): k j, h l
-      if (t.vert and t.what == 'vol') or t.knob then   -- 9 окт: и кноб панорамы
+      if ((t.vert and t.what == 'vol') or t.knob) and not t.strip then   -- 9 окт: и кноб панорамы
         ctx.set_focus('mixer')
         state.kslider = { col = t.col, what = 'vol', mix = true }
         vim.msg = ('%s fader: k j volume, h l pan (Shift fine), 0 reset, Esc done'):format(t.col.name or '')
@@ -23657,7 +23657,7 @@ local function frame()
         or trs_drag.vert and math.max(0, math.min(1, (trs_drag.y0 - gfx.mouse_y) / math.max(1, trs_drag.h)))   -- фейдер микшера — вертикально (8 окт)
         or math.max(0, math.min(1, (gfx.mouse_x - trs_drag.x0) / math.max(1, trs_drag.w)))
       if trs_drag.knob then trs_drag.f0, trs_drag.my0, trs_drag.mx0 = frac, gfx.mouse_y, gfx.mouse_x end   -- шаг покадрово: Shift посреди протяжки без скачка
-      local v = trs_drag.vert and 10 ^ (draw.fader_db(frac) / 20) or trs_value(trs_drag.what, frac)   -- вертикальный — своя шкала
+      local v = (trs_drag.vert and trs_drag.what == 'vol') and 10 ^ (draw.fader_db(frac) / 20) or trs_value(trs_drag.what, frac)   -- вертикальный — своя шкала (22 окт: громкость; пан DSP — вертикально, его шкала)
       edit.track_value(trs_drag.col.track, TRS_KEY[trs_drag.what], v)
       trs_drag.v = v
     else

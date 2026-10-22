@@ -2914,6 +2914,99 @@ end
 -- имя, R I M S A + фаза / FX, громкость, панорама, вход (меню), master send,
 -- отправки (клик — окно маршрутизации REAPER). Фон — цвет трека, как шапка
 -- канала; слайдеры и кнопки — те же hover.trs / hover.btn, что в шапке
+-- 22 окт: блок трека в DSP вертикальной колонкой (место — модулям): кнопки по две в ряд, vol и pan —
+-- вертикальные фейдеры с вертикальными подписями, значения под ними, smart, in / out — вертикальные кнопки.
+-- → ширина (0 — не нарисован)
+function D.track_block_v(L, info, col, x, y, h, hover, rawc)
+  local io = info.trk_io and info.trk_io(col)
+  if not (col and io) then return 0 end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local bw0 = math.max(L.btn_w or 0, ms('fx') + 4)
+  local w = math.max(2 * bw0 + 3 * L.pad, ms('-00.0') + 2 * L.pad, ms('smart') + 2 * L.pad)
+  local mode = info.hdrfill or 'line'
+  local base = (info.trsel or {})[col.guid] and D.HDRSEL or D.HDR
+  local tint = col.rgb and mode ~= 'off'
+  local rbg = tint and U.mix(base, col.rgb, 0.18) or base
+  local fill = tint and rawc or set
+  fill(rbg); gfx.rect(x, y, w, h, 1)
+  local T0, G0 = U.TEXT, U.GREY
+  U.TEXT, U.GREY = U.readable(T0, rbg, 4.5), U.readable(G0, rbg, 3.0)
+  local mon = col.recmon or 0
+  local btns = { { 'r', col.armed, D.ARM, 'arm' }, { 'i', mon > 0, U.CYAN, 'monitor', mon == 2 },
+                 { 'm', col.muted, U.AMBER, 'mute' }, { 's', col.solo, U.GREEN, 'solo' },
+                 { 'ø', io.phase, U.AMBER, 'phase', nil, true }, { 'fx', not io.fxen, U.RED, 'fxen', nil, true },
+                 { '~', #(col.envs or {}) > 0, U.CYAN, 'auto' } }
+  local yy, bh = y + 3, L.rh - 3
+  for i, b in ipairs(btns) do
+    local bx = x + L.pad + ((i - 1) % 2) * (bw0 + L.pad)
+    local by = yy + math.floor((i - 1) / 2) * L.rh
+    local on = b[2]
+    local hot = mx >= bx and mx < bx + bw0 and my >= by and my < by + bh + 1
+    local onc = b[3] == D.ARM and D.ARM_T or U.tint(b[3], 0.5)
+    set((on and not b[5]) and onc or U.PANEL); gfx.rect(bx, by, bw0, bh, 1)
+    set(hot and U.AMBER or (on and b[3] or U.DIM)); gfx.rect(bx, by, bw0, bh, 0)
+    text(bx + math.floor((bw0 - ms(b[1])) / 2), by + math.floor((bh - (L.th or bh)) / 2) - (D.SPACE or 0), b[1], on and b[3] or U.readable(G0, U.PANEL, 4.5))
+    if hot then if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end end
+  end
+  yy = yy + math.ceil(#btns / 2) * L.rh + 2
+  -- фейдеры: высота — остаток минус значения, smart и in / out
+  local live = info.trs_live
+  local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
+  local rem = y + h - yy
+  local ioh = math.max(ms('out') + 2 * L.pad, math.floor(rem * 0.38))
+  local smh = info.smart_ok and L.rh or 0
+  local fh = rem - ioh - L.rh - smh - 6
+  local cw2 = math.floor((w - 3 * L.pad) / 2)
+  local vol = lv('vol', col.vol or 1)
+  local db = vol > 1e-6 and 20 * math.log(vol, 10) or -150
+  local pan = lv('pan', col.pan or 0)
+  local function fader(cx, what, frac, centered, label, val)
+    if fh < 2 * L.rh then return end
+    local tx = cx + L.th + 2                                 -- дорожка — справа от вертикальной подписи
+    local tw2 = math.max(4, cx + cw2 - tx)
+    local hot = mx >= cx and mx < cx + cw2 and my >= yy and my < yy + fh
+    D.vtext(cx, yy, fh, label, hot and U.AMBER or U.GREY, rbg)
+    local mid = tx + math.floor(tw2 / 2)
+    set(U.DIM); gfx.rect(mid - 1, yy, 2, fh, 1)
+    local ky = yy + fh - 1 - math.floor(frac * (fh - 1) + 0.5)
+    set(hot and U.AMBER or U.CYAN)
+    if centered then local cy = yy + math.floor(fh / 2); gfx.rect(mid - 1, math.min(cy, ky), 2, math.abs(ky - cy) + 1, 1)
+    else gfx.rect(mid - 1, ky, 2, yy + fh - ky, 1) end
+    set(hot and U.AMBER or U.TEXT); gfx.rect(tx, ky - 1, tw2, 3, 1)  -- ручка поперёк дорожки
+    text(cx, yy + fh + 2, fit(val, cw2 + L.pad), U.GREY)
+    if hot then hover.trs = { col = col, what = what, vert = true, strip = true, y0 = yy + fh, h = fh, sv = math.max(0, math.min(1, (yy + fh - my) / math.max(1, fh))) } end
+    if D.csel_on(col.guid, what) then csel_frame(cx - 1, yy, cw2 + 2, fh) end
+  end
+  fader(x + L.pad, 'vol', D.fader_pos(db), false, 'vol', db <= -60 and '-inf' or ('%+.1f'):format(db))
+  fader(x + 2 * L.pad + cw2, 'pan', (pan + 1) / 2, true, 'pan', math.abs(pan) < 0.005 and 'C' or ((pan < 0 and 'L' or 'R') .. math.floor(math.abs(pan) * 100 + 0.5)))
+  yy = yy + math.max(0, fh) + L.rh + 4
+  if smh > 0 then
+    local hot = mx >= x + L.pad and mx < x + w - L.pad and my >= yy and my < yy + L.rh
+    set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x + L.pad, yy + 1, w - 2 * L.pad, L.rh - 2, 1)
+    set(hot and U.AMBER or U.DIM); gfx.rect(x + L.pad, yy + 1, w - 2 * L.pad, L.rh - 2, 0)
+    text(x + 2 * L.pad, yy, fit('smart', w - 3 * L.pad), hot and U.AMBER or U.GREY)
+    if hot then hover.trkio = { col = col, what = 'smart' } end
+    yy = yy + L.rh
+  end
+  -- in / out — вертикальными кнопками: in — выбор входа, out — master и посылы (панель сендов)
+  local ih = y + h - yy - 3
+  if ih > L.cw * 3 then
+    local cells = { { 'in ' .. (io.input:gsub(' / in ', '/'):gsub(' / ', '/')), 'input', true },
+                    { 'out ' .. (io.mainsend and 'master' or 'no master') .. ('  s%d r%d'):format(#io.sends, io.recv), 'sends', io.mainsend } }
+    for i, c in ipairs(cells) do
+      local cx = x + L.pad + (i - 1) * (cw2 + L.pad)
+      local hot = mx >= cx and mx < cx + cw2 and my >= yy and my < yy + ih
+      set(hot and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(cx, yy, cw2, ih, 1)
+      set(hot and U.AMBER or U.DIM); gfx.rect(cx, yy, cw2, ih, 0)
+      D.vtext(cx + math.floor((cw2 - L.th) / 2), yy + 2, ih - 4, c[1], hot and U.AMBER or (c[3] and U.TEXT or U.GREY), hot and U.tint(U.AMBER, 0.25) or U.BG)
+      if hot then hover.trkio = { col = col, what = c[2] } end
+    end
+    if D.sendpop == col.guid then D.late_send = function() D.draw_sendpop(L, info, col, io, x, yy, hover) end end
+  end
+  U.TEXT, U.GREY = T0, G0
+  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  return w
+end
 function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local io = info.trk_io and info.trk_io(col)
   if not (col and io) then return 0 end
@@ -8253,8 +8346,7 @@ function D.frame(L, snap, rows, state, info)
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io and info.dsptrack then
-      local tw = L.cw * 19                         -- 4 окт: компактнее (было 24)
-      local used = D.track_block(L, info, info.pool_col, bx, boxy, tw, boxh, hover, rawset_col)
+      local used = D.track_block_v(L, info, info.pool_col, bx, boxy, boxh, hover, rawset_col)   -- 22 окт: вертикальной колонкой (было L.cw * 19 строками)
       if used > 0 then bx = bx + used + L.pad end
     end
     D.aw_status = nil
