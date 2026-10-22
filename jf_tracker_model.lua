@@ -1387,6 +1387,9 @@ function M.auto_module(tr, fx, short, np)
     local byi = {}
     for _, p in ipairs(list) do byi[p.i] = p end
     for _, a in ipairs(out) do a.nsteps = byi[a.i] and byi[a.i].nsteps end
+    -- 22 окт: вкладки по секциям синта (osc filter env lfo mod fx) — из всех параметров, не только 42 главных
+    out.pages = FC.pages and FC.pages(list, 42) or nil
+    for _, pg in ipairs(out.pages or {}) do for _, a in ipairs(pg.items) do a.nsteps = byi[a.i] and byi[a.i].nsteps end end
   else
     out = {}
     for k = 1, math.min(M.DSP_MAXP, #list) do local p = list[k]; out[k] = { i = p.i, name = p.name, kind = p.kind, nsteps = p.nsteps } end
@@ -1685,6 +1688,13 @@ function build_one(tr, fx, out)
       -- автомодуль (3 окт): любой эффект — параметры по категориям и
       -- подгруппам (jf_tracker_fxclass.lua), кэш на тип плагина
       local am = M.auto_module(tr, fx, short, np)
+      local apages, apage
+      if am.pages then   -- 22 окт: вкладки автомодуля; страница — M.dsp_page[имя], как у Surge
+        apages = {}
+        for k2, pg in ipairs(am.pages) do apages[k2] = pg.name end
+        apage = math.max(1, math.min(#am.pages, M.dsp_page[short] or 1))
+        am = am.pages[apage].items
+      end
       for _, a in ipairs(am) do
         params[#params + 1] = { i = a.i, name = a.name, kind = a.kind, nsteps = a.nsteps, cat = a.cat, group = a.group }
       end
@@ -1692,7 +1702,8 @@ function build_one(tr, fx, out)
       -- Airwindows (4 окт): имя без «(airwindows)» — по нему категория и описание (Airwindopedia)
       local aw = short:match('^(.-)%s*%([Aa]irwindows%)')
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw,
-                        vproc = short:lower():find('video processor', 1, true) ~= nil }   -- 11 окт: Video processor — строка code / редактор кода
+                        vproc = short:lower():find('video processor', 1, true) ~= nil,   -- 11 окт: Video processor — строка code / редактор кода
+                        pages = apages, page = apage }
     end
   end
 end

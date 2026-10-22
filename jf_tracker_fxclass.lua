@@ -161,4 +161,45 @@ function FC.auto(list, max)
   return top
 end
 
+-- 22 окт: вкладки автомодуля (как у Surge): все параметры плагина → секции синта по префиксу группы
+-- («osc 2», «lfo1», «filter») и словам имени. Порядок вкладок — SECTIONS; main — первая (FC.auto по всем),
+-- остальное без секции туда же. Вкладки — только если секций с параметрами ≥ 2 и плагин не влезает в одну
+-- страницу (> one); иначе nil. → { { name =, items = FC.auto(…) } … }
+FC.SECTIONS = { 'osc', 'filter', 'env', 'lfo', 'mod', 'fx' }
+local SEC_WORDS = {
+  osc = { 'osc', 'oscillator', 'wave', 'wavetable', 'wt', 'shape', 'sub', 'noise', 'unison', 'voices', 'op', 'operator', 'carrier', 'modulator', 'pw', 'pwm', 'sync' },
+  filter = { 'filter', 'filt', 'flt', 'vcf', 'cutoff', 'cut', 'reso', 'resonance', 'keytrk', 'keytrack', 'lp', 'hp', 'bp' },
+  env = { 'env', 'envelope', 'adsr', 'eg', 'attack', 'att', 'decay', 'dec', 'sustain', 'sus', 'release', 'rel', 'hold' },
+  lfo = { 'lfo' },
+  mod = { 'mod', 'matrix', 'macro', 'velocity', 'vel', 'aftertouch', 'wheel', 'mw', 'modwheel' },
+  fx = { 'fx', 'delay', 'reverb', 'verb', 'chorus', 'phaser', 'flanger', 'dist', 'distortion', 'eq', 'comp', 'bitcrush', 'crush' },
+}
+local SEC_OF = {}
+for sec, list in pairs(SEC_WORDS) do for _, w in ipairs(list) do SEC_OF[w] = sec end end
+function FC.section(name)
+  local g = FC.split(name)
+  local gw = (g or ''):match('^(%a+)')
+  if gw and SEC_OF[gw] then return SEC_OF[gw] end      -- префикс решает: «lfo1 rate» — lfo, не время
+  for _, w in ipairs(words_of(name or '')) do if SEC_OF[w] then return SEC_OF[w] end end
+  return nil
+end
+function FC.pages(list, max, one)
+  max, one = max or 42, one or 24
+  local by, n = {}, 0
+  for _, p in ipairs(list) do
+    if not FC.junk(p.name) then
+      n = n + 1
+      local sec = FC.section(p.name)
+      if sec then by[sec] = by[sec] or {}; by[sec][#by[sec] + 1] = p end
+    end
+  end
+  if n <= one then return nil end
+  local pages, nsec = { { name = 'main', items = FC.auto(list, max) } }, 0
+  for _, sec in ipairs(FC.SECTIONS) do
+    if by[sec] and #by[sec] >= 2 then nsec = nsec + 1; pages[#pages + 1] = { name = sec, items = FC.auto(by[sec], max) } end
+  end
+  if nsec < 2 then return nil end
+  return pages
+end
+
 return FC

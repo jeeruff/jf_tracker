@@ -8245,7 +8245,7 @@ function D.frame(L, snap, rows, state, info)
       end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
-        local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2) / L.rh))
+        local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page) and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
         return math.max(1, math.min(3, math.ceil(#f.params / rows_fit)))
       end
       -- 16 окт: секции потоком (f.heads) — колонок столько, сколько займёт поток при этой высоте

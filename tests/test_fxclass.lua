@@ -74,5 +74,26 @@ do
   eq('macro8', FC.is_macro('macro8'), true)
   eq('not a numbered macro', FC.is_macro('Macro Depth'), false)
 end
+-- 22 окт: вкладки автомодуля
+do
+  eq('section: osc prefix', FC.section('Osc 2 Pitch'), 'osc')
+  eq('section: lfo prefix beats rate', FC.section('LFO1 Rate'), 'lfo')
+  eq('section: filter word', FC.section('Filter Cutoff'), 'filter')
+  eq('section: env by attack', FC.section('Amp Attack'), 'env')
+  eq('section: none', FC.section('Master Volume'), nil)
+  local big = {}
+  for k = 1, 10 do big[#big + 1] = { i = #big, name = 'Osc 1 Param' .. k, units = '' } end
+  for k = 1, 10 do big[#big + 1] = { i = #big, name = 'Filter knob' .. k, units = '' } end
+  for k = 1, 10 do big[#big + 1] = { i = #big, name = 'LFO1 Rate' .. k, units = '' } end
+  local pg = FC.pages(big)
+  eq('pages: main + 3 sections', pg and #pg, 4)
+  eq('pages: main first', pg and pg[1].name, 'main')
+  eq('pages: order osc filter lfo', pg and (pg[2].name .. ' ' .. pg[3].name .. ' ' .. pg[4].name), 'osc filter lfo')
+  eq('pages: filter page has its 10', pg and #pg[3].items, 10)
+  eq('pages: small plugin - no tabs', FC.pages({ { i = 0, name = 'Osc 1 Pitch' }, { i = 1, name = 'Filter Cutoff' } }), nil)
+  local one = {}
+  for k = 1, 30 do one[#one + 1] = { i = k, name = 'Knob ' .. k, units = '' } end
+  eq('pages: no sections - no tabs', FC.pages(one), nil)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

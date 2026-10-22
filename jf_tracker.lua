@@ -25167,15 +25167,16 @@ local function frame()
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
-          elseif ch == 'p' then   -- 16 окт: модули со страницами (Surge): все сразу ↔ по одной; 22 окт: zp (было zf), вкладки строкой снизу
+          elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
+          elseif ch == 'P' then   -- 16 окт: модули со страницами (Surge): все сразу ↔ по одной; 22 окт: zP (было zf), вкладки строкой снизу
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-            vim.msg = model.dsp_fold and 'zp: pages folded - one page, tabs along the bottom of the module' or 'zp: pages unfolded - all of them in one pane'
+            vim.msg = model.dsp_fold and 'zP: Surge pages folded - one page, tabs along the bottom of the module' or 'zP: Surge pages unfolded - all of them in one pane'
           elseif ch == 'f' or ch == 'F' then ctx.dsp_mfold(ch == 'F' and 'all' or dsp_sel.fx)   -- 22 окт: сложить модуль / все
           end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold the module, F - fold / unfold all, p - module pages, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold the module, F - fold / unfold all, p - presets of the module, P - Surge pages, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
