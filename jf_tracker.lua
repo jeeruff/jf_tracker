@@ -23933,6 +23933,8 @@ local function frame()
   if (gfx.mouse_hwheel or 0) ~= 0 then
     local d = gfx.mouse_hwheel > 0 and 1 or -1
     if false then
+    elseif (hover.dsp or hover.dsphsb) and draw.dsp_sb_n then   -- 22 окт: свайп над DSP — цепочка на блок
+      draw.dsp_first = math.max(1, math.min(draw.dsp_sb_n, (draw.dsp_first or 1) + d))
     elseif w_trk and not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
       state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll

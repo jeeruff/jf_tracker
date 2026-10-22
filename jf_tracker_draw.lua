@@ -9431,17 +9431,18 @@ function D.frame(L, snap, rows, state, info)
     end
     -- полоса прокрутки цепочки (11 окт): ползунок = видимые блоки из всех; тянуть,
     -- клик мимо — страница, колесо над полосой — на блок
-    hover.dsphsb = nil
+    hover.dsphsb = nil; D.dsp_sb_n = nil
     if not (info.dsp_router and info.draw_router) and #fxs > 0 and (first > 1 or first + nshown - 1 < #fxs) then
       local x0, w = sb_x0, right - sb_x0 - L.pad
       local sy = dy + 3 + L.rh + bh0 + 2
       local h = D.SBW or 3
       if w > 20 then
         local n = #fxs
+        D.dsp_sb_n = n   -- 22 окт: горизонтальное колесо над DSP листает цепочку
         local tw = math.max(12, math.floor(w * math.max(1, nshown) / n))
         local tx = x0 + math.floor((w - tw) * ((first - 1) / math.max(1, n - math.max(1, nshown))))
         tx = math.max(x0, math.min(tx, x0 + w - tw))
-        local inbar = mx >= x0 and mx < x0 + w and my >= sy - 2 and my < sy + h + 2
+        local inbar = mx >= x0 and mx < x0 + w and my >= sy - L.rh and my < sy + h + 6   -- 22 окт: зона шире полоски (щелчок на 5 px выше мимо)
         local onthumb = inbar and mx >= tx and mx < tx + tw
         set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x0, sy + math.floor(h / 2), w, 1, 1)
         set((onthumb or D.dsphsb_drag) and U.AMBER or U.GREY); gfx.rect(tx, sy, tw, h, 1)
