@@ -9396,7 +9396,7 @@ function D.frame(L, snap, rows, state, info)
         local vx = wx0 + ww + L.pad
         local vw = bxc + L.pad + pw - vx
         local cy = py + math.floor(L.rh / 2)
-        local step_sv, steps_inline
+        local step_sv, steps_inline, step_direct
         if p.kind == 'toggle' then
           local on = v.n >= 0.5
           local sz = L.rh - 6
@@ -9422,9 +9422,15 @@ function D.frame(L, snap, rows, state, info)
             steps_inline = true
           else
             local segw = math.max(2, math.floor((ww - (p.nsteps - 1)) / p.nsteps))
+            -- 22 окт: до 4 положений — щелчок по квадрату ставит его (без выпадашки), под мышью — янтарный
+            local direct = p.nsteps <= 4
             for kk = 0, p.nsteps - 1 do
-              set(kk == cur and acc or U.DIM); gfx.rect(wx0 + kk * (segw + 1), py + 4, segw, L.rh - 8, kk == cur and 1 or 0)
+              local sx = wx0 + kk * (segw + 1)
+              local hot = direct and not drag and mx >= sx and mx < sx + segw + 1 and my >= py and my < py + L.rh
+              if hot then step_sv = kk / math.max(1, p.nsteps - 1) end
+              set(hot and U.AMBER or (kk == cur and acc or U.DIM)); gfx.rect(sx, py + 4, segw, L.rh - 8, (kk == cur or hot) and 1 or 0)
             end
+            if direct then step_direct = true end
           end
         else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
@@ -9470,7 +9476,7 @@ function D.frame(L, snap, rows, state, info)
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
-          if steps_inline then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
+          if steps_inline or step_direct then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
           elseif p.kind == 'steps' and p.nsteps then hover.dsp.steplist = true end   -- клик — список (5 окт)
         end
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end

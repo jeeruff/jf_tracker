@@ -128,7 +128,7 @@ function DK.key(c, sel, n, np, mods)
   -- 21 окт: счётчик: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 3w; 22 окт: только когда клавиатура не играет
   -- (KEYS — цифры ноты); значение числом — в INSERT параметра (i)
   if ch:match('^%d$') and not DK.digits_play then
-    DK.num = (DK.num or '') .. ch
+    DK.num = ((DK.num or '') .. ch):sub(-3)   -- 22 окт: счётчик до 3 цифр (было — без предела, 32 цифры в статусе)
     ctx.msg(('%s - h l: step x%s, j k: %s params, w: %s modules, Esc: cancel'):format(DK.num, DK.num, DK.num, DK.num)); return true
   end
   local num = DK.num; DK.num = nil
