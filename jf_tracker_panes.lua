@@ -345,7 +345,7 @@ local function place(lay, M, n, x, y, w, h)
 end
 
 function PN.layout(model, W, H, M)
-  local lay = { v = model.v, W = W, H = H, cells = {}, by_panel = {}, rects = {}, order = {}, grips = {}, seps = {}, nodes = {} }
+  local lay = { v = model.v, W = W, H = H, cells = {}, by_panel = {}, rects = {}, order = {}, grips = {}, seps = {}, nodes = {}, M = M }   -- M: минимумы для протяжки ручек
   local z = model.zoom and PN.find(model, model.zoom)
   -- 22 окт: зум нескольких листов друг под другом (zz в DSP: микшер над DSP на всё окно)
   local zl = {}
@@ -670,6 +670,26 @@ function PN.drag_grip(model, lay, grip, dpx)
   local size = grip.ax == 'h' and r.w or r.h
   if size <= 0 then return false end
   local p, i = grip.node, grip.i
+  -- 22 окт: упёрлись в минимум соседа — дальше не тянуть: раскладка добирала его минимум у самого большого
+  -- соседа, и ехал чужой край (тянешь вниз — растёт вверх). Запас сжатия — по цепочке до листа у ручки
+  local M = lay.M
+  if M then
+    local function room(n, last)
+      local r2 = lay.nodes[n]
+      if not r2 then return 0 end
+      local sz = grip.ax == 'h' and r2.w or r2.h
+      local free = sz - node_min(M, n, grip.ax)
+      if not is_leaf(n) and n.ax == grip.ax then
+        local edge
+        for k = (last and #n.kids or 1), (last and 1 or #n.kids), (last and -1 or 1) do if lay.nodes[n.kids[k]] then edge = n.kids[k]; break end end
+        if edge then free = math.min(free, room(edge, last)) end
+      end
+      return math.max(0, free)
+    end
+    local k1, k2 = grip.kid or p.kids[i], grip.next or p.kids[i + 1]
+    if dpx < 0 then dpx = math.max(dpx, -room(k1, true)) else dpx = math.min(dpx, room(k2, false)) end
+    if math.abs(dpx) < 0.5 then return false end
+  end
   local d = dpx / size
   d = math.max(-(p.fr[i] - 0.05), math.min(p.fr[i + 1] - 0.05, d))
   p.fr[i], p.fr[i + 1] = p.fr[i] + d, p.fr[i + 1] - d

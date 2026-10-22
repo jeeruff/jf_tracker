@@ -390,5 +390,38 @@ do
     end
   end
 end
+-- 22 окт (2): тянуть дальше упора (сосед на минимуме) — шагами, как мышь: чужие края не едут
+do
+  local base = PN.DEFAULT()
+  local lay0 = PN.layout(base, 1600, 1000, M)
+  for gi = 1, #lay0.grips do
+    for _, dir in ipairs({ 1, -1 }) do
+      local m9 = PN.decode(PN.encode(base))
+      local l1 = PN.layout(m9, 1600, 1000, M)
+      local g0 = l1.grips[gi]
+      local pos = g0.ax == 'v' and (g0.y + (g0.h - M.sep) // 2) or (g0.x + (g0.w - M.sep) // 2)
+      local e0 = {}
+      for id, c in pairs(l1.by_panel) do e0[id] = { c.x, c.y, c.x + c.w, c.y + c.h } end
+      for _ = 1, 40 do
+        local l2 = PN.layout(m9, 1600, 1000, M)
+        local g = l2.grips[gi]
+        if not g then break end
+        PN.drag_grip(m9, l2, g, 40 * dir)
+      end
+      local l3 = PN.layout(m9, 1600, 1000, M)
+      local ok = true
+      for id, a0 in pairs(e0) do
+        local c = l3.by_panel[id]
+        local a1 = { c.x, c.y, c.x + c.w, c.y + c.h }
+        for k = 1, 4 do
+          local axk = (k == 2 or k == 4) and 'v' or 'h'
+          local at = axk == g0.ax and (math.abs(a0[k] - pos) <= 2 or math.abs(a0[k] - pos - M.sep) <= 2)
+          if math.abs(a1[k] - a0[k]) > 1 and not at then ok = false; print(('  far grip %d (%s, %+d): %s edge %d %d -> %d'):format(gi, g0.ax, dir, id, k, a0[k], a1[k])) end
+        end
+      end
+      eq('grip ' .. gi .. ' far ' .. dir .. ': past the stop only its own edge', ok, true)
+    end
+  end
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
