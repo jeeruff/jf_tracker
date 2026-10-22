@@ -14701,6 +14701,17 @@ edit.inst_ref = function(it)
   local e = i and snap.pool and snap.pool[i]
   return e and e.item or nil
 end
+-- 22 окт: f в INSERT — метки прыжка, когда f здесь не набор: поле ноты (не vol / fx — там F это hex), не колонка
+-- огибающей / MIDI-лейна и f не нота раскладки клавиатуры
+ctx.f_in_insert = function()
+  if vim.mode ~= 'insert' or state.focus ~= 'tracker' then return false end
+  if (vim.cur.field or 1) ~= 1 then return false end
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not f or f.env or f.ml then return false end
+  local b = vim.note_key and vim.note_key(('f'):byte(), ctx.mods and ctx.mods() or {})
+  if b and ctx.piano and ctx.piano[b] ~= nil then return false end   -- в этой раскладке f — нота
+  return true
+end
 -- 20 окт: autoarm всех треков (кнопка уголка, tA): on = nil — переключить (у всех уже — снять, иначе — всем)
 ctx.autoarm_all = function(on)
   local nt = reaper.CountTracks(0)
@@ -25423,7 +25434,7 @@ local function frame()
     c = 0
   elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли
-  elseif c == ('f'):byte() and (vim.mode == 'normal' or vim.mode == 'visual' or vim.mode == 'vline') and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes'   -- 21 окт: и в VISUAL
+  elseif c == ('f'):byte() and (vim.mode == 'normal' or vim.mode == 'visual' or vim.mode == 'vline' or ctx.f_in_insert()) and not vim.hydra and not vim.picker and state.focus ~= 'browser' and state.focus ~= 'fxb' and state.focus ~= 'notes'   -- 21 окт: и в VISUAL
      and not vim.pending and not vim.op and not ctx.hp_pend and not (state.focus == 'dsp' and (DK.pending or state.dsp_z)) then   -- 9 окт: префикс ждёт вторую клавишу (a f в DSP) — f его
     -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
     ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
