@@ -81,5 +81,23 @@ do
   end
   gfx.w = 1600
 end
+-- 22 окт: zz в DSP — микшер над DSP на всё окно: трекер спрятан, микшер в своём листе (не поверх трекера)
+do
+  D.panes = dofile(DIR .. '/jf_tracker_panes.lua')
+  local m = D.panes.DEFAULT()
+  D.panes.zoom_multi(m, { 'mixer', 'dsp' }, { 0.3, 0.7 })
+  local c = { guid = 'A', name = 'A', lanes = { { idx = 0, subs = { {} }, items = {} } }, envs = {}, depth = 0 }
+  local state = { fontscale = 1, folds = {}, fxcols = 1, envs = true, hscroll = 1, wave = 'spec', hints = true, dsp = true, top = true,
+    panes_ui = true, panes = m, mixer = true }
+  D.set_font(state)
+  local ok, L = pcall(D.layout, { cols = { c } }, state, 0)
+  eq(ok, true, 'zoomv layout ' .. tostring(not ok and L or ''))
+  if ok then
+    eq(L.pn_hidden_tracker, true, 'zoomv: tracker hidden')
+    eq(L.body_h, 0, 'zoomv: no tracker rows under the mixer')
+    eq(L.pn and L.pn.by_panel.dsp ~= nil, true, 'zoomv: dsp cell')
+  end
+  D.panes = nil
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

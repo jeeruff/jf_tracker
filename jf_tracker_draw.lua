@@ -797,7 +797,7 @@ function D.layout(snap, state, nregions)
     local tr = c and c.content or { x = 0, y = 0, w = gfx.w, h = gfx.h - L.status_h }
     -- 15 окт: развёрнут другой модуль (zz) — у трекера листа нет: не раскладывать его на всё окно под ним
     -- (шапка «fx Superior», транспорт и модлайн ложились поверх развёрнутого слайсера)
-    if not c and state.panes.zoom and state.panes.zoom ~= 'tracker' then tr = { x = 0, y = gfx.h - L.status_h, w = gfx.w, h = 0 }; L.pn_hidden_tracker = true else L.pn_hidden_tracker = nil end
+    if not c and ((state.panes.zoom and state.panes.zoom ~= 'tracker') or state.panes.zoomv) then tr = { x = 0, y = gfx.h - L.status_h, w = gfx.w, h = 0 }; L.pn_hidden_tracker = true else L.pn_hidden_tracker = nil end
     L.side_w, L.rstrip_w, L.slices_w, L.inst_w, L.top_h, L.pool_h, L.dsp_h = 0, 0, 0, 0, 0, 0, 0
     L.browser_left, L.lside_rect, L.slices_split = false, nil, false
     L.ctrl_alone, L.ctrl_box, L.ctrl_dsp, L.mx_top, L.mx_bot, L.mx_ext, L.top_x0 = false, nil, nil, nil, nil, nil, 0
@@ -810,7 +810,7 @@ function D.layout(snap, state, nregions)
     L.sess_y = L.fxrow_y + L.fxrow_h
     local bot = tr.y + tr.h
     -- 10 окт: развёрнут другой модуль (zoom, например big item) — клипов сессии над трекером нет
-    local zoomed_other = state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker'
+    local zoomed_other = state.panes and ((state.panes.zoom and state.panes.zoom ~= 'tracker') or state.panes.zoomv)
     L.sess_h = (state.clipsview and not zoomed_other) and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
     L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
     -- 11 окт: модуль mixer — полоски рисуются в его листе (по колонкам трекера), в теле трекера места не берут
