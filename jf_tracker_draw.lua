@@ -6376,7 +6376,9 @@ function D.frame(L, snap, rows, state, info)
       local function slider(sx, sy, sw, frac, centered, label, val, what, in_pop, noval)
         -- узко (3 окт): дорожке меньше трёх символов — слайдер сворачивается в
         -- кнопку-букву; клик — всплывающий слайдер под ней (D.trspop), повтор — закрыть
-        if not in_pop and sw - ms(label) - 2 * L.pad < ms('000') then
+        -- 22 окт: порог — дорожка с местом под значение уже 5 знаков (было: без значения, меньше 3 — мелкий слайдер оставался)
+        local vres0 = noval and 0 or (math.max(ms(what == 'vol' and '-00.0' or (what == 'width' and '100' or 'R100')), ms(val or '')) + L.pad)
+        if not in_pop and sw - ms(label) - 2 * L.pad - vres0 < ms('00000') then
           local bw = math.min(sw, math.max(L.btn_w, ms(label) + 4))
           local open = D.trspop and D.trspop.guid == col.guid and D.trspop.what == what
           local off_default = centered and math.abs(frac - 0.5) > 0.003 or (not centered and math.abs(frac - 60 / 72) > 0.003)
