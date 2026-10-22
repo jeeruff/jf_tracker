@@ -10611,8 +10611,9 @@ function D.frame(L, snap, rows, state, info)
       kx1 = math.min(kx1, (D.cols_edge(L) or (kx1 + L.pad)) - L.pad)
       kx0 = math.max((L.cols[1].x or 0) + L.cw * 4, kx1 - L.cw * 18); kback = true
     end
+    kx1 = kx1 - 2   -- 22 окт: на 2 px от края — рамка INSERT не ложится на keycast
     if kx1 - kx0 >= L.cw * 6 then
-      local yb = L.body_y + L.body_h - krh - 2
+      local yb = L.body_y + L.body_h - krh - 4
       local i = 0
       for k = #info.keycast, 1, -1 do
         local e = info.keycast[k]
