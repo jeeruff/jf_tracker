@@ -532,6 +532,7 @@ KH.PAGES = {
     { k = 'N h l  N j k  N Enter', m = 'numbers on a param', d = 'on a parameter (slider): 20 h / l - step x20, 23 j / k - 23 params down / up, 23 Enter - set it to 23 in its units (Hz, dB, %), 023 Enter - 0.23; Esc - cancel the number. The same on the rows of reform / humanizer / bouncer (a number + Enter sets the row, Enter alone - keep / apply / bounce)' },
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
+    { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },
     { k = 'Cmd+1..0', d = 'module 1..10 of the chain (in the tracker Cmd+digit is a channel: the N-th thing of the focused module)' },
     { k = 'dw db', d = 'delete modules: d3w - three from the cursor forward, db - the one before, d2b - two before (3dw too)' },
     { k = 'Shift / Cmd+click', d = 'on a module (its name or empty space): Shift - pick from the selected one to it, Cmd - add / remove it (apart is fine); then x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick' },

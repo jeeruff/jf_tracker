@@ -25245,6 +25245,11 @@ local function frame()
           end
           return
         end
+        if ch == 'Z' and not DK.pending and not DK.pads then   -- 22 окт: Z — меню выделенного эффекта (как ПКМ по нему)
+          local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]
+          if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
+          return
+        end
         if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold the module, F - fold / unfold all, p - presets of the module, P - Surge pages, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
