@@ -25097,6 +25097,7 @@ local function frame()
         if not ctx.act_key(c) then return vim.key(c) end
       elseif state.focus == 'reform' then   -- 19 окт: панель reform
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if vim.piano and c >= 48 and c <= 57 and vim.plays_note(c) then return vim.key(c) end   -- 22 окт: KEYS — цифры играют ноты, число не набирается
         local r = ctx.RF.key(ctx.rf_p, c, ctx.mods().shift)
         if r == 'play' then ctx.rf_play()
         elseif r == 'changed' then ctx.rf_apply()
@@ -25105,6 +25106,7 @@ local function frame()
         elseif not r then return vim.key(c) end
       elseif state.focus == 'renderer' then   -- 20 окт: панель renderer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if vim.piano and c >= 48 and c <= 57 and vim.plays_note(c) then return vim.key(c) end   -- 22 окт: KEYS — цифры играют ноты, число не набирается
         local r = ctx.RD.key(ctx.rd_load(), c, ctx.mods().shift)
         if r == 'changed' then ctx.rd_save()
         elseif r == 'render' then ctx.rd_render()
@@ -25112,6 +25114,7 @@ local function frame()
         elseif not r then return vim.key(c) end
       elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        if vim.piano and c >= 48 and c <= 57 and vim.plays_note(c) then return vim.key(c) end   -- 22 окт: KEYS — цифры играют ноты, число не набирается
         ctx.hum_load()
         local r = ctx.HU.key(ctx.hum_s, c, ctx.mods().shift)
         if r == 'changed' then ctx.hum_save()
