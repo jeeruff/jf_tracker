@@ -7594,13 +7594,13 @@ function D.frame(L, snap, rows, state, info)
       if plb then small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn') end
       -- 18 окт: autoarm — под clips (просьба; был в шапке мастера): все треки на автоарм / обратно, горит — у всех
       local all, nt = true, reaper.CountTracks(0)
-      for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'I_RECARM') ~= 1 then all = false; break end end   -- 22 окт: горит — армлены все
+      for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
       all = all and nt > 0
       local ay = hy + 1 + 2 * L.rh
       D.cn_r1x = plb and (x2 + ms(plb) + 4) or x2   -- 20 окт: свободное место ряда 1 (az mk низкой шапки)
       -- 20 окт: ряд autoarm / fold — на своём месте и в низкой шапке (микшер внизу): влезает над последним рядом
       if ay + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
-        local xf = small(bx, ay, ms('arm all') + 4 <= bw and 'arm all' or 'arm', all and 'off' or 'on', all, 'mautoarm')
+        local xf = small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'arm', all and 'off' or 'on', all, 'mautoarm')
         -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
         local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end

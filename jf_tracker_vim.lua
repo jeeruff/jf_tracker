@@ -2827,7 +2827,7 @@ function V.key_impl(c)
         elseif ch == 'm' and ctx.track_toggle then ctx.track_toggle('mute')   -- 21 окт: tm — mute трека курсора
         elseif ch == 'u' and ctx.unsolo_all then ctx.unsolo_all()          -- 21 окт: tu — снять все соло и mute
         elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm(V.count)   -- 16 окт: 6ta — шесть треков от курсора
-        elseif ch == 'A' and ctx.autoarm_all then ctx.autoarm_all()   -- 20 окт: tA — арм всех треков (кнопка arm all)
+        elseif ch == 'A' and ctx.autoarm_all then ctx.autoarm_all()   -- 20 окт: tA — autoarm всех треков (кнопка autoarm)
         elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)
         elseif ch == 'I' and ctx.smart_input and col then ctx.smart_input(col)   -- 10 окт: tI — активный вход (jf_smart_set_input)
         elseif ch == 'l' and ctx.toggle_lanes then ctx.toggle_lanes()
