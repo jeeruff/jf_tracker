@@ -344,6 +344,18 @@ do
   eq('tracker still there', l7.by_panel.tracker ~= nil, true)
   eq('neighbour stack keeps its tabs', #PN.find(m7, 'browser').panes, stack0)
   eq('decode(encode) keeps it', PN.encode(PN.decode(PN.encode(m7))), PN.encode(m7))
+  -- 22 окт: возврат без снимка (после перезапуска) — полоса снята, dsp снова в обычной панели
+  ok('spanned_bottom sees the strip', PN.spanned_bottom(m7, 'dsp'))
+  eq('plain layout is not spanned', PN.spanned_bottom(PN.DEFAULT(), 'dsp'), nil)
+  local m8 = PN.decode(PN.encode(m7))   -- как после перезапуска: только строка раскладки
+  eq('unspan_bottom ok', PN.unspan_bottom(m8, 'dsp'), true)
+  eq('nothing to unspan twice', PN.unspan_bottom(m8, 'dsp'), false)
+  local l8 = PN.layout(m8, 1600, 900, M)
+  local d8 = l8.by_panel.dsp
+  ok('dsp visible again', d8 ~= nil)
+  eq('dsp no longer across the width', d8 and d8.w == 1600, false)
+  eq('dsp is not hidden', m8.hidden.dsp, nil)
+  tiling('after unspan', m8, 1600, 900)
 end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

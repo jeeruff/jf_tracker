@@ -432,6 +432,7 @@ state.panes = (function()
     top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
     mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
 end)()
+do local z = reaper.GetExtState(EXT, 'dsp_zx'); state.dsp_zx_saved = z ~= '' and z or nil end   -- 22 окт: снимок раскладки до zx — переживает перезапуск
 -- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
 if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
 -- 10 окт: props — свой модуль; один раз показать справа от вкладки item (дальше — как пользователь разложит)
@@ -25812,13 +25813,22 @@ local function frame()
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'x' then   -- 22 окт: zx — DSP полосой во всю ширину снизу, боковые модули поднимаются; ещё раз — как было
+            -- снимок до zx живёт в ExtState dsp_zx: раскладка с полосой сохраняется, и после перезапуска
+            -- второй zx снова делал полосу поверх полосы (лог 20:31 → 21:00), «назад» вело к полосе
             if state.dsp_zx_saved then
               local saved, v = state.dsp_zx_saved, state.panes.v
-              state.dsp_zx_saved = nil
-              ctx.pane_do(function() state.panes = draw.panes.decode(saved); state.panes.v = v + 1; return true end, 'zx: panes as before')
+              state.dsp_zx_saved = nil; reaper.DeleteExtState(EXT, 'dsp_zx', true)
+              ctx.pane_do(function()
+                local m = draw.panes.decode(saved)
+                if not m then return draw.panes.unspan_bottom(state.panes, 'dsp') end
+                state.panes = m; state.panes.v = v + 1; return true
+              end, 'zx: panes as before')
+            elseif draw.panes.spanned_bottom(state.panes, 'dsp') then   -- полоса есть, снимка нет (старый запуск): снять структурно
+              ctx.pane_do(function() return draw.panes.unspan_bottom(state.panes, 'dsp') end, 'zx: strip removed, dsp back in its default pane (no snapshot from before the restart)')
             else
               local saved = draw.panes.encode(state.panes)
-              if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, 'dsp', 0.32) end, 'zx: dsp across the whole width, the side modules moved up (zx - back)') then state.dsp_zx_saved = saved
+              if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, 'dsp', 0.32) end, 'zx: dsp across the whole width, the side modules moved up (zx - back)') then
+                state.dsp_zx_saved = saved; reaper.SetExtState(EXT, 'dsp_zx', saved, true)
               else vim.msg = 'zx: dsp is not in a pane here' end
             end
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)

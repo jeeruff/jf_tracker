@@ -720,6 +720,32 @@ function PN.span_bottom(model, id, share)
   return bump(model)
 end
 
+-- 22 окт: полоса span_bottom на месте? — корень v, последний ребёнок — лист с id (его панели — вкладки полосы)
+function PN.spanned_bottom(model, id)
+  local r = model.root
+  if not r or is_leaf(r) or r.ax ~= 'v' then return nil end
+  local lf = r.kids[#r.kids]
+  if not is_leaf(lf) then return nil end
+  for _, pid in ipairs(lf.panes) do if pid == id then return lf end end
+  return nil
+end
+-- 22 окт: обратно без снимка (после перезапуска снимка zx нет, а полоса в сохранённой раскладке осталась):
+-- полоса снизу снимается, её вкладки встают на свои места по умолчанию (PANELS side), одним стеком
+function PN.unspan_bottom(model, id)
+  local lf = PN.spanned_bottom(model, id)
+  if not lf then return false end
+  local r = model.root
+  table.remove(r.kids, #r.kids); table.remove(r.fr, #r.fr)
+  PN.normalize(model)   -- корень с одним ребёнком складывается; панели полосы помечены hidden
+  local first
+  for _, pid in ipairs(lf.panes) do
+    if first then PN.stack(model, pid, first)
+    elseif PN.show(model, pid) then first = pid end
+  end
+  if first then PN.set_active(model, id) end
+  return bump(model)
+end
+
 -- имя → id: id, подпись или буква режима PANE
 function PN.parse_name(s)
   s = (s or ''):lower()
