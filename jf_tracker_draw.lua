@@ -5210,8 +5210,10 @@ function D.draw_notepop(L, hover)
   text(px + L.pad, py + L.pad, fit((np.name or 'note') .. ': ' .. (hot and nm(hot) or (np.cur and nm(np.cur) or '')) .. '   click - set, Esc / click outside - close', pw - 2 * L.pad), U.AMBER)
   if hot then hover.notepop = hot end
 end
--- 22 окт: снапшоты микшера (SWS Snapshots — нативные: окно SWS Snapshots, хранятся в проекте) слева в пустом месте
--- микшера: кнопки 1..12, заполненные — голубым, последний вызванный — янтарём; щелчок — вызвать, Shift — записать
+-- 22 окт: снапшоты микшера слева в пустом месте микшера — как окно SWS Snapshots: вкладки snapshots | xy;
+-- snapshots — кнопки new prev next up down sws, таблица # / name / date / time (щелчок — вызвать, Cmd — записать
+-- поверх, Alt — удалить, ПКМ — меню), фильтр SWS (full mix / visibility / custom + галочки) и опции, если влезают
+-- по высоте (иначе кнопка filter — меню); xy — пэд: 4 угла = громкость и пан всех треков, шайба — морф
 function D.draw_mixsnaps(L, info, hover)
   local ms0 = info.mixsnaps
   local x0 = L.mix_pane and L.mix_pane.x or 0
@@ -5220,26 +5222,124 @@ function D.draw_mixsnaps(L, info, hover)
   if L.mix_pane then x1 = math.min(x1 or (L.mix_pane.x + L.mix_pane.w), L.mix_pane.x + L.mix_pane.w) end
   if not x1 then return end
   local y0, h = L.mix_y + 3, L.mix_h - 6
-  local cw = ms('12') + 2 * L.pad
-  local avail = x1 - x0 - 2 * L.pad
-  local ncol = math.floor((avail + 2) / (cw + 2))
-  if ncol < 2 or h < 3 * L.rh then return end
+  local x, w = x0 + L.pad, x1 - x0 - 2 * L.pad
+  if w < ms('snapshots xy') + 6 * L.pad or h < 3 * L.rh then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  text(x0 + L.pad, y0, fit('snapshots', avail), U.GREY)
-  local rows = math.floor((h - L.rh - 2) / L.rh)
-  local n = math.min(12, ncol * rows)
-  for i = 1, n do
-    local cx = x0 + L.pad + ((i - 1) % ncol) * (cw + 2)
-    local cy = y0 + L.rh + 2 + math.floor((i - 1) / ncol) * L.rh
-    local on, cur = ms0.has[i], ms0.cur == i
-    local hot = mx >= cx and mx < cx + cw and my >= cy and my < cy + L.rh - 1
-    set(hot and U.tint(U.AMBER, 0.35) or (cur and U.tint(U.AMBER, 0.25) or (on and U.tint(U.CYAN, 0.3) or U.PANEL))); gfx.rect(cx, cy, cw, L.rh - 2, 1)
-    set(hot and U.AMBER or (cur and U.AMBER or (on and U.CYAN or U.DIM))); gfx.rect(cx, cy, cw, L.rh - 2, 0)
-    local lab = tostring(i)
-    text(cx + math.floor((cw - ms(lab)) / 2), cy, lab, (hot or cur) and U.AMBER or (on and U.TEXT or U.GREY))
-    if hot then hover.mixsnap = i end
-    hint('mixsnap', cx, cy, cw, L.rh - 2, { i = i })
+  local rh = L.rh
+  local function btn(bx, by, label, on, sel, h2)
+    local bw = ms(label) + 2 * L.pad
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh - 1
+    set(hot and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.3) or U.PANEL)); gfx.rect(bx, by, bw, rh - 2, 1)
+    set((hot or sel) and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(bx, by, bw, rh - 2, 0)
+    text(bx + L.pad, by, label, (hot or sel) and U.AMBER or (on and U.TEXT or U.GREY))
+    if hot then hover.mixsnap = h2 end
+    hint('mixsnap', bx, by, bw, rh - 2, h2)
+    return bw
   end
+  local function check(bx, by, bw, label, on, h2, radio)
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
+    local bs = rh - 6
+    set(on and U.CYAN or U.DIM); gfx.rect(bx, by + 3, bs, bs, on and 1 or 0)
+    if radio and not on then set(U.DIM); gfx.rect(bx + 2, by + 5, bs - 4, bs - 4, 0) end
+    text(bx + bs + L.pad, by, fit(label, bw - bs - L.pad), hot and U.AMBER or (on and U.TEXT or U.GREY))
+    if hot then hover.mixsnap = h2 end
+    hint('mixsnap', bx, by, bw, rh, h2)
+  end
+  local yy = y0
+  -- вкладки
+  local tx = x
+  for _, t in ipairs({ { 'snapshots', 'list' }, { 'xy', 'xy' } }) do
+    tx = tx + btn(tx, yy, t[1], false, ms0.tab == t[2], { what = 'tab', arg = t[2] }) + 2
+  end
+  yy = yy + rh
+  if ms0.tab == 'xy' then
+    local xy = ms0.xy or { has = {} }
+    local side = math.max(4 * rh, math.min(w, y0 + h - yy - 4))
+    if yy + side > y0 + h + 1 then return end
+    local px0, py0 = x + math.floor((w - side) / 2), yy + 2
+    local cbw = ms('4') + 2 * L.pad
+    local onpad = mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side
+    set(U.BG); gfx.rect(px0, py0, side, side, 1)
+    set(onpad and U.AMBER or U.LINE); gfx.rect(px0, py0, side, side, 0)
+    set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(px0 + math.floor(side / 2), py0 + 1, 1, side - 2, 1); gfx.rect(px0 + 1, py0 + math.floor(side / 2), side - 2, 1, 1)
+    local corners = { { px0 + 1, py0 + 1 }, { px0 + side - cbw - 1, py0 + 1 }, { px0 + 1, py0 + side - rh }, { px0 + side - cbw - 1, py0 + side - rh } }
+    local oncorner
+    for i, c in ipairs(corners) do
+      local hot = mx >= c[1] and mx < c[1] + cbw and my >= c[2] and my < c[2] + rh - 1
+      btn(c[1], c[2], tostring(i), xy.has[i], false, { what = 'xyc', arg = i })
+      if hot then oncorner = true end
+    end
+    local n = 0; for i = 1, 4 do if xy.has[i] then n = n + 1 end end
+    if n >= 2 then
+      local cx, cy = px0 + math.floor((xy.x or 0.5) * (side - 1)), py0 + math.floor((xy.y or 0.5) * (side - 1))
+      set(xy.drag and U.AMBER or U.CYAN)
+      for d = 0, 4 do gfx.rect(cx - d, cy - 4 + d, 2 * d + 1, 1, 1); gfx.rect(cx - d, cy + 4 - d, 2 * d + 1, 1, 1) end
+    elseif side > ms('corners: save') + 2 * cbw then
+      text(px0 + math.floor((side - ms('corners: save')) / 2), py0 + math.floor(side / 2) - rh, 'corners: save', U.DIM)
+    end
+    if onpad and not oncorner then hover.mixsnap = { what = 'xypad', x0 = px0, y0 = py0, side = side } end
+    return
+  end
+  -- кнопки: new prev next up down sws (+ filter, если блок фильтра не влезает)
+  local FB = (1 + 3 + 4 + 5) * rh + 4                           -- блок фильтра: заголовок, 3 режима, 4 строки галочек, 5 опций
+  local inline = (y0 + h) - (yy + 2 * rh + 4 * rh) >= FB      -- под таблицей хотя бы 4 строки
+  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' } }
+  if not inline then B[#B + 1] = { 'filter', 'filtermenu' } end
+  local bx = x
+  for _, b in ipairs(B) do
+    local bw = ms(b[1]) + 2 * L.pad
+    if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
+    bx = bx + btn(bx, yy, b[1], false, false, { what = b[2] }) + 2
+  end
+  yy = yy + rh + 2
+  -- таблица
+  local nw = ms('12') + L.pad
+  local tw = ms('00:00:00') + L.pad
+  local dw = ms('00.00.00') + L.pad
+  local showt = w - nw - tw >= ms('Mix 12') + L.pad
+  local showd = showt and (w - nw - tw - dw >= ms('Mix 12') + L.pad)
+  local namew = w - nw - (showt and tw or 0) - (showd and dw or 0)
+  set(U.mix(U.BG, U.TEXT, 0.12)); gfx.rect(x, yy, w, rh, 1)
+  text(x + 2, yy, '#', U.GREY); text(x + nw, yy, fit('name', namew - L.pad), U.GREY)
+  if showd then text(x + nw + namew, yy, 'date', U.GREY) end
+  if showt then text(x + w - tw, yy, 'time', U.GREY) end
+  yy = yy + rh
+  local listh = (inline and (y0 + h - FB) or (y0 + h)) - yy
+  local nvis = math.max(1, math.floor(listh / rh))
+  for i = 1, nvis do
+    local ry = yy + (i - 1) * rh
+    local r = ms0.rows[i]
+    set(i % 2 == 0 and U.mix(U.BG, U.TEXT, 0.05) or U.BG); gfx.rect(x, ry, w, rh, 1)
+    if r then
+      local cur = ms0.cur == r.slot
+      local hot = mx >= x and mx < x + w and my >= ry and my < ry + rh
+      if cur or hot then set(U.tint(U.AMBER, cur and 0.25 or 0.15)); gfx.rect(x, ry, w, rh, 1) end
+      local tc = (cur or hot) and U.AMBER or U.TEXT
+      text(x + 2, ry, tostring(r.slot), (cur or hot) and U.AMBER or U.GREY)
+      text(x + nw, ry, fit(r.name ~= '' and r.name or ('Mix ' .. r.slot), namew - L.pad), tc)
+      if showd then text(x + nw + namew, ry, fit(r.date or '', dw - 2), U.GREY) end
+      if showt then text(x + w - tw, ry, fit(r.time or '', tw - 2), U.GREY) end
+      if hot then hover.mixsnap = { what = 'row', i = i } end
+      hint('mixsnap', x, ry, w, rh, { what = 'row', i = i })
+    end
+  end
+  if #ms0.rows > nvis then text(x + w - ms('+' .. (#ms0.rows - nvis)), yy + (nvis - 1) * rh, '+' .. (#ms0.rows - nvis), U.GREY) end
+  set(U.LINE); gfx.rect(x, yy - rh, w, nvis * rh + rh, 0)
+  if not inline then return end
+  -- фильтр SWS и опции
+  local fy = y0 + h - FB + 4
+  text(x, fy, fit('filter', w), U.GREY); fy = fy + rh
+  for _, m in ipairs({ { 'full', 'full track mix' }, { 'vis', 'current visibility' }, { 'custom', 'custom' } }) do
+    check(x, fy, w, m[2], ms0.mode == m[1], { what = 'mode', arg = m[1] }, true); fy = fy + rh
+  end
+  local half = math.floor(w / 2)
+  for k, t in ipairs(info.msn_tog or {}) do
+    local cx = x + ((k - 1) % 2) * half
+    check(cx + L.pad, fy + math.floor((k - 1) / 2) * rh, half - L.pad, t[2], ms0.tog[t[1]], { what = 'tog', arg = t[1] })
+  end
+  fy = fy + 4 * rh
+  for _, t in ipairs(info.msn_opt or {}) do check(x, fy, w, t[2], ms0.opt[t[1]], { what = 'opt', arg = t[1] }); fy = fy + rh end
+  check(x, fy, w, 'prompt for name', ms0.prompt, { what = 'prompt' })
 end
 -- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
 -- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)

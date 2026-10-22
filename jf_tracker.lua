@@ -2086,29 +2086,178 @@ ctx = {
     end
     done()
   end,
-  -- 22 окт: снапшоты микшера — SWS Snapshots 1..12 (нативные: «SWS: Save as / Recall snapshot N», окно Snapshots);
-  -- какие слоты заполнены, SWS не отдаёт — отметка в ProjExtState jf_tracker/mixsnaps (только подсветка кнопок)
+  -- 22 окт: снапшоты микшера — SWS Snapshots (нативные: хранятся в проекте, окно SWS Snapshots), как окно SWS:
+  -- список # / имя / дата / время, New, Previous / Next, Move Up / Down, Alt-щелчок — удалить, Cmd-щелчок — записать
+  -- поверх; фильтр (Full Track Mix / Current Visibility / Custom + галочки) и опции — действия SWS, состояние —
+  -- GetToggleCommandState (то же, что в окне SWS). Список SWS наружу не отдаёт — строки (слот 1..12, имя, когда)
+  -- в ProjExtState jf_tracker/mixsnaplist; запись / вызов — «SWS: Save as / Recall snapshot N»
+  MSN_TOG = { { 'PAN', 'pan' }, { 'VOL', 'volume' }, { 'MUTE', 'mute' }, { 'FX', 'fx chain' }, { 'SOLO', 'solo' }, { 'SEND', 'sends' },
+    { 'VIS', 'vis' }, { 'TOGSEL', 'selection' } },
+  MSN_OPT = { { 'APPLYLOAD', 'filter on recall' }, { 'SELONLY', 'save sel tracks only' }, { 'SELONLYRECALL', 'recall sel tracks only' },
+    { 'SHOWONLYSEL', 'show for sel tracks only' } },
+  msn_rows = function()
+    local _, str = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnaplist')
+    local rows = {}
+    for tok in (str or ''):gmatch('[^;]+') do
+      local sl, nm, dt, tm = tok:match('^(%d+)|([^|]*)|([^|]*)|(.*)$')
+      if sl then rows[#rows + 1] = { slot = tonumber(sl), name = nm, date = dt, time = tm } end
+    end
+    if #rows == 0 then   -- слоты, записанные кнопками 1..12 (днём 22 окт), — строками без даты
+      local _, old = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnaps')
+      for k in (old or ''):gmatch('%d+') do rows[#rows + 1] = { slot = tonumber(k), name = 'Mix ' .. k, date = '', time = '' } end
+    end
+    return rows
+  end,
+  msn_write = function(rows)
+    local t = {}
+    for _, r in ipairs(rows) do t[#t + 1] = ('%d|%s|%s|%s'):format(r.slot, (r.name or ''):gsub('[|;]', ' '), r.date or '', r.time or '') end
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixsnaplist', table.concat(t, ';'))
+    ctx.msn_c = nil
+  end,
   mixsnaps_info = function()
     if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then return nil end
-    local _, str = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnaps')
-    local has = {}
-    for i in (str or ''):gmatch('%d+') do has[tonumber(i)] = true end
+    local now = reaper.time_precise()
+    local c = ctx.msn_c
+    if c and now - c.t < 0.5 then c.tab = state.mixsnap_tab or 'list'; c.xy = ctx.mixxy_info(); return c end
+    c = { t = now, rows = ctx.msn_rows(), tog = {}, opt = {}, prompt = state.msn_prompt }
     local _, cur = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnapcur')
-    return { has = has, cur = tonumber(cur) }
+    c.cur = tonumber(cur)
+    local function st(k) local id = reaper.NamedCommandLookup('_SWSSNAPSHOT_' .. k); return id ~= 0 and reaper.GetToggleCommandState(id) == 1 end
+    for _, t in ipairs(ctx.MSN_TOG) do c.tog[t[1]] = st(t[1]) end
+    for _, t in ipairs(ctx.MSN_OPT) do c.opt[t[1]] = st(t[1]) end
+    local T = c.tog
+    if T.PAN and T.VOL and T.MUTE and T.FX and T.SOLO and T.SEND and not T.VIS and not T.TOGSEL then c.mode = 'full'
+    elseif T.VIS and not (T.PAN or T.VOL or T.MUTE or T.FX or T.SOLO or T.SEND or T.TOGSEL) then c.mode = 'vis'
+    else c.mode = 'custom' end
+    if state.msn_custom then c.mode = 'custom' end
+    c.tab = state.mixsnap_tab or 'list'
+    c.xy = ctx.mixxy_info()
+    ctx.msn_c = c
+    return c
   end,
-  mixsnap_do = function(i, save)
-    local id = reaper.NamedCommandLookup((save and '_SWSSNAPSHOT_SAVE' or '_SWSSNAPSHOT_GET') .. i)
-    if id == 0 then vim.msg = 'snapshots need SWS'; return end
-    reaper.Main_OnCommand(id, 0)
-    local inf = ctx.mixsnaps_info() or { has = {} }
-    if save then
-      inf.has[i] = true
-      local t = {}; for k in pairs(inf.has) do t[#t + 1] = k end; table.sort(t)
-      reaper.SetProjExtState(0, 'jf_tracker', 'mixsnaps', table.concat(t, ' '))
+  msn_cmd = function(k) local id = reaper.NamedCommandLookup('_SWSSNAPSHOT_' .. k); if id ~= 0 then reaper.Main_OnCommand(id, 0) end; ctx.msn_c = nil end,
+  -- what: new / recall / save / del / prev / next / up / down / mode / tog / opt / prompt / win / tab
+  mixsnap_do = function(what, arg)
+    if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then vim.msg = 'snapshots need SWS'; return end
+    local rows = ctx.msn_rows()
+    local _, cs = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnapcur')
+    local cur = tonumber(cs)
+    local function ri_of(slot) for i, r in ipairs(rows) do if r.slot == slot then return i end end end
+    local function setcur(slot) reaper.SetProjExtState(0, 'jf_tracker', 'mixsnapcur', tostring(slot or '')); ctx.msn_c = nil end
+    local function recall(r) ctx.msn_cmd('GET' .. r.slot); setcur(r.slot); model.invalidate(); vim.msg = ('snapshot %d recalled: %s'):format(r.slot, r.name) end
+    if what == 'new' then
+      local used = {}; for _, r in ipairs(rows) do used[r.slot] = true end
+      local slot; for k = 1, 12 do if not used[k] then slot = k; break end end
+      if not slot then vim.msg = 'snapshots: all 12 slots used - Alt+click one to delete, Cmd+click to save over'; return end
+      ctx.msn_cmd('SAVE' .. slot)
+      rows[#rows + 1] = { slot = slot, name = 'Mix ' .. slot, date = os.date('%d.%m.%y'), time = os.date('%H:%M:%S') }
+      ctx.msn_write(rows); setcur(slot)
+      if state.msn_prompt then ctx.msn_ren = slot; vim.open_prompt('snapname ', 'Mix ' .. slot) end
+      vim.msg = ('snapshot %d saved (%s)'):format(slot, ({ full = 'full track mix', vis = 'visibility', custom = 'custom filter' })[(ctx.mixsnaps_info() or {}).mode] or '')
+    elseif what == 'recall' then local r = rows[arg]; if r then recall(r) end
+    elseif what == 'save' then
+      local r = rows[arg]; if not r then return end
+      ctx.msn_cmd('SAVE' .. r.slot); r.date, r.time = os.date('%d.%m.%y'), os.date('%H:%M:%S'); ctx.msn_write(rows); setcur(r.slot)
+      vim.msg = ('snapshot %d saved over: %s (Cmd+click)'):format(r.slot, r.name)
+    elseif what == 'del' then
+      local r = rows[arg]; if not r then return end
+      table.remove(rows, arg); ctx.msn_write(rows); if cur == r.slot then setcur(nil) end
+      vim.msg = ('snapshot %d removed from the list (its SWS slot is free - the next New saves over it)'):format(r.slot)
+    elseif what == 'prev' or what == 'next' then
+      if #rows == 0 then vim.msg = 'snapshots: none yet - New'; return end
+      local i = ri_of(cur) or (what == 'next' and 0 or #rows + 1)
+      i = i + (what == 'next' and 1 or -1)
+      if i < 1 then i = #rows elseif i > #rows then i = 1 end
+      recall(rows[i])
+    elseif what == 'up' or what == 'down' then
+      local i = ri_of(cur); if not i then vim.msg = 'snapshots: recall one first (click), then move it'; return end
+      local j = i + (what == 'down' and 1 or -1)
+      if j < 1 or j > #rows then return end
+      rows[i], rows[j] = rows[j], rows[i]; ctx.msn_write(rows)
+    elseif what == 'mode' then
+      local inf = ctx.mixsnaps_info() or { tog = {} }
+      state.msn_custom = arg == 'custom' or nil
+      if arg ~= 'custom' then
+        local want = arg == 'vis' and { VIS = true } or { PAN = true, VOL = true, MUTE = true, FX = true, SOLO = true, SEND = true }
+        for _, t in ipairs(ctx.MSN_TOG) do if (inf.tog[t[1]] and true or false) ~= (want[t[1]] or false) then ctx.msn_cmd(t[1]) end end
+      end
+      ctx.msn_c = nil
+    elseif what == 'tog' then state.msn_custom = true; ctx.msn_cmd(arg)
+    elseif what == 'opt' then ctx.msn_cmd(arg)
+    elseif what == 'prompt' then state.msn_prompt = not state.msn_prompt or nil; ctx.msn_c = nil
+    elseif what == 'win' then ctx.msn_cmd('OPEN')
+    elseif what == 'filtermenu' then   -- места мало — фильтр и опции меню (то же, что галочки панели)
+      local inf = ctx.mixsnaps_info() or { tog = {}, opt = {} }
+      local items = {}
+      for _, m in ipairs({ { 'f', 'full', 'full track mix' }, { 'v', 'vis', 'current visibility' }, { 'c', 'custom', 'custom' } }) do
+        items[#items + 1] = { key = m[1], label = (inf.mode == m[2] and '(o) ' or '( ) ') .. m[3], fn = function() ctx.mixsnap_do('mode', m[2]) end }
+      end
+      local keys = { PAN = 'p', VOL = 'o', MUTE = 'm', FX = 'x', SOLO = 's', SEND = 'e', VIS = 'i', TOGSEL = 'l' }
+      for _, t in ipairs(ctx.MSN_TOG) do items[#items + 1] = { key = keys[t[1]], label = (inf.tog[t[1]] and '[x] ' or '[ ] ') .. t[2], fn = function() ctx.mixsnap_do('tog', t[1]) end } end
+      local ok2 = { APPLYLOAD = 'r', SELONLY = 'a', SELONLYRECALL = 'b', SHOWONLYSEL = 'h' }
+      for _, t in ipairs(ctx.MSN_OPT) do items[#items + 1] = { key = ok2[t[1]], label = (inf.opt[t[1]] and '[x] ' or '[ ] ') .. t[2], fn = function() ctx.mixsnap_do('opt', t[1]) end } end
+      items[#items + 1] = { key = 'n', label = (state.msn_prompt and '[x] ' or '[ ] ') .. 'prompt for name', fn = function() ctx.mixsnap_do('prompt') end }
+      vim.open_hydra({ title = 'snapshots filter (SWS)', items = items })
+    elseif what == 'tab' then state.mixsnap_tab = arg; ctx.msn_c = nil
+    elseif what == 'xyc' then if ctx.mods().shift or not (ctx.mixxy_of().snaps[arg]) then ctx.mixxy_save(arg) else ctx.mixxy_recall(arg) end
     end
-    reaper.SetProjExtState(0, 'jf_tracker', 'mixsnapcur', tostring(i))
-    model.invalidate()
-    vim.msg = save and ('snapshot %d saved (SWS: volume, pan, mute, solo, fx ... - what the SWS Snapshots window has on)'):format(i) or ('snapshot %d recalled'):format(i)
+  end,
+  msn_name = function(text)
+    local slot = ctx.msn_ren; ctx.msn_ren = nil
+    local rows = ctx.msn_rows()
+    for _, r in ipairs(rows) do if r.slot == slot then r.name = (text or ''):gsub('^%s+', ''):gsub('%s+$', '') end end
+    ctx.msn_write(rows)
+  end,
+  -- 22 окт: XY микшера — 4 угла: громкость и пан всех треков (быстрый снапшот), шайба — морф; хранение —
+  -- ProjExtState jf_tracker/mixxy (SN.ser), ключ «GUID трека|vol» (dB −60..+12 → 0..1) / «|pan» (−1..1 → 0..1)
+  mixxy_of = function()
+    if not ctx.mixxy then
+      local _, str = reaper.GetProjExtState(0, 'jf_tracker', 'mixxy')
+      ctx.mixxy = { snaps = ctx.SN.parse(str), x = 0.5, y = 0.5 }
+    end
+    return ctx.mixxy
+  end,
+  mixxy_info = function()
+    local e = ctx.mixxy_of()
+    return { has = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }, x = e.x, y = e.y, drag = ctx.mixxydrag ~= nil }
+  end,
+  mixxy_grab = function()
+    local s = {}
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, i)
+      local g = reaper.GetTrackGUID(tr)
+      local v = reaper.GetMediaTrackInfo_Value(tr, 'D_VOL')
+      local db = v > 1e-6 and 20 * math.log(v, 10) or -60
+      s[g .. '|vol'] = math.max(0, math.min(1, (db + 60) / 72))
+      s[g .. '|pan'] = (reaper.GetMediaTrackInfo_Value(tr, 'D_PAN') + 1) / 2
+    end
+    return s
+  end,
+  mixxy_apply = function(vals, last)
+    local map = {}
+    for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); map[reaper.GetTrackGUID(tr)] = tr end
+    for k, v in pairs(vals) do
+      if not last or math.abs((last[k] or -1) - v) > 1e-4 then
+        local g, w = k:match('^(.-)|(%a+)$')
+        local tr = g and map[g]
+        if tr and w == 'vol' then local db = v * 72 - 60; reaper.SetMediaTrackInfo_Value(tr, 'D_VOL', db <= -59.9 and 0 or 10 ^ (db / 20))
+        elseif tr and w == 'pan' then reaper.SetMediaTrackInfo_Value(tr, 'D_PAN', v * 2 - 1) end
+        if last then last[k] = v end
+      end
+    end
+  end,
+  mixxy_save = function(i)
+    local e = ctx.mixxy_of()
+    e.snaps[i] = ctx.mixxy_grab()
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser(e.snaps))
+    vim.msg = ('mixer XY corner %d saved (volume and pan of every track; Shift+click - overwrite)'):format(i)
+  end,
+  mixxy_recall = function(i)
+    local e = ctx.mixxy_of()
+    if not e.snaps[i] then return ctx.mixxy_save(i) end
+    reaper.Undo_BeginBlock2(0); ctx.mixxy_apply(e.snaps[i]); reaper.Undo_EndBlock2(0, 'jf_tracker: mixer XY corner ' .. i, -1)
+    e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
+    model.invalidate(); vim.msg = ('mixer XY corner %d recalled (u - undo)'):format(i)
   end,
   -- 22 окт: снапшоты трека — 4 угла XY-пэда в DSP; хранение — P_EXT:jf_snaps трека, шайба — в памяти
   snaps_of = function(col)
@@ -16063,7 +16212,7 @@ local function hint_go(t)
     local col = dsp_target()
     if col and d and d.what and d.what ~= 'sl' and d.what ~= 'cv' and d.what ~= 'row' then ctx.set_focus('dsp'); ctx.trkmod_do({ col = col, what = d.what, tab = d.tab, v = d.v }) end
   elseif t.kind == 'snapc' then local col = dsp_target(); if col and d then ctx.snap_recall(col, d.i) end
-  elseif t.kind == 'mixsnap' then if d then ctx.mixsnap_do(d.i, false) end
+  elseif t.kind == 'mixsnap' then if d and d.what == 'row' then ctx.mixsnap_do('recall', d.i) elseif d and d.what ~= 'xypad' then ctx.mixsnap_do(d.what, d.arg) end
   elseif t.kind == 'libtab' then state.libtab = d; ctx.set_focus('inst'); vim.msg = 'lib: ' .. tostring(d) .. ' (F4)'
   elseif t.kind == 'mxbpm' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.bpm_prompt(seq[d]) end
   elseif t.kind == 'mxsig' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.sig_prompt(seq[d]) end
@@ -19760,6 +19909,7 @@ local function frame()
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
+    msn_tog = ctx.MSN_TOG, msn_opt = ctx.MSN_OPT,
     macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
     modedit = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3) (modsel занято строкой вкладки modulation): редактор модуляции выбранного параметра
@@ -22761,8 +22911,15 @@ local function frame()
     elseif hover.trkmod then   -- 22 окт: мини-панель mod · auto
       ctx.trkmod_do(hover.trkmod)
       click = { t = now2, zone = 'trkmod' }
-    elseif hover.mixsnap then   -- 22 окт: снапшот SWS в микшере: щелчок — вызвать, Shift — записать
-      ctx.mixsnap_do(hover.mixsnap, ctx.mods().shift)
+    elseif hover.mixsnap then   -- 22 окт: снапшоты SWS в микшере (как окно SWS): строка — вызвать, Cmd — записать поверх, Alt — удалить
+      local h, m = hover.mixsnap, ctx.mods()
+      if h.what == 'row' then ctx.mixsnap_do(m.alt and 'del' or (m.cmd and 'save' or 'recall'), h.i)
+      elseif h.what == 'xypad' then
+        local e = ctx.mixxy_of()
+        local n = 0; for i = 1, 4 do if e.snaps[i] then n = n + 1 end end
+        if n >= 2 then ctx.mixxydrag = { x0 = h.x0, y0 = h.y0, side = h.side, keys = ctx.SN.diff_keys(e.snaps), last = {}, e = e }
+        else vim.msg = 'mixer XY: save at least two corners (click an empty corner)' end
+      else ctx.mixsnap_do(h.what, h.arg) end
       click = { t = now2, zone = 'mixsnap' }
     elseif hover.snapc then   -- 22 окт: угол XY-пресетов: пустой — запомнить, полный — вызвать, Shift — перезаписать
       local h = hover.snapc
@@ -23917,12 +24074,17 @@ local function frame()
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
   elseif U.rclick and hover.trkmod and (hover.trkmod.what == 'row' or hover.trkmod.what == 'pk' or hover.trkmod.what == 'cv') then   -- pk: меню длины подката, cv: убрать точку кривой
     ctx.trkmod_do(hover.trkmod, true); U.rclick = false
-  elseif U.rclick and hover.mixsnap then
-    local i = hover.mixsnap
-    vim.open_hydra({ title = 'snapshot ' .. i .. ' (SWS)', items = {
-      { key = 's', label = 'save as snapshot ' .. i, fn = function() ctx.mixsnap_do(i, true) end },
-      { key = 'r', label = 'recall', fn = function() ctx.mixsnap_do(i, false) end },
-      { key = 'w', label = 'SWS Snapshots window (what is stored: vol, pan, mute, fx ...)', fn = function() reaper.Main_OnCommand(reaper.NamedCommandLookup('_SWSSNAPSHOT_OPEN'), 0) end } } })
+  elseif U.rclick and hover.mixsnap and hover.mixsnap.what == 'row' then
+    local i = hover.mixsnap.i
+    local r = ctx.msn_rows()[i]
+    if r then
+      vim.open_hydra({ title = ('snapshot %d: %s (SWS)'):format(r.slot, r.name), items = {
+        { key = 'r', label = 'recall', fn = function() ctx.mixsnap_do('recall', i) end },
+        { key = 's', label = 'save over (Cmd+click)', fn = function() ctx.mixsnap_do('save', i) end },
+        { key = 'n', label = 'rename', fn = function() ctx.msn_ren = r.slot; vim.open_prompt('snapname ', r.name) end },
+        { key = 'd', label = 'delete from the list (Alt+click)', fn = function() ctx.mixsnap_do('del', i) end },
+        { key = 'w', label = 'SWS Snapshots window', fn = function() ctx.mixsnap_do('win') end } } })
+    end
     U.rclick = false
   elseif U.rclick and hover.snapc then
     local h = hover.snapc
@@ -24176,6 +24338,23 @@ local function frame()
       b = math.max(0, math.min(L.hs_n - 1, b))
       state.hscroll = L.hs_list[b + 1] or state.hscroll
     else draw.hsb_drag = nil end
+  end
+  if ctx.mixxydrag then   -- 22 окт: XY микшера — морф громкости и пана всех треков, отпустил — одна отмена
+    local d = ctx.mixxydrag
+    if gfx.mouse_cap & 1 == 1 then
+      local x = math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.side - 1)))
+      local y = math.max(0, math.min(1, (gfx.mouse_y - d.y0) / math.max(1, d.side - 1)))
+      if x ~= d.e.x or y ~= d.e.y or not d.moved then
+        d.e.x, d.e.y = x, y
+        local have = { d.e.snaps[1] ~= nil, d.e.snaps[2] ~= nil, d.e.snaps[3] ~= nil, d.e.snaps[4] ~= nil }
+        ctx.mixxy_apply(ctx.SN.blend(d.e.snaps, ctx.SN.weights(x, y, have), d.keys), d.last)
+        d.moved = true
+      end
+      state.status = ('mixer XY: morph %d values  x %.2f  y %.2f'):format(#d.keys, x, y)
+    else
+      if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: mixer XY morph'); model.invalidate() end
+      ctx.mixxydrag = nil
+    end
   end
   if ctx.snapdrag then   -- 22 окт: морф XY-пресетов, пока кнопка нажата; отпустил — одна отмена
     local d = ctx.snapdrag
