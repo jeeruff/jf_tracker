@@ -3163,31 +3163,36 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     end
     if onpad and not oncorner then hover.snappad = { col = col, x0 = px0, y0 = py0, side = side } end
   end
-  -- 22 окт: mod · auto — вертикальной кнопкой у правого края блока; раскрытая — блок вдвое шире,
-  -- справа панель: модулированные / автоматизированные параметры трека (LFO и кривые — графикой),
-  -- кнопки назначения для выбранного в DSP параметра и podkat (anticipate: кривая до ноты)
+  -- 22 окт: mod · auto — у правого края блока две вертикальные кнопки: auto (сверху) и mod (снизу);
+  -- любая раскрытая — блок вдвое шире, справа панель: сверху автоматизация, снизу модуляция с редакторами
   local tm = info.trk_mods and info.trk_mods(col)
   local extra = 0
   if tm then
     local sw = L.th + 6
     local sx = x + w
-    local hot = mx >= sx and mx < sx + sw and my >= y and my < y + h
-    local on = tm.wide
-    set(on and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)); gfx.rect(sx, y, sw, h, 1)
-    set((on or hot) and U.AMBER or U.LINE); gfx.rect(sx, y, sw, h, 0)
-    local lbl = 'mod · auto ' .. #tm.rows
-    if ms(lbl) > h - 6 then lbl = 'mod ' .. #tm.rows end
-    local tl = math.min(ms(lbl), h - 6)
-    D.vtext(sx + math.floor((sw - L.th) / 2), y + 3, tl, lbl, (on or hot) and U.AMBER or (#tm.rows > 0 and U.TEXT or U.GREY), on and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg), true)
-    if hot then hover.trkmod = { col = col, what = 'wide' } end
-    hint('trkmod', sx, y, sw, h, { what = 'wide' })
+    local hh = math.floor(h / 2)
+    for bi, b in ipairs({ { 'wauto', 'auto ' .. (tm.nauto or 0), tm.wauto, y, hh }, { 'wmod', 'mod ' .. (tm.nmod or 0), tm.wmod, y + hh, h - hh } }) do
+      local by, bh2 = b[4], b[5]
+      local hot = mx >= sx and mx < sx + sw and my >= by and my < by + bh2
+      local bg = b[3] and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)
+      set(bg); gfx.rect(sx, by, sw, bh2, 1)
+      set((b[3] or hot) and U.AMBER or U.LINE); gfx.rect(sx, by, sw, bh2, 0)
+      local tl = math.min(ms(b[2]), bh2 - 6)
+      D.vtext(sx + math.floor((sw - L.th) / 2), by + 3, tl, b[2], (b[3] or hot) and U.AMBER or U.GREY, bg, true)
+      if hot then hover.trkmod = { col = col, what = b[1] } end
+      hint('trkmod', sx, by, sw, bh2, { what = b[1] })
+    end
     extra = sw
-    if on then
-      local pw = w
-      local px = sx + sw
+    if tm.wauto or tm.wmod then
+      local pw, px = w, sx + sw
       fill(rbg); gfx.rect(px, y, pw, h, 1)
       extra = extra + pw
-      D.modauto_panel(L, info, col, tm, px, y, pw, h, hover)
+      local ah = tm.wauto and (tm.wmod and math.max(3 * L.rh, math.floor(h * 0.35)) or h) or 0
+      if tm.wauto then D.auto_section(L, info, col, tm, px, y, pw, ah, hover) end
+      if tm.wmod then
+        if tm.wauto then set(U.LINE); gfx.rect(px + L.pad, y + ah - 1, pw - 2 * L.pad, 1, 1) end
+        D.mod_section(L, info, col, tm, px, y + ah, pw, h - ah, hover)
+      end
       set(U.LINE); gfx.rect(px, y, pw, h, 0)
     end
   end
@@ -3232,40 +3237,54 @@ end
 
 local PK_PRE = { [0.25] = '1/16', [0.5] = '1/8', [1] = '1/4', [2] = '1/2', [4] = '1 bar', [8] = '2 bars' }
 
-function D.modauto_panel(L, info, col, tm, x, y, w, h, hover)
+-- строка кнопок с переносом: list = { { what, label, on, sel, data } }; возвращает новый yy
+local function btn_row(L, x, w, yy, list, hover, col, enabled)
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local yy = y + 3
-  text(x + L.pad, yy, fit('mod · auto  ' .. #tm.rows, w - 2 * L.pad), U.AMBER)
-  set(U.LINE); gfx.rect(x + L.pad, yy + L.rh - 2, w - 2 * L.pad, 1, 1)
-  yy = yy + L.rh
-  -- кнопки снизу: раскладка заранее (сколько строк займут), строки параметров — над ними
-  local function btn_rows(list)
-    local rows, bx, n = 1, x + L.pad, 0
-    for _, b in ipairs(list) do
-      local bw = ms(b[2]) + 2 * L.pad
-      if bx + bw > x + w - L.pad and n > 0 then rows = rows + 1; bx = x + L.pad end
-      bx = bx + bw + 2; n = n + 1
-    end
-    return rows
+  local bx = x + L.pad
+  for n, b in ipairs(list) do
+    local bw = ms(b[2]) + 2 * L.pad
+    if bx + bw > x + w - L.pad and n > 1 then bx = x + L.pad; yy = yy + L.rh end
+    local hb = enabled and mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh
+    set(hb and U.tint(U.AMBER, 0.35) or (b[3] and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 1)
+    set((hb or b[4]) and U.AMBER or (b[3] and U.CYAN or U.DIM)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 0)
+    text(bx + L.pad, yy, b[2], enabled and ((hb or b[4]) and U.AMBER or (b[3] and U.TEXT or U.GREY)) or U.DIM)
+    if hb then hover.trkmod = { col = col, what = b[1], tab = b[5], v = b[5] } end
+    hint('trkmod', bx, yy, bw, L.rh, { what = b[1] })
+    bx = bx + bw + 2
   end
-  local B = { { 'lfo', 'lfo' }, { 'acs', 'acs' }, { 'lnk', 'link' }, { 'env', 'env' }, { 'side', 'side' }, { 'pk', 'podkat' } }
-  local pc = tm.selpk
-  local PB = pc and { { 'pkpre', 'pre ' .. (PK_PRE[pc.pre] or ('%g'):format(pc.pre)) }, { 'pkkey', 'key' }, { 'pkvel', 'vel' },
-    { 'pkhum', 'hum ' .. (pc.hum or 0) .. '%' }, { 'pkedit', 'curve' } } or nil
-  local nb = 1 + btn_rows(B) + (PB and btn_rows(PB) or 0)
-  local bottom = y + h - nb * L.rh - 4
-  local FL = { { 'lfo', 'L', U.CYAN }, { 'acs', 'A', U.GREEN }, { 'lnk', 'K', U.AMBER }, { 'env', 'E', U.TEXT }, { 'pk', 'P', U.MAGENTA or U.AMBER } }
-  local flw = ms('LAKEP') + L.pad
-  local gw = math.floor(w * 0.3)
-  local nfit = math.max(0, math.floor((bottom - yy) / L.rh))
-  local more = #tm.rows > nfit and nfit > 0
-  local nshow = math.min(#tm.rows, more and nfit - 1 or nfit)
-  if #tm.rows == 0 and nfit > 0 then text(x + L.pad, yy, fit('nothing modulated or automated yet', w - 2 * L.pad), U.GREY); yy = yy + L.rh end
-  for r = 1, nshow do
-    local row = tm.rows[r]
+  return yy + L.rh
+end
+local function btn_rows_n(L, x, w, list)
+  local rows, bx = 1, x + L.pad
+  for n, b in ipairs(list) do
+    local bw = ms(b[2]) + 2 * L.pad
+    if bx + bw > x + w - L.pad and n > 1 then rows = rows + 1; bx = x + L.pad end
+    bx = bx + bw + 2
+  end
+  return rows
+end
+
+-- строки параметров (filter: 'auto' | 'mod'); возвращает yy
+local function mod_rows(L, col, tm, x, yy, w, ymax, filter, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local list = {}
+  for ri, r in ipairs(tm.rows) do if (filter == 'auto' and r.env) or (filter == 'mod' and r.ismod) then list[#list + 1] = ri end end
+  local nfit = math.max(0, math.floor((ymax - yy) / L.rh))
+  local more = #list > nfit and nfit > 0
+  local nshow = math.min(#list, more and nfit - 1 or nfit)
+  if #list == 0 and nfit > 0 then
+    text(x + L.pad, yy, fit(filter == 'auto' and 'no automation on this track' or 'nothing modulated - pick a parameter, a tab below', w - 2 * L.pad), U.GREY)
+    return yy + L.rh
+  end
+  local FL = filter == 'mod' and { { 'lfo', 'L', U.CYAN }, { 'acs', 'A', U.GREEN }, { 'lnk', 'K', U.AMBER }, { 'pk', 'P', U.AMBER } } or {}
+  local flw = filter == 'mod' and ms('LAKP') + L.pad or 0
+  local gw = math.floor(w * (filter == 'auto' and 0.45 or 0.3))
+  for n = 1, nshow do
+    local ri = list[n]
+    local row = tm.rows[ri]
     local hot = mx >= x and mx < x + w and my >= yy and my < yy + L.rh
     if hot or row.sel then set(U.tint(U.AMBER, row.sel and 0.25 or 0.15)); gfx.rect(x + 1, yy, w - 2, L.rh, 1) end
-    if hot then hover.trkmod = { col = col, what = 'row', r = r } end
+    if hot then hover.trkmod = { col = col, what = 'row', r = ri, auto = filter == 'auto' } end
     local gx = x + w - L.pad - gw
     local fx0 = gx - L.pad - flw
     text(x + L.pad, yy, fit(row.label, fx0 - x - 2 * L.pad), row.sel and U.AMBER or U.TEXT)
@@ -3273,32 +3292,162 @@ function D.modauto_panel(L, info, col, tm, x, y, w, h, hover)
       if row[fl[1]] then text(fx0, yy, fl[2], fl[3]) end
       fx0 = fx0 + ms(fl[2])
     end
-    mod_graph(gx, yy + 2, gw, L.rh - 4, row, row.lfoshape and U.CYAN or (hot and U.AMBER or U.GREY))
+    local g = filter == 'auto' and { pts = row.pts } or row
+    mod_graph(gx, yy + 2, gw, L.rh - 4, g, (filter == 'mod' and row.lfoshape) and U.CYAN or (hot and U.AMBER or U.GREY))
     yy = yy + L.rh
   end
-  if more then text(x + L.pad, yy, fit(('+%d more - automation tab'):format(#tm.rows - nshow), w - 2 * L.pad), U.GREY) end
-  -- выбранный параметр и кнопки
-  yy = bottom
+  if more then text(x + L.pad, yy, fit(('+%d more - automation tab'):format(#list - nshow), w - 2 * L.pad), U.GREY); yy = yy + L.rh end
+  return yy
+end
+
+function D.auto_section(L, info, col, tm, x, y, w, h, hover)
+  local yy = y + 3
+  text(x + L.pad, yy, fit('automation  ' .. (tm.nauto or 0), w - 2 * L.pad), U.AMBER)
+  yy = yy + L.rh
+  mod_rows(L, col, tm, x, yy, w, y + h - 2, 'auto', hover)
+end
+
+-- ползунок настройки модуляции: имя, полоса, значение; протяжка — ctx.mdrag
+local function mslider(L, col, x, yy, w, sl, val, fmtx, hover, enabled)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local lw, vw = ms('depth') + L.pad, ms('1000 ms') + L.pad   -- подписи до 5 букв (rate att rel offs), значение до 7
+  local bx, bw = x + L.pad + lw, w - 2 * L.pad - lw - vw
+  if bw < 10 then return yy end
+  local fr = math.max(0, math.min(1, (val - sl[3]) / math.max(1e-9, sl[4] - sl[3])))
+  local hot = enabled and mx >= bx - 2 and mx < bx + bw + 2 and my >= yy and my < yy + L.rh
+  text(x + L.pad, yy, sl[2], hot and U.AMBER or U.GREY)
+  set(U.mix(U.LINE, U.BG, 0.3)); gfx.rect(bx, yy + math.floor(L.rh / 2) - 1, bw, 2, 1)
+  set(enabled and (hot and U.AMBER or U.CYAN) or U.DIM); gfx.rect(bx, yy + math.floor(L.rh / 2) - 1, math.floor(bw * fr + 0.5), 2, 1)
+  gfx.rect(bx + math.floor((bw - 3) * fr + 0.5), yy + 3, 3, L.rh - 6, 1)
+  local f = sl[5]
+  local vs = f == 'pct' and ('%d%%'):format(math.floor(val * 100 + 0.5)) or (f == 'hz' and (fmtx and ('%.2f qn'):format(val) or ('%.2f Hz'):format(val)) or f:format(val))
+  text(x + w - L.pad - ms(vs), yy, vs, hot and U.AMBER or U.TEXT)
+  if hot then hover.trkmod = { col = col, what = 'sl', key = sl[1], lo = sl[3], hi = sl[4], x0 = bx, w = bw, name = sl[2] } end
+  return yy + L.rh
+end
+
+-- вертикальная пианинка 2 октавы (вход MIDI трека светится) + метр velocity входа
+local function vpiano(L, info, col, x, y, w, h)
+  local t, v, pn = nil, nil, nil
+  if info.midi_in then t, v, pn = info.midi_in(col.guid) end
+  local age = t and (reaper.time_precise() - t) or 99
+  local lo = pn and math.max(0, math.min(104, 12 * math.floor(pn / 12) - 12 + (pn % 12 >= 6 and 12 or 0))) or 48
+  local kh = math.max(2, math.floor(h / 24))
+  local mw = 4
+  local kw = w - mw - 2
+  set(U.BG); gfx.rect(x, y, w, h, 1)
+  for k = 0, 23 do
+    local note = lo + k
+    local ky = y + h - (k + 1) * kh
+    if ky < y then break end
+    local blk = ({ [1] = 1, [3] = 1, [6] = 1, [8] = 1, [10] = 1 })[note % 12]
+    local lit = pn == note and age < 0.6
+    set(lit and U.AMBER or (blk and U.mix(U.BG, U.TEXT, 0.15) or U.mix(U.BG, U.TEXT, 0.55)))
+    gfx.rect(x, ky, blk and math.floor(kw * 0.6) or kw, kh - 1, 1)
+    if note == 60 then set(U.CYAN); gfx.rect(x + kw - 2, ky, 2, kh - 1, 1) end   -- C-4: keytrack x1
+  end
+  -- метр velocity: высота — сила последней ноты входа, гаснет за 0.8 с
+  local lvl = v and age < 0.8 and (v / 127) * (1 - age / 0.8) or 0
+  set(U.LINE); gfx.rect(x + w - mw, y, mw, h, 0)
+  if lvl > 0 then set(U.GREEN); gfx.rect(x + w - mw + 1, y + h - math.floor(h * lvl), mw - 2, math.floor(h * lvl), 1) end
+end
+
+-- редактор кривой premod: точки ромбами, линия; протяжка точки, двойной щелчок — точка, ПКМ — убрать
+local function curve_edit(L, info, col, x, y, w, h, cv, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  set(U.BG); gfx.rect(x, y, w, h, 1)
+  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  if not cv then return end
+  local ix, iy, iw, ih = x + 3, y + 3, w - 6, h - 6
+  local function P(pt) return ix + math.floor(pt[1] * (iw - 1) + 0.5), iy + ih - 1 - math.floor(pt[2] * (ih - 1) + 0.5) end
+  set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(ix, iy + math.floor(ih / 2), iw, 1, 1)
+  set(U.CYAN)
+  local px, py
+  for _, pt in ipairs(cv.pts) do local cx, cy = P(pt); if px then gfx.line(px, py, cx, cy) end; px, py = cx, cy end
+  local onpt
+  for i, pt in ipairs(cv.pts) do
+    local cx, cy = P(pt)
+    local hot = math.abs(mx - cx) <= 4 and math.abs(my - cy) <= 4
+    if hot then onpt = i - 1 end
+    set(hot and U.AMBER or U.TEXT)
+    for d = 0, 3 do gfx.rect(cx - d, cy - 3 + d, 2 * d + 1, 1, 1); gfx.rect(cx - d, cy + 3 - d, 2 * d + 1, 1, 1) end
+  end
+  local ph = info.pm_phase and info.pm_phase()
+  if ph then set(U.AMBER); gfx.rect(ix + math.floor(ph * (iw - 1)), iy, 1, ih, 1) end
+  if mx >= x and mx < x + w and my >= y and my < y + h then hover.trkmod = { col = col, what = 'cv', k = onpt, x0 = ix, y0 = iy, w = iw, h = ih } end
+end
+
+local function ctx_sl(info, tab) return info.modsl and info.modsl[tab] or {} end   -- ползунки вкладки (ctx.MODSL)
+local LFO_SH = { { 0, 'sin' }, { 1, 'sqr' }, { 2, 'saw-' }, { 3, 'saw+' }, { 4, 'tri' }, { 5, 'rnd' } }
+
+function D.mod_section(L, info, col, tm, x, y, w, h, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local yy = y + 3
+  text(x + L.pad, yy, fit('modulation  ' .. (tm.nmod or 0), w - 2 * L.pad), U.AMBER)
+  yy = yy + L.rh
+  local m = tm.sel and info.modsel and info.modsel(col, tm) or nil
+  local tab = info.modtab and info.modtab() or 'lfo'
+  -- список модулированных — не больше трёх строк, редактор важнее
+  yy = mod_rows(L, col, tm, x, yy, w, math.min(y + h - 6 * L.rh, yy + 3 * L.rh), 'mod', hover)
   text(x + L.pad, yy, fit(tm.sel and ('> ' .. tm.sel) or '> pick a parameter in DSP', w - 2 * L.pad), tm.sel and U.TEXT or U.GREY)
   yy = yy + L.rh
-  local function buttons(list, flags)
-    local bx = x + L.pad
-    for n, b in ipairs(list) do
-      local bw = ms(b[2]) + 2 * L.pad
-      if bx + bw > x + w - L.pad and n > 1 then bx = x + L.pad; yy = yy + L.rh end
-      local on = flags and flags[b[1]]
-      local hb = tm.sel and mx >= bx and mx < bx + bw and my >= yy and my < yy + L.rh
-      set(hb and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 1)
-      set(hb and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(bx, yy + 1, bw, L.rh - 2, 0)
-      text(bx + L.pad, yy, b[2], tm.sel and (hb and U.AMBER or (on and U.TEXT or U.GREY)) or U.DIM)
-      if hb then hover.trkmod = { col = col, what = b[1] } end
-      hint('trkmod', bx, yy, bw, L.rh, { what = b[1] })
-      bx = bx + bw + 2
-    end
-    yy = yy + L.rh
+  local act = m and m.act or {}
+  local TABS = { { 'tab', 'lfo', act.lfo, tab == 'lfo', 'lfo' }, { 'tab', 'acs', act.acs, tab == 'acs', 'acs' }, { 'tab', 'link', act.lnk, tab == 'lnk', 'lnk' },
+    { 'tab', 'env', act.env, tab == 'env', 'env' }, { 'tab', 'premod', act.pm, tab == 'pm', 'pm' } }
+  yy = btn_row(L, x, w, yy, TABS, hover, col, tm.sel ~= nil)
+  if not m then return end
+  local bottom = y + h - 3
+  local on = act[tab]
+  local NAME = { lfo = 'lfo', acs = 'acs', lnk = 'link', env = 'envelope', pm = 'premod' }
+  local top = { { 'on', NAME[tab] .. (on and ' on' or ' off'), on } }
+  if tab == 'lfo' then top[#top + 1] = { 'sync', 'sync', m.sync }
+  elseif tab == 'acs' then top[#top + 1] = { 'chan', m.chan34 and 'in 3/4' or 'in 1/2', m.chan34 }; top[#top + 1] = { 'side', 'side' }
+  elseif tab == 'lnk' then top[#top + 1] = { 'pick', 'source' }
+  elseif tab == 'env' then top[#top + 1] = { 'envshow', 'show' }
+  elseif tab == 'pm' and m.pk then
+    top[#top + 1] = { 'pkpre', 'pre ' .. (PK_PRE[m.pk.pre] or ('%g'):format(m.pk.pre)) }
+    top[#top + 1] = { 'pkkey', 'key', m.pk.key }; top[#top + 1] = { 'pkvel', 'vel', m.pk.vel }
+    top[#top + 1] = { 'pkhum', 'hum ' .. (m.pk.hum or 0) .. '%', (m.pk.hum or 0) > 0 }; top[#top + 1] = { 'pktest', 'test' }
   end
-  buttons(B, tm.selflags)
-  if PB then buttons(PB, { pkkey = pc.key, pkvel = pc.vel, pkhum = (pc.hum or 0) > 0 }) end
+  yy = btn_row(L, x, w, yy, top, hover, col, true)
+  if tab == 'lfo' then
+    local gh = math.min(3 * L.rh, bottom - yy - (btn_rows_n(L, x, w, LFO_SH) + #ctx_sl(info, 'lfo')) * L.rh)
+    if gh >= L.rh then
+      local gx, gw = x + L.pad, w - 2 * L.pad
+      set(U.BG); gfx.rect(gx, yy + 1, gw, gh - 2, 1); set(U.LINE); gfx.rect(gx, yy + 1, gw, gh - 2, 0)
+      mod_graph(gx + 2, yy + 3, gw - 4, gh - 6, { lfoshape = m.shape, lfostr = m.vals['lfo.strength'] }, on and U.CYAN or U.GREY)
+      yy = yy + gh
+    end
+    local SH = {}
+    for _, sh in ipairs(LFO_SH) do SH[#SH + 1] = { 'shape', sh[2], m.shape == sh[1], false, sh[1] } end
+    yy = btn_row(L, x, w, yy, SH, hover, col, true)
+  elseif tab == 'lnk' then
+    text(x + L.pad, yy, fit('from ' .. (m.src or '- (source: pick one)'), w - 2 * L.pad), m.src and U.TEXT or U.GREY)
+    yy = yy + L.rh
+  elseif tab == 'env' then
+    local gh = bottom - yy - L.rh
+    if gh >= L.rh and m.envpts then
+      local gx, gw = x + L.pad, w - 2 * L.pad
+      set(U.BG); gfx.rect(gx, yy + 1, gw, gh - 2, 1); set(U.LINE); gfx.rect(gx, yy + 1, gw, gh - 2, 0)
+      mod_graph(gx + 2, yy + 3, gw - 4, gh - 6, { pts = m.envpts }, U.CYAN)
+      yy = yy + gh
+      text(x + L.pad, yy, fit(('%d points over the song - show: in REAPER'):format(m.npts or 0), w - 2 * L.pad), U.GREY)
+    elseif not m.envpts then text(x + L.pad, yy, fit('no envelope yet - envelope off: click to make it', w - 2 * L.pad), U.GREY) end
+    return
+  elseif tab == 'pm' then
+    if not m.pk then text(x + L.pad, yy, fit('a curve before every note of the track (premod off: click)', w - 2 * L.pad), U.GREY); return end
+    local eh = bottom - yy - 2
+    if eh >= 2 * L.rh then
+      local pw2 = math.max(L.cw * 3, math.floor(w * 0.18))
+      curve_edit(L, info, col, x + L.pad, yy + 1, w - 3 * L.pad - pw2, eh, m.curve, hover)
+      vpiano(L, info, col, x + w - L.pad - pw2, yy + 1, pw2, eh)
+    end
+    return
+  end
+  for _, sl in ipairs(ctx_sl(info, tab)) do
+    if yy + L.rh > bottom then break end
+    yy = mslider(L, col, x, yy, w, sl, m.vals[sl[1]] or sl[3], tab == 'lfo' and m.sync, hover, on)
+  end
 end
 
 -- панель сендов трека (3 окт): над строкой sends блока трека DSP (не влезает —

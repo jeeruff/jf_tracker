@@ -21,7 +21,7 @@ local model
 local DIR = (debug.getinfo(1, 'S').source:sub(2):match('(.*)/') or '.')
 E.NM = dofile(DIR .. '/jf_tracker_notemod.lua')
 E.LY = dofile(DIR .. '/jf_tracker_layers.lua')   -- 19 окт: слоёный инструмент (¥)
-E.PK = dofile(DIR .. '/jf_tracker_podkat.lua')   -- 22 окт: podkat / anticipate — кривая до ноты
+E.PK = dofile(DIR .. '/jf_tracker_premod.lua')   -- 22 окт: premod — кривая до ноты
 function E.init(m) model = m; m.LY = E.LY; E.NM.init(E, m) end
 
 -- ── связь копий с инструментом (3 окт): метка P_EXT:jf_iid ─────────────
@@ -292,7 +292,7 @@ local function run(desc, fn)
   if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
-  if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: podkat — за нотами трека
+  if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: premod — за нотами трека
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
@@ -2867,6 +2867,16 @@ function E.mod_set(track, fx, param, what, on, src_fx, src_param)
   if model then model.invalidate() end
 end
 
+-- 22 окт: настройка модуляции параметра (lfo.speed, acs.attack, plink.scale …) без undo — для протяжки
+-- в панели mod (undo — одной записью на отпускании, как XY-морф)
+function E.mod_cfg_raw(track, fx, param, key, val)
+  R.TrackFX_SetNamedConfigParm(track, fx, ('param.%d.%s'):format(param, key), tostring(val))
+end
+function E.mod_cfg(track, fx, param, key, val, desc)
+  run(desc or ('mod ' .. key), function() E.mod_cfg_raw(track, fx, param, key, val) end)
+  if model then model.invalidate() end
+end
+
 -- ── DSP-панель: параметры и bypass FX ────────────────────────────────────
 -- Все правки FX принимают obj = MediaTrack* или MediaItem_Take* (take FX
 -- инструмента, 2 окт); функции API выбирает model.fxapi.
@@ -4937,12 +4947,12 @@ function E.layers_set(root_it, list)
 end
 function E.layer_item(guid) local _, srcs = E.layer_roots(); return srcs[guid] end
 
--- ── podkat / anticipate (22 окт): кривая автоматизации до каждой ноты трека ──
--- Настройки — P_EXT:jf_podkat трека (jf_tracker_podkat.lua); AI одного пула на
+-- ── premod (22 окт): кривая автоматизации до каждой ноты трека ──
+-- Настройки — P_EXT:jf_premod трека (jf_tracker_premod.lua); AI одного пула на
 -- огибающей параметра, каждый кончается на ноте. Сверка — в run после каждой правки
 -- (ноты сдвинули / добавили / удалили — подкаты за ними), только если что-то поменялось.
 do
-  local PKEXT = 'P_EXT:jf_podkat'
+  local PKEXT = 'P_EXT:jf_premod'
   local PKDEL = 42086                       -- Envelope: Delete automation items
   function E.pk_get(tr)
     local _, v = R.GetSetMediaTrackInfo_String(tr, PKEXT, '', false)
@@ -4950,7 +4960,7 @@ do
   end
   local function pk_set(tr, list)
     R.GetSetMediaTrackInfo_String(tr, PKEXT, E.PK.encode(list), true)
-    if #list > 0 then R.SetProjExtState(0, 'jf_tracker', 'podkat', '1') end
+    if #list > 0 then R.SetProjExtState(0, 'jf_tracker', 'premod', '1') end
   end
   -- ноты трека в QN: MIDI-ноты незаглушённых items и аудио-ноты (items без MIDI)
   function E.pk_notes(tr)
@@ -5037,7 +5047,7 @@ do
     return #want
   end
   function E.pk_sync()
-    local _, on = R.GetProjExtState(0, 'jf_tracker', 'podkat')
+    local _, on = R.GetProjExtState(0, 'jf_tracker', 'premod')
     if on ~= '1' then return end
     for ti = 0, R.CountTracks(0) - 1 do
       local tr = R.GetTrack(0, ti)
@@ -5048,13 +5058,13 @@ do
   -- новый подкат на параметр: пул с кривой-затравкой (подъём 0 → 1 к ноте), дальше расставит сверка
   function E.pk_add(tr, key, label)
     local list = E.pk_get(tr)
-    for _, c in ipairs(list) do if c.env == key then return nil, 'already has podkat' end end
+    for _, c in ipairs(list) do if c.env == key then return nil, 'already has premod' end end
     local notes = E.pk_notes(tr)
     local q = R.TimeMap2_timeToQN(0, R.GetCursorPosition())
     for _, n in ipairs(notes) do if n.qn < q or q < 1 then q = n.qn end end
     q = math.max(1, q)
     local ok
-    run('podkat: ' .. (label or key), function()
+    run('premod: ' .. (label or key), function()
       local env = E.NM.env(tr, key, true)
       if not env then error('no envelope for ' .. key, 0) end
       R.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true)
@@ -5079,15 +5089,46 @@ do
   function E.pk_change(tr, i, fn, desc)
     local list = E.pk_get(tr)
     if not list[i] then return end
-    run(desc or 'podkat', function() fn(list[i]); pk_set(tr, list) end)
+    run(desc or 'premod', function() fn(list[i]); pk_set(tr, list) end)
     if model then model.invalidate() end
+  end
+  -- кривая пула (редактор в панели mod): точки первого экземпляра, t — доля его длины 0..1
+  function E.pk_curve(tr, c)
+    local env = E.NM.env(tr, c.env, false)
+    if not env then return nil end
+    local have = pk_have(env, c.pool)
+    local h = have[1]
+    if not h then return nil end
+    local pos = R.GetSetAutomationItemInfo(env, h.idx, 'D_POSITION', 0, false)
+    local len = R.GetSetAutomationItemInfo(env, h.idx, 'D_LENGTH', 0, false)
+    local mode = R.GetEnvelopeScalingMode(env)
+    local pts = {}
+    for k = 0, R.CountEnvelopePointsEx(env, h.idx) - 1 do
+      local _, t, v, sh, tn = R.GetEnvelopePointEx(env, h.idx, k)
+      pts[#pts + 1] = { (t - pos) / math.max(1e-9, len), R.ScaleFromEnvelopeMode(mode, v), sh, tn, k = k }
+    end
+    return { env = env, ai = h.idx, pos = pos, len = len, mode = mode, pts = pts, n = #have }
+  end
+  -- точка кривой: без undo (протяжка — undo в конце, как у XY), t / v — доли
+  function E.pk_point_raw(cv, k, t, v)
+    R.SetEnvelopePointEx(cv.env, cv.ai, k, cv.pos + t * cv.len, R.ScaleToEnvelopeMode(cv.mode, v), nil, nil, nil, true)
+    R.Envelope_SortPointsEx(cv.env, cv.ai)
+  end
+  function E.pk_point_add(cv, t, v)
+    run('premod curve point', function()
+      R.InsertEnvelopePointEx(cv.env, cv.ai, cv.pos + t * cv.len, R.ScaleToEnvelopeMode(cv.mode, v), 0, 0, false, true)
+      R.Envelope_SortPointsEx(cv.env, cv.ai)
+    end)
+  end
+  function E.pk_point_del(cv, k)
+    run('premod curve point delete', function() R.DeleteEnvelopePointEx(cv.env, cv.ai, k) end)
   end
   -- снять подкат: все его AI и запись
   function E.pk_remove(tr, i)
     local list = E.pk_get(tr)
     local c = list[i]
     if not c then return end
-    run('podkat off: ' .. (c.label or ''), function()
+    run('premod off: ' .. (c.label or ''), function()
       local env = E.NM.env(tr, c.env, false)
       if env then local d = {}; for _, h in ipairs(pk_have(env, c.pool)) do d[#d + 1] = h.idx end; pk_del(env, d) end
       table.remove(list, i)

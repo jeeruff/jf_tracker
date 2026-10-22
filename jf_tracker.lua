@@ -1155,7 +1155,7 @@ ctx = {
     items[#items + 1] = { key = 'e', label = 'automation …', sub = function() return { title = 'automation (cursor on an envelope column)', items = {
       { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.open_prompt('ramp ', '') end },
       { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.open_prompt('fade ', '') end },
-      { key = 'c', label = 'curve (LFO / podkat / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
+      { key = 'c', label = 'curve (LFO / premod / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
       { key = 'p', label = 'pick a parameter to automate (fzf)', fn = function() ctx.automation_picker() end },
     } } end }
     return { title = 'insert', items = items }
@@ -1861,7 +1861,7 @@ ctx = {
       c = { rows = {} }
       local function cfg(id, pi, what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s'):format(pi, what)); return ok and v or nil end
       local function flag(id, pi, what) return cfg(id, pi, what .. '.active') == '1' end
-      -- 22 окт: podkat (anticipate) трека — по ключу fx:GUID:параметр (как note mod)
+      -- 22 окт: premod трека — по ключу fx:GUID:параметр (как note mod)
       local pks = {}
       for i, pc in ipairs(edit.pk_get(col.track)) do pks[pc.env] = i end
       c.pk = edit.pk_get(col.track)
@@ -1886,7 +1886,10 @@ ctx = {
               end
               r.pts = pts
             end
+            r.ismod = (r.lfo or r.acs or r.lnk or r.pk or p.mod) and true or nil
             c.rows[#c.rows + 1] = r
+            if r.env then c.nauto = (c.nauto or 0) + 1 end
+            if r.ismod then c.nmod = (c.nmod or 0) + 1 end
           end
         end
       end
@@ -1895,11 +1898,11 @@ ctx = {
     local t = dsp_target()
     local f = t and t.col == col and (col.fx or {})[dsp_sel.fx]
     local p = f and f.params and f.params[dsp_sel.param]
-    c.wide = state.dsp_modwide
+    c.wauto, c.wmod = state.dsp_wauto, state.dsp_wmod
     c.sel = p and ((p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8)) or nil
     c.selflags = nil
     for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
-    -- podkat выбранного параметра: его запись (настройки — строкой кнопок)
+    -- premod выбранного параметра: его запись (настройки — строкой кнопок)
     c.selpk = nil
     if p and not f.kids and not p.fx then
       local key = ('fx:%s:%d'):format(reaper.TrackFX_GetFXGUID(col.track, f.i), p.i)
@@ -1929,52 +1932,145 @@ ctx = {
       vim.msg = ('%s follows the audio of %s (send to channels 3/4, ACS; u - undo)'):format(pname or 'param', it.label)
     end)
   end,
+  -- 22 окт (3): панель mod · auto — сверху автоматизация, снизу модуляция с редакторами (вкладки lfo acs link env premod);
+  -- ползунки: ключ named config parm (param.N.<key>), диапазон, формат; протяжка — без undo, запись на отпускании
+  MODSL = {
+    lfo = { { 'mod.baseline', 'base', 0, 1, 'pct' }, { 'lfo.speed', 'rate', 0.0039, 8, 'hz' }, { 'lfo.strength', 'depth', 0, 1, 'pct' }, { 'lfo.phase', 'phase', 0, 1, '%.2f' } },
+    acs = { { 'mod.baseline', 'base', 0, 1, 'pct' }, { 'acs.attack', 'att', 0, 1000, '%d ms' }, { 'acs.release', 'rel', 0, 1000, '%d ms' },
+      { 'acs.dblo', 'min', -60, 12, '%.0f dB' }, { 'acs.dbhi', 'max', -60, 12, '%.0f dB' }, { 'acs.strength', 'depth', 0, 1, 'pct' } },
+    lnk = { { 'mod.baseline', 'base', 0, 1, 'pct' }, { 'plink.scale', 'scale', -1, 1, '%+.2f' }, { 'plink.offset', 'offs', -1, 1, '%+.2f' } },
+  },
+  -- данные редактора выбранного параметра (4 раза в секунду, правка — сразу)
+  modsel = function(col, c)
+    local f = (col.fx or {})[dsp_sel.fx]
+    local p = f and f.params and f.params[dsp_sel.param]
+    if not p then return nil end
+    local id = p.fx or f.i
+    local tab = state.modtab or 'lfo'
+    local key = col.guid .. ':' .. dsp_sel.fx .. ':' .. dsp_sel.param .. ':' .. tab
+    local now = reaper.time_precise()
+    local m = ctx.modsel_c
+    if m and m.key == key and now - m.t < 0.25 and not ctx.modsel_dirty then return m end
+    ctx.modsel_dirty = nil
+    local function cfg(k) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s'):format(p.i, k)); return ok and v or nil end
+    m = { key = key, t = now, tab = tab, id = id, pi = p.i, f = f, p = p, vals = {} }
+    m.act = { lfo = cfg('lfo.active') == '1', acs = cfg('acs.active') == '1', lnk = cfg('plink.active') == '1', pm = c.selpk ~= nil }
+    local env = reaper.GetFXEnvelope(col.track, id, p.i, false)
+    m.act.env = env ~= nil
+    for _, sl in ipairs(ctx.MODSL[tab] or {}) do m.vals[sl[1]] = tonumber(cfg(sl[1]) or '') or sl[3] end
+    if tab == 'lfo' then m.shape = tonumber(cfg('lfo.shape') or '0') or 0; m.sync = cfg('lfo.temposync') == '1' end
+    if tab == 'acs' then m.chan34 = (tonumber(cfg('acs.chan') or '0') or 0) >= 2 end
+    if tab == 'lnk' and m.act.lnk then
+      local fe, pp = tonumber(cfg('plink.effect') or ''), tonumber(cfg('plink.param') or '')
+      if fe and fe >= 0 and pp then
+        local _, fn = reaper.TrackFX_GetFXName(col.track, fe, ''); local _, pn = reaper.TrackFX_GetParamName(col.track, fe, pp, '')
+        m.src = (pn or '?') .. ' · ' .. (fn or '?'):gsub('^%w+: ', ''):sub(1, 10)
+      elseif fe == -100 then m.src = 'MIDI ' .. (cfg('plink.midi_msg') or '') .. ' ' .. (cfg('plink.midi_msg2') or '') end
+    end
+    if tab == 'env' and env then
+      local plen, pts, mode = reaper.GetProjectLength(0), {}, reaper.GetEnvelopeScalingMode(env)
+      for s2 = 0, 63 do local _, v = reaper.Envelope_Evaluate(env, plen * s2 / 63, 44100, 0); pts[#pts + 1] = { s2 / 63, math.max(0, math.min(1, reaper.ScaleFromEnvelopeMode(mode, v))) } end
+      m.envpts = pts
+      m.npts = reaper.CountEnvelopePoints(env)
+    end
+    if tab == 'pm' and c.selpk then m.pk = c.selpk; m.curve = edit.pk_curve(col.track, c.selpk) end
+    ctx.modsel_c = m
+    return m
+  end,
   trkmod_do = function(h, rclick)
     local col = h.col
-    if h.what == 'wide' then state.dsp_modwide = not state.dsp_modwide; return end
+    if h.what == 'wauto' then state.dsp_wauto = not state.dsp_wauto; return end
+    if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
     local c = ctx.trk_mods(col)
     if h.what == 'row' then
       local r = c and c.rows[h.r]; if not r then return end
       ctx.set_focus('dsp'); dsp_sel.fx, dsp_sel.param = r.k, r.pi; DK.pslider = true
+      if r.env and h.auto and not rclick then state.modtab = state.modtab or 'lfo' end
       if rclick then local f = (col.fx or {})[r.k]; if f and ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = r.k, f = f, param = r.pi } }) end end
       return
     end
+    if h.what == 'tab' then state.modtab = h.tab; ctx.modsel_dirty = true; return end
     local f = (col.fx or {})[dsp_sel.fx]
     local p = f and f.params and f.params[dsp_sel.param]
     if not p then vim.msg = 'mod · auto: pick a parameter in DSP first'; return end
     local id = p.fx or f.i
-    if h.what == 'lfo' or h.what == 'acs' then edit.mod_set(col.track, id, p.i, h.what)
-    elseif h.what == 'lnk' then if ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
-    elseif h.what == 'env' then edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate()
-    elseif h.what == 'side' then ctx.mod_sidechain(col, id, p.i, p.name)
-    elseif h.what == 'pk' then ctx.podkat_do(col, c, f, p, rclick and 'menu' or 'toggle')
-    elseif h.what:match('^pk') then ctx.podkat_do(col, c, f, p, h.what) end
+    local tab = state.modtab or 'lfo'
+    ctx.modsel_dirty = true
+    local w = h.what
+    if w == 'on' then
+      if tab == 'lfo' or tab == 'acs' then edit.mod_set(col.track, id, p.i, tab)
+      elseif tab == 'lnk' then
+        local m = ctx.modsel_c
+        if m and m.act and m.act.lnk then edit.mod_set(col.track, id, p.i, 'plink', false)
+        elseif ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
+      elseif tab == 'env' then
+        local env = reaper.GetFXEnvelope(col.track, id, p.i, false)
+        if env then edit.run('envelope active', function() local _, a = reaper.GetSetEnvelopeInfo_String(env, 'ACTIVE', '', false); reaper.GetSetEnvelopeInfo_String(env, 'ACTIVE', a == '1' and '0' or '1', true) end)
+        else edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end) end
+        state.envs = true; model.invalidate()
+      elseif tab == 'pm' then ctx.premod_do(col, c, f, p, 'toggle') end
+      ctx.tmod = nil
+    elseif w == 'pick' then if ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
+    elseif w == 'envshow' then edit.run('show envelope', function() local env = reaper.GetFXEnvelope(col.track, id, p.i, true); reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true) end); state.envs = true; model.invalidate()
+    elseif w == 'shape' then edit.mod_cfg(col.track, id, p.i, 'lfo.shape', h.v, 'lfo shape')
+    elseif w == 'sync' then local m = ctx.modsel_c; edit.mod_cfg(col.track, id, p.i, 'lfo.temposync', (m and m.sync) and 0 or 1, 'lfo tempo sync')
+    elseif w == 'chan' then local m = ctx.modsel_c; edit.mod_cfg(col.track, id, p.i, 'acs.chan', (m and m.chan34) and 0 or 2, 'acs channels')
+    elseif w == 'side' then ctx.mod_sidechain(col, id, p.i, p.name)
+    elseif w == 'sl' then
+      ctx.mdrag = { track = col.track, id = id, pi = p.i, key = h.key, lo = h.lo, hi = h.hi, x0 = h.x0, w = h.w, name = h.name }
+    elseif w == 'pk' then ctx.premod_do(col, c, f, p, rclick and 'menu' or 'toggle')
+    elseif w == 'pktest' then
+      -- проба кривой: проиграть её на параметре в реальном времени (длина pre по темпу), потом вернуть значение
+      local m = ctx.modsel_c
+      local cv = m and m.curve
+      if not cv then vim.msg = 'premod: turn it on first'; return end
+      local qn = reaper.TimeMap2_timeToQN(0, reaper.GetCursorPosition())
+      local dur = reaper.TimeMap2_QNToTime(0, qn + (m.pk.pre or 1)) - reaper.TimeMap2_QNToTime(0, qn)
+      local fxa = model.fxapi(col.track)
+      ctx.pm_test = { track = col.track, id = id, pi = p.i, pts = cv.pts, t0 = reaper.time_precise(), dur = math.max(0.05, dur), orig = fxa.GetParamNormalized(col.track, id, p.i) }
+      vim.msg = ('premod test: the curve on %s for %.2f s (as before a note), then back'):format(p.name or 'param', dur)
+    elseif w == 'cv' then
+      local m = ctx.modsel_c
+      local cv = m and m.curve
+      if not cv then return end
+      local t = math.max(0, math.min(1, (gfx.mouse_x - h.x0) / math.max(1, h.w - 1)))
+      local v = math.max(0, math.min(1, 1 - (gfx.mouse_y - h.y0) / math.max(1, h.h - 1)))
+      if rclick then
+        if h.k and #cv.pts > 2 then edit.pk_point_del(cv, h.k); vim.msg = 'premod curve: point removed' end
+      elseif h.k then ctx.pmdrag = { cv = cv, k = h.k, x0 = h.x0, y0 = h.y0, w = h.w, h = h.h, last = h.k == 0 and 0 or (h.k == #cv.pts - 1 and 1 or nil) }
+      else
+        local now = reaper.time_precise()
+        if ctx.pm_click and now - ctx.pm_click < 0.35 then edit.pk_point_add(cv, t, v); vim.msg = 'premod curve: point added (drag - move, right click - remove)'
+        else vim.msg = 'premod curve: double click - add a point, drag a point - move, right click - remove' end
+        ctx.pm_click = now
+      end
+    elseif w:match('^pk') then ctx.premod_do(col, c, f, p, w) end
   end,
-  -- 22 окт: podkat (функция anticipate) — кривая автоматизации ДО каждой ноты трека (как клипы автоматизации FL),
-  -- нативно: pooled automation items на огибающей параметра, edit.pk_* (jf_tracker_podkat.lua)
-  podkat_do = function(col, c, f, p, what)
-    if not c.selkey then vim.msg = 'podkat: parameters of an fx inside a container - not yet'; return end
+  -- 22 окт: premod — кривая автоматизации ДО каждой ноты трека (как клипы автоматизации FL),
+  -- нативно: pooled automation items на огибающей параметра, edit.pk_* (jf_tracker_premod.lua)
+  premod_do = function(col, c, f, p, what)
+    if not c.selkey then vim.msg = 'premod: parameters of an fx inside a container - not yet'; return end
     local tr, i, pc = col.track, c.selpki, c.selpk
     local function done() ctx.tmod = nil; model.invalidate() end
     if what == 'toggle' then
-      if pc then edit.pk_remove(tr, i); vim.msg = 'podkat off: ' .. (p.name or '') .. ' - its automation items removed'
+      if pc then edit.pk_remove(tr, i); vim.msg = 'premod off: ' .. (p.name or '') .. ' - its automation items removed'
       else
         local ok, why = edit.pk_add(tr, c.selkey, p.name)
-        vim.msg = ok and ('podkat: %s - a curve before every note of the track (1 beat; rclick podkat - length, keytrack, humanize; pkedit - the curve)'):format(p.name or '') or ('podkat: ' .. (why or 'failed'))
+        vim.msg = ok and ('premod: %s - a curve before every note of the track (1 beat; rclick premod - length, keytrack, humanize; pkedit - the curve)'):format(p.name or '') or ('premod: ' .. (why or 'failed'))
       end
       return done()
     end
-    if not pc then vim.msg = 'podkat: turn it on first (podkat button)'; return end
-    if what == 'pkkey' then edit.pk_change(tr, i, function(x) x.key = not x.key end, 'podkat keytrack'); vim.msg = 'podkat keytrack ' .. (pc.key and 'off' or 'on - higher notes: shorter, faster')
-    elseif what == 'pkvel' then edit.pk_change(tr, i, function(x) x.vel = not x.vel end, 'podkat velocity'); vim.msg = 'podkat velocity ' .. (pc.vel and 'off' or 'on - note velocity scales the curve')
+    if not pc then vim.msg = 'premod: turn it on first (premod button)'; return end
+    if what == 'pkkey' then edit.pk_change(tr, i, function(x) x.key = not x.key end, 'premod keytrack'); vim.msg = 'premod keytrack ' .. (pc.key and 'off' or 'on - higher notes: shorter, faster')
+    elseif what == 'pkvel' then edit.pk_change(tr, i, function(x) x.vel = not x.vel end, 'premod velocity'); vim.msg = 'premod velocity ' .. (pc.vel and 'off' or 'on - note velocity scales the curve')
     elseif what == 'pkpre' or what == 'menu' then
       local items = {}
       for _, q in ipairs({ { 0.25, '1/16' }, { 0.5, '1/8' }, { 1, '1/4 (a beat)' }, { 2, '1/2' }, { 4, '1 bar' }, { 8, '2 bars' } }) do items[#items + 1] = { label = 'length ' .. q[2], data = q[1] } end
-      vim.open_picker('podkat: length before the note', items, function(it) edit.pk_change(tr, i, function(x) x.pre = it.data end, 'podkat length'); done() end)
+      vim.open_picker('premod: length before the note', items, function(it) edit.pk_change(tr, i, function(x) x.pre = it.data end, 'premod length'); done() end)
     elseif what == 'pkhum' then
       local items = {}
       for _, v in ipairs({ 0, 5, 10, 25, 50, 100 }) do items[#items + 1] = { label = ('humanize %d %%'):format(v) .. (v == 0 and ' (off)' or ' - timing, depth, shape'), data = v } end
-      vim.open_picker('podkat: humanize', items, function(it) edit.pk_change(tr, i, function(x) x.hum = it.data end, 'podkat humanize'); done() end)
+      vim.open_picker('premod: humanize', items, function(it) edit.pk_change(tr, i, function(x) x.hum = it.data end, 'premod humanize'); done() end)
     elseif what == 'pkedit' then
       -- кривая — в пуле: правится в первом AI (все экземпляры следом); окно REAPER: огибающая видна, AI выделен
       local env = edit.NM.env(tr, pc.env, false)
@@ -1984,7 +2080,7 @@ ctx = {
           reaper.GetSetAutomationItemInfo(env, k, 'D_UISEL', mine and 1 or 0, true)
         end
         state.envs = true
-        vim.msg = 'podkat: the curve is pooled - edit any of its automation items in REAPER, all follow (selected)'
+        vim.msg = 'premod: the curve is pooled - edit any of its automation items in REAPER, all follow (selected)'
       end
     end
     done()
@@ -3394,10 +3490,10 @@ ctx = {
     else
       local scol = snap and snap.cols[LG.src_i]
       if not scol and not (LG.type == 'follow' and LG.fsrc == 'env') then vim.msg = LG.type .. ': no source track'; return end
-      if LG.type == 'podkat' then
+      if LG.type == 'premod' then
         local hits = ctx.lfo_hits(scol, r0, r1)
-        if #hits == 0 then vim.msg = ('podkat: no %s on %s in the span'):format(LG.hits, scol.name); return end
-        pts = LG.podkat_points(hits, r0, r1)
+        if #hits == 0 then vim.msg = ('premod: no %s on %s in the span'):format(LG.hits, scol.name); return end
+        pts = LG.premod_points(hits, r0, r1)
       else
         local fn, why = ctx.lfo_follow_src(scol, r0, r1)
         if not fn then vim.msg = 'follow: ' .. tostring(why); return end
@@ -3428,7 +3524,7 @@ ctx = {
     end)
     state.envs = true
     local what = LG.type == 'lfo' and ('LFO %s %d rows'):format(LG.shape, LG.period)
-      or (LG.type == 'podkat' and ('podkat %s from %s'):format(LG.hits, LG.src_names[LG.src_i] or '?'))
+      or (LG.type == 'premod' and ('premod %s from %s'):format(LG.hits, LG.src_names[LG.src_i] or '?'))
       or ('follow %s'):format(LG.fsrc == 'env' and (LG.src_env or '?') or ('audio of ' .. (LG.src_names[LG.src_i] or '?')))
     vim.msg = ('%s -> %s: %s, %d points (%s)'):format(what, mode == 'ai' and 'auto-item' or 'envelope', tg.label, n, where)
   end,
@@ -17455,6 +17551,7 @@ local function poll_midi_in()
             if st >= 0x90 and st < 0xF0 and not off and (dv == 63 or dv == ev.dev) and (ch == 0 or (st & 0x0F) + 1 == ch) then
               ctx.midi_in_t[c.guid] = now   -- 19 окт: метр MIDI — note-on по velocity, CC / прочее по значению; note-off не поднимает
               ctx.midi_in_v = ctx.midi_in_v or {}; ctx.midi_in_v[c.guid] = vl > 0 and vl or 64
+              if (st & 0xF0) == 0x90 then ctx.midi_in_p = ctx.midi_in_p or {}; ctx.midi_in_p[c.guid] = ev.buf:byte(2) end   -- 22 окт: нота входа — пианинка premod
             end
           end
         end
@@ -19613,6 +19710,11 @@ local function frame()
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
+    modsel = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3): редактор модуляции выбранного параметра
+    modtab = function() return state.modtab or 'lfo' end,
+    modsl = ctx.MODSL,
+    midi_in = function(guid) return ctx.midi_in_t and ctx.midi_in_t[guid], ctx.midi_in_v and ctx.midi_in_v[guid], ctx.midi_in_p and ctx.midi_in_p[guid] end,
+    pm_phase = function() return ctx.pm_test and ctx.pm_test.ph end,
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
       if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
@@ -19871,7 +19973,7 @@ local function frame()
       return MX.SS.draw_top(Lx, x, y, w, h, seq, ctx.ss_V(), ctx.ss_G(), reaper.time_precise(), reaper.GetPlayPosition())
     end,
     -- вкладка modulate (2 окт): нативная матрица модуляции + генератор кривых
-    -- (lfo / podkat = Anticipate / follow). Широко — рядом, узко — страницы
+    -- (lfo / premod = Anticipate / follow). Широко — рядом, узко — страницы
     -- [matrix] [curves] (L переключает)
     mm_draw = function(Lx, x, y, w, h)
       local col = cur_col()
@@ -20872,7 +20974,7 @@ local function frame()
   elseif hover.retrobtn then state.status = ({ prev = 'previous track with jf_rec', next = 'next track with jf_rec', all = 'select whole buffer (a)', play = 'preview selection (Space)', stop = 'stop preview (s)', put = 'put selection on this track at the cursor row (p)', loop = 'looper: while playing, loop the last N bars just played from the next bar (L); stopped: click sets N = 1 / 2 / 4 / 8', depot = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', lib = 'put selection into the track lib after =LIB - then slice it in the item tab (d)', add = 'add jf_rec (40 s ring buffer) to the cursor track' })[hover.retrobtn] or hover.retrobtn
   elseif hover.retro then state.status = ('retro buffer: drag to select, click: set start · %.0f%% of ring'):format(hover.retro * 100)
   elseif hover.recbtn then state.status = 'rec: record into an item - the jf_rec ring of the track (retro): select what was played, put / loop / to library; click again: back to item editing'
-  elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / podkat / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
+  elseif hover.tab then state.status = ({ clips = 'clips: the session - scenes x tracks, Enter launches a clip into the =SESSION loop zone (zz - over the whole window)', scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / premod / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
@@ -23741,7 +23843,7 @@ local function frame()
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
-  elseif U.rclick and hover.trkmod and (hover.trkmod.what == 'row' or hover.trkmod.what == 'pk') then   -- pk: меню длины подката
+  elseif U.rclick and hover.trkmod and (hover.trkmod.what == 'row' or hover.trkmod.what == 'pk' or hover.trkmod.what == 'cv') then   -- pk: меню длины подката, cv: убрать точку кривой
     ctx.trkmod_do(hover.trkmod, true); U.rclick = false
   elseif U.rclick and hover.mixsnap then
     local i = hover.mixsnap
@@ -24018,6 +24120,55 @@ local function frame()
     else
       if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: XY preset morph'); model.invalidate() end
       ctx.snapdrag = nil
+    end
+  end
+  -- 22 окт (3): панель mod — ползунок настройки модуляции, точка кривой premod, проба кривой
+  if ctx.mdrag then
+    local d = ctx.mdrag
+    if gfx.mouse_cap & 1 == 1 and reaper.ValidatePtr(d.track, 'MediaTrack*') then
+      local fr = math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.w - 1)))
+      local v = d.lo + (d.hi - d.lo) * fr
+      if v ~= d.v then edit.mod_cfg_raw(d.track, d.id, d.pi, d.key, v); d.v = v; ctx.modsel_dirty = true end
+      state.status = ('mod %s: %s'):format(d.name or d.key, ('%.3g'):format(v))
+    else
+      if d.v then reaper.Undo_OnStateChange2(0, 'jf_tracker: mod ' .. (d.name or d.key)); model.invalidate() end
+      ctx.mdrag = nil
+    end
+  end
+  if ctx.pmdrag then
+    local d = ctx.pmdrag
+    if gfx.mouse_cap & 1 == 1 then
+      local t = d.last or math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.w - 1)))
+      local pa, pb = d.cv.pts[d.k], d.cv.pts[d.k + 2]      -- между соседями: порядок точек (индексы) не меняется
+      if not d.last then t = math.max(pa and pa[1] + 0.001 or 0, math.min(pb and pb[1] - 0.001 or 1, t)) end
+      local v = math.max(0, math.min(1, 1 - (gfx.mouse_y - d.y0) / math.max(1, d.h - 1)))
+      local pt = d.cv.pts[d.k + 1]
+      if pt and (pt[1] ~= t or pt[2] ~= v) then edit.pk_point_raw(d.cv, d.k, t, v); pt[1], pt[2] = t, v; d.moved = true; ctx.modsel_dirty = true end
+      state.status = ('premod curve: point %d  t %.2f  v %.2f'):format(d.k + 1, t, v)
+    else
+      if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: premod curve'); model.invalidate() end
+      ctx.pmdrag = nil
+    end
+  end
+  if ctx.pm_test then
+    local d = ctx.pm_test
+    local fxa = reaper.ValidatePtr(d.track, 'MediaTrack*') and model.fxapi(d.track)
+    local ph = (reaper.time_precise() - d.t0) / d.dur
+    if fxa and ph < 1 then
+      local pts, v = d.pts, nil
+      for i = 1, #pts - 1 do
+        if ph >= pts[i][1] and ph <= pts[i + 1][1] then
+          local a, b = pts[i], pts[i + 1]
+          v = a[2] + (b[2] - a[2]) * ((ph - a[1]) / math.max(1e-9, b[1] - a[1]))
+          break
+        end
+      end
+      v = v or (pts[#pts] and pts[#pts][2]) or d.orig
+      fxa.SetParamNormalized(d.track, d.id, d.pi, v)
+      d.ph = ph
+    else
+      if fxa then fxa.SetParamNormalized(d.track, d.id, d.pi, d.orig) end
+      ctx.pm_test = nil
     end
   end
   if trs_drag then

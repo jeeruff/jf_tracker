@@ -1,4 +1,4 @@
--- jf_tracker_podkat.lua — podkat (функция anticipate, 22 окт): кривая автоматизации ДО ноты.
+-- jf_tracker_premod.lua — premod (22 окт): кривая автоматизации ДО ноты.
 --
 -- Как клипы автоматизации FL Studio, но нативно: на огибающей параметра FX трека —
 -- pooled automation items REAPER, каждый кончается ровно на начале ноты трека
@@ -8,7 +8,7 @@
 -- hum — humanize 0..100 %: чуть раньше / позже, размах и подложка кривой (форма).
 -- Случайность детерминированная (от позиции ноты): переприменение не «дрожит».
 --
--- Хранение: P_EXT:jf_podkat трека, «env|pool|pre|flags|hum;…» (env как у note mod:
+-- Хранение: P_EXT:jf_premod трека, «env|pool|pre|flags|hum;…» (env как у note mod:
 -- fx:<GUID>:<param>). Здесь — только чистые функции (тест без REAPER).
 
 local PK = {}
