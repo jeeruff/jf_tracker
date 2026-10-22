@@ -10651,7 +10651,7 @@ function D.frame(L, snap, rows, state, info)
   -- ползунок = видимые треки из всех; клик мимо — страница, протяжка — скролл
   do
     local x0 = tx0 + L.label_w
-    local w = W - x0 - L.pad
+    local w = W - x0 - L.pad - 2                         -- 22 окт: на 2 px от края — рамка INSERT на него не ложится
     local h = math.min(L.hsb_h - 2, D.SBW or 3)          -- 8 окт: толщина, как у всех скроллбаров
     local y = L.hsb_y + math.floor((L.hsb_h - h) / 2)
     hover.hsb = nil
