@@ -2974,7 +2974,7 @@ function D.track_block_v(L, info, col, x, y, h, hover, rawc)
     if centered then local cy = yy + math.floor(fh / 2); gfx.rect(mid - 1, math.min(cy, ky), 2, math.abs(ky - cy) + 1, 1)
     else gfx.rect(mid - 1, ky, 2, yy + fh - ky, 1) end
     set(hot and U.AMBER or U.TEXT); gfx.rect(tx, ky - 1, tw2, 3, 1)  -- ручка поперёк дорожки
-    text(x + L.pad, yy + fh + 2 + vrow * L.rh, fit(label .. ' ' .. val, w - 2 * L.pad), U.GREY); vrow = vrow + 1
+    text(x + L.pad, yy + fh + 2 + vrow * L.rh, fit(val, w - 2 * L.pad), U.GREY); vrow = vrow + 1
     if hot then hover.trs = { col = col, what = what, vert = true, strip = true, y0 = yy + fh, h = fh, sv = math.max(0, math.min(1, (yy + fh - my) / math.max(1, fh))) } end
     if D.csel_on(col.guid, what) then csel_frame(cx - 1, yy, cw2 + 2, fh) end
   end
