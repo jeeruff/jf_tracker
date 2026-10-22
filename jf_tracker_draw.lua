@@ -10655,7 +10655,7 @@ function D.frame(L, snap, rows, state, info)
     local h = math.min(L.hsb_h - 2, D.SBW or 3)          -- 8 окт: толщина, как у всех скроллбаров
     local y = L.hsb_y + math.floor((L.hsb_h - h) / 2)
     hover.hsb = nil
-    if w > 20 and L.hs_n > 0 then
+    if w > 20 and L.hs_n > 0 and (L.hs_full or 0) < L.hs_n then   -- 22 окт: все треки на экране — полосы нет (ползунок во всю ширину ничего не двигал)
       local n = L.hs_n
       local tw = math.max(12, math.floor(w * math.min(1, math.max(1, L.hs_full) / n)))
       local tx = x0 + math.floor((w - tw) * (n > L.hs_full and (L.hs_before / math.max(1, n - L.hs_full)) or 0))
