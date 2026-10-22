@@ -2165,6 +2165,18 @@ ctx = {
     e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
     model.invalidate()
     vim.msg = ('snapshot %d recalled (u - undo)'):format(i)
+    if vim.mode == 'insert' then ctx.snap_rec(col, e.snaps[i], ctx.SN.diff_keys(e.snaps), 'snapshot ' .. i) end
+  end,
+  -- 22 окт: INSERT — пресет / морф XY пишется автоматизацией на строку курсора (как запись ручек в Renoise):
+  -- точки только у параметров, которыми пресеты различаются (diff_keys), одна отмена
+  snap_rec = function(col, vals, keys, what)
+    if #keys == 0 then vim.msg = 'XY -> automation: the corners do not differ - nothing to write'; return end
+    local only = {}
+    for _, k in ipairs(keys) do if vals[k] then only[k] = vals[k] end end
+    local row = vim.cur.row
+    local t = ctx.row_time(row)
+    local n = edit.snap_points(col.track, only, ctx.snap_fxmap(col.track), t, 'XY ' .. (what or 'morph') .. ' -> automation')
+    vim.msg = ('INSERT: %s -> automation at row %d - %d envelope points (u - undo)'):format(what or 'XY', row, n)
   end,
   snap_clear = function(col, i)
     local e = ctx.snaps_of(col); e.snaps[i] = nil; ctx.snaps_write(col, e)
@@ -24119,6 +24131,10 @@ local function frame()
       state.status = ('XY presets: morph %d parameters  x %.2f  y %.2f'):format(#d.keys, x, y)
     else
       if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: XY preset morph'); model.invalidate() end
+      if d.moved and vim.mode == 'insert' then   -- 22 окт: INSERT — где отпустил, то и на строку курсора
+        local have = { d.e.snaps[1] ~= nil, d.e.snaps[2] ~= nil, d.e.snaps[3] ~= nil, d.e.snaps[4] ~= nil }
+        ctx.snap_rec(d.col, ctx.SN.blend(d.e.snaps, ctx.SN.weights(d.e.x, d.e.y, have), d.keys), d.keys, ('morph %.2f %.2f'):format(d.e.x, d.e.y))
+      end
       ctx.snapdrag = nil
     end
   end

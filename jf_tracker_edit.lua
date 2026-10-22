@@ -2675,6 +2675,29 @@ function E.env_set(e, t, v, tol, shape)
   end)
 end
 
+-- 22 окт: XY-пресет в INSERT — точки автоматизации в t для параметров FX трека (vals: «GUID|param» → 0..1,
+-- fxmap: GUID → индекс FX); огибающая создаётся, точка в t заменяется. Возвращает число точек
+function E.snap_points(tr, vals, fxmap, t, desc)
+  local n = 0
+  run(desc or 'XY preset -> automation', function()
+    for k, v in pairs(vals) do
+      local g, pi = k:match('^(.-)|(%d+)$')
+      local fx = g and fxmap[g]
+      local env = fx and R.GetFXEnvelope(tr, fx, tonumber(pi), true)
+      if env then
+        local raw = R.ScaleToEnvelopeMode(R.GetEnvelopeScalingMode(env), math.max(0, math.min(1, v)))
+        local idx = env_point_at(env, t, 0.001)
+        if idx then R.SetEnvelopePoint(env, idx, t, raw, nil, nil, nil, true)
+        else R.InsertEnvelopePoint(env, t, raw, 0, 0, false, true) end
+        R.Envelope_SortPoints(env)
+        n = n + 1
+      end
+    end
+  end)
+  if model then model.invalidate() end
+  return n
+end
+
 -- значение огибающей в t (0..1 от min/max)
 function E.env_value(e, t)
   local _, raw = R.Envelope_Evaluate(e.env, t, 0, 0)
