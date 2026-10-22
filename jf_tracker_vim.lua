@@ -4085,7 +4085,8 @@ function V.pan_field_ok()
 end
 function V.wave_field_ok()   -- 16 окт: колонка волны есть у этой подколонки
   local f = flat()[V.cur.fi]
-  if not f or f.env or f.compact or f.folded or f.ml then return false end   -- 20 окт: MIDI-лейн (PB, CC …) — волны нет, l уводил в невидимое подполе
+  if not f or f.env or f.folded or f.ml then return false end   -- 20 окт: MIDI-лейн (PB, CC …) — волны нет, l уводил в невидимое подполе
+  -- 22 окт: узкая колонка (уровень ширины «нота», compact → GC) волну показывает — курсор туда тоже (решает G.w_wave)
   local G = f.G or ctx.layout()
   return (G.w_wave or 0) > 0
 end

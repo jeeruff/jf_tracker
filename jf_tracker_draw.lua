@@ -7465,7 +7465,7 @@ function D.frame(L, snap, rows, state, info)
         local inst_ok = not (f.env or f.folded) and G.x_inst and true or false   -- 21 окт: и свёрнутый MIDI (GCM: нота | инстр. | vol) — курсор туда ходит   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
         for _, fld in ipairs(vo(fi)) do
           -- 16 окт: колонка волны — шаг перед нотой (h с ноты, l из соседней подколонки встают на неё)
-          if fld == 1 and (G.w_wave or 0) > 0 and not (f.env or f.compact or f.folded) then
+          if fld == 1 and (G.w_wave or 0) > 0 and not (f.env or f.folded or f.ml) then   -- 22 окт: и у узкой (уровень «нота», GC) — волна там есть
             idx = idx + 1
             if fi == vc.fi and vc.sub == 'wave' then cur_i = idx end
             if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'wave' } end
