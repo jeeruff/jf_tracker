@@ -47,4 +47,43 @@ eq(FP.abbr('Filter 1 Resonance', 13), 'Filter 1 reso', 'dictionary: longest word
 eq(#FP.abbr('Gain for minimum velocity', 10) <= 10, true, 'never longer than asked')
 eq(FP.abbr('Highpass', 4), 'hp', 'highpass -> hp')
 eq(FP.abbr('Feedback', 4), 'fb', 'feedback -> fb')
+-- Serum 2 (2626 параметров): «25% [-21.1 dB]», «-∞», пан «-50 L», октавы, центр «--»
+local se = load('Serum_2_Xfer_Records.txt')
+eq(#se.params, se.np, 'serum: all parameters parsed')
+eq(cls(se, 'Main Vol').kind, 'db', 'serum main vol: dB in brackets')
+eq(FP.compact('  0% [-\226\136\158 dB]'), '-inf', 'serum -inf'); eq(FP.compact(' 75% [-2.0 dB]'), '-2', 'serum dB in brackets compact')
+eq(cls(se, 'A Pan').kind, 'bipolar', 'serum pan L/R bipolar'); eq(FP.compact('-50 L'), '50L', 'pan L'); eq(FP.compact(' 0'), '0', 'pan centre plain number')
+eq(cls(se, 'A Octave').kind, 'bipolar', 'serum octave bipolar'); eq(FP.compact('+2 oct'), '+2oct', 'oct compact')
+eq(cls(se, 'A Fine').kind, 'bipolar', 'serum cents bipolar')
+eq(cls(se, 'Porta Time').kind, 'time', 'serum porta time'); eq(cls(se, 'Porta Time').log, true, 'porta log')
+eq(cls(se, 'Mono Toggle').kind, 'toggle', 'serum toggle')
+eq(cls(se, 'A Loop Mode').kind, 'steps', 'serum loop mode steps')
+eq(cls(se, 'A Coarse Pitch').kind ~= 'steps', true, 'coarse pitch with -- in the middle - not steps')
+eq(cls(se, 'A Hz Offset').kind, 'bipolar', 'serum hz offset bipolar')
+local okall = true
+for _, p in ipairs(se.params) do if not pcall(FP.classify, p.t, p.toggle) or not pcall(FP.compact, p.t[3]) then okall = false end end
+eq(okall, true, 'serum: every parameter classifies and compacts')
+local sen = {}; for _, p in ipairs(se.params) do sen[#sen + 1] = p.name end
+local nenv = 0; for _ in pairs(FP.adsr_groups(sen)) do nenv = nenv + 1 end
+eq(nenv >= 4, true, 'serum: Env 1..4 (A H D S R) found ' .. nenv)
+-- огибающие
+local G = FP.adsr_groups({ 'cutoff', 'attack', 'decay', 'sustain', 'release', 'f att', 'f dec', 'f sus', 'f rel', 'Env 2 Attack', 'Env 2 Decay', 'Env 2 Sustain', 'Env 2 Release' })
+eq(G[2] and G[2].r, 5, 'adsr plain words'); eq(G[6] and G[6].r, 9, 'adsr abbreviated with prefix'); eq(G[10] and G[10].last, 13, 'adsr numbered group')
+local G2 = FP.adsr_groups({ 'Amp Attack', 'Filter Decay', 'Amp Sustain', 'Amp Release' })
+eq(next(G2), nil, 'different groups - not one envelope')
+local G3 = FP.adsr_groups({ '1 A', '1 D', '1 S', '1 R', 'A', 'mix', 'D' })
+eq(G3[1] and G3[1].r, 4, 'single letters - full quartet'); eq(G3[5], nil, 'a lone A - not an envelope')
+eq(next(FP.adsr_groups({ 'attack', 'decay', 'release' })), nil, 'three of four - no')
+-- на образце Surge: огибающие Amp EG / Filter EG находятся (attack, attack shape, decay … — не подряд → без графика)
+local sgn = {}; for _, p in ipairs(sg.params) do sgn[#sgn + 1] = p.name end
+local cntS = 0; for _ in pairs(FP.adsr_groups(sgn)) do cntS = cntS + 1 end
+eq(cntS >= 0, true, 'surge names run without error')
+local GH = FP.adsr_groups({ 'Env 1 Attack', 'Env 1 Hold', 'Env 1 Decay', 'Env 1 Sustain', 'Env 1 Release' })
+eq(GH[1] and GH[1].h, 2, 'hold between attack and decay'); eq(GH[1] and GH[1].last, 5, 'A H D S R - five rows')
+local GS = FP.adsr_groups({ 'attack', 'attack shape', 'decay', 'decay shape', 'sustain', 'release' })
+eq(GS[1] and GS[1].role[2], 'x', 'surge: attack shape inside the group'); eq(GS[1] and GS[1].r, 6, 'surge: release last')
+local cntSg = 0; for _ in pairs(FP.adsr_groups(sgn)) do cntSg = cntSg + 1 end
+eq(cntSg >= 2, true, 'surge sample: Amp EG / Filter EG found ' .. cntSg)
+local rsn = {}; for _, p in ipairs(rs.params) do rsn[#rsn + 1] = p.name end
+eq(next(FP.adsr_groups(rsn)), nil, 'rs5k: attack / release apart - no envelope')
 print(('test_fxparse: %d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)

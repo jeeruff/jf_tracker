@@ -14,16 +14,25 @@ local FP = {}
 
 local function trim(s) return ((s or ''):gsub('^%s+', ''):gsub('%s+$', '')) end
 
+-- 22 окт: Serum 2 — «25% [-21.1 dB]» (главное — в скобках), «-∞», пан «-50 L» / «25 R», октавы «-4 oct»
+local function norm(text)
+  local t = trim(text):lower():gsub('\226\136\158', 'inf')      -- ∞ → inf
+  local br = t:match('%[([^%]]*)%]')
+  if br and br:find('db', 1, true) then t = trim(br) end
+  return t
+end
 function FP.unit(text)
-  local t = trim(text):lower()
+  local t = norm(text)
   if t == '' then return nil end
   if t:match('^[%+%-]?inf') and t:find('db', 1, true) then return 'db' end
   if t:find('%f[%a]db%f[%A]') or t:match('db$') then return 'db' end
   if t:find('%f[%a]k?hz%f[%A]') or t:match('k?hz$') then return 'hz' end
   if t:find('semitone', 1, true) or t:match('%d%s*st$') then return 'semi' end
+  if t:match('^[%+%-]?[%d%.]+%s*oct') then return 'oct' end
   if t:find('cent', 1, true) then return 'cent' end
   if t:match('^[%+%-]?[%d%.]+%s*ms$') or t:match('^[%+%-]?[%d%.]+%s*s$') or t:match('^[%+%-]?[%d%.]+%s*sec') then return 'time' end
   if t:match('^[%+%-]?[%d%.]+%s*%%') then return 'pct' end
+  if t:match('^[%+%-]?[%d%.]+%s*[lr]$') then return 'pan' end
   if trim(text):match('^[A-G][#b]?%-?%d$') then return 'note' end
   if t == 'on' or t == 'off' then return 'onoff' end
   if t:match('^[%+%-]?%d*%.?%d+$') then return 'num' end
@@ -31,7 +40,7 @@ function FP.unit(text)
 end
 
 function FP.num(text)
-  local t = trim(text):lower()
+  local t = norm(text)
   if t:match('^%-inf') then return -math.huge end
   if t:match('^%+?inf') then return math.huge end
   local n = tonumber(t:match('^[%+%-]?%d*%.?%d+'))
@@ -39,10 +48,11 @@ function FP.num(text)
   local u = FP.unit(text)
   if u == 'hz' and t:find('khz', 1, true) then n = n * 1000 end
   if u == 'time' and not t:find('ms', 1, true) then n = n * 1000 end   -- секунды → ms
+  if u == 'pan' and t:match('l$') and n > 0 then n = -n end           -- «50 L» без минуса — левее
   return n
 end
 
-local UKIND = { db = 'db', hz = 'freq', time = 'time', pct = 'pct', semi = 'semi', cent = 'semi', note = 'note', num = 'plain' }
+local UKIND = { db = 'db', hz = 'freq', time = 'time', pct = 'pct', semi = 'semi', cent = 'semi', oct = 'semi', pan = 'plain', note = 'note', num = 'plain' }
 
 function FP.classify(texts, toggle)
   local units, distinct, nd = {}, {}, 0
@@ -98,7 +108,9 @@ function FP.compact(text)
   elseif u == 'db' then return (n > 0 and '+' or '') .. g(n, 1)
   elseif u == 'pct' then return g(n, a >= 10 and 0 or 1) .. '%'
   elseif u == 'semi' then return (n > 0 and '+' or '') .. g(n, 1) .. 'st'
-  elseif u == 'cent' then return (n > 0 and '+' or '') .. g(n, 0) .. 'ct' end
+  elseif u == 'cent' then return (n > 0 and '+' or '') .. g(n, 0) .. 'ct'
+  elseif u == 'oct' then return (n > 0 and '+' or '') .. g(n, 0) .. 'oct'
+  elseif u == 'pan' then return n == 0 and 'C' or (g(math.abs(n), 0) .. (n < 0 and 'L' or 'R')) end
   return trim(text)
 end
 
@@ -139,6 +151,51 @@ function FP.abbr(name, n)
   local s = join()
   if #s > n then s = s:gsub(' ', '') end
   return s:sub(1, n)
+end
+
+-- 22 окт (этап 1): огибающие — attack, [hold], decay, sustain, release подряд с общим префиксом группы
+-- («Amp Attack», «Env 2 Decay», «f att», «1 A»), между ними — их форма («Attack Shape», curve, slope):
+-- Surge (A shape D shape S R), Serum 2 (A H D S R). Одна буква (A D S R) — только полной группой подряд.
+-- names → { [первый] = { last = последний, role = { [индекс] = 'a' 'h' 'd' 's' 'r' 'x' (форма) }, a = , h = , d = , s = , r = } }
+local ADSR_KEY = {
+  attack = 'a', att = 'a', atk = 'a', a = 'a', hold = 'h', hld = 'h', h = 'h', decay = 'd', dec = 'd', dcy = 'd', d = 'd',
+  sustain = 's', sus = 's', s = 's', release = 'r', rel = 'r', rls = 'r', r = 'r',
+}
+local function adsr_split(name)
+  local t = trim(name):lower()
+  local shape = false
+  local base = t:match('^(.-)%s+shape$') or t:match('^(.-)%s+curve$') or t:match('^(.-)%s+slope$')
+  if base then t, shape = base, true end
+  local pre, w = t:match('^(.-)%s*([%a]+)$')
+  if not w then return nil end
+  local k = ADSR_KEY[w]
+  if not k then return nil end
+  return k, pre, #w == 1, shape
+end
+function FP.adsr_groups(names)
+  local out = {}
+  local i = 1
+  while i <= #names - 3 do
+    local k1, p1, s1, sh1 = adsr_split(names[i])
+    local g
+    if k1 == 'a' and not sh1 then
+      g = { a = i, role = { [i] = 'a' } }
+      local want = { 'h', 'd', 's', 'r' }
+      local wi, j = 1, i + 1
+      while j <= #names and wi <= #want do
+        local k, pre, single, sh = adsr_split(names[j])
+        if not k or pre ~= p1 or single ~= s1 then break end
+        if sh then g.role[j] = 'x'                                   -- форма предыдущего узла
+        elseif k == want[wi] then g[k] = j; g.role[j] = k; wi = wi + 1
+        elseif want[wi] == 'h' and k == 'd' then wi = wi + 1; g.d = j; g.role[j] = 'd'; wi = wi + 1   -- hold нет
+        else break end
+        j = j + 1
+      end
+      if g.d and g.s and g.r then g.last = g.r; out[i] = g; i = g.r + 1 else g = nil end
+    end
+    if not g then i = i + 1 end
+  end
+  return out
 end
 
 return FP

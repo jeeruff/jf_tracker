@@ -10094,18 +10094,17 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       -- 22 окт: attack decay sustain release подряд в одной колонке — графиком огибающей на их 4 строки (ромбы на узлах)
-      local adsr
-      if not cl and not grp then
-        local idx = {}
-        for pi0, p0 in ipairs(f.params) do
-          local w0 = (p0.name or ''):lower():match('^%s*(%a+)')
-          if (w0 == 'attack' or w0 == 'decay' or w0 == 'sustain' or w0 == 'release') and not idx[w0] then idx[w0] = pi0 end
-        end
-        local a0 = idx.attack
-        if a0 and idx.decay == a0 + 1 and idx.sustain == a0 + 2 and idx.release == a0 + 3 then
-          if spos then
-            if spos[a0] and spos[a0 + 3] and spos[a0][1] == spos[a0 + 3][1] and spos[a0 + 3][2] - spos[a0][2] == 3 then adsr = a0 end
-          elseif math.floor((a0 - 1) / nfit) == math.floor((a0 + 2) / nfit) then adsr = a0 end
+      -- 22 окт (2): любая группа A [H] D S R с общим префиксом и формами между узлами (Serum A H D S R, Surge с shape) —
+      -- D.FP.adsr_groups; график на все её строки, если группа целиком в одной колонке
+      local adsr_of = {}
+      if not cl and not grp and D.FP then
+        local names = {}
+        for pi0, p0 in ipairs(f.params) do names[pi0] = p0.name or '' end
+        for a0, g in pairs(D.FP.adsr_groups(names)) do
+          local okc
+          if spos then okc = spos[a0] and spos[g.last] and spos[a0][1] == spos[g.last][1] and spos[g.last][2] - spos[a0][2] == g.last - a0
+          else okc = math.floor((a0 - 1) / nfit) == math.floor((g.last - 1) / nfit) end
+          if okc then g.first = a0; for q = a0, g.last do adsr_of[q] = g end end
         end
       end
       for pi, p in ipairs(f.params) do
@@ -10160,32 +10159,39 @@ function D.frame(L, snap, rows, state, info)
           hint('dspparam', x0, py, pw, nmh, { fx = k, param = pi })
           goto next_param
         end
-        if adsr and pi >= adsr and pi <= adsr + 3 then
+        if adsr_of[pi] then
+          local g = adsr_of[pi]
+          local n = g.last - g.first + 1
           local gx, gw = bxc + L.pad, pw
-          local gy0, gh = py - (pi - adsr) * L.rh, 4 * L.rh
-          local lmax = ms('S +00.00')   -- 22 окт: по самому длинному значению A D S R (было — «A 19.2 m»)
-          for o2 = 0, 3 do local vv = vals[adsr + o2]; if vv and vv.s then lmax = math.max(lmax, ms('A ' .. vv.s)) end end
+          local gy0, gh = py - (pi - g.first) * L.rh, n * L.rh
+          local LET = { a = 'A', h = 'H', d = 'D', s = 'S', r = 'R', x = '~' }
+          local lmax = ms('S +00.00')   -- 22 окт: по самому длинному значению группы (было — «A 19.2 m»)
+          for q = g.first, g.last do local vv = vals[q]; if vv and vv.s then lmax = math.max(lmax, ms('A ' .. vv.s)) end end
           local labw = math.min(math.floor(gw * 0.55), lmax + L.pad)
           local ex0, ex1 = gx + 4, gx + gw - labw - 4
-          if pi == adsr then
+          if pi == g.first then
             set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(gx, gy0 + 1, gw - labw, gh - 2, 1)
             set(U.LINE); gfx.rect(gx, gy0 + 1, gw - labw, gh - 2, 0)
-            local function nv(o) return math.max(0, math.min(1, (vals[adsr + o] or {}).n or 0)) end
-            local seg = (ex1 - ex0) / 3.4
+            local function nv(q) return q and math.max(0, math.min(1, (vals[q] or {}).n or 0)) or 0 end
+            local seg = (ex1 - ex0) / (g.h and 3.9 or 3.4)
             local top, bot = gy0 + 4, gy0 + gh - 5
             local function Y(l) return bot - math.floor(l * (bot - top) + 0.5) end
-            local xa = ex0 + math.floor(nv(0) * seg + 0.5)
-            local xd = xa + math.floor(nv(1) * seg + 0.5)
+            local xa = ex0 + math.floor(nv(g.a) * seg + 0.5)
+            local xh = xa + (g.h and math.floor(nv(g.h) * seg * 0.5 + 0.5) or 0)
+            local xd = xh + math.floor(nv(g.d) * seg + 0.5)
             local xs = xd + math.floor(0.4 * seg + 0.5)
-            local xr = math.min(ex1, xs + math.floor(nv(3) * seg + 0.5))
-            local ys = Y(nv(2))
-            local sel_o = is_sel and sel.param and (sel.param - adsr) or -1
-            local hot_i = ({ [0] = 2, [1] = 3, [2] = 4, [3] = 4 })[sel_o]
+            local xr = math.min(ex1, xs + math.floor(nv(g.r) * seg + 0.5))
+            local ys = Y(nv(g.s))
+            local pts = { { ex0, bot }, { xa, top } }
+            if g.h then pts[#pts + 1] = { xh, top } end
+            pts[#pts + 1] = { xd, ys }; pts[#pts + 1] = { xs, ys }; pts[#pts + 1] = { xr, bot }
+            local role = is_sel and sel.param and g.role[sel.param]
+            local off = g.h and 1 or 0
+            local hot_i = ({ a = 2, h = 3, d = 3 + off, s = 4 + off, r = 5 + off })[role or '']
             D.L_rh = L.rh
-            D.adsr_line({ { ex0, bot }, { xa, top }, { xd, ys }, { xs, ys }, { xr, bot } }, U.BG, hot_i)
+            D.adsr_line(pts, U.BG, hot_i)
           end
-          local o = pi - adsr
-          local lab = (pins and (info.dsp_ins.buf .. '_')) or (({ 'A', 'D', 'S', 'R' })[o + 1] .. ' ' .. (v.s or ''))
+          local lab = (pins and (info.dsp_ins.buf .. '_')) or ((LET[g.role[pi]] or '?') .. ' ' .. (v.s or ''))
           text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and U.AMBER or U.GREY))
           if not drag and mx >= gx and mx < gx + gw and my >= py and my < py + L.rh then
             hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
