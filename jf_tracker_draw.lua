@@ -9494,6 +9494,21 @@ function D.frame(L, snap, rows, state, info)
           end
         end
       end
+      -- 22 окт: attack decay sustain release подряд в одной колонке — графиком огибающей на их 4 строки (ромбы на узлах)
+      local adsr
+      if not cl and not grp then
+        local idx = {}
+        for pi0, p0 in ipairs(f.params) do
+          local w0 = (p0.name or ''):lower():match('^%s*(%a+)')
+          if (w0 == 'attack' or w0 == 'decay' or w0 == 'sustain' or w0 == 'release') and not idx[w0] then idx[w0] = pi0 end
+        end
+        local a0 = idx.attack
+        if a0 and idx.decay == a0 + 1 and idx.sustain == a0 + 2 and idx.release == a0 + 3 then
+          if spos then
+            if spos[a0] and spos[a0 + 3] and spos[a0][1] == spos[a0 + 3][1] and spos[a0 + 3][2] - spos[a0][2] == 3 then adsr = a0 end
+          elseif math.floor((a0 - 1) / nfit) == math.floor((a0 + 2) / nfit) then adsr = a0 end
+        end
+      end
       for pi, p in ipairs(f.params) do
         if eq_only then break end
         if spos then if spos[pi][1] >= ncol then break end
@@ -9543,6 +9558,38 @@ function D.frame(L, snap, rows, state, info)
           end
           if not drag and not hover.dsp and mx >= x0 and mx < bx2 and my >= py and my < py + nmh then hover.dsp = { fx = k, f = f, param = pi } end
           hint('dspparam', x0, py, pw, nmh, { fx = k, param = pi })
+          goto next_param
+        end
+        if adsr and pi >= adsr and pi <= adsr + 3 then
+          local gx, gw = bxc + L.pad, pw
+          local gy0, gh = py - (pi - adsr) * L.rh, 4 * L.rh
+          local labw = math.min(math.floor(gw * 0.45), ms('S +00.00') + L.pad)
+          local ex0, ex1 = gx + 4, gx + gw - labw - 4
+          if pi == adsr then
+            set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(gx, gy0 + 1, gw - labw, gh - 2, 1)
+            set(U.LINE); gfx.rect(gx, gy0 + 1, gw - labw, gh - 2, 0)
+            local function nv(o) return math.max(0, math.min(1, (vals[adsr + o] or {}).n or 0)) end
+            local seg = (ex1 - ex0) / 3.4
+            local top, bot = gy0 + 4, gy0 + gh - 5
+            local function Y(l) return bot - math.floor(l * (bot - top) + 0.5) end
+            local xa = ex0 + math.floor(nv(0) * seg + 0.5)
+            local xd = xa + math.floor(nv(1) * seg + 0.5)
+            local xs = xd + math.floor(0.4 * seg + 0.5)
+            local xr = math.min(ex1, xs + math.floor(nv(3) * seg + 0.5))
+            local ys = Y(nv(2))
+            local sel_o = is_sel and sel.param and (sel.param - adsr) or -1
+            local hot_i = ({ [0] = 2, [1] = 3, [2] = 4, [3] = 4 })[sel_o]
+            D.L_rh = L.rh
+            D.adsr_line({ { ex0, bot }, { xa, top }, { xd, ys }, { xs, ys }, { xr, bot } }, U.BG, hot_i)
+          end
+          local o = pi - adsr
+          local lab = (pins and (info.dsp_ins.buf .. '_')) or (({ 'A', 'D', 'S', 'R' })[o + 1] .. ' ' .. (v.s or ''))
+          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and U.AMBER or U.GREY))
+          if not drag and mx >= gx and mx < gx + gw and my >= py and my < py + L.rh then
+            hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
+          end
+          hint('dspparam', gx, py, gw, L.rh, { fx = k, param = pi })
+          if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), x = gx, y = py, w = gw, h = L.rh } end
           goto next_param
         end
         local nw = math.floor(pw * 0.40)
