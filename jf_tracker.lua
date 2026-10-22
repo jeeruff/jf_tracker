@@ -14859,6 +14859,25 @@ edit.inst_ref = function(it)
   local e = i and snap.pool and snap.pool[i]
   return e and e.item or nil
 end
+-- 22 окт: :fxdump — образец параметров модуля DSP под курсором для парсера (jf_tracker_fxdump.lua; только чтение)
+ctx.fxdump = function()
+  local col = dsp_target()
+  local f = col and (col.fx or {})[dsp_sel.fx]
+  if not f then vim.msg = ':fxdump: put the DSP cursor on a module'; return end
+  local FD = dofile(DIR .. '/jf_tracker_fxdump.lua')
+  local A = model.fxapi(col.track)
+  local id = f.i
+  local _, nm = A.GetFXName(col.track, id, '')
+  local oko, orig = A.GetNamedConfigParm(col.track, id, 'original_name')
+  if oko and orig ~= '' then nm = orig end
+  local dir = DIR .. '/tests/fixtures/fxdump'
+  reaper.RecursiveCreateDirectory(dir, 0)
+  local path = dir .. '/' .. FD.file_name(nm) .. '.txt'
+  local h = io.open(path, 'w')
+  if not h then vim.msg = ':fxdump: cannot write ' .. path; return end
+  h:write(FD.dump(A, col.track, id)); h:close()
+  vim.msg = (':fxdump: %s - %d parameters -> tests/fixtures/fxdump/%s.txt'):format(nm, A.GetNumParams(col.track, id), FD.file_name(nm))
+end
 -- 22 окт: f в INSERT — метки прыжка, когда f здесь не набор: поле ноты (не vol / fx — там F это hex), не колонка
 -- огибающей / MIDI-лейна и f не нота раскладки клавиатуры
 ctx.f_in_insert = function()

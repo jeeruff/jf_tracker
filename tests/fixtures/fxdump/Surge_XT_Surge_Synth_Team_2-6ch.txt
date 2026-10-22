@@ -1,0 +1,2859 @@
+plugin	VST3i: Surge XT (Surge Synth Team) (2->6ch)	2858
+0	M1: -			0.000000	0.000000	0.000000	0.000000	0.000000
+1	M2: -			0.000000	0.000000	0.000000	0.000000	0.000000
+2	M3: -			0.000000	0.000000	0.000000	0.000000	0.000000
+3	M4: -			0.000000	0.000000	0.000000	0.000000	0.000000
+4	M5: -			0.000000	0.000000	0.000000	0.000000	0.000000
+5	M6: -			0.000000	0.000000	0.000000	0.000000	0.000000
+6	M7: -			0.000000	0.000000	0.000000	0.000000	0.000000
+7	M8: -			0.000000	0.000000	0.000000	0.000000	0.000000
+8	Send FX 1 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+9	Send FX 2 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+10	Send FX 3 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+11	Send FX 4 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+12	Global Volume			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+13	Active Scene			0	0	1	1	1
+14	Scene Mode			Single	Key Split	Dual	Dual	Channel Split
+15	Split Point			C4	C4	C4	C4	C4
+16	FX Disable			-	-	-	-	-
+17	Polyphony Limit			2	17	33	49	64
+18	FX Chain Bypass			All FX	No Send FX	No Send and Global FX	No Send and Global FX	All FX Off
+19	FX A1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+20	FX A1 Delay Time - Left			1/512 note	1/64 note	1/8 dotted	whole dotted	16 whole notes
+21	FX A1 Delay Time - Right			1/512 note	1/64 note	1/8 dotted	whole dotted	16 whole notes
+22	FX A1 Feedback/EQ - Feedback			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+23	FX A1 Feedback/EQ - Crossfeed			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+24	FX A1 Feedback/EQ - Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+25	FX A1 Feedback/EQ - High Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+26	FX A1 Modulation - Rate			0.01 Hz	0.12 Hz	2.00 Hz	32.00 Hz	512.00 Hz
+27	FX A1 Modulation - Depth			0.00 cents	50.00 cents	100.00 cents	150.00 cents	200.00 cents
+28	FX A1 Input - Channel			-100.00 % (Left)	-50.00 %	0.00 % (Stereo)	50.00 %	100.00 % (Right)
+29	FX A1 Feedback/EQ - -			-	-	-	-	-
+30	FX A1 Output - Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+31	FX A1 Output - Width			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+32	FX A2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+33	FX A2 Pre-Delay - Pre-Delay			3.91 ms	37.16 ms	353.55 ms	3.36 s	32.00 s
+34	FX A2 Reverb - Room Shape			Type 1	Type 2	Type 3	Type 3	Type 4
+35	FX A2 Reverb - Size			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+36	FX A2 Reverb - Decay Time			0.06 s	0.35 s	2.00 s	11.31 s	64.00 s
+37	FX A2 Reverb - HF Damping			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+38	FX A2 EQ - Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+39	FX A2 EQ - Peak Freq			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+40	FX A2 EQ - Peak Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+41	FX A2 EQ - High Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+42	FX A2 Output - Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+43	FX A2 Output - Width			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+44	FX A2 EQ - -			-	-	-	-	-
+45	FX B1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+46	FX B1 Param 1			-	-	-	-	-
+47	FX B1 Param 2			-	-	-	-	-
+48	FX B1 Param 3			-	-	-	-	-
+49	FX B1 Param 4			-	-	-	-	-
+50	FX B1 Param 5			-	-	-	-	-
+51	FX B1 Param 6			-	-	-	-	-
+52	FX B1 Param 7			-	-	-	-	-
+53	FX B1 Param 8			-	-	-	-	-
+54	FX B1 Param 9			-	-	-	-	-
+55	FX B1 Param 10			-	-	-	-	-
+56	FX B1 Param 11			-	-	-	-	-
+57	FX B1 Param 12			-	-	-	-	-
+58	FX B2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+59	FX B2 Param 1			-	-	-	-	-
+60	FX B2 Param 2			-	-	-	-	-
+61	FX B2 Param 3			-	-	-	-	-
+62	FX B2 Param 4			-	-	-	-	-
+63	FX B2 Param 5			-	-	-	-	-
+64	FX B2 Param 6			-	-	-	-	-
+65	FX B2 Param 7			-	-	-	-	-
+66	FX B2 Param 8			-	-	-	-	-
+67	FX B2 Param 9			-	-	-	-	-
+68	FX B2 Param 10			-	-	-	-	-
+69	FX B2 Param 11			-	-	-	-	-
+70	FX B2 Param 12			-	-	-	-	-
+71	FX S1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+72	FX S1 Param 1			-	-	-	-	-
+73	FX S1 Param 2			-	-	-	-	-
+74	FX S1 Param 3			-	-	-	-	-
+75	FX S1 Param 4			-	-	-	-	-
+76	FX S1 Param 5			-	-	-	-	-
+77	FX S1 Param 6			-	-	-	-	-
+78	FX S1 Param 7			-	-	-	-	-
+79	FX S1 Param 8			-	-	-	-	-
+80	FX S1 Param 9			-	-	-	-	-
+81	FX S1 Param 10			-	-	-	-	-
+82	FX S1 Param 11			-	-	-	-	-
+83	FX S1 Param 12			-	-	-	-	-
+84	FX S2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+85	FX S2 Param 1			-	-	-	-	-
+86	FX S2 Param 2			-	-	-	-	-
+87	FX S2 Param 3			-	-	-	-	-
+88	FX S2 Param 4			-	-	-	-	-
+89	FX S2 Param 5			-	-	-	-	-
+90	FX S2 Param 6			-	-	-	-	-
+91	FX S2 Param 7			-	-	-	-	-
+92	FX S2 Param 8			-	-	-	-	-
+93	FX S2 Param 9			-	-	-	-	-
+94	FX S2 Param 10			-	-	-	-	-
+95	FX S2 Param 11			-	-	-	-	-
+96	FX S2 Param 12			-	-	-	-	-
+97	FX G1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+98	FX G1 EQ - Bass			-12.00 dB	-6.00 dB	0.00 dB	6.00 dB	12.00 dB
+99	FX G1 EQ - Treble			-12.00 dB	-6.00 dB	0.00 dB	6.00 dB	12.00 dB
+100	FX G1 Stereo - Width			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+101	FX G1 Stereo - Balance			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+102	FX G1 Limiter - Threshold			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+103	FX G1 Limiter - Attack Rate			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+104	FX G1 Limiter - Release Rate			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+105	FX G1 Output - Gain			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+106	FX G1 Stereo - Side Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+107	FX G1 Limiter - -			-	-	-	-	-
+108	FX G1 Limiter - -			-	-	-	-	-
+109	FX G1 Limiter - -			-	-	-	-	-
+110	FX G2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+111	FX G2 Param 1			-	-	-	-	-
+112	FX G2 Param 2			-	-	-	-	-
+113	FX G2 Param 3			-	-	-	-	-
+114	FX G2 Param 4			-	-	-	-	-
+115	FX G2 Param 5			-	-	-	-	-
+116	FX G2 Param 6			-	-	-	-	-
+117	FX G2 Param 7			-	-	-	-	-
+118	FX G2 Param 8			-	-	-	-	-
+119	FX G2 Param 9			-	-	-	-	-
+120	FX G2 Param 10			-	-	-	-	-
+121	FX G2 Param 11			-	-	-	-	-
+122	FX G2 Param 12			-	-	-	-	-
+123	FX A3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+124	FX A3 Param 1			-	-	-	-	-
+125	FX A3 Param 2			-	-	-	-	-
+126	FX A3 Param 3			-	-	-	-	-
+127	FX A3 Param 4			-	-	-	-	-
+128	FX A3 Param 5			-	-	-	-	-
+129	FX A3 Param 6			-	-	-	-	-
+130	FX A3 Param 7			-	-	-	-	-
+131	FX A3 Param 8			-	-	-	-	-
+132	FX A3 Param 9			-	-	-	-	-
+133	FX A3 Param 10			-	-	-	-	-
+134	FX A3 Param 11			-	-	-	-	-
+135	FX A3 Param 12			-	-	-	-	-
+136	FX A4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+137	FX A4 Param 1			-	-	-	-	-
+138	FX A4 Param 2			-	-	-	-	-
+139	FX A4 Param 3			-	-	-	-	-
+140	FX A4 Param 4			-	-	-	-	-
+141	FX A4 Param 5			-	-	-	-	-
+142	FX A4 Param 6			-	-	-	-	-
+143	FX A4 Param 7			-	-	-	-	-
+144	FX A4 Param 8			-	-	-	-	-
+145	FX A4 Param 9			-	-	-	-	-
+146	FX A4 Param 10			-	-	-	-	-
+147	FX A4 Param 11			-	-	-	-	-
+148	FX A4 Param 12			-	-	-	-	-
+149	FX B3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+150	FX B3 Param 1			-	-	-	-	-
+151	FX B3 Param 2			-	-	-	-	-
+152	FX B3 Param 3			-	-	-	-	-
+153	FX B3 Param 4			-	-	-	-	-
+154	FX B3 Param 5			-	-	-	-	-
+155	FX B3 Param 6			-	-	-	-	-
+156	FX B3 Param 7			-	-	-	-	-
+157	FX B3 Param 8			-	-	-	-	-
+158	FX B3 Param 9			-	-	-	-	-
+159	FX B3 Param 10			-	-	-	-	-
+160	FX B3 Param 11			-	-	-	-	-
+161	FX B3 Param 12			-	-	-	-	-
+162	FX B4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+163	FX B4 Param 1			-	-	-	-	-
+164	FX B4 Param 2			-	-	-	-	-
+165	FX B4 Param 3			-	-	-	-	-
+166	FX B4 Param 4			-	-	-	-	-
+167	FX B4 Param 5			-	-	-	-	-
+168	FX B4 Param 6			-	-	-	-	-
+169	FX B4 Param 7			-	-	-	-	-
+170	FX B4 Param 8			-	-	-	-	-
+171	FX B4 Param 9			-	-	-	-	-
+172	FX B4 Param 10			-	-	-	-	-
+173	FX B4 Param 11			-	-	-	-	-
+174	FX B4 Param 12			-	-	-	-	-
+175	FX S3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+176	FX S3 Param 1			-	-	-	-	-
+177	FX S3 Param 2			-	-	-	-	-
+178	FX S3 Param 3			-	-	-	-	-
+179	FX S3 Param 4			-	-	-	-	-
+180	FX S3 Param 5			-	-	-	-	-
+181	FX S3 Param 6			-	-	-	-	-
+182	FX S3 Param 7			-	-	-	-	-
+183	FX S3 Param 8			-	-	-	-	-
+184	FX S3 Param 9			-	-	-	-	-
+185	FX S3 Param 10			-	-	-	-	-
+186	FX S3 Param 11			-	-	-	-	-
+187	FX S3 Param 12			-	-	-	-	-
+188	FX S4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+189	FX S4 Param 1			-	-	-	-	-
+190	FX S4 Param 2			-	-	-	-	-
+191	FX S4 Param 3			-	-	-	-	-
+192	FX S4 Param 4			-	-	-	-	-
+193	FX S4 Param 5			-	-	-	-	-
+194	FX S4 Param 6			-	-	-	-	-
+195	FX S4 Param 7			-	-	-	-	-
+196	FX S4 Param 8			-	-	-	-	-
+197	FX S4 Param 9			-	-	-	-	-
+198	FX S4 Param 10			-	-	-	-	-
+199	FX S4 Param 11			-	-	-	-	-
+200	FX S4 Param 12			-	-	-	-	-
+201	FX G3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+202	FX G3 Param 1			-	-	-	-	-
+203	FX G3 Param 2			-	-	-	-	-
+204	FX G3 Param 3			-	-	-	-	-
+205	FX G3 Param 4			-	-	-	-	-
+206	FX G3 Param 5			-	-	-	-	-
+207	FX G3 Param 6			-	-	-	-	-
+208	FX G3 Param 7			-	-	-	-	-
+209	FX G3 Param 8			-	-	-	-	-
+210	FX G3 Param 9			-	-	-	-	-
+211	FX G3 Param 10			-	-	-	-	-
+212	FX G3 Param 11			-	-	-	-	-
+213	FX G3 Param 12			-	-	-	-	-
+214	FX G4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+215	FX G4 Param 1			-	-	-	-	-
+216	FX G4 Param 2			-	-	-	-	-
+217	FX G4 Param 3			-	-	-	-	-
+218	FX G4 Param 4			-	-	-	-	-
+219	FX G4 Param 5			-	-	-	-	-
+220	FX G4 Param 6			-	-	-	-	-
+221	FX G4 Param 7			-	-	-	-	-
+222	FX G4 Param 8			-	-	-	-	-
+223	FX G4 Param 9			-	-	-	-	-
+224	FX G4 Param 10			-	-	-	-	-
+225	FX G4 Param 11			-	-	-	-	-
+226	FX G4 Param 12			-	-	-	-	-
+227	Character			Warm	Warm	Neutral	Bright	Bright
+228	A Octave			-3	-2	0	2	3
+229	A Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+230	A Portamento			0.0 ms	22.1 ms	125.0 ms	707.1 ms	4.00 s
+231	A Play Mode			Poly	Mono	Mono (Fingered Portamento)	Mono (Single Trigger & Fingered Portamento)	Latch (Monophonic)
+232	A FM Routing			Off	2 > 1	3 > 2 > 1	3 > 2 > 1	2 > 1 < 3
+233	A FM Depth			-48.00 dB	-30.00 dB	-12.00 dB	6.00 dB	24.00 dB
+234	A Osc Drift			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+235	A Noise Color			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+236	A Keytrack Root Key			C4	C4	C4	C4	C4
+237	A Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+238	A Pan			-100.00 % (Left)	-50.00 %	0.00 % (Center)	50.00 %	100.00 % (Right)
+239	A Width			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+240	A Send FX 1 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+241	A Send FX 2 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+242	A Send FX 3 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+243	A Send FX 4 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+244	A Pitch Bend Up Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+245	A Pitch Bend Down Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+246	A VCA Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+247	A Velocity > VCA Gain			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+248	A Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+249	A Filter Configuration			Serial 1	Serial 3	Dual 2	Stereo	Wide
+250	A Filter Balance			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+251	A Highpass			6.88 Hz	24.15 Hz	84.82 Hz	297.94 Hz	1046.50 Hz
+252	A Waveshaper Type			Off	Full Wave	Additive 12345	Sin 7x + x	Soft Single Fold
+253	A Waveshaper Drive			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+254	A Filter 2 Offset Mode			Off	Off	Off	On	On
+255	A Link Resonance			Off	Off	Off	On	On
+256	A Osc 1 Type			Classic	S&H Noise	FM2	Modern	Alias
+257	A Osc 1 Octave			-3	-2	0	2	3
+258	A Osc 1 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+259	A Osc 1 Shape			Wave 1 (TX 1)	Wave 8 (TX 8)	Wave 15	Wave 21	Wave 28
+260	A Osc 1 Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+261	A Osc 1 Behavior			Legacy (<v1.6.2)	Legacy (<v1.6.2)	Same as FM2/3	Same as FM2/3	Same as FM2/3
+262	A Osc 1 Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+263	A Osc 1 High Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+264	A Osc 1 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+265	A Osc 1 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+266	A Osc 1 Keytrack			Off	Off	Off	On	On
+267	A Osc 1 Retrigger			Off	Off	Off	On	On
+268	A Osc 2 Type			Classic	S&H Noise	FM2	Modern	Alias
+269	A Osc 2 Octave			-3	-2	0	2	3
+270	A Osc 2 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+271	A Osc 2 Shape			Wave 1 (TX 1)	Wave 8 (TX 8)	Wave 15	Wave 21	Wave 28
+272	A Osc 2 Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+273	A Osc 2 Behavior			Legacy (<v1.6.2)	Legacy (<v1.6.2)	Same as FM2/3	Same as FM2/3	Same as FM2/3
+274	A Osc 2 Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+275	A Osc 2 High Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+276	A Osc 2 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+277	A Osc 2 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+278	A Osc 2 Keytrack			Off	Off	Off	On	On
+279	A Osc 2 Retrigger			Off	Off	Off	On	On
+280	A Osc 3 Type			Classic	S&H Noise	FM2	Modern	Alias
+281	A Osc 3 Octave			-3	-2	0	2	3
+282	A Osc 3 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+283	A Osc 3 Shape			Wave 1 (TX 1)	Wave 8 (TX 8)	Wave 15	Wave 21	Wave 28
+284	A Osc 3 Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+285	A Osc 3 Behavior			Legacy (<v1.6.2)	Legacy (<v1.6.2)	Same as FM2/3	Same as FM2/3	Same as FM2/3
+286	A Osc 3 Low Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+287	A Osc 3 High Cut			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+288	A Osc 3 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+289	A Osc 3 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+290	A Osc 3 Keytrack			Off	Off	Off	On	On
+291	A Osc 3 Retrigger			Off	Off	Off	On	On
+292	A Osc 1 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+293	A Osc 1 Mute			Off	Off	Off	On	On
+294	A Osc 1 Solo			Off	Off	Off	On	On
+295	A Osc 1 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+296	A Osc 2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+297	A Osc 2 Mute			Off	Off	Off	On	On
+298	A Osc 2 Solo			Off	Off	Off	On	On
+299	A Osc 2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+300	A Osc 3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+301	A Osc 3 Mute			Off	Off	Off	On	On
+302	A Osc 3 Solo			Off	Off	Off	On	On
+303	A Osc 3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+304	A Ring Modulation 1x2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+305	A Ring Modulation 1x2 Mute			Off	Off	Off	On	On
+306	A Ring Modulation 1x2 Solo			Off	Off	Off	On	On
+307	A Ring Modulation 1x2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+308	A Ring Modulation 2x3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+309	A Ring Modulation 2x3 Mute			Off	Off	Off	On	On
+310	A Ring Modulation 2x3 Solo			Off	Off	Off	On	On
+311	A Ring Modulation 2x3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+312	A Noise Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+313	A Noise Mute			Off	Off	Off	On	On
+314	A Noise Solo			Off	Off	Off	On	On
+315	A Noise Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+316	A Pre-Filter Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+317	A Filter 1 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+318	A Filter 1 Subtype			None	None	None	None	None
+319	A Filter 1 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+320	A Filter 1 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+321	A Filter 1 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+322	A Filter 1 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+323	A Filter 2 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+324	A Filter 2 Subtype			6 dB	None	None	None	None
+325	A Filter 2 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+326	A Filter 2 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+327	A Filter 2 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+328	A Filter 2 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+329	A Amp EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+330	A Amp EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+331	A Amp EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+332	A Amp EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+333	A Amp EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+334	A Amp EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+335	A Amp EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+336	A Amp EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+337	A Filter EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+338	A Filter EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+339	A Filter EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+340	A Filter EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+341	A Filter EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+342	A Filter EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+343	A Filter EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+344	A Filter EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+345	A LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+346	A LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+347	A LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+348	A LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+349	A LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+350	A LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+351	A LFO 1 Unipolar			Off	Off	Off	On	On
+352	A LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+353	A LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+354	A LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+355	A LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+356	A LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+357	A LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+358	A LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+359	A LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+360	A LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+361	A LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+362	A LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+363	A LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+364	A LFO 2 Unipolar			Off	Off	Off	On	On
+365	A LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+366	A LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+367	A LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+368	A LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+369	A LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+370	A LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+371	A LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+372	A LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+373	A LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+374	A LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+375	A LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+376	A LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+377	A LFO 3 Unipolar			Off	Off	Off	On	On
+378	A LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+379	A LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+380	A LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+381	A LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+382	A LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+383	A LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+384	A LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+385	A LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+386	A LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+387	A LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+388	A LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+389	A LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+390	A LFO 4 Unipolar			Off	Off	Off	On	On
+391	A LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+392	A LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+393	A LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+394	A LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+395	A LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+396	A LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+397	A LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+398	A LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+399	A LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+400	A LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+401	A LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+402	A LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+403	A LFO 5 Unipolar			Off	Off	Off	On	On
+404	A LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+405	A LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+406	A LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+407	A LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+408	A LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+409	A LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+410	A LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+411	A LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+412	A LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+413	A LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+414	A LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+415	A LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+416	A LFO 6 Unipolar			Off	Off	Off	On	On
+417	A LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+418	A LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+419	A LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+420	A LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+421	A LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+422	A LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+423	A Scene LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+424	A Scene LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+425	A Scene LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+426	A Scene LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+427	A Scene LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+428	A Scene LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+429	A Scene LFO 1 Unipolar			Off	Off	Off	On	On
+430	A Scene LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+431	A Scene LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+432	A Scene LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+433	A Scene LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+434	A Scene LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+435	A Scene LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+436	A Scene LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+437	A Scene LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+438	A Scene LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+439	A Scene LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+440	A Scene LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+441	A Scene LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+442	A Scene LFO 2 Unipolar			Off	Off	Off	On	On
+443	A Scene LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+444	A Scene LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+445	A Scene LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+446	A Scene LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+447	A Scene LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+448	A Scene LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+449	A Scene LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+450	A Scene LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+451	A Scene LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+452	A Scene LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+453	A Scene LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+454	A Scene LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+455	A Scene LFO 3 Unipolar			Off	Off	Off	On	On
+456	A Scene LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+457	A Scene LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+458	A Scene LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+459	A Scene LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+460	A Scene LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+461	A Scene LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+462	A Scene LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+463	A Scene LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+464	A Scene LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+465	A Scene LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+466	A Scene LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+467	A Scene LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+468	A Scene LFO 4 Unipolar			Off	Off	Off	On	On
+469	A Scene LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+470	A Scene LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+471	A Scene LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+472	A Scene LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+473	A Scene LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+474	A Scene LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+475	A Scene LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+476	A Scene LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+477	A Scene LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+478	A Scene LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+479	A Scene LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+480	A Scene LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+481	A Scene LFO 5 Unipolar			Off	Off	Off	On	On
+482	A Scene LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+483	A Scene LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+484	A Scene LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+485	A Scene LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+486	A Scene LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+487	A Scene LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+488	A Scene LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+489	A Scene LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+490	A Scene LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+491	A Scene LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+492	A Scene LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+493	A Scene LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+494	A Scene LFO 6 Unipolar			Off	Off	Off	On	On
+495	A Scene LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+496	A Scene LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+497	A Scene LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+498	A Scene LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+499	A Scene LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+500	A Scene LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+501	B Octave			-3	-2	0	2	3
+502	B Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+503	B Portamento			0.0 ms	22.1 ms	125.0 ms	707.1 ms	4.00 s
+504	B Play Mode			Poly	Mono	Mono (Fingered Portamento)	Mono (Single Trigger & Fingered Portamento)	Latch (Monophonic)
+505	B FM Routing			Off	2 > 1	3 > 2 > 1	3 > 2 > 1	2 > 1 < 3
+506	B FM Depth			-48.00 dB	-30.00 dB	-12.00 dB	6.00 dB	24.00 dB
+507	B Osc Drift			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+508	B Noise Color			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+509	B Keytrack Root Key			C4	C4	C4	C4	C4
+510	B Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+511	B Pan			-100.00 % (Left)	-50.00 %	0.00 % (Center)	50.00 %	100.00 % (Right)
+512	B Width			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+513	B Send FX 1 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+514	B Send FX 2 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+515	B Send FX 3 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+516	B Send FX 4 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+517	B Pitch Bend Up Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+518	B Pitch Bend Down Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+519	B VCA Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+520	B Velocity > VCA Gain			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+521	B Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+522	B Filter Configuration			Serial 1	Serial 3	Dual 2	Stereo	Wide
+523	B Filter Balance			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+524	B Highpass			6.88 Hz	24.15 Hz	84.82 Hz	297.94 Hz	1046.50 Hz
+525	B Waveshaper Type			Off	Full Wave	Additive 12345	Sin 7x + x	Soft Single Fold
+526	B Waveshaper Drive			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+527	B Filter 2 Offset Mode			Off	Off	Off	On	On
+528	B Link Resonance			Off	Off	Off	On	On
+529	B Osc 1 Type			Classic	S&H Noise	FM2	Modern	Alias
+530	B Osc 1 Octave			-3	-2	0	2	3
+531	B Osc 1 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+532	B Osc 1 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+533	B Osc 1 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+534	B Osc 1 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+535	B Osc 1 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+536	B Osc 1 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+537	B Osc 1 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+538	B Osc 1 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+539	B Osc 1 Keytrack			Off	Off	Off	On	On
+540	B Osc 1 Retrigger			Off	Off	Off	On	On
+541	B Osc 2 Type			Classic	S&H Noise	FM2	Modern	Alias
+542	B Osc 2 Octave			-3	-2	0	2	3
+543	B Osc 2 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+544	B Osc 2 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+545	B Osc 2 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+546	B Osc 2 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+547	B Osc 2 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+548	B Osc 2 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+549	B Osc 2 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+550	B Osc 2 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+551	B Osc 2 Keytrack			Off	Off	Off	On	On
+552	B Osc 2 Retrigger			Off	Off	Off	On	On
+553	B Osc 3 Type			Classic	S&H Noise	FM2	Modern	Alias
+554	B Osc 3 Octave			-3	-2	0	2	3
+555	B Osc 3 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+556	B Osc 3 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+557	B Osc 3 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+558	B Osc 3 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+559	B Osc 3 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+560	B Osc 3 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+561	B Osc 3 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+562	B Osc 3 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+563	B Osc 3 Keytrack			Off	Off	Off	On	On
+564	B Osc 3 Retrigger			Off	Off	Off	On	On
+565	B Osc 1 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+566	B Osc 1 Mute			Off	Off	Off	On	On
+567	B Osc 1 Solo			Off	Off	Off	On	On
+568	B Osc 1 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+569	B Osc 2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+570	B Osc 2 Mute			Off	Off	Off	On	On
+571	B Osc 2 Solo			Off	Off	Off	On	On
+572	B Osc 2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+573	B Osc 3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+574	B Osc 3 Mute			Off	Off	Off	On	On
+575	B Osc 3 Solo			Off	Off	Off	On	On
+576	B Osc 3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+577	B Ring Modulation 1x2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+578	B Ring Modulation 1x2 Mute			Off	Off	Off	On	On
+579	B Ring Modulation 1x2 Solo			Off	Off	Off	On	On
+580	B Ring Modulation 1x2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+581	B Ring Modulation 2x3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+582	B Ring Modulation 2x3 Mute			Off	Off	Off	On	On
+583	B Ring Modulation 2x3 Solo			Off	Off	Off	On	On
+584	B Ring Modulation 2x3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+585	B Noise Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+586	B Noise Mute			Off	Off	Off	On	On
+587	B Noise Solo			Off	Off	Off	On	On
+588	B Noise Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+589	B Pre-Filter Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+590	B Filter 1 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+591	B Filter 1 Subtype			None	None	None	None	None
+592	B Filter 1 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+593	B Filter 1 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+594	B Filter 1 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+595	B Filter 1 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+596	B Filter 2 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+597	B Filter 2 Subtype			None	None	None	None	None
+598	B Filter 2 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+599	B Filter 2 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+600	B Filter 2 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+601	B Filter 2 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+602	B Amp EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+603	B Amp EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+604	B Amp EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+605	B Amp EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+606	B Amp EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+607	B Amp EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+608	B Amp EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+609	B Amp EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+610	B Filter EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+611	B Filter EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+612	B Filter EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+613	B Filter EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+614	B Filter EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+615	B Filter EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+616	B Filter EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+617	B Filter EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+618	B LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+619	B LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+620	B LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+621	B LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+622	B LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+623	B LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+624	B LFO 1 Unipolar			Off	Off	Off	On	On
+625	B LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+626	B LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+627	B LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+628	B LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+629	B LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+630	B LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+631	B LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+632	B LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+633	B LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+634	B LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+635	B LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+636	B LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+637	B LFO 2 Unipolar			Off	Off	Off	On	On
+638	B LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+639	B LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+640	B LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+641	B LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+642	B LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+643	B LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+644	B LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+645	B LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+646	B LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+647	B LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+648	B LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+649	B LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+650	B LFO 3 Unipolar			Off	Off	Off	On	On
+651	B LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+652	B LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+653	B LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+654	B LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+655	B LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+656	B LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+657	B LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+658	B LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+659	B LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+660	B LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+661	B LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+662	B LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+663	B LFO 4 Unipolar			Off	Off	Off	On	On
+664	B LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+665	B LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+666	B LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+667	B LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+668	B LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+669	B LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+670	B LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+671	B LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+672	B LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+673	B LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+674	B LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+675	B LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+676	B LFO 5 Unipolar			Off	Off	Off	On	On
+677	B LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+678	B LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+679	B LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+680	B LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+681	B LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+682	B LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+683	B LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+684	B LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+685	B LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+686	B LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+687	B LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+688	B LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+689	B LFO 6 Unipolar			Off	Off	Off	On	On
+690	B LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+691	B LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+692	B LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+693	B LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+694	B LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+695	B LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+696	B Scene LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+697	B Scene LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+698	B Scene LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+699	B Scene LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+700	B Scene LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+701	B Scene LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+702	B Scene LFO 1 Unipolar			Off	Off	Off	On	On
+703	B Scene LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+704	B Scene LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+705	B Scene LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+706	B Scene LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+707	B Scene LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+708	B Scene LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+709	B Scene LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+710	B Scene LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+711	B Scene LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+712	B Scene LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+713	B Scene LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+714	B Scene LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+715	B Scene LFO 2 Unipolar			Off	Off	Off	On	On
+716	B Scene LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+717	B Scene LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+718	B Scene LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+719	B Scene LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+720	B Scene LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+721	B Scene LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+722	B Scene LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+723	B Scene LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+724	B Scene LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+725	B Scene LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+726	B Scene LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+727	B Scene LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+728	B Scene LFO 3 Unipolar			Off	Off	Off	On	On
+729	B Scene LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+730	B Scene LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+731	B Scene LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+732	B Scene LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+733	B Scene LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+734	B Scene LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+735	B Scene LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+736	B Scene LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+737	B Scene LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+738	B Scene LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+739	B Scene LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+740	B Scene LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+741	B Scene LFO 4 Unipolar			Off	Off	Off	On	On
+742	B Scene LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+743	B Scene LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+744	B Scene LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+745	B Scene LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+746	B Scene LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+747	B Scene LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+748	B Scene LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+749	B Scene LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+750	B Scene LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+751	B Scene LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+752	B Scene LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+753	B Scene LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+754	B Scene LFO 5 Unipolar			Off	Off	Off	On	On
+755	B Scene LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+756	B Scene LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+757	B Scene LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+758	B Scene LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+759	B Scene LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+760	B Scene LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+761	B Scene LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+762	B Scene LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+763	B Scene LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+764	B Scene LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+765	B Scene LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+766	B Scene LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+767	B Scene LFO 6 Unipolar			Off	Off	Off	On	On
+768	B Scene LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+769	B Scene LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+770	B Scene LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+771	B Scene LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+772	B Scene LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+773	B Scene LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+774	Bypass Surge XT			Active	Active	Active	Active	Active
+775	MIDI CC 0|0			0.0000	0.2500	0.5000	0.7500	1.0000
+776	MIDI CC 0|1			0.0000	0.2500	0.5000	0.7500	1.0000
+777	MIDI CC 0|2			0.0000	0.2500	0.5000	0.7500	1.0000
+778	MIDI CC 0|3			0.0000	0.2500	0.5000	0.7500	1.0000
+779	MIDI CC 0|4			0.0000	0.2500	0.5000	0.7500	1.0000
+780	MIDI CC 0|5			0.0000	0.2500	0.5000	0.7500	1.0000
+781	MIDI CC 0|6			0.0000	0.2500	0.5000	0.7500	1.0000
+782	MIDI CC 0|7			0.0000	0.2500	0.5000	0.7500	1.0000
+783	MIDI CC 0|8			0.0000	0.2500	0.5000	0.7500	1.0000
+784	MIDI CC 0|9			0.0000	0.2500	0.5000	0.7500	1.0000
+785	MIDI CC 0|10			0.0000	0.2500	0.5000	0.7500	1.0000
+786	MIDI CC 0|11			0.0000	0.2500	0.5000	0.7500	1.0000
+787	MIDI CC 0|12			0.0000	0.2500	0.5000	0.7500	1.0000
+788	MIDI CC 0|13			0.0000	0.2500	0.5000	0.7500	1.0000
+789	MIDI CC 0|14			0.0000	0.2500	0.5000	0.7500	1.0000
+790	MIDI CC 0|15			0.0000	0.2500	0.5000	0.7500	1.0000
+791	MIDI CC 0|16			0.0000	0.2500	0.5000	0.7500	1.0000
+792	MIDI CC 0|17			0.0000	0.2500	0.5000	0.7500	1.0000
+793	MIDI CC 0|18			0.0000	0.2500	0.5000	0.7500	1.0000
+794	MIDI CC 0|19			0.0000	0.2500	0.5000	0.7500	1.0000
+795	MIDI CC 0|20			0.0000	0.2500	0.5000	0.7500	1.0000
+796	MIDI CC 0|21			0.0000	0.2500	0.5000	0.7500	1.0000
+797	MIDI CC 0|22			0.0000	0.2500	0.5000	0.7500	1.0000
+798	MIDI CC 0|23			0.0000	0.2500	0.5000	0.7500	1.0000
+799	MIDI CC 0|24			0.0000	0.2500	0.5000	0.7500	1.0000
+800	MIDI CC 0|25			0.0000	0.2500	0.5000	0.7500	1.0000
+801	MIDI CC 0|26			0.0000	0.2500	0.5000	0.7500	1.0000
+802	MIDI CC 0|27			0.0000	0.2500	0.5000	0.7500	1.0000
+803	MIDI CC 0|28			0.0000	0.2500	0.5000	0.7500	1.0000
+804	MIDI CC 0|29			0.0000	0.2500	0.5000	0.7500	1.0000
+805	MIDI CC 0|30			0.0000	0.2500	0.5000	0.7500	1.0000
+806	MIDI CC 0|31			0.0000	0.2500	0.5000	0.7500	1.0000
+807	MIDI CC 0|32			0.0000	0.2500	0.5000	0.7500	1.0000
+808	MIDI CC 0|33			0.0000	0.2500	0.5000	0.7500	1.0000
+809	MIDI CC 0|34			0.0000	0.2500	0.5000	0.7500	1.0000
+810	MIDI CC 0|35			0.0000	0.2500	0.5000	0.7500	1.0000
+811	MIDI CC 0|36			0.0000	0.2500	0.5000	0.7500	1.0000
+812	MIDI CC 0|37			0.0000	0.2500	0.5000	0.7500	1.0000
+813	MIDI CC 0|38			0.0000	0.2500	0.5000	0.7500	1.0000
+814	MIDI CC 0|39			0.0000	0.2500	0.5000	0.7500	1.0000
+815	MIDI CC 0|40			0.0000	0.2500	0.5000	0.7500	1.0000
+816	MIDI CC 0|41			0.0000	0.2500	0.5000	0.7500	1.0000
+817	MIDI CC 0|42			0.0000	0.2500	0.5000	0.7500	1.0000
+818	MIDI CC 0|43			0.0000	0.2500	0.5000	0.7500	1.0000
+819	MIDI CC 0|44			0.0000	0.2500	0.5000	0.7500	1.0000
+820	MIDI CC 0|45			0.0000	0.2500	0.5000	0.7500	1.0000
+821	MIDI CC 0|46			0.0000	0.2500	0.5000	0.7500	1.0000
+822	MIDI CC 0|47			0.0000	0.2500	0.5000	0.7500	1.0000
+823	MIDI CC 0|48			0.0000	0.2500	0.5000	0.7500	1.0000
+824	MIDI CC 0|49			0.0000	0.2500	0.5000	0.7500	1.0000
+825	MIDI CC 0|50			0.0000	0.2500	0.5000	0.7500	1.0000
+826	MIDI CC 0|51			0.0000	0.2500	0.5000	0.7500	1.0000
+827	MIDI CC 0|52			0.0000	0.2500	0.5000	0.7500	1.0000
+828	MIDI CC 0|53			0.0000	0.2500	0.5000	0.7500	1.0000
+829	MIDI CC 0|54			0.0000	0.2500	0.5000	0.7500	1.0000
+830	MIDI CC 0|55			0.0000	0.2500	0.5000	0.7500	1.0000
+831	MIDI CC 0|56			0.0000	0.2500	0.5000	0.7500	1.0000
+832	MIDI CC 0|57			0.0000	0.2500	0.5000	0.7500	1.0000
+833	MIDI CC 0|58			0.0000	0.2500	0.5000	0.7500	1.0000
+834	MIDI CC 0|59			0.0000	0.2500	0.5000	0.7500	1.0000
+835	MIDI CC 0|60			0.0000	0.2500	0.5000	0.7500	1.0000
+836	MIDI CC 0|61			0.0000	0.2500	0.5000	0.7500	1.0000
+837	MIDI CC 0|62			0.0000	0.2500	0.5000	0.7500	1.0000
+838	MIDI CC 0|63			0.0000	0.2500	0.5000	0.7500	1.0000
+839	MIDI CC 0|64			0.0000	0.2500	0.5000	0.7500	1.0000
+840	MIDI CC 0|65			0.0000	0.2500	0.5000	0.7500	1.0000
+841	MIDI CC 0|66			0.0000	0.2500	0.5000	0.7500	1.0000
+842	MIDI CC 0|67			0.0000	0.2500	0.5000	0.7500	1.0000
+843	MIDI CC 0|68			0.0000	0.2500	0.5000	0.7500	1.0000
+844	MIDI CC 0|69			0.0000	0.2500	0.5000	0.7500	1.0000
+845	MIDI CC 0|70			0.0000	0.2500	0.5000	0.7500	1.0000
+846	MIDI CC 0|71			0.0000	0.2500	0.5000	0.7500	1.0000
+847	MIDI CC 0|72			0.0000	0.2500	0.5000	0.7500	1.0000
+848	MIDI CC 0|73			0.0000	0.2500	0.5000	0.7500	1.0000
+849	MIDI CC 0|74			0.0000	0.2500	0.5000	0.7500	1.0000
+850	MIDI CC 0|75			0.0000	0.2500	0.5000	0.7500	1.0000
+851	MIDI CC 0|76			0.0000	0.2500	0.5000	0.7500	1.0000
+852	MIDI CC 0|77			0.0000	0.2500	0.5000	0.7500	1.0000
+853	MIDI CC 0|78			0.0000	0.2500	0.5000	0.7500	1.0000
+854	MIDI CC 0|79			0.0000	0.2500	0.5000	0.7500	1.0000
+855	MIDI CC 0|80			0.0000	0.2500	0.5000	0.7500	1.0000
+856	MIDI CC 0|81			0.0000	0.2500	0.5000	0.7500	1.0000
+857	MIDI CC 0|82			0.0000	0.2500	0.5000	0.7500	1.0000
+858	MIDI CC 0|83			0.0000	0.2500	0.5000	0.7500	1.0000
+859	MIDI CC 0|84			0.0000	0.2500	0.5000	0.7500	1.0000
+860	MIDI CC 0|85			0.0000	0.2500	0.5000	0.7500	1.0000
+861	MIDI CC 0|86			0.0000	0.2500	0.5000	0.7500	1.0000
+862	MIDI CC 0|87			0.0000	0.2500	0.5000	0.7500	1.0000
+863	MIDI CC 0|88			0.0000	0.2500	0.5000	0.7500	1.0000
+864	MIDI CC 0|89			0.0000	0.2500	0.5000	0.7500	1.0000
+865	MIDI CC 0|90			0.0000	0.2500	0.5000	0.7500	1.0000
+866	MIDI CC 0|91			0.0000	0.2500	0.5000	0.7500	1.0000
+867	MIDI CC 0|92			0.0000	0.2500	0.5000	0.7500	1.0000
+868	MIDI CC 0|93			0.0000	0.2500	0.5000	0.7500	1.0000
+869	MIDI CC 0|94			0.0000	0.2500	0.5000	0.7500	1.0000
+870	MIDI CC 0|95			0.0000	0.2500	0.5000	0.7500	1.0000
+871	MIDI CC 0|96			0.0000	0.2500	0.5000	0.7500	1.0000
+872	MIDI CC 0|97			0.0000	0.2500	0.5000	0.7500	1.0000
+873	MIDI CC 0|98			0.0000	0.2500	0.5000	0.7500	1.0000
+874	MIDI CC 0|99			0.0000	0.2500	0.5000	0.7500	1.0000
+875	MIDI CC 0|100			0.0000	0.2500	0.5000	0.7500	1.0000
+876	MIDI CC 0|101			0.0000	0.2500	0.5000	0.7500	1.0000
+877	MIDI CC 0|102			0.0000	0.2500	0.5000	0.7500	1.0000
+878	MIDI CC 0|103			0.0000	0.2500	0.5000	0.7500	1.0000
+879	MIDI CC 0|104			0.0000	0.2500	0.5000	0.7500	1.0000
+880	MIDI CC 0|105			0.0000	0.2500	0.5000	0.7500	1.0000
+881	MIDI CC 0|106			0.0000	0.2500	0.5000	0.7500	1.0000
+882	MIDI CC 0|107			0.0000	0.2500	0.5000	0.7500	1.0000
+883	MIDI CC 0|108			0.0000	0.2500	0.5000	0.7500	1.0000
+884	MIDI CC 0|109			0.0000	0.2500	0.5000	0.7500	1.0000
+885	MIDI CC 0|110			0.0000	0.2500	0.5000	0.7500	1.0000
+886	MIDI CC 0|111			0.0000	0.2500	0.5000	0.7500	1.0000
+887	MIDI CC 0|112			0.0000	0.2500	0.5000	0.7500	1.0000
+888	MIDI CC 0|113			0.0000	0.2500	0.5000	0.7500	1.0000
+889	MIDI CC 0|114			0.0000	0.2500	0.5000	0.7500	1.0000
+890	MIDI CC 0|115			0.0000	0.2500	0.5000	0.7500	1.0000
+891	MIDI CC 0|116			0.0000	0.2500	0.5000	0.7500	1.0000
+892	MIDI CC 0|117			0.0000	0.2500	0.5000	0.7500	1.0000
+893	MIDI CC 0|118			0.0000	0.2500	0.5000	0.7500	1.0000
+894	MIDI CC 0|119			0.0000	0.2500	0.5000	0.7500	1.0000
+895	MIDI CC 0|120			0.0000	0.2500	0.5000	0.7500	1.0000
+896	MIDI CC 0|121			0.0000	0.2500	0.5000	0.7500	1.0000
+897	MIDI CC 0|122			0.0000	0.2500	0.5000	0.7500	1.0000
+898	MIDI CC 0|123			0.0000	0.2500	0.5000	0.7500	1.0000
+899	MIDI CC 0|124			0.0000	0.2500	0.5000	0.7500	1.0000
+900	MIDI CC 0|125			0.0000	0.2500	0.5000	0.7500	1.0000
+901	MIDI CC 0|126			0.0000	0.2500	0.5000	0.7500	1.0000
+902	MIDI CC 0|127			0.0000	0.2500	0.5000	0.7500	1.0000
+903	MIDI CC 0|128			0.0000	0.2500	0.5000	0.7500	1.0000
+904	MIDI CC 0|129			0.0000	0.2500	0.5000	0.7500	1.0000
+905	MIDI CC 1|0			0.0000	0.2500	0.5000	0.7500	1.0000
+906	MIDI CC 1|1			0.0000	0.2500	0.5000	0.7500	1.0000
+907	MIDI CC 1|2			0.0000	0.2500	0.5000	0.7500	1.0000
+908	MIDI CC 1|3			0.0000	0.2500	0.5000	0.7500	1.0000
+909	MIDI CC 1|4			0.0000	0.2500	0.5000	0.7500	1.0000
+910	MIDI CC 1|5			0.0000	0.2500	0.5000	0.7500	1.0000
+911	MIDI CC 1|6			0.0000	0.2500	0.5000	0.7500	1.0000
+912	MIDI CC 1|7			0.0000	0.2500	0.5000	0.7500	1.0000
+913	MIDI CC 1|8			0.0000	0.2500	0.5000	0.7500	1.0000
+914	MIDI CC 1|9			0.0000	0.2500	0.5000	0.7500	1.0000
+915	MIDI CC 1|10			0.0000	0.2500	0.5000	0.7500	1.0000
+916	MIDI CC 1|11			0.0000	0.2500	0.5000	0.7500	1.0000
+917	MIDI CC 1|12			0.0000	0.2500	0.5000	0.7500	1.0000
+918	MIDI CC 1|13			0.0000	0.2500	0.5000	0.7500	1.0000
+919	MIDI CC 1|14			0.0000	0.2500	0.5000	0.7500	1.0000
+920	MIDI CC 1|15			0.0000	0.2500	0.5000	0.7500	1.0000
+921	MIDI CC 1|16			0.0000	0.2500	0.5000	0.7500	1.0000
+922	MIDI CC 1|17			0.0000	0.2500	0.5000	0.7500	1.0000
+923	MIDI CC 1|18			0.0000	0.2500	0.5000	0.7500	1.0000
+924	MIDI CC 1|19			0.0000	0.2500	0.5000	0.7500	1.0000
+925	MIDI CC 1|20			0.0000	0.2500	0.5000	0.7500	1.0000
+926	MIDI CC 1|21			0.0000	0.2500	0.5000	0.7500	1.0000
+927	MIDI CC 1|22			0.0000	0.2500	0.5000	0.7500	1.0000
+928	MIDI CC 1|23			0.0000	0.2500	0.5000	0.7500	1.0000
+929	MIDI CC 1|24			0.0000	0.2500	0.5000	0.7500	1.0000
+930	MIDI CC 1|25			0.0000	0.2500	0.5000	0.7500	1.0000
+931	MIDI CC 1|26			0.0000	0.2500	0.5000	0.7500	1.0000
+932	MIDI CC 1|27			0.0000	0.2500	0.5000	0.7500	1.0000
+933	MIDI CC 1|28			0.0000	0.2500	0.5000	0.7500	1.0000
+934	MIDI CC 1|29			0.0000	0.2500	0.5000	0.7500	1.0000
+935	MIDI CC 1|30			0.0000	0.2500	0.5000	0.7500	1.0000
+936	MIDI CC 1|31			0.0000	0.2500	0.5000	0.7500	1.0000
+937	MIDI CC 1|32			0.0000	0.2500	0.5000	0.7500	1.0000
+938	MIDI CC 1|33			0.0000	0.2500	0.5000	0.7500	1.0000
+939	MIDI CC 1|34			0.0000	0.2500	0.5000	0.7500	1.0000
+940	MIDI CC 1|35			0.0000	0.2500	0.5000	0.7500	1.0000
+941	MIDI CC 1|36			0.0000	0.2500	0.5000	0.7500	1.0000
+942	MIDI CC 1|37			0.0000	0.2500	0.5000	0.7500	1.0000
+943	MIDI CC 1|38			0.0000	0.2500	0.5000	0.7500	1.0000
+944	MIDI CC 1|39			0.0000	0.2500	0.5000	0.7500	1.0000
+945	MIDI CC 1|40			0.0000	0.2500	0.5000	0.7500	1.0000
+946	MIDI CC 1|41			0.0000	0.2500	0.5000	0.7500	1.0000
+947	MIDI CC 1|42			0.0000	0.2500	0.5000	0.7500	1.0000
+948	MIDI CC 1|43			0.0000	0.2500	0.5000	0.7500	1.0000
+949	MIDI CC 1|44			0.0000	0.2500	0.5000	0.7500	1.0000
+950	MIDI CC 1|45			0.0000	0.2500	0.5000	0.7500	1.0000
+951	MIDI CC 1|46			0.0000	0.2500	0.5000	0.7500	1.0000
+952	MIDI CC 1|47			0.0000	0.2500	0.5000	0.7500	1.0000
+953	MIDI CC 1|48			0.0000	0.2500	0.5000	0.7500	1.0000
+954	MIDI CC 1|49			0.0000	0.2500	0.5000	0.7500	1.0000
+955	MIDI CC 1|50			0.0000	0.2500	0.5000	0.7500	1.0000
+956	MIDI CC 1|51			0.0000	0.2500	0.5000	0.7500	1.0000
+957	MIDI CC 1|52			0.0000	0.2500	0.5000	0.7500	1.0000
+958	MIDI CC 1|53			0.0000	0.2500	0.5000	0.7500	1.0000
+959	MIDI CC 1|54			0.0000	0.2500	0.5000	0.7500	1.0000
+960	MIDI CC 1|55			0.0000	0.2500	0.5000	0.7500	1.0000
+961	MIDI CC 1|56			0.0000	0.2500	0.5000	0.7500	1.0000
+962	MIDI CC 1|57			0.0000	0.2500	0.5000	0.7500	1.0000
+963	MIDI CC 1|58			0.0000	0.2500	0.5000	0.7500	1.0000
+964	MIDI CC 1|59			0.0000	0.2500	0.5000	0.7500	1.0000
+965	MIDI CC 1|60			0.0000	0.2500	0.5000	0.7500	1.0000
+966	MIDI CC 1|61			0.0000	0.2500	0.5000	0.7500	1.0000
+967	MIDI CC 1|62			0.0000	0.2500	0.5000	0.7500	1.0000
+968	MIDI CC 1|63			0.0000	0.2500	0.5000	0.7500	1.0000
+969	MIDI CC 1|64			0.0000	0.2500	0.5000	0.7500	1.0000
+970	MIDI CC 1|65			0.0000	0.2500	0.5000	0.7500	1.0000
+971	MIDI CC 1|66			0.0000	0.2500	0.5000	0.7500	1.0000
+972	MIDI CC 1|67			0.0000	0.2500	0.5000	0.7500	1.0000
+973	MIDI CC 1|68			0.0000	0.2500	0.5000	0.7500	1.0000
+974	MIDI CC 1|69			0.0000	0.2500	0.5000	0.7500	1.0000
+975	MIDI CC 1|70			0.0000	0.2500	0.5000	0.7500	1.0000
+976	MIDI CC 1|71			0.0000	0.2500	0.5000	0.7500	1.0000
+977	MIDI CC 1|72			0.0000	0.2500	0.5000	0.7500	1.0000
+978	MIDI CC 1|73			0.0000	0.2500	0.5000	0.7500	1.0000
+979	MIDI CC 1|74			0.0000	0.2500	0.5000	0.7500	1.0000
+980	MIDI CC 1|75			0.0000	0.2500	0.5000	0.7500	1.0000
+981	MIDI CC 1|76			0.0000	0.2500	0.5000	0.7500	1.0000
+982	MIDI CC 1|77			0.0000	0.2500	0.5000	0.7500	1.0000
+983	MIDI CC 1|78			0.0000	0.2500	0.5000	0.7500	1.0000
+984	MIDI CC 1|79			0.0000	0.2500	0.5000	0.7500	1.0000
+985	MIDI CC 1|80			0.0000	0.2500	0.5000	0.7500	1.0000
+986	MIDI CC 1|81			0.0000	0.2500	0.5000	0.7500	1.0000
+987	MIDI CC 1|82			0.0000	0.2500	0.5000	0.7500	1.0000
+988	MIDI CC 1|83			0.0000	0.2500	0.5000	0.7500	1.0000
+989	MIDI CC 1|84			0.0000	0.2500	0.5000	0.7500	1.0000
+990	MIDI CC 1|85			0.0000	0.2500	0.5000	0.7500	1.0000
+991	MIDI CC 1|86			0.0000	0.2500	0.5000	0.7500	1.0000
+992	MIDI CC 1|87			0.0000	0.2500	0.5000	0.7500	1.0000
+993	MIDI CC 1|88			0.0000	0.2500	0.5000	0.7500	1.0000
+994	MIDI CC 1|89			0.0000	0.2500	0.5000	0.7500	1.0000
+995	MIDI CC 1|90			0.0000	0.2500	0.5000	0.7500	1.0000
+996	MIDI CC 1|91			0.0000	0.2500	0.5000	0.7500	1.0000
+997	MIDI CC 1|92			0.0000	0.2500	0.5000	0.7500	1.0000
+998	MIDI CC 1|93			0.0000	0.2500	0.5000	0.7500	1.0000
+999	MIDI CC 1|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1000	MIDI CC 1|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1001	MIDI CC 1|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1002	MIDI CC 1|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1003	MIDI CC 1|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1004	MIDI CC 1|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1005	MIDI CC 1|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1006	MIDI CC 1|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1007	MIDI CC 1|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1008	MIDI CC 1|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1009	MIDI CC 1|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1010	MIDI CC 1|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1011	MIDI CC 1|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1012	MIDI CC 1|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1013	MIDI CC 1|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1014	MIDI CC 1|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1015	MIDI CC 1|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1016	MIDI CC 1|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1017	MIDI CC 1|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1018	MIDI CC 1|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1019	MIDI CC 1|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1020	MIDI CC 1|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1021	MIDI CC 1|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1022	MIDI CC 1|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1023	MIDI CC 1|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1024	MIDI CC 1|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1025	MIDI CC 1|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1026	MIDI CC 1|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1027	MIDI CC 1|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1028	MIDI CC 1|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1029	MIDI CC 1|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1030	MIDI CC 1|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1031	MIDI CC 1|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1032	MIDI CC 1|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1033	MIDI CC 1|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1034	MIDI CC 1|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1035	MIDI CC 2|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1036	MIDI CC 2|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1037	MIDI CC 2|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1038	MIDI CC 2|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1039	MIDI CC 2|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1040	MIDI CC 2|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1041	MIDI CC 2|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1042	MIDI CC 2|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1043	MIDI CC 2|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1044	MIDI CC 2|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1045	MIDI CC 2|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1046	MIDI CC 2|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1047	MIDI CC 2|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1048	MIDI CC 2|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1049	MIDI CC 2|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1050	MIDI CC 2|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1051	MIDI CC 2|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1052	MIDI CC 2|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1053	MIDI CC 2|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1054	MIDI CC 2|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1055	MIDI CC 2|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1056	MIDI CC 2|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1057	MIDI CC 2|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1058	MIDI CC 2|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1059	MIDI CC 2|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1060	MIDI CC 2|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1061	MIDI CC 2|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1062	MIDI CC 2|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1063	MIDI CC 2|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1064	MIDI CC 2|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1065	MIDI CC 2|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1066	MIDI CC 2|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1067	MIDI CC 2|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1068	MIDI CC 2|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1069	MIDI CC 2|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1070	MIDI CC 2|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1071	MIDI CC 2|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1072	MIDI CC 2|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1073	MIDI CC 2|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1074	MIDI CC 2|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1075	MIDI CC 2|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1076	MIDI CC 2|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1077	MIDI CC 2|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1078	MIDI CC 2|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1079	MIDI CC 2|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1080	MIDI CC 2|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1081	MIDI CC 2|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1082	MIDI CC 2|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1083	MIDI CC 2|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1084	MIDI CC 2|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1085	MIDI CC 2|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1086	MIDI CC 2|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1087	MIDI CC 2|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1088	MIDI CC 2|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1089	MIDI CC 2|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1090	MIDI CC 2|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1091	MIDI CC 2|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1092	MIDI CC 2|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1093	MIDI CC 2|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1094	MIDI CC 2|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1095	MIDI CC 2|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1096	MIDI CC 2|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1097	MIDI CC 2|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1098	MIDI CC 2|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1099	MIDI CC 2|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1100	MIDI CC 2|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1101	MIDI CC 2|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1102	MIDI CC 2|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1103	MIDI CC 2|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1104	MIDI CC 2|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1105	MIDI CC 2|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1106	MIDI CC 2|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1107	MIDI CC 2|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1108	MIDI CC 2|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1109	MIDI CC 2|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1110	MIDI CC 2|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1111	MIDI CC 2|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1112	MIDI CC 2|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1113	MIDI CC 2|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1114	MIDI CC 2|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1115	MIDI CC 2|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1116	MIDI CC 2|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1117	MIDI CC 2|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1118	MIDI CC 2|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1119	MIDI CC 2|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1120	MIDI CC 2|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1121	MIDI CC 2|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1122	MIDI CC 2|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1123	MIDI CC 2|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1124	MIDI CC 2|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1125	MIDI CC 2|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1126	MIDI CC 2|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1127	MIDI CC 2|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1128	MIDI CC 2|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1129	MIDI CC 2|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1130	MIDI CC 2|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1131	MIDI CC 2|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1132	MIDI CC 2|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1133	MIDI CC 2|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1134	MIDI CC 2|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1135	MIDI CC 2|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1136	MIDI CC 2|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1137	MIDI CC 2|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1138	MIDI CC 2|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1139	MIDI CC 2|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1140	MIDI CC 2|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1141	MIDI CC 2|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1142	MIDI CC 2|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1143	MIDI CC 2|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1144	MIDI CC 2|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1145	MIDI CC 2|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1146	MIDI CC 2|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1147	MIDI CC 2|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1148	MIDI CC 2|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1149	MIDI CC 2|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1150	MIDI CC 2|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1151	MIDI CC 2|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1152	MIDI CC 2|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1153	MIDI CC 2|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1154	MIDI CC 2|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1155	MIDI CC 2|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1156	MIDI CC 2|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1157	MIDI CC 2|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1158	MIDI CC 2|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1159	MIDI CC 2|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1160	MIDI CC 2|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1161	MIDI CC 2|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1162	MIDI CC 2|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1163	MIDI CC 2|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1164	MIDI CC 2|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1165	MIDI CC 3|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1166	MIDI CC 3|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1167	MIDI CC 3|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1168	MIDI CC 3|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1169	MIDI CC 3|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1170	MIDI CC 3|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1171	MIDI CC 3|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1172	MIDI CC 3|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1173	MIDI CC 3|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1174	MIDI CC 3|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1175	MIDI CC 3|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1176	MIDI CC 3|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1177	MIDI CC 3|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1178	MIDI CC 3|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1179	MIDI CC 3|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1180	MIDI CC 3|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1181	MIDI CC 3|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1182	MIDI CC 3|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1183	MIDI CC 3|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1184	MIDI CC 3|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1185	MIDI CC 3|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1186	MIDI CC 3|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1187	MIDI CC 3|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1188	MIDI CC 3|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1189	MIDI CC 3|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1190	MIDI CC 3|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1191	MIDI CC 3|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1192	MIDI CC 3|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1193	MIDI CC 3|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1194	MIDI CC 3|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1195	MIDI CC 3|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1196	MIDI CC 3|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1197	MIDI CC 3|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1198	MIDI CC 3|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1199	MIDI CC 3|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1200	MIDI CC 3|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1201	MIDI CC 3|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1202	MIDI CC 3|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1203	MIDI CC 3|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1204	MIDI CC 3|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1205	MIDI CC 3|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1206	MIDI CC 3|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1207	MIDI CC 3|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1208	MIDI CC 3|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1209	MIDI CC 3|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1210	MIDI CC 3|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1211	MIDI CC 3|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1212	MIDI CC 3|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1213	MIDI CC 3|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1214	MIDI CC 3|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1215	MIDI CC 3|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1216	MIDI CC 3|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1217	MIDI CC 3|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1218	MIDI CC 3|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1219	MIDI CC 3|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1220	MIDI CC 3|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1221	MIDI CC 3|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1222	MIDI CC 3|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1223	MIDI CC 3|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1224	MIDI CC 3|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1225	MIDI CC 3|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1226	MIDI CC 3|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1227	MIDI CC 3|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1228	MIDI CC 3|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1229	MIDI CC 3|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1230	MIDI CC 3|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1231	MIDI CC 3|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1232	MIDI CC 3|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1233	MIDI CC 3|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1234	MIDI CC 3|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1235	MIDI CC 3|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1236	MIDI CC 3|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1237	MIDI CC 3|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1238	MIDI CC 3|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1239	MIDI CC 3|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1240	MIDI CC 3|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1241	MIDI CC 3|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1242	MIDI CC 3|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1243	MIDI CC 3|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1244	MIDI CC 3|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1245	MIDI CC 3|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1246	MIDI CC 3|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1247	MIDI CC 3|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1248	MIDI CC 3|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1249	MIDI CC 3|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1250	MIDI CC 3|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1251	MIDI CC 3|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1252	MIDI CC 3|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1253	MIDI CC 3|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1254	MIDI CC 3|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1255	MIDI CC 3|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1256	MIDI CC 3|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1257	MIDI CC 3|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1258	MIDI CC 3|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1259	MIDI CC 3|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1260	MIDI CC 3|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1261	MIDI CC 3|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1262	MIDI CC 3|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1263	MIDI CC 3|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1264	MIDI CC 3|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1265	MIDI CC 3|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1266	MIDI CC 3|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1267	MIDI CC 3|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1268	MIDI CC 3|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1269	MIDI CC 3|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1270	MIDI CC 3|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1271	MIDI CC 3|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1272	MIDI CC 3|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1273	MIDI CC 3|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1274	MIDI CC 3|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1275	MIDI CC 3|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1276	MIDI CC 3|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1277	MIDI CC 3|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1278	MIDI CC 3|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1279	MIDI CC 3|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1280	MIDI CC 3|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1281	MIDI CC 3|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1282	MIDI CC 3|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1283	MIDI CC 3|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1284	MIDI CC 3|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1285	MIDI CC 3|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1286	MIDI CC 3|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1287	MIDI CC 3|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1288	MIDI CC 3|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1289	MIDI CC 3|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1290	MIDI CC 3|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1291	MIDI CC 3|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1292	MIDI CC 3|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1293	MIDI CC 3|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1294	MIDI CC 3|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1295	MIDI CC 4|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1296	MIDI CC 4|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1297	MIDI CC 4|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1298	MIDI CC 4|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1299	MIDI CC 4|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1300	MIDI CC 4|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1301	MIDI CC 4|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1302	MIDI CC 4|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1303	MIDI CC 4|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1304	MIDI CC 4|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1305	MIDI CC 4|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1306	MIDI CC 4|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1307	MIDI CC 4|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1308	MIDI CC 4|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1309	MIDI CC 4|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1310	MIDI CC 4|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1311	MIDI CC 4|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1312	MIDI CC 4|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1313	MIDI CC 4|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1314	MIDI CC 4|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1315	MIDI CC 4|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1316	MIDI CC 4|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1317	MIDI CC 4|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1318	MIDI CC 4|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1319	MIDI CC 4|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1320	MIDI CC 4|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1321	MIDI CC 4|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1322	MIDI CC 4|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1323	MIDI CC 4|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1324	MIDI CC 4|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1325	MIDI CC 4|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1326	MIDI CC 4|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1327	MIDI CC 4|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1328	MIDI CC 4|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1329	MIDI CC 4|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1330	MIDI CC 4|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1331	MIDI CC 4|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1332	MIDI CC 4|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1333	MIDI CC 4|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1334	MIDI CC 4|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1335	MIDI CC 4|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1336	MIDI CC 4|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1337	MIDI CC 4|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1338	MIDI CC 4|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1339	MIDI CC 4|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1340	MIDI CC 4|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1341	MIDI CC 4|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1342	MIDI CC 4|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1343	MIDI CC 4|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1344	MIDI CC 4|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1345	MIDI CC 4|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1346	MIDI CC 4|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1347	MIDI CC 4|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1348	MIDI CC 4|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1349	MIDI CC 4|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1350	MIDI CC 4|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1351	MIDI CC 4|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1352	MIDI CC 4|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1353	MIDI CC 4|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1354	MIDI CC 4|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1355	MIDI CC 4|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1356	MIDI CC 4|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1357	MIDI CC 4|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1358	MIDI CC 4|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1359	MIDI CC 4|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1360	MIDI CC 4|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1361	MIDI CC 4|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1362	MIDI CC 4|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1363	MIDI CC 4|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1364	MIDI CC 4|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1365	MIDI CC 4|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1366	MIDI CC 4|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1367	MIDI CC 4|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1368	MIDI CC 4|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1369	MIDI CC 4|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1370	MIDI CC 4|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1371	MIDI CC 4|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1372	MIDI CC 4|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1373	MIDI CC 4|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1374	MIDI CC 4|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1375	MIDI CC 4|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1376	MIDI CC 4|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1377	MIDI CC 4|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1378	MIDI CC 4|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1379	MIDI CC 4|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1380	MIDI CC 4|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1381	MIDI CC 4|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1382	MIDI CC 4|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1383	MIDI CC 4|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1384	MIDI CC 4|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1385	MIDI CC 4|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1386	MIDI CC 4|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1387	MIDI CC 4|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1388	MIDI CC 4|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1389	MIDI CC 4|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1390	MIDI CC 4|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1391	MIDI CC 4|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1392	MIDI CC 4|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1393	MIDI CC 4|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1394	MIDI CC 4|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1395	MIDI CC 4|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1396	MIDI CC 4|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1397	MIDI CC 4|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1398	MIDI CC 4|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1399	MIDI CC 4|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1400	MIDI CC 4|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1401	MIDI CC 4|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1402	MIDI CC 4|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1403	MIDI CC 4|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1404	MIDI CC 4|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1405	MIDI CC 4|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1406	MIDI CC 4|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1407	MIDI CC 4|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1408	MIDI CC 4|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1409	MIDI CC 4|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1410	MIDI CC 4|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1411	MIDI CC 4|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1412	MIDI CC 4|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1413	MIDI CC 4|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1414	MIDI CC 4|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1415	MIDI CC 4|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1416	MIDI CC 4|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1417	MIDI CC 4|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1418	MIDI CC 4|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1419	MIDI CC 4|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1420	MIDI CC 4|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1421	MIDI CC 4|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1422	MIDI CC 4|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1423	MIDI CC 4|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1424	MIDI CC 4|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1425	MIDI CC 5|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1426	MIDI CC 5|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1427	MIDI CC 5|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1428	MIDI CC 5|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1429	MIDI CC 5|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1430	MIDI CC 5|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1431	MIDI CC 5|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1432	MIDI CC 5|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1433	MIDI CC 5|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1434	MIDI CC 5|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1435	MIDI CC 5|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1436	MIDI CC 5|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1437	MIDI CC 5|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1438	MIDI CC 5|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1439	MIDI CC 5|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1440	MIDI CC 5|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1441	MIDI CC 5|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1442	MIDI CC 5|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1443	MIDI CC 5|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1444	MIDI CC 5|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1445	MIDI CC 5|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1446	MIDI CC 5|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1447	MIDI CC 5|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1448	MIDI CC 5|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1449	MIDI CC 5|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1450	MIDI CC 5|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1451	MIDI CC 5|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1452	MIDI CC 5|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1453	MIDI CC 5|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1454	MIDI CC 5|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1455	MIDI CC 5|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1456	MIDI CC 5|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1457	MIDI CC 5|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1458	MIDI CC 5|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1459	MIDI CC 5|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1460	MIDI CC 5|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1461	MIDI CC 5|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1462	MIDI CC 5|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1463	MIDI CC 5|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1464	MIDI CC 5|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1465	MIDI CC 5|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1466	MIDI CC 5|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1467	MIDI CC 5|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1468	MIDI CC 5|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1469	MIDI CC 5|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1470	MIDI CC 5|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1471	MIDI CC 5|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1472	MIDI CC 5|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1473	MIDI CC 5|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1474	MIDI CC 5|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1475	MIDI CC 5|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1476	MIDI CC 5|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1477	MIDI CC 5|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1478	MIDI CC 5|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1479	MIDI CC 5|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1480	MIDI CC 5|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1481	MIDI CC 5|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1482	MIDI CC 5|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1483	MIDI CC 5|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1484	MIDI CC 5|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1485	MIDI CC 5|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1486	MIDI CC 5|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1487	MIDI CC 5|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1488	MIDI CC 5|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1489	MIDI CC 5|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1490	MIDI CC 5|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1491	MIDI CC 5|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1492	MIDI CC 5|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1493	MIDI CC 5|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1494	MIDI CC 5|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1495	MIDI CC 5|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1496	MIDI CC 5|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1497	MIDI CC 5|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1498	MIDI CC 5|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1499	MIDI CC 5|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1500	MIDI CC 5|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1501	MIDI CC 5|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1502	MIDI CC 5|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1503	MIDI CC 5|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1504	MIDI CC 5|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1505	MIDI CC 5|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1506	MIDI CC 5|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1507	MIDI CC 5|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1508	MIDI CC 5|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1509	MIDI CC 5|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1510	MIDI CC 5|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1511	MIDI CC 5|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1512	MIDI CC 5|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1513	MIDI CC 5|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1514	MIDI CC 5|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1515	MIDI CC 5|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1516	MIDI CC 5|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1517	MIDI CC 5|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1518	MIDI CC 5|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1519	MIDI CC 5|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1520	MIDI CC 5|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1521	MIDI CC 5|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1522	MIDI CC 5|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1523	MIDI CC 5|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1524	MIDI CC 5|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1525	MIDI CC 5|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1526	MIDI CC 5|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1527	MIDI CC 5|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1528	MIDI CC 5|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1529	MIDI CC 5|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1530	MIDI CC 5|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1531	MIDI CC 5|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1532	MIDI CC 5|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1533	MIDI CC 5|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1534	MIDI CC 5|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1535	MIDI CC 5|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1536	MIDI CC 5|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1537	MIDI CC 5|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1538	MIDI CC 5|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1539	MIDI CC 5|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1540	MIDI CC 5|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1541	MIDI CC 5|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1542	MIDI CC 5|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1543	MIDI CC 5|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1544	MIDI CC 5|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1545	MIDI CC 5|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1546	MIDI CC 5|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1547	MIDI CC 5|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1548	MIDI CC 5|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1549	MIDI CC 5|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1550	MIDI CC 5|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1551	MIDI CC 5|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1552	MIDI CC 5|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1553	MIDI CC 5|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1554	MIDI CC 5|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1555	MIDI CC 6|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1556	MIDI CC 6|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1557	MIDI CC 6|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1558	MIDI CC 6|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1559	MIDI CC 6|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1560	MIDI CC 6|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1561	MIDI CC 6|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1562	MIDI CC 6|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1563	MIDI CC 6|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1564	MIDI CC 6|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1565	MIDI CC 6|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1566	MIDI CC 6|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1567	MIDI CC 6|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1568	MIDI CC 6|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1569	MIDI CC 6|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1570	MIDI CC 6|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1571	MIDI CC 6|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1572	MIDI CC 6|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1573	MIDI CC 6|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1574	MIDI CC 6|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1575	MIDI CC 6|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1576	MIDI CC 6|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1577	MIDI CC 6|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1578	MIDI CC 6|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1579	MIDI CC 6|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1580	MIDI CC 6|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1581	MIDI CC 6|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1582	MIDI CC 6|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1583	MIDI CC 6|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1584	MIDI CC 6|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1585	MIDI CC 6|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1586	MIDI CC 6|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1587	MIDI CC 6|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1588	MIDI CC 6|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1589	MIDI CC 6|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1590	MIDI CC 6|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1591	MIDI CC 6|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1592	MIDI CC 6|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1593	MIDI CC 6|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1594	MIDI CC 6|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1595	MIDI CC 6|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1596	MIDI CC 6|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1597	MIDI CC 6|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1598	MIDI CC 6|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1599	MIDI CC 6|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1600	MIDI CC 6|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1601	MIDI CC 6|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1602	MIDI CC 6|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1603	MIDI CC 6|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1604	MIDI CC 6|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1605	MIDI CC 6|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1606	MIDI CC 6|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1607	MIDI CC 6|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1608	MIDI CC 6|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1609	MIDI CC 6|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1610	MIDI CC 6|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1611	MIDI CC 6|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1612	MIDI CC 6|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1613	MIDI CC 6|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1614	MIDI CC 6|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1615	MIDI CC 6|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1616	MIDI CC 6|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1617	MIDI CC 6|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1618	MIDI CC 6|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1619	MIDI CC 6|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1620	MIDI CC 6|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1621	MIDI CC 6|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1622	MIDI CC 6|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1623	MIDI CC 6|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1624	MIDI CC 6|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1625	MIDI CC 6|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1626	MIDI CC 6|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1627	MIDI CC 6|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1628	MIDI CC 6|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1629	MIDI CC 6|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1630	MIDI CC 6|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1631	MIDI CC 6|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1632	MIDI CC 6|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1633	MIDI CC 6|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1634	MIDI CC 6|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1635	MIDI CC 6|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1636	MIDI CC 6|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1637	MIDI CC 6|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1638	MIDI CC 6|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1639	MIDI CC 6|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1640	MIDI CC 6|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1641	MIDI CC 6|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1642	MIDI CC 6|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1643	MIDI CC 6|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1644	MIDI CC 6|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1645	MIDI CC 6|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1646	MIDI CC 6|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1647	MIDI CC 6|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1648	MIDI CC 6|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1649	MIDI CC 6|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1650	MIDI CC 6|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1651	MIDI CC 6|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1652	MIDI CC 6|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1653	MIDI CC 6|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1654	MIDI CC 6|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1655	MIDI CC 6|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1656	MIDI CC 6|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1657	MIDI CC 6|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1658	MIDI CC 6|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1659	MIDI CC 6|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1660	MIDI CC 6|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1661	MIDI CC 6|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1662	MIDI CC 6|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1663	MIDI CC 6|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1664	MIDI CC 6|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1665	MIDI CC 6|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1666	MIDI CC 6|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1667	MIDI CC 6|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1668	MIDI CC 6|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1669	MIDI CC 6|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1670	MIDI CC 6|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1671	MIDI CC 6|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1672	MIDI CC 6|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1673	MIDI CC 6|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1674	MIDI CC 6|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1675	MIDI CC 6|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1676	MIDI CC 6|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1677	MIDI CC 6|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1678	MIDI CC 6|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1679	MIDI CC 6|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1680	MIDI CC 6|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1681	MIDI CC 6|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1682	MIDI CC 6|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1683	MIDI CC 6|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1684	MIDI CC 6|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1685	MIDI CC 7|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1686	MIDI CC 7|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1687	MIDI CC 7|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1688	MIDI CC 7|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1689	MIDI CC 7|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1690	MIDI CC 7|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1691	MIDI CC 7|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1692	MIDI CC 7|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1693	MIDI CC 7|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1694	MIDI CC 7|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1695	MIDI CC 7|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1696	MIDI CC 7|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1697	MIDI CC 7|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1698	MIDI CC 7|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1699	MIDI CC 7|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1700	MIDI CC 7|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1701	MIDI CC 7|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1702	MIDI CC 7|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1703	MIDI CC 7|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1704	MIDI CC 7|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1705	MIDI CC 7|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1706	MIDI CC 7|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1707	MIDI CC 7|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1708	MIDI CC 7|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1709	MIDI CC 7|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1710	MIDI CC 7|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1711	MIDI CC 7|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1712	MIDI CC 7|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1713	MIDI CC 7|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1714	MIDI CC 7|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1715	MIDI CC 7|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1716	MIDI CC 7|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1717	MIDI CC 7|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1718	MIDI CC 7|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1719	MIDI CC 7|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1720	MIDI CC 7|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1721	MIDI CC 7|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1722	MIDI CC 7|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1723	MIDI CC 7|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1724	MIDI CC 7|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1725	MIDI CC 7|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1726	MIDI CC 7|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1727	MIDI CC 7|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1728	MIDI CC 7|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1729	MIDI CC 7|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1730	MIDI CC 7|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1731	MIDI CC 7|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1732	MIDI CC 7|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1733	MIDI CC 7|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1734	MIDI CC 7|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1735	MIDI CC 7|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1736	MIDI CC 7|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1737	MIDI CC 7|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1738	MIDI CC 7|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1739	MIDI CC 7|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1740	MIDI CC 7|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1741	MIDI CC 7|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1742	MIDI CC 7|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1743	MIDI CC 7|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1744	MIDI CC 7|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1745	MIDI CC 7|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1746	MIDI CC 7|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1747	MIDI CC 7|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1748	MIDI CC 7|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1749	MIDI CC 7|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1750	MIDI CC 7|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1751	MIDI CC 7|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1752	MIDI CC 7|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1753	MIDI CC 7|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1754	MIDI CC 7|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1755	MIDI CC 7|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1756	MIDI CC 7|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1757	MIDI CC 7|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1758	MIDI CC 7|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1759	MIDI CC 7|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1760	MIDI CC 7|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1761	MIDI CC 7|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1762	MIDI CC 7|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1763	MIDI CC 7|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1764	MIDI CC 7|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1765	MIDI CC 7|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1766	MIDI CC 7|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1767	MIDI CC 7|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1768	MIDI CC 7|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1769	MIDI CC 7|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1770	MIDI CC 7|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1771	MIDI CC 7|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1772	MIDI CC 7|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1773	MIDI CC 7|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1774	MIDI CC 7|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1775	MIDI CC 7|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1776	MIDI CC 7|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1777	MIDI CC 7|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1778	MIDI CC 7|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1779	MIDI CC 7|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1780	MIDI CC 7|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1781	MIDI CC 7|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1782	MIDI CC 7|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1783	MIDI CC 7|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1784	MIDI CC 7|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1785	MIDI CC 7|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1786	MIDI CC 7|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1787	MIDI CC 7|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1788	MIDI CC 7|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1789	MIDI CC 7|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1790	MIDI CC 7|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1791	MIDI CC 7|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1792	MIDI CC 7|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1793	MIDI CC 7|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1794	MIDI CC 7|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1795	MIDI CC 7|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1796	MIDI CC 7|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1797	MIDI CC 7|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1798	MIDI CC 7|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1799	MIDI CC 7|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1800	MIDI CC 7|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1801	MIDI CC 7|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1802	MIDI CC 7|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1803	MIDI CC 7|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1804	MIDI CC 7|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1805	MIDI CC 7|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1806	MIDI CC 7|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1807	MIDI CC 7|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1808	MIDI CC 7|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1809	MIDI CC 7|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1810	MIDI CC 7|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1811	MIDI CC 7|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1812	MIDI CC 7|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1813	MIDI CC 7|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1814	MIDI CC 7|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1815	MIDI CC 8|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1816	MIDI CC 8|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1817	MIDI CC 8|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1818	MIDI CC 8|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1819	MIDI CC 8|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1820	MIDI CC 8|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1821	MIDI CC 8|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1822	MIDI CC 8|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1823	MIDI CC 8|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1824	MIDI CC 8|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1825	MIDI CC 8|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1826	MIDI CC 8|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1827	MIDI CC 8|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1828	MIDI CC 8|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1829	MIDI CC 8|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1830	MIDI CC 8|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1831	MIDI CC 8|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1832	MIDI CC 8|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1833	MIDI CC 8|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1834	MIDI CC 8|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1835	MIDI CC 8|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1836	MIDI CC 8|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1837	MIDI CC 8|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1838	MIDI CC 8|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1839	MIDI CC 8|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1840	MIDI CC 8|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1841	MIDI CC 8|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1842	MIDI CC 8|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1843	MIDI CC 8|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1844	MIDI CC 8|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1845	MIDI CC 8|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1846	MIDI CC 8|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1847	MIDI CC 8|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1848	MIDI CC 8|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1849	MIDI CC 8|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1850	MIDI CC 8|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1851	MIDI CC 8|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1852	MIDI CC 8|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1853	MIDI CC 8|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1854	MIDI CC 8|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1855	MIDI CC 8|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1856	MIDI CC 8|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1857	MIDI CC 8|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1858	MIDI CC 8|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1859	MIDI CC 8|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1860	MIDI CC 8|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1861	MIDI CC 8|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1862	MIDI CC 8|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1863	MIDI CC 8|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1864	MIDI CC 8|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1865	MIDI CC 8|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1866	MIDI CC 8|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1867	MIDI CC 8|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1868	MIDI CC 8|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1869	MIDI CC 8|54			0.0000	0.2500	0.5000	0.7500	1.0000
+1870	MIDI CC 8|55			0.0000	0.2500	0.5000	0.7500	1.0000
+1871	MIDI CC 8|56			0.0000	0.2500	0.5000	0.7500	1.0000
+1872	MIDI CC 8|57			0.0000	0.2500	0.5000	0.7500	1.0000
+1873	MIDI CC 8|58			0.0000	0.2500	0.5000	0.7500	1.0000
+1874	MIDI CC 8|59			0.0000	0.2500	0.5000	0.7500	1.0000
+1875	MIDI CC 8|60			0.0000	0.2500	0.5000	0.7500	1.0000
+1876	MIDI CC 8|61			0.0000	0.2500	0.5000	0.7500	1.0000
+1877	MIDI CC 8|62			0.0000	0.2500	0.5000	0.7500	1.0000
+1878	MIDI CC 8|63			0.0000	0.2500	0.5000	0.7500	1.0000
+1879	MIDI CC 8|64			0.0000	0.2500	0.5000	0.7500	1.0000
+1880	MIDI CC 8|65			0.0000	0.2500	0.5000	0.7500	1.0000
+1881	MIDI CC 8|66			0.0000	0.2500	0.5000	0.7500	1.0000
+1882	MIDI CC 8|67			0.0000	0.2500	0.5000	0.7500	1.0000
+1883	MIDI CC 8|68			0.0000	0.2500	0.5000	0.7500	1.0000
+1884	MIDI CC 8|69			0.0000	0.2500	0.5000	0.7500	1.0000
+1885	MIDI CC 8|70			0.0000	0.2500	0.5000	0.7500	1.0000
+1886	MIDI CC 8|71			0.0000	0.2500	0.5000	0.7500	1.0000
+1887	MIDI CC 8|72			0.0000	0.2500	0.5000	0.7500	1.0000
+1888	MIDI CC 8|73			0.0000	0.2500	0.5000	0.7500	1.0000
+1889	MIDI CC 8|74			0.0000	0.2500	0.5000	0.7500	1.0000
+1890	MIDI CC 8|75			0.0000	0.2500	0.5000	0.7500	1.0000
+1891	MIDI CC 8|76			0.0000	0.2500	0.5000	0.7500	1.0000
+1892	MIDI CC 8|77			0.0000	0.2500	0.5000	0.7500	1.0000
+1893	MIDI CC 8|78			0.0000	0.2500	0.5000	0.7500	1.0000
+1894	MIDI CC 8|79			0.0000	0.2500	0.5000	0.7500	1.0000
+1895	MIDI CC 8|80			0.0000	0.2500	0.5000	0.7500	1.0000
+1896	MIDI CC 8|81			0.0000	0.2500	0.5000	0.7500	1.0000
+1897	MIDI CC 8|82			0.0000	0.2500	0.5000	0.7500	1.0000
+1898	MIDI CC 8|83			0.0000	0.2500	0.5000	0.7500	1.0000
+1899	MIDI CC 8|84			0.0000	0.2500	0.5000	0.7500	1.0000
+1900	MIDI CC 8|85			0.0000	0.2500	0.5000	0.7500	1.0000
+1901	MIDI CC 8|86			0.0000	0.2500	0.5000	0.7500	1.0000
+1902	MIDI CC 8|87			0.0000	0.2500	0.5000	0.7500	1.0000
+1903	MIDI CC 8|88			0.0000	0.2500	0.5000	0.7500	1.0000
+1904	MIDI CC 8|89			0.0000	0.2500	0.5000	0.7500	1.0000
+1905	MIDI CC 8|90			0.0000	0.2500	0.5000	0.7500	1.0000
+1906	MIDI CC 8|91			0.0000	0.2500	0.5000	0.7500	1.0000
+1907	MIDI CC 8|92			0.0000	0.2500	0.5000	0.7500	1.0000
+1908	MIDI CC 8|93			0.0000	0.2500	0.5000	0.7500	1.0000
+1909	MIDI CC 8|94			0.0000	0.2500	0.5000	0.7500	1.0000
+1910	MIDI CC 8|95			0.0000	0.2500	0.5000	0.7500	1.0000
+1911	MIDI CC 8|96			0.0000	0.2500	0.5000	0.7500	1.0000
+1912	MIDI CC 8|97			0.0000	0.2500	0.5000	0.7500	1.0000
+1913	MIDI CC 8|98			0.0000	0.2500	0.5000	0.7500	1.0000
+1914	MIDI CC 8|99			0.0000	0.2500	0.5000	0.7500	1.0000
+1915	MIDI CC 8|100			0.0000	0.2500	0.5000	0.7500	1.0000
+1916	MIDI CC 8|101			0.0000	0.2500	0.5000	0.7500	1.0000
+1917	MIDI CC 8|102			0.0000	0.2500	0.5000	0.7500	1.0000
+1918	MIDI CC 8|103			0.0000	0.2500	0.5000	0.7500	1.0000
+1919	MIDI CC 8|104			0.0000	0.2500	0.5000	0.7500	1.0000
+1920	MIDI CC 8|105			0.0000	0.2500	0.5000	0.7500	1.0000
+1921	MIDI CC 8|106			0.0000	0.2500	0.5000	0.7500	1.0000
+1922	MIDI CC 8|107			0.0000	0.2500	0.5000	0.7500	1.0000
+1923	MIDI CC 8|108			0.0000	0.2500	0.5000	0.7500	1.0000
+1924	MIDI CC 8|109			0.0000	0.2500	0.5000	0.7500	1.0000
+1925	MIDI CC 8|110			0.0000	0.2500	0.5000	0.7500	1.0000
+1926	MIDI CC 8|111			0.0000	0.2500	0.5000	0.7500	1.0000
+1927	MIDI CC 8|112			0.0000	0.2500	0.5000	0.7500	1.0000
+1928	MIDI CC 8|113			0.0000	0.2500	0.5000	0.7500	1.0000
+1929	MIDI CC 8|114			0.0000	0.2500	0.5000	0.7500	1.0000
+1930	MIDI CC 8|115			0.0000	0.2500	0.5000	0.7500	1.0000
+1931	MIDI CC 8|116			0.0000	0.2500	0.5000	0.7500	1.0000
+1932	MIDI CC 8|117			0.0000	0.2500	0.5000	0.7500	1.0000
+1933	MIDI CC 8|118			0.0000	0.2500	0.5000	0.7500	1.0000
+1934	MIDI CC 8|119			0.0000	0.2500	0.5000	0.7500	1.0000
+1935	MIDI CC 8|120			0.0000	0.2500	0.5000	0.7500	1.0000
+1936	MIDI CC 8|121			0.0000	0.2500	0.5000	0.7500	1.0000
+1937	MIDI CC 8|122			0.0000	0.2500	0.5000	0.7500	1.0000
+1938	MIDI CC 8|123			0.0000	0.2500	0.5000	0.7500	1.0000
+1939	MIDI CC 8|124			0.0000	0.2500	0.5000	0.7500	1.0000
+1940	MIDI CC 8|125			0.0000	0.2500	0.5000	0.7500	1.0000
+1941	MIDI CC 8|126			0.0000	0.2500	0.5000	0.7500	1.0000
+1942	MIDI CC 8|127			0.0000	0.2500	0.5000	0.7500	1.0000
+1943	MIDI CC 8|128			0.0000	0.2500	0.5000	0.7500	1.0000
+1944	MIDI CC 8|129			0.0000	0.2500	0.5000	0.7500	1.0000
+1945	MIDI CC 9|0			0.0000	0.2500	0.5000	0.7500	1.0000
+1946	MIDI CC 9|1			0.0000	0.2500	0.5000	0.7500	1.0000
+1947	MIDI CC 9|2			0.0000	0.2500	0.5000	0.7500	1.0000
+1948	MIDI CC 9|3			0.0000	0.2500	0.5000	0.7500	1.0000
+1949	MIDI CC 9|4			0.0000	0.2500	0.5000	0.7500	1.0000
+1950	MIDI CC 9|5			0.0000	0.2500	0.5000	0.7500	1.0000
+1951	MIDI CC 9|6			0.0000	0.2500	0.5000	0.7500	1.0000
+1952	MIDI CC 9|7			0.0000	0.2500	0.5000	0.7500	1.0000
+1953	MIDI CC 9|8			0.0000	0.2500	0.5000	0.7500	1.0000
+1954	MIDI CC 9|9			0.0000	0.2500	0.5000	0.7500	1.0000
+1955	MIDI CC 9|10			0.0000	0.2500	0.5000	0.7500	1.0000
+1956	MIDI CC 9|11			0.0000	0.2500	0.5000	0.7500	1.0000
+1957	MIDI CC 9|12			0.0000	0.2500	0.5000	0.7500	1.0000
+1958	MIDI CC 9|13			0.0000	0.2500	0.5000	0.7500	1.0000
+1959	MIDI CC 9|14			0.0000	0.2500	0.5000	0.7500	1.0000
+1960	MIDI CC 9|15			0.0000	0.2500	0.5000	0.7500	1.0000
+1961	MIDI CC 9|16			0.0000	0.2500	0.5000	0.7500	1.0000
+1962	MIDI CC 9|17			0.0000	0.2500	0.5000	0.7500	1.0000
+1963	MIDI CC 9|18			0.0000	0.2500	0.5000	0.7500	1.0000
+1964	MIDI CC 9|19			0.0000	0.2500	0.5000	0.7500	1.0000
+1965	MIDI CC 9|20			0.0000	0.2500	0.5000	0.7500	1.0000
+1966	MIDI CC 9|21			0.0000	0.2500	0.5000	0.7500	1.0000
+1967	MIDI CC 9|22			0.0000	0.2500	0.5000	0.7500	1.0000
+1968	MIDI CC 9|23			0.0000	0.2500	0.5000	0.7500	1.0000
+1969	MIDI CC 9|24			0.0000	0.2500	0.5000	0.7500	1.0000
+1970	MIDI CC 9|25			0.0000	0.2500	0.5000	0.7500	1.0000
+1971	MIDI CC 9|26			0.0000	0.2500	0.5000	0.7500	1.0000
+1972	MIDI CC 9|27			0.0000	0.2500	0.5000	0.7500	1.0000
+1973	MIDI CC 9|28			0.0000	0.2500	0.5000	0.7500	1.0000
+1974	MIDI CC 9|29			0.0000	0.2500	0.5000	0.7500	1.0000
+1975	MIDI CC 9|30			0.0000	0.2500	0.5000	0.7500	1.0000
+1976	MIDI CC 9|31			0.0000	0.2500	0.5000	0.7500	1.0000
+1977	MIDI CC 9|32			0.0000	0.2500	0.5000	0.7500	1.0000
+1978	MIDI CC 9|33			0.0000	0.2500	0.5000	0.7500	1.0000
+1979	MIDI CC 9|34			0.0000	0.2500	0.5000	0.7500	1.0000
+1980	MIDI CC 9|35			0.0000	0.2500	0.5000	0.7500	1.0000
+1981	MIDI CC 9|36			0.0000	0.2500	0.5000	0.7500	1.0000
+1982	MIDI CC 9|37			0.0000	0.2500	0.5000	0.7500	1.0000
+1983	MIDI CC 9|38			0.0000	0.2500	0.5000	0.7500	1.0000
+1984	MIDI CC 9|39			0.0000	0.2500	0.5000	0.7500	1.0000
+1985	MIDI CC 9|40			0.0000	0.2500	0.5000	0.7500	1.0000
+1986	MIDI CC 9|41			0.0000	0.2500	0.5000	0.7500	1.0000
+1987	MIDI CC 9|42			0.0000	0.2500	0.5000	0.7500	1.0000
+1988	MIDI CC 9|43			0.0000	0.2500	0.5000	0.7500	1.0000
+1989	MIDI CC 9|44			0.0000	0.2500	0.5000	0.7500	1.0000
+1990	MIDI CC 9|45			0.0000	0.2500	0.5000	0.7500	1.0000
+1991	MIDI CC 9|46			0.0000	0.2500	0.5000	0.7500	1.0000
+1992	MIDI CC 9|47			0.0000	0.2500	0.5000	0.7500	1.0000
+1993	MIDI CC 9|48			0.0000	0.2500	0.5000	0.7500	1.0000
+1994	MIDI CC 9|49			0.0000	0.2500	0.5000	0.7500	1.0000
+1995	MIDI CC 9|50			0.0000	0.2500	0.5000	0.7500	1.0000
+1996	MIDI CC 9|51			0.0000	0.2500	0.5000	0.7500	1.0000
+1997	MIDI CC 9|52			0.0000	0.2500	0.5000	0.7500	1.0000
+1998	MIDI CC 9|53			0.0000	0.2500	0.5000	0.7500	1.0000
+1999	MIDI CC 9|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2000	MIDI CC 9|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2001	MIDI CC 9|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2002	MIDI CC 9|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2003	MIDI CC 9|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2004	MIDI CC 9|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2005	MIDI CC 9|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2006	MIDI CC 9|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2007	MIDI CC 9|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2008	MIDI CC 9|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2009	MIDI CC 9|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2010	MIDI CC 9|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2011	MIDI CC 9|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2012	MIDI CC 9|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2013	MIDI CC 9|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2014	MIDI CC 9|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2015	MIDI CC 9|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2016	MIDI CC 9|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2017	MIDI CC 9|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2018	MIDI CC 9|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2019	MIDI CC 9|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2020	MIDI CC 9|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2021	MIDI CC 9|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2022	MIDI CC 9|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2023	MIDI CC 9|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2024	MIDI CC 9|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2025	MIDI CC 9|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2026	MIDI CC 9|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2027	MIDI CC 9|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2028	MIDI CC 9|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2029	MIDI CC 9|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2030	MIDI CC 9|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2031	MIDI CC 9|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2032	MIDI CC 9|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2033	MIDI CC 9|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2034	MIDI CC 9|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2035	MIDI CC 9|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2036	MIDI CC 9|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2037	MIDI CC 9|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2038	MIDI CC 9|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2039	MIDI CC 9|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2040	MIDI CC 9|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2041	MIDI CC 9|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2042	MIDI CC 9|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2043	MIDI CC 9|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2044	MIDI CC 9|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2045	MIDI CC 9|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2046	MIDI CC 9|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2047	MIDI CC 9|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2048	MIDI CC 9|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2049	MIDI CC 9|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2050	MIDI CC 9|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2051	MIDI CC 9|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2052	MIDI CC 9|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2053	MIDI CC 9|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2054	MIDI CC 9|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2055	MIDI CC 9|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2056	MIDI CC 9|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2057	MIDI CC 9|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2058	MIDI CC 9|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2059	MIDI CC 9|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2060	MIDI CC 9|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2061	MIDI CC 9|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2062	MIDI CC 9|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2063	MIDI CC 9|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2064	MIDI CC 9|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2065	MIDI CC 9|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2066	MIDI CC 9|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2067	MIDI CC 9|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2068	MIDI CC 9|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2069	MIDI CC 9|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2070	MIDI CC 9|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2071	MIDI CC 9|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2072	MIDI CC 9|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2073	MIDI CC 9|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2074	MIDI CC 9|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2075	MIDI CC 10|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2076	MIDI CC 10|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2077	MIDI CC 10|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2078	MIDI CC 10|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2079	MIDI CC 10|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2080	MIDI CC 10|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2081	MIDI CC 10|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2082	MIDI CC 10|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2083	MIDI CC 10|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2084	MIDI CC 10|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2085	MIDI CC 10|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2086	MIDI CC 10|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2087	MIDI CC 10|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2088	MIDI CC 10|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2089	MIDI CC 10|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2090	MIDI CC 10|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2091	MIDI CC 10|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2092	MIDI CC 10|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2093	MIDI CC 10|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2094	MIDI CC 10|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2095	MIDI CC 10|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2096	MIDI CC 10|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2097	MIDI CC 10|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2098	MIDI CC 10|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2099	MIDI CC 10|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2100	MIDI CC 10|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2101	MIDI CC 10|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2102	MIDI CC 10|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2103	MIDI CC 10|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2104	MIDI CC 10|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2105	MIDI CC 10|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2106	MIDI CC 10|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2107	MIDI CC 10|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2108	MIDI CC 10|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2109	MIDI CC 10|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2110	MIDI CC 10|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2111	MIDI CC 10|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2112	MIDI CC 10|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2113	MIDI CC 10|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2114	MIDI CC 10|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2115	MIDI CC 10|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2116	MIDI CC 10|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2117	MIDI CC 10|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2118	MIDI CC 10|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2119	MIDI CC 10|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2120	MIDI CC 10|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2121	MIDI CC 10|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2122	MIDI CC 10|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2123	MIDI CC 10|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2124	MIDI CC 10|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2125	MIDI CC 10|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2126	MIDI CC 10|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2127	MIDI CC 10|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2128	MIDI CC 10|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2129	MIDI CC 10|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2130	MIDI CC 10|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2131	MIDI CC 10|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2132	MIDI CC 10|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2133	MIDI CC 10|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2134	MIDI CC 10|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2135	MIDI CC 10|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2136	MIDI CC 10|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2137	MIDI CC 10|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2138	MIDI CC 10|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2139	MIDI CC 10|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2140	MIDI CC 10|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2141	MIDI CC 10|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2142	MIDI CC 10|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2143	MIDI CC 10|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2144	MIDI CC 10|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2145	MIDI CC 10|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2146	MIDI CC 10|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2147	MIDI CC 10|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2148	MIDI CC 10|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2149	MIDI CC 10|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2150	MIDI CC 10|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2151	MIDI CC 10|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2152	MIDI CC 10|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2153	MIDI CC 10|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2154	MIDI CC 10|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2155	MIDI CC 10|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2156	MIDI CC 10|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2157	MIDI CC 10|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2158	MIDI CC 10|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2159	MIDI CC 10|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2160	MIDI CC 10|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2161	MIDI CC 10|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2162	MIDI CC 10|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2163	MIDI CC 10|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2164	MIDI CC 10|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2165	MIDI CC 10|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2166	MIDI CC 10|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2167	MIDI CC 10|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2168	MIDI CC 10|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2169	MIDI CC 10|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2170	MIDI CC 10|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2171	MIDI CC 10|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2172	MIDI CC 10|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2173	MIDI CC 10|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2174	MIDI CC 10|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2175	MIDI CC 10|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2176	MIDI CC 10|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2177	MIDI CC 10|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2178	MIDI CC 10|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2179	MIDI CC 10|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2180	MIDI CC 10|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2181	MIDI CC 10|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2182	MIDI CC 10|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2183	MIDI CC 10|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2184	MIDI CC 10|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2185	MIDI CC 10|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2186	MIDI CC 10|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2187	MIDI CC 10|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2188	MIDI CC 10|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2189	MIDI CC 10|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2190	MIDI CC 10|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2191	MIDI CC 10|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2192	MIDI CC 10|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2193	MIDI CC 10|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2194	MIDI CC 10|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2195	MIDI CC 10|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2196	MIDI CC 10|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2197	MIDI CC 10|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2198	MIDI CC 10|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2199	MIDI CC 10|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2200	MIDI CC 10|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2201	MIDI CC 10|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2202	MIDI CC 10|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2203	MIDI CC 10|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2204	MIDI CC 10|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2205	MIDI CC 11|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2206	MIDI CC 11|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2207	MIDI CC 11|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2208	MIDI CC 11|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2209	MIDI CC 11|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2210	MIDI CC 11|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2211	MIDI CC 11|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2212	MIDI CC 11|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2213	MIDI CC 11|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2214	MIDI CC 11|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2215	MIDI CC 11|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2216	MIDI CC 11|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2217	MIDI CC 11|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2218	MIDI CC 11|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2219	MIDI CC 11|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2220	MIDI CC 11|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2221	MIDI CC 11|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2222	MIDI CC 11|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2223	MIDI CC 11|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2224	MIDI CC 11|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2225	MIDI CC 11|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2226	MIDI CC 11|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2227	MIDI CC 11|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2228	MIDI CC 11|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2229	MIDI CC 11|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2230	MIDI CC 11|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2231	MIDI CC 11|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2232	MIDI CC 11|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2233	MIDI CC 11|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2234	MIDI CC 11|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2235	MIDI CC 11|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2236	MIDI CC 11|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2237	MIDI CC 11|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2238	MIDI CC 11|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2239	MIDI CC 11|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2240	MIDI CC 11|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2241	MIDI CC 11|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2242	MIDI CC 11|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2243	MIDI CC 11|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2244	MIDI CC 11|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2245	MIDI CC 11|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2246	MIDI CC 11|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2247	MIDI CC 11|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2248	MIDI CC 11|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2249	MIDI CC 11|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2250	MIDI CC 11|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2251	MIDI CC 11|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2252	MIDI CC 11|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2253	MIDI CC 11|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2254	MIDI CC 11|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2255	MIDI CC 11|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2256	MIDI CC 11|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2257	MIDI CC 11|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2258	MIDI CC 11|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2259	MIDI CC 11|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2260	MIDI CC 11|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2261	MIDI CC 11|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2262	MIDI CC 11|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2263	MIDI CC 11|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2264	MIDI CC 11|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2265	MIDI CC 11|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2266	MIDI CC 11|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2267	MIDI CC 11|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2268	MIDI CC 11|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2269	MIDI CC 11|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2270	MIDI CC 11|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2271	MIDI CC 11|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2272	MIDI CC 11|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2273	MIDI CC 11|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2274	MIDI CC 11|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2275	MIDI CC 11|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2276	MIDI CC 11|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2277	MIDI CC 11|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2278	MIDI CC 11|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2279	MIDI CC 11|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2280	MIDI CC 11|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2281	MIDI CC 11|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2282	MIDI CC 11|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2283	MIDI CC 11|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2284	MIDI CC 11|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2285	MIDI CC 11|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2286	MIDI CC 11|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2287	MIDI CC 11|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2288	MIDI CC 11|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2289	MIDI CC 11|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2290	MIDI CC 11|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2291	MIDI CC 11|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2292	MIDI CC 11|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2293	MIDI CC 11|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2294	MIDI CC 11|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2295	MIDI CC 11|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2296	MIDI CC 11|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2297	MIDI CC 11|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2298	MIDI CC 11|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2299	MIDI CC 11|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2300	MIDI CC 11|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2301	MIDI CC 11|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2302	MIDI CC 11|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2303	MIDI CC 11|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2304	MIDI CC 11|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2305	MIDI CC 11|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2306	MIDI CC 11|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2307	MIDI CC 11|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2308	MIDI CC 11|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2309	MIDI CC 11|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2310	MIDI CC 11|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2311	MIDI CC 11|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2312	MIDI CC 11|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2313	MIDI CC 11|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2314	MIDI CC 11|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2315	MIDI CC 11|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2316	MIDI CC 11|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2317	MIDI CC 11|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2318	MIDI CC 11|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2319	MIDI CC 11|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2320	MIDI CC 11|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2321	MIDI CC 11|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2322	MIDI CC 11|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2323	MIDI CC 11|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2324	MIDI CC 11|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2325	MIDI CC 11|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2326	MIDI CC 11|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2327	MIDI CC 11|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2328	MIDI CC 11|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2329	MIDI CC 11|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2330	MIDI CC 11|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2331	MIDI CC 11|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2332	MIDI CC 11|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2333	MIDI CC 11|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2334	MIDI CC 11|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2335	MIDI CC 12|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2336	MIDI CC 12|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2337	MIDI CC 12|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2338	MIDI CC 12|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2339	MIDI CC 12|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2340	MIDI CC 12|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2341	MIDI CC 12|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2342	MIDI CC 12|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2343	MIDI CC 12|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2344	MIDI CC 12|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2345	MIDI CC 12|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2346	MIDI CC 12|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2347	MIDI CC 12|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2348	MIDI CC 12|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2349	MIDI CC 12|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2350	MIDI CC 12|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2351	MIDI CC 12|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2352	MIDI CC 12|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2353	MIDI CC 12|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2354	MIDI CC 12|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2355	MIDI CC 12|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2356	MIDI CC 12|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2357	MIDI CC 12|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2358	MIDI CC 12|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2359	MIDI CC 12|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2360	MIDI CC 12|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2361	MIDI CC 12|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2362	MIDI CC 12|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2363	MIDI CC 12|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2364	MIDI CC 12|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2365	MIDI CC 12|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2366	MIDI CC 12|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2367	MIDI CC 12|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2368	MIDI CC 12|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2369	MIDI CC 12|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2370	MIDI CC 12|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2371	MIDI CC 12|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2372	MIDI CC 12|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2373	MIDI CC 12|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2374	MIDI CC 12|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2375	MIDI CC 12|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2376	MIDI CC 12|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2377	MIDI CC 12|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2378	MIDI CC 12|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2379	MIDI CC 12|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2380	MIDI CC 12|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2381	MIDI CC 12|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2382	MIDI CC 12|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2383	MIDI CC 12|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2384	MIDI CC 12|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2385	MIDI CC 12|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2386	MIDI CC 12|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2387	MIDI CC 12|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2388	MIDI CC 12|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2389	MIDI CC 12|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2390	MIDI CC 12|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2391	MIDI CC 12|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2392	MIDI CC 12|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2393	MIDI CC 12|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2394	MIDI CC 12|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2395	MIDI CC 12|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2396	MIDI CC 12|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2397	MIDI CC 12|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2398	MIDI CC 12|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2399	MIDI CC 12|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2400	MIDI CC 12|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2401	MIDI CC 12|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2402	MIDI CC 12|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2403	MIDI CC 12|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2404	MIDI CC 12|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2405	MIDI CC 12|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2406	MIDI CC 12|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2407	MIDI CC 12|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2408	MIDI CC 12|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2409	MIDI CC 12|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2410	MIDI CC 12|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2411	MIDI CC 12|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2412	MIDI CC 12|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2413	MIDI CC 12|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2414	MIDI CC 12|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2415	MIDI CC 12|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2416	MIDI CC 12|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2417	MIDI CC 12|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2418	MIDI CC 12|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2419	MIDI CC 12|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2420	MIDI CC 12|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2421	MIDI CC 12|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2422	MIDI CC 12|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2423	MIDI CC 12|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2424	MIDI CC 12|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2425	MIDI CC 12|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2426	MIDI CC 12|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2427	MIDI CC 12|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2428	MIDI CC 12|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2429	MIDI CC 12|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2430	MIDI CC 12|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2431	MIDI CC 12|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2432	MIDI CC 12|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2433	MIDI CC 12|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2434	MIDI CC 12|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2435	MIDI CC 12|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2436	MIDI CC 12|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2437	MIDI CC 12|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2438	MIDI CC 12|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2439	MIDI CC 12|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2440	MIDI CC 12|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2441	MIDI CC 12|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2442	MIDI CC 12|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2443	MIDI CC 12|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2444	MIDI CC 12|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2445	MIDI CC 12|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2446	MIDI CC 12|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2447	MIDI CC 12|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2448	MIDI CC 12|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2449	MIDI CC 12|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2450	MIDI CC 12|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2451	MIDI CC 12|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2452	MIDI CC 12|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2453	MIDI CC 12|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2454	MIDI CC 12|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2455	MIDI CC 12|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2456	MIDI CC 12|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2457	MIDI CC 12|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2458	MIDI CC 12|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2459	MIDI CC 12|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2460	MIDI CC 12|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2461	MIDI CC 12|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2462	MIDI CC 12|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2463	MIDI CC 12|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2464	MIDI CC 12|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2465	MIDI CC 13|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2466	MIDI CC 13|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2467	MIDI CC 13|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2468	MIDI CC 13|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2469	MIDI CC 13|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2470	MIDI CC 13|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2471	MIDI CC 13|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2472	MIDI CC 13|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2473	MIDI CC 13|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2474	MIDI CC 13|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2475	MIDI CC 13|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2476	MIDI CC 13|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2477	MIDI CC 13|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2478	MIDI CC 13|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2479	MIDI CC 13|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2480	MIDI CC 13|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2481	MIDI CC 13|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2482	MIDI CC 13|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2483	MIDI CC 13|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2484	MIDI CC 13|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2485	MIDI CC 13|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2486	MIDI CC 13|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2487	MIDI CC 13|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2488	MIDI CC 13|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2489	MIDI CC 13|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2490	MIDI CC 13|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2491	MIDI CC 13|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2492	MIDI CC 13|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2493	MIDI CC 13|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2494	MIDI CC 13|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2495	MIDI CC 13|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2496	MIDI CC 13|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2497	MIDI CC 13|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2498	MIDI CC 13|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2499	MIDI CC 13|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2500	MIDI CC 13|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2501	MIDI CC 13|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2502	MIDI CC 13|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2503	MIDI CC 13|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2504	MIDI CC 13|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2505	MIDI CC 13|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2506	MIDI CC 13|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2507	MIDI CC 13|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2508	MIDI CC 13|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2509	MIDI CC 13|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2510	MIDI CC 13|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2511	MIDI CC 13|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2512	MIDI CC 13|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2513	MIDI CC 13|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2514	MIDI CC 13|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2515	MIDI CC 13|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2516	MIDI CC 13|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2517	MIDI CC 13|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2518	MIDI CC 13|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2519	MIDI CC 13|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2520	MIDI CC 13|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2521	MIDI CC 13|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2522	MIDI CC 13|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2523	MIDI CC 13|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2524	MIDI CC 13|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2525	MIDI CC 13|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2526	MIDI CC 13|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2527	MIDI CC 13|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2528	MIDI CC 13|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2529	MIDI CC 13|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2530	MIDI CC 13|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2531	MIDI CC 13|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2532	MIDI CC 13|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2533	MIDI CC 13|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2534	MIDI CC 13|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2535	MIDI CC 13|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2536	MIDI CC 13|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2537	MIDI CC 13|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2538	MIDI CC 13|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2539	MIDI CC 13|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2540	MIDI CC 13|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2541	MIDI CC 13|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2542	MIDI CC 13|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2543	MIDI CC 13|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2544	MIDI CC 13|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2545	MIDI CC 13|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2546	MIDI CC 13|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2547	MIDI CC 13|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2548	MIDI CC 13|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2549	MIDI CC 13|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2550	MIDI CC 13|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2551	MIDI CC 13|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2552	MIDI CC 13|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2553	MIDI CC 13|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2554	MIDI CC 13|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2555	MIDI CC 13|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2556	MIDI CC 13|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2557	MIDI CC 13|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2558	MIDI CC 13|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2559	MIDI CC 13|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2560	MIDI CC 13|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2561	MIDI CC 13|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2562	MIDI CC 13|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2563	MIDI CC 13|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2564	MIDI CC 13|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2565	MIDI CC 13|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2566	MIDI CC 13|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2567	MIDI CC 13|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2568	MIDI CC 13|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2569	MIDI CC 13|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2570	MIDI CC 13|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2571	MIDI CC 13|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2572	MIDI CC 13|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2573	MIDI CC 13|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2574	MIDI CC 13|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2575	MIDI CC 13|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2576	MIDI CC 13|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2577	MIDI CC 13|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2578	MIDI CC 13|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2579	MIDI CC 13|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2580	MIDI CC 13|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2581	MIDI CC 13|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2582	MIDI CC 13|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2583	MIDI CC 13|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2584	MIDI CC 13|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2585	MIDI CC 13|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2586	MIDI CC 13|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2587	MIDI CC 13|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2588	MIDI CC 13|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2589	MIDI CC 13|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2590	MIDI CC 13|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2591	MIDI CC 13|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2592	MIDI CC 13|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2593	MIDI CC 13|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2594	MIDI CC 13|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2595	MIDI CC 14|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2596	MIDI CC 14|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2597	MIDI CC 14|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2598	MIDI CC 14|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2599	MIDI CC 14|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2600	MIDI CC 14|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2601	MIDI CC 14|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2602	MIDI CC 14|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2603	MIDI CC 14|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2604	MIDI CC 14|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2605	MIDI CC 14|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2606	MIDI CC 14|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2607	MIDI CC 14|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2608	MIDI CC 14|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2609	MIDI CC 14|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2610	MIDI CC 14|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2611	MIDI CC 14|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2612	MIDI CC 14|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2613	MIDI CC 14|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2614	MIDI CC 14|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2615	MIDI CC 14|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2616	MIDI CC 14|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2617	MIDI CC 14|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2618	MIDI CC 14|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2619	MIDI CC 14|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2620	MIDI CC 14|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2621	MIDI CC 14|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2622	MIDI CC 14|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2623	MIDI CC 14|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2624	MIDI CC 14|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2625	MIDI CC 14|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2626	MIDI CC 14|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2627	MIDI CC 14|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2628	MIDI CC 14|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2629	MIDI CC 14|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2630	MIDI CC 14|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2631	MIDI CC 14|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2632	MIDI CC 14|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2633	MIDI CC 14|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2634	MIDI CC 14|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2635	MIDI CC 14|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2636	MIDI CC 14|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2637	MIDI CC 14|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2638	MIDI CC 14|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2639	MIDI CC 14|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2640	MIDI CC 14|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2641	MIDI CC 14|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2642	MIDI CC 14|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2643	MIDI CC 14|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2644	MIDI CC 14|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2645	MIDI CC 14|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2646	MIDI CC 14|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2647	MIDI CC 14|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2648	MIDI CC 14|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2649	MIDI CC 14|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2650	MIDI CC 14|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2651	MIDI CC 14|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2652	MIDI CC 14|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2653	MIDI CC 14|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2654	MIDI CC 14|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2655	MIDI CC 14|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2656	MIDI CC 14|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2657	MIDI CC 14|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2658	MIDI CC 14|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2659	MIDI CC 14|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2660	MIDI CC 14|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2661	MIDI CC 14|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2662	MIDI CC 14|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2663	MIDI CC 14|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2664	MIDI CC 14|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2665	MIDI CC 14|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2666	MIDI CC 14|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2667	MIDI CC 14|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2668	MIDI CC 14|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2669	MIDI CC 14|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2670	MIDI CC 14|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2671	MIDI CC 14|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2672	MIDI CC 14|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2673	MIDI CC 14|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2674	MIDI CC 14|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2675	MIDI CC 14|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2676	MIDI CC 14|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2677	MIDI CC 14|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2678	MIDI CC 14|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2679	MIDI CC 14|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2680	MIDI CC 14|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2681	MIDI CC 14|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2682	MIDI CC 14|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2683	MIDI CC 14|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2684	MIDI CC 14|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2685	MIDI CC 14|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2686	MIDI CC 14|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2687	MIDI CC 14|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2688	MIDI CC 14|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2689	MIDI CC 14|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2690	MIDI CC 14|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2691	MIDI CC 14|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2692	MIDI CC 14|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2693	MIDI CC 14|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2694	MIDI CC 14|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2695	MIDI CC 14|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2696	MIDI CC 14|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2697	MIDI CC 14|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2698	MIDI CC 14|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2699	MIDI CC 14|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2700	MIDI CC 14|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2701	MIDI CC 14|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2702	MIDI CC 14|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2703	MIDI CC 14|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2704	MIDI CC 14|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2705	MIDI CC 14|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2706	MIDI CC 14|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2707	MIDI CC 14|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2708	MIDI CC 14|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2709	MIDI CC 14|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2710	MIDI CC 14|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2711	MIDI CC 14|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2712	MIDI CC 14|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2713	MIDI CC 14|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2714	MIDI CC 14|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2715	MIDI CC 14|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2716	MIDI CC 14|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2717	MIDI CC 14|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2718	MIDI CC 14|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2719	MIDI CC 14|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2720	MIDI CC 14|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2721	MIDI CC 14|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2722	MIDI CC 14|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2723	MIDI CC 14|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2724	MIDI CC 14|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2725	MIDI CC 15|0			0.0000	0.2500	0.5000	0.7500	1.0000
+2726	MIDI CC 15|1			0.0000	0.2500	0.5000	0.7500	1.0000
+2727	MIDI CC 15|2			0.0000	0.2500	0.5000	0.7500	1.0000
+2728	MIDI CC 15|3			0.0000	0.2500	0.5000	0.7500	1.0000
+2729	MIDI CC 15|4			0.0000	0.2500	0.5000	0.7500	1.0000
+2730	MIDI CC 15|5			0.0000	0.2500	0.5000	0.7500	1.0000
+2731	MIDI CC 15|6			0.0000	0.2500	0.5000	0.7500	1.0000
+2732	MIDI CC 15|7			0.0000	0.2500	0.5000	0.7500	1.0000
+2733	MIDI CC 15|8			0.0000	0.2500	0.5000	0.7500	1.0000
+2734	MIDI CC 15|9			0.0000	0.2500	0.5000	0.7500	1.0000
+2735	MIDI CC 15|10			0.0000	0.2500	0.5000	0.7500	1.0000
+2736	MIDI CC 15|11			0.0000	0.2500	0.5000	0.7500	1.0000
+2737	MIDI CC 15|12			0.0000	0.2500	0.5000	0.7500	1.0000
+2738	MIDI CC 15|13			0.0000	0.2500	0.5000	0.7500	1.0000
+2739	MIDI CC 15|14			0.0000	0.2500	0.5000	0.7500	1.0000
+2740	MIDI CC 15|15			0.0000	0.2500	0.5000	0.7500	1.0000
+2741	MIDI CC 15|16			0.0000	0.2500	0.5000	0.7500	1.0000
+2742	MIDI CC 15|17			0.0000	0.2500	0.5000	0.7500	1.0000
+2743	MIDI CC 15|18			0.0000	0.2500	0.5000	0.7500	1.0000
+2744	MIDI CC 15|19			0.0000	0.2500	0.5000	0.7500	1.0000
+2745	MIDI CC 15|20			0.0000	0.2500	0.5000	0.7500	1.0000
+2746	MIDI CC 15|21			0.0000	0.2500	0.5000	0.7500	1.0000
+2747	MIDI CC 15|22			0.0000	0.2500	0.5000	0.7500	1.0000
+2748	MIDI CC 15|23			0.0000	0.2500	0.5000	0.7500	1.0000
+2749	MIDI CC 15|24			0.0000	0.2500	0.5000	0.7500	1.0000
+2750	MIDI CC 15|25			0.0000	0.2500	0.5000	0.7500	1.0000
+2751	MIDI CC 15|26			0.0000	0.2500	0.5000	0.7500	1.0000
+2752	MIDI CC 15|27			0.0000	0.2500	0.5000	0.7500	1.0000
+2753	MIDI CC 15|28			0.0000	0.2500	0.5000	0.7500	1.0000
+2754	MIDI CC 15|29			0.0000	0.2500	0.5000	0.7500	1.0000
+2755	MIDI CC 15|30			0.0000	0.2500	0.5000	0.7500	1.0000
+2756	MIDI CC 15|31			0.0000	0.2500	0.5000	0.7500	1.0000
+2757	MIDI CC 15|32			0.0000	0.2500	0.5000	0.7500	1.0000
+2758	MIDI CC 15|33			0.0000	0.2500	0.5000	0.7500	1.0000
+2759	MIDI CC 15|34			0.0000	0.2500	0.5000	0.7500	1.0000
+2760	MIDI CC 15|35			0.0000	0.2500	0.5000	0.7500	1.0000
+2761	MIDI CC 15|36			0.0000	0.2500	0.5000	0.7500	1.0000
+2762	MIDI CC 15|37			0.0000	0.2500	0.5000	0.7500	1.0000
+2763	MIDI CC 15|38			0.0000	0.2500	0.5000	0.7500	1.0000
+2764	MIDI CC 15|39			0.0000	0.2500	0.5000	0.7500	1.0000
+2765	MIDI CC 15|40			0.0000	0.2500	0.5000	0.7500	1.0000
+2766	MIDI CC 15|41			0.0000	0.2500	0.5000	0.7500	1.0000
+2767	MIDI CC 15|42			0.0000	0.2500	0.5000	0.7500	1.0000
+2768	MIDI CC 15|43			0.0000	0.2500	0.5000	0.7500	1.0000
+2769	MIDI CC 15|44			0.0000	0.2500	0.5000	0.7500	1.0000
+2770	MIDI CC 15|45			0.0000	0.2500	0.5000	0.7500	1.0000
+2771	MIDI CC 15|46			0.0000	0.2500	0.5000	0.7500	1.0000
+2772	MIDI CC 15|47			0.0000	0.2500	0.5000	0.7500	1.0000
+2773	MIDI CC 15|48			0.0000	0.2500	0.5000	0.7500	1.0000
+2774	MIDI CC 15|49			0.0000	0.2500	0.5000	0.7500	1.0000
+2775	MIDI CC 15|50			0.0000	0.2500	0.5000	0.7500	1.0000
+2776	MIDI CC 15|51			0.0000	0.2500	0.5000	0.7500	1.0000
+2777	MIDI CC 15|52			0.0000	0.2500	0.5000	0.7500	1.0000
+2778	MIDI CC 15|53			0.0000	0.2500	0.5000	0.7500	1.0000
+2779	MIDI CC 15|54			0.0000	0.2500	0.5000	0.7500	1.0000
+2780	MIDI CC 15|55			0.0000	0.2500	0.5000	0.7500	1.0000
+2781	MIDI CC 15|56			0.0000	0.2500	0.5000	0.7500	1.0000
+2782	MIDI CC 15|57			0.0000	0.2500	0.5000	0.7500	1.0000
+2783	MIDI CC 15|58			0.0000	0.2500	0.5000	0.7500	1.0000
+2784	MIDI CC 15|59			0.0000	0.2500	0.5000	0.7500	1.0000
+2785	MIDI CC 15|60			0.0000	0.2500	0.5000	0.7500	1.0000
+2786	MIDI CC 15|61			0.0000	0.2500	0.5000	0.7500	1.0000
+2787	MIDI CC 15|62			0.0000	0.2500	0.5000	0.7500	1.0000
+2788	MIDI CC 15|63			0.0000	0.2500	0.5000	0.7500	1.0000
+2789	MIDI CC 15|64			0.0000	0.2500	0.5000	0.7500	1.0000
+2790	MIDI CC 15|65			0.0000	0.2500	0.5000	0.7500	1.0000
+2791	MIDI CC 15|66			0.0000	0.2500	0.5000	0.7500	1.0000
+2792	MIDI CC 15|67			0.0000	0.2500	0.5000	0.7500	1.0000
+2793	MIDI CC 15|68			0.0000	0.2500	0.5000	0.7500	1.0000
+2794	MIDI CC 15|69			0.0000	0.2500	0.5000	0.7500	1.0000
+2795	MIDI CC 15|70			0.0000	0.2500	0.5000	0.7500	1.0000
+2796	MIDI CC 15|71			0.0000	0.2500	0.5000	0.7500	1.0000
+2797	MIDI CC 15|72			0.0000	0.2500	0.5000	0.7500	1.0000
+2798	MIDI CC 15|73			0.0000	0.2500	0.5000	0.7500	1.0000
+2799	MIDI CC 15|74			0.0000	0.2500	0.5000	0.7500	1.0000
+2800	MIDI CC 15|75			0.0000	0.2500	0.5000	0.7500	1.0000
+2801	MIDI CC 15|76			0.0000	0.2500	0.5000	0.7500	1.0000
+2802	MIDI CC 15|77			0.0000	0.2500	0.5000	0.7500	1.0000
+2803	MIDI CC 15|78			0.0000	0.2500	0.5000	0.7500	1.0000
+2804	MIDI CC 15|79			0.0000	0.2500	0.5000	0.7500	1.0000
+2805	MIDI CC 15|80			0.0000	0.2500	0.5000	0.7500	1.0000
+2806	MIDI CC 15|81			0.0000	0.2500	0.5000	0.7500	1.0000
+2807	MIDI CC 15|82			0.0000	0.2500	0.5000	0.7500	1.0000
+2808	MIDI CC 15|83			0.0000	0.2500	0.5000	0.7500	1.0000
+2809	MIDI CC 15|84			0.0000	0.2500	0.5000	0.7500	1.0000
+2810	MIDI CC 15|85			0.0000	0.2500	0.5000	0.7500	1.0000
+2811	MIDI CC 15|86			0.0000	0.2500	0.5000	0.7500	1.0000
+2812	MIDI CC 15|87			0.0000	0.2500	0.5000	0.7500	1.0000
+2813	MIDI CC 15|88			0.0000	0.2500	0.5000	0.7500	1.0000
+2814	MIDI CC 15|89			0.0000	0.2500	0.5000	0.7500	1.0000
+2815	MIDI CC 15|90			0.0000	0.2500	0.5000	0.7500	1.0000
+2816	MIDI CC 15|91			0.0000	0.2500	0.5000	0.7500	1.0000
+2817	MIDI CC 15|92			0.0000	0.2500	0.5000	0.7500	1.0000
+2818	MIDI CC 15|93			0.0000	0.2500	0.5000	0.7500	1.0000
+2819	MIDI CC 15|94			0.0000	0.2500	0.5000	0.7500	1.0000
+2820	MIDI CC 15|95			0.0000	0.2500	0.5000	0.7500	1.0000
+2821	MIDI CC 15|96			0.0000	0.2500	0.5000	0.7500	1.0000
+2822	MIDI CC 15|97			0.0000	0.2500	0.5000	0.7500	1.0000
+2823	MIDI CC 15|98			0.0000	0.2500	0.5000	0.7500	1.0000
+2824	MIDI CC 15|99			0.0000	0.2500	0.5000	0.7500	1.0000
+2825	MIDI CC 15|100			0.0000	0.2500	0.5000	0.7500	1.0000
+2826	MIDI CC 15|101			0.0000	0.2500	0.5000	0.7500	1.0000
+2827	MIDI CC 15|102			0.0000	0.2500	0.5000	0.7500	1.0000
+2828	MIDI CC 15|103			0.0000	0.2500	0.5000	0.7500	1.0000
+2829	MIDI CC 15|104			0.0000	0.2500	0.5000	0.7500	1.0000
+2830	MIDI CC 15|105			0.0000	0.2500	0.5000	0.7500	1.0000
+2831	MIDI CC 15|106			0.0000	0.2500	0.5000	0.7500	1.0000
+2832	MIDI CC 15|107			0.0000	0.2500	0.5000	0.7500	1.0000
+2833	MIDI CC 15|108			0.0000	0.2500	0.5000	0.7500	1.0000
+2834	MIDI CC 15|109			0.0000	0.2500	0.5000	0.7500	1.0000
+2835	MIDI CC 15|110			0.0000	0.2500	0.5000	0.7500	1.0000
+2836	MIDI CC 15|111			0.0000	0.2500	0.5000	0.7500	1.0000
+2837	MIDI CC 15|112			0.0000	0.2500	0.5000	0.7500	1.0000
+2838	MIDI CC 15|113			0.0000	0.2500	0.5000	0.7500	1.0000
+2839	MIDI CC 15|114			0.0000	0.2500	0.5000	0.7500	1.0000
+2840	MIDI CC 15|115			0.0000	0.2500	0.5000	0.7500	1.0000
+2841	MIDI CC 15|116			0.0000	0.2500	0.5000	0.7500	1.0000
+2842	MIDI CC 15|117			0.0000	0.2500	0.5000	0.7500	1.0000
+2843	MIDI CC 15|118			0.0000	0.2500	0.5000	0.7500	1.0000
+2844	MIDI CC 15|119			0.0000	0.2500	0.5000	0.7500	1.0000
+2845	MIDI CC 15|120			0.0000	0.2500	0.5000	0.7500	1.0000
+2846	MIDI CC 15|121			0.0000	0.2500	0.5000	0.7500	1.0000
+2847	MIDI CC 15|122			0.0000	0.2500	0.5000	0.7500	1.0000
+2848	MIDI CC 15|123			0.0000	0.2500	0.5000	0.7500	1.0000
+2849	MIDI CC 15|124			0.0000	0.2500	0.5000	0.7500	1.0000
+2850	MIDI CC 15|125			0.0000	0.2500	0.5000	0.7500	1.0000
+2851	MIDI CC 15|126			0.0000	0.2500	0.5000	0.7500	1.0000
+2852	MIDI CC 15|127			0.0000	0.2500	0.5000	0.7500	1.0000
+2853	MIDI CC 15|128			0.0000	0.2500	0.5000	0.7500	1.0000
+2854	MIDI CC 15|129			0.0000	0.2500	0.5000	0.7500	1.0000
+2855	Bypass			normal	normal	bypassed	bypassed	bypassed
+2856	Wet			0%	25%	50%	75%	100%
+2857	Delta			normal	normal	normal	enabled	enabled

@@ -1,0 +1,779 @@
+plugin	CLAPi: Surge XT (Surge Synth Team)	778
+0	M1: -			0.000000	0.000000	0.000000	0.000000	0.000000
+1	M2: -			0.000000	0.000000	0.000000	0.000000	0.000000
+2	M3: -			0.000000	0.000000	0.000000	0.000000	0.000000
+3	M4: -			0.000000	0.000000	0.000000	0.000000	0.000000
+4	M5: -			0.000000	0.000000	0.000000	0.000000	0.000000
+5	M6: -			0.000000	0.000000	0.000000	0.000000	0.000000
+6	M7: -			0.000000	0.000000	0.000000	0.000000	0.000000
+7	M8: -			0.000000	0.000000	0.000000	0.000000	0.000000
+8	Send FX 1 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+9	Send FX 2 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+10	Send FX 3 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+11	Send FX 4 Return			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+12	Global Volume			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+13	Active Scene			0	0	1	1	1
+14	Scene Mode			Single	Key Split	Dual	Dual	Channel Split
+15	Split Point			C4	C4	C4	C4	C4
+16	FX Disable			-	-	-	-	-
+17	Polyphony Limit			2	17	33	49	64
+18	FX Chain Bypass			All FX	No Send FX	No Send and Global FX	No Send and Global FX	All FX Off
+19	FX A1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+20	FX A1 Param 1			-	-	-	-	-
+21	FX A1 Param 2			-	-	-	-	-
+22	FX A1 Param 3			-	-	-	-	-
+23	FX A1 Param 4			-	-	-	-	-
+24	FX A1 Param 5			-	-	-	-	-
+25	FX A1 Param 6			-	-	-	-	-
+26	FX A1 Param 7			-	-	-	-	-
+27	FX A1 Param 8			-	-	-	-	-
+28	FX A1 Param 9			-	-	-	-	-
+29	FX A1 Param 10			-	-	-	-	-
+30	FX A1 Param 11			-	-	-	-	-
+31	FX A1 Param 12			-	-	-	-	-
+32	FX A2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+33	FX A2 Param 1			-	-	-	-	-
+34	FX A2 Param 2			-	-	-	-	-
+35	FX A2 Param 3			-	-	-	-	-
+36	FX A2 Param 4			-	-	-	-	-
+37	FX A2 Param 5			-	-	-	-	-
+38	FX A2 Param 6			-	-	-	-	-
+39	FX A2 Param 7			-	-	-	-	-
+40	FX A2 Param 8			-	-	-	-	-
+41	FX A2 Param 9			-	-	-	-	-
+42	FX A2 Param 10			-	-	-	-	-
+43	FX A2 Param 11			-	-	-	-	-
+44	FX A2 Param 12			-	-	-	-	-
+45	FX B1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+46	FX B1 Param 1			-	-	-	-	-
+47	FX B1 Param 2			-	-	-	-	-
+48	FX B1 Param 3			-	-	-	-	-
+49	FX B1 Param 4			-	-	-	-	-
+50	FX B1 Param 5			-	-	-	-	-
+51	FX B1 Param 6			-	-	-	-	-
+52	FX B1 Param 7			-	-	-	-	-
+53	FX B1 Param 8			-	-	-	-	-
+54	FX B1 Param 9			-	-	-	-	-
+55	FX B1 Param 10			-	-	-	-	-
+56	FX B1 Param 11			-	-	-	-	-
+57	FX B1 Param 12			-	-	-	-	-
+58	FX B2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+59	FX B2 Param 1			-	-	-	-	-
+60	FX B2 Param 2			-	-	-	-	-
+61	FX B2 Param 3			-	-	-	-	-
+62	FX B2 Param 4			-	-	-	-	-
+63	FX B2 Param 5			-	-	-	-	-
+64	FX B2 Param 6			-	-	-	-	-
+65	FX B2 Param 7			-	-	-	-	-
+66	FX B2 Param 8			-	-	-	-	-
+67	FX B2 Param 9			-	-	-	-	-
+68	FX B2 Param 10			-	-	-	-	-
+69	FX B2 Param 11			-	-	-	-	-
+70	FX B2 Param 12			-	-	-	-	-
+71	FX S1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+72	FX S1 Param 1			-	-	-	-	-
+73	FX S1 Param 2			-	-	-	-	-
+74	FX S1 Param 3			-	-	-	-	-
+75	FX S1 Param 4			-	-	-	-	-
+76	FX S1 Param 5			-	-	-	-	-
+77	FX S1 Param 6			-	-	-	-	-
+78	FX S1 Param 7			-	-	-	-	-
+79	FX S1 Param 8			-	-	-	-	-
+80	FX S1 Param 9			-	-	-	-	-
+81	FX S1 Param 10			-	-	-	-	-
+82	FX S1 Param 11			-	-	-	-	-
+83	FX S1 Param 12			-	-	-	-	-
+84	FX S2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+85	FX S2 Param 1			-	-	-	-	-
+86	FX S2 Param 2			-	-	-	-	-
+87	FX S2 Param 3			-	-	-	-	-
+88	FX S2 Param 4			-	-	-	-	-
+89	FX S2 Param 5			-	-	-	-	-
+90	FX S2 Param 6			-	-	-	-	-
+91	FX S2 Param 7			-	-	-	-	-
+92	FX S2 Param 8			-	-	-	-	-
+93	FX S2 Param 9			-	-	-	-	-
+94	FX S2 Param 10			-	-	-	-	-
+95	FX S2 Param 11			-	-	-	-	-
+96	FX S2 Param 12			-	-	-	-	-
+97	FX G1 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+98	FX G1 Param 1			-	-	-	-	-
+99	FX G1 Param 2			-	-	-	-	-
+100	FX G1 Param 3			-	-	-	-	-
+101	FX G1 Param 4			-	-	-	-	-
+102	FX G1 Param 5			-	-	-	-	-
+103	FX G1 Param 6			-	-	-	-	-
+104	FX G1 Param 7			-	-	-	-	-
+105	FX G1 Param 8			-	-	-	-	-
+106	FX G1 Param 9			-	-	-	-	-
+107	FX G1 Param 10			-	-	-	-	-
+108	FX G1 Param 11			-	-	-	-	-
+109	FX G1 Param 12			-	-	-	-	-
+110	FX G2 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+111	FX G2 Param 1			-	-	-	-	-
+112	FX G2 Param 2			-	-	-	-	-
+113	FX G2 Param 3			-	-	-	-	-
+114	FX G2 Param 4			-	-	-	-	-
+115	FX G2 Param 5			-	-	-	-	-
+116	FX G2 Param 6			-	-	-	-	-
+117	FX G2 Param 7			-	-	-	-	-
+118	FX G2 Param 8			-	-	-	-	-
+119	FX G2 Param 9			-	-	-	-	-
+120	FX G2 Param 10			-	-	-	-	-
+121	FX G2 Param 11			-	-	-	-	-
+122	FX G2 Param 12			-	-	-	-	-
+123	FX A3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+124	FX A3 Param 1			-	-	-	-	-
+125	FX A3 Param 2			-	-	-	-	-
+126	FX A3 Param 3			-	-	-	-	-
+127	FX A3 Param 4			-	-	-	-	-
+128	FX A3 Param 5			-	-	-	-	-
+129	FX A3 Param 6			-	-	-	-	-
+130	FX A3 Param 7			-	-	-	-	-
+131	FX A3 Param 8			-	-	-	-	-
+132	FX A3 Param 9			-	-	-	-	-
+133	FX A3 Param 10			-	-	-	-	-
+134	FX A3 Param 11			-	-	-	-	-
+135	FX A3 Param 12			-	-	-	-	-
+136	FX A4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+137	FX A4 Param 1			-	-	-	-	-
+138	FX A4 Param 2			-	-	-	-	-
+139	FX A4 Param 3			-	-	-	-	-
+140	FX A4 Param 4			-	-	-	-	-
+141	FX A4 Param 5			-	-	-	-	-
+142	FX A4 Param 6			-	-	-	-	-
+143	FX A4 Param 7			-	-	-	-	-
+144	FX A4 Param 8			-	-	-	-	-
+145	FX A4 Param 9			-	-	-	-	-
+146	FX A4 Param 10			-	-	-	-	-
+147	FX A4 Param 11			-	-	-	-	-
+148	FX A4 Param 12			-	-	-	-	-
+149	FX B3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+150	FX B3 Param 1			-	-	-	-	-
+151	FX B3 Param 2			-	-	-	-	-
+152	FX B3 Param 3			-	-	-	-	-
+153	FX B3 Param 4			-	-	-	-	-
+154	FX B3 Param 5			-	-	-	-	-
+155	FX B3 Param 6			-	-	-	-	-
+156	FX B3 Param 7			-	-	-	-	-
+157	FX B3 Param 8			-	-	-	-	-
+158	FX B3 Param 9			-	-	-	-	-
+159	FX B3 Param 10			-	-	-	-	-
+160	FX B3 Param 11			-	-	-	-	-
+161	FX B3 Param 12			-	-	-	-	-
+162	FX B4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+163	FX B4 Param 1			-	-	-	-	-
+164	FX B4 Param 2			-	-	-	-	-
+165	FX B4 Param 3			-	-	-	-	-
+166	FX B4 Param 4			-	-	-	-	-
+167	FX B4 Param 5			-	-	-	-	-
+168	FX B4 Param 6			-	-	-	-	-
+169	FX B4 Param 7			-	-	-	-	-
+170	FX B4 Param 8			-	-	-	-	-
+171	FX B4 Param 9			-	-	-	-	-
+172	FX B4 Param 10			-	-	-	-	-
+173	FX B4 Param 11			-	-	-	-	-
+174	FX B4 Param 12			-	-	-	-	-
+175	FX S3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+176	FX S3 Param 1			-	-	-	-	-
+177	FX S3 Param 2			-	-	-	-	-
+178	FX S3 Param 3			-	-	-	-	-
+179	FX S3 Param 4			-	-	-	-	-
+180	FX S3 Param 5			-	-	-	-	-
+181	FX S3 Param 6			-	-	-	-	-
+182	FX S3 Param 7			-	-	-	-	-
+183	FX S3 Param 8			-	-	-	-	-
+184	FX S3 Param 9			-	-	-	-	-
+185	FX S3 Param 10			-	-	-	-	-
+186	FX S3 Param 11			-	-	-	-	-
+187	FX S3 Param 12			-	-	-	-	-
+188	FX S4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+189	FX S4 Param 1			-	-	-	-	-
+190	FX S4 Param 2			-	-	-	-	-
+191	FX S4 Param 3			-	-	-	-	-
+192	FX S4 Param 4			-	-	-	-	-
+193	FX S4 Param 5			-	-	-	-	-
+194	FX S4 Param 6			-	-	-	-	-
+195	FX S4 Param 7			-	-	-	-	-
+196	FX S4 Param 8			-	-	-	-	-
+197	FX S4 Param 9			-	-	-	-	-
+198	FX S4 Param 10			-	-	-	-	-
+199	FX S4 Param 11			-	-	-	-	-
+200	FX S4 Param 12			-	-	-	-	-
+201	FX G3 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+202	FX G3 Param 1			-	-	-	-	-
+203	FX G3 Param 2			-	-	-	-	-
+204	FX G3 Param 3			-	-	-	-	-
+205	FX G3 Param 4			-	-	-	-	-
+206	FX G3 Param 5			-	-	-	-	-
+207	FX G3 Param 6			-	-	-	-	-
+208	FX G3 Param 7			-	-	-	-	-
+209	FX G3 Param 8			-	-	-	-	-
+210	FX G3 Param 9			-	-	-	-	-
+211	FX G3 Param 10			-	-	-	-	-
+212	FX G3 Param 11			-	-	-	-	-
+213	FX G3 Param 12			-	-	-	-	-
+214	FX G4 FX Type			Off	Freq Shift	Neuron	Nimbus	Audio In
+215	FX G4 Param 1			-	-	-	-	-
+216	FX G4 Param 2			-	-	-	-	-
+217	FX G4 Param 3			-	-	-	-	-
+218	FX G4 Param 4			-	-	-	-	-
+219	FX G4 Param 5			-	-	-	-	-
+220	FX G4 Param 6			-	-	-	-	-
+221	FX G4 Param 7			-	-	-	-	-
+222	FX G4 Param 8			-	-	-	-	-
+223	FX G4 Param 9			-	-	-	-	-
+224	FX G4 Param 10			-	-	-	-	-
+225	FX G4 Param 11			-	-	-	-	-
+226	FX G4 Param 12			-	-	-	-	-
+227	Character			Warm	Warm	Neutral	Bright	Bright
+228	A Octave			-3	-2	0	2	3
+229	A Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+230	A Portamento			0.0 ms	22.1 ms	125.0 ms	707.1 ms	4.00 s
+231	A Play Mode			Poly	Mono	Mono (Fingered Portamento)	Mono (Single Trigger & Fingered Portamento)	Latch (Monophonic)
+232	A FM Routing			Off	2 > 1	3 > 2 > 1	3 > 2 > 1	2 > 1 < 3
+233	A FM Depth			-48.00 dB	-30.00 dB	-12.00 dB	6.00 dB	24.00 dB
+234	A Osc Drift			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+235	A Noise Color			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+236	A Keytrack Root Key			C4	C4	C4	C4	C4
+237	A Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+238	A Pan			-100.00 % (Left)	-50.00 %	0.00 % (Center)	50.00 %	100.00 % (Right)
+239	A Width			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+240	A Send FX 1 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+241	A Send FX 2 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+242	A Send FX 3 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+243	A Send FX 4 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+244	A Pitch Bend Up Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+245	A Pitch Bend Down Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+246	A VCA Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+247	A Velocity > VCA Gain			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+248	A Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+249	A Filter Configuration			Serial 1	Serial 3	Dual 2	Stereo	Wide
+250	A Filter Balance			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+251	A Highpass			6.88 Hz	24.15 Hz	84.82 Hz	297.94 Hz	1046.50 Hz
+252	A Waveshaper Type			Off	Full Wave	Additive 12345	Sin 7x + x	Soft Single Fold
+253	A Waveshaper Drive			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+254	A Filter 2 Offset Mode			Off	Off	Off	On	On
+255	A Link Resonance			Off	Off	Off	On	On
+256	A Osc 1 Type			Classic	S&H Noise	FM2	Modern	Alias
+257	A Osc 1 Octave			-3	-2	0	2	3
+258	A Osc 1 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+259	A Osc 1 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+260	A Osc 1 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+261	A Osc 1 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+262	A Osc 1 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+263	A Osc 1 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+264	A Osc 1 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+265	A Osc 1 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+266	A Osc 1 Keytrack			Off	Off	Off	On	On
+267	A Osc 1 Retrigger			Off	Off	Off	On	On
+268	A Osc 2 Type			Classic	S&H Noise	FM2	Modern	Alias
+269	A Osc 2 Octave			-3	-2	0	2	3
+270	A Osc 2 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+271	A Osc 2 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+272	A Osc 2 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+273	A Osc 2 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+274	A Osc 2 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+275	A Osc 2 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+276	A Osc 2 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+277	A Osc 2 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+278	A Osc 2 Keytrack			Off	Off	Off	On	On
+279	A Osc 2 Retrigger			Off	Off	Off	On	On
+280	A Osc 3 Type			Classic	S&H Noise	FM2	Modern	Alias
+281	A Osc 3 Octave			-3	-2	0	2	3
+282	A Osc 3 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+283	A Osc 3 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+284	A Osc 3 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+285	A Osc 3 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+286	A Osc 3 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+287	A Osc 3 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+288	A Osc 3 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+289	A Osc 3 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+290	A Osc 3 Keytrack			Off	Off	Off	On	On
+291	A Osc 3 Retrigger			Off	Off	Off	On	On
+292	A Osc 1 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+293	A Osc 1 Mute			Off	Off	Off	On	On
+294	A Osc 1 Solo			Off	Off	Off	On	On
+295	A Osc 1 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+296	A Osc 2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+297	A Osc 2 Mute			Off	Off	Off	On	On
+298	A Osc 2 Solo			Off	Off	Off	On	On
+299	A Osc 2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+300	A Osc 3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+301	A Osc 3 Mute			Off	Off	Off	On	On
+302	A Osc 3 Solo			Off	Off	Off	On	On
+303	A Osc 3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+304	A Ring Modulation 1x2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+305	A Ring Modulation 1x2 Mute			Off	Off	Off	On	On
+306	A Ring Modulation 1x2 Solo			Off	Off	Off	On	On
+307	A Ring Modulation 1x2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+308	A Ring Modulation 2x3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+309	A Ring Modulation 2x3 Mute			Off	Off	Off	On	On
+310	A Ring Modulation 2x3 Solo			Off	Off	Off	On	On
+311	A Ring Modulation 2x3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+312	A Noise Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+313	A Noise Mute			Off	Off	Off	On	On
+314	A Noise Solo			Off	Off	Off	On	On
+315	A Noise Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+316	A Pre-Filter Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+317	A Filter 1 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+318	A Filter 1 Subtype			None	None	None	None	None
+319	A Filter 1 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+320	A Filter 1 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+321	A Filter 1 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+322	A Filter 1 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+323	A Filter 2 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+324	A Filter 2 Subtype			None	None	None	None	None
+325	A Filter 2 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+326	A Filter 2 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+327	A Filter 2 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+328	A Filter 2 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+329	A Amp EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+330	A Amp EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+331	A Amp EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+332	A Amp EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+333	A Amp EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+334	A Amp EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+335	A Amp EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+336	A Amp EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+337	A Filter EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+338	A Filter EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+339	A Filter EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+340	A Filter EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+341	A Filter EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+342	A Filter EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+343	A Filter EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+344	A Filter EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+345	A LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+346	A LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+347	A LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+348	A LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+349	A LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+350	A LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+351	A LFO 1 Unipolar			Off	Off	Off	On	On
+352	A LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+353	A LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+354	A LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+355	A LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+356	A LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+357	A LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+358	A LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+359	A LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+360	A LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+361	A LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+362	A LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+363	A LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+364	A LFO 2 Unipolar			Off	Off	Off	On	On
+365	A LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+366	A LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+367	A LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+368	A LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+369	A LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+370	A LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+371	A LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+372	A LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+373	A LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+374	A LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+375	A LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+376	A LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+377	A LFO 3 Unipolar			Off	Off	Off	On	On
+378	A LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+379	A LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+380	A LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+381	A LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+382	A LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+383	A LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+384	A LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+385	A LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+386	A LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+387	A LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+388	A LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+389	A LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+390	A LFO 4 Unipolar			Off	Off	Off	On	On
+391	A LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+392	A LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+393	A LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+394	A LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+395	A LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+396	A LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+397	A LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+398	A LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+399	A LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+400	A LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+401	A LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+402	A LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+403	A LFO 5 Unipolar			Off	Off	Off	On	On
+404	A LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+405	A LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+406	A LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+407	A LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+408	A LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+409	A LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+410	A LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+411	A LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+412	A LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+413	A LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+414	A LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+415	A LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+416	A LFO 6 Unipolar			Off	Off	Off	On	On
+417	A LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+418	A LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+419	A LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+420	A LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+421	A LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+422	A LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+423	A Scene LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+424	A Scene LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+425	A Scene LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+426	A Scene LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+427	A Scene LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+428	A Scene LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+429	A Scene LFO 1 Unipolar			Off	Off	Off	On	On
+430	A Scene LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+431	A Scene LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+432	A Scene LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+433	A Scene LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+434	A Scene LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+435	A Scene LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+436	A Scene LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+437	A Scene LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+438	A Scene LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+439	A Scene LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+440	A Scene LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+441	A Scene LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+442	A Scene LFO 2 Unipolar			Off	Off	Off	On	On
+443	A Scene LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+444	A Scene LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+445	A Scene LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+446	A Scene LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+447	A Scene LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+448	A Scene LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+449	A Scene LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+450	A Scene LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+451	A Scene LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+452	A Scene LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+453	A Scene LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+454	A Scene LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+455	A Scene LFO 3 Unipolar			Off	Off	Off	On	On
+456	A Scene LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+457	A Scene LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+458	A Scene LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+459	A Scene LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+460	A Scene LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+461	A Scene LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+462	A Scene LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+463	A Scene LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+464	A Scene LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+465	A Scene LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+466	A Scene LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+467	A Scene LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+468	A Scene LFO 4 Unipolar			Off	Off	Off	On	On
+469	A Scene LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+470	A Scene LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+471	A Scene LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+472	A Scene LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+473	A Scene LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+474	A Scene LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+475	A Scene LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+476	A Scene LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+477	A Scene LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+478	A Scene LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+479	A Scene LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+480	A Scene LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+481	A Scene LFO 5 Unipolar			Off	Off	Off	On	On
+482	A Scene LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+483	A Scene LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+484	A Scene LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+485	A Scene LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+486	A Scene LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+487	A Scene LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+488	A Scene LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+489	A Scene LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+490	A Scene LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+491	A Scene LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+492	A Scene LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+493	A Scene LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+494	A Scene LFO 6 Unipolar			Off	Off	Off	On	On
+495	A Scene LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+496	A Scene LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+497	A Scene LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+498	A Scene LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+499	A Scene LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+500	A Scene LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+501	B Octave			-3	-2	0	2	3
+502	B Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+503	B Portamento			0.0 ms	22.1 ms	125.0 ms	707.1 ms	4.00 s
+504	B Play Mode			Poly	Mono	Mono (Fingered Portamento)	Mono (Single Trigger & Fingered Portamento)	Latch (Monophonic)
+505	B FM Routing			Off	2 > 1	3 > 2 > 1	3 > 2 > 1	2 > 1 < 3
+506	B FM Depth			-48.00 dB	-30.00 dB	-12.00 dB	6.00 dB	24.00 dB
+507	B Osc Drift			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+508	B Noise Color			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+509	B Keytrack Root Key			C4	C4	C4	C4	C4
+510	B Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+511	B Pan			-100.00 % (Left)	-50.00 %	0.00 % (Center)	50.00 %	100.00 % (Right)
+512	B Width			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+513	B Send FX 1 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+514	B Send FX 2 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+515	B Send FX 3 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+516	B Send FX 4 Level			-inf dB	-24.00 dB	-6.00 dB	4.53 dB	12.00 dB
+517	B Pitch Bend Up Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+518	B Pitch Bend Down Range			0 semitones	6 semitones	12 semitones	18 semitones	24 semitones
+519	B VCA Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+520	B Velocity > VCA Gain			-48.00 dB	-36.00 dB	-24.00 dB	-12.00 dB	0.00 dB
+521	B Feedback			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+522	B Filter Configuration			Serial 1	Serial 3	Dual 2	Stereo	Wide
+523	B Filter Balance			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+524	B Highpass			6.88 Hz	24.15 Hz	84.82 Hz	297.94 Hz	1046.50 Hz
+525	B Waveshaper Type			Off	Full Wave	Additive 12345	Sin 7x + x	Soft Single Fold
+526	B Waveshaper Drive			-24.00 dB	-12.00 dB	0.00 dB	12.00 dB	24.00 dB
+527	B Filter 2 Offset Mode			Off	Off	Off	On	On
+528	B Link Resonance			Off	Off	Off	On	On
+529	B Osc 1 Type			Classic	S&H Noise	FM2	Modern	Alias
+530	B Osc 1 Octave			-3	-2	0	2	3
+531	B Osc 1 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+532	B Osc 1 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+533	B Osc 1 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+534	B Osc 1 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+535	B Osc 1 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+536	B Osc 1 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+537	B Osc 1 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+538	B Osc 1 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+539	B Osc 1 Keytrack			Off	Off	Off	On	On
+540	B Osc 1 Retrigger			Off	Off	Off	On	On
+541	B Osc 2 Type			Classic	S&H Noise	FM2	Modern	Alias
+542	B Osc 2 Octave			-3	-2	0	2	3
+543	B Osc 2 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+544	B Osc 2 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+545	B Osc 2 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+546	B Osc 2 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+547	B Osc 2 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+548	B Osc 2 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+549	B Osc 2 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+550	B Osc 2 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+551	B Osc 2 Keytrack			Off	Off	Off	On	On
+552	B Osc 2 Retrigger			Off	Off	Off	On	On
+553	B Osc 3 Type			Classic	S&H Noise	FM2	Modern	Alias
+554	B Osc 3 Octave			-3	-2	0	2	3
+555	B Osc 3 Pitch			-7.00 semitones	-3.50 semitones	0.00 semitones	3.50 semitones	7.00 semitones
+556	B Osc 3 Shape			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+557	B Osc 3 Width 1			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+558	B Osc 3 Width 2			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+559	B Osc 3 Sub Mix			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+560	B Osc 3 Sync			0.00 semitones	15.00 semitones	30.00 semitones	45.00 semitones	60.00 semitones
+561	B Osc 3 Unison Detune			0.00 cents	25.00 cents	50.00 cents	75.00 cents	100.00 cents
+562	B Osc 3 Unison Voices			1 voice	5 voices	9 voices	12 voices	16 voices
+563	B Osc 3 Keytrack			Off	Off	Off	On	On
+564	B Osc 3 Retrigger			Off	Off	Off	On	On
+565	B Osc 1 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+566	B Osc 1 Mute			Off	Off	Off	On	On
+567	B Osc 1 Solo			Off	Off	Off	On	On
+568	B Osc 1 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+569	B Osc 2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+570	B Osc 2 Mute			Off	Off	Off	On	On
+571	B Osc 2 Solo			Off	Off	Off	On	On
+572	B Osc 2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+573	B Osc 3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+574	B Osc 3 Mute			Off	Off	Off	On	On
+575	B Osc 3 Solo			Off	Off	Off	On	On
+576	B Osc 3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+577	B Ring Modulation 1x2 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+578	B Ring Modulation 1x2 Mute			Off	Off	Off	On	On
+579	B Ring Modulation 1x2 Solo			Off	Off	Off	On	On
+580	B Ring Modulation 1x2 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+581	B Ring Modulation 2x3 Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+582	B Ring Modulation 2x3 Mute			Off	Off	Off	On	On
+583	B Ring Modulation 2x3 Solo			Off	Off	Off	On	On
+584	B Ring Modulation 2x3 Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+585	B Noise Volume			-inf dB	-36.00 dB	-18.00 dB	-7.47 dB	0.00 dB
+586	B Noise Mute			Off	Off	Off	On	On
+587	B Noise Solo			Off	Off	Off	On	On
+588	B Noise Route			Filter 1	Filter 1	Both	Filter 2	Filter 2
+589	B Pre-Filter Gain			-48.00 dB	-24.00 dB	0.00 dB	24.00 dB	48.00 dB
+590	B Filter 1 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+591	B Filter 1 Subtype			None	None	None	None	None
+592	B Filter 1 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+593	B Filter 1 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+594	B Filter 1 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+595	B Filter 1 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+596	B Filter 2 Type			Off	FX Comb +	HP Cutoff Warp	FX Comb -	MULTI Tri-pole
+597	B Filter 2 Subtype			None	None	None	None	None
+598	B Filter 2 Cutoff			13.75 Hz	89.87 Hz	587.33 Hz	3838.59 Hz	25087.71 Hz
+599	B Filter 2 Resonance			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+600	B Filter 2 FEG Mod Amount			-96.00 semitones	-48.00 semitones	0.00 semitones	48.00 semitones	96.00 semitones
+601	B Filter 2 Keytrack			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+602	B Amp EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+603	B Amp EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+604	B Amp EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+605	B Amp EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+606	B Amp EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+607	B Amp EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+608	B Amp EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+609	B Amp EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+610	B Filter EG Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+611	B Filter EG Attack Shape			Convex	Convex	Linear	Concave	Concave
+612	B Filter EG Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+613	B Filter EG Decay Shape			Linear	Linear	Quadratic	Cubic	Cubic
+614	B Filter EG Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+615	B Filter EG Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+616	B Filter EG Release Shape			Linear	Linear	Quadratic	Cubic	Cubic
+617	B Filter EG Envelope Mode			Digital	Digital	Analog	Analog	Analog
+618	B LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+619	B LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+620	B LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+621	B LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+622	B LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+623	B LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+624	B LFO 1 Unipolar			Off	Off	Off	On	On
+625	B LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+626	B LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+627	B LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+628	B LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+629	B LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+630	B LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+631	B LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+632	B LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+633	B LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+634	B LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+635	B LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+636	B LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+637	B LFO 2 Unipolar			Off	Off	Off	On	On
+638	B LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+639	B LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+640	B LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+641	B LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+642	B LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+643	B LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+644	B LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+645	B LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+646	B LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+647	B LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+648	B LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+649	B LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+650	B LFO 3 Unipolar			Off	Off	Off	On	On
+651	B LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+652	B LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+653	B LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+654	B LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+655	B LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+656	B LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+657	B LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+658	B LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+659	B LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+660	B LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+661	B LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+662	B LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+663	B LFO 4 Unipolar			Off	Off	Off	On	On
+664	B LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+665	B LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+666	B LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+667	B LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+668	B LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+669	B LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+670	B LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+671	B LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+672	B LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+673	B LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+674	B LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+675	B LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+676	B LFO 5 Unipolar			Off	Off	Off	On	On
+677	B LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+678	B LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+679	B LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+680	B LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+681	B LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+682	B LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+683	B LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+684	B LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+685	B LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+686	B LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+687	B LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+688	B LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+689	B LFO 6 Unipolar			Off	Off	Off	On	On
+690	B LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+691	B LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+692	B LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+693	B LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+694	B LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+695	B LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+696	B Scene LFO 1 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+697	B Scene LFO 1 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+698	B Scene LFO 1 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+699	B Scene LFO 1 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+700	B Scene LFO 1 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+701	B Scene LFO 1 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+702	B Scene LFO 1 Unipolar			Off	Off	Off	On	On
+703	B Scene LFO 1 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+704	B Scene LFO 1 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+705	B Scene LFO 1 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+706	B Scene LFO 1 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+707	B Scene LFO 1 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+708	B Scene LFO 1 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+709	B Scene LFO 2 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+710	B Scene LFO 2 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+711	B Scene LFO 2 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+712	B Scene LFO 2 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+713	B Scene LFO 2 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+714	B Scene LFO 2 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+715	B Scene LFO 2 Unipolar			Off	Off	Off	On	On
+716	B Scene LFO 2 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+717	B Scene LFO 2 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+718	B Scene LFO 2 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+719	B Scene LFO 2 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+720	B Scene LFO 2 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+721	B Scene LFO 2 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+722	B Scene LFO 3 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+723	B Scene LFO 3 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+724	B Scene LFO 3 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+725	B Scene LFO 3 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+726	B Scene LFO 3 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+727	B Scene LFO 3 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+728	B Scene LFO 3 Unipolar			Off	Off	Off	On	On
+729	B Scene LFO 3 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+730	B Scene LFO 3 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+731	B Scene LFO 3 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+732	B Scene LFO 3 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+733	B Scene LFO 3 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+734	B Scene LFO 3 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+735	B Scene LFO 4 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+736	B Scene LFO 4 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+737	B Scene LFO 4 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+738	B Scene LFO 4 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+739	B Scene LFO 4 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+740	B Scene LFO 4 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+741	B Scene LFO 4 Unipolar			Off	Off	Off	On	On
+742	B Scene LFO 4 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+743	B Scene LFO 4 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+744	B Scene LFO 4 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+745	B Scene LFO 4 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+746	B Scene LFO 4 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+747	B Scene LFO 4 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+748	B Scene LFO 5 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+749	B Scene LFO 5 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+750	B Scene LFO 5 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+751	B Scene LFO 5 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+752	B Scene LFO 5 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+753	B Scene LFO 5 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+754	B Scene LFO 5 Unipolar			Off	Off	Off	On	On
+755	B Scene LFO 5 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+756	B Scene LFO 5 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+757	B Scene LFO 5 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+758	B Scene LFO 5 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+759	B Scene LFO 5 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+760	B Scene LFO 5 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+761	B Scene LFO 6 Type			Sine	Square	Sample & Hold	Step Sequencer	Formula
+762	B Scene LFO 6 Rate			0.008 Hz	0.125 Hz	2.000 Hz	32.000 Hz	512.000 Hz
+763	B Scene LFO 6 Phase			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+764	B Scene LFO 6 Amplitude			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+765	B Scene LFO 6 Deform			-100.00 %	-50.00 %	0.00 %	50.00 %	100.00 %
+766	B Scene LFO 6 Trigger Mode			Freerun	Freerun	Keytrigger	Random	Random
+767	B Scene LFO 6 Unipolar			Off	Off	Off	On	On
+768	B Scene LFO 6 Delay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+769	B Scene LFO 6 Attack			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+770	B Scene LFO 6 Hold			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+771	B Scene LFO 6 Decay			0.0 ms	37.2 ms	353.6 ms	3.36 s	32.00 s
+772	B Scene LFO 6 Sustain			0.00 %	25.00 %	50.00 %	75.00 %	100.00 %
+773	B Scene LFO 6 Release			0.0 ms	37.2 ms	353.6 ms	3.36 s	Forever
+774	Bypass Surge XT			Active	Active	Active	Active	Active
+775	Bypass			normal	normal	bypassed	bypassed	bypassed
+776	Wet			0%	25%	50%	75%	100%
+777	Delta			normal	normal	normal	enabled	enabled

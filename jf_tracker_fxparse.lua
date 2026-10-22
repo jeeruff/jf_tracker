@@ -1,0 +1,144 @@
+-- jf_tracker_fxparse.lua — парсер параметров плагина по тексту значения (PLAN_DSP этапы 1–2, 22 окт).
+--
+-- Правила взяты из образцов tests/fixtures/fxdump (RS5K, Surge XT): тексты при 0 / .25 / .5 / .75 / 1.
+--   FP.unit(text)        → 'db' 'hz' 'time' 'pct' 'semi' 'cent' 'note' 'onoff' 'num' 'text'
+--   FP.num(text)         → число в базовой единице (Hz, ms, dB; −inf → −math.huge) или nil
+--   FP.classify(texts, toggle) → { kind = toggle | steps | bipolar | db | freq | time | pct | semi | note | plain,
+--                                  unit, log (шаг не линейный: частота / время), bipolar }
+--   FP.compact(text)     → короткий вид значения: 25087.71 Hz → 25.1k, 353.6 ms → 354ms, 3.36 s → 3.4s,
+--                          -7.47 dB → -7.5, -inf dB → -inf, 50.00 % → 50%, 3.50 semitones → +3.5st
+--   FP.abbr(name, n)     → имя не длиннее n знаков: словарь сокращений, потом без гласных, потом обрезка
+-- Без reaper.* — тест tests/test_fxparse.lua.
+
+local FP = {}
+
+local function trim(s) return ((s or ''):gsub('^%s+', ''):gsub('%s+$', '')) end
+
+function FP.unit(text)
+  local t = trim(text):lower()
+  if t == '' then return nil end
+  if t:match('^[%+%-]?inf') and t:find('db', 1, true) then return 'db' end
+  if t:find('%f[%a]db%f[%A]') or t:match('db$') then return 'db' end
+  if t:find('%f[%a]k?hz%f[%A]') or t:match('k?hz$') then return 'hz' end
+  if t:find('semitone', 1, true) or t:match('%d%s*st$') then return 'semi' end
+  if t:find('cent', 1, true) then return 'cent' end
+  if t:match('^[%+%-]?[%d%.]+%s*ms$') or t:match('^[%+%-]?[%d%.]+%s*s$') or t:match('^[%+%-]?[%d%.]+%s*sec') then return 'time' end
+  if t:match('^[%+%-]?[%d%.]+%s*%%') then return 'pct' end
+  if trim(text):match('^[A-G][#b]?%-?%d$') then return 'note' end
+  if t == 'on' or t == 'off' then return 'onoff' end
+  if t:match('^[%+%-]?%d*%.?%d+$') then return 'num' end
+  return 'text'
+end
+
+function FP.num(text)
+  local t = trim(text):lower()
+  if t:match('^%-inf') then return -math.huge end
+  if t:match('^%+?inf') then return math.huge end
+  local n = tonumber(t:match('^[%+%-]?%d*%.?%d+'))
+  if not n then return nil end
+  local u = FP.unit(text)
+  if u == 'hz' and t:find('khz', 1, true) then n = n * 1000 end
+  if u == 'time' and not t:find('ms', 1, true) then n = n * 1000 end   -- секунды → ms
+  return n
+end
+
+local UKIND = { db = 'db', hz = 'freq', time = 'time', pct = 'pct', semi = 'semi', cent = 'semi', note = 'note', num = 'plain' }
+
+function FP.classify(texts, toggle)
+  local units, distinct, nd = {}, {}, 0
+  for _, s in ipairs(texts) do
+    local u = FP.unit(s)
+    if u then units[#units + 1] = u end
+    local k = trim(s):lower()
+    if k ~= '' and not distinct[k] then distinct[k] = true; nd = nd + 1 end
+  end
+  local main
+  local cnt = {}
+  for _, u in ipairs(units) do cnt[u] = (cnt[u] or 0) + 1; if not main or cnt[u] > cnt[main] then main = u end end
+  local r = { unit = main }
+  -- переключатель: флаг плагина или два значения из 0 / 1 / on / off
+  local binary = nd == 2
+  if binary then for k in pairs(distinct) do if not (k == '0' or k == '1' or k == 'on' or k == 'off') then binary = false end end end
+  if toggle or binary then r.kind = 'toggle'; return r end
+  if main == 'text' or main == 'onoff' then r.kind = 'steps'; return r end
+  if main == 'note' and nd == 1 then r.kind = 'plain'; return r end   -- Keytrack Root Key: C4 на всём ходу — показ, не ступени
+  local n1, n3, n5 = FP.num(texts[1]), FP.num(texts[3]), FP.num(texts[5])
+  if n1 and n3 and n5 and n1 > -math.huge and n5 < math.huge then
+    local span = n5 - n1
+    if n1 < 0 and n5 > 0 and math.abs(n3) <= math.abs(span) * 0.02 then r.bipolar = true end
+    if span ~= 0 and (main == 'hz' or main == 'time') then
+      local mid = (n1 + n5) / 2
+      if math.abs(n3 - mid) > math.abs(span) * 0.2 then r.log = true end
+    end
+  end
+  r.kind = r.bipolar and 'bipolar' or (UKIND[main] or 'plain')
+  return r
+end
+
+local function g(v, d)   -- число без лишних нулей
+  local s = ('%.' .. d .. 'f'):format(v)
+  if s:find('%.') then s = s:gsub('0+$', ''):gsub('%.$', '') end
+  return s
+end
+
+function FP.compact(text)
+  local u = FP.unit(text)
+  local n = FP.num(text)
+  if not n then return trim(text) end
+  if n == -math.huge then return '-inf' end
+  local a = math.abs(n)
+  if u == 'hz' then
+    if a >= 10000 then return g(n / 1000, 1) .. 'k' elseif a >= 1000 then return g(n / 1000, 2) .. 'k'
+    elseif a >= 100 then return g(n, 0) elseif a >= 10 then return g(n, 1) end
+    return g(n, 2)
+  elseif u == 'time' then
+    if a >= 10000 then return g(n / 1000, 1) .. 's' elseif a >= 1000 then return g(n / 1000, 2) .. 's'
+    elseif a >= 10 then return g(n, 0) .. 'ms' end
+    return g(n, 1) .. 'ms'
+  elseif u == 'db' then return (n > 0 and '+' or '') .. g(n, 1)
+  elseif u == 'pct' then return g(n, a >= 10 and 0 or 1) .. '%'
+  elseif u == 'semi' then return (n > 0 and '+' or '') .. g(n, 1) .. 'st'
+  elseif u == 'cent' then return (n > 0 and '+' or '') .. g(n, 0) .. 'ct' end
+  return trim(text)
+end
+
+-- словарь: слово (нижний регистр) → сокращение; порядок не важен, применяются по одному, пока не влезет
+FP.ABBR = {
+  highpass = 'hp', lowpass = 'lp', bandpass = 'bp', notch = 'ntch', feedback = 'fb', frequency = 'freq',
+  resonance = 'reso', cutoff = 'cut', attack = 'att', decay = 'dec', sustain = 'sus', release = 'rel',
+  amount = 'amt', envelope = 'env', oscillator = 'osc', volume = 'vol', level = 'lvl', detune = 'det',
+  keytrack = 'kt', velocity = 'vel', modulation = 'mod', depth = 'dpt', offset = 'offs', width = 'wid',
+  balance = 'bal', filter = 'flt', shape = 'shp', phase = 'ph', drive = 'drv', octave = 'oct', pitch = 'ptch',
+  channel = 'ch', stereo = 'st', position = 'pos', threshold = 'thr', ratio = 'rat', gain = 'gn', range = 'rng',
+  minimum = 'min', maximum = 'max', start = 'st', ['end'] = 'end', note = 'nt', voices = 'vox', sample = 'smp',
+  crossfade = 'xf', length = 'len', mode = 'md', type = 'typ', time = 't', rate = 'rt', delay = 'dly',
+  reverb = 'rvb', chorus = 'chr', distortion = 'dist', compressor = 'comp', ring = 'rng', noise = 'nz',
+  global = 'gl', portamento = 'porta', pitchbend = 'pb', bend = 'bnd', round = 'rnd', robin = 'rb',
+}
+
+function FP.abbr(name, n)
+  name = trim(name)
+  if #name <= n then return name end
+  local words = {}
+  for w in name:gmatch('%S+') do words[#words + 1] = w end
+  local function join() return table.concat(words, ' ') end
+  -- 1) словарь: с самого длинного слова
+  local order = {}
+  for i = 1, #words do order[i] = i end
+  table.sort(order, function(a, b) return #words[a] > #words[b] end)
+  for _, i in ipairs(order) do
+    local a = FP.ABBR[words[i]:lower()]
+    if a then words[i] = a; if #join() <= n then return join() end end
+  end
+  -- 2) без гласных в словах длиннее 3 (первая буква остаётся)
+  for _, i in ipairs(order) do
+    local w = words[i]
+    if #w > 3 then words[i] = w:sub(1, 1) .. w:sub(2):gsub('[aeiouAEIOU]', ''); if #join() <= n then return join() end end
+  end
+  -- 3) без пробелов, потом обрезка
+  local s = join()
+  if #s > n then s = s:gsub(' ', '') end
+  return s:sub(1, n)
+end
+
+return FP
