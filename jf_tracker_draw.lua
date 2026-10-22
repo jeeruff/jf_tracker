@@ -9625,7 +9625,7 @@ function D.frame(L, snap, rows, state, info)
         local tallh = spos and spos[pi] and spos[pi][3] or 1
         if tallh > 1 then
           local labs = (info.step_labels and info.step_labels(f, p)) or {}
-          local cur = math.floor(v.n * (p.nsteps - 1) + 0.5)
+          local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           local x0 = bxc + L.pad
           local nmh = tallh * L.rh
           local ncol_c = pins and U.RED or (psel and U.AMBER or U.TEXT)
@@ -9649,7 +9649,9 @@ function D.frame(L, snap, rows, state, info)
         if adsr and pi >= adsr and pi <= adsr + 3 then
           local gx, gw = bxc + L.pad, pw
           local gy0, gh = py - (pi - adsr) * L.rh, 4 * L.rh
-          local labw = math.min(math.floor(gw * 0.45), ms('S +00.00') + L.pad)
+          local lmax = ms('S +00.00')   -- 22 окт: по самому длинному значению A D S R (было — «A 19.2 m»)
+          for o2 = 0, 3 do local vv = vals[adsr + o2]; if vv and vv.s then lmax = math.max(lmax, ms('A ' .. vv.s)) end end
+          local labw = math.min(math.floor(gw * 0.55), lmax + L.pad)
           local ex0, ex1 = gx + 4, gx + gw - labw - 4
           if pi == adsr then
             set(U.mix(U.BG, U.TEXT, 0.05)); gfx.rect(gx, gy0 + 1, gw - labw, gh - 2, 1)
@@ -9691,7 +9693,7 @@ function D.frame(L, snap, rows, state, info)
           set(on and acc or U.BG); gfx.rect(wx0, py + 3, sz, sz, 1)
           set(on and acc or U.LINE); gfx.rect(wx0, py + 3, sz, sz, 0)
         elseif p.kind == 'steps' and p.nsteps then
-          local cur = math.floor(v.n * (p.nsteps - 1) + 0.5)
+          local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           -- выбором (4 окт): подписи положений в ряд — текущее голубым, под
           -- мышью янтарным, клик выбирает; не влезают — квадраты, как раньше
           local labs = info.step_labels and info.step_labels(f, p)
@@ -9747,7 +9749,8 @@ function D.frame(L, snap, rows, state, info)
           elseif info.param_bipolar and info.param_bipolar(f, p) then
             -- 22 окт: ноль посередине (pan, pitch, детюн) — ромбик от центра, как пан в шапке трека
             local ispan = (p.name or ''):lower():match('pan') ~= nil
-            U.dslider(wx0, cy, ww, v.n, true, cc or acc, psel, L.rh, ispan)
+            local dr = math.max(3, math.floor((L.rh - 6) / 2))   -- 22 окт: ромб на краю не наезжает на значение
+            U.dslider(wx0 + dr, cy, math.max(4, ww - 2 * dr), v.n, true, cc or acc, psel, L.rh, ispan)
           else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
           -- цвет категории (громкость / фильтр / время …) — заливкой слайдера,

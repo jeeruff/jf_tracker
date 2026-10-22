@@ -1795,6 +1795,7 @@ ctx = {
   -- значение на этот параметр у каждого RS5K кита (общий контроль)
   fx_write = function(track, f, p, v)
     v = math.max(0, math.min(1, v))
+    if p and p.stepnorm then v = model.step_value(p, math.floor(v * (p.nsteps - 1) + 0.5)) end   -- 22 окт: распознанные ступени — середина участка
     local A = model.fxapi(track)
     if f and f.kit and f.kit_all and f.kids then
       -- 16 окт: пэд drumrs5k бывает подконтейнером — пишем в его RS5K; эффекты пэдов (у кого есть) — нет
@@ -1956,8 +1957,8 @@ ctx = {
     if not (p.kind == 'steps' and p.nsteps) then vim.msg = (p.name or 'param') .. ': i - type a value'; return end
     local labs = ctx.step_labels(f, p) or {}
     local tr, n = col.track, p.nsteps
-    local cur = math.floor(A.GetParamNormalized(tr, fx, p.i) * (n - 1) + 0.5)
-    local function setk(k2) edit.fx_param(tr, fx, p.i, k2 / math.max(1, n - 1)) end
+    local cur = model.step_index(p, A.GetParamNormalized(tr, fx, p.i))
+    local function setk(k2) edit.fx_param(tr, fx, p.i, model.step_value(p, k2)) end
     if n <= 35 then
       local KEYS, list = '123456789abcdefghijklmnopqrstuvwxyz', {}
       for k2 = 0, n - 1 do list[#list + 1] = { key = KEYS:sub(k2 + 1, k2 + 1), label = (labs[k2 + 1] or tostring(k2)) .. (k2 == cur and '  *' or ''), fn = function() setk(k2) end } end
@@ -14198,6 +14199,7 @@ ctx.load_user_themes()                                   -- свои темы и
 if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
+draw.step_index = model.step_index   -- 22 окт: ступени, распознанные по тексту (середины участков)
 -- Theme Adjuster / смена темы (2 окт): раз в секунду подпись темы; изменилась —
 -- палитра перечитывается (jf_looper_ui не трогаем: свежая копия, поля в U),
 -- draw заново выводит свои цвета, кэши картинок текста и цветов сброшены

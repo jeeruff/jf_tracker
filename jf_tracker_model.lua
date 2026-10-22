@@ -1315,6 +1315,60 @@ function M.param_bipolar(tr, fx, pi, name, key)
   bip_cache[key] = c
   return c
 end
+-- 22 окт: параметр, который плагин отдаёт непрерывным, а значений у него мало (Surge subtype: Clean / Dirty):
+-- 33 точки хода по тексту (FormatParamValueNormalized — без записи); 2..8 разных подписей → ступени,
+-- положение ступени — середина её участка. Чистое ядро — M.steps_from_texts (тест).
+function M.steps_from_texts(texts)
+  local labels, norms, cur, a = {}, {}, nil, nil
+  local n = #texts
+  for k = 1, n do
+    local t = texts[k]
+    if t == nil or t == '' then return nil end
+    if t ~= cur then
+      if cur then norms[#norms + 1] = ((a - 1) + (k - 2)) / 2 / (n - 1) end
+      cur, a = t, k
+      for _, l in ipairs(labels) do if l == t then return nil end end   -- подпись вернулась — не ступени
+      labels[#labels + 1] = t
+      if #labels > 8 then return nil end
+    end
+  end
+  norms[#norms + 1] = ((a - 1) + (n - 1)) / 2 / (n - 1)
+  if #labels < 2 then return nil end
+  return labels, norms
+end
+local disc_cache = {}
+function M.discretize(tr, out)
+  local A = M.fxapi(tr)
+  if not A.FormatParamValueNormalized then return end
+  local function one(e, p)
+    if p.kind ~= 'slider' or p.show or p.head then return end
+    local fx = p.fx or e.i
+    local key = (e.fxname or e.name or '?') .. '|' .. tostring(p.fx and 'k' or '') .. '|' .. p.i
+    local c = disc_cache[key]
+    if c == nil then
+      local texts = {}
+      for k = 0, 32 do local ok, t = A.FormatParamValueNormalized(tr, fx, p.i, k / 32, ''); texts[#texts + 1] = ok and t or nil end
+      local labels, norms = M.steps_from_texts(texts)
+      c = labels and { labels = labels, norms = norms } or false
+      disc_cache[key] = c
+    end
+    if c then p.kind, p.nsteps, p.labels, p.stepnorm = 'steps', #c.labels, c.labels, c.norms end
+  end
+  for _, e in ipairs(out) do for _, p in ipairs(e.params or {}) do one(e, p) end end
+end
+-- индекс ступени по значению 0..1: у «распознанных» — ближайшая середина участка
+function M.step_index(p, v)
+  if p.stepnorm then
+    local best, bd = 0, nil
+    for k, nv in ipairs(p.stepnorm) do local d = math.abs(nv - v); if not bd or d < bd then best, bd = k - 1, d end end
+    return best
+  end
+  return math.floor(v * math.max(1, (p.nsteps or 2) - 1) + 0.5)
+end
+function M.step_value(p, k)
+  if p.stepnorm then return p.stepnorm[k + 1] or 0 end
+  return k / math.max(1, (p.nsteps or 2) - 1)
+end
 local function param_entry(tr, fx, pi, label)
   local A = M.fxapi(tr)
   local _, pname = A.GetParamName(tr, fx, pi, '')
@@ -1483,6 +1537,7 @@ function M.track_fx(tr)
     return c.out
   end
   local out = build_track_fx(tr)
+  M.discretize(tr, out)   -- 22 окт: «непрерывные» с 2..8 подписями (Surge subtype) — ступени
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
   mark_params(tr, A, out)
