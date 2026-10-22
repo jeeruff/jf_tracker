@@ -14,4 +14,18 @@ key('w'); eq('w on the last wraps to the first', sel.fx, 1)
 key('2w'); eq('2w: two modules on', sel.fx, 3)
 DK.pslider = true; key('w'); eq('w from a parameter slider: next module', sel.fx, 4); eq('…slider closed', DK.pslider, nil)
 DK.pads = true; sel.fx = 2; DK.pad_param_key = nil; key('w'); eq('pads mode: w is not module navigation', sel.fx, 2); DK.pads = nil
+-- 22 окт: INSERT параметра (i)
+do
+  local got
+  DK.init({ msg = function() end, dsp_value = function() end, dsp_type_entry = function(k, pi, buf) got = k .. ':' .. pi .. ':' .. buf end })
+  local s2 = { fx = 2, param = 3 }
+  local function k2(str) for ch in str:gmatch('.') do DK.key(ch:byte(), s2, 4, 9, {}) end end
+  k2('i'); eq('i opens the parameter INSERT', DK.ins ~= nil, true)
+  k2('hp2'); DK.key(8, s2, 4, 9, {}); eq('letters and digits go to the buffer, BS erases', DK.ins.buf, 'hp')
+  DK.key(13, s2, 4, 9, {}); eq('Enter sends the entry', got, '2:3:hp'); eq('…and closes it', DK.ins, nil)
+  k2('i'); k2('12'); DK.key(27, s2, 4, 9, {}); eq('Esc cancels', DK.ins, nil); eq('…nothing sent', got, '2:3:hp')
+  DK.digits_play = true; DK.pslider = true
+  local r = DK.key(('5'):byte(), s2, 4, 9, {}); eq('KEYS on: a digit is not captured', r, false); eq('…no count', DK.num, nil)
+  DK.digits_play = false; DK.pslider = nil
+end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)

@@ -3,6 +3,7 @@
 -- Объект — эффект (блок) цепочки трека курсора, внутри — параметр.
 --   h l          эффект влево / вправо      j k        параметр
 --   w W          следующий / предыдущий модуль (по кругу, N w; и из слайдера параметра)
+--   i            INSERT параметра (22 окт): число или начало имени значения, Enter / Esc; вне — цифры и буквы ноты KEYS
 --   + - ^A ^X    значение (Shift — грубо)   Enter b    тоггл / bypass
 --   dd           удалить эффект (v — диапазон)
 --   dc           распаковать контейнер (дети в цепочку, контейнер долой)
@@ -82,6 +83,21 @@ function DK.key(c, sel, n, np, mods)
   if DK.anchor and (ch == 'd' or ch == 'x') then local r0, r1 = DK.range(sel); ctx.dsp_delete(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'c' then local r0, r1 = DK.range(sel); ctx.dsp_pack(r0, r1); DK.anchor = nil; return true end
   if DK.anchor and ch == 'y' then ctx.dsp_yank(sel.fx); DK.anchor = nil; return true end
+  -- 22 окт: INSERT параметра (i): набор числа или начала имени значения, Enter — записать, Esc — отмена;
+  -- вне него цифры и буквы — ноты KEYS (DSP их не перехватывает)
+  if DK.ins then
+    if c == 27 then DK.ins = nil; ctx.msg('parameter: entry cancelled'); return true end
+    if c == 13 then local buf = DK.ins.buf; DK.ins = nil; if buf ~= '' and ctx.dsp_type_entry then ctx.dsp_type_entry(sel.fx, sel.param, buf) end; return true end
+    if c == 8 then DK.ins.buf = DK.ins.buf:sub(1, -2); return true end
+    if c == UP or c == DOWN then sel.param = math.max(1, math.min(math.max(1, np), sel.param + (c == DOWN and 1 or -1))); DK.ins.buf = ''; return true end
+    if c >= 32 and c < 127 then DK.ins.buf = DK.ins.buf .. string.char(c); return true end
+    return true
+  end
+  if ch == 'i' and not DK.pads and np > 0 then
+    DK.ins = { buf = '' }; DK.pslider = true; DK.num = nil
+    ctx.msg('-- INSERT parameter --  type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter - set, Esc - cancel')
+    return true
+  end
   -- 22 окт: w / W — следующий / предыдущий модуль (как w в трекере — к следующему событию), по кругу, N w;
   -- из слайдера параметра тоже (он закрывается); в режиме пэдов w — буква параметра vel lo
   if (ch == 'w' or ch == 'W') and not DK.pads then
@@ -109,20 +125,15 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
   end
-  -- 21 окт: число на параметре: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 23 Enter — значение 23
-  -- (в единицах параметра), 023 Enter — 0.23; цифры — когда параметр в фокусе (слайдер) или клавиатура не играет
-  if (ch:match('^%d$') or (ch == '.' and DK.num)) and (DK.pslider or not DK.digits_play) then
+  -- 21 окт: счётчик: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 3w; 22 окт: только когда клавиатура не играет
+  -- (KEYS — цифры ноты); значение числом — в INSERT параметра (i)
+  if ch:match('^%d$') and not DK.digits_play then
     DK.num = (DK.num or '') .. ch
-    ctx.msg(('%s - h l: step x%s, j k: %s params, Enter: set the value, Esc: cancel'):format(DK.num, DK.num, DK.num)); return true
+    ctx.msg(('%s - h l: step x%s, j k: %s params, w: %s modules, Esc: cancel'):format(DK.num, DK.num, DK.num, DK.num)); return true
   end
   local num = DK.num; DK.num = nil
-  if num and c == 27 then ctx.msg('number cancelled'); return true end
+  if num and c == 27 then ctx.msg('count cancelled'); return true end
   local cnt = num and tonumber(num) or nil
-  if num and c == 13 then
-    local v = (num:match('^0%d') and not num:find('.', 1, true)) and tonumber('0.' .. num:sub(2)) or tonumber(num)
-    if v and ctx.dsp_type_value then ctx.dsp_type_value(sel.fx, sel.param, v) end
-    return true
-  end
   if cnt and (ch == 'j' or c == DOWN or ch == 'k' or c == UP) then
     sel.param = math.max(1, math.min(math.max(1, np), sel.param + ((ch == 'j' or c == DOWN) and cnt or -cnt))); return true
   end

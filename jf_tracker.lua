@@ -1832,6 +1832,39 @@ ctx = {
     vim.msg = ('%s = %s (u - undo)'):format(p.name or 'param', shown or tostring(v))
     local _ = old
   end,
+  -- 22 окт: INSERT параметра (i, Enter): число — как dsp_type_value (023 = 0.23), иначе — начало имени значения
+  -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
+  dsp_type_entry = function(k, pi, buf)
+    local num = buf:match('^%s*([-+]?[%d%.]+)%s*$')
+    if num and tonumber(num) then
+      local v = (num:match('^0%d') and not num:find('.', 1, true)) and tonumber('0.' .. num:sub(2)) or tonumber(num)
+      return ctx.dsp_type_value(k, pi, v)
+    end
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then return end
+    local A = model.fxapi(col.track)
+    local id = p.fx or f.i
+    local want = buf:lower():gsub('^%s+', ''):gsub('%s+$', '')
+    local old = A.GetParamNormalized(col.track, id, p.i)
+    local n = (p.nsteps and p.nsteps > 1) and p.nsteps or (p.kind == 'toggle' and 2 or 101)
+    local hit, contains
+    for kk = 0, n - 1 do
+      local x = kk / (n - 1)
+      A.SetParamNormalized(col.track, id, p.i, x)
+      local _, s2 = A.GetFormattedParamValue(col.track, id, p.i, '')
+      local sl = (s2 or ''):lower():gsub('^%s+', '')
+      if sl:sub(1, #want) == want then hit = x; break end
+      if not contains and sl:find(want, 1, true) then contains = x end
+    end
+    A.SetParamNormalized(col.track, id, p.i, old)
+    hit = hit or contains
+    if not hit then vim.msg = ('%s: no value starts with "%s"'):format(p.name or 'param', buf); return end
+    edit.run('fx value ' .. (p.name or ''), function() ctx.fx_write(col.track, f, p, hit) end)
+    model.invalidate()
+    local _, shown = A.GetFormattedParamValue(col.track, id, p.i, '')
+    vim.msg = ('%s = %s (u - undo)'):format(p.name or 'param', shown or buf)
+  end,
   dsp_enter = function(k, pi)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
@@ -13575,6 +13608,7 @@ ctx = {
   end,
   set_focus = function(f)
     if f ~= 'fxb' then ctx.fxb_pad = nil end
+    if f ~= 'dsp' then DK.ins = nil end   -- 22 окт: INSERT параметра не висит после ухода из DSP
     if f == 'tracker' then ctx.drum_target = nil end   -- 19 окт: вернулся в трекер — браузер снова шлёт на трек   -- 19 окт: ушли из браузера эффектов — слот пэда больше не ждёт
     -- 11 окт: модуль mixer — часть трекера (полоски его колонок): фокус — трекер с флагом
     -- mixfocus (рамка — у mixer, Cmd+hjkl от него, k j громкость / h l пан трека курсора)
@@ -19260,7 +19294,7 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsp_ins = state.focus == 'dsp' and DK.ins or nil, hdrmeter = state.hdrmeter, kitsize = state.kitsize,
     kit_wave = ctx.kit_wave,
     midi_in_age = function(col)   -- 19 окт: метр MIDI: возраст события и velocity последней ноты
       local t = ctx.midi_in_t and ctx.midi_in_t[col.guid]
@@ -25134,6 +25168,7 @@ local function frame()
         -- в vim уходят только командная строка и поиск (: /)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
+        if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
         -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
@@ -25148,7 +25183,7 @@ local function frame()
         -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
         -- 21 окт: цифры — числу параметра, когда параметр в фокусе (слайдер) или набор числа уже идёт; иначе — нотам клавиатуры
         DK.digits_play = vim.piano or vim.mode == 'insert'
-        local numkey = (DK.pslider or DK.num) and ch:match('^[%d%.]$')
+        local numkey = DK.num and not DK.digits_play and ch:match('^%d$')   -- 22 окт: значение — в INSERT параметра (i); цифры при KEYS — ноты
         if not DK.pending and not numkey and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()

@@ -4590,9 +4590,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local vc = info.vcur
     local f = vc and L.flat and L.flat[vc.fi]
     if f and f.col then
-      local fname = f.env and (f.env.name or 'envelope') or (vc.sub == 'inst' and 'inst') or (vc.sub == 'wave' and 'wave') or (vc.sub == 'slc' and 'slice') or (vc.sub == 'pan' and 'pan')
-        or ({ 'note', 'vol', 'delay' })[vc.field or 1] or ('fx ' .. ((vc.field or 1) - 3))
-      local fcol = not f.env and (D.field_rgb(vc.sub or vc.field or 1) or (vc.sub == 'inst' and U.TEXT))
+      local fname = D.cursor_field_name(f, vc)
+      local fcol = not f.env and not f.ml and not f.folded and (D.field_rgb(vc.sub or vc.field or 1) or (vc.sub == 'inst' and U.TEXT))
       local l1 = (f.col.name ~= '' and f.col.name) or 'track'
       local l2 = ('%04d'):format(math.max(0, vc.row or 0))
       local cl = ms('col') + L.pad          -- пробел в битмапе — нулевой ширины: отступ L.pad
@@ -4751,6 +4750,18 @@ end
 D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
+-- 22 окт: имя колонки под курсором (инфо у клавиатуры): MIDI-лейн (PB, CC74, cmd, chord, visor) и сложенный
+-- трек — своим именем; было — по номеру поля, и курсор на PB показывал «note»
+function D.cursor_field_name(f, vc)
+  if not f then return '' end
+  if f.env then return f.env.name or 'envelope' end
+  if f.ml then return f.ml.name or f.ml.kind or 'lane' end
+  if f.folded then return 'folded' end
+  local sub = vc and vc.sub
+  if sub == 'inst' then return 'inst' elseif sub == 'wave' then return 'wave' elseif sub == 'slc' then return 'slice' elseif sub == 'pan' then return 'pan' end
+  local fld = (vc and vc.field) or 1
+  return ({ 'note', 'vol', 'delay' })[fld] or ('fx ' .. (fld - 3))
+end
 function D.draw_mode(L, sx0, sy0, sw, str, dry)
   local mode = (str or ''):match('^([^|]*)') or ''
   -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
@@ -8369,8 +8380,9 @@ function D.frame(L, snap, rows, state, info)
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
       local in_rng = info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
-      set((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM)); gfx.rect(bx, by, bw, bh, 0)
-      if info.dsp_learn == k then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
+      local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
+      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)
+      if info.dsp_learn == k or ins_here then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       if htab > 0 then
         local tx, ty = bx + 1, by + bh - htab - 1
         set(U.LINE); gfx.rect(bx + 1, ty - 1, bw - 2, 1, 1)
@@ -9374,9 +9386,10 @@ function D.frame(L, snap, rows, state, info)
         if f.view == 'rec' then bxc = bx + bw - bw1; py = by + bh - (#f.params - pi + 2) * L.rh - 3 end   -- строка статуса, справа
         local v = vals[pi] or { n = 0, s = '' }
         local psel = is_sel and sel.param == pi
+        local pins = psel and info.dsp_ins   -- 22 окт: INSERT параметра (i) — красным, набор вместо значения
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
-        local acc = psel and U.AMBER or U.TEXT
+        local acc = pins and U.RED or (psel and U.AMBER or U.TEXT)
         local nw = math.floor(pw * 0.40)
         local wx0 = bxc + L.pad + nw
         local ww = math.floor(pw * 0.34)
@@ -9420,7 +9433,14 @@ function D.frame(L, snap, rows, state, info)
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
         end
-        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), psel and U.AMBER or U.TEXT)
+        text(bxc + L.pad, py, fit(p.name, nw - L.pad - ms(p.mk or '')) .. (p.mk or ''), pins and U.RED or (psel and U.AMBER or U.TEXT))
+        if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
+          local ix = steps_inline and wx0 or vx
+          local iw = bxc + L.pad + pw - ix
+          set(U.BG); gfx.rect(ix, py, iw, L.rh, 1)
+          text(ix, py, fit(info.dsp_ins.buf .. '_', iw), U.RED)
+          steps_inline = true   -- значение ниже не рисовать
+        end
         -- 19 окт: пэд drumrs5k — буква-хоткей параметра оранжевым (прыжок в режиме пэдов)
         if f.kit and D.DR and p.kid and not psel then
           local hk = D.PADKEYS[(p.name or ''):lower()]
