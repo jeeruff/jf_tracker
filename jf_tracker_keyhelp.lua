@@ -141,6 +141,7 @@ KH.PAGES = {
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },
     { k = 'Ctrl+Cmd+F12', d = 'restart the tracker from its files (as :reload) - after an update, no REAPER restart' },
     { k = 'zf zF', d = 'DSP: fold the module under the cursor into a narrow strip (x B on top, its name vertically; zf again or a click on the name - unfold) / fold all modules (all folded - unfold all)' },
+    { k = 'zl', d = 'DSP: the list of all modules of the chain (type to search), Enter - the cursor on it' },
     { k = 'zp', d = 'DSP: the preset list of the module under the cursor (also when its < preset > does not fit in the header)' },
     { k = 'zP', d = 'DSP: Surge XT - all pages in one pane (default) / one page with tabs along the bottom; other big plugins get tabs by themselves (main + osc filter env lfo mod fx found in the parameter names)' },
     { k = 'zss zsm zsl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },

@@ -25243,6 +25243,13 @@ local function frame()
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
             vim.msg = model.dsp_fold and 'zP: Surge pages folded - one page, tabs along the bottom of the module' or 'zP: Surge pages unfolded - all of them in one pane'
+          elseif ch == 'l' then   -- 22 окт: zl — список всех модулей цепочки (fzf), выбор — курсор на модуль
+            local col0 = dsp_target(); local items = {}
+            for k, f0 in ipairs(col0 and col0.fx or {}) do
+              items[#items + 1] = { label = ('%d  %s%s%s'):format(k, f0.name or '?', f0.enabled and '' or '  (off)', (state.dsp_mfold or {})[tostring(f0.fguid or f0.i)] and '  (folded)' or ''), k = k }
+            end
+            if #items == 0 then vim.msg = 'zl: no fx on this track'
+            else vim.open_picker(('DSP: %d modules of %s'):format(#items, col0.name or 'track'), items, function(it) dsp_sel.fx = it.k; dsp_sel.param = 1; DK.pslider = nil end) end
           elseif ch == 'f' and DK.picked(dsp_sel) then for _, k in ipairs(DK.picked(dsp_sel)) do ctx.dsp_mfold(k) end; DK.clear_pick()   -- 22 окт: выбранные модули
           elseif ch == 'f' or ch == 'F' then ctx.dsp_mfold(ch == 'F' and 'all' or dsp_sel.fx)   -- 22 окт: сложить модуль / все
           end
@@ -25253,7 +25260,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, f - fold the module, F - fold / unfold all, p - presets of the module, P - Surge pages, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - Surge pages, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
