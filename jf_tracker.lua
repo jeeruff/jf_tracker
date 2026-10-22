@@ -2015,6 +2015,7 @@ ctx = {
       elseif tab == 'pm' then ctx.premod_do(col, c, f, p, 'toggle') end
       ctx.tmod = nil
     elseif w == 'pick' then if ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
+    elseif w == 'follow' then ctx.mod_follow(col, id, p.i, p.name)
     elseif w == 'envshow' then edit.run('show envelope', function() local env = reaper.GetFXEnvelope(col.track, id, p.i, true); reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true) end); state.envs = true; model.invalidate()
     elseif w == 'shape' then edit.mod_cfg(col.track, id, p.i, 'lfo.shape', h.v, 'lfo shape')
     elseif w == 'sync' then local m = ctx.modsel_c; edit.mod_cfg(col.track, id, p.i, 'lfo.temposync', (m and m.sync) and 0 or 1, 'lfo tempo sync')
@@ -2052,6 +2053,22 @@ ctx = {
   end,
   -- 22 окт: premod — кривая автоматизации ДО каждой ноты трека (как клипы автоматизации FL),
   -- нативно: pooled automation items на огибающей параметра, edit.pk_* (jf_tracker_premod.lua)
+  -- 22 окт: follow из панели mod — параметр следует за громкостью другого трека / другой огибающей: огибающая
+  -- параметра колонкой в трекере (курсор туда), генератор вкладки automation в режиме follow (src, p — точки)
+  mod_follow = function(col, id, pi, pname)
+    local env
+    edit.run('automate ' .. (pname or 'param'), function()
+      env = reaper.GetFXEnvelope(col.track, id, pi, true)
+      if env then reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true); reaper.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true); reaper.TrackList_AdjustWindows(false) end
+    end)
+    if not env then vim.msg = 'follow: no envelope for ' .. (pname or 'the parameter'); return end
+    state.trackenvs[col.guid] = true
+    ctx.env_jump = { env = env, name = pname }; model.invalidate()
+    LG.type = 'follow'
+    state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'
+    if state.panes_ui and ctx.pane_focus then ctx.pane_focus('automation') else ctx.set_focus('top') end
+    vim.msg = ('follow: %s - its envelope is the cursor column; automation tab, type follow: pick the source (src: a track audio or an envelope), p - write the points'):format(pname or 'param')
+  end,
   premod_do = function(col, c, f, p, what)
     if not c.selkey then vim.msg = 'premod: pick a parameter in DSP first'; return end
     local tr, i, pc = col.track, c.selpki, c.selpk

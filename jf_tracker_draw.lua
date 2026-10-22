@@ -3403,7 +3403,7 @@ function D.mod_section(L, info, col, tm, x, y, w, h, hover)
   if tab == 'lfo' then top[#top + 1] = { 'sync', 'sync', m.sync }
   elseif tab == 'acs' then top[#top + 1] = { 'chan', m.chan34 and 'in 3/4' or 'in 1/2', m.chan34 }; top[#top + 1] = { 'side', 'side' }
   elseif tab == 'lnk' then top[#top + 1] = { 'pick', 'source' }
-  elseif tab == 'env' then top[#top + 1] = { 'envshow', 'show' }
+  elseif tab == 'env' then top[#top + 1] = { 'envshow', 'show' }; top[#top + 1] = { 'follow', 'follow' }   -- 22 окт: за другим треком / огибающей
   elseif tab == 'pm' and m.pk then
     top[#top + 1] = { 'pkpre', 'pre ' .. (PK_PRE[m.pk.pre] or ('%g'):format(m.pk.pre)) }
     top[#top + 1] = { 'pkkey', 'key', m.pk.key }; top[#top + 1] = { 'pkvel', 'vel', m.pk.vel }
