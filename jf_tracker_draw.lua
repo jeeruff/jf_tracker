@@ -3130,6 +3130,39 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   if D.sendpop == col.guid then
     D.late_send = function() D.draw_sendpop(L, info, col, io, x, ry0, hover) end
   end
+  -- 22 окт: быстрые пресеты трека — XY-пэд на пустом месте, в углах снапшоты 1..4 (все параметры FX трека),
+  -- шайба — морф между ними; щелчок по пустому углу — запомнить, по полному — вызвать, Shift — перезаписать
+  local sinfo = info.track_snaps and info.track_snaps(col)
+  local room = y + h - yy - 6
+  if sinfo and room >= 4 * L.rh then
+    local side = math.max(4 * L.rh, math.min(w - 2 * L.pad, room))
+    local px0, py0 = x + math.floor((w - side) / 2), yy + 3
+    local cbw = math.max(L.btn_w or 0, ms('4') + 6)
+    local onpad = mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side
+    set(U.BG); gfx.rect(px0, py0, side, side, 1)
+    set(onpad and U.AMBER or U.LINE); gfx.rect(px0, py0, side, side, 0)
+    set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(px0 + math.floor(side / 2), py0 + 1, 1, side - 2, 1); gfx.rect(px0 + 1, py0 + math.floor(side / 2), side - 2, 1, 1)
+    local corners = { { px0 + 1, py0 + 1 }, { px0 + side - cbw - 1, py0 + 1 }, { px0 + 1, py0 + side - L.rh }, { px0 + side - cbw - 1, py0 + side - L.rh } }
+    local oncorner
+    for i, c in ipairs(corners) do
+      local on = sinfo.has[i]
+      local hot = mx >= c[1] and mx < c[1] + cbw and my >= c[2] and my < c[2] + L.rh - 1
+      set(hot and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(c[1], c[2], cbw, L.rh - 1, 1)
+      set(hot and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(c[1], c[2], cbw, L.rh - 1, 0)
+      text(c[1] + math.floor((cbw - ms(tostring(i))) / 2), c[2], tostring(i), hot and U.AMBER or (on and U.TEXT or U.GREY))
+      if hot then hover.snapc = { col = col, i = i }; oncorner = true end
+      hint('snapc', c[1], c[2], cbw, L.rh - 1, { i = i })
+    end
+    local n = 0; for i = 1, 4 do if sinfo.has[i] then n = n + 1 end end
+    if n >= 2 then
+      local cx = px0 + math.floor(sinfo.x * (side - 1) + 0.5)
+      local cy = py0 + math.floor(sinfo.y * (side - 1) + 0.5)
+      U.diamond(cx, cy, math.max(3, math.floor(L.rh / 3)), (onpad or sinfo.drag) and U.AMBER or U.CYAN, sinfo.drag)
+    elseif n < 2 and side > ms('2 snapshots') + 2 * cbw then
+      text(px0 + math.floor((side - ms('corners: save')) / 2), py0 + math.floor(side / 2) - L.rh, 'corners: save', U.DIM)
+    end
+    if onpad and not oncorner then hover.snappad = { col = col, x0 = px0, y0 = py0, side = side } end
+  end
   U.TEXT, U.GREY = T0, G0
   set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
   return w
@@ -8400,7 +8433,9 @@ function D.frame(L, snap, rows, state, info)
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
     if info.pool_col and info.trk_io and info.dsptrack then
-      local used = D.track_block_v(L, info, info.pool_col, bx, boxy, boxh, hover, rawset_col)   -- 22 окт: вертикальной колонкой (было L.cw * 19 строками)
+      -- 22 окт: опция slim DSP track header — узкой вертикальной колонкой; по умолчанию — строками (L.cw * 19), под ними XY-пресеты
+      local used = info.dsptrackslim and D.track_block_v(L, info, info.pool_col, bx, boxy, boxh, hover, rawset_col)
+        or D.track_block(L, info, info.pool_col, bx, boxy, L.cw * 19, boxh, hover, rawset_col)
       if used > 0 then bx = bx + used + L.pad end
     end
     D.aw_status = nil

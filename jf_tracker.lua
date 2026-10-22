@@ -254,6 +254,7 @@ local state = {
   whichkey = flag('whichkey', true),              -- подсказка второй клавиши у курсора (7 окт)
   browserleft = flag('browserleft', false),       -- браузер слева над матрицей, вкладка fx (7 окт)
   eqgraph = flag('eqgraph', true),               -- ReaEQ в DSP: только график (кнопка P — только параметры), 7 окт
+  dsptrackslim = flag('dsptrackslim', false),    -- 22 окт: блок трека в DSP узкой вертикальной колонкой
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
   quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
@@ -751,7 +752,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -986,6 +987,7 @@ local retro_current, retro_preview, retro_put, retro_loop
 local track_actions, region_actions, event_actions, view_actions, mono_request, ctrl_action
 local MONO_ID = 9             -- id мода трекера на шине jf_mono
 ctx = {
+  SN = dofile(DIR .. '/jf_tracker_snaps.lua'),   -- 22 окт: снапшоты трека (XY-пресеты в DSP)
   tx = dofile(DIR .. '/jf_tracker_utf8.lua'),   -- 20 окт: TX.char / TX.bs — Юникод в полях ввода
   model = model, edit = edit, state = state, piano = keys.piano,
   keys_frow = function() return keys.layout == 'frow' end,
@@ -1848,6 +1850,67 @@ ctx = {
   end,
   -- 22 окт: INSERT параметра (i, Enter): число — как dsp_type_value (023 = 0.23), иначе — начало имени значения
   -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
+  -- 22 окт: снапшоты трека — 4 угла XY-пэда в DSP; хранение — P_EXT:jf_snaps трека, шайба — в памяти
+  snaps_of = function(col)
+    ctx.snapc = ctx.snapc or {}
+    local e = ctx.snapc[col.guid]
+    if not e or e.track ~= col.track then
+      local _, str = reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_snaps', '', false)
+      e = { track = col.track, snaps = ctx.SN.parse(str), x = 0.5, y = 0.5 }
+      ctx.snapc[col.guid] = e
+    end
+    return e
+  end,
+  snaps_info = function(col)
+    if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return nil end
+    local e = ctx.snaps_of(col)
+    return { has = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }, x = e.x, y = e.y, drag = ctx.snapdrag and ctx.snapdrag.col.guid == col.guid }
+  end,
+  snaps_write = function(col, e) reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_snaps', ctx.SN.ser(e.snaps), true) end,
+  snap_fxmap = function(tr)
+    local m = {}
+    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do local g = reaper.TrackFX_GetFXGUID(tr, fx); if g then m[g] = fx end end
+    return m
+  end,
+  snap_apply = function(tr, vals, fxmap, last)
+    for k, v in pairs(vals) do
+      if not last or math.abs((last[k] or -1) - v) > 1e-4 then
+        local g, pi = k:match('^(.-)|(%d+)$')
+        local fx = g and fxmap[g]
+        if fx then reaper.TrackFX_SetParamNormalized(tr, fx, tonumber(pi), v) end
+        if last then last[k] = v end
+      end
+    end
+  end,
+  snap_save = function(col, i)
+    local tr = col.track
+    local s = {}
+    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do
+      local g = reaper.TrackFX_GetFXGUID(tr, fx)
+      local np = reaper.TrackFX_GetNumParams(tr, fx)
+      for pi = 0, math.min(np - 3, 1024) - 1 do s[g .. '|' .. pi] = reaper.TrackFX_GetParamNormalized(tr, fx, pi) end   -- последние 3 — Bypass / Wet / Delta REAPER
+    end
+    local e = ctx.snaps_of(col)
+    e.snaps[i] = s
+    ctx.snaps_write(col, e)
+    e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
+    local n = 0; for _ in pairs(s) do n = n + 1 end
+    vim.msg = ('snapshot %d of %s saved: %d parameters of %d fx (click - recall, Shift+click - overwrite, drag the pad - morph)'):format(i, col.name or 'track', n, reaper.TrackFX_GetCount(tr))
+  end,
+  snap_recall = function(col, i)
+    local e = ctx.snaps_of(col)
+    if not e.snaps[i] then return ctx.snap_save(col, i) end
+    reaper.Undo_BeginBlock2(0)
+    ctx.snap_apply(col.track, e.snaps[i], ctx.snap_fxmap(col.track))
+    reaper.Undo_EndBlock2(0, 'jf_tracker: snapshot ' .. i, -1)
+    e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
+    model.invalidate()
+    vim.msg = ('snapshot %d recalled (u - undo)'):format(i)
+  end,
+  snap_clear = function(col, i)
+    local e = ctx.snaps_of(col); e.snaps[i] = nil; ctx.snaps_write(col, e)
+    vim.msg = ('snapshot %d cleared'):format(i)
+  end,
   -- 22 окт: fx list — A (Shift = выбранные) к выбранным трекам, n — на новый трек
   fxb_add_sel = function(it)
     it = it or FB.selected(); if not it then return end
@@ -11982,6 +12045,7 @@ ctx = {
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('panes_ui', 'panes', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs). Cmd+h j k l - focus, Cmd+Shift+h j k l - move, Ctrl+W - pane mode (split, stack, size, zoom, hide, layouts), :pane; click - focus, drag the line between panes - size. Off - the old fixed layout'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
+      flag('dsptrackslim', 'slim DSP track header', 'the DSP track block as a narrow vertical column (vertical vol / pan faders, in / out) - more room for the modules; off - rows with the XY snapshot pad under them'),
       flag('dsptrack', 'dsp track block', 'the track block on the left of the DSP panel: R I M S, volume, pan, input, output (off - the fx chain only)'),
       flag('synchdr', 'sync track header size', 'the track column follows the REAPER track height, both ways: low track - folded, middle - compact, tall - full; folding a column (za) sets the REAPER height'),
       flag('aipoints', 'automation item points', 'the points of automation items on the envelope lanes of the tracker (every loop pass), with their hex values'),
@@ -12058,7 +12122,7 @@ ctx = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dspmeters', 'dsptabs', 'eqgraph' } },
+      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -19353,7 +19417,8 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
+    track_snaps = function(col) return ctx.snaps_info(col) end,
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
       if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
@@ -22313,6 +22378,18 @@ local function frame()
         state.hscroll = L.hs_list[b + 1] or state.hscroll
       end
       click = { t = now2, zone = 'hsb' }
+    elseif hover.snapc then   -- 22 окт: угол XY-пресетов: пустой — запомнить, полный — вызвать, Shift — перезаписать
+      local h = hover.snapc
+      if ctx.mods().shift then ctx.snap_save(h.col, h.i) else ctx.snap_recall(h.col, h.i) end
+      click = { t = now2, zone = 'snapc' }
+    elseif hover.snappad then   -- шайба: морф между заполненными углами
+      local h = hover.snappad
+      local e = ctx.snaps_of(h.col)
+      local n = 0; for i = 1, 4 do if e.snaps[i] then n = n + 1 end end
+      if n >= 2 then
+        ctx.snapdrag = { col = h.col, x0 = h.x0, y0 = h.y0, side = h.side, keys = ctx.SN.diff_keys(e.snaps), fxmap = ctx.snap_fxmap(h.col.track), last = {}, e = e }
+      else vim.msg = 'XY presets: save at least two corners (click an empty corner)' end
+      click = { t = now2, zone = 'snappad' }
     elseif hover.trsbtn then
       local t = hover.trsbtn
       local open = draw.trspop and draw.trspop.guid == t.col.guid and draw.trspop.what == t.what
@@ -23449,6 +23526,14 @@ local function frame()
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
+  elseif U.rclick and hover.snapc then
+    local h = hover.snapc
+    local has = ctx.snaps_of(h.col).snaps[h.i] ~= nil
+    vim.open_hydra({ title = 'snapshot ' .. h.i, items = {
+      { key = 's', label = (has and 'overwrite' or 'save') .. ' with the track now', fn = function() ctx.snap_save(h.col, h.i) end },
+      has and { key = 'r', label = 'recall', fn = function() ctx.snap_recall(h.col, h.i) end } or nil,
+      has and { key = 'x', label = 'clear', fn = function() ctx.snap_clear(h.col, h.i) end } or nil } })
+    U.rclick = false
   elseif U.rclick and hover.trs and hover.trs.col and (hover.trs.what == 'pan' or hover.trs.what == 'width' or hover.trs.what == 'panl' or hover.trs.what == 'panr') then
     ctx.pan_menu(hover.trs.col)
   elseif U.rclick and hover.trs and hover.trs.col and hover.trs.what == 'vol' then
@@ -23693,6 +23778,23 @@ local function frame()
       b = math.max(0, math.min(L.hs_n - 1, b))
       state.hscroll = L.hs_list[b + 1] or state.hscroll
     else draw.hsb_drag = nil end
+  end
+  if ctx.snapdrag then   -- 22 окт: морф XY-пресетов, пока кнопка нажата; отпустил — одна отмена
+    local d = ctx.snapdrag
+    if gfx.mouse_cap & 1 == 1 and reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
+      local x = math.max(0, math.min(1, (gfx.mouse_x - d.x0) / math.max(1, d.side - 1)))
+      local y = math.max(0, math.min(1, (gfx.mouse_y - d.y0) / math.max(1, d.side - 1)))
+      if x ~= d.e.x or y ~= d.e.y or not d.moved then
+        d.e.x, d.e.y = x, y
+        local have = { d.e.snaps[1] ~= nil, d.e.snaps[2] ~= nil, d.e.snaps[3] ~= nil, d.e.snaps[4] ~= nil }
+        ctx.snap_apply(d.col.track, ctx.SN.blend(d.e.snaps, ctx.SN.weights(x, y, have), d.keys), d.fxmap, d.last)
+        d.moved = true
+      end
+      state.status = ('XY presets: morph %d parameters  x %.2f  y %.2f'):format(#d.keys, x, y)
+    else
+      if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: XY preset morph'); model.invalidate() end
+      ctx.snapdrag = nil
+    end
   end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then

@@ -535,6 +535,7 @@ KH.PAGES = {
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
     { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },
+    { k = 'XY presets', d = 'under the track block (option slim DSP track header off): 4 corners 1..4 - snapshots of every fx parameter of the track; click an empty corner - save, a filled one - recall, Shift+click - overwrite, right click - save / recall / clear; drag the pad - morph between the corners (one undo)' },
     { k = 'Ctrl+Enter', d = 'the dropdown of the parameter: a note (note lo / hi, root) - a keyboard of all octaves, a switch - the list of its values (a click on it - the same)' },
     { k = '^ $ N|', d = 'the first / last module, module N (3| - the third), as columns in Vim; Cmd+1..0 - a track, as in the tracker' },
     { k = 'dw db', d = 'delete modules: d3w - three from the cursor forward, db - the one before, d2b - two before (3dw too)' },
