@@ -24812,15 +24812,22 @@ local function frame()
   if L and L.flat then
     -- 22 окт: место курсора для 'b: скачок (другой модуль / трек / клетка / модуль DSP, строка дальше соседней) —
     -- прежнее место запоминается; шаги j k l h его не трогают
+    -- без новой таблицы в кадре, пока место то же: сравнение полей; таблица — только при смене
     do
-      local h = ctx.jump_here()
       local c0 = ctx.place_cur
-      if c0 then
-        local big = c0.focus ~= h.focus or c0.guid ~= h.guid or math.abs((c0.row or 0) - (h.row or 0)) > 1
-          or (h.focus == 'matrix' and (c0.ri ~= h.ri or c0.ci ~= h.ci)) or (h.focus == 'dsp' and c0.fx ~= h.fx)
-        if big and reaper.GetPlayState() & 1 == 0 then ctx.place_prev = c0 end   -- игра с follow тянет курсор — это не скачок
+      local f = L.flat[vim.cur.fi]
+      local g = f and f.col and f.col.guid
+      local same = c0 and c0.focus == state.focus and c0.guid == g and c0.row == vim.cur.row and c0.ri == MX.cur.ri
+        and c0.ci == MX.cur.ci and c0.fx == dsp_sel.fx and c0.param == dsp_sel.param
+      if not same then
+        local h = ctx.jump_here()
+        if c0 then
+          local big = c0.focus ~= h.focus or c0.guid ~= h.guid or math.abs((c0.row or 0) - (h.row or 0)) > 1
+            or (h.focus == 'matrix' and (c0.ri ~= h.ri or c0.ci ~= h.ci)) or (h.focus == 'dsp' and c0.fx ~= h.fx)
+          if big and reaper.GetPlayState() & 1 == 0 then ctx.place_prev = c0 end   -- игра с follow тянет курсор — это не скачок
+        end
+        ctx.place_cur = h
       end
-      ctx.place_cur = h
     end
   end
   local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
