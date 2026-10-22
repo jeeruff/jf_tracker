@@ -143,7 +143,7 @@ KH.PAGES = {
     { k = 'zf zF', d = 'DSP: fold the module under the cursor into a narrow strip (x B on top, its name vertically; zf again or a click on the name - unfold) / fold all modules (all folded - unfold all)' },
     { k = 'zl', d = 'DSP: the list of all modules of the chain (type to search), Enter - the cursor on it' },
     { k = 'zp', d = 'DSP: the preset list of the module under the cursor (also when its < preset > does not fit in the header)' },
-    { k = 'zP', d = 'DSP: Surge XT - all pages in one pane (default) / one page with tabs along the bottom; other big plugins get tabs by themselves (main + osc filter env lfo mod fx found in the parameter names)' },
+    { k = 'zP', d = 'DSP: modules with pages (Surge XT and every big plugin - its sections osc filter env lfo mod fx are found in the parameter names): all sections in one pane under their titles (default) / one page with tabs (where - option DSP page tabs)' },
     { k = 'zss zsm zsl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },

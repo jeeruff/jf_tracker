@@ -1688,12 +1688,24 @@ function build_one(tr, fx, out)
       -- автомодуль (3 окт): любой эффект — параметры по категориям и
       -- подгруппам (jf_tracker_fxclass.lua), кэш на тип плагина
       local am = M.auto_module(tr, fx, short, np)
-      local apages, apage
-      if am.pages then   -- 22 окт: вкладки автомодуля; страница — M.dsp_page[имя], как у Surge
+      local apages, apage, aheads
+      if am.pages and M.dsp_fold then   -- 22 окт: zP свёрнуто — одна страница, вкладки (main + секции); страница — M.dsp_page[имя]
         apages = {}
         for k2, pg in ipairs(am.pages) do apages[k2] = pg.name end
         apage = math.max(1, math.min(#am.pages, M.dsp_page[short] or 1))
         am = am.pages[apage].items
+      elseif am.pages then
+        -- 22 окт: zP развёрнуто (по умолчанию) — все секции одним пейном, заголовками: сначала главное вне секций, потом osc filter …
+        local insec, list = {}, {}
+        aheads = {}
+        for k2 = 2, #am.pages do for _, a in ipairs(am.pages[k2].items) do insec[a.i] = true end end
+        local first = true
+        for _, a in ipairs(am.pages[1].items) do if not insec[a.i] then if first then aheads[#list + 1] = 'main'; first = false end; list[#list + 1] = a end end
+        for k2 = 2, #am.pages do
+          aheads[#list + 1] = am.pages[k2].name
+          for _, a in ipairs(am.pages[k2].items) do list[#list + 1] = a end
+        end
+        am = list
       end
       for _, a in ipairs(am) do
         params[#params + 1] = { i = a.i, name = a.name, kind = a.kind, nsteps = a.nsteps, cat = a.cat, group = a.group }
@@ -1703,7 +1715,7 @@ function build_one(tr, fx, out)
       local aw = short:match('^(.-)%s*%([Aa]irwindows%)')
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = cols, auto = true, airwin = aw,
                         vproc = short:lower():find('video processor', 1, true) ~= nil,   -- 11 окт: Video processor — строка code / редактор кода
-                        pages = apages, page = apage }
+                        pages = apages, page = apage, heads = aheads }
     end
   end
 end

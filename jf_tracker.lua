@@ -25239,10 +25239,10 @@ local function frame()
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
-          elseif ch == 'P' then   -- 16 окт: модули со страницами (Surge): все сразу ↔ по одной; 22 окт: zP (было zf), вкладки строкой снизу
+          elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
             model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-            vim.msg = model.dsp_fold and 'zP: Surge pages folded - one page, tabs along the bottom of the module' or 'zP: Surge pages unfolded - all of them in one pane'
+            vim.msg = model.dsp_fold and 'zP: module pages folded - one page with tabs (Surge and every big plugin)' or 'zP: module pages unfolded - every section in one pane, under its title'
           elseif ch == 'l' then   -- 22 окт: zl — список всех модулей цепочки (fzf), выбор — курсор на модуль
             local col0 = dsp_target(); local items = {}
             for k, f0 in ipairs(col0 and col0.fx or {}) do
@@ -25260,7 +25260,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - Surge pages, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
