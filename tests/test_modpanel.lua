@@ -27,7 +27,7 @@ local MODSL = { lfo = { { 'lfo.speed', 'rate', 0.0039, 8, 'hz' } }, acs = { { 'a
 for _, tab in ipairs({ 'lfo', 'acs', 'lnk', 'env', 'pm' }) do
   local m = { tab = tab, act = { lfo = true, pm = true }, vals = {}, shape = 0, envpts = { { 0, 0.2 }, { 1, 0.8 } }, npts = 2,
     pk = { pre = 1, hum = 10, key = true }, curve = { pts = { { 0, 0 }, { 0.5, 0.7 }, { 1, 1 } } } }
-  local info = { modsel = function() return m end, modtab = function() return tab end, modsl = MODSL, midi_in = function() return 0, 100, 60 end, pm_phase = function() return 0.5 end }
+  local info = { modedit = function() return m end, modtab = function() return tab end, modsl = MODSL, midi_in = function() return 0, 100, 60 end, pm_phase = function() return 0.5 end }
   for _, w in ipairs({ L.cw * 19, L.cw * 8 }) do
     local hover = {}
     local ok, err = pcall(D.mod_section, L, info, col, tm, 0, 0, w, 20 * L.rh, hover)
@@ -38,7 +38,7 @@ for _, tab in ipairs({ 'lfo', 'acs', 'lnk', 'env', 'pm' }) do
 end
 -- ползунок: мышь на полосе lfo speed — hover с ключом и диапазоном
 do
-  local info = { modsel = function() return { tab = 'lfo', act = { lfo = true }, vals = { ['lfo.speed'] = 1 }, shape = 0 } end, modtab = function() return 'lfo' end, modsl = MODSL }
+  local info = { modedit = function() return { tab = 'lfo', act = { lfo = true }, vals = { ['lfo.speed'] = 1 }, shape = 0 } end, modtab = function() return 'lfo' end, modsl = MODSL }
   local found
   for yy = 0, 20 * L.rh, 2 do
     gfx.mouse_x, gfx.mouse_y = math.floor(L.cw * 9 + 4), yy

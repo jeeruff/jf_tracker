@@ -322,5 +322,28 @@ do
   PN.minimize(m5, id); eq('minimize again opens', PN.find(m5, id).min, nil)
   eq('tracker does not fold', PN.minimize(m5, 'tracker'), false)
 end
+-- 22 окт: zz в DSP — микшер над DSP на всё окно; zx — DSP полосой во всю ширину снизу
+do
+  local m6 = PN.DEFAULT()
+  eq('zoom_multi ok', PN.zoom_multi(m6, { 'mixer', 'dsp' }, { 0.3, 0.7 }), true)
+  local lay = PN.layout(m6, 1600, 900, M)
+  eq('zoom_multi: two cells', #lay.cells, 2)
+  local cm, cd = lay.by_panel.mixer, lay.by_panel.dsp
+  eq('mixer on top, whole width', cm and cm.y == 0 and cm.w == 1600, true)
+  eq('dsp below it', cd and cd.y > cm.y and cd.w == 1600, true)
+  eq('dsp the bigger part', cd and cd.h > cm.h, true)
+  PN.zoom_multi(m6, { 'mixer', 'dsp' })
+  eq('zoom_multi again: back', #PN.layout(m6, 1600, 900, M).cells > 2, true)
+  local m7 = PN.DEFAULT()
+  local stack0 = #PN.find(m7, 'browser').panes
+  eq('span_bottom ok', PN.span_bottom(m7, 'dsp', 0.3), true)
+  local l7 = PN.layout(m7, 1600, 900, M)
+  local d7 = l7.by_panel.dsp
+  eq('dsp spans the width', d7 and d7.x == 0 and d7.w == 1600, true)
+  eq('dsp at the bottom', d7 and d7.y + d7.h == 900, true)
+  eq('tracker still there', l7.by_panel.tracker ~= nil, true)
+  eq('neighbour stack keeps its tabs', #PN.find(m7, 'browser').panes, stack0)
+  eq('decode(encode) keeps it', PN.encode(PN.decode(PN.encode(m7))), PN.encode(m7))
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

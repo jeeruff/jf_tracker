@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 29287 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 29300 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2587 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 5141 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 848 | алиасы паттернов (этап 6). |
@@ -116,7 +116,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_vim.lua` | 4099 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 129 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 70 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1265 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1267 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 161 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 101 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 226 | клавиши DSP-панели в духе Vim (2 окт). |
@@ -124,7 +124,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
 | `jf_tracker_draw.lua` | 10826 | отрисовка снимка трекера в gfx. |
-| `jf_tracker_panes.lua` | 851 | раскладка окна как в tmux / zellij (9 окт). |
+| `jf_tracker_panes.lua` | 887 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 256 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 109 | темы трекера (3 окт). |
 | `jf_tracker_smart.lua` | 330 | смарт-панель (9 окт, как Smart Select в PlayerPro / Paketti): у ячейки курсора всплывает сетка значений того поля, где стоит курсор — ноты (октавы … |
@@ -261,7 +261,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `dsp_c` | c - container | `c` |
 | `dsp_d` | d - delete | `d` `c` `m` `a` |
 | `dsp_y` | y - copy | `y` |
-| `dsp_z` | z - router / pages | `z r` `R` `l` `f` `F` `p` `P` `s` `m` |
+| `dsp_z` | z - view / router / pages | `z` `x` `r` `R` `l` `f` `F` `p` `P` `s` `m` |
 | `dsp_zs` | zs - pad size | `s` `m` `l` |
 | `g` | g - go | `g` `12 Enter` `w` `p` `P` `s` `S` `m` `t` `T` `i` `r` |
 | `pane` | PANE (Ctrl+W) - Esc out | `h j k l` `H J K L` `w W  1..9` `g + key` `s v + key` `T + key` `B` `X + key  x` `+ -  < >` `=` `z` `c` `Space` `u` |

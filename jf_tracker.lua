@@ -10453,7 +10453,7 @@ ctx = {
       state.dsp, state.dsp_big = true, true
       ctx.db_cache = nil
       relayout(); ctx.set_focus('dsp')
-      vim.msg = 'router in DSP: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, d delete, zz back'
+      vim.msg = 'router in DSP: h l signal, j k row, a / A add, | join row, s solo, = unity, b bypass, d delete, zr back'
     end
   end,
   -- 18 окт: gain staging — измерители jf_tracker_probe на треке роутера (вход / выход каждого ряда)
@@ -19710,7 +19710,7 @@ local function frame()
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
-    modsel = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3): редактор модуляции выбранного параметра
+    modedit = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3) (modsel занято строкой вкладки modulation): редактор модуляции выбранного параметра
     modtab = function() return state.modtab or 'lfo' end,
     modsl = ctx.MODSL,
     midi_in = function(guid) return ctx.midi_in_t and ctx.midi_in_t[guid], ctx.midi_in_v and ctx.midi_in_v[guid], ctx.midi_in_p and ctx.midi_in_p[guid] end,
@@ -25763,7 +25763,20 @@ local function frame()
           state.dsp_z = nil
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
-          if ch == 'z' or ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
+          if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
+          elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
+            ctx.pane_do(function() return draw.panes.zoom_multi(state.panes, { 'mixer', 'dsp' }, { 0.3, 0.7 }) end,
+              state.panes.zoomv and 'dsp back in its pane' or 'dsp + mixer on the whole window (zz - back, zr - router)')
+          elseif ch == 'x' then   -- 22 окт: zx — DSP полосой во всю ширину снизу, боковые модули поднимаются; ещё раз — как было
+            if state.dsp_zx_saved then
+              local saved, v = state.dsp_zx_saved, state.panes.v
+              state.dsp_zx_saved = nil
+              ctx.pane_do(function() state.panes = draw.panes.decode(saved); state.panes.v = v + 1; return true end, 'zx: panes as before')
+            else
+              local saved = draw.panes.encode(state.panes)
+              if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, 'dsp', 0.32) end, 'zx: dsp across the whole width, the side modules moved up (zx - back)') then state.dsp_zx_saved = saved
+              else vim.msg = 'zx: dsp is not in a pane here' end
+            end
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
@@ -25786,7 +25799,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z / r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z - dsp + mixer on the whole window, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

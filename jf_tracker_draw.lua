@@ -3385,7 +3385,7 @@ function D.mod_section(L, info, col, tm, x, y, w, h, hover)
   local yy = y + 3
   text(x + L.pad, yy, fit('modulation  ' .. (tm.nmod or 0), w - 2 * L.pad), U.AMBER)
   yy = yy + L.rh
-  local m = tm.sel and info.modsel and info.modsel(col, tm) or nil
+  local m = tm.sel and info.modedit and info.modedit(col, tm) or nil
   local tab = info.modtab and info.modtab() or 'lfo'
   -- список модулированных — не больше трёх строк, редактор важнее
   yy = mod_rows(L, col, tm, x, yy, w, math.min(y + h - 6 * L.rh, yy + 3 * L.rh), 'mod', hover)

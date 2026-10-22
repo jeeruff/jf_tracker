@@ -347,7 +347,17 @@ end
 function PN.layout(model, W, H, M)
   local lay = { v = model.v, W = W, H = H, cells = {}, by_panel = {}, rects = {}, order = {}, grips = {}, seps = {}, nodes = {} }
   local z = model.zoom and PN.find(model, model.zoom)
-  if z and alive(M, z) then place_leaf(lay, M, z, 0, 0, W, H); lay.nodes[z] = { x = 0, y = 0, w = W, h = H }
+  -- 22 окт: зум нескольких листов друг под другом (zz в DSP: микшер над DSP на всё окно)
+  local zl = {}
+  for _, id in ipairs(model.zoomv or {}) do local l = PN.find(model, id); if l and alive(M, l) then zl[#zl + 1] = l end end
+  if #zl > 0 then
+    local y0, fr = 0, model.zoomfr or {}
+    for i, l in ipairs(zl) do
+      local hh = i == #zl and H - y0 or math.floor((H - M.sep * (#zl - 1)) * (fr[i] or 1 / #zl))
+      place_leaf(lay, M, l, 0, y0, W, hh); lay.nodes[l] = { x = 0, y = y0, w = W, h = hh }
+      y0 = y0 + hh + M.sep
+    end
+  elseif z and alive(M, z) then place_leaf(lay, M, z, 0, 0, W, H); lay.nodes[z] = { x = 0, y = 0, w = W, h = H }
   else place(lay, M, model.root, 0, 0, W, H) end
   -- трекер — первым в кольце (номер 1), остальные по обходу
   for i, id in ipairs(lay.order) do
@@ -681,6 +691,32 @@ end
 function PN.zoom(model, id)
   if id and not PN.find(model, id) then return false end
   model.zoom = (id and model.zoom ~= id) and id or nil
+  model.zoomv, model.zoomfr = nil, nil
+  return bump(model)
+end
+-- 22 окт: зум нескольких панелей друг под другом (ids сверху вниз, fr — доли); ещё раз — назад.
+-- Скрытые / закрытые пропускаются; не на экране ни одной — false
+function PN.zoom_multi(model, ids, fr)
+  if model.zoomv then model.zoomv, model.zoomfr = nil, nil; return bump(model) end
+  local have, hf = {}, {}
+  for i, id in ipairs(ids) do if PN.find(model, id) then have[#have + 1] = id; hf[#hf + 1] = fr and fr[i] or 1 end end
+  if #have == 0 then return false end
+  local sum = 0; for _, f in ipairs(hf) do sum = sum + f end
+  for i = 1, #hf do hf[i] = hf[i] / sum end
+  model.zoom, model.zoomv, model.zoomfr = nil, have, hf
+  return bump(model)
+end
+-- 22 окт: лист панели id (весь стек, со всеми вкладками) — полосой во всю ширину окна снизу (share — доля
+-- высоты); соседи по бокам поднимаются и занимают его место (zx в DSP). Возврат — сохранённой строкой (encode)
+function PN.span_bottom(model, id, share)
+  local lf = PN.find(model, id)
+  if not lf or id == 'tracker' then return false end
+  if model.root == lf then return false end
+  local copy = { panes = {}, active = lf.active, min = lf.min }
+  for i, pid in ipairs(lf.panes) do copy.panes[i] = pid end
+  lf.panes = {}
+  model.root = node('v', { 1 - (share or 0.3), share or 0.3 }, model.root, copy)
+  PN.normalize(model)
   return bump(model)
 end
 
