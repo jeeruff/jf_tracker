@@ -1851,6 +1851,30 @@ ctx = {
   end,
   -- 22 окт: INSERT параметра (i, Enter): число — как dsp_type_value (023 = 0.23), иначе — начало имени значения
   -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
+  -- 22 окт: снапшоты микшера — SWS Snapshots 1..12 (нативные: «SWS: Save as / Recall snapshot N», окно Snapshots);
+  -- какие слоты заполнены, SWS не отдаёт — отметка в ProjExtState jf_tracker/mixsnaps (только подсветка кнопок)
+  mixsnaps_info = function()
+    if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then return nil end
+    local _, str = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnaps')
+    local has = {}
+    for i in (str or ''):gmatch('%d+') do has[tonumber(i)] = true end
+    local _, cur = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnapcur')
+    return { has = has, cur = tonumber(cur) }
+  end,
+  mixsnap_do = function(i, save)
+    local id = reaper.NamedCommandLookup((save and '_SWSSNAPSHOT_SAVE' or '_SWSSNAPSHOT_GET') .. i)
+    if id == 0 then vim.msg = 'snapshots need SWS'; return end
+    reaper.Main_OnCommand(id, 0)
+    local inf = ctx.mixsnaps_info() or { has = {} }
+    if save then
+      inf.has[i] = true
+      local t = {}; for k in pairs(inf.has) do t[#t + 1] = k end; table.sort(t)
+      reaper.SetProjExtState(0, 'jf_tracker', 'mixsnaps', table.concat(t, ' '))
+    end
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixsnapcur', tostring(i))
+    model.invalidate()
+    vim.msg = save and ('snapshot %d saved (SWS: volume, pan, mute, solo, fx ... - what the SWS Snapshots window has on)'):format(i) or ('snapshot %d recalled'):format(i)
+  end,
   -- 22 окт: снапшоты трека — 4 угла XY-пэда в DSP; хранение — P_EXT:jf_snaps трека, шайба — в памяти
   snaps_of = function(col)
     ctx.snapc = ctx.snapc or {}
@@ -19421,6 +19445,7 @@ local function frame()
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
+    mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
       if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
@@ -22392,6 +22417,9 @@ local function frame()
         state.hscroll = L.hs_list[b + 1] or state.hscroll
       end
       click = { t = now2, zone = 'hsb' }
+    elseif hover.mixsnap then   -- 22 окт: снапшот SWS в микшере: щелчок — вызвать, Shift — записать
+      ctx.mixsnap_do(hover.mixsnap, ctx.mods().shift)
+      click = { t = now2, zone = 'mixsnap' }
     elseif hover.snapc then   -- 22 окт: угол XY-пресетов: пустой — запомнить, полный — вызвать, Shift — перезаписать
       local h = hover.snapc
       if ctx.mods().shift then ctx.snap_save(h.col, h.i) else ctx.snap_recall(h.col, h.i) end
@@ -23540,6 +23568,13 @@ local function frame()
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
+  elseif U.rclick and hover.mixsnap then
+    local i = hover.mixsnap
+    vim.open_hydra({ title = 'snapshot ' .. i .. ' (SWS)', items = {
+      { key = 's', label = 'save as snapshot ' .. i, fn = function() ctx.mixsnap_do(i, true) end },
+      { key = 'r', label = 'recall', fn = function() ctx.mixsnap_do(i, false) end },
+      { key = 'w', label = 'SWS Snapshots window (what is stored: vol, pan, mute, fx ...)', fn = function() reaper.Main_OnCommand(reaper.NamedCommandLookup('_SWSSNAPSHOT_OPEN'), 0) end } } })
+    U.rclick = false
   elseif U.rclick and hover.snapc then
     local h = hover.snapc
     local has = ctx.snaps_of(h.col).snaps[h.i] ~= nil

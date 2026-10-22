@@ -4928,6 +4928,37 @@ function D.draw_notepop(L, hover)
   text(px + L.pad, py + L.pad, fit((np.name or 'note') .. ': ' .. (hot and nm(hot) or (np.cur and nm(np.cur) or '')) .. '   click - set, Esc / click outside - close', pw - 2 * L.pad), U.AMBER)
   if hot then hover.notepop = hot end
 end
+-- 22 окт: снапшоты микшера (SWS Snapshots — нативные: окно SWS Snapshots, хранятся в проекте) слева в пустом месте
+-- микшера: кнопки 1..12, заполненные — голубым, последний вызванный — янтарём; щелчок — вызвать, Shift — записать
+function D.draw_mixsnaps(L, info, hover)
+  local ms0 = info.mixsnaps
+  local x0 = L.mix_pane and L.mix_pane.x or 0
+  local x1
+  for _, c in ipairs(L.cols or {}) do if c.x and c.x > x0 and (not x1 or c.x < x1) then x1 = c.x end end
+  if L.mix_pane then x1 = math.min(x1 or (L.mix_pane.x + L.mix_pane.w), L.mix_pane.x + L.mix_pane.w) end
+  if not x1 then return end
+  local y0, h = L.mix_y + 3, L.mix_h - 6
+  local cw = ms('12') + 2 * L.pad
+  local avail = x1 - x0 - 2 * L.pad
+  local ncol = math.floor((avail + 2) / (cw + 2))
+  if ncol < 2 or h < 3 * L.rh then return end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  text(x0 + L.pad, y0, fit('snapshots', avail), U.GREY)
+  local rows = math.floor((h - L.rh - 2) / L.rh)
+  local n = math.min(12, ncol * rows)
+  for i = 1, n do
+    local cx = x0 + L.pad + ((i - 1) % ncol) * (cw + 2)
+    local cy = y0 + L.rh + 2 + math.floor((i - 1) / ncol) * L.rh
+    local on, cur = ms0.has[i], ms0.cur == i
+    local hot = mx >= cx and mx < cx + cw and my >= cy and my < cy + L.rh - 1
+    set(hot and U.tint(U.AMBER, 0.35) or (cur and U.tint(U.AMBER, 0.25) or (on and U.tint(U.CYAN, 0.3) or U.PANEL))); gfx.rect(cx, cy, cw, L.rh - 2, 1)
+    set(hot and U.AMBER or (cur and U.AMBER or (on and U.CYAN or U.DIM))); gfx.rect(cx, cy, cw, L.rh - 2, 0)
+    local lab = tostring(i)
+    text(cx + math.floor((cw - ms(lab)) / 2), cy, lab, (hot or cur) and U.AMBER or (on and U.TEXT or U.GREY))
+    if hot then hover.mixsnap = i end
+    hint('mixsnap', cx, cy, cw, L.rh - 2, { i = i })
+  end
+end
 -- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
 -- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)
 function D.param_rows(p, nfit)
@@ -10246,6 +10277,7 @@ function D.frame(L, snap, rows, state, info)
     end
   else D.notes_popup = nil end
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
+  if L.mix_bottom and L.mix_h > 0 and info.mixsnaps then D.draw_mixsnaps(L, info, hover) end   -- 22 окт: снапшоты SWS в пустом месте микшера
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
   if D.notepop then D.draw_notepop(L, hover) end   -- 22 окт: клавиатура всех октав для параметра-ноты
