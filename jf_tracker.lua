@@ -20954,7 +20954,7 @@ local function frame()
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
-  elseif hover.mautoarm then state.status = 'autoarm: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm (the selected track is armed for recording)' or 'loses auto-arm') .. ' (tA)'
+  elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
   elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
   elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')

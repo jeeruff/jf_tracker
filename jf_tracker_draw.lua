@@ -7600,7 +7600,7 @@ function D.frame(L, snap, rows, state, info)
       D.cn_r1x = plb and (x2 + ms(plb) + 4) or x2   -- 20 окт: свободное место ряда 1 (az mk низкой шапки)
       -- 20 окт: ряд autoarm / fold — на своём месте и в низкой шапке (микшер внизу): влезает над последним рядом
       if ay + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
-        local xf = small(bx, ay, ms('autoarm') + 4 <= bw and 'autoarm' or 'arm', all and 'off' or 'on', all, 'mautoarm')
+        local xf = small(bx, ay, ms('autoarm all') + 4 <= bw and 'autoarm all' or (ms('autoarm') + 4 <= bw and 'autoarm' or 'arm'), all and 'off' or 'on', all, 'mautoarm')   -- 22 окт: autoarm all — флаг всем трекам
         -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
         local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
