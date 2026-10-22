@@ -3141,8 +3141,12 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     hint('trkmod', x, yy, w, L.rh, { what = 'fold' })
     yy = yy + L.rh
     if not tm.folded then
-      local room2 = y + h - yy - 2 * L.rh - 4
-      local nshow = math.max(0, math.min(#tm.rows, math.floor(room2 / L.rh)))
+      -- 22 окт: XY-пэд снизу не вытеснять — место под него (4 строки) оставить, строк панели не больше 6
+      local xyres = info.track_snaps and (4 * L.rh + 8) or 0
+      local room2 = y + h - yy - 2 * L.rh - 4 - xyres
+      local nshow = math.max(0, math.min(#tm.rows, 6, math.floor(room2 / L.rh)))
+      local more = #tm.rows > nshow and nshow > 0
+      if more then nshow = nshow - 1 end            -- последняя строка — «+N more», не поверх параметра
       local FL = { { 'lfo', 'L', U.CYAN }, { 'acs', 'A', U.GREEN }, { 'lnk', 'K', U.AMBER }, { 'env', 'E', U.TEXT } }
       local flw = ms('LAKE') + L.pad
       for r = 1, nshow do
@@ -3157,7 +3161,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
         end
         yy = yy + L.rh
       end
-      if #tm.rows > nshow then text(x + L.pad, yy - L.rh, fit(('+%d more - the automation tab'):format(#tm.rows - nshow + 1), w - 2 * L.pad), U.GREY) end
+      if more then text(x + L.pad, yy, fit(('+%d more - automation tab'):format(#tm.rows - nshow), w - 2 * L.pad), U.GREY); yy = yy + L.rh end
       -- выбранный параметр DSP и кнопки назначения
       if yy + 2 * L.rh <= y + h then
         text(x + L.pad, yy, fit(tm.sel and ('> ' .. tm.sel) or '> pick a parameter in DSP', w - 2 * L.pad), tm.sel and U.TEXT or U.GREY)

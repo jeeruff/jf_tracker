@@ -1864,7 +1864,7 @@ ctx = {
         for pi, p in ipairs(f.params or {}) do
           if p.auto or p.mod then
             local id = p.fx or f.i
-            c.rows[#c.rows + 1] = { k = k, pi = pi, label = (f.name or '?'):sub(1, 10) .. ' · ' .. (p.name or '?'), env = p.auto,
+            c.rows[#c.rows + 1] = { k = k, pi = pi, label = (p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8), env = p.auto,
               lfo = p.mod and flag(id, p.i, 'lfo'), acs = p.mod and flag(id, p.i, 'acs'), lnk = p.mod and flag(id, p.i, 'plink') }
           end
         end
@@ -1875,7 +1875,7 @@ ctx = {
     local f = t and t.col == col and (col.fx or {})[dsp_sel.fx]
     local p = f and f.params and f.params[dsp_sel.param]
     c.folded = state.dsp_modfold
-    c.sel = p and ((f.name or '?'):sub(1, 10) .. ' · ' .. (p.name or '?')) or nil
+    c.sel = p and ((p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8)) or nil
     c.selflags = nil
     for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
     return c
