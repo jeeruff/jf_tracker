@@ -1868,9 +1868,11 @@ ctx = {
       c.pk = edit.pk_get(col.track)
       local plen = reaper.GetProjectLength(0)
       for k, f in ipairs(col.fx or {}) do
-        local guid = not f.kids and reaper.TrackFX_GetFXGUID(col.track, f.i) or nil
+        local gc = {}
+        local function guid_of(id) if gc[id] == nil then gc[id] = reaper.TrackFX_GetFXGUID(col.track, id) or false end; return gc[id] or nil end
         for pi, p in ipairs(f.params or {}) do
-          local pkey = guid and not p.fx and ('fx:%s:%d'):format(guid, p.i) or nil
+          local g = guid_of(p.fx or f.i)   -- 22 окт: и параметры внутри контейнера (пэд drumrs5k) — GUID ребёнка
+          local pkey = g and ('fx:%s:%d'):format(g, p.i) or nil
           if p.auto or p.mod or (pkey and pks[pkey]) then
             local id = p.fx or f.i
             local r = { k = k, pi = pi, label = (p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8), env = p.auto, pkey = pkey, pk = pkey and pks[pkey],
@@ -1905,8 +1907,9 @@ ctx = {
     for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
     -- premod выбранного параметра: его запись (настройки — строкой кнопок)
     c.selpk = nil
-    if p and not f.kids and not p.fx then
-      local key = ('fx:%s:%d'):format(reaper.TrackFX_GetFXGUID(col.track, f.i), p.i)
+    local pg = p and reaper.TrackFX_GetFXGUID(col.track, p.fx or f.i)
+    if pg then
+      local key = ('fx:%s:%d'):format(pg, p.i)
       for i, pc in ipairs(c.pk or {}) do if pc.env == key then c.selpk = pc; c.selpki = i end end
       c.selkey = key
     else c.selkey = nil end
@@ -2050,7 +2053,7 @@ ctx = {
   -- 22 окт: premod — кривая автоматизации ДО каждой ноты трека (как клипы автоматизации FL),
   -- нативно: pooled automation items на огибающей параметра, edit.pk_* (jf_tracker_premod.lua)
   premod_do = function(col, c, f, p, what)
-    if not c.selkey then vim.msg = 'premod: parameters of an fx inside a container - not yet'; return end
+    if not c.selkey then vim.msg = 'premod: pick a parameter in DSP first'; return end
     local tr, i, pc = col.track, c.selpki, c.selpk
     local function done() ctx.tmod = nil; model.invalidate() end
     if what == 'toggle' then
@@ -2068,6 +2071,15 @@ ctx = {
       local items = {}
       for _, q in ipairs({ { 0.25, '1/16' }, { 0.5, '1/8' }, { 1, '1/4 (a beat)' }, { 2, '1/2' }, { 4, '1 bar' }, { 8, '2 bars' } }) do items[#items + 1] = { label = 'length ' .. q[2], data = q[1] } end
       vim.open_picker('premod: length before the note', items, function(it) edit.pk_change(tr, i, function(x) x.pre = it.data end, 'premod length'); done() end)
+    elseif what == 'pkpitch' then
+      -- 22 окт: только ноты одной высоты (бочка в ките) — высоты, что есть на треке
+      local seen, list = {}, {}
+      for _, nt in ipairs(edit.pk_notes(tr)) do if not seen[nt.pitch] then seen[nt.pitch] = 0; list[#list + 1] = nt.pitch end; seen[nt.pitch] = seen[nt.pitch] + 1 end
+      table.sort(list)
+      local NNm = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+      local items = { { label = 'all notes of the track', data = false } }
+      for _, pp in ipairs(list) do items[#items + 1] = { label = ('only %s%d  (%d notes)'):format(NNm[pp % 12 + 1], pp // 12 - 1, seen[pp]), data = pp } end
+      vim.open_picker('premod: before which notes', items, function(it) edit.pk_change(tr, i, function(x) x.pitch = it.data or nil end, 'premod notes'); done() end)
     elseif what == 'pkhum' then
       local items = {}
       for _, v in ipairs({ 0, 5, 10, 25, 50, 100 }) do items[#items + 1] = { label = ('humanize %d %%'):format(v) .. (v == 0 and ' (off)' or ' - timing, depth, shape'), data = v } end

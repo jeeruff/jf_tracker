@@ -23,5 +23,11 @@ eq(s, 'fx:{AB}:3|7|0.5|k|10|cutoff', 'encode')
 local c = PK.parse(s)[1]
 eq(c.pool, 7, 'parse pool'); near(c.pre, 0.5, 'parse pre'); eq(c.key, true, 'parse key'); eq(c.vel, false, 'parse vel'); eq(c.hum, 10, 'parse hum'); eq(c.label, 'cutoff', 'parse label')
 eq(PK.encode({ { env = 'fx:{A}:1', pool = 1, pre = 2, hum = 0 } }), 'fx:{A}:1|1|2||0|', 'integer pre')
+-- 22 окт: только одна высота
+p = PK.places({ { qn = 4, pitch = 36 }, { qn = 5, pitch = 38 }, { qn = 6, pitch = 36 } }, { pre = 1, hum = 0, pitch = 36 }, 1)
+eq(#p, 2, 'pitch filter: only the kick'); near(p[2].qn + p[2].len, 6, '...before the second kick')
+local s2 = PK.encode({ { env = 'fx:{A}:1', pool = 1, pre = 1, hum = 0, pitch = 36, label = 'cut' } })
+eq(s2, 'fx:{A}:1|1|1||0@36|cut', 'encode pitch'); eq(PK.parse(s2)[1].pitch, 36, 'parse pitch'); eq(PK.parse(s2)[1].label, 'cut', 'label after pitch')
+eq(PK.parse('fx:{A}:1|1|1||0|cut')[1].pitch, nil, 'old format: no pitch')
 print(('test_premod: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

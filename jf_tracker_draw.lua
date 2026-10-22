@@ -3407,7 +3407,10 @@ function D.mod_section(L, info, col, tm, x, y, w, h, hover)
   elseif tab == 'pm' and m.pk then
     top[#top + 1] = { 'pkpre', 'pre ' .. (PK_PRE[m.pk.pre] or ('%g'):format(m.pk.pre)) }
     top[#top + 1] = { 'pkkey', 'key', m.pk.key }; top[#top + 1] = { 'pkvel', 'vel', m.pk.vel }
-    top[#top + 1] = { 'pkhum', 'hum ' .. (m.pk.hum or 0) .. '%', (m.pk.hum or 0) > 0 }; top[#top + 1] = { 'pktest', 'test' }
+    top[#top + 1] = { 'pkhum', 'hum ' .. (m.pk.hum or 0) .. '%', (m.pk.hum or 0) > 0 }
+    local NNm = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+    top[#top + 1] = { 'pkpitch', m.pk.pitch and (NNm[m.pk.pitch % 12 + 1] .. (m.pk.pitch // 12 - 1)) or 'all notes', m.pk.pitch ~= nil }   -- 22 окт: одна высота (бочка кита)
+    top[#top + 1] = { 'pktest', 'test' }
   end
   yy = btn_row(L, x, w, yy, top, hover, col, true)
   if tab == 'lfo' then

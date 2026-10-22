@@ -16,10 +16,10 @@ local PK = {}
 function PK.parse(s)
   local out = {}
   for part in (s or ''):gmatch('[^;]+') do
-    local env, pool, pre, flags, hum, label = part:match('^([^|]+)|(%-?%d+)|([%d%.]+)|(%a*)|(%d+)|?(.*)$')
+    local env, pool, pre, flags, hum, pitch, label = part:match('^([^|]+)|(%-?%d+)|([%d%.]+)|(%a*)|(%d+)@?(%d*)|?(.*)$')
     if env then
       out[#out + 1] = { env = env, pool = tonumber(pool), pre = tonumber(pre), key = flags:find('k') ~= nil,
-        vel = flags:find('v') ~= nil, hum = tonumber(hum), label = label ~= '' and label or env }
+        vel = flags:find('v') ~= nil, hum = tonumber(hum), pitch = tonumber(pitch), label = label ~= '' and label or env }   -- 22 окт: @N — только ноты высоты N
     end
   end
   return out
@@ -28,8 +28,8 @@ end
 function PK.encode(list)
   local t = {}
   for _, c in ipairs(list or {}) do
-    t[#t + 1] = ('%s|%d|%s|%s%s|%d|%s'):format(c.env, c.pool or -1, ('%.4f'):format(c.pre or 1):gsub('0+$', ''):gsub('%.$', ''),
-      c.key and 'k' or '', c.vel and 'v' or '', math.floor(c.hum or 0), (c.label or ''):gsub('[|;]', ' '))
+    t[#t + 1] = ('%s|%d|%s|%s%s|%d%s|%s'):format(c.env, c.pool or -1, ('%.4f'):format(c.pre or 1):gsub('0+$', ''):gsub('%.$', ''),
+      c.key and 'k' or '', c.vel and 'v' or '', math.floor(c.hum or 0), c.pitch and ('@' .. math.floor(c.pitch)) or '', (c.label or ''):gsub('[|;]', ' '))
   end
   return table.concat(t, ';')
 end
@@ -47,7 +47,7 @@ end
 -- Подкат не налезает на прошлую ноту: длина — не больше промежутка.
 function PK.places(notes, cfg, poolqn)
   local ns = {}
-  for _, n in ipairs(notes or {}) do ns[#ns + 1] = n end
+  for _, n in ipairs(notes or {}) do if not cfg.pitch or n.pitch == cfg.pitch then ns[#ns + 1] = n end end   -- 22 окт: только одна высота (бочка кита)
   table.sort(ns, function(a, b) if math.abs(a.qn - b.qn) > 1e-6 then return a.qn < b.qn end; return (a.pitch or 60) > (b.pitch or 60) end)
   local on = {}
   for _, n in ipairs(ns) do

@@ -64,8 +64,19 @@ function NM.mark() R.SetProjExtState(0, 'jf_tracker', FLAG, '1') end
 function NM.env(tr, key, create)
   local guid, param = key:match('^fx:([^:]+):(%d+)$')
   if guid then
+    -- 22 окт: и внутри контейнеров (пэды drumrs5k): адрес ребёнка — из container_item.k (REAPER 7)
+    local function find(fx)
+      if R.TrackFX_GetFXGUID(tr, fx) == guid then return fx end
+      local ok, cc = R.TrackFX_GetNamedConfigParm(tr, fx, 'container_count')
+      for k = 0, (ok and tonumber(cc) or 0) - 1 do
+        local ok2, id = R.TrackFX_GetNamedConfigParm(tr, fx, 'container_item.' .. k)
+        local hit = ok2 and tonumber(id) and find(tonumber(id))
+        if hit then return hit end
+      end
+    end
     for fx = 0, R.TrackFX_GetCount(tr) - 1 do
-      if R.TrackFX_GetFXGUID(tr, fx) == guid then return R.GetFXEnvelope(tr, fx, tonumber(param), create or false) end
+      local at = find(fx)
+      if at then return R.GetFXEnvelope(tr, at, tonumber(param), create or false) end
     end
     return nil
   end
