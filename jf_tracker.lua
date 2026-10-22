@@ -25359,7 +25359,8 @@ local function frame()
     else vim.msg = 'Cmd+I interpolates: select rows first (v / V), the field under the cursor - note, vol, delay or a command' end
     c = 0
   end
-  if (c == 9 or c == 25) and not ctrl_note and not HN.active and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+  if (c == 9 or c == 25) and not ctrl_note and not HN.active and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search'
+     and not (c == 9 and state.focus == 'dsp' and state.dsp_z) then   -- 22 окт: z Tab в DSP — свой (микшер / DSP местами)
     local m = ctx.mods()
     local back = c == 25 or m.shift or (inject_cap or gfx.mouse_cap) & 8 == 8
     if m.ctrl then
@@ -25781,8 +25782,21 @@ local function frame()
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
-            ctx.pane_do(function() return draw.panes.zoom_multi(state.panes, { 'mixer', 'dsp' }, { 0.3, 0.7 }) end,
-              state.panes.zoomv and 'dsp back in its pane' or 'dsp + mixer on the whole window (zz - back, zr - router)')
+            local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }
+            if state.dsp_zzflip then ids, fr = { 'dsp', 'mixer' }, { 0.7, 0.3 } end   -- z Tab — DSP сверху
+            ctx.pane_do(function() return draw.panes.zoom_multi(state.panes, ids, fr) end,
+              state.panes.zoomv and 'dsp back in its pane' or 'dsp + mixer on the whole window (zz - back, z Tab - swap them, zr - router)')
+          elseif c == 9 then   -- 22 окт: z Tab — микшер и DSP местами (в виде zz; запоминается для следующего zz)
+            state.dsp_zzflip = not state.dsp_zzflip or nil
+            local m = state.panes
+            if m.zoomv and #m.zoomv > 1 then
+              ctx.pane_do(function()
+                local v, f = {}, {}
+                for i = #m.zoomv, 1, -1 do v[#v + 1] = m.zoomv[i]; f[#f + 1] = m.zoomfr[i] end
+                m.zoomv, m.zoomfr = v, f; m.v = (m.v or 1) + 1
+                return true
+              end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
+            else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'x' then   -- 22 окт: zx — DSP полосой во всю ширину снизу, боковые модули поднимаются; ещё раз — как было
             if state.dsp_zx_saved then
               local saved, v = state.dsp_zx_saved, state.panes.v
@@ -25815,7 +25829,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z - dsp + mixer on the whole window, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
