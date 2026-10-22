@@ -1851,6 +1851,73 @@ ctx = {
   end,
   -- 22 окт: INSERT параметра (i, Enter): число — как dsp_type_value (023 = 0.23), иначе — начало имени значения
   -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
+  -- 22 окт: мини-панель mod · auto (блок трека DSP): автоматизированные (~) и модулированные (≈) параметры трека,
+  -- у модулированных — что именно (LFO / ACS / link); кэш на снимок колонки (пересборка модели — новый)
+  trk_mods = function(col)
+    if not (col and col.track) or model.is_take(col.track) then return nil end
+    ctx.tmod = ctx.tmod or setmetatable({}, { __mode = 'k' })
+    local c = ctx.tmod[col]
+    if not c then
+      c = { rows = {} }
+      local function flag(id, pi, what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s.active'):format(pi, what)); return ok and v == '1' end
+      for k, f in ipairs(col.fx or {}) do
+        for pi, p in ipairs(f.params or {}) do
+          if p.auto or p.mod then
+            local id = p.fx or f.i
+            c.rows[#c.rows + 1] = { k = k, pi = pi, label = (f.name or '?'):sub(1, 10) .. ' · ' .. (p.name or '?'), env = p.auto,
+              lfo = p.mod and flag(id, p.i, 'lfo'), acs = p.mod and flag(id, p.i, 'acs'), lnk = p.mod and flag(id, p.i, 'plink') }
+          end
+        end
+      end
+      ctx.tmod[col] = c
+    end
+    local t = dsp_target()
+    local f = t and t.col == col and (col.fx or {})[dsp_sel.fx]
+    local p = f and f.params and f.params[dsp_sel.param]
+    c.folded = state.dsp_modfold
+    c.sel = p and ((f.name or '?'):sub(1, 10) .. ' · ' .. (p.name or '?')) or nil
+    c.selflags = nil
+    for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
+    return c
+  end,
+  -- 22 окт: зависимость от другого канала — сайдчейн: посыл с трека-источника в каналы 3/4 этого трека и ACS
+  -- параметра по ним (нативно: окно модуляции REAPER покажет audio control signal, chan 3/4)
+  mod_sidechain = function(col, id, pi, pname)
+    local items = {}
+    for _, c2 in ipairs(snap and snap.cols or {}) do if c2.track and c2.track ~= col.track then items[#items + 1] = { label = c2.name ~= '' and c2.name or '?', data = c2.track } end end
+    vim.open_picker('side: ' .. (pname or 'param') .. ' follows the audio of', items, function(it)
+      edit.run('sidechain ' .. (pname or ''), function()
+        if reaper.GetMediaTrackInfo_Value(col.track, 'I_NCHAN') < 4 then reaper.SetMediaTrackInfo_Value(col.track, 'I_NCHAN', 4) end
+        local si = reaper.CreateTrackSend(it.data, col.track)
+        if si >= 0 then reaper.SetTrackSendInfo_Value(it.data, 0, si, 'I_DSTCHAN', 2); reaper.SetTrackSendInfo_Value(it.data, 0, si, 'I_SENDMODE', 3) end
+        reaper.TrackFX_SetNamedConfigParm(col.track, id, ('param.%d.acs.chan'):format(pi), '2')
+        reaper.TrackFX_SetNamedConfigParm(col.track, id, ('param.%d.acs.stereo'):format(pi), '1')
+        reaper.TrackFX_SetNamedConfigParm(col.track, id, ('param.%d.acs.active'):format(pi), '1')
+        reaper.TrackFX_SetNamedConfigParm(col.track, id, ('param.%d.mod.active'):format(pi), '1')
+      end)
+      model.invalidate()
+      vim.msg = ('%s follows the audio of %s (send to channels 3/4, ACS; u - undo)'):format(pname or 'param', it.label)
+    end)
+  end,
+  trkmod_do = function(h, rclick)
+    local col = h.col
+    if h.what == 'fold' then state.dsp_modfold = not state.dsp_modfold; return end
+    local c = ctx.trk_mods(col)
+    if h.what == 'row' then
+      local r = c and c.rows[h.r]; if not r then return end
+      ctx.set_focus('dsp'); dsp_sel.fx, dsp_sel.param = r.k, r.pi; DK.pslider = true
+      if rclick then local f = (col.fx or {})[r.k]; if f and ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = r.k, f = f, param = r.pi } }) end end
+      return
+    end
+    local f = (col.fx or {})[dsp_sel.fx]
+    local p = f and f.params and f.params[dsp_sel.param]
+    if not p then vim.msg = 'mod · auto: pick a parameter in DSP first'; return end
+    local id = p.fx or f.i
+    if h.what == 'lfo' or h.what == 'acs' then edit.mod_set(col.track, id, p.i, h.what)
+    elseif h.what == 'lnk' then if ctx.open_ctx_menu then ctx.open_ctx_menu({ dsp = { fx = dsp_sel.fx, f = f, param = dsp_sel.param } }) end
+    elseif h.what == 'env' then edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate()
+    elseif h.what == 'side' then ctx.mod_sidechain(col, id, p.i, p.name) end
+  end,
   -- 22 окт: снапшоты микшера — SWS Snapshots 1..12 (нативные: «SWS: Save as / Recall snapshot N», окно Snapshots);
   -- какие слоты заполнены, SWS не отдаёт — отметка в ProjExtState jf_tracker/mixsnaps (только подсветка кнопок)
   mixsnaps_info = function()
@@ -16173,6 +16240,7 @@ local function context_menu(hover, anchor)
   vim.open_hydra({ title = own or (page and ('menu: ' .. (P and P.title or page))) or 'menu', items = hitems })
   state.popup_at = anchor or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
+ctx.open_ctx_menu = context_menu   -- 22 окт: для функций ctx выше по файлу (mod · auto)
 ctx.open_context = context_menu          -- для \ из ctx.context_key (объявлен выше этого места)
 function ctx.context_items(hover)
   local items = {}
@@ -19473,6 +19541,7 @@ local function frame()
     track_snaps = function(col) return ctx.snaps_info(col) end,
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
+    trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
       local col = dsp_target()
       if not (col and col.track) or p.show then return false end   -- 22 окт: ноты / канал (root −80…+80) — не биполярный
@@ -22444,6 +22513,9 @@ local function frame()
         state.hscroll = L.hs_list[b + 1] or state.hscroll
       end
       click = { t = now2, zone = 'hsb' }
+    elseif hover.trkmod then   -- 22 окт: мини-панель mod · auto
+      ctx.trkmod_do(hover.trkmod)
+      click = { t = now2, zone = 'trkmod' }
     elseif hover.mixsnap then   -- 22 окт: снапшот SWS в микшере: щелчок — вызвать, Shift — записать
       ctx.mixsnap_do(hover.mixsnap, ctx.mods().shift)
       click = { t = now2, zone = 'mixsnap' }
@@ -23598,6 +23670,8 @@ local function frame()
     ctx.transport_menu(hover.ctrl == 'rec' and 'rec' or 'play')   -- 11 окт: ПКМ по rec / play — как в REAPER
   elseif U.rclick and hover.ctrl == 'q_keys' then
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
+  elseif U.rclick and hover.trkmod and hover.trkmod.what == 'row' then
+    ctx.trkmod_do(hover.trkmod, true); U.rclick = false
   elseif U.rclick and hover.mixsnap then
     local i = hover.mixsnap
     vim.open_hydra({ title = 'snapshot ' .. i .. ' (SWS)', items = {
