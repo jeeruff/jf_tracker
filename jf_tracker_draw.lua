@@ -8811,8 +8811,8 @@ function D.frame(L, snap, rows, state, info)
     end
     -- первый видимый блок — D.dsp_first (полоса прокрутки); выбор другого эффекта
     -- подтягивает его в поле зрения, прокрутка мимо выбора его не трогает
-    local first = D.dsp_first or 1
-    if sel.fx ~= D.dsp_sel_last then
+    local first = 1   -- 22 окт: прокрутка по пикселям (D.dsp_px) — блоки не пропускаются
+    if false then
       D.dsp_sel_last = sel.fx
       if sel.fx and sel.fx >= 1 and sel.fx <= #fxs then
         local est = 1
@@ -8842,14 +8842,34 @@ function D.frame(L, snap, rows, state, info)
       bx = right
       goto dsp_router_done
     end
+    -- 22 окт: прокрутка цепочки — плавно, по пикселям (не по блоку): блоки во всю свою ширину рисуются в
+    -- буфер 700 со сдвигом D.dsp_px, на экран — только окно цепочки [cx0, cx1); мышь вне окна — не над блоками
+    do   -- 22 окт: свои локальные — goto роутера не прыгает в их область
+    local cx0, cx1 = bx, right
+    D.dsp_px = D.dsp_px or 0
+    if D.dsp_px_t then
+      D.dsp_px = D.dsp_px + (D.dsp_px_t - D.dsp_px) * 0.35
+      if math.abs(D.dsp_px_t - D.dsp_px) < 0.5 then D.dsp_px, D.dsp_px_t = D.dsp_px_t, nil end
+    end
+    local px = math.floor(D.dsp_px + 0.5)
+    local dest0, mx0 = gfx.dest, mx
+    if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end
+    gfx.dest = 700
+    gfx.blit(dest0, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)   -- фон под блоками
+    if mx < cx0 or mx >= cx1 then mx = -100000 end
+    bx = cx0 - px
+    -- подсказки и группы SLIDER — только у того, что в окне (спрятанное за краем мышь не находит)
+    local hint0, nslr0 = D.hint, D.slr and #D.slr or 0
+    if hint0 then D.hint = function(kind, x, y, w, h, data) if x + w > cx0 and x < cx1 then hint0(kind, x, y, w, h, data) end end end
+    D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
     for k, f in ipairs(fxs) do
-      if k < first then goto next_block end
       do
       -- 22 окт: модуль сложен (zf / zF) — узкая полоса во всю высоту: кнопки x B сверху, имя вертикально (щелчок — развернуть)
       if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
         local kb = ms('O') + 2 * L.pad
         local fw = math.max(kb, L.th + 2 * L.pad) + 2
-        if bx + fw > right and nshown > 0 then break end
+        D.dsp_vx[k] = { bx + px - cx0, fw }
+        if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end   -- вне окна — только место
         nshown = nshown + 1
         local is_sel = sel.fx == k
         blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, cont = f.container }
@@ -8883,20 +8903,19 @@ function D.frame(L, snap, rows, state, info)
       local ncol = ncol_of(f)
       -- ширина колонки: 22 знака; тесно — оставшиеся блоки делят место
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
-      local share = math.floor((right - bx) / (#fxs - k + 1)) - L.pad
-      local bw1 = math.max(L.cw * 14, math.min(L.cw * (f.colw or 22), share))   -- 13 окт: модуль может просить колонку шире
+      local bw1 = L.cw * (f.colw or 22)   -- 13 окт: модуль может просить колонку шире; 22 окт: всегда своя ширина (целиком, прокрутка плавная)
       -- 19 окт: рэк drumrs5k не свёрнут (zf) — колонки вдвое шире: пэды 4 × 4 крупно (m > s, волна, подписи, группа)
       -- 19 окт: размер пэдов рэка zs + s / m / l: l — колонки вдвое шире, m — в 1.5 раза меньше l, s — мелкие (прежний вид)
       if f.kit and D.DR and info.kitsize ~= 's' then
         local k2 = info.kitsize == 'm' and (4 / 3) or 2
         local b2 = math.floor(bw1 * k2)
-        if bx + 2 * b2 <= right then bw1 = b2 end
+        if 2 * b2 <= cx1 - cx0 then bw1 = b2 end
       end
       local by = boxy
       local bh = bh0
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
-      local room = right
+      local room = math.huge   -- 22 окт: модуль целиком, не поджимается к краю (прокрутка плавная)
       -- 22 окт: колонка MACRO и вкладки справа — тоже место: считать их до подгонки колонок (иначе Surge
       -- «не влезал» целиком и пропадал, хотя справа было пусто); один столбец не влез — столбец уже, до 10 знаков
       local tabpos0 = info.dsptabs or 'bottom'
@@ -8910,7 +8929,7 @@ function D.frame(L, snap, rows, state, info)
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
       if f.kit and D.DR then
         local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
-        if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, right - bx - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
+        if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, cx1 - cx0 - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
       end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
       -- 22 окт: вкладки страниц — опция dsptabs: bottom (строкой снизу) / top (строкой под шапкой) / right (колонкой справа)
@@ -8923,7 +8942,8 @@ function D.frame(L, snap, rows, state, info)
       local macfold = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
       local mw = (f.nmacro and not f.container) and (macfold and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
       bw = bw + mw
-      if bx + bw > room and nshown > 0 then break end   -- не влез — дальше полосой прокрутки (первый — всегда)
+      D.dsp_vx[k] = { bx + px - cx0, bw }
+      if bx + bw <= cx0 or bx >= cx1 then bx = bx + bw + L.pad; goto next_block end   -- вне окна — только место (полоса прокрутки)
       nshown = nshown + 1
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
@@ -10194,25 +10214,51 @@ function D.frame(L, snap, rows, state, info)
       end
       ::next_block::
     end
-    -- полоса прокрутки цепочки (11 окт): ползунок = видимые блоки из всех; тянуть,
-    -- клик мимо — страница, колесо над полосой — на блок
+    -- окно цепочки — на экран; всё, что левее / правее, осталось в буфере
+    D.dsp_total = bx + px - cx0
+    gfx.dest = dest0
+    gfx.blit(700, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)
+    mx = mx0
+    D.hint = hint0
+    if D.slr then
+      local keep = {}
+      for i2 = nslr0 + 1, #D.slr do local e = D.slr[i2]; if e.x + e.w > cx0 and e.x < cx1 then keep[#keep + 1] = e end end
+      for i2 = #D.slr, nslr0 + 1, -1 do D.slr[i2] = nil end
+      for _, e in ipairs(keep) do D.slr[#D.slr + 1] = e end
+    end
+    local vw = cx1 - cx0
+    local maxpx = math.max(0, D.dsp_total - vw)
+    D.dsp_view, D.dsp_maxpx = vw, maxpx
+    D.dsp_px = math.max(0, math.min(maxpx, D.dsp_px))
+    if D.dsp_px_t then D.dsp_px_t = math.max(0, math.min(maxpx, D.dsp_px_t)) end
+    -- выбранный модуль (w / W, щелчок, harpoon) — плавно в поле зрения, целиком, если влезает
+    if sel.fx ~= D.dsp_sel_last then
+      D.dsp_sel_last = sel.fx
+      local v = D.dsp_vx[sel.fx or 0]
+      if v then
+        local t = D.dsp_px_t or D.dsp_px
+        if v[1] < t then t = v[1] elseif v[1] + v[2] > t + vw then t = math.min(v[1], v[1] + v[2] - vw + L.pad) end
+        if t ~= (D.dsp_px_t or D.dsp_px) then D.dsp_px_t = math.max(0, math.min(maxpx, t)) end
+      end
+    end
+    -- полоса прокрутки цепочки: ползунок = окно из всей ширины цепочки, едет плавно (по пикселям)
     hover.dsphsb = nil; D.dsp_sb_n = nil
-    if not (info.dsp_router and info.draw_router) and #fxs > 0 and (first > 1 or first + nshown - 1 < #fxs) then
-      local x0, w = sb_x0, right - sb_x0 - L.pad
+    if not (info.dsp_router and info.draw_router) and #fxs > 0 and maxpx > 0 then
+      local x0, w = cx0, cx1 - cx0 - L.pad
       local sy = dy + 3 + L.rh + bh0 + 2
       local h = D.SBW or 3
       if w > 20 then
-        local n = #fxs
-        D.dsp_sb_n = n   -- 22 окт: горизонтальное колесо над DSP листает цепочку
-        local tw = math.max(12, math.floor(w * math.max(1, nshown) / n))
-        local tx = x0 + math.floor((w - tw) * ((first - 1) / math.max(1, n - math.max(1, nshown))))
+        D.dsp_sb_n = #fxs   -- горизонтальное колесо над DSP листает цепочку
+        local tw = math.max(12, math.floor(w * vw / math.max(1, D.dsp_total)))
+        local tx = x0 + math.floor((w - tw) * (D.dsp_px / math.max(1, maxpx)) + 0.5)
         tx = math.max(x0, math.min(tx, x0 + w - tw))
-        local inbar = not hover.dspbtn and mx >= x0 and mx < x0 + w and my >= sy - 5 and my < sy + h + 6   -- 22 окт: зона шире полоски, но не над вкладками / кнопками (строка вкладок снизу — щелчок уходил в полосу)
+        local inbar = not hover.dspbtn and mx >= x0 and mx < x0 + w and my >= sy - 5 and my < sy + h + 6   -- 22 окт: зона шире полоски, но не над вкладками / кнопками
         local onthumb = inbar and mx >= tx and mx < tx + tw
         set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x0, sy + math.floor(h / 2), w, 1, 1)
         set((onthumb or D.dsphsb_drag) and U.AMBER or U.GREY); gfx.rect(tx, sy, tw, h, 1)
-        if inbar then hover.dsphsb = { thumb = onthumb, w = w, n = n, page = math.max(1, nshown), dir = mx < tx and -1 or 1 } end
+        if inbar then hover.dsphsb = { thumb = onthumb, w = w, tw = tw, dir = mx < tx and -1 or 1 } end
       end
+    end
     end
     ::dsp_router_done::
     -- выход после всех эффектов и кнопка компенсации громкости под ним (4 окт)

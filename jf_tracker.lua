@@ -22688,8 +22688,9 @@ local function frame()
     elseif hover.dsphsb then
       -- 11 окт: полоса прокрутки цепочки DSP — ползунок тянется, клик мимо — страница
       local h = hover.dsphsb
-      if h.thumb then draw.dsphsb_drag = { x0 = gfx.mouse_x, f0 = draw.dsp_first or 1, w = h.w, n = h.n }
-      else draw.dsp_first = math.max(1, math.min(h.n, (draw.dsp_first or 1) + h.dir * h.page)) end
+      -- 22 окт: по пикселям — ползунок тянется плавно, щелчок мимо — на окно (плавно)
+      if h.thumb then draw.dsphsb_drag = { x0 = gfx.mouse_x, p0 = draw.dsp_px or 0, w = h.w, tw = h.tw }; draw.dsp_px_t = nil
+      else draw.dsp_px_t = (draw.dsp_px_t or draw.dsp_px or 0) + h.dir * (draw.dsp_view or 400) * 0.9 end
       click = { t = now2, zone = 'dsphsb' }
     elseif hover.hsb then
       -- скролл-бар треков (3 окт): ползунок тянется, клик мимо — страница
@@ -24101,14 +24102,14 @@ local function frame()
   if draw.dsphsb_drag then
     local d = draw.dsphsb_drag
     if gfx.mouse_cap & 1 == 1 then
-      draw.dsp_first = math.max(1, math.min(d.n, d.f0 + math.floor((gfx.mouse_x - d.x0) / math.max(1, d.w) * d.n + 0.5)))
+      draw.dsp_px = d.p0 + (gfx.mouse_x - d.x0) * (draw.dsp_maxpx or 0) / math.max(1, d.w - d.tw); draw.dsp_px_t = nil
     else draw.dsphsb_drag = nil end
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.tmpl then   -- 11 окт: колесо над < шаблон > — листать
     ctx.tmpl_do(gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.dsphsb then
-    draw.dsp_first = math.max(1, math.min(hover.dsphsb.n, (draw.dsp_first or 1) + (gfx.mouse_wheel > 0 and -1 or 1))); gfx.mouse_wheel = 0
+    draw.dsp_px_t = (draw.dsp_px_t or draw.dsp_px or 0) + (gfx.mouse_wheel > 0 and -1 or 1) * (draw.dsp_view or 400) / 5; gfx.mouse_wheel = 0
   end
   if draw.hsb_drag then
     local d = draw.hsb_drag
@@ -24573,7 +24574,7 @@ local function frame()
     local d = gfx.mouse_hwheel > 0 and 1 or -1
     if false then
     elseif (hover.dsp or hover.dsphsb) and draw.dsp_sb_n then   -- 22 окт: свайп над DSP — цепочка на блок
-      draw.dsp_first = math.max(1, math.min(draw.dsp_sb_n, (draw.dsp_first or 1) + d))
+      draw.dsp_px = (draw.dsp_px or 0) + gfx.mouse_hwheel * 0.5; draw.dsp_px_t = nil   -- 22 окт: свайп — по пикселям, за пальцем
     elseif w_trk and not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
       state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll
