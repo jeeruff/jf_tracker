@@ -16285,7 +16285,7 @@ function ctx.context_items(hover)
     items[#items + 1] = { 'Bounce the notes to audio (selection / note / track in the region)', function() ctx.rd_notes() end, key = 'b', g = 'bounce' }
     items[#items + 1] = { 'Instrument of the track to a sampler …', function() ctx.rd_open('sampler') end, key = 's', g = 'bounce' }
     items[#items + 1] = { 'Bouncer pane (Ctrl+W g B)', function() ctx.rd_open() end, key = 'p', g = 'bounce' }
-  elseif hover.matrix then
+  elseif type(hover.matrix) == 'table' and hover.matrix.inside then   -- 22 окт: hover.matrix почти всегда {} — над DSP вылезали пункты матрицы
     -- 10 окт: пустое место матрицы — её собственное меню (раньше общий «view»)
     add('New slot at the end (+)', function() ctx.mx_add() end, '+')
     add((MX.fill and '!' or '') .. 'Fill: cells show their content (f)', function() MX.fill = not MX.fill end, 'f')
