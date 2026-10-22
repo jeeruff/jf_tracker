@@ -722,7 +722,13 @@ function E.set_pitch(heads, lpb, pitch)
         audio_set_semis(h, inst_base(h.item) + pitch - model.BASE_NOTE)   -- от транспоза инструмента (6 окт)
       elseif h.kind == 'midi' then
         local i, n = midi_note(h, lpb)
-        if i then R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, n.eppq, n.ch, pitch, n.vel, false) end
+        if i then
+          R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, n.eppq, n.ch, pitch, n.vel, false)
+          -- 22 окт: нота поверх ноты (только высота) — удержание клавиши тоже тянет её (main: hold_length), но
+          -- только длиннее: прежний OFF не срезается
+          E.last_midi = { item = h.item, take = h.take, pitch = pitch, p0 = n.sppq, t0 = R.MIDI_GetProjTimeFromPPQPos(h.take, n.sppq),
+            t_press = R.time_precise(), min_te = R.MIDI_GetProjTimeFromPPQPos(h.take, n.eppq) }
+        end
       end
     end
   end)
@@ -1417,7 +1423,7 @@ function E.hold_length(sec)
   local tk = lm.take
   local ip = R.GetMediaItemInfo_Value(lm.item, 'D_POSITION')
   local ie = ip + R.GetMediaItemInfo_Value(lm.item, 'D_LENGTH')
-  local te = lm.t0 + math.max(0.02, sec)
+  local te = math.max(lm.t0 + math.max(0.02, sec), lm.min_te or 0)
   if te > ie + 1e-6 and R.MIDI_SetItemExtents then
     -- 21 окт: держат дольше конца клипа (паттерна) — клип тянется, пока дальше на треке (этом лейне) пусто
     local tr = R.GetMediaItem_Track(lm.item)
