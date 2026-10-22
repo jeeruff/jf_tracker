@@ -4844,6 +4844,57 @@ end
 D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
+-- 22 окт: выпадашка-клавиатура для параметра-ноты DSP (note lo / hi, root): 0..127, текущая — голубым, под мышью —
+-- янтарём, подпись октав C0 … C9; D.notepop = { k, pi, x, y, cur, name } ставит main; щелчок по клавише — hover.notepop
+function D.draw_notepop(L, hover)
+  local np = D.notepop
+  local W, H = gfx.w, gfx.h
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local nwhite = 75
+  local kw = math.max(5, math.floor(math.min(W - 4 * L.pad, L.cw * 90) / nwhite))
+  local kbw = kw * nwhite
+  local kh = 3 * L.rh
+  local pw, ph = kbw + 2 * L.pad, kh + 2 * L.rh + 2 * L.pad
+  local px = math.max(L.pad, math.min(W - pw - L.pad, (np.x or 0) - math.floor(pw / 2)))
+  local py = (np.y or 0) - ph - 4
+  if py < L.pad then py = math.min(H - ph - L.pad, (np.y or 0) + L.rh) end
+  for k0 in pairs(hover) do if mx >= px and mx < px + pw and my >= py and my < py + ph then hover[k0] = nil end end
+  hover.notepop_in = mx >= px and mx < px + pw and my >= py and my < py + ph or nil
+  set(U.PANEL); gfx.rect(px, py, pw, ph, 1)
+  set(U.AMBER); gfx.rect(px, py, pw, ph, 0)
+  local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+  local function nm(n) local o = n // 12 - 1; local b = NN[n % 12 + 1]; if o < 0 then b = b:gsub('%-$', '') end; return b .. o end
+  local kx0, ky0 = px + L.pad, py + L.pad + L.rh
+  local WHITE = { [0] = 0, 2, 4, 5, 7, 9, 11 }
+  local wpos, hot = {}, nil
+  local wi = 0
+  for n = 0, 127 do
+    local pc = n % 12
+    if pc == 0 or pc == 2 or pc == 4 or pc == 5 or pc == 7 or pc == 9 or pc == 11 then wpos[n] = wi; wi = wi + 1 end
+  end
+  -- чёрные сверху приоритетнее при наведении
+  local bh = math.floor(kh * 0.6)
+  for n = 0, 127 do
+    if not wpos[n] then
+      local x = kx0 + wpos[n - 1] * kw + kw - math.floor(kw / 3)
+      if mx >= x and mx < x + math.max(2, math.floor(kw * 2 / 3)) and my >= ky0 and my < ky0 + bh then hot = n end
+    end
+  end
+  if not hot then for n, w0 in pairs(wpos) do local x = kx0 + w0 * kw; if mx >= x and mx < x + kw and my >= ky0 and my < ky0 + kh then hot = n end end end
+  for n, w0 in pairs(wpos) do
+    local x = kx0 + w0 * kw
+    set(n == hot and U.AMBER or (n == np.cur and U.CYAN or U.mix(U.TEXT, U.BG, 0.2))); gfx.rect(x, ky0, kw - 1, kh, 1)
+    if n % 12 == 0 then text(x, ky0 + kh + 1, 'C' .. (n // 12 - 1), U.GREY) end
+  end
+  for n = 0, 127 do
+    if not wpos[n] then
+      local x = kx0 + wpos[n - 1] * kw + kw - math.floor(kw / 3)
+      set(n == hot and U.AMBER or (n == np.cur and U.CYAN or U.BG)); gfx.rect(x, ky0, math.max(2, math.floor(kw * 2 / 3)), bh, 1)
+    end
+  end
+  text(px + L.pad, py + L.pad, fit((np.name or 'note') .. ': ' .. (hot and nm(hot) or (np.cur and nm(np.cur) or '')) .. '   click - set, Esc / click outside - close', pw - 2 * L.pad), U.AMBER)
+  if hot then hover.notepop = hot end
+end
 -- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
 -- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)
 function D.param_rows(p, nfit)
@@ -9598,7 +9649,7 @@ function D.frame(L, snap, rows, state, info)
         local vx = wx0 + ww + L.pad
         local vw = bxc + L.pad + pw - vx
         local cy = py + math.floor(L.rh / 2)
-        local step_sv, steps_inline, step_direct
+        local step_sv, steps_inline, step_direct, notepk
         if p.kind == 'toggle' then
           local on = v.n >= 0.5
           local sz = L.rh - 6
@@ -9637,6 +9688,7 @@ function D.frame(L, snap, rows, state, info)
         else
           local cc = (acc == U.TEXT and p.cat and p.cat ~= 'other' and p.cat ~= 'mode') and D.cat_colour(p.cat) or nil
           local notep = (p.show == 'note' or p.show == 'root') and tonumber(v.s)
+          notepk = notep and true or nil
           if notep then
             -- 22 окт: параметр-нота (note lo / hi, root) — мини-клавиатура октавы, нота — янтарём, октава — в значении
             local pc = p.show == 'root' and nil or (math.floor(notep + 0.5) % 12)
@@ -9705,7 +9757,8 @@ function D.frame(L, snap, rows, state, info)
         if not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + L.rh then
           hover.dsp = { fx = k, f = f, param = pi, frac = (mx - bx - L.pad) / pw,
                         sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 and mx < wx0 + ww + 2 }
-          if steps_inline or step_direct then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
+          if notepk then hover.dsp.onwidget = false; hover.dsp.notepick = true   -- 22 окт: нота — щелчок открывает клавиатуру, не ставит значение
+          elseif steps_inline or step_direct then hover.dsp.onwidget = step_sv ~= nil; hover.dsp.sv = step_sv or hover.dsp.sv
           elseif p.kind == 'steps' and p.nsteps then hover.dsp.steplist = true end   -- клик — список (5 окт)
         end
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
@@ -10121,6 +10174,7 @@ function D.frame(L, snap, rows, state, info)
   -- всплывающий слайдер свёрнутой кнопки v / p (3 окт) — поверх всего
   if D.late_send then local f = D.late_send; D.late_send = nil; f() end
   if D.late_pop then local f = D.late_pop; D.late_pop = nil; f() end
+  if D.notepop then D.draw_notepop(L, hover) end   -- 22 окт: клавиатура всех октав для параметра-ноты
   -- верхняя линия главного модуля и верхней панели (5 окт): как у lib сверху;
   -- до сайдбара — у него своя
   if L.top_h > 0 and L.top_first then set(D.SEP); gfx.rect(0, L.top_y or 0, (L.side_w or 0) > 0 and (L.side_x or L.win_w) - 2 or L.win_w, D.SEPW, 1) end

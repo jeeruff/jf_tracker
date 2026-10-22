@@ -1871,6 +1871,41 @@ ctx = {
     FB.push_recent(it); ctx.fxb_save(); model.invalidate()
     vim.msg = FB.short(it.label) .. ' on a new track (u - undo)'
   end,
+  -- 22 окт: выпадашка параметра DSP (щелчок / Ctrl+Enter): нота — клавиатура 0..127, ступени — список (до 35 — меню, больше — поиск)
+  dsp_param_pop = function(k, pi, x, y)
+    local col, f = ctx.dsp_fx(k)
+    local p = f and f.params[pi]
+    if not p then return end
+    local A = model.fxapi(col.track)
+    local fx = p.fx or f.i
+    if p.show == 'note' or p.show == 'root' then
+      local _, s0 = A.GetFormattedParamValue(col.track, fx, p.i, '')
+      local cur = tonumber(s0)
+      local lo = 0
+      if p.show == 'root' then
+        for _, p2 in ipairs(f.params) do if p2.show == 'note' and p2.name == 'note lo' then local _, sl = A.GetFormattedParamValue(col.track, p2.fx or f.i, p2.i, ''); lo = tonumber(sl) or 0 end end
+        cur = cur and (lo - cur)
+      end
+      draw.notepop = { k = k, pi = pi, x = x or math.floor(gfx.w / 2), y = y or math.floor(gfx.h * 0.7), cur = cur and math.floor(cur + 0.5), name = p.name, root = p.show == 'root', lo = lo }
+      vim.msg = p.name .. ': click a key (Esc - close)'
+      return
+    end
+    if not (p.kind == 'steps' and p.nsteps) then vim.msg = (p.name or 'param') .. ': i - type a value'; return end
+    local labs = ctx.step_labels(f, p) or {}
+    local tr, n = col.track, p.nsteps
+    local cur = math.floor(A.GetParamNormalized(tr, fx, p.i) * (n - 1) + 0.5)
+    local function setk(k2) edit.fx_param(tr, fx, p.i, k2 / math.max(1, n - 1)) end
+    if n <= 35 then
+      local KEYS, list = '123456789abcdefghijklmnopqrstuvwxyz', {}
+      for k2 = 0, n - 1 do list[#list + 1] = { key = KEYS:sub(k2 + 1, k2 + 1), label = (labs[k2 + 1] or tostring(k2)) .. (k2 == cur and '  *' or ''), fn = function() setk(k2) end } end
+      vim.open_hydra({ title = p.name, items = list })
+      state.popup_at = { kind = 'xy', x = x or gfx.mouse_x, y = (y or gfx.mouse_y) + 4 }
+    else
+      local list = {}
+      for k2 = 0, n - 1 do list[#list + 1] = { label = labs[k2 + 1] or tostring(k2), data = k2 } end
+      vim.open_picker(p.name, list, function(it) setk(it.data) end)
+    end
+  end,
   dsp_type_entry = function(k, pi, buf)
     local num = buf:match('^%s*([-+]?[%d%.]+)%s*$')
     if num and tonumber(num) then
@@ -21854,6 +21889,16 @@ local function frame()
   end
   -- всплывающий слайдер свёрнутой кнопки: клик мимо него и мимо кнопок — закрыть
   if U.click and draw.trspop and not hover.trspop_in and not hover.trsbtn then draw.trspop = nil end
+  -- 22 окт: клавиатура ноты DSP: щелчок по клавише — значение (у root — от note lo), мимо — закрыть
+  if draw.notepop and (U.click or U.rclick) then
+    local np = draw.notepop
+    if U.click and hover.notepop then
+      local n = hover.notepop
+      ctx.dsp_type_value(np.k, np.pi, np.root and (np.lo - n) or n)
+    end
+    if hover.notepop or not hover.notepop_in or U.rclick then draw.notepop = nil end
+    U.click, U.rclick = false, false
+  end
   if U.click and draw.sendpop and not hover.sendpop_in and not (hover.trkio and hover.trkio.what == 'sends') then draw.sendpop = nil end
   ctx.click_guard = U.click and state.focusclick ~= 'click' and not ctx.mods().alt or nil
   if U.click and state.kslider then state.kslider = nil end                -- клик — выход из режима слайдера
@@ -22698,22 +22743,8 @@ local function frame()
         local p = hover.dsp.f.params[hover.dsp.param]
         if p and p.kind == 'toggle' then
           edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, model.fxapi(col.track).GetParamNormalized(col.track, p.fx or hover.dsp.f.i, p.i) >= 0.5 and 0 or 1)
-        elseif p and hover.dsp.steplist and hover.dsp.onwidget then
-          -- выпадашка значений (5 окт): до 35 — меню у мыши, больше — поиск
-          local labs = ctx.step_labels(hover.dsp.f, p) or {}
-          local fx, tr, n = p.fx or hover.dsp.f.i, col.track, p.nsteps
-          local cur = math.floor(model.fxapi(tr).GetParamNormalized(tr, fx, p.i) * (n - 1) + 0.5)
-          local function setk(k) edit.fx_param(tr, fx, p.i, k / math.max(1, n - 1)) end
-          if n <= 35 then
-            local KEYS, list = '123456789abcdefghijklmnopqrstuvwxyz', {}
-            for k = 0, n - 1 do list[#list + 1] = { key = KEYS:sub(k + 1, k + 1), label = (labs[k + 1] or tostring(k)) .. (k == cur and '  *' or ''), fn = function() setk(k) end } end
-            vim.open_hydra({ title = p.name, items = list })
-            state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
-          else
-            local list = {}
-            for k = 0, n - 1 do list[#list + 1] = { label = labs[k + 1] or tostring(k), data = k } end
-            vim.open_picker(p.name, list, function(it) setk(it.data) end)
-          end
+        elseif p and (hover.dsp.notepick or (hover.dsp.steplist and hover.dsp.onwidget)) then
+          ctx.dsp_param_pop(hover.dsp.fx, hover.dsp.param, gfx.mouse_x, gfx.mouse_y)   -- 22 окт: нота — клавиатура всех октав; ступени — список
         elseif p and (hover.dsp.onwidget or state.namedrag) and hover.dsp.sv then edit.fx_param(col.track, p.fx or hover.dsp.f.i, p.i, hover.dsp.sv) end
       elseif dbl and click.zone == 'dsp' and col then
         edit.fx_show(col.track, hover.dsp.f.i)
@@ -25219,6 +25250,8 @@ local function frame()
         -- в vim уходят только командная строка и поиск (: /)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
+        if draw.notepop and c == 27 then draw.notepop = nil; return end   -- 22 окт
+        if c == 13 and ctx.mods().ctrl and not DK.ins and not DK.pads then ctx.dsp_param_pop(dsp_sel.fx, dsp_sel.param); return end   -- 22 окт: Ctrl+Enter — выпадашка параметра
         if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
