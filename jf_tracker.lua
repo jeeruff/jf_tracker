@@ -7308,6 +7308,14 @@ ctx = {
   -- mx:guid@pos|dsp:guid@fxguid#p»; старое «guid@row» = trk. '' — список
   -- fzf по модулям; '1..'9 — прыжок, фокус в модуль метки
   harpoon = function(ch)
+    -- 22 окт: 'b — туда, где курсор был до последнего скачка (модуль, трек, прыжок, клик), ещё раз — обратно (как '' в Vim)
+    if ch == 'b' then
+      local p = ctx.place_prev
+      if not p then vim.msg = "'b: no previous place yet (it is remembered on every jump, click or module change)"; return end
+      ctx.jump_go(p)
+      vim.msg = "'b: back where the cursor was ('b again - return)"
+      return
+    end
     local _, raw = reaper.GetProjExtState(0, EXT, 'harpoon')
     local list = {}
     for tok in (raw or ''):gmatch('[^|]+') do
@@ -24800,6 +24808,20 @@ local function frame()
     local onw = fc and vim.cur.sub == 'wave' and (vim.cur.fi .. ':' .. tostring(col and col.guid)) or nil
     if onw and ctx.waveauto_at ~= onw and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'sample') then state.toptab = 'sample'; relayout() end
     ctx.waveauto_at = onw
+  end
+  if L and L.flat then
+    -- 22 окт: место курсора для 'b: скачок (другой модуль / трек / клетка / модуль DSP, строка дальше соседней) —
+    -- прежнее место запоминается; шаги j k l h его не трогают
+    do
+      local h = ctx.jump_here()
+      local c0 = ctx.place_cur
+      if c0 then
+        local big = c0.focus ~= h.focus or c0.guid ~= h.guid or math.abs((c0.row or 0) - (h.row or 0)) > 1
+          or (h.focus == 'matrix' and (c0.ri ~= h.ri or c0.ci ~= h.ci)) or (h.focus == 'dsp' and c0.fx ~= h.fx)
+        if big and reaper.GetPlayState() & 1 == 0 then ctx.place_prev = c0 end   -- игра с follow тянет курсор — это не скачок
+      end
+      ctx.place_cur = h
+    end
   end
   local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
   -- 13 окт: clipboard — каждый новый yank в историю (последний сверху, до 40)

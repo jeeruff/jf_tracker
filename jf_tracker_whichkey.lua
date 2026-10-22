@@ -30,7 +30,7 @@ local T = {
         { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
         { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' } },
         panels = true },   -- 16 окт: клавиши панелей — из реестра панелей (main), по алфавиту, буква подсвечена
-  ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'd', 'unpin this place' } } },
+  ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'b', 'back where the cursor just was (again - return)' }, { 'd', 'unpin this place' } } },
   T = { title = 'T - take (the note under the cursor)', items = { { 'f', 'add take fx (fzf)' }, { 'o', 'its take fx chain in DSP' } } },
   t = { title = 't - track', items = { { 't', 'new track (3tt)' }, { 'd', 'delete tracks (5td), to the buffer' }, { 'x', 'cut tracks' }, { 'p', 'paste tracks' }, { 's', 'new bus: tracks send to it' }, { 'r', 'new source: sends to tracks' },
         { 'n', 'rename' }, { 'c', 'colour' }, { 'y', 'duplicate' }, { 'a', 'rec arm (6ta - six tracks; t135a - tracks 1 3 5)' }, { 'm', 'mute (t23m - tracks 2 3; t23s - solo them)' }, { 'u', 'unsolo / unmute every track' }, { 'A', 'autoarm: every track (again - off)' }, { 'i', 'input (list)' }, { 'I', 'input: the active one' },

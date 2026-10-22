@@ -94,6 +94,7 @@ KH.PAGES = {
     { k = 'gp gP  gs gS', t = { 'gp', 'gP', 'gs', 'gS' }, d = 'go to the start / the last row of the pattern under the cursor, of its section; with an operator - a motion (dgP deletes to the pattern end)' },
     { k = 'Esc', d = 'smart: while playing - stop, the cursor on the play position (Space - stop and back); stopped - toggles INSERT (as the edit mode in Renoise); options Esc stops playback, Esc mode = vim - only back to NORMAL' },
     { k = 'Ctrl+O / Ctrl+I', d = 'jumps: back / forward to where you were before a jump (f label, harpoon, gg, G)' },
+    { k = "'b", d = "back where the cursor just was - before the last jump, click or module change (any module: tracker, matrix, DSP); 'b again - return; plain j k steps do not count" },
     { k = "'a '1..'9 '' 'd", d = "harpoon: pin the place under the cursor - a track row (tracker), a cell (matrix) or a parameter (DSP, also inside a container / pad); jump to pin 1..9 (the focus goes to its module; a DSP pin unfolds the module and opens the page of the parameter), list the pins by module (fzf), unpin; works in the tracker, the matrix and DSP; per project" },
     { k = "'A", d = "harpoon: pin the last touched fx parameter (the knob you just moved in a plugin window, DSP or a track header) - from anywhere" },
     { k = 'gw  3gw', d = 'swap the event under the cursor with the next / the 3rd below (:sw N)' },
