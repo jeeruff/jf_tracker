@@ -21335,15 +21335,31 @@ local function frame()
           if not bd or ddx * ddx + ddy * ddy < bd then best, bd = r, ddx * ddx + ddy * ddy end
         end
         SG = { none = true }
+        -- 22 окт: семья слайдера — DSP / микшер / один трек (громкость, пан, ширина и параметры шапки)
+        local function fam(r) local g = r.g or ''; if g:match('^trs:') or g:match('^hdr:') then return 'col:' .. g:match(':(.*)$') end; return g:match('^(%a+)') or g end
+        -- 22 окт: фокус-радиус — до ближайшего дальше 4 строк, а мышь над треком: только слайдеры этого трека
+        local hc = hover.col
+        if best and bd > (4 * L.rh) ^ 2 and hc and hc.guid then
+          local want, b2, d2 = 'col:' .. tostring(hc.guid)
+          for _, r in ipairs(draw.slr or {}) do
+            if fam(r) == want then
+              local ddx = math.max(r.x - gfx.mouse_x, 0, gfx.mouse_x - (r.x + r.w))
+              local ddy = math.max(r.y - gfx.mouse_y, 0, gfx.mouse_y - (r.y + r.h))
+              if not d2 or ddx * ddx + ddy * ddy < d2 then b2, d2 = r, ddx * ddx + ddy * ddy end
+            end
+          end
+          if b2 then best = b2 end
+        end
         if best then
-          -- 16 окт: до 8 БЛИЖАЙШИХ к мыши той же ориентации — из любых групп (DSP, шапки, фейдеры
-          -- микшера), по оси выбора по порядку; первым выбран ближайший, выбор — от точки нажатия
+          -- 16 окт: до 8 БЛИЖАЙШИХ к мыши той же ориентации, по оси выбора по порядку; первым выбран
+          -- ближайший, выбор — от точки нажатия. 22 окт: только своей семьи (группа не разлетается по экрану)
           local ori = best.xy and 'xy' or (best.ori or 'h')
           local list = { best }
+          local bf = fam(best)
           if ori ~= 'xy' then
             local cand = {}
             for _, r in ipairs(draw.slr) do
-              if r ~= best and not r.xy and (r.ori or 'h') == ori then
+              if r ~= best and not r.xy and (r.ori or 'h') == ori and fam(r) == bf then
                 local cx, cy = r.x + r.w / 2, r.y + r.h / 2
                 cand[#cand + 1] = { r = r, d = (cx - gfx.mouse_x) ^ 2 + (cy - gfx.mouse_y) ^ 2 }
               end
