@@ -24757,8 +24757,12 @@ local function frame()
     if col and col.guid and ctx.dspauto_trk ~= col.guid then
       ctx.dspauto_trk = col.guid
       local ti = ctx.track_insts(col)
-      if ti[1] and ti[1].fx and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
+      if vim.cur.sub ~= 'wave' and ti[1] and ti[1].fx and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
     end
+    -- 22 окт: курсор пришёл на колонку волны — вкладка item (сэмпл, слайсы), а не dsp; ушёл и вернулся — снова
+    local onw = fc and vim.cur.sub == 'wave' and (vim.cur.fi .. ':' .. tostring(col and col.guid)) or nil
+    if onw and ctx.waveauto_at ~= onw and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'sample') then state.toptab = 'sample'; relayout() end
+    ctx.waveauto_at = onw
   end
   local aipos = state.autoinst and (vim.cur.fi .. ':' .. vim.cur.row .. ':' .. tostring(snap))
   -- 13 окт: clipboard — каждый новый yank в историю (последний сверху, до 40)
