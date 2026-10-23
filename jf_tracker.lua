@@ -9666,6 +9666,9 @@ ctx = {
       { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
+      -- 23 окт: размер такта всегда (по умолчанию — только когда у паттернов разный) и полоса секций — отдельно от ruler
+      { key = 'g', label = 'signature column: 4/4 always (off - only when the patterns differ)' .. on(MX.sig_always), fn = function() MX.sig_always = not MX.sig_always; reaper.SetExtState(EXT, 'mxsig', MX.sig_always and '1' or '0', true); relayout() end },
+      { key = 'e', label = 'sections strip: the section names on the left (also without the ruler)' .. on(MX.sections ~= false), fn = function() MX.sections = MX.sections == false; reaper.SetExtState(EXT, 'mxsec', MX.sections and '1' or '0', true); relayout() end },
       -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
       { key = 'm', label = 'minimize the pane (zm)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
@@ -14989,6 +14992,8 @@ ctx.midi_out_menu = function(col)
   end }
   vim.open_hydra({ title = 'MIDI out of ' .. (col.name or 'track') .. ' (MIDI-only sends)', items = items })
 end
+-- 23 окт: мышь над полосой прокрутки списка (полосы стоят у края панели, рядом с ручкой между панелями)
+ctx.vbar_hot = function() for _, r in pairs(draw.vbars or {}) do if r.hot then return true end end; return false end
 -- 20 окт: autoarm всех треков (кнопка уголка, tA): on = nil — переключить (у всех уже — снять, иначе — всем)
 ctx.autoarm_all = function(on)
   local nt = reaper.CountTracks(0)
@@ -16178,6 +16183,8 @@ ctx.kcfont_pick = function()
   vim.open_hydra({ title = 'keycast font', items = items })
 end
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
+MX.sig_always = reaper.GetExtState(EXT, 'mxsig') == '1'   -- 23 окт: колонка размера всегда
+MX.sections = reaper.GetExtState(EXT, 'mxsec') ~= '0'     -- 23 окт: полоса секций — своя опция (не от ruler)
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
@@ -21737,7 +21744,7 @@ local function frame()
       local id = hover.ptab.id
       if ctx.pane_do(function() return draw.panes.hide(state.panes, id) end, 'pane ' .. id .. ' hidden (Ctrl+W g + letter shows it)') and ctx.pane_cur() == id then ctx.set_focus('tracker') end
       U.rclick = false
-    elseif U.click and hover.pgrip then
+    elseif U.click and hover.pgrip and not ctx.vbar_hot() then   -- 23 окт: полоса прокрутки у края панели — её, не ручку
       local now = reaper.time_precise()
       if ctx.pn_click and now - ctx.pn_click < 0.35 then
         local g = hover.pgrip

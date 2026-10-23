@@ -241,16 +241,16 @@ function MX.width(L, nregions, ncols)
   L.mx_arrow_w = U.measure('<')
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
   -- 18 окт: секции — полоса их цвета с вертикальным именем слева от номеров тактов
-  MX.sec_w = (MX.ruler and not MX.fold and MX.has_sec) and (L.th + 4) or 0
+  MX.sec_w = (MX.sections ~= false and not MX.fold and MX.has_sec) and (L.th + 4) or 0   -- 23 окт: своя опция view (было — только с ruler)
   -- 19 окт: stack — такт / размер / длина второй строкой под именем: линейка — только риски, колонок справа нет
   -- 20 окт: самый мелкий зум (слот не выше двух строк) — stack в одну строку колонками: строка на паттерн, метка шире
   local st = MX.stack and not MX.fold and math.floor(L.rh * MX.vz + 0.5) >= 2 * L.rh + 1
   MX.st_on = st
-  L.mx_ruler_w = (MX.ruler and not MX.fold) and ((st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) + MX.sec_w) or 0
+  L.mx_ruler_w = ((MX.ruler and not MX.fold) and (st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) or 0) + MX.sec_w
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
   L.mx_dur_w = (MX.fold or st) and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
-  L.mx_sig_w = (MX.fold or st or (MX.sig_same and not MX.vismetro)) and 0 or (U.measure('15/16') + L.pad)   -- 18 окт: vismetro — колонка размера всегда
+  L.mx_sig_w = (MX.fold or st or (MX.sig_same and not MX.vismetro and not MX.sig_always)) and 0 or (U.measure('15/16') + L.pad)   -- 23 окт: view — 4/4 всегда   -- 18 окт: vismetro — колонка размера всегда
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
   L.mx_bpm_w = (MX.fold or st or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
@@ -655,7 +655,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
     -- линейка: черта начала слота, «такт.доля», риски тактов (длинные) и долей
-    if RW > 0 then
+    if RW > 0 and MX.ruler and not MX.fold then   -- 23 окт: без ruler RW — только полоса секций, линейки нет
       U.set(U.LINE); gfx.rect(0, y, RW - 2, 1, 1)
       local sc = sec_first[ri]
       local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)

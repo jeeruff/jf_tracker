@@ -5475,7 +5475,7 @@ function D.vbar(key, x, y, w, h, scroll, nvis, total)
   -- 8 окт: без дорожки во всю высоту — она рядом с границей модуля давала
   -- двойную линию; только ползунок
   set((hot or drag) and U.AMBER or U.GREY); gfx.rect(x, ty, w, th, 1)
-  D.vbars[key] = { x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
+  D.vbars[key] = { x = x + (D.pn_ox or 0), y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
 end
 -- горизонтальная полоса (5 окт, матрица): та же запись, ось x
 function D.hbar(key, x, y, w, h, scroll, nvis, total)
@@ -5488,7 +5488,8 @@ function D.hbar(key, x, y, w, h, scroll, nvis, total)
   local hot = mx >= x and mx < x + w and my >= y - 3 and my < y + h + 3
   local drag = D.vbar_drag and D.vbar_drag.key == key
   set((hot or drag) and U.AMBER or U.GREY); gfx.rect(tx, y, tw, h, 1)
-  D.vbars[key] = { horiz = true, x = x, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx, th = tw, a0 = x, alen = w }
+  local ox = D.pn_ox or 0   -- 23 окт: экранные x (лист панели в буфере со сдвигом): протяжка сравнивает с экранной мышью
+  D.vbars[key] = { horiz = true, x = x + ox, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx + ox, th = tw, a0 = x + ox, alen = w }
 end
 
 D.pool_scroll = 0
@@ -6119,7 +6120,9 @@ local function pn_buffered(x, y, w, h, fn)
   gfx.dest = 798
   set(U.PANEL); gfx.rect(0, y, w, h, 1)
   gfx.mouse_x = mx0 - x
+  D.pn_ox = x          -- 23 окт: сдвиг буфера — полосы прокрутки запоминают экранные x (щелчок приходит в экранных)
   local ok, res = pcall(fn)
+  D.pn_ox = 0
   gfx.mouse_x, gfx.dest = mx0, dest0
   if not ok then error(res, 0) end
   gfx.blit(798, 1, 0, 0, y, w, h, x, y, w, h)
