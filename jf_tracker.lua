@@ -16183,7 +16183,7 @@ ctx.kcfont_pick = function()
   vim.open_hydra({ title = 'keycast font', items = items })
 end
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
-MX.sig_always = reaper.GetExtState(EXT, 'mxsig') == '1'   -- 23 окт: колонка размера всегда
+MX.sig_always = reaper.GetExtState(EXT, 'mxsig') ~= '0'   -- 23 окт: колонка размера всегда (по умолчанию — вкл)
 MX.sections = reaper.GetExtState(EXT, 'mxsec') ~= '0'     -- 23 окт: полоса секций — своя опция (не от ruler)
 if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
