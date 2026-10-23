@@ -13483,7 +13483,13 @@ ctx = {
       return
     end
     local names = ctx.preset_names(t.track, f.i)
-    if #names == 0 then vim.msg = f.name .. ': no preset names (REAPER lists none; < > step through what the plugin has)'; return end
+    if #names == 0 then
+      -- 23 окт: свои пресеты плагин держит в своём браузере (Serum 2 — .SerumPreset, закрытый формат: REAPER их не
+      -- загружает) — окно плагина, где этот браузер; сохранённые в REAPER пресеты (+ в окне FX) — появятся здесь
+      if A.Show then A.Show(t.track, f.i, 3) end
+      vim.msg = f.name .. ': REAPER lists no presets - its own preset browser is in its window (opened); presets saved in REAPER show here'
+      return
+    end
     local items = {}
     for _, nm in ipairs(names) do items[#items + 1] = { label = nm, data = nm } end
     vim.open_picker('preset of ' .. f.name, items, function(it)

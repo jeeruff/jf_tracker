@@ -5349,7 +5349,9 @@ end
 function D.param_rows(p, nfit)
   if p and p.mfader then return 0 end   -- 22 окт: макрос — фейдером слева, строк не занимает
   local n = p and p.kind == 'steps' and p.nsteps or 0
-  return (n >= 5 and n <= 8 and n <= (nfit or 0)) and n or 1
+  -- 23 окт: кнопки в две колонки, имя строкой сверху: 1 + ceil(n / 2) строк (6 положений — 4, было 6)
+  local rows = 1 + math.ceil(n / 2)
+  return (n >= 5 and n <= 8 and rows <= (nfit or 0)) and rows or 1
 end
 -- поток параметров по колонкам с учётом высоты и секций (heads[pi] — заголовок перед параметром: своя строка,
 -- секция целиком переносится в новую колонку, если в ней помещается) → spos[pi] = { col, row, rows },
@@ -10131,6 +10133,8 @@ function D.frame(L, snap, rows, state, info)
         local v = vals[pi] or { n = 0, s = '' }
         local psel = is_sel and sel.param == pi
         local pins = psel and info.dsp_ins   -- 22 окт: INSERT параметра (i) — красным, набор вместо значения
+        -- 23 окт: под мышью — цветом как выбранный (колесо меняет именно его): микро-отклик
+        if not psel and not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + (spos and spos[pi] and spos[pi][3] or 1) * L.rh then psel = true end
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
         local acc = pins and U.RED or (psel and U.AMBER or U.TEXT)
@@ -10142,20 +10146,21 @@ function D.frame(L, snap, rows, state, info)
           local x0 = bxc + L.pad
           local nmh = tallh * L.rh
           local ncol_c = pins and U.RED or (psel and U.AMBER or U.TEXT)
-          D.vtext(x0, py + 1, nmh - 2, p.name or '', ncol_c, U.BG)
-          local bx2 = x0 + L.th + L.pad
-          local bw2 = bxc + L.pad + pw - bx2
+          -- 23 окт: имя строкой сверху, кнопки — две колонки вдвое уже (по строкам: 1 2 / 3 4 / 5 6)
+          text(x0, py, fit(p.name or '', pw), ncol_c)
+          local half = math.floor((pw - 2) / 2)
           for kk = 0, p.nsteps - 1 do
-            local yy = py + kk * L.rh
+            local bx2 = x0 + (kk % 2) * (half + 2)
+            local yy = py + (1 + kk // 2) * L.rh
             local on = kk == cur
-            local hot = not drag and mx >= bx2 and mx < bx2 + bw2 and my >= yy and my < yy + L.rh
-            set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 1)
-            set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx2, yy + 1, bw2, L.rh - 2, 0)
+            local hot = not drag and mx >= bx2 and mx < bx2 + half and my >= yy and my < yy + L.rh
+            set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(bx2, yy + 1, half, L.rh - 2, 1)
+            set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx2, yy + 1, half, L.rh - 2, 0)
             local lab = (pins and on) and (info.dsp_ins.buf .. '_') or (labs[kk + 1] or tostring(kk + 1))
-            text(bx2 + L.pad, yy, fit(lab, bw2 - 2 * L.pad), (pins and on) and U.RED or (hot and U.AMBER or (on and U.CYAN or U.GREY)))
+            text(bx2 + L.pad, yy, fit(lab, half - 2 * L.pad), (pins and on) and U.RED or (hot and U.AMBER or (on and U.CYAN or U.GREY)))
             if hot then hover.dsp = { fx = k, f = f, param = pi, sv = kk / math.max(1, p.nsteps - 1), onwidget = true } end
           end
-          if not drag and not hover.dsp and mx >= x0 and mx < bx2 and my >= py and my < py + nmh then hover.dsp = { fx = k, f = f, param = pi } end
+          if not drag and not hover.dsp and mx >= x0 and mx < x0 + pw and my >= py and my < py + L.rh then hover.dsp = { fx = k, f = f, param = pi } end
           hint('dspparam', x0, py, pw, nmh, { fx = k, param = pi })
           goto next_param
         end
