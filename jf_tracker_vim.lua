@@ -3033,8 +3033,8 @@ function V.key_impl(c)
     elseif c == ('o'):byte() then V.cur, V.anchor = V.anchor, V.cur; done = true
     elseif c == ('R'):byte() and ctx.razor_from then   -- 16 окт: R — выделение в razor edit REAPER (те же строки × треки)
       ctx.razor_from(f0, f1, r0, r1); V.mode = 'normal'; finish_move(); done = true
-    elseif c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
-        or c == ('M'):byte() or c == ('s'):byte() then
+    elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
+        or c == ('M'):byte() or c == ('s'):byte()) and not (V.vfield and (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte())) then   -- 23 окт: поле-колонка — своя ветка ниже (было — удалялись ноты целиком)
       local e = apply(c == ('M'):byte() and 'm' or string.char(c), f0, f1, r0, r1)
       V.cur.fi, V.cur.row = f0, r0
       if V.mode ~= 'insert' then V.mode = 'normal' end
