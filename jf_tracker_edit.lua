@@ -2452,7 +2452,9 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
       local hh = (E.human or 0) / 100
       local t_row = t0
       if hh > 0 then
-        t0 = math.max(0, t0 + (math.random() * 2 - 1) * hh * E.hum_v('time', 10) / 1000)
+        -- 23 окт: тайминг — только позже (не раньше строки): «раньше» уводило ноту в прошлую строку, там OFF —
+        -- нота вставала в соседнюю подколонку; не дальше полудлины ноты (строка короче 18 мс — нота не уходит в следующую)
+        t0 = t0 + math.min(math.random() * hh * E.hum_v('time', 10) / 1000, math.max(0, (t1 - t0) * 0.45))
         vel = math.max(1, math.min(127, math.floor((vel or 100) + (math.random() * 2 - 1) * hh * E.hum_v('vel', 12) + 0.5)))
       end
       insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false, t_row)
@@ -2490,7 +2492,7 @@ function E.humanize(it, tk)
   R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + r() * HV('pitch', 8) / 100)
   R.SetMediaItemInfo_Value(it, 'D_VOL', R.GetMediaItemInfo_Value(it, 'D_VOL') * 10 ^ (r() * HV('vol', 1.0) / 20))
   R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * (1 + r() * HV('rate', 0.3) / 100))
-  R.SetMediaItemInfo_Value(it, 'D_POSITION', math.max(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + r() * HV('time', 10) / 1000))   -- 15 окт: и тайминг ±10 мс
+  R.SetMediaItemInfo_Value(it, 'D_POSITION', R.GetMediaItemInfo_Value(it, 'D_POSITION') + math.min(math.random() * h * HV('time', 10) / 1000, R.GetMediaItemInfo_Value(it, 'D_LENGTH') * 0.45))   -- 15 окт: тайминг; 23 окт: только позже — нота не уходит в прошлую строку
 end
 
 -- 17 окт: humanizer (макрос) — у уже стоящих нот, по флагам opt: time (±10 мс), pitch (±8 центов), vol (±1.5 dB,

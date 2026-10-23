@@ -14550,6 +14550,24 @@ ctx = {
       end
       ctx.stuffed = ctx.stuffed or {}
       ctx.note_offs = ctx.note_offs or {}
+      -- 23 окт: нота прослушки идёт через виртуальную клавиатуру — её слышат ВСЕ армленые треки со входом «все MIDI»
+      -- (пэд мышкой звучал и на Serum соседнего трека): на время прослушки арм у них снят, потом вернётся (не при записи)
+      if reaper.GetPlayState() & 4 == 0 then
+        local iso = ctx.vkb_iso or { list = {} }
+        for i = 0, reaper.CountTracks(0) - 1 do
+          local t2 = reaper.GetTrack(0, i)
+          if t2 ~= track and reaper.GetMediaTrackInfo_Value(t2, 'I_RECARM') == 1 then
+            local inp = math.floor(reaper.GetMediaTrackInfo_Value(t2, 'I_RECINPUT'))
+            local dev = (inp >> 5) & 63
+            if inp >= 4096 and (dev == 63 or dev == 62) then
+              iso.list[#iso.list + 1] = { tr = t2, aa = reaper.GetMediaTrackInfo_Value(t2, 'B_AUTO_RECARM') }
+              reaper.SetMediaTrackInfo_Value(t2, 'I_RECARM', 0)
+            end
+          end
+        end
+        iso.t = now + 0.8
+        if #iso.list > 0 then ctx.vkb_iso = iso end
+      end
       local vel = math.max(1, math.min(127, vim.vel or 100))
       if delay > 0 then
         ctx.note_ons = ctx.note_ons or {}
@@ -14933,11 +14951,11 @@ ctx.autoarm_all = function(on)
     for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
     on = not all
   end
-  edit.run('auto-arm all tracks ' .. (on and 'on' or 'off'), function()
-    for i = 0, nt - 1 do reaper.SetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM', on and 1 or 0) end
-  end)
+  -- 23 окт: autoarm all = опция rec follows selection (armsel): и новым трекам auto-arm, армится трек под курсором
+  edit.run('auto-arm all tracks ' .. (on and 'on' or 'off'), function() state.armsel = on; ctx.armsel_apply(on) end)
+  ctx.armsel_n, ctx.armsel_tr = nil, nil   -- новые треки и трек курсора — заново со следующего кадра
   model.invalidate()
-  vim.msg = on and 'auto-arm on every track: the selected track records (tA / the autoarm button again - off)' or 'auto-arm off on every track'
+  vim.msg = on and 'auto-arm on every track, new ones too: the track under the cursor records (tA / autoarm all again - off; option rec follows selection)' or 'auto-arm off on every track'
 end
 ctx.theme_list = function() return draw.themes.LIST end   -- 20 окт: :theme без аргумента — тот же список, что в меню (свои темы тоже)
 ctx.lpb = function() return state.lpb or 4 end   -- 15 окт: свойства — beatsync в строках
@@ -19571,6 +19589,15 @@ local function frame()
     ctx.note_ons = keep
   end
   if ctx.arm_tmp and reaper.time_precise() > (ctx.arm_tmp.t or 0) then ctx.arm_restore() end
+  if ctx.vkb_iso and reaper.time_precise() > (ctx.vkb_iso.t or 0) then   -- 23 окт: арм соседей — обратно после прослушки
+    for _, e in ipairs(ctx.vkb_iso.list) do
+      if reaper.ValidatePtr(e.tr, 'MediaTrack*') then
+        reaper.SetMediaTrackInfo_Value(e.tr, 'I_RECARM', 1)
+        if e.aa == 1 then reaper.SetMediaTrackInfo_Value(e.tr, 'B_AUTO_RECARM', 1) end
+      end
+    end
+    ctx.vkb_iso = nil
+  end
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
     for _, o in ipairs(ctx.note_offs) do
