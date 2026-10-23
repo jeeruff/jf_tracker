@@ -8930,7 +8930,10 @@ function D.frame(L, snap, rows, state, info)
         local extra = np > first and math.ceil((np - first) / rows) or 0
         local kk2 = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
         local lst = (D.kit_list or {})[kk2] == 'list' and 1 or 0   -- 23 окт: список — вдвое шире сетки (+ колонка)
-        return math.min(5 + lst, 2 + extra + lst)
+        -- 23 окт: эффекты выбранного пэда — колонками за параметрами сэмплера (цепочка пэда вправо), до трёх
+        local kid0 = f.kids[(D.kit_sel or {})[kk2] or 0]
+        local nsl = kid0 and math.min(3, #(kid0.slots or {})) or 0
+        return math.min(5 + lst, 2 + extra + lst) + nsl
       end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
@@ -9152,6 +9155,11 @@ function D.frame(L, snap, rows, state, info)
       -- ReaEQ (7 окт): P — только параметры, G — только график
       if f.view == 'eq' and tw > L.cw * 8 + kb then
         bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
+        tw = tw - kb - 2
+      end
+      -- 23 окт: ÷ — эффект в полосы (3 / 4 / 5 band, нативные сплиттер + джойнер REAPER), только верхний уровень
+      if not f.container and not f.kids and tw > L.cw * 10 + kb then
+        bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
 
@@ -9829,6 +9837,43 @@ function D.frame(L, snap, rows, state, info)
               if cnt >= rmax and colp + 1 < ncol then colp, cnt = colp + 1, 0 end
               cl[pi] = { colp, cnt }; cnt = cnt + 1
             else cl[pi] = { 99, 0 } end
+          end
+          -- 23 окт: цепочка пэда — его эффекты (за сэмплером) колонками справа: имя, B x, параметры (тянуть)
+          if D.DR and ks > 0 and f.kids[ks] and info.db_params then
+            local kd = f.kids[ks]
+            local nsl = math.min(3, #(kd.slots or {}))
+            local vis = ncol - (f._klist and 1 or 0)
+            for j = 1, nsl do
+              local sl = kd.slots[j]
+              local cx = bx + (vis - nsl + j - 1) * bw1
+              set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1)
+              local hy2 = by + L.rh + 1
+              local kb2 = ms('x') + 2 * L.pad
+              for _, b2 in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
+                local hb = not drag and mx >= b2[3] and mx < b2[3] + kb2 and my >= hy2 and my < hy2 + L.rh
+                local lit = b2[2] == 'kbypass' and not sl.enabled
+                set(hb and U.tint(b2[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b2[3], hy2, kb2, L.rh - 1, 1)
+                set(hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b2[3], hy2, kb2, L.rh - 1, 0)
+                text(b2[3] + L.pad, hy2, b2[1], hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+                if hb then hover.dspbtn = { fx = k, f = f, what = b2[2], kid = { i = sl.i, name = sl.name, enabled = sl.enabled } } end
+              end
+              text(cx + L.pad, hy2, fit('> ' .. (sl.name or ''), bw1 - 2 * L.pad - 2 * kb2 - 4), sl.enabled and U.CYAN or U.GREY)
+              local ps = info.db_params(sl.i) or {}
+              local nw2, vw2 = math.floor((bw1 - 2 * L.pad) * 0.38), ms('-00.0')
+              for pi2, p2 in ipairs(ps) do
+                local py2 = hy2 + pi2 * L.rh + 1
+                if py2 + L.rh > by + bh - 2 then break end
+                local v2, t2 = 0, ''
+                if info.db_pval then v2, t2 = info.db_pval(sl.i, p2.i) end
+                local sx2, sw2 = cx + L.pad + nw2, bw1 - 3 * L.pad - nw2 - vw2
+                local hot2 = not drag and mx >= sx2 and mx < sx2 + sw2 and my >= py2 and my < py2 + L.rh
+                text(cx + L.pad, py2, fit(p2.name or '', nw2 - L.pad), hot2 and U.AMBER or U.TEXT)
+                set(U.DIM); gfx.rect(sx2, py2 + L.rh // 2 - 1, sw2, 2, 1)
+                set(hot2 and U.AMBER or (sl.enabled and U.CYAN or U.GREY)); gfx.rect(sx2, py2 + 4, math.max(1, math.floor(sw2 * (v2 or 0) + 0.5)), L.rh - 8, 1)
+                text(cx + bw1 - L.pad - vw2, py2, fit(t2 or '', vw2), U.GREY)
+                if hot2 then hover.dbparam = { addr = sl.i, i = p2.i, x = sx2 + (D.pn_ox or 0), w = sw2, name = p2.name } end
+              end
+            end
           end
           ::kit_done::
         elseif #f.kids > 0 and (D.kit_list or {})[tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)] == 'list' then

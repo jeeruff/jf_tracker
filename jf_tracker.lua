@@ -20134,6 +20134,7 @@ local function frame()
     modtab = function() return state.modtab or 'lfo' end,
     modsl = ctx.MODSL,
     midi_out_n = function(tr) return ctx.midi_out_n(tr) end,   -- 23 окт: кнопка midi out рэка
+    db_params = function(a) return ctx.db_params(a) end, db_pval = function(a, i) return ctx.db_pval(a, i) end,   -- 23 окт: эффекты пэда рэка
     midi_in = function(guid) return ctx.midi_in_t and ctx.midi_in_t[guid], ctx.midi_in_v and ctx.midi_in_v[guid], ctx.midi_in_p and ctx.midi_in_p[guid] end,
     pm_phase = function() return ctx.pm_test and ctx.pm_test.ph end,
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
