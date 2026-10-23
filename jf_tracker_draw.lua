@@ -9355,8 +9355,15 @@ function D.frame(L, snap, rows, state, info)
             f._klist = true
             local bwl = bw1 - (L.th + 6) - 3
             local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 12 }, { 'vol', 'volume', 6 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 3 } }
-            local tot = 0
-            for _, c2 in ipairs(COLS) do tot = tot + c2[3] end
+            -- узко — сначала без grp / chk, потом без vol, имя короче (колонки не вылезают за вкладку)
+            local avail = math.floor((bwl - 2 * L.pad) / L.cw)
+            local function sum() local t = 0; for _, c2 in ipairs(COLS) do t = t + c2[3] end; return t end
+            for _, drop in ipairs({ 'chk', 'grp', 'vol' }) do
+              if sum() <= avail then break end
+              for i2, c2 in ipairs(COLS) do if c2[1] == drop then table.remove(COLS, i2); break end end
+            end
+            if sum() > avail then for _, c2 in ipairs(COLS) do if c2[1] == 'name' then c2[3] = math.max(4, c2[3] - (sum() - avail)) end end end
+            local tot = sum()
             local cwx = math.max(L.cw, math.floor((bwl - 2 * L.pad) / tot))
             local ly0 = hy
             local xh = bx + L.pad
@@ -9404,7 +9411,8 @@ function D.frame(L, snap, rows, state, info)
             D.kit_lkey = kkey; D.vbar('kitlist', bx, ly0 + L.rh + 2, bwl - 2, nrow * L.rh, sc, nrow, #f.kids)
           else f._klist = nil
           end
-          if D.DR and not f._klist then   -- 23 окт: список — вместо сетки
+          if f._klist then   -- 23 окт: список уже нарисован на месте сетки — ни сетки, ни старого списка слайсов
+          elseif D.DR then
             -- 16 окт: drumrs5k — сетка пэдов вместо списка: шапка «all · N pads · cell: …»,
             -- ячейка — имя пэда и подпись (note / key / wave / spec); щелчок — выбрать
             -- и прослушать (main), выбранный — янтарём, выключенный — тускло
