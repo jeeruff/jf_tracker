@@ -14726,6 +14726,11 @@ if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
 draw.step_index = model.step_index   -- 22 окт: ступени, распознанные по тексту (середины участков)
+-- 23 окт: выбранная полоса ÷N (её эффекты — модулями за контейнером): тот же ключ, что draw.kit_sel
+model.inner_sel = function(tr, e)
+  local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
+  return (draw.kit_sel or {})[g .. ':' .. tostring(e.fguid or e.i)]
+end
 draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
 -- зона цепи kid (ребёнок-контейнер): её первый — jf_tracker_zone? → { addr, key, vel, sel, select }; кеш 0.25 с / fx_gen
 ctx.zone_cache = {}
@@ -23582,6 +23587,7 @@ local function frame()
     elseif hover.dspkit then
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
+      if hover.dspkit.k and hover.dsp and hover.dsp.f and hover.dsp.f.bands then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end   -- 23 окт: полоса ÷N — её модули за контейнером
       if hover.dsp then ctx.set_focus('dsp') end
       -- 19 окт: щелчок по пэду drumrs5k — режим пэдов DSP (h j k l, x yy yp p, M S) на этом рэке
       if hover.dspkid and hover.dspkid.kid and hover.dspkit.k and ctx.pad_rack(hover.dspkit.k) then
@@ -24823,13 +24829,17 @@ local function frame()
         else vim.msg = 'could not move ' .. dd.f.name .. ' into the container' end
         g = nil
       end
+      -- 23 окт: щель — в позициях верхнего уровня (модули полос ÷N в списке не считаются): s — место источника там же
+      local tlist = {}
+      do local col0 = dsp_target(); for _, e in ipairs(col0 and col0.fx or {}) do if not e.inner then tlist[#tlist + 1] = e end end end
+      if g and dd.f.inner then vim.msg = dd.f.name .. ' is inside ' .. (dd.f.inner.parent.name or 'the container') .. ' - drop it onto a band row, or onto a track'; g = nil end
+      if g then for i, e in ipairs(tlist) do if e == dd.f then s = i end end end
       if dd.active and g and g ~= s and g ~= s - 1 then
         local col = dsp_target()
-        local fxs = col and col.fx or {}
-        local dst = (g < s - 1) and fxs[g + 1] or fxs[g]
+        local dst = (g < s - 1) and tlist[g + 1] or tlist[g]
         if col and dst then
           edit.fx_move(col.track, dd.f.i, dst.i)
-          dsp_sel.fx = (g < s - 1) and (g + 1) or g
+          for i, e in ipairs(col.fx or {}) do if e == dst then dsp_sel.fx = i end end
           vim.msg = 'fx moved: ' .. dd.f.name
         end
       end

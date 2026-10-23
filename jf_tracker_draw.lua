@@ -8975,12 +8975,7 @@ function D.frame(L, snap, rows, state, info)
         local nsl = kid0 and D.pad_chain_view(kid0, kk2 .. ':' .. tostring((D.kit_sel or {})[kk2] or 0)).ncols or 0
         return math.min(5 + lst, 2 + extra + lst) + nsl
       end
-      if f.bands and f.kids and #f.kids > 0 then   -- 23 окт: ÷N — список полос + колонка на каждый эффект выбранной полосы (до 4)
-        local kk2 = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
-        local b0 = f.kids[math.max(1, math.min(#f.kids, (D.kit_sel or {})[kk2] or 1))]
-        local ng = math.max(0, #(b0 and b0.entry and b0.entry.kids or {}) - 1)
-        return 1 + math.max(1, math.min(4, ng))
-      end
+      if f.bands and f.kids and #f.kids > 0 then return 1 end   -- 23 окт: ÷N — список полос + кроссовер; эффекты полосы — модулями за ним
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page and (info.dsptabs or 'bottom') ~= 'right') and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
@@ -9076,7 +9071,7 @@ function D.frame(L, snap, rows, state, info)
         if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end   -- вне окна — только место
         nshown = nshown + 1
         local is_sel = sel.fx == k
-        blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, cont = f.container }
+        blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, cont = f.container, bands = f.bands, inner = f.inner }
         local picked = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
         set(picked and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
         set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, boxy, fw, bh0, 0)
@@ -9151,7 +9146,7 @@ function D.frame(L, snap, rows, state, info)
       if bx + bw <= cx0 or bx >= cx1 then bx = bx + bw + L.pad; goto next_block end   -- вне окна — только место (полоса прокрутки)
       nshown = nshown + 1
       local is_sel = sel.fx == k
-      blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container }
+      blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container, bands = f.bands, inner = f.inner }
       local in_rng = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
@@ -9204,7 +9199,7 @@ function D.frame(L, snap, rows, state, info)
         tw = tw - kb - 2
       end
       -- 23 окт: ÷ — эффект в полосы (3 / 4 / 5 band, нативные сплиттер + джойнер REAPER), только верхний уровень
-      if not f.container and not f.kids and tw > L.cw * 10 + kb then
+      if not f.container and not f.kids and not f.inner and tw > L.cw * 10 + kb then
         bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
@@ -9227,7 +9222,10 @@ function D.frame(L, snap, rows, state, info)
         end
         tw = tw - ptw - L.pad
       end
-      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
+      local inp = f.inner and (f.inner.band .. ' > ') or ''
+      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      if f.inner then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
       if tw > 0 then
         for _, b in ipairs(bxs) do
           local kx = b[3]
@@ -9387,7 +9385,7 @@ function D.frame(L, snap, rows, state, info)
           local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
           return fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), w0)
         end
-        if f.bands and #f.kids > 0 and ncol >= 2 then
+        if f.bands and #f.kids > 0 then
           -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
           -- под ними — кроссовер (частоты сплиттера; правка идёт во все полосы); справа — эффекты выбранной полосы
           -- колонками (сплиттер в начале цепи не показан — он часть контейнера)
@@ -9427,36 +9425,12 @@ function D.frame(L, snap, rows, state, info)
           set(U.LINE); gfx.rect(bx + L.pad, xy - 1, bw1 - 2 * L.pad, 1, 1)
           text(bx + L.pad, xy, fit('crossover', bw1 - 2 * L.pad), U.GREY)
           set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1)
-          -- эффекты выбранной полосы: внуки 2.. (1 — сплиттер)
-          local band = f.kids[sb]
-          local gk = band.entry and band.entry.kids or {}
-          local nshow = math.min(ncol - 1, #gk - 1)
-          local kb2 = ms('x') + 2 * L.pad
-          for c = 1, nshow do
-            local g = gk[c + 1]
-            local cx = bx + c * bw1
-            if c > 1 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1) end
-            local nw = D.kid_head(L, info, cx, hy, bw1, g, k, f, drag, mx, my, hover)
-            local onb = hover.dspbtn and hover.dspbtn.kid == g
-            local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < hy + L.rh
-            text(cx + L.pad, hy, kid_label(g, nw), g.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
-            if hot then hover.dspkid = { k = k, f = f, ki = sb, kid = g } end
-          end
-          if nshow < 1 then text(bx + bw1 + L.pad, hy, fit((band.name or 'band') .. ': empty - af / drop an fx', bw1 * (ncol - 1) - 2 * L.pad), U.GREY) end
-          -- эффект из fx list тащат на цепь — в конец выбранной полосы (голубая рамка)
-          if drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= bx + bw1 and mx < bx + bw and my >= by and my < by + bh then
-            hover.kitdrop = { k = k, f = f, ki = sb, kid = band, pos = #gk, band = true }
-            set(U.CYAN); gfx.rect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, 0)
-          end
           -- раскладка параметров: кроссовер — сплиттер low (kid 1, внук 1) под списком; цепь — колонками; остальное спрятано
           cl = {}
           local cnt = {}
           for pi, p in ipairs(f.params) do
             if p.kid == 1 and p.gkid == 1 and not p.macro then
               cnt.x = (cnt.x or 0) + 1; cl[pi] = { 0, nb + cnt.x - 1 }
-            elseif p.kid == sb and p.gkid and p.gkid >= 2 and p.gkid - 1 <= nshow and not p.macro then
-              local c = p.gkid - 1
-              cnt[c] = (cnt[c] or 0) + 1; cl[pi] = { c, cnt[c] - 1 }
             else cl[pi] = { 99, 0 } end
           end
         elseif f.kit and ncol >= 2 then
@@ -10879,7 +10853,7 @@ function D.frame(L, snap, rows, state, info)
     -- двойная голубая рамка вместо черты; края блока — как раньше, до / после
     if drag and my >= dy and my < dy + DH and mx >= fbw then
       for _, b in ipairs(blocks) do
-        if b.cont and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
+        if b.cont and not b.bands and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
           set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
           hover.dsp_into = b.k
           hover.dsp_into_par = mx >= b.x + b.w / 2 and 1 or 0     -- правая половина — parallel
@@ -10887,10 +10861,13 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     if drag and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
-      local gap, gx = #blocks, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
-      for _, b in ipairs(blocks) do
-        if mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
+      local gap, gx = #blocks > 0 and blocks[#blocks].k or 0, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
+      for _, b in ipairs(blocks) do   -- 23 окт: модули полосы (inner) — не щели верхнего уровня
+        if not b.inner and mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
       end
+      local tl = 0   -- щель — в позициях верхнего уровня REAPER (без модулей полос)
+      for i = 1, gap do if fxs[i] and not fxs[i].inner then tl = tl + 1 end end
+      gap = tl
       local gy, gh = dy + 3 + L.rh, DH - L.rh - 6 - (L.hint_h or 0)
       set(U.AMBER); gfx.rect(gx - 1, gy, 3, gh, 1)
       gfx.rect(gx - 4, gy, 9, 2, 1); gfx.rect(gx - 4, gy + gh - 2, 9, 2, 1)

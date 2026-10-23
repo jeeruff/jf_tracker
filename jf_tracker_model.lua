@@ -1605,18 +1605,53 @@ function M.track_fx(tr)
         e.file = ok and file ~= '' and file or nil
       end
     end
-    mark_params(tr, A, c.out)
-    M.macro_labels(tr, c.out)
-    return c.out
+    local view = M.expand_inner(tr, c.out)
+    mark_params(tr, A, view)
+    M.macro_labels(tr, view)
+    return view
   end
   local out = build_track_fx(tr)
   M.discretize(tr, out)   -- 22 окт: «непрерывные» с 2..8 подписями (Surge subtype) — ступени
   M.macroize(out, tr)    -- 22 окт: Macro 1..8 — фейдерами слева в модуле, в конце списка
+  -- 23 окт: эффекты полос ÷N — полноценными модулями (так же ступени и макросы)
+  for _, e in ipairs(out) do
+    if e.bands then
+      for _, b in ipairs(e.kids or {}) do
+        local lst = {}
+        for gi, g in ipairs(b.entry and b.entry.kids or {}) do if gi > 1 and g.entry then lst[#lst + 1] = g.entry end end
+        if #lst > 0 then M.discretize(tr, lst); M.macroize(lst, tr) end
+      end
+    end
+  end
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
-  mark_params(tr, A, out)
-  M.macro_labels(tr, out)
-  return out
+  local view = M.expand_inner(tr, out)
+  mark_params(tr, A, view)
+  M.macro_labels(tr, view)
+  return view
+end
+-- 23 окт: как Ableton — за контейнером ÷N bands его выбранная полоса: её эффекты (без сплиттера) полноценными
+-- модулями DSP (страницы, макросы, огибающие), с пометкой inner = { parent, band }. Адрес эффекта (0x2000000+…)
+-- годится во все TrackFX_*; перестановки / щели верхнего уровня их не касаются. Выбор полосы — M.inner_sel(tr, e)
+function M.expand_inner(tr, out)
+  local has = false
+  for _, e in ipairs(out) do if e.bands then has = true; break end end
+  if not has then return out end
+  local view = {}
+  for _, e in ipairs(out) do
+    view[#view + 1] = e
+    if e.bands and e.kids and #e.kids > 0 then
+      local bi = math.max(1, math.min(#e.kids, (M.inner_sel and M.inner_sel(tr, e)) or 1))
+      local b = e.kids[bi]
+      for gi, g in ipairs(b.entry and b.entry.kids or {}) do
+        if gi > 1 and g.entry then
+          g.entry.inner = { parent = e, band = b.name or ('band ' .. bi), bi = bi }
+          view[#view + 1] = g.entry
+        end
+      end
+    end
+  end
+  return view
 end
 
 -- один эффект по адресу fx (верхний уровень или ребёнок контейнера) → в out;
