@@ -60,7 +60,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 -- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'sketch', 'sketch' }, { 'add', '+' } }   -- 23 окт: sketch — строка эскизов (была строкой-подсказкой)   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -354,7 +354,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
-    U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6) or (b[1] == 'follow' and MX.follow)) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6) or (b[1] == 'follow' and MX.follow) or (b[1] == 'sketch' and (MX.sk_show or #(MX.sketch or {}) > 0))) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, by + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
     if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, b[1]) end
@@ -1088,23 +1088,21 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if hbar_h > 0 and ctx.hbar then ctx.hbar('matrixh', L.mx_label_w, ybot - 4, ncv * L.mx_cell_w, 3, MX.hs, ncv, ncols) end
   end
   if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
-  -- 23 окт: треки за краем матрицы — янтарная черта по краю клеток и число спрятанных (‹2 слева, 3› справа) в строке
+  -- 23 окт: треки за краем матрицы — число спрятанных (<2 слева, 3> справа) приглушённо в строке
   -- над клетками; щелчок по числу — на страницу туда (полоса прокрутки снизу — только про клетки, её мало)
   local hid_l, hid_r = MX.hs, math.max(0, ncols - MX.hs - ncv)
   local cx0, cx1 = L.mx_label_w, L.mx_label_w + math.min(ncv, ncols - MX.hs) * L.mx_cell_w
   local ly = top - L.rh
   for side, nh in pairs({ [-1] = hid_l, [1] = hid_r }) do
     if nh > 0 then
-      local ex = side < 0 and cx0 or (cx1 - 2)
-      U.set(U.mix(U.AMBER, U.BG, 0.35)); gfx.rect(ex, top, 2, math.max(0, math.min(bottom, top + nvis * rh) - top), 1)
+      -- 23 окт: тихо (было ярко — рамка и черта): только приглушённое число, под мышью — ярче
       local lbl = side < 0 and ('<' .. nh) or (nh .. '>')
       local lw = U.measure(lbl) + 2 * L.pad
       local lx = side < 0 and cx0 or (cx1 - lw)
       if ly >= 0 and lx >= 0 then
         local hot = mx >= lx and mx < lx + lw and my >= ly and my < ly + L.rh
-        U.set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(lx, ly, lw, L.rh - 1, 1)
-        U.set(U.AMBER); gfx.rect(lx, ly, lw, L.rh - 1, 0)
-        U.text(lx + L.pad, ly, lbl, U.AMBER)
+        U.set(U.PANEL); gfx.rect(lx, ly, lw, L.rh - 1, 1)
+        U.text(lx + L.pad, ly, lbl, hot and U.AMBER or U.GREY)
         if hot then hover.edge = side * ncv end
         if ctx.hint then ctx.hint('mxedge', lx, ly, lw, L.rh - 1, side * ncv) end
       end

@@ -21349,6 +21349,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
+  elseif hover.matrix and hover.matrix.btn == 'sketch' then state.status = 'sketchpad: c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch (X1 X2 ... in the row; click - the row on / off)'
   elseif hover.matrix and hover.matrix.btn == 'follow' then state.status = 'follow ' .. (MX.follow and 'on' or 'off') .. ': while you are in the tracker the matrix cursor stands on the slot and the track of the tracker cursor and scrolls to it; click - ' .. (MX.follow and 'off' or 'on')
   elseif hover.matrix and hover.matrix.btn == 'clips' then state.status = 'clips: the matrix as a session - scenes x tracks, Enter launches a clip into the =SESSION loop; zz - over the whole window'
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
@@ -26875,6 +26876,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'timesel' then ctx.tsel_menu()
+  elseif b == 'sketch' then MX.sk_show = not MX.sk_show; vim.msg = 'sketchpad: c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch'
   elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
     MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
     vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
@@ -28204,8 +28206,9 @@ end
 ctx.sketch_draw = function(Lx, x, y, w)
   local hv = {}
   ctx.sketch_ensure()   -- 21 окт: эскизы проекта (после рестарта / смены вкладки)
-  if #MX.sketch == 0 then   -- 21 окт: строка видна и пустой — с подсказкой, как начать (её не находили)
-    U.text(x + Lx.pad, y, ctx.fit('sketch  c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch', w - 2 * Lx.pad), U.DIM)
+  if #MX.sketch == 0 then   -- 23 окт: пустая — строки нет (кнопка sketch в ряду кнопок; как начать — в статусе над ней)
+    if not MX.sk_show then return 0, hv end
+    U.text(x + Lx.pad, y, 'sketch', U.GREY)
     return Lx.rh + 2, hv
   end
   local mx, my = gfx.mouse_x, gfx.mouse_y
