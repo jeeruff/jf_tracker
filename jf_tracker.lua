@@ -16336,6 +16336,7 @@ local function hint_go(t)
   elseif t.kind == 'libtab' then state.libtab = d; ctx.set_focus('inst'); vim.msg = 'lib: ' .. tostring(d) .. ' (F4)'
   elseif t.kind == 'mxbpm' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.bpm_prompt(seq[d]) end
   elseif t.kind == 'mxsig' then if seq[d] then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d, MX.cur.ci); ctx.sig_prompt(seq[d]) end
+  elseif t.kind == 'mxedge' then MX.hs = math.max(0, (MX.hs or 0) + (d or 0))
   elseif t.kind == 'mxvis' then local rg = d and seq[d.ri]; if rg then ctx.visor_pick(math.floor(rg.r0 + 0.5)) end
   elseif t.kind == 'mlane' then ctx.set_focus('tracker'); vim.cur.fi, vim.cur.field, vim.cur.sub = d, 1, nil
   elseif t.kind == 'arcring' then ctx.arc_assign(d)
@@ -23209,6 +23210,9 @@ local function frame()
       local rg = seq[hover.matrix.vis.ri]
       if rg then ctx.visor_pick(math.floor(rg.r0 + 0.5)) end
       click = { t = now2, zone = 'mxvis' }
+    elseif hover.matrix and hover.matrix.edge then   -- 23 окт: ‹N / N› у края матрицы — на страницу треков туда
+      MX.hs = math.max(0, (MX.hs or 0) + hover.matrix.edge)
+      click = { t = now2, zone = 'mxedge' }
     elseif hover.matrix and hover.matrix.btn then
       ctx.set_focus('matrix')
       ctx.mx_btn_do(hover.matrix.btn)

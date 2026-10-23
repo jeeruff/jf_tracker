@@ -1088,6 +1088,28 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if hbar_h > 0 and ctx.hbar then ctx.hbar('matrixh', L.mx_label_w, ybot - 4, ncv * L.mx_cell_w, 3, MX.hs, ncv, ncols) end
   end
   if ctx.vbar then ctx.vbar('matrix', W - 5, top, 3, nvis * rh, MX.scroll, nvis, #regions) end   -- поверх строк
+  -- 23 окт: треки за краем матрицы — янтарная черта по краю клеток и число спрятанных (‹2 слева, 3› справа) в строке
+  -- над клетками; щелчок по числу — на страницу туда (полоса прокрутки снизу — только про клетки, её мало)
+  local hid_l, hid_r = MX.hs, math.max(0, ncols - MX.hs - ncv)
+  local cx0, cx1 = L.mx_label_w, L.mx_label_w + math.min(ncv, ncols - MX.hs) * L.mx_cell_w
+  local ly = top - L.rh
+  for side, nh in pairs({ [-1] = hid_l, [1] = hid_r }) do
+    if nh > 0 then
+      local ex = side < 0 and cx0 or (cx1 - 2)
+      U.set(U.mix(U.AMBER, U.BG, 0.35)); gfx.rect(ex, top, 2, math.max(0, math.min(bottom, top + nvis * rh) - top), 1)
+      local lbl = side < 0 and ('<' .. nh) or (nh .. '>')
+      local lw = U.measure(lbl) + 2 * L.pad
+      local lx = side < 0 and cx0 or (cx1 - lw)
+      if ly >= 0 and lx >= 0 then
+        local hot = mx >= lx and mx < lx + lw and my >= ly and my < ly + L.rh
+        U.set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(lx, ly, lw, L.rh - 1, 1)
+        U.set(U.AMBER); gfx.rect(lx, ly, lw, L.rh - 1, 0)
+        U.text(lx + L.pad, ly, lbl, U.AMBER)
+        if hot then hover.edge = side * ncv end
+        if ctx.hint then ctx.hint('mxedge', lx, ly, lw, L.rh - 1, side * ncv) end
+      end
+    end
+  end
   return hover
 end
 
