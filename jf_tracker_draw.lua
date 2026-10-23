@@ -8115,7 +8115,7 @@ function D.frame(L, snap, rows, state, info)
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
-    if secb[r.row] then set(secb[r.row]); gfx.rect(tx0, y, W - tx0, 2, 1)
+    if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
     elseif patb[r.row] then set(U.LINE); gfx.rect(tx0, y, W - tx0, 2, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
@@ -8367,6 +8367,8 @@ function D.frame(L, snap, rows, state, info)
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
   D.sf_draw(L, info, state)      -- 20 окт: Shift+F — призрак сэмпла на месте вставки
   D.pmark('draw: ai handles, tint, cursor')
+  for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
+  D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
   if D.aim_line then   -- 12 окт: полоска реза прицела — янтарь, как линия прицела во вкладке item, с мягким ореолом
