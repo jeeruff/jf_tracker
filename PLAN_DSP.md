@@ -89,6 +89,13 @@
 - Частоты разделов — ручками прямо на шине (параметры сплиттера), solo / mute полосы (pin bypass), громкость полосы.
 - Команда «split into 3 / 4 / 5 bands»: на выбранный эффект / ряд — сплиттер + джойнер вокруг.
 
+### Что уже есть в REAPER для роутера (23 окт, разведка установленных JSFX и API)
+- **Полосы:** `loser/3BandSplitter`, `4BandSplitter`, `5BandSplitter` + `…Joiner` — кроссовер в пары каналов (1/2, 3/4, 5/6…), частоты — слайдеры; `schwa/fft_splitter` — фазово-линейный FFT-сплиттер (без сдвига фаз полос).
+- **Каналы и смесь:** `utility/channel_mapper` (Channel Mapper-Downmixer), `utility/channelmixer`, `IX/PhaseAdjustingRouter` (роутер каналов с полярностью), `IX/Mixer_8xS-1xS` / `8xM-1xS` (сумма 8 пар в одну — свой джойнер на 8 веток), `IX/Switcher2` (выбор 1 из 8 входов — A/B веток, «переключатель» как кнопка), `IX/StereoPhaseInvert`.
+- **Мид / сайд, ширина:** `sstillwell/stereowidth`, `sstillwell/width`, `Liteon/rbjstereofilter12db`, `loser/stereoEnhancer` — ветки M/S.
+- **API:** контейнеры (`container_count`, `container_item.N`, `parallel` 0/1/2 — 2 = parallel с MIDI-merge), `container_nch` / `container_nch_in` / `container_nch_out` (каналы контейнера), `TrackFX_Get/SetPinMappings` (какие каналы видит эффект), `I_NCHAN` трека, parameter link между детьми контейнера (`param.N.plink`, у контейнера — свои параметры-макросы через «container parameter»), `TrackFX_CopyToTrack` с адресами контейнера, `.RfxChain` — пресет цепочки.
+- **Как использовать:** полоса = пара каналов: эффект в полосе — pin mapping на эту пару; сумма — Joiner или Mixer_8x; A/B — Switcher2; M/S — ветка с stereowidth / channel mapper. Свой JSFX не нужен — всё штатное.
+
 ### Контейнер
 - Вид: рамка с именем, ряды parallel видны шиной-разветвлением и суммой (есть), у ветки — wet / громкость, solo / mute ветки (есть s, =), полоса-метр на ветке.
 - Свои 8 макро-ручек контейнера (родные parameter link контейнера REAPER 7: container макрос → параметры детей), назначение — перетаскиванием параметра на макрос.
