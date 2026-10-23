@@ -14726,6 +14726,29 @@ if not draw.themes.valid(state.theme) then state.theme = 'reaper' end
 draw.themes.apply(U, state.theme)
 draw.init(U, model.peaks, MX)
 draw.step_index = model.step_index   -- 22 окт: ступени, распознанные по тексту (середины участков)
+draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
+-- зона цепи kid (ребёнок-контейнер): её первый — jf_tracker_zone? → { addr, key, vel, sel, select }; кеш 0.25 с / fx_gen
+ctx.zone_cache = {}
+ctx.zone_read = function(track, kid)
+  if not (track and kid) then return nil end
+  local now = reaper.time_precise()
+  local c = ctx.zone_cache[kid.i]
+  if c and c.track == track and c.gen == model.fx_gen and now - c.t < 0.25 then return c.z end
+  local z
+  if kid.container then
+    local ok, first = reaper.TrackFX_GetNamedConfigParm(track, kid.i, 'container_item.0')
+    first = ok and tonumber(first)
+    local _, nm = reaper.TrackFX_GetFXName(track, first or -1, '')
+    if first and (nm or ''):find('jf_tracker_zone', 1, true) then
+      local v = {}
+      for i = 0, 12 do v[i] = math.floor(reaper.TrackFX_GetParam(track, first, i) + 0.5) end
+      z = { addr = first, key = { lo = v[0], hi = v[1], flo = v[2], fhi = v[3] }, vel = { lo = v[4], hi = v[5], flo = v[6], fhi = v[7] },
+            sel = { lo = v[8], hi = v[9], flo = v[10], fhi = v[11] }, select = v[12] }
+    end
+  end
+  ctx.zone_cache[kid.i] = { track = track, gen = model.fx_gen, t = now, z = z }
+  return z
+end
 draw.FP = dofile(DIR .. '/jf_tracker_fxparse.lua')   -- 22 окт: PLAN_DSP 2 — короткие значения и имена параметров DSP, когда не влезают
 -- Theme Adjuster / смена темы (2 окт): раз в секунду подпись темы; изменилась —
 -- палитра перечитывается (jf_looper_ui не трогаем: свежая копия, поля в U),
@@ -20154,7 +20177,8 @@ local function frame()
     modtab = function() return state.modtab or 'lfo' end,
     modsl = ctx.MODSL,
     midi_out_n = function(tr) return ctx.midi_out_n(tr) end,   -- 23 окт: кнопка midi out рэка
-    db_params = function(a) return ctx.db_params(a) end, db_pval = function(a, i) return ctx.db_pval(a, i) end,   -- 23 окт: эффекты пэда рэка
+    db_params = function(a) return ctx.db_params(a) end, db_pval = function(a, i) return ctx.db_pval(a, i) end,
+    zone_read = function(tr, kid) return ctx.zone_read(tr, kid) end,   -- 23 окт: зоны цепей рэка   -- 23 окт: эффекты пэда рэка
     midi_in = function(guid) return ctx.midi_in_t and ctx.midi_in_t[guid], ctx.midi_in_v and ctx.midi_in_v[guid], ctx.midi_in_p and ctx.midi_in_p[guid] end,
     pm_phase = function() return ctx.pm_test and ctx.pm_test.ph end,
     param_bipolar = function(f, p)   -- 22 окт: ноль посередине — ромбик (кэш по типу плагина и номеру параметра)
@@ -22009,6 +22033,37 @@ local function frame()
     ctx.set_focus('dsp'); if hover.dbnode then MX.DB.sel = hover.dbnode.guid end
     U.click = false
   end
+  -- 23 окт: зоны цепей рэка — щелчок по полосе зоны (края / скаты / вся), бегунок select в линейке
+  if U.click and hover.zone then
+    local hz, t = hover.zone, dsp_target()
+    if t then
+      local zaddr = hz.zaddr
+      if not zaddr and hz.what ~= 'select' then zaddr = edit.zone_ensure(t.track, hz.c, hz.k); ctx.zone_cache = {} end
+      if zaddr or hz.what == 'select' then
+        ctx.zone_drag = { track = t.track, zaddr = zaddr, kind = hz.kind, what = hz.what, x0 = hz.x0, w = hz.w,
+                          z = hz.z, v0 = (gfx.mouse_x - hz.x0) / math.max(1, hz.w) * 128, sels = hz.sels }
+      end
+    end
+    ctx.set_focus('dsp'); U.click = false
+  end
+  if ctx.zone_drag then
+    local d = ctx.zone_drag
+    if gfx.mouse_cap & 1 == 1 then
+      local v = (gfx.mouse_x - d.x0) / math.max(1, d.w) * 128
+      local Z = draw.Z
+      if d.what == 'select' then
+        local sv = math.max(0, math.min(127, math.floor(v)))
+        for _, za in ipairs(d.sels or {}) do edit.zone_write(d.track, za, { [Z.SELECT] = sv }) end
+        vim.msg = 'chain select ' .. sv
+      else
+        local nz = Z.drag(d.z, d.what, d.what == 'move' and (v - d.v0) or v, d.kind)
+        local sl = Z.SL[d.kind]
+        edit.zone_write(d.track, d.zaddr, { [sl[1]] = nz.lo, [sl[2]] = nz.hi, [sl[3]] = nz.flo, [sl[4]] = nz.fhi })
+        vim.msg = ('%s zone %s .. %s (full %s .. %s)'):format(d.kind, Z.label(d.kind, nz.lo), Z.label(d.kind, nz.hi), Z.label(d.kind, nz.flo), Z.label(d.kind, nz.fhi))
+      end
+      ctx.zone_cache = {}
+    else ctx.zone_drag = nil end
+  end
   if MX.DB.pdrag then
     if gfx.mouse_cap & 1 == 1 then
       local d, t = MX.DB.pdrag, dsp_target()
@@ -23475,6 +23530,10 @@ local function frame()
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
       elseif hover.dspbtn.what == 'kchain' then draw.chain_sel = draw.chain_sel or {}; draw.chain_sel[hover.dspbtn.key] = hover.dspbtn.idx   -- 23 окт: цепь пэда — её эффекты справа
+      elseif hover.dspbtn.what == 'kzone' then   -- 23 окт: key / vel / chain — вид зон цепей (ещё раз — спрятать)
+        draw.zone_view = draw.zone_view or {}
+        local cur = draw.zone_view[hover.dspbtn.key]
+        draw.zone_view[hover.dspbtn.key] = cur ~= hover.dspbtn.kind and hover.dspbtn.kind or nil
       elseif hover.dspbtn.what == 'kview' then draw.kit_list = draw.kit_list or {}; draw.kit_list[hover.dspbtn.key] = hover.dspbtn.view   -- 19 окт: pads | list
       elseif (hover.dspbtn.what == 'kgroup' or hover.dspbtn.what == 'kchoke') and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid, hover.dspbtn.what == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
       elseif hover.dspbtn.what == 'kall_m' or hover.dspbtn.what == 'kall_s' then ctx.pad_ms_all(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kall_s')   -- 19 окт: m s под пэдами

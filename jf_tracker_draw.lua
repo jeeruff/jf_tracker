@@ -10067,17 +10067,53 @@ function D.frame(L, snap, rows, state, info)
           set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
           local ly0 = by + L.rh + 1
           local tr0 = info.pool_col and info.pool_col.track
+          local ckey = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+          -- 23 окт: key / vel / chain — зоны цепей (как Instrument Rack в Ableton): список слева, полосы зон справа
+          D.zone_view = D.zone_view or {}
+          local zk = D.zone_view[ckey]
+          local Z = D.Z
+          local lw = zk and math.max(ms('= name 9 fx 100% off') + 4 * L.pad, math.floor(bw * 0.38)) or bw
+          if zk and lw > bw - 12 * L.cw then zk, lw = nil, bw end   -- узко — без зон
           local cw_par, cw_on, cw_wet, cw_n = ms('= '), ms('off') + L.pad, ms('100%') + L.pad, ms('99 fx') + L.pad
           local nx0 = bx + L.pad + cw_par
-          local nw0 = bw - 2 * L.pad - cw_par - cw_on - cw_wet - cw_n
-          text(bx + L.pad, ly0, fit('chains: | serial  = parallel   zv - columns', bw - 2 * L.pad), U.GREY)
+          local nw0 = lw - 2 * L.pad - cw_par - cw_on - cw_wet - cw_n
+          -- шапка: key vel chain (кнопки, 2 положения: показан / нет) и подсказка
+          local hx = bx + L.pad
+          for _, zb in ipairs({ { 'key', 'key' }, { 'vel', 'vel' }, { 'chain', 'sel' } }) do
+            local w0 = ms(zb[1]) + 2 * L.pad
+            local on = D.zone_view[ckey] == zb[2]
+            local hb = not drag and mx >= hx and mx < hx + w0 and my >= ly0 and my < ly0 + L.rh
+            set(hb and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(hx, ly0, w0, L.rh - 1, 1)
+            set(hb and U.AMBER or U.LINE); gfx.rect(hx, ly0, w0, L.rh - 1, 0)
+            text(hx + L.pad, ly0, zb[1], (hb or on) and U.AMBER or U.GREY)
+            if hb then hover.dspbtn = { fx = k, f = f, what = 'kzone', key = ckey, kind = zb[2] } end
+            hx = hx + w0 + 2
+          end
+          if not zk then text(hx + L.pad, ly0, fit('| serial  = parallel   zv - columns', bx + bw - hx - 2 * L.pad), U.GREY) end
           set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bw - 2 * L.pad, 1, 1)
+          -- линейка зон: над полосами (в строке шапки, правее кнопок)
+          local zx = bx + lw
+          local zw = bx + bw - L.pad - zx
+          local function X(v) return zx + math.floor(v / 128 * zw + 0.5) end
+          local sels = {}
+          if zk then
+            set(U.LINE); gfx.rect(zx - 1, ly0 + L.rh + 1, 1, bh - 2 * L.rh - 4, 1)
+            local last = -1e9
+            for v = 0, 127 do
+              local tick = zk == 'key' and v % 12 == 0 or (zk ~= 'key' and v % 32 == 0)
+              if tick then
+                set(U.mix(U.LINE, U.BG, 0.4)); gfx.rect(X(v), ly0 + L.rh + 1, 1, bh - 2 * L.rh - 4, 1)
+                local lb = Z.label(zk, v)
+                if X(v) > last + L.pad and X(v) + ms(lb) < zx + zw and X(v) > hx + L.pad then text(X(v) + 2, ly0, lb, U.GREY); last = X(v) + ms(lb) end
+              end
+            end
+          end
           for ki, kid in ipairs(f.kids) do
             local ry = ly0 + L.rh + 2 + (ki - 1) * L.rh
             if ry + L.rh > by + bh - 2 then break end
-            local hotr = not drag and mx >= bx and mx < bx + bw and my >= ry and my < ry + L.rh
+            local hotr = not drag and mx >= bx and mx < bx + lw and my >= ry and my < ry + L.rh
             local issel = is_sel and info.dsp_kid == ki
-            if hotr or issel then set(issel and U.tint(U.AMBER, 0.25) or D.CURROW); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1) end
+            if hotr or issel then set(issel and U.tint(U.AMBER, 0.25) or D.CURROW); gfx.rect(bx + 2, ry, lw - 4, L.rh, 1) end
             local par = (kid.parallel or 0) > 0 and ki > 1
             text(bx + L.pad, ry, par and '=' or '|', par and U.CYAN or U.GREY)
             local nfx = kid.container and ((tr0 and select(2, reaper.TrackFX_GetNamedConfigParm(tr0, kid.i, 'container_count'))) or '?') or nil
@@ -10090,11 +10126,51 @@ function D.frame(L, snap, rows, state, info)
               set(U.mix(U.LINE, U.BG, 0.3)); gfx.rect(wx, ry + L.rh // 2, cw_wet - L.pad, 1, 1)
               set(U.CYAN); gfx.rect(wx, ry + 3, math.floor((cw_wet - L.pad) * wv + 0.5), L.rh - 6, 1)
             end
-            local ox = bx + bw - L.pad - cw_on
+            local ox = bx + lw - L.pad - cw_on
             local hon = hotr and mx >= ox
             text(ox, ry, kid.enabled and 'on' or 'off', hon and U.AMBER or (kid.enabled and U.GREEN or U.RED))
             if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = kid }
             elseif hotr then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+            if zk then
+              -- полоса зоны: скаты — клиньями, полная часть — заливкой; без плагина зоны — вся ширина бледно
+              local zz = info.zone_read and info.zone_read(tr0, kid)
+              if zz then sels[#sels + 1] = zz.addr end
+              local z = zz and zz[zk] or { lo = Z.MIN[zk], hi = 127, flo = Z.MIN[zk], fhi = 127 }
+              local y0, y1 = ry + 2, ry + L.rh - 2
+              local xl, xfl, xfh, xh = X(z.lo), X(z.flo), X(z.fhi + 1), X(z.hi + 1)
+              local col = zz and (kid.enabled and U.GREEN or U.GREY) or U.DIM
+              set(U.tint(col, 0.55)); gfx.rect(xfl, y0, math.max(1, xfh - xfl), y1 - y0, 1)
+              if xfl > xl then gfx.triangle(xl, y1, xfl, y0, xfl, y1) end
+              if xh > xfh then gfx.triangle(xfh, y0, xh, y1, xfh, y1) end
+              set(col); gfx.rect(xl, y0 - 1, math.max(1, xh - xl), 1, 1)
+              -- мышь: край (±4 px) — lo / hi; в верхней половине у скатов — flo / fhi; внутри — сдвиг всей зоны
+              if not drag and my >= ry and my < ry + L.rh and mx >= zx and mx < zx + zw then
+                local what
+                local top = my < ry + L.rh // 2
+                if top and math.abs(mx - xfl) <= 4 then what = 'flo'
+                elseif top and math.abs(mx - xfh) <= 4 then what = 'fhi'
+                elseif math.abs(mx - xl) <= 4 then what = 'lo'
+                elseif math.abs(mx - xh) <= 4 then what = 'hi'
+                elseif mx > xl and mx < xh then what = 'move' end
+                if what then
+                  hover.zone = { kind = zk, what = what, zaddr = zz and zz.addr, z = z, x0 = zx, w = zw, c = f.i, k = ki - 1 }
+                  set(U.AMBER)
+                  local ex = what == 'lo' and xl or (what == 'hi' and xh or (what == 'flo' and xfl or (what == 'fhi' and xfh or nil)))
+                  if ex then gfx.rect(ex - 1, y0 - 1, 2, y1 - y0 + 2, 1) else gfx.rect(xl, y0 - 1, math.max(1, xh - xl), y1 - y0 + 2, 0) end
+                end
+              end
+            end
+          end
+          -- chain: бегунок select (общий регулятор) в линейке — тянуть; цепи звучат, где он внутри их зоны
+          if zk == 'sel' and #sels > 0 then
+            local z1 = info.zone_read(tr0, f.kids[1])
+            local sv = 0
+            for _, kd in ipairs(f.kids) do local zz = info.zone_read(tr0, kd); if zz then sv = zz.select; break end end
+            local sx = X(sv + 0.5)
+            set(U.AMBER); gfx.rect(sx - 1, ly0 + 2, 3, bh - L.rh - 6, 1)
+            if not drag and my >= ly0 and my < ly0 + L.rh and mx >= zx and mx < zx + zw then
+              hover.zone = { kind = 'sel', what = 'select', x0 = zx, w = zw, sels = sels, c = f.i, k = 0, z = z1 and z1.sel }
+            end
           end
           cl = {}
           for pi in ipairs(f.params) do cl[pi] = { 99, 0 } end

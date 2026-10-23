@@ -1,0 +1,72 @@
+desc:jf_tracker_zone (rack chain zones: key / velocity / chain select with fades, as an Ableton rack)
+//tags: MIDI processing
+//author: jeeruff
+
+// Зона цепи рэка (23 окт): ставится трекером первым в цепь (контейнер-ребёнок параллельного контейнера).
+// Три зоны 0..127: key (высота ноты), vel (velocity), sel (chain select — общий регулятор рэка).
+// Зона: lo..hi — звучит, flo..fhi (внутри) — в полную силу, между — линейный скат (как fade в Ableton).
+// Нота вне зон глушится (и её note-off), в скате — velocity умножается на скат. Звук через плагин
+// умножается на скат sel (для цепей эффектов); у инструмента sel действует через velocity.
+// Расчёт тот же, что jf_tracker_zones.lua (Z.gain) — вид в трекере.
+
+slider1:0<0,127,1>key lo
+slider2:127<0,127,1>key hi
+slider3:0<0,127,1>key fade lo
+slider4:127<0,127,1>key fade hi
+slider5:1<1,127,1>vel lo
+slider6:127<1,127,1>vel hi
+slider7:1<1,127,1>vel fade lo
+slider8:127<1,127,1>vel fade hi
+slider9:0<0,127,1>sel lo
+slider10:127<0,127,1>sel hi
+slider11:0<0,127,1>sel fade lo
+slider12:127<0,127,1>sel fade hi
+slider13:0<0,127,1>select
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+ext_noinit = 1;
+passed = 0;   // passed[ch * 128 + note] — нота прошла (её note-off тоже пропустить)
+memset(passed, 0, 16 * 128);
+sg = 1;
+
+function zgain(x, lo, hi, flo, fhi) local(g)
+(
+  flo = max(lo, min(hi, flo));
+  fhi = max(flo, min(hi, fhi));
+  g = 1;
+  x < lo || x > hi ? g = 0 : (
+    x < flo ? g = (x - lo + 1) / (flo - lo + 1);
+    x > fhi ? g = (hi - x + 1) / (hi - fhi + 1);
+  );
+  g;
+);
+
+@block
+selg = zgain(slider13, slider9, slider10, slider11, slider12);
+while (midirecv(ofs, m1, m2, m3)) (
+  st = m1 & 0xF0;
+  ch = m1 & 0x0F;
+  st == 0x90 && m3 > 0 ? (
+    g = zgain(m2, slider1, slider2, slider3, slider4) * zgain(m3, slider5, slider6, slider7, slider8) * selg;
+    g > 0 ? (
+      passed[ch * 128 + m2] = 1;
+      midisend(ofs, m1, m2, max(1, min(127, floor(m3 * g + 0.5))));
+    ) : passed[ch * 128 + m2] = 0;
+  ) : (st == 0x80 || st == 0x90) ? (
+    passed[ch * 128 + m2] ? (
+      passed[ch * 128 + m2] = 0;
+      midisend(ofs, m1, m2, m3);
+    );
+  ) : midisend(ofs, m1, m2, m3);
+);
+sstep = (selg - sg) / max(1, samplesblock);
+
+@sample
+sg += sstep;
+spl0 *= sg;
+spl1 *= sg;

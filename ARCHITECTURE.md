@@ -104,9 +104,9 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 29885 | трекерный вид таймлайна REAPER с Vim-редактированием. |
-| `jf_tracker_model.lua` | 2617 | снимок проекта REAPER в трекерных строках. |
-| `jf_tracker_edit.lua` | 5320 | ВСЕ записи трекера в проект REAPER. |
+| `jf_tracker.lua` | 29966 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker_model.lua` | 2620 | снимок проекта REAPER в трекерных строках. |
+| `jf_tracker_edit.lua` | 5366 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 848 | алиасы паттернов (этап 6). |
 | `jf_tracker_arr.lua` | 101 | аранжировки (9 окт): фиксированные лейны трека — его версии, аранжировка — именованный набор играющих лейнов всех треков (C_LANEPLAYS). |
 | `jf_tracker_cmds.lua` | 392 | команды-огибающие и генераторы (этап 7). |
@@ -123,7 +123,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 11313 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 11466 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 967 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 256 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 109 | темы трекера (3 окт). |
@@ -198,6 +198,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_undotree.lua` | 331 | дерево undo (15 окт), как undotree в Vim. |
 | `jf_tracker_utf8.lua` | 18 | набор текста не только латиницей (20 окт): кириллица и любой Юникод в полях ввода. |
 | `jf_tracker_xform.lua` | 156 | модификаторы (15 окт): трансформации времени и громкости блока событий. |
+| `jf_tracker_zones.lua` | 54 | зоны цепей рэка (23 окт): key / vel / sel, как Key / Vel / Chain в Ableton Rack. |
 <!-- files:end -->
 
 ## Карта модулей и клавиш

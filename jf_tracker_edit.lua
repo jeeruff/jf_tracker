@@ -3301,6 +3301,40 @@ function E.pad_chain_add(track, c, k, j, name)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 23 окт: зоны цепей рэка (Key / Vel / Chain, как Ableton): первым в цепи — JS jf_tracker_zone.
+-- Цепь — ребёнок k контейнера c (верхний уровень); эффект-ребёнок без контейнера заворачивается в «chain»
+function E.zone_ensure(track, c, k)
+  local A = FA(track)
+  local ok = nil
+  run('rack chain zone', function()
+    local ca = child_addr(track, c, k)
+    if not cont_count(track, ca) then   -- одиночный эффект → контейнер-цепь на его месте (parallel — как был)
+      local _, par = A.GetNamedConfigParm(track, ca, 'parallel')
+      local _, nm = A.GetFXName(track, ca, '')
+      local sub = add_fx(track, 'Container', -1000 - ca)
+      if not (sub and sub >= 0) then return end
+      copy_fx(track, child_addr(track, c, k + 1), track, grand_addr(track, c, k, 0), true)
+      ca = child_addr(track, c, k)
+      A.SetNamedConfigParm(track, ca, 'renamed_name', ((nm or ''):gsub('^[^:]*: ', '')))
+      A.SetNamedConfigParm(track, ca, 'parallel', par or '0')
+    end
+    local okf, first = A.GetNamedConfigParm(track, ca, 'container_item.0')
+    local _, fnm = A.GetFXName(track, okf and tonumber(first) or -1, '')
+    if not (okf and (fnm or ''):find('jf_tracker_zone', 1, true)) then
+      local z = add_fx(track, 'JS: jf_tracker_zone', -1000 - grand_addr(track, c, k, 0))
+      if not (z and z >= 0) then return end
+      A.Show(track, grand_addr(track, c, k, 0), 2)
+    end
+    ok = grand_addr(track, c, k, 0)
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+-- значения слайдеров зоны (с 0) — без undo на каждый шаг протяжки, как fx_param
+function E.zone_write(track, zaddr, vals)
+  local A = FA(track)
+  for i, v in pairs(vals) do A.SetParam(track, zaddr, i, v) end
+end
 -- убрать эффект пэда (адрес внука — из модели)
 function E.drum_slot_del(track, addr)
   run('drumrs5k pad fx off', function() FA(track).Delete(track, addr) end)
