@@ -44,7 +44,7 @@ eq(FP.compact('-100.00 % (Left)'), '-100%', 'pan left'); eq(FP.compact('Freq Shi
 -- сокращения
 eq(FP.abbr('Filter 1 Cutoff', 20), 'Filter 1 Cutoff', 'fits - unchanged')
 eq(FP.abbr('Filter 1 Resonance', 13), 'Filter 1 reso', 'dictionary: longest word first'); eq(FP.abbr('Filter 1 Resonance', 12), 'flt 1 reso', 'then the next word')
-eq(#FP.abbr('Gain for minimum velocity', 10) <= 10, true, 'never longer than asked')
+eq(FP.abbr('Gain for minimum velocity', 10), 'gn for min vel', 'dictionary only, no vowel stripping (fit cuts the rest)')
 eq(FP.abbr('Highpass', 4), 'hp', 'highpass -> hp')
 eq(FP.abbr('Feedback', 4), 'fb', 'feedback -> fb')
 -- Serum 2 (2626 параметров): «25% [-21.1 dB]», «-∞», пан «-50 L», октавы, центр «--»

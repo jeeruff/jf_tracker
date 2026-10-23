@@ -7,7 +7,7 @@
 --                                  unit, log (шаг не линейный: частота / время), bipolar }
 --   FP.compact(text)     → короткий вид значения: 25087.71 Hz → 25.1k, 353.6 ms → 354ms, 3.36 s → 3.4s,
 --                          -7.47 dB → -7.5, -inf dB → -inf, 50.00 % → 50%, 3.50 semitones → +3.5st
---   FP.abbr(name, n)     → имя не длиннее n знаков: словарь сокращений, потом без гласных, потом обрезка
+--   FP.abbr(name, n)     → короче по словарю сокращений (длиннее n — обрежет fit отрисовки)
 -- Без reaper.* — тест tests/test_fxparse.lua.
 
 local FP = {}
@@ -142,15 +142,8 @@ function FP.abbr(name, n)
     local a = FP.ABBR[words[i]:lower()]
     if a then words[i] = a; if #join() <= n then return join() end end
   end
-  -- 2) без гласных в словах длиннее 3 (первая буква остаётся)
-  for _, i in ipairs(order) do
-    local w = words[i]
-    if #w > 3 then words[i] = w:sub(1, 1) .. w:sub(2):gsub('[aeiouAEIOU]', ''); if #join() <= n then return join() end end
-  end
-  -- 3) без пробелов, потом обрезка
-  local s = join()
-  if #s > n then s = s:gsub(' ', '') end
-  return s:sub(1, n)
+  -- 23 окт: дальше — как есть (обрежет fit, по краю видно, что обрезано): «без гласных» давало нечитаемое (Mdrmr)
+  return join()
 end
 
 -- 22 окт (этап 1): огибающие — attack, [hold], decay, sustain, release подряд с общим префиксом группы

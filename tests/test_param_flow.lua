@@ -43,4 +43,21 @@ local flat = {}; for k = 1, 10 do flat[k] = { kind = 'slider' } end
 local sp4, nc4 = D.param_flow(flat, nil, 4, 1)
 eq(sp4[5][1] .. ':' .. sp4[5][2], '2:0', 'plain params: 4 per column, from column col0')
 eq(nc4, 3, 'plain: 3 columns for 10 params')
+-- 23 окт: дети контейнера — маленькие (до 5 параметров) подряд — столбиком
+do
+  local function F(counts, par)
+    local f = { kids = {}, params = {} }
+    for ki, c in ipairs(counts) do f.kids[ki] = { parallel = (par and par[ki]) or 0 }; for _ = 1, c do f.params[#f.params + 1] = { kid = ki } end end
+    return f
+  end
+  local pl, nc = D.kid_pack(F({ 30, 3 }), 14)
+  eq(nc, 2, 'big + small - two columns'); eq(pl[2].hr, -1, 'small after big - its own column top')
+  pl, nc = D.kid_pack(F({ 3, 2, 5 }), 14)
+  eq(nc, 1, 'three small - one column'); eq(pl[2].hr, 3, 'second header under the first (3 params)'); eq(pl[2].r0, 4, 'its params under its header')
+  eq(pl[3].hr, 6, 'third under the second'); eq(pl[3].r0, 7, 'third params')
+  pl, nc = D.kid_pack(F({ 3, 2, 5 }), 8)
+  eq(nc, 2, 'no room - next column'); eq(pl[3].c, 1, 'third in column 2')
+  pl, nc = D.kid_pack(F({ 3, 2 }, { 0, 1 }), 14)
+  eq(nc, 2, 'parallel kid - not stacked (signal goes down only in series)')
+end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)

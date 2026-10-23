@@ -5345,6 +5345,28 @@ function D.draw_mixsnaps(L, info, hover)
   for _, t in ipairs(info.msn_opt or {}) do check(x, fy, w, t[2], ms0.opt[t[1]], { what = 'opt', arg = t[1] }); fy = fy + rh end
   check(x, fy, w, 'prompt for name', ms0.prompt, { what = 'prompt' })
 end
+-- 23 окт: дети контейнера — колонками; маленькие (до 5 параметров) подряд по цепочке (serial) — друг под другом
+-- в одной колонке: сигнал течёт сверху вниз. rows — строк под параметры. → place[ki] = { c = колонка с 0,
+-- hr = строка заголовка (−1 — верхний, в шапке), r0 = первая строка параметров }, число колонок
+function D.kid_pack(f, rows)
+  local n = {}
+  for _, p in ipairs(f.params or {}) do if p.kid and not p.macro then n[p.kid] = (n[p.kid] or 0) + 1 end end
+  local place, col, used, prev_small = {}, -1, 0, false
+  for ki, kid in ipairs(f.kids or {}) do
+    local nk = n[ki] or 0
+    local small = nk <= 5
+    if ki > 1 and small and prev_small and (kid.parallel or 0) == 0 and used + 1 + nk <= rows then
+      place[ki] = { c = col, hr = used, r0 = used + 1 }
+      used = used + 1 + nk
+    else
+      col = col + 1
+      place[ki] = { c = col, hr = -1, r0 = 0 }
+      used = nk
+    end
+    prev_small = small
+  end
+  return place, col + 1
+end
 -- 22 окт: высота параметра DSP в строках: 5..8 положений — столбик кнопок (по строке на положение, имя
 -- вертикально слева), если влезает по высоте; иначе одна строка (больше 8 — выпадашка)
 function D.param_rows(p, nfit)
@@ -8920,6 +8942,11 @@ function D.frame(L, snap, rows, state, info)
         local _, nc = D.param_flow(f.params, f.heads, nfit2, 0)   -- 22 окт: тот же поток, что в раскладке
         return nc
       end
+      if f.container and f.kids and not f.kit then   -- 23 окт: маленькие дети — столбиком, колонок меньше
+        local rows = math.floor((bh0 - L.rh - 2) / L.rh) - 2
+        local _, nc = D.kid_pack(f, rows)
+        return (f.has_macros and 1 or 0) + nc
+      end
       return f.cols or 1
     end
     -- первый видимый блок — D.dsp_first (полоса прокрутки); выбор другого эффекта
@@ -9787,7 +9814,7 @@ function D.frame(L, snap, rows, state, info)
             else cl[pi] = { 99, 0 } end
           end
           ::kit_done::
-        elseif #f.kids > 0 and ncol >= (f.cols or 1) then
+        elseif #f.kids > 0 and ncol >= ((f.has_macros and 1 or 0) + select(2, D.kid_pack(f, nfit - 2))) then
           -- развёрнут (6 окт): контейнер — рамка, внутри колонка на каждый
           -- плагин: имя (| за предыдущим, = параллельно, + с суммой) и его
           -- параметры тем же модулем, что на верхнем уровне; макросы — первой
@@ -9796,11 +9823,18 @@ function D.frame(L, snap, rows, state, info)
           set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
           local hy = by + L.rh + 1
           if base == 1 then text(bx + L.pad, hy, fit('macros', bw1 - 2 * L.pad), U.GREY) end
+          local place = D.kid_pack(f, nfit - 2)
           for ki, kid in ipairs(f.kids) do
-            local c = base + ki - 1
+            local pl = place[ki]
+            local c = base + pl.c
             if c >= ncol then break end
             local cx = bx + c * bw1
-            if c > 0 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - 2 * L.rh - 4, 1) end
+            if c > 0 and pl.hr < 0 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - 2 * L.rh - 4, 1) end
+            local hy = hy
+            if pl.hr >= 0 then   -- 23 окт: под предыдущим в той же колонке — заголовок строкой, черта над ним
+              hy = by + 2 * L.rh + 2 + pl.hr * L.rh
+              set(U.LINE); gfx.rect(cx + L.pad, hy - 1, bw1 - 2 * L.pad, 1, 1)
+            end
             -- B / x у каждого плагина внутри (6 окт): bypass / удалить без выбора блока
             local kb2 = ms('x') + 2 * L.pad
             local kbx = { { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }
@@ -9813,16 +9847,23 @@ function D.frame(L, snap, rows, state, info)
               text(b[3] + L.pad, hy, b[1], hb and (b[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
               if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid }; onb = true end
             end
-            local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < by + bh - L.rh - 2
+            local nxt = place[ki + 1]
+            local ybot = (nxt and nxt.c == pl.c) and (by + 2 * L.rh + 2 + nxt.hr * L.rh) or (by + bh - L.rh - 2)
+            local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < ybot
             text(cx + L.pad, hy, kid_label(kid, bw1 - 2 * L.pad - 2 * kb2 - 4), kid.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
             if hot then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
           end
           cl = {}
           local cnt = {}
           for pi, p in ipairs(f.params) do
-            local c = p.macro and 0 or (base + (p.kid or 1) - 1)
-            cnt[c] = (cnt[c] or 0) + 1
-            cl[pi] = { c, cnt[c] - 1 }
+            if p.macro then
+              cnt.m = (cnt.m or 0) + 1; cl[pi] = { 0, cnt.m - 1 }
+            else
+              local pl = place[p.kid or 1] or { c = (p.kid or 1) - 1, r0 = 0 }
+              local key = p.kid or 1
+              cnt[key] = (cnt[key] or 0) + 1
+              cl[pi] = { base + pl.c, pl.r0 + cnt[key] - 1 }
+            end
           end
           if nfit >= 3 then drop_row(bx + L.pad, by + bh - L.rh - 2, bw - 2 * L.pad) end
         else
