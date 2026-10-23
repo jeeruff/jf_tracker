@@ -5355,17 +5355,11 @@ function D.pad_chain_view(kid, key)
   local slots = kid and kid.slots or {}
   local has = false
   for _, sl in ipairs(slots) do if sl.chain then has = true end end
-  if not has then
-    local show = {}
-    for j = 1, math.min(3, #slots) do show[j] = slots[j] end
-    return { list = false, ncols = #show, show = show }
-  end
+  -- 23 окт: сами эффекты — полноценными модулями за рэком (model.expand_inner); здесь — только список цепей
+  if not has then return { list = false, ncols = 0, show = {} } end
   D.chain_sel = D.chain_sel or {}
   local sel = math.max(1, math.min(#slots, D.chain_sel[key] or 1))
-  local sl = slots[sel]
-  local show = {}
-  if sl.chain then for m = 1, math.min(2, #sl.chain) do show[m] = sl.chain[m] end else show[1] = sl end
-  return { list = true, ncols = 1 + math.max(1, #show), sel = sel, show = show, slot = sl }
+  return { list = true, ncols = 1, sel = sel, show = {}, slot = slots[sel] }
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
@@ -9934,13 +9928,8 @@ function D.frame(L, snap, rows, state, info)
           for pi, p in ipairs(f.params) do
             if p.kid == show and not p.macro and p.gkid and p.gkid >= 2 then
               -- колонка эффекта: без цепей — внук j; с цепями — эффект m выбранной цепи (или сам выбранный эффект пэда)
-              local j
-              if not cv.list then j = p.gkid - 1; if j > nsl0 then j = nil end
-              elseif cv.slot and p.gkid == cv.slot.gi then
-                if cv.slot.chain then j = p.ggkid and p.ggkid <= #cv.show and (1 + p.ggkid) or nil else j = 2 end
-              end
-              if j then scnt[j] = (scnt[j] or 0) + 1; cl[pi] = { vis0 - nsl0 + j - 1, scnt[j] - 1 }
-              else cl[pi] = { 99, 0 } end
+              cl[pi] = { 99, 0 }   -- 23 окт: эффекты пэда — модулями за рэком
+              local _ = scnt, vis0
             elseif p.kid == show and not p.macro then
               if cnt >= rmax and colp + 1 < ncol - nsl0 then colp, cnt = colp + 1, 0 end
               cl[pi] = { colp, cnt }; cnt = cnt + 1
@@ -9986,6 +9975,12 @@ function D.frame(L, snap, rows, state, info)
                 text(ox, ry, sl.enabled and 'on' or 'off', hon and U.AMBER or (sl.enabled and U.GREEN or U.RED))
                 if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = sl }
                 elseif hotr then hover.dspbtn = { fx = k, f = f, what = 'kchain', key = ckey, idx = r } end
+                -- бросок на строку цепи — в конец этой цепи (эффект пэда — за ним, в цепь пэда)
+                if drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= lx and mx < lx + bw1 and my >= ry and my < ry + L.rh then
+                  if sl.chain then hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, chain = sl }
+                  else hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, pos = sl.gi } end
+                  set(U.CYAN); gfx.rect(lx + 2, ry, bw1 - 3, L.rh, 0)
+                end
               end
               local dy = hy2 + (#kd.slots + 1) * L.rh + 2
               if dy + L.rh <= by + bh - 2 then
@@ -9993,11 +9988,6 @@ function D.frame(L, snap, rows, state, info)
                 set(dhot and U.tint(U.CYAN, 0.35) or U.tint(U.CYAN, 0.08)); gfx.rect(lx + 2, dy, bw1 - 4, L.rh, 1)
                 text(lx + L.pad, dy, fit('= drop fx here - a new chain', bw1 - 2 * L.pad), dhot and U.TEXT or U.GREY)
                 if dhot then hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, par = true } end
-              end
-              -- бросок на эффекты справа — в конец выбранной цепи
-              if drag and (drag.new or (drag.k and drag.k ~= k)) and cv2.slot and cv2.slot.chain and mx >= lx + bw1 and mx < bx + bw - 2 and my >= by and my < by + bh then
-                hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, chain = cv2.slot }
-                set(U.CYAN); gfx.rect(lx + bw1 + 1, by + L.rh + 1, bx + bw - lx - bw1 - 3, bh - L.rh - 4, 0)
               end
             end
             for j = 1, #cv2.show do
@@ -10008,9 +9998,7 @@ function D.frame(L, snap, rows, state, info)
               text(cx + L.pad, hy2, fit(sl.name or '', nw), sl.enabled and U.CYAN or U.GREY)
               -- параметры — общими виджетами (раскладка cl выше), как у сэмплера
             end
-            if cv2.list and #cv2.show == 0 then
-              text(bx + (vis - nsl + 1) * bw1 + L.pad, hy2, fit((cv2.slot and cv2.slot.name or 'chain') .. ': empty - drop an fx', bw1 - 2 * L.pad), U.GREY)
-            end
+
           end
           -- 23 окт: тащат эффект за модуль сэмплера (правее его параметров) — те же две кнопки для выбранного пэда
           if drag and (drag.new or (drag.k and drag.k ~= k)) and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop and not cv.list then

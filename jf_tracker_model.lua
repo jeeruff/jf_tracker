@@ -1615,10 +1615,15 @@ function M.track_fx(tr)
   M.macroize(out, tr)    -- 22 окт: Macro 1..8 — фейдерами слева в модуле, в конце списка
   -- 23 окт: эффекты полос ÷N — полноценными модулями (так же ступени и макросы)
   for _, e in ipairs(out) do
-    if e.bands then
+    if e.bands or e.kit then   -- 23 окт: и эффекты пэдов drumrs5k (и их цепей chain N)
       for _, b in ipairs(e.kids or {}) do
         local lst = {}
-        for gi, g in ipairs(b.entry and b.entry.kids or {}) do if gi > 1 and g.entry then lst[#lst + 1] = g.entry end end
+        for gi, g in ipairs(b.entry and b.entry.kids or {}) do
+          if gi > 1 and g.entry then
+            lst[#lst + 1] = g.entry
+            for _, g2 in ipairs(g.container and g.entry.kids or {}) do if g2.entry then lst[#lst + 1] = g2.entry end end
+          end
+        end
         if #lst > 0 then M.discretize(tr, lst); M.macroize(lst, tr) end
       end
     end
@@ -1633,15 +1638,38 @@ end
 -- 23 окт: как Ableton — за контейнером ÷N bands его выбранная полоса: её эффекты (без сплиттера) полноценными
 -- модулями DSP (страницы, макросы, огибающие), с пометкой inner = { parent, band }. Адрес эффекта (0x2000000+…)
 -- годится во все TrackFX_*; перестановки / щели верхнего уровня их не касаются. Выбор полосы — M.inner_sel(tr, e)
+-- 23 окт: drumrs5k — эффекты выбранного пэда (за сэмплером) так же; есть цепи chain N — эффекты выбранной цепи
+-- (M.inner_chain(tr, e, ki) — номер строки списка цепей), подпись «пэд > цепь»
+local function pad_inner(tr, e, view)
+  local ki = M.inner_sel and M.inner_sel(tr, e) or 0
+  e._isel = (ki or 0) .. ':' .. tostring(M.inner_chain and M.inner_chain(tr, e, ki) or '')   -- по нему трекер видит смену выбора
+  local pad = ki and ki > 0 and e.kids[ki]
+  local gk = pad and pad.entry and pad.entry.kids or {}
+  if #gk < 2 then return end
+  local chains = false
+  for gi = 2, #gk do if gk[gi].container and (gk[gi].name or ''):match('^chain') then chains = true end end
+  local function push(en, lbl) if en then en.inner = { parent = e, band = lbl, bi = ki }; view[#view + 1] = en end end
+  if not chains then
+    for gi = 2, #gk do push(gk[gi].entry, pad.name or 'pad') end
+    return
+  end
+  local r = math.max(1, math.min(#gk - 1, (M.inner_chain and M.inner_chain(tr, e, ki)) or 1))
+  local sl = gk[r + 1]
+  if sl.container and (sl.name or ''):match('^chain') then
+    for _, g2 in ipairs(sl.entry and sl.entry.kids or {}) do push(g2.entry, (pad.name or 'pad') .. ' > ' .. (sl.name or 'chain')) end
+  else push(sl.entry, pad.name or 'pad') end
+end
 function M.expand_inner(tr, out)
   local has = false
-  for _, e in ipairs(out) do if e.bands then has = true; break end end
+  for _, e in ipairs(out) do if e.bands or e.kit then has = true; break end end
   if not has then return out end
   local view = {}
   for _, e in ipairs(out) do
     view[#view + 1] = e
+    if e.kit and e.kids then pad_inner(tr, e, view) end
     if e.bands and e.kids and #e.kids > 0 then
       local bi = math.max(1, math.min(#e.kids, (M.inner_sel and M.inner_sel(tr, e)) or 1))
+      e._isel = tostring(M.inner_sel and M.inner_sel(tr, e) or '')
       local b = e.kids[bi]
       for gi, g in ipairs(b.entry and b.entry.kids or {}) do
         if gi > 1 and g.entry then

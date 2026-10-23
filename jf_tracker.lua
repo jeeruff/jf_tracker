@@ -14731,6 +14731,10 @@ model.inner_sel = function(tr, e)
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.kit_sel or {})[g .. ':' .. tostring(e.fguid or e.i)]
 end
+model.inner_chain = function(tr, e, ki)   -- строка списка цепей пэда (ключ — как в draw.pad_chain_view)
+  local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
+  return (draw.chain_sel or {})[g .. ':' .. tostring(e.fguid or e.i) .. ':' .. ki]
+end
 draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
 -- зона цепи kid (ребёнок-контейнер): её первый — jf_tracker_zone? → { addr, key, vel, sel, select }; кеш 0.25 с / fx_gen
 ctx.zone_cache = {}
@@ -22020,6 +22024,16 @@ local function frame()
     state.ss_clip, state.ss_zone = nil, nil
     if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
   end
+  do   -- 23 окт: выбор пэда / полосы / цепи сменился (мышь, клавиши, бросок) — пересобрать развёртку модулей за контейнером
+    local t = dsp_target()
+    for _, e in ipairs(t and t.fx or {}) do
+      if e._isel then
+        local ki = model.inner_sel(t.track, e)
+        local now = e.kit and ((ki or 0) .. ':' .. tostring(model.inner_chain(t.track, e, ki) or '')) or tostring(ki or '')
+        if now ~= e._isel then e._isel = now; model.invalidate(); break end
+      end
+    end
+  end
   do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
     local e = ctx.eq_drag or hover.dspeq
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
@@ -23534,7 +23548,7 @@ local function frame()
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
-      elseif hover.dspbtn.what == 'kchain' then draw.chain_sel = draw.chain_sel or {}; draw.chain_sel[hover.dspbtn.key] = hover.dspbtn.idx   -- 23 окт: цепь пэда — её эффекты справа
+      elseif hover.dspbtn.what == 'kchain' then draw.chain_sel = draw.chain_sel or {}; draw.chain_sel[hover.dspbtn.key] = hover.dspbtn.idx; model.invalidate()   -- 23 окт: цепь пэда — её эффекты модулями за рэком
       elseif hover.dspbtn.what == 'kzone' then   -- 23 окт: key / vel / chain — вид зон цепей (ещё раз — спрятать)
         draw.zone_view = draw.zone_view or {}
         local cur = draw.zone_view[hover.dspbtn.key]
@@ -23587,7 +23601,7 @@ local function frame()
     elseif hover.dspkit then
       -- 11 окт: кит RS5K — щелчок по строке слайса выбирает его (свойства справа); блок — выбран
       draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[hover.dspkit.key] = hover.dspkit.ki
-      if hover.dspkit.k and hover.dsp and hover.dsp.f and hover.dsp.f.bands then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end   -- 23 окт: полоса ÷N — её модули за контейнером
+      if hover.dsp and hover.dsp.f and (hover.dsp.f.bands or hover.dsp.f.kit) then model.invalidate() end   -- 23 окт: полоса ÷N / пэд — их модули за контейнером (кеш fx тот же, меняется только развёртка)
       if hover.dsp then ctx.set_focus('dsp') end
       -- 19 окт: щелчок по пэду drumrs5k — режим пэдов DSP (h j k l, x yy yp p, M S) на этом рэке
       if hover.dspkid and hover.dspkid.kid and hover.dspkit.k and ctx.pad_rack(hover.dspkit.k) then
