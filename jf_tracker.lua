@@ -24771,7 +24771,11 @@ local function frame()
       if dsp_drag.active then
         local g = hover.dsp_gap
         local tc = not g and not hover.dsp_into and ctx.drop_track_col(hover)
-        state.status = hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
+        local kd0 = hover.kitdrop
+        local cp = ctx.mods().alt and 'copy ' or 'move '
+        state.status = (kd0 and (cp .. dsp_drag.f.name .. ' into ' .. (kd0.band and 'the band ' or (kd0.chain and '' or 'pad ')) .. ((kd0.chain and kd0.chain.name) or (kd0.kid and kd0.kid.name) or '')
+            .. (kd0.band and '' or (kd0.chain and ' (its end)' or (kd0.par and ': = a parallel chain' or ': | serial, after its sampler and fx'))) .. '  (Opt - copy)'))
+          or hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
           or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)'))
           or (tc and ('move ' .. dsp_drag.f.name .. ' → ' .. (tc.name or 'track') .. ' (instrument - first slot, effect - end of the chain)'))
           or ('move ' .. dsp_drag.f.name .. ' - drop between blocks, into a container or onto a track / mixer strip')
@@ -24796,6 +24800,20 @@ local function frame()
         model.invalidate()
         vim.msg = 'moved ' .. dd.f.name .. ' -> ' .. ((tc.name and tc.name ~= '') and tc.name or 'track') .. (inst and ' (first slot - instrument)' or ' (end of the chain)')
         g = nil
+      end
+      -- 23 окт: модуль на полосу ÷N / пэд / цепь пэда — перенос туда (Opt — копия), как из fx list
+      local kd = dd.active and not tc and hover.kitdrop
+      local tk = kd and dsp_target()
+      if tk and kd.f and kd.kid then
+        local copy = ctx.mods().alt
+        local ok
+        if kd.chain then ok = edit.pad_chain_add(tk.track, kd.f.i, kd.ki - 1, kd.chain.gi - 1, dd.f.i, copy)
+        elseif kd.par and not kd.band then ok = edit.pad_par_add(tk.track, kd.f.i, kd.ki - 1, dd.f.i, copy)
+        else ok = edit.drum_slot_add(tk.track, kd.f.i, kd.ki - 1, dd.f.i, kd.pos or (1 + #(kd.kid.slots or {})), copy) end
+        vim.msg = ok and ((copy and 'copied ' or 'moved ') .. dd.f.name .. ' into ' .. (kd.chain and kd.chain.name or kd.kid.name or ''))
+          or ('could not ' .. (copy and 'copy ' or 'move ') .. dd.f.name .. ' there')
+        g = nil
+        hover.dsp_into = nil
       end
       local col = dd.active and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]

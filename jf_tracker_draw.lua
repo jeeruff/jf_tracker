@@ -9417,6 +9417,11 @@ function D.frame(L, snap, rows, state, info)
             if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = kid }
             elseif hotr then hover.dspkit = { k = k, key = kkey, ki = b } end
             hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = b })
+            -- 23 окт: эффект / модуль тащат на строку полосы — в конец её цепи (голубая рамка строки)
+            if drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= bx and mx < bx + bw1 and my >= ry and my < ry + L.rh then
+              hover.kitdrop = { k = k, f = f, ki = b, kid = kid, pos = #(kid.entry and kid.entry.kids or {}), band = true }
+              set(U.CYAN); gfx.rect(bx + 2, ry, bw1 - 3, L.rh, 0)
+            end
           end
           local xy = hy + nb * L.rh + 2
           set(U.LINE); gfx.rect(bx + L.pad, xy - 1, bw1 - 2 * L.pad, 1, 1)
@@ -9439,7 +9444,7 @@ function D.frame(L, snap, rows, state, info)
           end
           if nshow < 1 then text(bx + bw1 + L.pad, hy, fit((band.name or 'band') .. ': empty - af / drop an fx', bw1 * (ncol - 1) - 2 * L.pad), U.GREY) end
           -- эффект из fx list тащат на цепь — в конец выбранной полосы (голубая рамка)
-          if drag and drag.new and mx >= bx + bw1 and mx < bx + bw and my >= by and my < by + bh then
+          if drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= bx + bw1 and mx < bx + bw and my >= by and my < by + bh then
             hover.kitdrop = { k = k, f = f, ki = sb, kid = band, pos = #gk, band = true }
             set(U.CYAN); gfx.rect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, 0)
           end
@@ -9712,7 +9717,7 @@ function D.frame(L, snap, rows, state, info)
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
                 -- 23 окт: эффект из fx list тащат на пэд — в пэд (его цепочка, справа от сэмплера); подсветка цели
-                if drag and drag.new and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0 then
+                if drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0 then
                   hover.kitdrop = { k = k, f = f, ki = ki, kid = kid, par = mx >= cx0 + cw0 // 2 }
                   D.kitdrop_cell = { cx0, cy0, cw0, ch0 }   -- 23 окт: половины | serial / = parallel — поверх пэда, после него
                 end
@@ -10010,13 +10015,13 @@ function D.frame(L, snap, rows, state, info)
               end
               local dy = hy2 + (#kd.slots + 1) * L.rh + 2
               if dy + L.rh <= by + bh - 2 then
-                local dhot = drag and drag.new and mx >= lx and mx < lx + bw1 and my >= dy - 2 and my < by + bh - 2
+                local dhot = drag and (drag.new or (drag.k and drag.k ~= k)) and mx >= lx and mx < lx + bw1 and my >= dy - 2 and my < by + bh - 2
                 set(dhot and U.tint(U.CYAN, 0.35) or U.tint(U.CYAN, 0.08)); gfx.rect(lx + 2, dy, bw1 - 4, L.rh, 1)
                 text(lx + L.pad, dy, fit('= drop fx here - a new chain', bw1 - 2 * L.pad), dhot and U.TEXT or U.GREY)
                 if dhot then hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, par = true } end
               end
               -- бросок на эффекты справа — в конец выбранной цепи
-              if drag and drag.new and cv2.slot and cv2.slot.chain and mx >= lx + bw1 and mx < bx + bw - 2 and my >= by and my < by + bh then
+              if drag and (drag.new or (drag.k and drag.k ~= k)) and cv2.slot and cv2.slot.chain and mx >= lx + bw1 and mx < bx + bw - 2 and my >= by and my < by + bh then
                 hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, chain = cv2.slot }
                 set(U.CYAN); gfx.rect(lx + bw1 + 1, by + L.rh + 1, bx + bw - lx - bw1 - 3, bh - L.rh - 4, 0)
               end
@@ -10034,7 +10039,7 @@ function D.frame(L, snap, rows, state, info)
             end
           end
           -- 23 окт: тащат эффект за модуль сэмплера (правее его параметров) — те же две кнопки для выбранного пэда
-          if drag and drag.new and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop and not cv.list then
+          if drag and (drag.new or (drag.k and drag.k ~= k)) and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop and not cv.list then
             local ax = bx + (colp + 1) * bw1
             if bx + bw - ax < bw1 then ax = bx + bw1 end
             local ay, ah2 = by + L.rh + 2, bh - L.rh - 6

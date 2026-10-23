@@ -3238,12 +3238,23 @@ function E.drum_wrap(track, c, k)
   return addr
 end
 -- эффект name в пэд k на позицию pos (после RS5K = 1); пэд без подконтейнера заворачивается
-function E.drum_slot_add(track, c, k, name, pos)
+-- 23 окт: what — имя нового эффекта или индекс эффекта верхнего уровня (бросок модуля DSP): копия внутрь,
+-- оригинал удаляется в конце (copy — оставить). Вставка внутрь контейнера индексы верхнего уровня не двигает
+local function put_fx(track, what, addr)
+  if type(what) == 'number' then copy_fx(track, what, track, addr, false); return 0 end
+  return add_fx(track, what, -1000 - addr)
+end
+local function src_done(track, what, copy)
+  if type(what) == 'number' and not copy then FA(track).Delete(track, what) end
+end
+function E.drum_slot_add(track, c, k, name, pos, copy)
+  if name == c then return false end
   local ok = false
-  run('drumrs5k pad fx', function()
+  run(type(name) == 'number' and (copy and 'copy fx into the chain' or 'move fx into the chain') or 'drumrs5k pad fx', function()
     if not E.drum_wrap(track, c, k) then return end
-    local idx = add_fx(track, name, -1000 - grand_addr(track, c, k, pos or 1))
+    local idx = put_fx(track, name, grand_addr(track, c, k, pos or 1))
     ok = idx ~= nil and idx >= 0
+    if ok then src_done(track, name, copy) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
@@ -3257,7 +3268,8 @@ local function ggrand_addr(obj, c, k, j, m)
   local n2 = cont_count(obj, child_addr(obj, c, k)) or 0
   return grand_addr(obj, c, k, j) + (m + 1) * (n0 + 1) * (n1 + 1) * (n2 + 1)
 end
-function E.pad_par_add(track, c, k, name)
+function E.pad_par_add(track, c, k, name, copy)
+  if name == c then return false end
   local ok = false
   run('drumrs5k pad parallel chain', function()
     local A = FA(track)
@@ -3283,20 +3295,23 @@ function E.pad_par_add(track, c, k, name)
     A.SetNamedConfigParm(track, ca, 'renamed_name', 'chain ' .. n3)
     A.SetNamedConfigParm(track, ca, 'parallel', '1')
     A.Show(track, ca, 2)
-    local idx = add_fx(track, name, -1000 - ggrand_addr(track, c, k, n3, 0))
+    local idx = put_fx(track, name, ggrand_addr(track, c, k, n3, 0))
     ok = idx ~= nil and idx >= 0
+    if ok then src_done(track, name, copy) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
 -- 23 окт: эффект name — в конец цепи j (с 0, позиция в пэде) пэда k рэка c
-function E.pad_chain_add(track, c, k, j, name)
+function E.pad_chain_add(track, c, k, j, name, copy)
+  if name == c then return false end
   local ok = false
   run('drumrs5k chain fx', function()
     local ch = grand_addr(track, c, k, j)
     local m = cont_count(track, ch) or 0
-    local idx = add_fx(track, name, -1000 - ggrand_addr(track, c, k, j, m))
+    local idx = put_fx(track, name, ggrand_addr(track, c, k, j, m))
     ok = idx ~= nil and idx >= 0
+    if ok then src_done(track, name, copy) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
