@@ -76,7 +76,9 @@ end
 -- строка и доля строки (xx/256) от позиции в QN
 function M.row_of_qn(qn, lpb)
   local x = qn * lpb
-  local row = math.floor(x + 1e-7)
+  -- 23 окт: допуск в 1/50 строки — округление PPQ (1024 отсчёта на четверть: строка LPB 12 = 85⅓) ставило ноту
+  -- на 541.992 вместо 542: она показывалась строкой раньше, в чужой подколонке
+  local row = math.floor(x + 0.02)
   local frac = x - row
   if frac < 0 then frac = 0 end
   local d = math.floor(frac * 256 + 0.5)

@@ -1409,8 +1409,10 @@ local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted, t_row
     local ie = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
     t1 = math.max(t1, math.min(E.sus_t, ie))
   end
-  local p0 = R.MIDI_GetPPQPosFromProjTime(tk, t0)
-  local p1 = R.MIDI_GetPPQPosFromProjTime(tk, t1)
+  -- 23 окт: PPQ — до ближайшего целого (было — вниз): при 1024 PPQ и LPB 12 строка = 85⅓ отсчёта, нота на строке 542
+  -- вставала на 541.992 — в прошлую строку, там OFF — и уходила в соседнюю подколонку
+  local p0 = math.floor(R.MIDI_GetPPQPosFromProjTime(tk, t0) + 0.5)
+  local p1 = math.floor(R.MIDI_GetPPQPosFromProjTime(tk, t1) + 0.5)
   R.MIDI_InsertNote(tk, false, muted or false, p0, p1, ch or 0, pitch, vel or 100, false)
   E.last_midi = { item = it, take = tk, pitch = pitch, p0 = p0, t0 = t0, t_press = R.time_precise() }   -- 21 окт: удержание клавиши — длина (main)
   return it
