@@ -23485,6 +23485,21 @@ local function frame()
         local kkey = hover.dspkit and hover.dspkit.key
         if kkey then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[kkey] = hover.dspbtn.ki end
         if dk.note and dk.rs5k_i then local col = dsp_target(); if col then ctx.preview(col.track, dk.note, 'midi') end end
+      elseif (hover.dspbtn.what == 'kopen' or hover.dspbtn.what == 'kdelta' or hover.dspbtn.what == 'klastp') and hover.dspbtn.kid then
+        -- 23 окт: эффект внутри контейнера (цепь пэда / полосы) — шапка как у модуля: O окно, ∆ delta, + последний параметр
+        local col, kd = dsp_target(), hover.dspbtn.kid
+        if col and hover.dspbtn.what == 'kopen' then edit.fx_show(col.track, kd.i)
+        elseif col and hover.dspbtn.what == 'kdelta' then
+          local on = edit.fx_delta(col.track, kd.i)
+          vim.msg = on == nil and (kd.name .. ': no delta solo') or (kd.name .. (on and ': delta solo - you hear only what the fx adds / removes' or ': delta off'))
+        elseif col then
+          local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+          local tr = ok and (tn == 0 and reaper.GetMasterTrack(0) or reaper.GetTrack(0, (tn & 0xFFFF) - 1)) or nil
+          local pi
+          if tr == col.track and fxn == kd.i then for i, p in ipairs(hover.dspbtn.f.params or {}) do if p.i == pn and p.fx == kd.i then pi = i end end end
+          if pi then ctx.open_context({ dsp = { fx = hover.dspbtn.fx, f = hover.dspbtn.f, param = pi }, only = true })
+          else vim.msg = kd.name .. ': touch a parameter of it first - then + opens its menu' end
+        end
       elseif hover.dspbtn.what == 'kbypass' and hover.dspbtn.kid then
         local col = dsp_target(); if col then edit.fx_bypass(col.track, hover.dspbtn.kid.i); model.invalidate() end end
       click = { t = now2, zone = 'dspbtn' }

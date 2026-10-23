@@ -5348,6 +5348,27 @@ end
 -- 23 окт: дети контейнера — колонками; маленькие (до 5 параметров) подряд по цепочке (serial) — друг под другом
 -- в одной колонке: сигнал течёт сверху вниз. rows — строк под параметры. → place[ki] = { c = колонка с 0,
 -- hr = строка заголовка (−1 — верхний, в шапке), r0 = первая строка параметров }, число колонок
+-- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
+-- (узко — только B x); возвращает ширину под имя
+function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
+  local kb = ms('O') + 2 * L.pad
+  local full = w - 2 * L.pad - 5 * kb - 12 >= L.cw * 8
+  local bs = { { 'x', 'kdel' }, { 'B', 'kbypass' } }
+  if full then bs[3], bs[4], bs[5] = { '∆', 'kdelta' }, { 'O', 'kopen' }, { '+', 'klastp' } end
+  local dl = full and info.fx_delta and info.fx_delta(kid)
+  local x = cx + w - 1
+  for _, b in ipairs(bs) do
+    x = x - kb - 2
+    local hb = not drag and mx >= x and mx < x + kb and my >= hy and my < hy + L.rh
+    local lit = (b[2] == 'kbypass' and not kid.enabled) or (b[2] == 'kdelta' and dl)
+    local red = b[2] == 'kdel'
+    set(hb and U.tint(red and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(x, hy, kb, L.rh - 1, 1)
+    set(hb and (red and U.RED or U.AMBER) or U.LINE); gfx.rect(x, hy, kb, L.rh - 1, 0)
+    text(x + L.pad, hy, b[1], hb and (red and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+    if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
+  end
+  return math.max(L.cw, x - cx - 2 * L.pad - 2)
+end
 function D.kid_pack(f, rows)
   local n = {}
   for _, p in ipairs(f.params or {}) do if p.kid and not p.macro then n[p.kid] = (n[p.kid] or 0) + 1 end end
@@ -9391,17 +9412,10 @@ function D.frame(L, snap, rows, state, info)
             local g = gk[c + 1]
             local cx = bx + c * bw1
             if c > 1 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1) end
-            local onb = false
-            for _, b2 in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
-              local hb = not drag and mx >= b2[3] and mx < b2[3] + kb2 and my >= hy and my < hy + L.rh
-              local lit = b2[2] == 'kbypass' and not g.enabled
-              set(hb and U.tint(b2[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b2[3], hy, kb2, L.rh - 1, 1)
-              set(hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b2[3], hy, kb2, L.rh - 1, 0)
-              text(b2[3] + L.pad, hy, b2[1], hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
-              if hb then hover.dspbtn = { fx = k, f = f, what = b2[2], kid = g }; onb = true end
-            end
+            local nw = D.kid_head(L, info, cx, hy, bw1, g, k, f, drag, mx, my, hover)
+            local onb = hover.dspbtn and hover.dspbtn.kid == g
             local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < hy + L.rh
-            text(cx + L.pad, hy, kid_label(g, bw1 - 2 * L.pad - 2 * kb2 - 4), g.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
+            text(cx + L.pad, hy, kid_label(g, nw), g.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
             if hot then hover.dspkid = { k = k, f = f, ki = sb, kid = g } end
           end
           if nshow < 1 then text(bx + bw1 + L.pad, hy, fit((band.name or 'band') .. ': empty - af / drop an fx', bw1 * (ncol - 1) - 2 * L.pad), U.GREY) end
@@ -9938,16 +9952,8 @@ function D.frame(L, snap, rows, state, info)
               local cx = bx + (vis - nsl + j - 1) * bw1
               set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1)
               local hy2 = by + L.rh + 1
-              local kb2 = ms('x') + 2 * L.pad
-              for _, b2 in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
-                local hb = not drag and mx >= b2[3] and mx < b2[3] + kb2 and my >= hy2 and my < hy2 + L.rh
-                local lit = b2[2] == 'kbypass' and not sl.enabled
-                set(hb and U.tint(b2[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b2[3], hy2, kb2, L.rh - 1, 1)
-                set(hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b2[3], hy2, kb2, L.rh - 1, 0)
-                text(b2[3] + L.pad, hy2, b2[1], hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
-                if hb then hover.dspbtn = { fx = k, f = f, what = b2[2], kid = { i = sl.i, name = sl.name, enabled = sl.enabled } } end
-              end
-              text(cx + L.pad, hy2, fit('> ' .. (sl.name or ''), bw1 - 2 * L.pad - 2 * kb2 - 4), sl.enabled and U.CYAN or U.GREY)
+              local nw = D.kid_head(L, info, cx, hy2, bw1, { i = sl.i, name = sl.name, enabled = sl.enabled }, k, f, drag, mx, my, hover)
+              text(cx + L.pad, hy2, fit(sl.name or '', nw), sl.enabled and U.CYAN or U.GREY)
               -- параметры — общими виджетами (раскладка cl выше), как у сэмплера
             end
           end
