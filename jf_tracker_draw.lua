@@ -9313,10 +9313,21 @@ function D.frame(L, snap, rows, state, info)
               { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 4 } }
             local tot = 0
             for _, c2 in ipairs(COLS) do tot = tot + c2[3] end
-            local cwx = math.max(L.cw, math.floor((bw - 2 * L.pad) / tot))
+            -- 23 окт: выход из списка — кнопка pads в конце строки заголовков (было не найти: кнопка list — только у сетки)
+            local pbw = ms('pads') + 2 * L.pad
+            local cwx = math.max(L.cw, math.floor((bw - 3 * L.pad - pbw) / tot))
             local ly0 = hy
             local xh = bx + L.pad
             for _, c2 in ipairs(COLS) do text(xh, ly0, fit(c2[1], c2[3] * cwx - L.pad), U.GREY); xh = xh + c2[3] * cwx end
+            do
+              local pbx = bx + bw - L.pad - pbw
+              local hp = not drag and mx >= pbx and mx < pbx + pbw and my >= ly0 and my < ly0 + L.rh
+              set(hp and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(pbx, ly0, pbw, L.rh - 1, 1)
+              set(U.AMBER); gfx.rect(pbx, ly0, pbw, L.rh - 1, 0)
+              text(pbx + L.pad, ly0, 'pads', U.AMBER)
+              if hp then hover.dspbtn = { fx = k, f = f, what = 'kview', view = 'pads', key = kkey } end
+              hint('dspbtn', pbx, ly0, pbw, L.rh - 1, { fx = k, what = 'kview', view = 'pads', key = kkey })
+            end
             set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bw - 2 * L.pad, 1, 1)
             local function pidx(ki, want)
               for pi, p in ipairs(f.params) do if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return pi end end

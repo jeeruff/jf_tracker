@@ -16307,7 +16307,8 @@ local function hint_go(t)
     if w == 'open' then ctx.dsp_show(d.fx) elseif w == 'bypass' then ctx.dsp_bypass(d.fx) elseif w == 'delta' then ctx.dsp_delta(d.fx)
     elseif w == 'lastp' then ctx.dsp_lastparam_menu(d.fx) elseif w == 'pprev' then ctx.dsp_preset(d.fx, 'prev') elseif w == 'pnext' then ctx.dsp_preset(d.fx, 'next')
     elseif w == 'preset' then ctx.dsp_preset(d.fx, 'pick') elseif w == 'del' then ctx.dsp_delete(d.fx, d.fx)
-    elseif w == 'kmidi' then ctx.midi_out_menu(dsp_target()) end   -- 23 окт: midi out рэка
+    elseif w == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: midi out рэка
+    elseif w == 'kview' and d.key then draw.kit_list = draw.kit_list or {}; draw.kit_list[d.key] = d.view end
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d
