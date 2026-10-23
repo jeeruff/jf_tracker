@@ -46,6 +46,14 @@ function DB.read(obj, fa)
     local n = { addr = addr, name = name, guid = fa.GetFXGUID(obj, addr), on = fa.GetEnabled(obj, addr) }
     local okp, par = fa.GetNamedConfigParm(obj, addr, 'parallel')
     n.par = okp and tonumber(par) or 0
+    -- 23 окт: полосы — сплиттер / джойнер REAPER (N-Band Splitter / Joiner) и полоса эффекта по его входному пину
+    local _, raw = fa.GetFXName(obj, addr, '')
+    n.split, n.join = DB.band_kind(raw)
+    if n.split and fa.GetFormattedParamValue then
+      n.xover = {}
+      for i = 0, n.split - 2 do local _, t = fa.GetFormattedParamValue(obj, addr, i, ''); n.xover[#n.xover + 1] = t end
+    end
+    if fa.GetPinMappings then local lo = fa.GetPinMappings(obj, addr, 0, 0); n.pin_lo = tonumber(lo) end
     local wi = fa.GetParamFromIdent and fa.GetParamFromIdent(obj, addr, ':wet') or -1
     if wi and wi >= 0 then n.wet_i = wi; n.wet = fa.GetParamNormalized(obj, addr, wi) end
     local okc, cnt = fa.GetNamedConfigParm(obj, addr, 'container_count')
@@ -75,7 +83,67 @@ function DB.read(obj, fa)
       root.kids[#root.kids + 1] = n; prev = n
     end
   end
+  DB.bandize(root)
   return root
+end
+
+-- 23 окт: «3-Band Splitter» → 3, nil; «4-Band Joiner» → nil, 4 (JSFX REAPER loser/NBand*; имя — и переименованное)
+function DB.band_kind(name)
+  local s = (name or ''):lower()
+  local n = tonumber(s:match('(%d)%-band splitter'))
+  local j = tonumber(s:match('(%d)%-band joiner'))
+  return n, j
+end
+-- полоса эффекта по маске входного пина 1 (бит k — канал k + 1): каналы 1/2 → 0, 3/4 → 1 …
+function DB.band_of_mask(m)
+  if not m or m <= 0 then return 0 end
+  local b = 0
+  while m & 1 == 0 and b < 31 do m = m >> 1; b = b + 1 end
+  return b // 2
+end
+function DB.band_label(b, n, xs)
+  xs = xs or {}
+  local nm = n == 3 and ({ 'low', 'mid', 'high' })[b + 1] or (b == 0 and 'low' or (b == n - 1 and 'high' or ('mid ' .. b)))
+  local r
+  if b == 0 then r = xs[1] and ('< ' .. xs[1]) elseif b == n - 1 then r = xs[n - 1] and ('> ' .. xs[n - 1]) else r = xs[b] and xs[b + 1] and (xs[b] .. '-' .. xs[b + 1]) end
+  return nm .. (r and ('  ' .. r) or '')
+end
+-- верхний уровень: [сплиттер N] … [джойнер N] → сплиттер, ряд из N полос-«контейнеров» (виртуальные: addr нет),
+-- джойнер. Эффекты между ними — в полосу по своим пинам. Полоса знает свой сплиттер (s) и номер (band)
+function DB.bandize(root)
+  local kids, out, i = root.kids, {}, 1
+  while i <= #kids do
+    local s = kids[i]
+    local jn
+    if s.split then for j = i + 1, #kids do if kids[j].join == s.split then jn = j; break end end end
+    if jn then
+      out[#out + 1] = s
+      local bands = {}
+      for b = 0, s.split - 1 do
+        bands[b] = { virtual = true, band = b, s = s, kids = {}, on = true, par = b == 0 and 0 or 1, name = DB.band_label(b, s.split, s.xover),
+          guid = 'band:' .. tostring(s.guid) .. ':' .. b, parent = root, k = s.k }
+      end
+      for q = i + 1, jn - 1 do
+        local f = kids[q]
+        local b = math.min(s.split - 1, DB.band_of_mask(f.pin_lo))
+        local bd = bands[b]
+        f.parent, f.ki, f.bandof = bd, #bd.kids, bd
+        bd.kids[#bd.kids + 1] = f
+      end
+      for b = 0, s.split - 1 do local bd = bands[b]; bd.ki = #out; out[#out + 1] = bd end
+      out[#out + 1] = kids[jn]
+      i = jn + 1
+    else
+      out[#out + 1] = s; i = i + 1
+    end
+  end
+  for k, n in ipairs(out) do if not n.virtual then n.ki = k - 1 end end
+  root.kids = out
+end
+-- куда вставить в полосу: после последнего её эффекта, иначе сразу за сплиттером (позиция REAPER верхнего уровня)
+function DB.band_insert_pos(bd)
+  local last = bd.kids[#bd.kids]
+  return (last and last.k or bd.s.k) + 1
 end
 
 -- ряды: новый, когда parallel = 0; первый всегда serial
@@ -191,7 +259,8 @@ function DB.key(c, root, obj)
   if not n and root.kids[1] then n = root.kids[1]; DB.sel = n.guid end
   local pend = DB.pend; DB.pend = nil
   if pend == 'z' then
-    if ch == 'z' or ch == 'r' then ops.close() elseif ch == 'R' and ops.big then ops.big() elseif ch == 'a' and n and n.kids then DB.fold[n.guid] = not DB.fold[n.guid] or nil end
+    if ch == 'z' or ch == 'r' then ops.close() elseif ch == 'R' and ops.big then ops.big() elseif ch == 'a' and n and n.kids then DB.fold[n.guid] = not DB.fold[n.guid] or nil
+    elseif ch == 'b' and n and ops.split then ops.split(n) end   -- 23 окт: zb — эффект в полосы (3 / 4 / 5 band)
     return true
   end
   if c == 27 or ch == 'q' then ops.close(); return true end
@@ -204,6 +273,7 @@ function DB.key(c, root, obj)
   if ch == 'a' then ops.add(n, false); return true end
   if ch == 'A' then if n then ops.add(n, true) end; return true end
   if not n then return ch ~= ':' end
+  if n.virtual then ops.msg('band ' .. n.name .. ': a - add an effect into this band, l - inside, j k - other bands'); return true end   -- 23 окт: полоса — не эффект
   if c == 13 or ch == 'o' then ops.show(n.addr)
   elseif ch == 'b' then ops.bypass(n.addr)
   elseif ch == 'x' then DB.delete(n, obj)

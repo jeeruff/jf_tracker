@@ -2520,7 +2520,10 @@ ctx = {
       return
     end
     if ins and it and not pos then   -- 18 окт: точка вставки роутера (+ / = по клику)
-      if edit.fx_insert(ins.o, ins.parent, ins.pos, it.data, ins.pv) then
+      local okb
+      if ins.band then okb = edit.band_insert(ins.o, ins.pos, it.data, ins.band, ins.nb)   -- 23 окт: в полосу сплиттера
+      else okb = edit.fx_insert(ins.o, ins.parent, ins.pos, it.data, ins.pv) end
+      if okb then
         FB.push_recent(it); ctx.fxb_save(); ctx.db_cache = nil
         vim.msg = '+ ' .. FB.short(it.label) .. ' ' .. ins.what
       end
@@ -14891,6 +14894,25 @@ do   -- правки DSP big — через edit (undo), дерево после
     -- first (11 окт): + перед первым узлом — в начало цепочки
     add = function(n, par, first)
       local o = obj(); if not o then return end
+      -- 23 окт: полоса сплиттера — эффект в эту полосу (её пины), после её последнего эффекта
+      local bd = n and (n.virtual and n or n.bandof)
+      if bd then
+        local bpos = MX.DB.band_insert_pos(bd)
+        local what = 'into band ' .. bd.name
+        if state.panes_ui and state.panes then
+          ctx.fxb_insert = { o = o, pos = bpos, band = bd.band, nb = bd.s.split, what = what }
+          if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+          FB.query, FB.cur, FB.scroll = '', 1, 0
+          ctx.pane_cmd('fxb show')
+          vim.msg = 'fx: type to search, Enter inserts ' .. what .. ', Esc back'
+          return
+        end
+        vim.open_picker('add fx ' .. what, ctx.fx_list(), function(it)
+          if edit.band_insert(o, bpos, it.data, bd.band, bd.s.split) then vim.msg = '+ ' .. it.label .. ' ' .. what end
+          after()
+        end)
+        return
+      end
       local parent, pos, pv = MX.DB.insert_point(n, par)
       if parent and not parent.parent.root then vim.msg = 'dsp big: adding inside a nested container is not supported yet'; return end
       if not n then local root = ctx.db_tree(); pos = first and 0 or (root and #root.kids or 0) end
@@ -14907,6 +14929,15 @@ do   -- правки DSP big — через edit (undo), дерево после
         if edit.fx_insert(o, parent and parent.k or nil, pos, it.data, pv) then vim.msg = '+ ' .. it.label .. (par and ' (parallel)' or '') end
         after()
       end)
+    end,
+    -- 23 окт: zb — эффект в полосы: сплиттер перед ним, джойнер после (3 / 4 / 5 band, штатные JSFX)
+    split = function(n)
+      local o = obj(); if not o then return end
+      if n.virtual or n.bandof or not (n.parent and n.parent.root) then vim.msg = 'zb: an effect of the top chain (not inside bands / containers)'; return end
+      vim.open_hydra({ title = 'split ' .. (n.name or 'fx') .. ' into bands (REAPER band splitter + joiner)', items = {
+        { key = '3', label = '3 bands (low mid high)', fn = function() if edit.band_split(o, n.addr, 3) then vim.msg = n.name .. ': 3 bands - it is in low; a on a band adds an effect there'; after() end end },
+        { key = '4', label = '4 bands', fn = function() if edit.band_split(o, n.addr, 4) then vim.msg = n.name .. ': 4 bands'; after() end end },
+        { key = '5', label = '5 bands', fn = function() if edit.band_split(o, n.addr, 5) then vim.msg = n.name .. ': 5 bands'; after() end end } } })
     end,
   }) do ctx.db_ops[k] = v end
 end

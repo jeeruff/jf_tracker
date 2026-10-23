@@ -550,6 +550,7 @@ KH.PAGES = {
     { k = 'dw db', d = 'delete modules: d3w - three from the cursor forward, db - the one before, d2b - two before (3dw too)' },
     { k = 'Shift / Cmd+click', d = 'on a module (its name or empty space): Shift - pick from the selected one to it, Cmd - add / remove it (apart is fine); then x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick' },
     { k = 'i', d = 'INSERT the parameter: it and the module frame go red - type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)' },
+    { k = 'bands', d = 'router: a REAPER band splitter ... joiner (3 / 4 / 5 band) is drawn as band rows (low < 200 Hz, mid, high) - every effect between them sits in the band of its pins; a on a band - an effect into it (pins set to its channels), zb on an effect - wrap it into 3 / 4 / 5 bands (it stays in low); all native: pins / routing windows show the same' },
     { k = 'zz', d = 'the effects on the whole window with the mixer above them (strips of every track); again - back', t = { 'zz', 'z' } },
     { k = 'z Tab', d = 'swap the mixer and dsp in the zz view (dsp on top / below); remembered for the next zz', t = { 'z' } },
     { k = 'zx', d = 'dsp across the whole width at the bottom, the side modules (left and right stacks) move up; again - the panes as before', t = { 'z' } },

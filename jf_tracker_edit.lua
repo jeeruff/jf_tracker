@@ -3534,6 +3534,46 @@ function E.fx_insert(track, c, pos, name, par)
   return ok
 end
 
+-- ── полосы (23 окт): сплиттер / джойнер REAPER (JSFX loser/NBandSplitter / Joiner) ──
+-- Полоса b (0..) — пара каналов 2b+1 / 2b+2: эффект в полосе читает и пишет только её (pin mapping); каналов
+-- у трека — не меньше 2N. Всё штатное: окно routing / pins REAPER показывает то же
+local function set_band_pins(obj, addr, band)
+  if model.is_take(obj) then return end
+  for io = 0, 1 do
+    for pin = 0, 1 do R.TrackFX_SetPinMappings(obj, addr, io, pin, 1 << (2 * band + pin), 0) end
+  end
+end
+local function ensure_nch(obj, n)
+  if model.is_take(obj) then return end
+  if R.GetMediaTrackInfo_Value(obj, 'I_NCHAN') < 2 * n then R.SetMediaTrackInfo_Value(obj, 'I_NCHAN', 2 * n) end
+end
+-- эффект name — в полосу band сплиттера на n полос, позиция REAPER верхнего уровня pos
+function E.band_insert(obj, pos, name, band, n)
+  local ok = false
+  run('fx into band ' .. (band + 1), function()
+    local idx = add_fx(obj, name, -1000 - pos)
+    ok = idx ~= nil and idx >= 0
+    if ok then ensure_nch(obj, n); set_band_pins(obj, idx, band); if E.open_on_add then FA(obj).Show(obj, idx, 3) end end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+-- эффект addr (верхний уровень) — в полосы: сплиттер перед ним, джойнер после; сам он — полоса 1 (low)
+function E.band_split(obj, addr, n)
+  local ok = false
+  run(n .. ' bands', function()
+    -- имя как в списке REAPER (EnumInstalledFX: «JS: 3-Band Splitter» = loser/3BandSplitter), запасное — путь JSFX
+    local function addj(nm, path, at) local i = add_fx(obj, 'JS: ' .. nm, at); if not (i and i >= 0) then i = add_fx(obj, path, at) end; return i end
+    local s = addj(n .. '-Band Splitter', 'loser/' .. n .. 'BandSplitter', -1000 - addr)
+    if not (s and s >= 0) then return end
+    local j = addj(n .. '-Band Joiner', 'loser/' .. n .. 'BandJoiner', -1000 - (addr + 2))
+    ok = j and j >= 0
+    if ok then ensure_nch(obj, n); set_band_pins(obj, addr + 1, 0) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+
 -- ── осциллоскопы: JSFX-мост jf_tracker_scope на треках ───────────────────
 -- on: find-or-add (instantiate −1 — не плодить копии), slider1 = слот;
 -- off: удалить все экземпляры. Трек DEPOT не трогаем.

@@ -98,5 +98,29 @@ log = {}; DB.key(('d'):byte(), root, 'TR'); DB.key(('d'):byte(), root, 'TR'); eq
 log = {}; DB.key(('z'):byte(), root, 'TR'); DB.key(('z'):byte(), root, 'TR'); eq('zz closes', log[1], 'close')
 eq('unknown key not eaten', DB.key(('Y'):byte(), root, 'TR'), false)
 
+-- 23 окт: полосы — [eq] [3-band splitter] [comp: каналы 3/4] [sat: 1/2] [verb: 5/6] [3-band joiner] [lim]
+do
+  eq('band kind splitter', select(1, DB.band_kind('JS: 3-Band Splitter')), 3)
+  eq('band kind joiner', select(2, DB.band_kind('JS: loser/4-Band Joiner')), 4)
+  eq('mask 1/2 -> band 0', DB.band_of_mask(1), 0); eq('mask 3/4 -> band 1', DB.band_of_mask(4), 1); eq('mask 5/6 -> band 2', DB.band_of_mask(16), 2)
+  local function nd(k, t) t.k = k; t.guid = 'g' .. k; t.on = true; t.par = 0; return t end
+  local root = { root = true, kids = { nd(0, { name = 'eq' }), nd(1, { name = 'split', split = 3, xover = { '200 Hz', '2000 Hz' } }),
+    nd(2, { name = 'comp', pin_lo = 4 }), nd(3, { name = 'sat', pin_lo = 1 }), nd(4, { name = 'verb', pin_lo = 16 }),
+    nd(5, { name = 'join', join = 3 }), nd(6, { name = 'lim' }) } }
+  for _, k in ipairs(root.kids) do k.parent = root end
+  DB.bandize(root)
+  eq('bands: eq split 3 bands join lim', #root.kids, 7)
+  local low, mid, high = root.kids[3], root.kids[4], root.kids[5]
+  eq('low band virtual', low.virtual, true); eq('low has sat', low.kids[1] and low.kids[1].name, 'sat')
+  eq('mid has comp', mid.kids[1] and mid.kids[1].name, 'comp'); eq('high has verb', high.kids[1] and high.kids[1].name, 'verb')
+  eq('bands one parallel row', DB.stages(root.kids)[3][3], high)
+  eq('band label', low.name, 'low  < 200 Hz'); eq('mid label', mid.name, 'mid  200 Hz-2000 Hz')
+  eq('insert into mid after comp', DB.band_insert_pos(mid), 3)
+  local empty = { kids = {}, s = root.kids[2] }
+  eq('empty band - right after the splitter', DB.band_insert_pos(empty), 2)
+  local m = { nw = 100, nh = 30, gap = 10, bus = 6, pad = 4, th = 14 }
+  local okl = pcall(DB.layout, root, m, 0, 0, 200)
+  eq('layout with bands', okl, true)
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
