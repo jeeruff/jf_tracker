@@ -65,6 +65,9 @@ function DB.read(obj, fa)
           local kid = node(tonumber(a2)); kid.parent = n; kid.k = k; kid.ki = k; n.kids[#n.kids + 1] = kid
         end
       end
+      -- 23 окт: рэк drumrs5k — пэды банком (параллельный ряд): RS5K складывает свой звук, флаг parallel у простых
+      -- пэдов 0, но по смыслу и звуку это параллель; в проекте флаги не меняются — только вид (vpar)
+      if (name or ''):lower():find('^drumrs5k') then for i = 2, #n.kids do n.kids[i].vpar = true end end
     end
     return n
   end
@@ -150,7 +153,7 @@ end
 function DB.stages(list)
   local st = {}
   for i, n in ipairs(list) do
-    if i == 1 or (n.par or 0) == 0 then st[#st + 1] = { n } else table.insert(st[#st], n) end
+    if i == 1 or ((n.par or 0) == 0 and not n.vpar) then st[#st + 1] = { n } else table.insert(st[#st], n) end
     n.si, n.mi = #st, #st[#st]
   end
   return st

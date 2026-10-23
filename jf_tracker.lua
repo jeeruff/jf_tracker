@@ -9984,6 +9984,15 @@ ctx = {
     if what == 'mainsend' then toggle('B_MAINSEND', 'track master send')
     elseif what == 'phase' then toggle('B_PHASE', 'track phase')
     elseif what == 'fxen' then toggle('I_FXEN', 'track fx on / off')
+    elseif what == 'contain' then   -- 23 окт: [] блока трека DSP — все эффекты трека в один контейнер (REAPER 7); один контейнер — распаковать
+      local n = reaper.TrackFX_GetCount(tr)
+      if n == 0 then vim.msg = 'contain: no effects on the track'; return end
+      local okc, cc = reaper.TrackFX_GetNamedConfigParm(tr, 0, 'container_count')
+      if n == 1 and okc and tonumber(cc) then
+        if edit.fx_unpack then edit.fx_unpack(tr, 0); vim.msg = 'contain: the container unpacked into the chain' else vim.msg = 'contain: already one container (dc unpacks)' end
+      elseif edit.fx_pack(tr, 0, n - 1) then vim.msg = ('contain: %d effects in one container (dc - unpack, rclick - its menu)'):format(n)
+      else vim.msg = 'contain failed (REAPER 7 containers)' end
+      model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
     elseif what == 'routing' then
       reaper.SetOnlyTrackSelected(tr)
       reaper.Main_OnCommand(40914, 0)              -- Track: set first selected track as last touched
@@ -20098,6 +20107,7 @@ local function frame()
       if not t then return nil end
       return reaper.time_precise() - t, ctx.midi_in_v and ctx.midi_in_v[col.guid]
     end,   -- 19 окт: индикатор входа   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
+    dsp_wide = state.panes and (state.panes.zoom == 'dsp' or (function() for _, id in ipairs(state.panes.zoomv or {}) do if id == 'dsp' then return true end end end)()),   -- 23 окт: DSP развёрнут (zz) — модули рядами
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
     view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле
     sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),   -- 23 окт: были за комментарием — колонка размера, линейка, маркеры не получали данных
@@ -26221,10 +26231,18 @@ local function frame()
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
+          elseif ch == 'v' then   -- 23 окт: zv — рэк drumrs5k: сетка пэдов <-> список
+            local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
+            if f0 and f0.kit then
+              local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
+              draw.kit_list = draw.kit_list or {}
+              draw.kit_list[key] = (draw.kit_list[key] == 'list') and 'pads' or 'list'
+              vim.msg = 'drumrs5k: ' .. draw.kit_list[key] .. ' (zv - switch)'
+            else vim.msg = 'zv: put the DSP cursor on a drumrs5k rack' end
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
             local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }
             if state.dsp_zzflip then ids, fr = { 'dsp', 'mixer' }, { 0.7, 0.3 } end   -- z Tab — DSP сверху
-            ctx.pane_do(function() return draw.panes.zoom_multi(state.panes, ids, fr) end,
+            ctx.pane_do(function() return draw.panes.zoom_multi(state.panes, ids, fr, { 'inst', 'browser' }) end,   -- 23 окт: справа — lib и браузер / fx list (их стеки)
               state.panes.zoomv and 'dsp back in its pane' or 'dsp + mixer on the whole window (zz - back, z Tab - swap them, zr - router)')
           elseif c == 9 then   -- 22 окт: z Tab — микшер и DSP местами (в виде zz; запоминается для следующего zz)
             state.dsp_zzflip = not state.dsp_zzflip or nil
@@ -26278,7 +26296,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: v - drumrs5k pads / list, z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end

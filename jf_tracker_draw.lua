@@ -3030,7 +3030,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local btns = { { 'r', col.armed, D.ARM, 'arm', nil, false, round = true }, { 'i', mon > 0, U.CYAN, 'monitor', mon == 2 },
                  { 'm', col.muted, U.AMBER, 'mute', gap = true }, { 's', col.solo, U.GREEN, 'solo' },
                  { 'ø', io.phase, U.AMBER, 'phase', nil, true, round = true, gap = true }, { 'fx', not io.fxen, U.RED, 'fxen', nil, true },
-                 { '~', #(col.envs or {}) > 0, U.CYAN, 'auto' } }
+                 { '~', #(col.envs or {}) > 0, U.CYAN, 'auto' }, { '[]', false, U.CYAN, 'contain', nil, true } }   -- 23 окт: [] — все эффекты трека в один контейнер
   for _, b in ipairs(btns) do
     if b.gap then bx = bx + L.pad end
     local bw = b.round and bh or math.max(L.btn_w, ms(b[1]) + 4)
@@ -8970,6 +8970,18 @@ function D.frame(L, snap, rows, state, info)
     gfx.dest = 700
     gfx.blit(dest0, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)   -- фон под блоками
     if mx < cx0 or mx >= cx1 then mx = -100000 end
+    -- 23 окт: DSP развёрнут (zz) и высоко — модули рядами, как строки: слева направо, следующий ряд снова слева
+    -- (сигнал идёт по рядам); рядов — сколько влезает модулей в высоту ≥ 16 строк, до трёх; прокрутки нет
+    local boxy0, bh00 = boxy, bh0
+    local wrap = info.dsp_wide and math.min(3, math.floor((bh0 + L.pad) / (16 * L.rh + L.pad))) or 1
+    if wrap > 1 then bh0 = math.floor((bh00 - (wrap - 1) * L.pad) / wrap); px = 0; D.dsp_px, D.dsp_px_t = 0, nil end
+    local wrow = 1
+    local function wrap_next(w2)
+      if wrap > 1 and bx + w2 > cx1 and bx > cx0 + 1 and wrow < wrap then
+        wrow = wrow + 1; bx = cx0; boxy = boxy0 + (wrow - 1) * (bh0 + L.pad)
+        return true
+      end
+    end
     bx = cx0 - px
     -- подсказки и группы SLIDER — только у того, что в окне (спрятанное за краем мышь не находит)
     local hint0, nslr0 = D.hint, D.slr and #D.slr or 0
@@ -8981,6 +8993,7 @@ function D.frame(L, snap, rows, state, info)
       if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
         local kb = ms('O') + 2 * L.pad
         local fw = math.max(kb, L.th + 2 * L.pad) + 2
+        wrap_next(fw)
         D.dsp_vx[k] = { bx + px - cx0, fw }
         if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end   -- вне окна — только место
         nshown = nshown + 1
@@ -9042,7 +9055,7 @@ function D.frame(L, snap, rows, state, info)
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
       if f.kit and D.DR then
         local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
-        if ((D.kit_list or {})[kk] or (info.dsp_zoomed and 'list' or 'pads')) == 'list' then bw = math.max(bw, cx1 - cx0 - L.pad); bw1 = math.floor(bw / math.max(1, ncol)) end
+        local _ = kk   -- 23 окт: список — на месте сетки (шириной с неё), модуль не растягивается во всю ширину
       end
       -- 16 окт (вечер): свёрнутый модуль со страницами (zf) — справа колонка вертикальных вкладок
       -- 22 окт: вкладки страниц — опция dsptabs: bottom (строкой снизу) / top (строкой под шапкой) / right (колонкой справа)
@@ -9055,6 +9068,7 @@ function D.frame(L, snap, rows, state, info)
       local macfold = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
       local mw = (f.nmacro and not f.container) and (macfold and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
       bw = bw + mw
+      if wrap_next(bw) then by = boxy end   -- 23 окт: следующий ряд
       D.dsp_vx[k] = { bx + px - cx0, bw }
       if bx + bw <= cx0 or bx >= cx1 then bx = bx + bw + L.pad; goto next_block end   -- вне окна — только место (полоса прокрутки)
       nshown = nshown + 1
@@ -9310,27 +9324,17 @@ function D.frame(L, snap, rows, state, info)
           local zoomed = info.dsp_zoomed
           -- 19 окт: вид pads | list — кнопка list в шапке (вкладки на всё окно убраны: одна кнопка на функцию)
           if D.DR and (D.kit_list[kkey] or (zoomed and 'list' or 'pads')) == 'list' then   -- 19 окт: и без zz (кнопка list)
-            local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 14 }, { 'vol', 'volume', 7 }, { 'pan', 'pan', 6 }, { 'pitch', 'pitch', 7 },
-              { 'att', 'attack', 6 }, { 'dec', 'decay', 6 }, { 'sus', 'sustain', 6 }, { 'rel', 'release', 6 },
-              { 'start', 'start', 7 }, { 'end', 'end', 7 }, { 'off', 'note-off', 4 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 4 } }
+            -- 23 окт: список — на месте сетки пэдов (шириной с неё), параметры выбранного пэда — справа, как у сетки
+            f._klist = true
+            local bwl = bw1 - (L.th + 6) - 3
+            local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 12 }, { 'vol', 'volume', 6 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 3 } }
             local tot = 0
             for _, c2 in ipairs(COLS) do tot = tot + c2[3] end
-            -- 23 окт: выход из списка — кнопка pads в конце строки заголовков (было не найти: кнопка list — только у сетки)
-            local pbw = ms('pads') + 2 * L.pad
-            local cwx = math.max(L.cw, math.floor((bw - 3 * L.pad - pbw) / tot))
+            local cwx = math.max(L.cw, math.floor((bwl - 2 * L.pad) / tot))
             local ly0 = hy
             local xh = bx + L.pad
             for _, c2 in ipairs(COLS) do text(xh, ly0, fit(c2[1], c2[3] * cwx - L.pad), U.GREY); xh = xh + c2[3] * cwx end
-            do
-              local pbx = bx + bw - L.pad - pbw
-              local hp = not drag and mx >= pbx and mx < pbx + pbw and my >= ly0 and my < ly0 + L.rh
-              set(hp and U.tint(U.AMBER, 0.3) or U.tint(U.AMBER, 0.15)); gfx.rect(pbx, ly0, pbw, L.rh - 1, 1)
-              set(U.AMBER); gfx.rect(pbx, ly0, pbw, L.rh - 1, 0)
-              text(pbx + L.pad, ly0, 'pads', U.AMBER)
-              if hp then hover.dspbtn = { fx = k, f = f, what = 'kview', view = 'pads', key = kkey } end
-              hint('dspbtn', pbx, ly0, pbw, L.rh - 1, { fx = k, what = 'kview', view = 'pads', key = kkey })
-            end
-            set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bw - 2 * L.pad, 1, 1)
+            set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bwl - 2 * L.pad, 1, 1)
             local function pidx(ki, want)
               for pi, p in ipairs(f.params) do if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return pi end end
             end
@@ -9345,11 +9349,11 @@ function D.frame(L, snap, rows, state, info)
               if not kid then break end
               local ry = ly0 + L.rh + 2 + (r - 1) * L.rh
               local on = ki == ks
-              local hotr = not drag and mx >= bx and mx < bx + bw and my >= ry and my < ry + L.rh
+              local hotr = not drag and mx >= bx and mx < bx + bwl and my >= ry and my < ry + L.rh
               local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
               local flash = hit and reaper.time_precise() - hit < 0.25
-              if flash then set(U.tint(U.GREEN, 0.35)); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1)
-              elseif on or hotr then set(on and U.tint(U.AMBER, 0.28) or D.CURROW); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1) end
+              if flash then set(U.tint(U.GREEN, 0.35)); gfx.rect(bx + 2, ry, bwl - 4, L.rh, 1)
+              elseif on or hotr then set(on and U.tint(U.AMBER, 0.28) or D.CURROW); gfx.rect(bx + 2, ry, bwl - 4, L.rh, 1) end
               local x2 = bx + L.pad
               for _, c2 in ipairs(COLS) do
                 local cw3 = c2[3] * cwx
@@ -9370,12 +9374,10 @@ function D.frame(L, snap, rows, state, info)
               end
               if hotr and not hover.dspbtn and not hover.kitcell then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
             end
-            D.kit_lkey = kkey; D.vbar('kitlist', bx, ly0 + L.rh + 2, bw - 2, nrow * L.rh, sc, nrow, #f.kids)
-            cl = {}
-            for pi in ipairs(f.params) do cl[pi] = { 99, 0 } end
-            goto kit_done
+            D.kit_lkey = kkey; D.vbar('kitlist', bx, ly0 + L.rh + 2, bwl - 2, nrow * L.rh, sc, nrow, #f.kids)
+          else f._klist = nil
           end
-          if D.DR then
+          if D.DR and not f._klist then   -- 23 окт: список — вместо сетки
             -- 16 окт: drumrs5k — сетка пэдов вместо списка: шапка «all · N pads · cell: …»,
             -- ячейка — имя пэда и подпись (note / key / wave / spec); щелчок — выбрать
             -- и прослушать (main), выбранный — янтарём, выключенный — тускло
@@ -9656,10 +9658,11 @@ function D.frame(L, snap, rows, state, info)
             local lbg = hl and U.tint(U.AMBER, 0.25) or U.BG
             set(lbg); gfx.rect(lx, ly, ltw, lh, 1)
             set(hl and U.AMBER or U.LINE); gfx.rect(lx, ly, ltw, lh, 0)
-            local tl = math.min(ms('list'), lh - 6)
-            D.vtext(lx + math.floor((ltw - L.th) / 2), ly + math.floor((lh - tl) / 2), tl, 'list', hl and U.AMBER or U.GREY, lbg)
-            if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = 'list', key = kkey } end
-            hint('dspbtn', lx, ly, ltw, lh, { fx = k, what = 'kview', view = 'list', key = kkey })
+            local vl = f._klist and 'pads' or 'list'   -- 23 окт: вкладка переключает: list <-> pads (zv)
+            local tl = math.min(ms(vl), lh - 6)
+            D.vtext(lx + math.floor((ltw - L.th) / 2), ly + math.floor((lh - tl) / 2), tl, vl, (hl or f._klist) and U.AMBER or U.GREY, lbg)
+            if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = vl, key = kkey } end
+            hint('dspbtn', lx, ly, ltw, lh, { fx = k, what = 'kview', view = vl, key = kkey })
           end
           if D.DR and ks > 0 then   -- 19 окт: свойства пэда (его сэмплер) — своей серой рамкой, отдельно от рамки рэка
             set(U.mix(U.LINE, U.GREY, 0.45)); rrect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, false)
@@ -10382,7 +10385,8 @@ function D.frame(L, snap, rows, state, info)
       ::next_block::
     end
     -- окно цепочки — на экран; всё, что левее / правее, осталось в буфере
-    D.dsp_total = bx + px - cx0
+    D.dsp_total = wrap > 1 and 0 or (bx + px - cx0)   -- рядами — без прокрутки
+    boxy, bh0 = boxy0, bh00
     gfx.dest = dest0
     gfx.blit(700, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)
     mx = mx0

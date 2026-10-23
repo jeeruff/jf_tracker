@@ -423,5 +423,15 @@ do
     end
   end
 end
+-- 23 окт: zz с колонкой справа (lib, браузер)
+do
+  local m = PN.DEFAULT()
+  PN.zoom_multi(m, { 'mixer', 'dsp' }, { 0.3, 0.7 }, { 'inst', 'browser' })
+  local lay = PN.layout(m, 1600, 900, M)
+  local d, li, br = lay.by_panel.dsp, lay.by_panel.inst, lay.by_panel.browser
+  eq('zz side: lib on the right', li and li.x > d.x + d.w - 1, true)
+  eq('zz side: browser under lib', br and li and br.y > li.y, true)
+  eq('zz side: right edge', li and li.x + li.w == 1600, true)
+end
 print(('test_panes: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

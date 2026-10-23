@@ -351,11 +351,22 @@ function PN.layout(model, W, H, M)
   local zl = {}
   for _, id in ipairs(model.zoomv or {}) do local l = PN.find(model, id); if l and alive(M, l) then zl[#zl + 1] = l end end
   if #zl > 0 then
+    -- 23 окт: колонка справа (lib, браузер / fx list) — её листы как есть, во всю высоту
+    local sl, seen = {}, {}
+    for _, id in ipairs(model.zoomside or {}) do local l = PN.find(model, id); if l and alive(M, l) and not seen[l] then seen[l] = true; sl[#sl + 1] = l end end
+    local SW = #sl > 0 and math.floor(W * (model.zoomside_w or 0.18)) or 0
+    local LW = W - (SW > 0 and SW + M.sep or 0)
     local y0, fr = 0, model.zoomfr or {}
     for i, l in ipairs(zl) do
       local hh = i == #zl and H - y0 or math.floor((H - M.sep * (#zl - 1)) * (fr[i] or 1 / #zl))
-      place_leaf(lay, M, l, 0, y0, W, hh); lay.nodes[l] = { x = 0, y = y0, w = W, h = hh }
+      place_leaf(lay, M, l, 0, y0, LW, hh); lay.nodes[l] = { x = 0, y = y0, w = LW, h = hh }
       y0 = y0 + hh + M.sep
+    end
+    local sy = 0
+    for i, l in ipairs(sl) do
+      local hh = i == #sl and H - sy or math.floor((H - M.sep * (#sl - 1)) / #sl)
+      place_leaf(lay, M, l, LW + M.sep, sy, SW, hh); lay.nodes[l] = { x = LW + M.sep, y = sy, w = SW, h = hh }
+      sy = sy + hh + M.sep
     end
   elseif z and alive(M, z) then place_leaf(lay, M, z, 0, 0, W, H); lay.nodes[z] = { x = 0, y = 0, w = W, h = H }
   else place(lay, M, model.root, 0, 0, W, H) end
@@ -733,13 +744,14 @@ end
 function PN.zoom(model, id)
   if id and not PN.find(model, id) then return false end
   model.zoom = (id and model.zoom ~= id) and id or nil
-  model.zoomv, model.zoomfr = nil, nil
+  model.zoomv, model.zoomfr, model.zoomside = nil, nil, nil
   return bump(model)
 end
 -- 22 окт: зум нескольких панелей друг под другом (ids сверху вниз, fr — доли); ещё раз — назад.
 -- Скрытые / закрытые пропускаются; не на экране ни одной — false
-function PN.zoom_multi(model, ids, fr)
-  if model.zoomv then model.zoomv, model.zoomfr = nil, nil; return bump(model) end
+function PN.zoom_multi(model, ids, fr, side)
+  if model.zoomv then model.zoomv, model.zoomfr, model.zoomside = nil, nil, nil; return bump(model) end
+  model.zoomside = side
   local have, hf = {}, {}
   for i, id in ipairs(ids) do if PN.find(model, id) then have[#have + 1] = id; hf[#hf + 1] = fr and fr[i] or 1 end end
   if #have == 0 then return false end
