@@ -9410,14 +9410,8 @@ function D.frame(L, snap, rows, state, info)
               -- 19 окт: list — все пэды таблицей (все параметры), на месте сетки; ещё раз — пэды
               D.kit_list = D.kit_list or {}
               local lon = (D.kit_list[kkey] or (info.dsp_zoomed and 'list' or 'pads')) == 'list'
-              local lw2 = ms('list') + 2 * L.pad
-              local lxb = cxb - lw2 - 2
+              local lxb = cxb   -- 23 окт: кнопки list в шапке нет — вертикальная вкладка у сетки
               if lxb > bx + 2 + ah + L.pad then
-                local hl = not drag and mx >= lxb and mx < lxb + lw2 and my >= hy and my < hy + L.rh
-                set(lon and U.tint(U.AMBER, 0.3) or (hl and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(lxb, hy, lw2, L.rh - 1, 1)
-                set((lon or hl) and U.AMBER or U.LINE); gfx.rect(lxb, hy, lw2, L.rh - 1, 0)
-                text(lxb + L.pad, hy, 'list', (lon or hl) and U.AMBER or U.TEXT)
-                if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = lon and 'pads' or 'list', key = kkey } end
                 -- 19 окт: размер пэдов s / m / l — кнопка с выпадашкой (3 значения — не перебор по кругу)
                 local szl = 'size ' .. (info.kitsize or 'l')
                 local szw = ms(szl) + 2 * L.pad
@@ -9434,7 +9428,8 @@ function D.frame(L, snap, rows, state, info)
               if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
             end
             local gx0, gy0 = bx + 2, hy + L.rh + 1
-            local gw, gh = bw1 - 4, by + bh - 3 - gy0 - (L.rh + 3)   -- 19 окт: внизу — строка grp / chk / r
+            local ltw = L.th + 6                                   -- 23 окт: вертикальная вкладка list у правого края сетки
+            local gw, gh = bw1 - 4 - ltw, by + bh - 3 - gy0 - (L.rh + 3)   -- 19 окт: внизу — строка grp / chk / r
             -- 18 окт: всегда 4 × 4 (как пэды MPC), справа — карта всех 128 пэдов кубиками 4 × 32 (прокрутка / прыжок)
             local cube = math.max(2, math.min(5, math.floor((gh - 2) / 32) - 1))
             local mw = 4 * (cube + 1) + 4
@@ -9650,6 +9645,19 @@ function D.frame(L, snap, rows, state, info)
               end
               hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
             end
+          end
+          -- 23 окт: list — вертикальной вкладкой между пэдами и параметрами (кнопка в шапке убрана)
+          if D.DR and f.kit then
+            local ltw = L.th + 6
+            local lx, ly, lh = bx + bw1 - ltw - 1, by + L.rh + 2, bh - L.rh - 6
+            local hl = not drag and mx >= lx and mx < lx + ltw and my >= ly and my < ly + lh
+            local lbg = hl and U.tint(U.AMBER, 0.25) or U.BG
+            set(lbg); gfx.rect(lx, ly, ltw, lh, 1)
+            set(hl and U.AMBER or U.LINE); gfx.rect(lx, ly, ltw, lh, 0)
+            local tl = math.min(ms('list'), lh - 6)
+            D.vtext(lx + math.floor((ltw - L.th) / 2), ly + math.floor((lh - tl) / 2), tl, 'list', hl and U.AMBER or U.GREY, lbg)
+            if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = 'list', key = kkey } end
+            hint('dspbtn', lx, ly, ltw, lh, { fx = k, what = 'kview', view = 'list', key = kkey })
           end
           if D.DR and ks > 0 then   -- 19 окт: свойства пэда (его сэмплер) — своей серой рамкой, отдельно от рамки рэка
             set(U.mix(U.LINE, U.GREY, 0.45)); rrect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, false)
