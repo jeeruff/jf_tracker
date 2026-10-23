@@ -9667,7 +9667,7 @@ ctx = {
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
       -- 23 окт: размер такта всегда (по умолчанию — только когда у паттернов разный) и полоса секций — отдельно от ruler
-      { key = 'g', label = 'signature column: 4/4 always (off - only when the patterns differ)' .. on(MX.sig_always), fn = function() MX.sig_always = not MX.sig_always; reaper.SetExtState(EXT, 'mxsig', MX.sig_always and '1' or '0', true); relayout() end },
+      { key = 'g', label = 'signature column' .. on(MX.sig_always), fn = function() MX.sig_always = not MX.sig_always; reaper.SetExtState(EXT, 'mxsig', MX.sig_always and '1' or '0', true); relayout() end },
       { key = 'e', label = 'sections strip: the section names on the left (also without the ruler)' .. on(MX.sections ~= false), fn = function() MX.sections = MX.sections == false; reaper.SetExtState(EXT, 'mxsec', MX.sections and '1' or '0', true); relayout() end },
       -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
@@ -20067,7 +20067,8 @@ local function frame()
       return reaper.time_precise() - t, ctx.midi_in_v and ctx.midi_in_v[col.guid]
     end,   -- 19 окт: индикатор входа   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),
+    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле
+    sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),   -- 23 окт: были за комментарием — колонка размера, линейка, маркеры не получали данных
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
     wheels = ctx.wheels,   -- 16 окт: pitch / mod / pedal — вход MIDI и мышь
