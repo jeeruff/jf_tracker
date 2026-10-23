@@ -5470,11 +5470,12 @@ function D.vbar(key, x, y, w, h, scroll, nvis, total)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local th = math.max(6, math.floor(h * nvis / total))
   local ty = y + math.floor((h - th) * math.min(1, scroll / math.max(1, total - nvis)))
-  local hot = mx >= x - 3 and mx < x + w + 3 and my >= y and my < y + h
+  local hot = mx >= x - 6 and mx < x + w + 4 and my >= y and my < y + h   -- 23 окт: зона шире — мышь попадает
   local drag = D.vbar_drag and D.vbar_drag.key == key
   -- 8 окт: без дорожки во всю высоту — она рядом с границей модуля давала
-  -- двойную линию; только ползунок
-  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(x, ty, w, th, 1)
+  -- двойную линию; только ползунок; 23 окт: под мышью — толще и янтарём (видно, что возьмётся)
+  local gw = (hot or drag) and (w + 2) or w
+  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(x - (gw - w), ty, gw, th, 1)
   D.vbars[key] = { x = x + (D.pn_ox or 0), y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = ty, th = th, a0 = y, alen = h }
 end
 -- горизонтальная полоса (5 окт, матрица): та же запись, ось x
@@ -5485,9 +5486,10 @@ function D.hbar(key, x, y, w, h, scroll, nvis, total)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local tw = math.max(6, math.floor(w * nvis / total))
   local tx = x + math.floor((w - tw) * math.min(1, scroll / math.max(1, total - nvis)))
-  local hot = mx >= x and mx < x + w and my >= y - 3 and my < y + h + 3
+  local hot = mx >= x and mx < x + w and my >= y - 6 and my < y + h + 4   -- 23 окт: зона шире
   local drag = D.vbar_drag and D.vbar_drag.key == key
-  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(tx, y, tw, h, 1)
+  local gh = (hot or drag) and (h + 2) or h
+  set((hot or drag) and U.AMBER or U.GREY); gfx.rect(tx, y - (gh - h), tw, gh, 1)
   local ox = D.pn_ox or 0   -- 23 окт: экранные x (лист панели в буфере со сдвигом): протяжка сравнивает с экранной мышью
   D.vbars[key] = { horiz = true, x = x + ox, y = y, w = w, h = h, nvis = nvis, total = total, hot = hot, ty = tx + ox, th = tw, a0 = x + ox, alen = w }
 end

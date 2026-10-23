@@ -20130,7 +20130,7 @@ local function frame()
       local info2 = S and { n = #S.heads, target = S.code or 'vol' } or (ctx.rf_lastvis and { n = #vim.heads_in(ctx.rf_lastvis[1], ctx.rf_lastvis[2], ctx.rf_lastvis[3], ctx.rf_lastvis[4]), target = 'vol', pending = true }) or nil
       return ctx.RF.draw(U, Lx, ctx.rf_p, info2, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y)
     end,
-    sf_ghost = ctx.sf_ghost, file_peaks = ctx.file_peaks,   -- 20 окт: призрак Shift+F
+    sf_ghost = ctx.sf_ghost,   -- 20 окт: призрак Shift+F (file_peaks — выше, был дублем)
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     hum_draw = function(Lx, x, y, w, h, foc)
       ctx.hum_load()
