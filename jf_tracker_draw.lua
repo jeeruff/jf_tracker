@@ -8920,7 +8920,7 @@ function D.frame(L, snap, rows, state, info)
       -- 19 окт: рэк drumrs5k в низкой панели — параметры пэда расходятся колонками вправо
       if f.kit and D.DR and f.kids then
         local np = 0
-        for _, p in ipairs(f.params or {}) do if p.kid == 1 and not p.macro then np = np + 1 end end
+        for _, p in ipairs(f.params or {}) do if p.kid == 1 and not p.macro and not (p.gkid and p.gkid >= 2) then np = np + 1 end end
         -- 21 окт: тот же счёт, что в раскладке (rmax, строка слотов + волна WR): было rows - 6 — на строку меньше,
         -- и при 25 параметрах выходила пустая четвёртая колонка справа
         local rows = math.max(2, math.floor((bh0 - L.rh - 2) / L.rh) - 2)
@@ -9913,9 +9913,18 @@ function D.frame(L, snap, rows, state, info)
           -- 19 окт: не влезли по высоте — следующая колонка справа (с верха), сколько колонок дал ncol_of
           local rmax = math.max(2, nfit - 2)
           local colp = 1
+          -- 23 окт: параметры эффектов пэда (внуки 2..) — не в колонки сэмплера (было наслоение с цепью), а в колонки цепи
+          local kd0 = D.DR and ks > 0 and f.kids[ks] or nil
+          local nsl0 = kd0 and math.min(3, #(kd0.slots or {})) or 0
+          local vis0 = ncol - (f._klist and 1 or 0)
+          local scnt = {}
           for pi, p in ipairs(f.params) do
-            if p.kid == show and not p.macro then
-              if cnt >= rmax and colp + 1 < ncol then colp, cnt = colp + 1, 0 end
+            if p.kid == show and not p.macro and p.gkid and p.gkid >= 2 then
+              local j = p.gkid - 1
+              if kd0 and j <= nsl0 then scnt[j] = (scnt[j] or 0) + 1; cl[pi] = { vis0 - nsl0 + j - 1, scnt[j] - 1 }
+              else cl[pi] = { 99, 0 } end
+            elseif p.kid == show and not p.macro then
+              if cnt >= rmax and colp + 1 < ncol - nsl0 then colp, cnt = colp + 1, 0 end
               cl[pi] = { colp, cnt }; cnt = cnt + 1
             else cl[pi] = { 99, 0 } end
           end
@@ -9939,21 +9948,7 @@ function D.frame(L, snap, rows, state, info)
                 if hb then hover.dspbtn = { fx = k, f = f, what = b2[2], kid = { i = sl.i, name = sl.name, enabled = sl.enabled } } end
               end
               text(cx + L.pad, hy2, fit('> ' .. (sl.name or ''), bw1 - 2 * L.pad - 2 * kb2 - 4), sl.enabled and U.CYAN or U.GREY)
-              local ps = info.db_params(sl.i) or {}
-              local nw2, vw2 = math.floor((bw1 - 2 * L.pad) * 0.38), ms('-00.0')
-              for pi2, p2 in ipairs(ps) do
-                local py2 = hy2 + pi2 * L.rh + 1
-                if py2 + L.rh > by + bh - 2 then break end
-                local v2, t2 = 0, ''
-                if info.db_pval then v2, t2 = info.db_pval(sl.i, p2.i) end
-                local sx2, sw2 = cx + L.pad + nw2, bw1 - 3 * L.pad - nw2 - vw2
-                local hot2 = not drag and mx >= sx2 and mx < sx2 + sw2 and my >= py2 and my < py2 + L.rh
-                text(cx + L.pad, py2, fit(p2.name or '', nw2 - L.pad), hot2 and U.AMBER or U.TEXT)
-                set(U.DIM); gfx.rect(sx2, py2 + L.rh // 2 - 1, sw2, 2, 1)
-                set(hot2 and U.AMBER or (sl.enabled and U.CYAN or U.GREY)); gfx.rect(sx2, py2 + 4, math.max(1, math.floor(sw2 * (v2 or 0) + 0.5)), L.rh - 8, 1)
-                text(cx + bw1 - L.pad - vw2, py2, fit(t2 or '', vw2), U.GREY)
-                if hot2 then hover.dbparam = { addr = sl.i, i = p2.i, x = sx2 + (D.pn_ox or 0), w = sw2, name = p2.name } end
-              end
+              -- параметры — общими виджетами (раскладка cl выше), как у сэмплера
             end
           end
           -- 23 окт: тащат эффект за модуль сэмплера (правее его параметров) — те же две кнопки для выбранного пэда
