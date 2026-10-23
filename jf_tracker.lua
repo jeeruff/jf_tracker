@@ -15034,6 +15034,20 @@ ctx.midi_out_menu = function(col)
 end
 -- 23 окт: мышь над полосой прокрутки списка (полосы стоят у края панели, рядом с ручкой между панелями)
 ctx.vbar_hot = function() for _, r in pairs(draw.vbars or {}) do if r.hot then return true end end; return false end
+-- 23 окт: ÷ в шапке модуля DSP — эффект в 3 / 4 / 5 полос (нативные 3/4/5-Band Splitter + Joiner REAPER);
+-- в роутере видно полосами, a на полосе — эффект в неё
+ctx.dsp_bands = function(k)
+  local col = dsp_target(); local f = col and (col.fx or {})[k]
+  if not f then return end
+  local items = {}
+  for _, n in ipairs({ 3, 4, 5 }) do
+    items[#items + 1] = { key = tostring(n), label = ('÷%d  %s'):format(n, n == 3 and 'low mid high' or (n .. ' bands')), fn = function()
+      if edit.band_split(col.track, f.i, n) then vim.msg = ('%s ÷%d: in the low band; zr - the router shows the bands, a on a band adds there'):format(f.name, n)
+      else vim.msg = 'bands: could not add the splitter' end
+    end }
+  end
+  vim.open_hydra({ title = f.name .. ' into bands (REAPER band splitter + joiner)', items = items })
+end
 -- 20 окт: autoarm всех треков (кнопка уголка, tA): on = nil — переключить (у всех уже — снять, иначе — всем)
 ctx.autoarm_all = function(on)
   local nt = reaper.CountTracks(0)
@@ -16348,6 +16362,7 @@ local function hint_go(t)
     elseif w == 'lastp' then ctx.dsp_lastparam_menu(d.fx) elseif w == 'pprev' then ctx.dsp_preset(d.fx, 'prev') elseif w == 'pnext' then ctx.dsp_preset(d.fx, 'next')
     elseif w == 'preset' then ctx.dsp_preset(d.fx, 'pick') elseif w == 'del' then ctx.dsp_delete(d.fx, d.fx)
     elseif w == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: midi out рэка
+    elseif w == 'bands' then ctx.dsp_bands(d.fx)
     elseif w == 'kview' and d.key then draw.kit_list = draw.kit_list or {}; draw.kit_list[d.key] = d.view end
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
@@ -21323,7 +21338,7 @@ local function frame()
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
-    kview = 'pads - the grid, list - every pad with every parameter (zz in pads mode - the rack on the whole window)' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
+    kview = 'pads / list of the rack (zv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
@@ -23393,6 +23408,7 @@ local function frame()
       if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'bands' then ctx.dsp_bands(hover.dspbtn.fx)   -- 23 окт: ÷ — в полосы
       elseif hover.dspbtn.what == 'lastp' then ctx.dsp_lastparam_menu(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
@@ -24718,6 +24734,7 @@ local function frame()
         state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
           or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
           or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
+          or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into pad ' .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '') .. ' (after its sampler and fx)'))
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
           or (hover.dbig and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbnode and (' after the row of ' .. hover.dbnode.name .. ' (Shift - parallel to it)') or ' at the end of the chain')))
           or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
@@ -24739,6 +24756,20 @@ local function frame()
           vim.msg = '+ ' .. FB.short(drop.it.label) .. (par and (' parallel to ' .. (n.name or '')) or (first and ' at the start' or (' after ' .. (n and n.name or ''))))
         end
         hover.dsp_into, hover.dsp_gap, hover.dbig = nil, nil, nil
+      end
+      -- 23 окт: на пэд drumrs5k — эффект в конец цепочки пэда (подконтейнер: сэмплер, его эффекты, этот)
+      if drop.active and not rt and hover.kitdrop then
+        local kd = hover.kitdrop
+        local t = dsp_target()
+        if t and kd.f and kd.kid then
+          local pos = 1 + #(kd.kid.slots or {})
+          if edit.drum_slot_add(t.track, kd.f.i, kd.ki - 1, drop.it.data, pos) then
+            FB.push_recent(drop.it); ctx.fxb_save()
+            vim.msg = ('+ %s into pad %s (its chain, after the sampler)'):format(FB.short(drop.it.label), kd.kid.name or '')
+          else vim.msg = 'could not add into the pad' end
+        end
+        hover.dsp_into, hover.dsp_gap, hover.dbig = nil, nil, nil
+        rt = true
       end
       local col = drop.active and not rt and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]

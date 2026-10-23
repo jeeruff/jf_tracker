@@ -9152,6 +9152,11 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
+      -- 23 окт: ÷ — эффект в полосы (3 / 4 / 5 band, нативные сплиттер + джойнер REAPER), только верхний уровень
+      if not f.container and not f.kids and tw > L.cw * 10 + kb then
+        bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
+        tw = tw - kb - 2
+      end
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
       local pre = info.fx_preset and not f.container and info.fx_preset(f)
@@ -9582,6 +9587,11 @@ function D.frame(L, snap, rows, state, info)
                 local cx0, cy0 = gx0 + c * G.cw, gy0 + r * G.ch
                 local cw0, ch0 = G.cw - 2, G.ch - 2
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
+                -- 23 окт: эффект из fx list тащат на пэд — в пэд (его цепочка, справа от сэмплера); подсветка цели
+                if drag and drag.new and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0 then
+                  hover.kitdrop = { k = k, f = f, ki = ki, kid = kid }
+                  set(U.CYAN); gfx.rect(cx0, cy0, cw0, ch0, 0); gfx.rect(cx0 + 1, cy0 + 1, cw0 - 2, ch0 - 2, 0)
+                end
                 local on = ki == ks or (D.pad_zone and D.pad_zone.key == kkey and D.pad_zone.note == pn)   -- 19 окт: зона тачпада 4 × 4
                 local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
                 local flash = hit and reaper.time_precise() - hit < 0.25        -- 19 окт: сыгранный (клавиатура / щелчок) — вспышка

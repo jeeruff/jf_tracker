@@ -551,6 +551,8 @@ KH.PAGES = {
     { k = 'Shift / Cmd+click', d = 'on a module (its name or empty space): Shift - pick from the selected one to it, Cmd - add / remove it (apart is fine); then x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick' },
     { k = 'i', d = 'INSERT the parameter: it and the module frame go red - type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)' },
     { k = '[] (track block)', d = 'contain: every effect of the track into one container (REAPER 7); one container on the track - unpack it; also cc on a range, dc unpacks' },
+    { k = '÷', d = 'module header: the effect into 3 / 4 / 5 frequency bands - native 3/4/5-Band Splitter + Joiner of REAPER (FFT Splitter - by hand); the router (zr) shows them as bands' },
+    { k = 'drop on a pad', d = 'drag an effect from the fx list onto a drumrs5k pad - it goes into that pad (its own container: sampler, its fx, this one)' },
     { k = 'bands', d = 'router: a REAPER band splitter ... joiner (3 / 4 / 5 band) is drawn as band rows (low < 200 Hz, mid, high) - every effect between them sits in the band of its pins; a on a band - an effect into it (pins set to its channels), zb on an effect - wrap it into 3 / 4 / 5 bands (it stays in low); all native: pins / routing windows show the same' },
     { k = 'zz', d = 'the effects on the whole window with the mixer above them (strips of every track); again - back', t = { 'zz', 'z' } },
     { k = 'zv', d = 'drumrs5k rack: switch the pad grid / the list of pads (in place of the grid; the parameters of the selected pad stay on the right); the vertical tab between them does the same', t = { 'z' } },
