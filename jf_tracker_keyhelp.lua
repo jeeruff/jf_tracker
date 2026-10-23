@@ -85,6 +85,7 @@ KH.PAGES = {
   } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
+    { k = 'arrows + mods', d = 'arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl' },
     { k = 'Opt+H Opt+L', d = 'previous / next track' },
     { k = 'w b e', d = 'next / previous event of the track (all its columns and envelope points, like words in Vim), end of event; dw yw cw - this column' },
     { k = 'E', d = 'the end of the lowest visible event of the track (the last one that starts on screen); dE - up to there' },

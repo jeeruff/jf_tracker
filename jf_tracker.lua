@@ -25281,7 +25281,7 @@ local function frame()
     elseif m.cmd and not m.ctrl and not m.alt then
       local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
       -- Cmd+h j k l приходят кодами 8 10 11 12 (как Ctrl+H …), а не буквами (журнал 9 окт)
-      local CODE = { [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l' }
+      local CODE = { [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l', [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l' }   -- 23 окт: и Cmd+стрелки
       local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
