@@ -10909,7 +10909,7 @@ function D.popup(L, p, anchor)
   for _, ln in ipairs(p.lines) do
     kw = math.max(kw, ms(ln.key or ''))
     tw = math.max(tw, ms(ln.text or ''))
-    if ln.hk then hw = math.max(hw, ms(ln.hk)) end
+    if ln.hk and D.hints_on then hw = math.max(hw, ms(ln.hk)) end   -- 23 окт: колонка хоткеев — только с hints
   end
   tw = math.min(tw, ms(string.rep('W', 60)))          -- длинные описания — обрезаются (fit), меню не во весь экран
   -- колонка хоткеев (5 окт): своя ширина, без наложений; описания ужимаются
@@ -11019,7 +11019,7 @@ function D.popup(L, p, anchor)
     if p.hl == i and p.kind == 'picker' then set(U.tint(U.AMBER, 0.3)); gfx.rect(lx, ly, colw - L.pad, L.rh, 1)   -- 18 окт: выбранное в поиске — заметно
     elseif p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
-    if ln.hk then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
+    if ln.hk and D.hints_on then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
     if ln.chips then   -- 16 окт: «клавиша имя» подряд, клавиша — янтарём
       local cx = lx + L.pad + kw + 2 * L.pad + hcol
       for _, ch in ipairs(ln.chips) do

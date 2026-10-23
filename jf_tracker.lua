@@ -16720,7 +16720,7 @@ local function context_menu(hover, anchor)
       for t in e.k:gmatch('%S+') do toks[#toks + 1] = t end
       local first = toks[1]
       local nav = e.k:match('^h j k l') or e.k:match('^hjkl') or e.k == 'j k' or e.k == 'h l' or e.k == 'gg G' or e.k == 'g G'
-                  or e.k == '?' or e.k:match('^Esc') or e.k:match('^%? ')
+                  or e.k == '?' or e.k:match('^Esc') or e.k:match('^%? ') or first == 'Space'   -- 23 окт: Space — транспорт везде, не пункт меню модуля
       local codes = first and ctx.tok_codes(first)
       if codes and not nav and not have[first] then
         have[first] = true
@@ -19530,6 +19530,7 @@ local function frame()
   draw.inst_num = snap and snap.inst_num
   draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
   draw.vbars = {}                         -- скролл-бары списков: заполняет отрисовка кадра (4 окт)
+  draw.hints_on = state.hints              -- 23 окт: колонка хоткеев в меню — только с hints
   draw.itemnames = state.itemnames
   draw.dotcolor = state.dotcolor   -- 18 окт
   regions = model.regions(state.lpb)
