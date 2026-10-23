@@ -5254,7 +5254,8 @@ function D.draw_mixsnaps(L, info, hover)
   for _, t in ipairs({ { 'snapshots', 'list' }, { 'xy', 'xy' } }) do
     tx = tx + btn(tx, yy, t[1], false, ms0.tab == t[2], { what = 'tab', arg = t[2] }) + 2
   end
-  yy = yy + rh
+  set(U.LINE); gfx.rect(x, yy + rh, w, 1, 1)   -- 23 окт: вкладки отделены полоской от кнопок
+  yy = yy + rh + 3
   if ms0.tab == 'xy' then
     local xy = ms0.xy or { has = {} }
     local side = math.max(4 * rh, math.min(w, y0 + h - yy - 4))
