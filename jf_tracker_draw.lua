@@ -9364,7 +9364,7 @@ function D.frame(L, snap, rows, state, info)
           if D.DR and (D.kit_list[kkey] or (zoomed and 'list' or 'pads')) == 'list' then   -- 19 окт: и без zz (кнопка list)
             -- 23 окт: список — на месте сетки пэдов (шириной с неё), параметры выбранного пэда — справа, как у сетки
             f._klist = true
-            local bwl = 2 * bw1 - (L.th + 6) - 3   -- 23 окт: вдвое шире сетки — колонки vol / grp / chk влезают
+            local bwl = 2 * bw1 - 3   -- 23 окт: вдвое шире сетки — колонки vol / grp / chk влезают
             local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 12 }, { 'vol', 'volume', 6 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 3 } }
             -- узко — сначала без grp / chk, потом без vol, имя короче (колонки не вылезают за вкладку)
             local avail = math.floor((bwl - 2 * L.pad) / L.cw)
@@ -9378,7 +9378,10 @@ function D.frame(L, snap, rows, state, info)
             local cwx = math.max(L.cw, math.floor((bwl - 2 * L.pad) / tot))
             local ly0 = hy
             local xh = bx + L.pad
-            for _, c2 in ipairs(COLS) do text(xh, ly0, fit(c2[1], c2[3] * cwx - L.pad), U.GREY); xh = xh + c2[3] * cwx end
+            local pbw = ms('pads') + 2 * L.pad   -- 23 окт: кнопка pads — справа в строке заголовков (вкладка сбоку убрана)
+            local pbx = bx + bwl - pbw - 2
+            for _, c2 in ipairs(COLS) do if xh < pbx then text(xh, ly0, fit(c2[1], math.min(c2[3] * cwx, pbx - xh) - L.pad), U.GREY) end; xh = xh + c2[3] * cwx end
+            D.kit_viewbtn = { x = pbx, y = ly0, w = pbw, lbl = 'pads' }
             set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bwl - 2 * L.pad, 1, 1)
             local function pidx(ki, want)
               for pi, p in ipairs(f.params) do if p.kid == ki and (p.name or ''):lower():find(want, 1, true) then return pi end end
@@ -9439,7 +9442,7 @@ function D.frame(L, snap, rows, state, info)
             local mol = mo_n > 0 and ('midi out ' .. mo_n) or 'midi out'
             local mow = ms(mol) + 2 * L.pad
             local mox = bx + 2 + ah + 2
-            if mox + mow < bx + bw1 - ms('cell note') - ms('list') - 6 * L.pad then
+            if mox + mow < bx + bw1 - ms('cell') - ms('list') - 6 * L.pad then
               local hm = not drag and mx >= mox and mx < mox + mow and my >= hy and my < hy + L.rh
               set(hm and U.tint(U.AMBER, 0.3) or (mo_n > 0 and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(mox, hy, mow, L.rh - 1, 1)
               set(hm and U.AMBER or (mo_n > 0 and U.CYAN or U.LINE)); gfx.rect(mox, hy, mow, L.rh - 1, 0)
@@ -9449,7 +9452,7 @@ function D.frame(L, snap, rows, state, info)
               ah = ah + mow + 2   -- счётчик пэдов и кнопки правее — после неё
             end
             local cm = info.drumcell or 'note'
-            local cl_lbl = 'cell ' .. cm
+            local cl_lbl = 'cell'   -- 23 окт: просто cell (режим подписи — в выпадашке)
             local cw2 = ms(cl_lbl) + 2 * L.pad
             local cxb = bx + bw1 - cw2 - 2
             if cxb > bx + 2 + ah + L.pad then
@@ -9461,8 +9464,10 @@ function D.frame(L, snap, rows, state, info)
               -- 19 окт: list — все пэды таблицей (все параметры), на месте сетки; ещё раз — пэды
               D.kit_list = D.kit_list or {}
               local lon = (D.kit_list[kkey] or (info.dsp_zoomed and 'list' or 'pads')) == 'list'
-              local lxb = cxb   -- 23 окт: кнопки list в шапке нет — вертикальная вкладка у сетки
+              local lbw = ms('list') + 2 * L.pad   -- 23 окт: list — снова кнопкой в шапке, левее cell
+              local lxb = cxb - lbw - 2
               if lxb > bx + 2 + ah + L.pad then
+                D.kit_viewbtn = { x = lxb, y = hy, w = lbw, lbl = 'list' }
                 -- 19 окт: размер пэдов s / m / l — кнопка с выпадашкой (3 значения — не перебор по кругу)
                 local szl = 'size ' .. (info.kitsize or 'l')
                 local szw = ms(szl) + 2 * L.pad
@@ -9476,11 +9481,10 @@ function D.frame(L, snap, rows, state, info)
                 end
               end
               local cnt_s = ('%d pads'):format(#f.kids)
-              if ms(cnt_s) <= cxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
+              if ms(cnt_s) <= lxb - (bx + 2 + ah + 2 * L.pad) then text(bx + 2 + ah + L.pad, hy, cnt_s, U.DIM) end
             end
             local gx0, gy0 = bx + 2, hy + L.rh + 1
-            local ltw = L.th + 6                                   -- 23 окт: вертикальная вкладка list у правого края сетки
-            local gw, gh = bw1 - 4 - ltw, by + bh - 3 - gy0 - (L.rh + 3)   -- 19 окт: внизу — строка grp / chk / r
+            local gw, gh = bw1 - 4, by + bh - 3 - gy0 - (L.rh + 3)   -- 19 окт: внизу — строка grp / chk / r
             -- 18 окт: всегда 4 × 4 (как пэды MPC), справа — карта всех 128 пэдов кубиками 4 × 32 (прокрутка / прыжок)
             local cube = math.max(2, math.min(5, math.floor((gh - 2) / 32) - 1))
             local mw = 4 * (cube + 1) + 4
@@ -9702,19 +9706,16 @@ function D.frame(L, snap, rows, state, info)
               hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = ki })
             end
           end
-          -- 23 окт: list — вертикальной вкладкой между пэдами и параметрами (кнопка в шапке убрана)
-          if D.DR and f.kit then
-            local ltw = L.th + 6
-            local lx, ly, lh = bx + bw1 - ltw - 1, by + L.rh + 2, bh - L.rh - 6
-            local hl = not drag and mx >= lx and mx < lx + ltw and my >= ly and my < ly + lh
-            local lbg = hl and U.tint(U.AMBER, 0.25) or U.BG
-            set(lbg); gfx.rect(lx, ly, ltw, lh, 1)
-            set(hl and U.AMBER or U.LINE); gfx.rect(lx, ly, ltw, lh, 0)
-            local vl = f._klist and 'pads' or 'list'   -- 23 окт: вкладка переключает: list <-> pads (zv)
-            local tl = math.min(ms(vl), lh - 6)
-            D.vtext(lx + math.floor((ltw - L.th) / 2), ly + math.floor((lh - tl) / 2), tl, vl, (hl or f._klist) and U.AMBER or U.GREY, lbg)
-            if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = vl, key = kkey } end
-            hint('dspbtn', lx, ly, ltw, lh, { fx = k, what = 'kview', view = vl, key = kkey })
+          -- 23 окт: list / pads — кнопкой в шапке (pads: левее cell; list: справа в строке заголовков); zv
+          local vb = D.kit_viewbtn
+          D.kit_viewbtn = nil
+          if D.DR and f.kit and vb then
+            local hl = not drag and mx >= vb.x and mx < vb.x + vb.w and my >= vb.y and my < vb.y + L.rh
+            set(hl and U.tint(U.AMBER, 0.3) or (f._klist and U.tint(U.AMBER, 0.2) or U.BG)); gfx.rect(vb.x, vb.y, vb.w, L.rh - 1, 1)
+            set(hl and U.AMBER or U.LINE); gfx.rect(vb.x, vb.y, vb.w, L.rh - 1, 0)
+            text(vb.x + L.pad, vb.y, vb.lbl, hl and U.AMBER or U.TEXT)
+            if hl then hover.dspbtn = { fx = k, f = f, what = 'kview', view = vb.lbl, key = kkey } end
+            hint('dspbtn', vb.x, vb.y, vb.w, L.rh - 1, { fx = k, what = 'kview', view = vb.lbl, key = kkey })
           end
           if D.DR and ks > 0 then   -- 19 окт: свойства пэда (его сэмплер) — своей серой рамкой, отдельно от рамки рэка
             set(U.mix(U.LINE, U.GREY, 0.45)); rrect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, false)

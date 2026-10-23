@@ -15063,8 +15063,11 @@ ctx.dsp_bands = function(k)
   local items = {}
   for _, n in ipairs({ 3, 4, 5 }) do
     items[#items + 1] = { key = tostring(n), label = ('÷%d  %s'):format(n, n == 3 and 'low mid high' or (n .. ' bands')), fn = function()
-      if edit.band_split(col.track, f.i, n) then vim.msg = ('%s ÷%d: in the low band; zr - the router shows the bands, a on a band adds there'):format(f.name, n)
-      else vim.msg = 'bands: could not add the splitter' end
+      -- 23 окт: контейнер «÷N bands» из N параллельных цепей (по сплиттеру с одной полосой в каждой), эффект — в low
+      if edit.band_container(col.track, f.i, n, true) then
+        draw.kit_list = draw.kit_list or {}
+        vim.msg = ('%s ÷%d: a container of %d bands (low ... high), it is in low; zv - the bands as a list, af / drop - into a band'):format(f.name, n, n)
+      else vim.msg = 'bands: could not build the container' end
     end }
   end
   vim.open_hydra({ title = f.name .. ' into bands (REAPER band splitter + joiner)', items = items })

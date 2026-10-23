@@ -3558,6 +3558,45 @@ function E.band_insert(obj, pos, name, band, n)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 23 окт: ÷N — контейнер «÷N bands»: N параллельных цепей (low / mid / high …); каждая начинается с N-Band Splitter,
+-- у которого на выход 1/2 пропущена только своя полоса (остальные выходные пины — никуда). Эффекты в цепи — на 1/2,
+-- как обычно; сумма цепей = исходный сигнал (одинаковые фильтры). Эффект addr — в цепь low, за сплиттером.
+-- Частоты разделов — у сплиттера каждой цепи (ставятся одинаковыми; потом — связать parameter link)
+E.BAND_NAMES = { [3] = { 'low', 'mid', 'high' }, [4] = { 'low', 'low mid', 'high mid', 'high' }, [5] = { 'sub', 'low', 'mid', 'high mid', 'high' } }
+function E.band_container(obj, addr, n, move_fx)
+  if model.is_take(obj) then return false end
+  local ok = false
+  run('÷' .. n .. ' bands', function()
+    local A = FA(obj)
+    local c = add_fx(obj, 'Container', -1000 - addr)
+    if not (c and c >= 0) then return end
+    A.SetNamedConfigParm(obj, c, 'renamed_name', '÷' .. n .. ' bands')
+    local names = E.BAND_NAMES[n] or {}
+    for b = 0, n - 1 do
+      local sub = add_fx(obj, 'Container', -1000 - child_addr(obj, c, b))
+      if not (sub and sub >= 0) then return end
+      local sa = child_addr(obj, c, b)
+      A.SetNamedConfigParm(obj, sa, 'renamed_name', names[b + 1] or ('band ' .. (b + 1)))
+      if b > 0 then A.SetNamedConfigParm(obj, sa, 'parallel', '1') end
+    end
+    for b = 0, n - 1 do
+      local at = grand_addr(obj, c, b, 0)
+      local sp = add_fx(obj, 'JS: ' .. n .. '-Band Splitter', -1000 - at)
+      if not (sp and sp >= 0) then sp = add_fx(obj, 'loser/' .. n .. 'BandSplitter', -1000 - at) end
+      if not (sp and sp >= 0) then return end
+      local sa = grand_addr(obj, c, b, 0)
+      for pin = 0, 2 * n - 1 do
+        local mask = (pin // 2 == b) and (1 << (pin % 2)) or 0
+        A.SetPinMappings(obj, sa, 1, pin, mask, 0)
+      end
+      A.Show(obj, sa, 2)
+    end
+    if move_fx then copy_fx(obj, c + 1, obj, grand_addr(obj, c, 0, 1), true) end   -- эффект — в low, за сплиттером
+    ok = true
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 -- эффект addr (верхний уровень) — в полосы: сплиттер перед ним, джойнер после; сам он — полоса 1 (low)
 function E.band_split(obj, addr, n)
   local ok = false
