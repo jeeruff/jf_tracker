@@ -9367,6 +9367,20 @@ function D.frame(L, snap, rows, state, info)
             set(ks == 0 and U.AMBER or U.LINE); gfx.rect(bx + 2, hy, ah, L.rh - 1, 0)
             text(bx + 2 + L.pad, hy, 'all', ks == 0 and U.AMBER or (hot_all and U.TEXT or U.GREY))
             if hot_all then hover.dspkit = { k = k, key = kkey, ki = 0 } end
+            -- 23 окт: midi out — MIDI-посылы рэка на другие треки (пэды и ноты играют и там); горит, когда есть
+            local mo_n = info.midi_out_n and info.pool_col and info.midi_out_n(info.pool_col.track) or 0
+            local mol = mo_n > 0 and ('midi out ' .. mo_n) or 'midi out'
+            local mow = ms(mol) + 2 * L.pad
+            local mox = bx + 2 + ah + 2
+            if mox + mow < bx + bw1 - ms('cell note') - ms('list') - 6 * L.pad then
+              local hm = not drag and mx >= mox and mx < mox + mow and my >= hy and my < hy + L.rh
+              set(hm and U.tint(U.AMBER, 0.3) or (mo_n > 0 and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(mox, hy, mow, L.rh - 1, 1)
+              set(hm and U.AMBER or (mo_n > 0 and U.CYAN or U.LINE)); gfx.rect(mox, hy, mow, L.rh - 1, 0)
+              text(mox + L.pad, hy, mol, hm and U.AMBER or (mo_n > 0 and U.TEXT or U.GREY))
+              if hm then hover.dspbtn = { fx = k, f = f, what = 'kmidi' } end
+              hint('dspbtn', mox, hy, mow, L.rh - 1, { fx = k, what = 'kmidi' })
+              ah = ah + mow + 2   -- счётчик пэдов и кнопки правее — после неё
+            end
             local cm = info.drumcell or 'note'
             local cl_lbl = 'cell ' .. cm
             local cw2 = ms(cl_lbl) + 2 * L.pad
