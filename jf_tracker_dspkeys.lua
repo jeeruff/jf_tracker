@@ -94,7 +94,7 @@ function DK.key(c, sel, n, np, mods)
     elseif op == 'c' and ch == 'c' then ctx.dsp_pack(r0, r1); DK.anchor = nil
     elseif op == 'a' and ch == 'a' then ctx.dsp_automate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'p' then ctx.dsp_pick_param(sel.fx)
-    elseif op == 'a' and ch == 'f' then ctx.fx_picker()
+    elseif op == 'a' and ch == 'f' then if not (ctx.pad_fx_add and ctx.pad_fx_add()) then ctx.fx_picker() end   -- 23 окт: на рэке с выбранным пэдом — в пэд
     elseif op == 'a' and ch == 'F' then ctx.dsp_take_slice()       -- aF (7 окт): take FX на слайс / ноту под курсором трекера
     elseif op == 'a' and ch == 'd' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'i' then ctx.dsp_autoitem(sel.fx, sel.param)

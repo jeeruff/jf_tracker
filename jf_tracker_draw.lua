@@ -8928,7 +8928,9 @@ function D.frame(L, snap, rows, state, info)
         local WR = avail >= 14 and 4 or (avail >= 9 and 3 or 0)
         local first = math.max(1, rows - 1 - WR)           -- первая колонка: под слотами и волной
         local extra = np > first and math.ceil((np - first) / rows) or 0
-        return math.min(5, 2 + extra)
+        local kk2 = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+        local lst = (D.kit_list or {})[kk2] == 'list' and 1 or 0   -- 23 окт: список — вдвое шире сетки (+ колонка)
+        return math.min(5 + lst, 2 + extra + lst)
       end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
@@ -9152,11 +9154,7 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
-      -- 23 окт: ÷ — эффект в полосы (3 / 4 / 5 band, нативные сплиттер + джойнер REAPER), только верхний уровень
-      if not f.container and not f.kids and tw > L.cw * 10 + kb then
-        bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
-        tw = tw - kb - 2
-      end
+
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
       local pre = info.fx_preset and not f.container and info.fx_preset(f)
@@ -9358,7 +9356,7 @@ function D.frame(L, snap, rows, state, info)
           if D.DR and (D.kit_list[kkey] or (zoomed and 'list' or 'pads')) == 'list' then   -- 19 окт: и без zz (кнопка list)
             -- 23 окт: список — на месте сетки пэдов (шириной с неё), параметры выбранного пэда — справа, как у сетки
             f._klist = true
-            local bwl = bw1 - (L.th + 6) - 3
+            local bwl = 2 * bw1 - (L.th + 6) - 3   -- 23 окт: вдвое шире сетки — колонки vol / grp / chk влезают
             local COLS = { { 'note', 'note lo', 4 }, { 'name', nil, 12 }, { 'vol', 'volume', 6 }, { 'grp', 'g', 5 }, { 'chk', 'cg', 5 }, { 'on', 'on', 3 } }
             -- узко — сначала без grp / chk, потом без vol, имя короче (колонки не вылезают за вкладку)
             local avail = math.floor((bwl - 2 * L.pad) / L.cw)
@@ -9414,6 +9412,7 @@ function D.frame(L, snap, rows, state, info)
               if hotr and not hover.dspbtn and not hover.kitcell then hover.dspkit = { k = k, key = kkey, ki = ki }; hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
             end
             D.kit_lkey = kkey; D.vbar('kitlist', bx, ly0 + L.rh + 2, bwl - 2, nrow * L.rh, sc, nrow, #f.kids)
+            bx, bw = bx + bw1, bw - bw1   -- дальше (вкладка, пэд, параметры) — правее списка; правый край модуля тот же
           else f._klist = nil
           end
           if f._klist then   -- 23 окт: список уже нарисован на месте сетки — ни сетки, ни старого списка слайсов

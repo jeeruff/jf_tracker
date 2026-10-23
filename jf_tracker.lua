@@ -15034,6 +15034,27 @@ ctx.midi_out_menu = function(col)
 end
 -- 23 окт: мышь над полосой прокрутки списка (полосы стоят у края панели, рядом с ручкой между панелями)
 ctx.vbar_hot = function() for _, r in pairs(draw.vbars or {}) do if r.hot then return true end end; return false end
+-- 23 окт: af на рэке drumrs5k с выбранным пэдом — эффект в конец цепочки пэда (за сэмплером); false — пэда нет
+ctx.pad_fx_add = function()
+  local col = dsp_target(); local f = col and (col.fx or {})[dsp_sel.fx]
+  if not (f and f.kit) then return false end
+  local key = tostring(col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+  local ki = (draw.kit_sel or {})[key] or 0
+  local kid = f.kids and f.kids[ki]
+  if not kid then return false end
+  local function put(name)
+    if edit.drum_slot_add(col.track, f.i, ki - 1, name, 1 + #(kid.slots or {})) then vim.msg = ('+ %s into pad %s (after its sampler)'):format(FB.short(name), kid.name or '')
+    else vim.msg = 'could not add into the pad' end
+  end
+  if state.panes_ui and state.panes then
+    if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+    FB.query, FB.cur, FB.scroll = '', 1, 0
+    ctx.fxb_pad = put
+    ctx.pane_cmd('fxb show')
+    vim.msg = ('fx into pad %s: type to search, Enter - add, Esc back'):format(kid.name or '')
+  else vim.open_picker('fx into pad ' .. (kid.name or ''), ctx.fx_list(), function(x) put(x.data or x.label) end) end
+  return true
+end
 -- 23 окт: ÷ в шапке модуля DSP — эффект в 3 / 4 / 5 полос (нативные 3/4/5-Band Splitter + Joiner REAPER);
 -- в роутере видно полосами, a на полосе — эффект в неё
 ctx.dsp_bands = function(k)
@@ -17045,6 +17066,9 @@ function ctx.context_items(hover)
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
       add('Rename container … (:fxname)', function() state.fxname_target = { track = col.track, addr = f.i }; vim.open_prompt('fxname ', '') end, 'n')
       add('--', function() end)
+    end
+    if col and f and not f.container and hover.dsp and not hover.dsp.param then   -- 23 окт: в полосы (было кнопкой ÷ — непонятно)
+      add('Split into bands ... (3 / 4 / 5 band splitter, zb)', function() ctx.dsp_bands(hover.dsp.fx) end, nil)
     end
     if col and f then
       add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name, function() edit.fx_bypass(col.track, f.i) end)
@@ -26263,6 +26287,7 @@ local function frame()
           if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
+          elseif ch == 'b' then ctx.dsp_bands(dsp_sel.fx)   -- 23 окт: zb — модуль в 3 / 4 / 5 полос
           elseif ch == 'v' then   -- 23 окт: zv — рэк drumrs5k: сетка пэдов <-> список
             local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
             if f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
@@ -26328,7 +26353,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: v - drumrs5k pads / list, z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: v - pads / list of a rack or container, b - into bands, z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
