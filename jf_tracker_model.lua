@@ -1673,6 +1673,7 @@ function build_one(tr, fx, out)
           local e = {}
           for k2, v2 in pairs(e0) do e[k2] = v2 end
           e.fx = e0.fx or kid.i      -- адрес ребёнка (внука — свой): fx_values / fx_param идут по нему
+          e.ggkid = e0.gkid          -- 23 окт: третий уровень (цепь chain N внутри пэда): номер эффекта в цепи
           e.gkid = e0.kid            -- 23 окт: ребёнок-контейнер — номер внука в нём (полосы ÷N: цепь полосы)
           e.kid = ki
           params[#params + 1] = e
@@ -1707,7 +1708,9 @@ function build_one(tr, fx, out)
             for gi, g in ipairs(kid.entry.kids or {}) do
               if gi > 1 then
                 local cat = M.DR.cat_of(g.name, M.drum_favs) or ('x' .. gi)
-                kid.slots[#kid.slots + 1] = { cat = cat, i = g.i, name = M.DR.short(g.name), enabled = g.enabled }
+                kid.slots[#kid.slots + 1] = { cat = cat, i = g.i, name = M.DR.short(g.name), enabled = g.enabled, gi = gi,
+                                              wet_i = g.wet_i, parallel = g.parallel,
+                                              chain = (g.container and (g.name or ''):match('^chain')) and (g.entry and g.entry.kids or {}) or nil }   -- 23 окт: цепь пэда — её эффекты
               end
             end
           end

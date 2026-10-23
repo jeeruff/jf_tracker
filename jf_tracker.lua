@@ -23474,6 +23474,7 @@ local function frame()
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str
+      elseif hover.dspbtn.what == 'kchain' then draw.chain_sel = draw.chain_sel or {}; draw.chain_sel[hover.dspbtn.key] = hover.dspbtn.idx   -- 23 окт: цепь пэда — её эффекты справа
       elseif hover.dspbtn.what == 'kview' then draw.kit_list = draw.kit_list or {}; draw.kit_list[hover.dspbtn.key] = hover.dspbtn.view   -- 19 окт: pads | list
       elseif (hover.dspbtn.what == 'kgroup' or hover.dspbtn.what == 'kchoke') and hover.dspbtn.kid then ctx.pad_group_menu(hover.dspbtn.kid, hover.dspbtn.what == 'kchoke' and 'choke' or 'group')   -- 19 окт: g / cg
       elseif hover.dspbtn.what == 'kall_m' or hover.dspbtn.what == 'kall_s' then ctx.pad_ms_all(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'kall_s')   -- 19 окт: m s под пэдами
@@ -24794,6 +24795,7 @@ local function frame()
         state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
           or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
           or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
+          or (hover.kitdrop and hover.kitdrop.chain and ('drop ' .. FB.short(fxb_drag.it.label) .. ' at the end of ' .. (hover.kitdrop.chain.name or 'the chain')))
           or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.kitdrop.band and 'the band ' or 'pad ') .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '')
             .. (hover.kitdrop.band and '' or (hover.kitdrop.par and ': = a parallel chain (right half)' or ': | serial, after its sampler and fx (left half)'))))
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
@@ -24824,7 +24826,12 @@ local function frame()
         local t = dsp_target()
         if t and kd.f and kd.kid then
           local pos = kd.pos or (1 + #(kd.kid.slots or {}))   -- 23 окт: полоса ÷N — в конец её цепи
-          if kd.par and not kd.band then   -- 23 окт: = parallel — новая цепь в пэде параллельно (контейнер в контейнере)
+          if kd.chain then   -- 23 окт: на эффекты выбранной цепи пэда — в конец этой цепи
+            if edit.pad_chain_add(t.track, kd.f.i, kd.ki - 1, kd.chain.gi - 1, drop.it.data) then
+              FB.push_recent(drop.it); ctx.fxb_save()
+              vim.msg = ('+ %s into %s of pad %s'):format(FB.short(drop.it.label), kd.chain.name or 'the chain', kd.kid.name or '')
+            else vim.msg = 'could not add into the chain' end
+          elseif kd.par and not kd.band then   -- 23 окт: = parallel — новая цепь в пэде параллельно (контейнер в контейнере)
             if edit.pad_par_add(t.track, kd.f.i, kd.ki - 1, drop.it.data) then
               FB.push_recent(drop.it); ctx.fxb_save()
               vim.msg = ('+ %s into pad %s: a parallel chain (the pad sums its chains)'):format(FB.short(drop.it.label), kd.kid.name or '')

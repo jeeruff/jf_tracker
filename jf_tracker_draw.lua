@@ -5348,6 +5348,25 @@ end
 -- 23 окт: дети контейнера — колонками; маленькие (до 5 параметров) подряд по цепочке (serial) — друг под другом
 -- в одной колонке: сигнал течёт сверху вниз. rows — строк под параметры. → place[ki] = { c = колонка с 0,
 -- hr = строка заголовка (−1 — верхний, в шапке), r0 = первая строка параметров }, число колонок
+-- 23 окт: вид цепи пэда drumrs5k. Есть цепи chain N (параллельный бросок) — как Ableton: столбец-список строк
+-- (цепи и эффекты пэда, | / =), выбранная строка — её эффекты колонками (до 2); нет цепей — эффекты пэда колонками (до 3).
+-- → { list = bool, ncols = колонок справа, sel, show = { эффекты колонками }, slot = выбранная строка }
+function D.pad_chain_view(kid, key)
+  local slots = kid and kid.slots or {}
+  local has = false
+  for _, sl in ipairs(slots) do if sl.chain then has = true end end
+  if not has then
+    local show = {}
+    for j = 1, math.min(3, #slots) do show[j] = slots[j] end
+    return { list = false, ncols = #show, show = show }
+  end
+  D.chain_sel = D.chain_sel or {}
+  local sel = math.max(1, math.min(#slots, D.chain_sel[key] or 1))
+  local sl = slots[sel]
+  local show = {}
+  if sl.chain then for m = 1, math.min(2, #sl.chain) do show[m] = sl.chain[m] end else show[1] = sl end
+  return { list = true, ncols = 1 + math.max(1, #show), sel = sel, show = show, slot = sl }
+end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
 function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
@@ -8953,7 +8972,7 @@ function D.frame(L, snap, rows, state, info)
         local lst = (D.kit_list or {})[kk2] == 'list' and 1 or 0   -- 23 окт: список — вдвое шире сетки (+ колонка)
         -- 23 окт: эффекты выбранного пэда — колонками за параметрами сэмплера (цепочка пэда вправо), до трёх
         local kid0 = f.kids[(D.kit_sel or {})[kk2] or 0]
-        local nsl = kid0 and math.min(3, #(kid0.slots or {})) or 0
+        local nsl = kid0 and D.pad_chain_view(kid0, kk2 .. ':' .. tostring((D.kit_sel or {})[kk2] or 0)).ncols or 0
         return math.min(5 + lst, 2 + extra + lst) + nsl
       end
       if f.bands and f.kids and #f.kids > 0 then   -- 23 окт: ÷N — список полос + колонка на каждый эффект выбранной полосы (до 4)
@@ -9929,13 +9948,19 @@ function D.frame(L, snap, rows, state, info)
           local colp = 1
           -- 23 окт: параметры эффектов пэда (внуки 2..) — не в колонки сэмплера (было наслоение с цепью), а в колонки цепи
           local kd0 = D.DR and ks > 0 and f.kids[ks] or nil
-          local nsl0 = kd0 and math.min(3, #(kd0.slots or {})) or 0
+          local cv = kd0 and D.pad_chain_view(kd0, kkey .. ':' .. ks) or { ncols = 0, show = {} }
+          local nsl0 = cv.ncols
           local vis0 = ncol - (f._klist and 1 or 0)
           local scnt = {}
           for pi, p in ipairs(f.params) do
             if p.kid == show and not p.macro and p.gkid and p.gkid >= 2 then
-              local j = p.gkid - 1
-              if kd0 and j <= nsl0 then scnt[j] = (scnt[j] or 0) + 1; cl[pi] = { vis0 - nsl0 + j - 1, scnt[j] - 1 }
+              -- колонка эффекта: без цепей — внук j; с цепями — эффект m выбранной цепи (или сам выбранный эффект пэда)
+              local j
+              if not cv.list then j = p.gkid - 1; if j > nsl0 then j = nil end
+              elseif cv.slot and p.gkid == cv.slot.gi then
+                if cv.slot.chain then j = p.ggkid and p.ggkid <= #cv.show and (1 + p.ggkid) or nil else j = 2 end
+              end
+              if j then scnt[j] = (scnt[j] or 0) + 1; cl[pi] = { vis0 - nsl0 + j - 1, scnt[j] - 1 }
               else cl[pi] = { 99, 0 } end
             elseif p.kid == show and not p.macro then
               if cnt >= rmax and colp + 1 < ncol - nsl0 then colp, cnt = colp + 1, 0 end
@@ -9945,20 +9970,71 @@ function D.frame(L, snap, rows, state, info)
           -- 23 окт: цепочка пэда — его эффекты (за сэмплером) колонками справа: имя, B x, параметры (тянуть)
           if D.DR and ks > 0 and f.kids[ks] and info.db_params then
             local kd = f.kids[ks]
-            local nsl = math.min(3, #(kd.slots or {}))
+            local ckey = kkey .. ':' .. ks
+            local cv2 = D.pad_chain_view(kd, ckey)
+            local nsl = cv2.ncols
             local vis = ncol - (f._klist and 1 or 0)
-            for j = 1, nsl do
-              local sl = kd.slots[j]
-              local cx = bx + (vis - nsl + j - 1) * bw1
+            local hy2 = by + L.rh + 1
+            local c0 = 1
+            if cv2.list then
+              -- список цепей (как Ableton): | / = , имя, N fx, wet, on; щелчок — её эффекты справа; внизу — бросок новой цепи
+              c0 = 2
+              local lx = bx + (vis - nsl) * bw1
+              set(U.LINE); gfx.rect(lx, by + L.rh + 1, 1, bh - L.rh - 4, 1)
+              text(lx + L.pad, hy2, fit('chains', bw1 - 2 * L.pad), U.GREY)
+              local tr0 = info.pool_col and info.pool_col.track
+              local cw_on, cw_n, cw_w = ms('off') + L.pad, ms('9 fx') + L.pad, ms('100%')
+              for r, sl in ipairs(kd.slots) do
+                local ry = hy2 + r * L.rh
+                if ry + 2 * L.rh > by + bh - 2 then break end
+                local on = r == cv2.sel
+                local hotr = not drag and mx >= lx and mx < lx + bw1 and my >= ry and my < ry + L.rh
+                if on or hotr then set(on and U.tint(U.AMBER, 0.28) or D.CURROW); gfx.rect(lx + 2, ry, bw1 - 3, L.rh, 1) end
+                local par = (sl.parallel or 0) > 0
+                text(lx + L.pad, ry, par and '=' or '|', par and U.CYAN or U.GREY)
+                local nx = lx + L.pad + ms('= ')
+                local nw0 = lx + bw1 - L.pad - cw_on - cw_n - cw_w - nx
+                text(nx, ry, fit(sl.name or '', nw0 - L.pad), sl.enabled and (on and U.AMBER or U.TEXT) or U.DIM)
+                if sl.chain then text(nx + nw0, ry, fit(#sl.chain .. ' fx', cw_n - L.pad), U.GREY) end
+                local wv = sl.wet_i and sl.wet_i >= 0 and tr0 and reaper.TrackFX_GetParamNormalized(tr0, sl.i, sl.wet_i)
+                if wv then
+                  local wx = nx + nw0 + cw_n
+                  set(U.mix(U.LINE, U.BG, 0.3)); gfx.rect(wx, ry + L.rh // 2, cw_w - L.pad, 1, 1)
+                  set(U.CYAN); gfx.rect(wx, ry + 3, math.floor((cw_w - L.pad) * wv + 0.5), L.rh - 6, 1)
+                end
+                local ox = lx + bw1 - L.pad - cw_on
+                local hon = hotr and mx >= ox
+                text(ox, ry, sl.enabled and 'on' or 'off', hon and U.AMBER or (sl.enabled and U.GREEN or U.RED))
+                if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = sl }
+                elseif hotr then hover.dspbtn = { fx = k, f = f, what = 'kchain', key = ckey, idx = r } end
+              end
+              local dy = hy2 + (#kd.slots + 1) * L.rh + 2
+              if dy + L.rh <= by + bh - 2 then
+                local dhot = drag and drag.new and mx >= lx and mx < lx + bw1 and my >= dy - 2 and my < by + bh - 2
+                set(dhot and U.tint(U.CYAN, 0.35) or U.tint(U.CYAN, 0.08)); gfx.rect(lx + 2, dy, bw1 - 4, L.rh, 1)
+                text(lx + L.pad, dy, fit('= drop fx here - a new chain', bw1 - 2 * L.pad), dhot and U.TEXT or U.GREY)
+                if dhot then hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, par = true } end
+              end
+              -- бросок на эффекты справа — в конец выбранной цепи
+              if drag and drag.new and cv2.slot and cv2.slot.chain and mx >= lx + bw1 and mx < bx + bw - 2 and my >= by and my < by + bh then
+                hover.kitdrop = { k = k, f = f, ki = ks, kid = kd, chain = cv2.slot }
+                set(U.CYAN); gfx.rect(lx + bw1 + 1, by + L.rh + 1, bx + bw - lx - bw1 - 3, bh - L.rh - 4, 0)
+              end
+            end
+            for j = 1, #cv2.show do
+              local sl = cv2.show[j]
+              local cx = bx + (vis - nsl + c0 + j - 2) * bw1
               set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1)
-              local hy2 = by + L.rh + 1
               local nw = D.kid_head(L, info, cx, hy2, bw1, { i = sl.i, name = sl.name, enabled = sl.enabled }, k, f, drag, mx, my, hover)
               text(cx + L.pad, hy2, fit(sl.name or '', nw), sl.enabled and U.CYAN or U.GREY)
               -- параметры — общими виджетами (раскладка cl выше), как у сэмплера
             end
+            if cv2.list and #cv2.show == 0 then
+              text(bx + (vis - nsl + 1) * bw1 + L.pad, hy2, fit((cv2.slot and cv2.slot.name or 'chain') .. ': empty - drop an fx', bw1 - 2 * L.pad), U.GREY)
+            end
           end
           -- 23 окт: тащат эффект за модуль сэмплера (правее его параметров) — те же две кнопки для выбранного пэда
-          if drag and drag.new and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop then
+          if drag and drag.new and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop and not cv.list then
             local ax = bx + (colp + 1) * bw1
             if bx + bw - ax < bw1 then ax = bx + bw1 end
             local ay, ah2 = by + L.rh + 2, bh - L.rh - 6

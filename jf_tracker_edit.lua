@@ -3289,6 +3289,18 @@ function E.pad_par_add(track, c, k, name)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 23 окт: эффект name — в конец цепи j (с 0, позиция в пэде) пэда k рэка c
+function E.pad_chain_add(track, c, k, j, name)
+  local ok = false
+  run('drumrs5k chain fx', function()
+    local ch = grand_addr(track, c, k, j)
+    local m = cont_count(track, ch) or 0
+    local idx = add_fx(track, name, -1000 - ggrand_addr(track, c, k, j, m))
+    ok = idx ~= nil and idx >= 0
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 -- убрать эффект пэда (адрес внука — из модели)
 function E.drum_slot_del(track, addr)
   run('drumrs5k pad fx off', function() FA(track).Delete(track, addr) end)
