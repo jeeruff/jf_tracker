@@ -8935,6 +8935,12 @@ function D.frame(L, snap, rows, state, info)
         local nsl = kid0 and math.min(3, #(kid0.slots or {})) or 0
         return math.min(5 + lst, 2 + extra + lst) + nsl
       end
+      if f.bands and f.kids and #f.kids > 0 then   -- 23 окт: ÷N — список полос + колонка на каждый эффект выбранной полосы (до 4)
+        local kk2 = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+        local b0 = f.kids[math.max(1, math.min(#f.kids, (D.kit_sel or {})[kk2] or 1))]
+        local ng = math.max(0, #(b0 and b0.entry and b0.entry.kids or {}) - 1)
+        return 1 + math.max(1, math.min(4, ng))
+      end
       if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page and (info.dsptabs or 'bottom') ~= 'right') and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
@@ -9341,7 +9347,81 @@ function D.frame(L, snap, rows, state, info)
           local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
           return fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), w0)
         end
-        if f.kit and ncol >= 2 then
+        if f.bands and #f.kids > 0 and ncol >= 2 then
+          -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
+          -- под ними — кроссовер (частоты сплиттера; правка идёт во все полосы); справа — эффекты выбранной полосы
+          -- колонками (сплиттер в начале цепи не показан — он часть контейнера)
+          D.kit_sel = D.kit_sel or {}
+          local kkey = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+          local nb = #f.kids
+          local sb = math.max(1, math.min(nb, D.kit_sel[kkey] or 1))
+          D.kit_sel[kkey] = sb
+          set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
+          local hy = by + L.rh + 1
+          local cw_on = ms('off') + L.pad
+          local cw_n = ms('9 fx') + L.pad
+          for r = 1, nb do
+            local b = nb - r + 1
+            local kid = f.kids[b]
+            local ry = hy + (r - 1) * L.rh
+            local on = b == sb
+            local hotr = not drag and mx >= bx and mx < bx + bw1 and my >= ry and my < ry + L.rh
+            if on or hotr then set(on and U.tint(U.AMBER, 0.28) or D.CURROW); gfx.rect(bx + 2, ry, bw1 - 3, L.rh, 1) end
+            local ng = math.max(0, #(kid.entry and kid.entry.kids or {}) - 1)
+            local nw0 = bw1 - 2 * L.pad - cw_on - cw_n
+            text(bx + L.pad, ry, fit(kid.name or ('band ' .. b), nw0 - L.pad), kid.enabled and (on and U.AMBER or (hotr and U.TEXT or U.TEXT)) or U.DIM)
+            text(bx + L.pad + nw0, ry, fit(ng > 0 and (ng .. ' fx') or '-', cw_n - L.pad), U.GREY)
+            local ox = bx + bw1 - L.pad - cw_on
+            local hon = hotr and mx >= ox
+            text(ox, ry, kid.enabled and 'on' or 'off', hon and U.AMBER or (kid.enabled and U.GREEN or U.RED))
+            if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = kid }
+            elseif hotr then hover.dspkit = { k = k, key = kkey, ki = b } end
+            hint('dspkit', bx, ry, bw1, L.rh, { key = kkey, ki = b })
+          end
+          local xy = hy + nb * L.rh + 2
+          set(U.LINE); gfx.rect(bx + L.pad, xy - 1, bw1 - 2 * L.pad, 1, 1)
+          text(bx + L.pad, xy, fit('crossover', bw1 - 2 * L.pad), U.GREY)
+          set(U.LINE); gfx.rect(bx + bw1, by + L.rh + 1, 1, bh - L.rh - 4, 1)
+          -- эффекты выбранной полосы: внуки 2.. (1 — сплиттер)
+          local band = f.kids[sb]
+          local gk = band.entry and band.entry.kids or {}
+          local nshow = math.min(ncol - 1, #gk - 1)
+          local kb2 = ms('x') + 2 * L.pad
+          for c = 1, nshow do
+            local g = gk[c + 1]
+            local cx = bx + c * bw1
+            if c > 1 then set(U.LINE); gfx.rect(cx, by + L.rh + 1, 1, bh - L.rh - 4, 1) end
+            local onb = false
+            for _, b2 in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
+              local hb = not drag and mx >= b2[3] and mx < b2[3] + kb2 and my >= hy and my < hy + L.rh
+              local lit = b2[2] == 'kbypass' and not g.enabled
+              set(hb and U.tint(b2[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b2[3], hy, kb2, L.rh - 1, 1)
+              set(hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or U.LINE); gfx.rect(b2[3], hy, kb2, L.rh - 1, 0)
+              text(b2[3] + L.pad, hy, b2[1], hb and (b2[2] == 'kdel' and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
+              if hb then hover.dspbtn = { fx = k, f = f, what = b2[2], kid = g }; onb = true end
+            end
+            local hot = not drag and not onb and mx >= cx and mx < cx + bw1 and my >= hy and my < hy + L.rh
+            text(cx + L.pad, hy, kid_label(g, bw1 - 2 * L.pad - 2 * kb2 - 4), g.enabled and (hot and U.AMBER or U.CYAN) or U.GREY)
+            if hot then hover.dspkid = { k = k, f = f, ki = sb, kid = g } end
+          end
+          if nshow < 1 then text(bx + bw1 + L.pad, hy, fit((band.name or 'band') .. ': empty - af / drop an fx', bw1 * (ncol - 1) - 2 * L.pad), U.GREY) end
+          -- эффект из fx list тащат на цепь — в конец выбранной полосы (голубая рамка)
+          if drag and drag.new and mx >= bx + bw1 and mx < bx + bw and my >= by and my < by + bh then
+            hover.kitdrop = { k = k, f = f, ki = sb, kid = band, pos = #gk, band = true }
+            set(U.CYAN); gfx.rect(bx + bw1 + 1, by + L.rh + 1, bw - bw1 - 3, bh - L.rh - 4, 0)
+          end
+          -- раскладка параметров: кроссовер — сплиттер low (kid 1, внук 1) под списком; цепь — колонками; остальное спрятано
+          cl = {}
+          local cnt = {}
+          for pi, p in ipairs(f.params) do
+            if p.kid == 1 and p.gkid == 1 and not p.macro then
+              cnt.x = (cnt.x or 0) + 1; cl[pi] = { 0, nb + cnt.x - 1 }
+            elseif p.kid == sb and p.gkid and p.gkid >= 2 and p.gkid - 1 <= nshow and not p.macro then
+              local c = p.gkid - 1
+              cnt[c] = (cnt[c] or 0) + 1; cl[pi] = { c, cnt[c] - 1 }
+            else cl[pi] = { 99, 0 } end
+          end
+        elseif f.kit and ncol >= 2 then
           -- 11 окт: кит RS5K — слева «all» и слайсы строками (имя, нота, громкость), щелчок —
           -- выбрать; справа свойства выбранного слайса тем же модулем RS5K. all — общий
           -- контроль: показаны параметры первого слайса, запись идёт на все (ctx.fx_write)
@@ -9600,8 +9680,8 @@ function D.frame(L, snap, rows, state, info)
                 local hot = not drag and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0
                 -- 23 окт: эффект из fx list тащат на пэд — в пэд (его цепочка, справа от сэмплера); подсветка цели
                 if drag and drag.new and mx >= cx0 and mx < cx0 + cw0 and my >= cy0 and my < cy0 + ch0 then
-                  hover.kitdrop = { k = k, f = f, ki = ki, kid = kid }
-                  set(U.CYAN); gfx.rect(cx0, cy0, cw0, ch0, 0); gfx.rect(cx0 + 1, cy0 + 1, cw0 - 2, ch0 - 2, 0)
+                  hover.kitdrop = { k = k, f = f, ki = ki, kid = kid, par = mx >= cx0 + cw0 // 2 }
+                  D.kitdrop_cell = { cx0, cy0, cw0, ch0 }   -- 23 окт: половины | serial / = parallel — поверх пэда, после него
                 end
                 local on = ki == ks or (D.pad_zone and D.pad_zone.key == kkey and D.pad_zone.note == pn)   -- 19 окт: зона тачпада 4 × 4
                 local hit = D.pad_hit and kid.note and D.pad_hit[kid.note]
@@ -9876,7 +9956,34 @@ function D.frame(L, snap, rows, state, info)
               end
             end
           end
+          -- 23 окт: тащат эффект за модуль сэмплера (правее его параметров) — те же две кнопки для выбранного пэда
+          if drag and drag.new and D.DR and ks > 0 and f.kids[ks] and not hover.kitdrop then
+            local ax = bx + (colp + 1) * bw1
+            if bx + bw - ax < bw1 then ax = bx + bw1 end
+            local ay, ah2 = by + L.rh + 2, bh - L.rh - 6
+            if mx >= ax and mx < bx + bw - 2 and my >= ay and my < ay + ah2 then
+              local aw = bx + bw - 2 - ax
+              hover.kitdrop = { k = k, f = f, ki = ks, kid = f.kids[ks], par = mx >= ax + aw // 2 }
+              D.kitdrop_cell = { ax, ay, aw, ah2 }
+            end
+          end
           ::kit_done::
+          -- 23 окт: бросок эффекта на пэд / на цепь пэда — две половины: | serial (в цепь пэда за сэмплером) и
+          -- = parallel (новая цепь внутри пэда параллельно: контейнер в контейнере)
+          if D.kitdrop_cell then
+            local q = D.kitdrop_cell
+            D.kitdrop_cell = nil
+            local hw = q[3] // 2
+            local kd = hover.kitdrop
+            for hi, part in ipairs({ { '|', 'serial' }, { '=', 'parallel' } }) do
+              local px = q[1] + (hi - 1) * hw
+              local on = kd and ((hi == 2) == (kd.par and true or false))
+              set(on and U.tint(U.CYAN, 0.45) or U.tint(U.CYAN, 0.12)); gfx.rect(px, q[2], hw - 1, q[4], 1)
+              set(U.CYAN); gfx.rect(px, q[2], hw - 1, q[4], 0)
+              local lbl = ms(part[1] .. ' ' .. part[2]) <= hw - 2 * L.pad and (part[1] .. ' ' .. part[2]) or part[1]
+              text(px + math.max(1, (hw - ms(lbl)) // 2), q[2] + (q[4] - L.rh) // 2, lbl, on and U.TEXT or U.CYAN)
+            end
+          end
         elseif #f.kids > 0 and (D.kit_list or {})[tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)] == 'list' then
           -- 23 окт: контейнер списком цепей (zv) — как рэк drumrs5k: строка на ребёнка — | за предыдущим / = параллельно,
           -- имя, внутри N fx, wet (громкость цепи), on; щелчок — цепь, on — bypass; zv — обратно колонками

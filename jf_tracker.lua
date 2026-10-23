@@ -15037,6 +15037,23 @@ ctx.vbar_hot = function() for _, r in pairs(draw.vbars or {}) do if r.hot then r
 -- 23 окт: af на рэке drumrs5k с выбранным пэдом — эффект в конец цепочки пэда (за сэмплером); false — пэда нет
 ctx.pad_fx_add = function()
   local col = dsp_target(); local f = col and (col.fx or {})[dsp_sel.fx]
+  if f and f.bands and f.kids and #f.kids > 0 then   -- 23 окт: ÷N bands — af в выбранную полосу, в конец её цепи
+    local key = tostring(col.guid or '') .. ':' .. tostring(f.fguid or f.i)
+    local bi = math.max(1, math.min(#f.kids, (draw.kit_sel or {})[key] or 1))
+    local band = f.kids[bi]
+    local function putb(name)
+      if edit.drum_slot_add(col.track, f.i, bi - 1, name, #(band.entry and band.entry.kids or {})) then vim.msg = ('+ %s into the band %s'):format(FB.short(name), band.name or '')
+      else vim.msg = 'could not add into the band' end
+    end
+    if state.panes_ui and state.panes then
+      if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+      FB.query, FB.cur, FB.scroll = '', 1, 0
+      ctx.fxb_pad = putb
+      ctx.pane_cmd('fxb show')
+      vim.msg = ('fx into the band %s: type to search, Enter - add, Esc back'):format(band.name or '')
+    else vim.open_picker('fx into the band ' .. (band.name or ''), ctx.fx_list(), function(x) putb(x.data or x.label) end) end
+    return true
+  end
   if not (f and f.kit) then return false end
   local key = tostring(col.guid or '') .. ':' .. tostring(f.fguid or f.i)
   local ki = (draw.kit_sel or {})[key] or 0
@@ -24762,7 +24779,8 @@ local function frame()
         state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
           or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
           or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
-          or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into pad ' .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '') .. ' (after its sampler and fx)'))
+          or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.kitdrop.band and 'the band ' or 'pad ') .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '')
+            .. (hover.kitdrop.band and '' or (hover.kitdrop.par and ': = a parallel chain (right half)' or ': | serial, after its sampler and fx (left half)'))))
           or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
           or (hover.dbig and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbnode and (' after the row of ' .. hover.dbnode.name .. ' (Shift - parallel to it)') or ' at the end of the chain')))
           or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
@@ -24790,10 +24808,16 @@ local function frame()
         local kd = hover.kitdrop
         local t = dsp_target()
         if t and kd.f and kd.kid then
-          local pos = 1 + #(kd.kid.slots or {})
-          if edit.drum_slot_add(t.track, kd.f.i, kd.ki - 1, drop.it.data, pos) then
+          local pos = kd.pos or (1 + #(kd.kid.slots or {}))   -- 23 окт: полоса ÷N — в конец её цепи
+          if kd.par and not kd.band then   -- 23 окт: = parallel — новая цепь в пэде параллельно (контейнер в контейнере)
+            if edit.pad_par_add(t.track, kd.f.i, kd.ki - 1, drop.it.data) then
+              FB.push_recent(drop.it); ctx.fxb_save()
+              vim.msg = ('+ %s into pad %s: a parallel chain (the pad sums its chains)'):format(FB.short(drop.it.label), kd.kid.name or '')
+            else vim.msg = 'could not add a parallel chain into the pad' end
+          elseif edit.drum_slot_add(t.track, kd.f.i, kd.ki - 1, drop.it.data, pos) then
             FB.push_recent(drop.it); ctx.fxb_save()
-            vim.msg = ('+ %s into pad %s (its chain, after the sampler)'):format(FB.short(drop.it.label), kd.kid.name or '')
+            vim.msg = kd.band and ('+ %s into the band %s'):format(FB.short(drop.it.label), kd.kid.name or '')
+              or ('+ %s into pad %s (its chain, after the sampler)'):format(FB.short(drop.it.label), kd.kid.name or '')
           else vim.msg = 'could not add into the pad' end
         end
         hover.dsp_into, hover.dsp_gap, hover.dbig = nil, nil, nil

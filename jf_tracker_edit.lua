@@ -2932,9 +2932,35 @@ local function add_fx(obj, name, inst)
   return R.TrackFX_AddByName(obj, name, false, inst)
 end
 
+-- 23 окт: ÷N bands — сплиттер (первый в цепи полосы) правится один, частоты идут во все полосы (одинаковые фильтры:
+-- сумма полос = исходный сигнал). Путь: fx → parent_container (полоса) → её parent (имя «÷N…») → первые всех полос
+local function band_mirror(track, fx, param, v)
+  local A = FA(track)
+  if not A.GetNamedConfigParm then return end
+  local ok, band = A.GetNamedConfigParm(track, fx, 'parent_container')
+  band = ok and tonumber(band)
+  if not band then return end
+  local ok0, first = A.GetNamedConfigParm(track, band, 'container_item.0')
+  if not (ok0 and tonumber(first) == fx) then return end
+  local okp, top = A.GetNamedConfigParm(track, band, 'parent_container')
+  top = okp and tonumber(top)
+  if not top then return end
+  local _, nm = A.GetFXName(track, top, '')
+  if not (nm or ''):match('÷%d') then return end
+  local okc, n = A.GetNamedConfigParm(track, top, 'container_count')
+  for b = 0, (okc and tonumber(n) or 0) - 1 do
+    local okb, bi = A.GetNamedConfigParm(track, top, 'container_item.' .. b)
+    bi = okb and tonumber(bi)
+    local okf, sp = false, nil
+    if bi then okf, sp = A.GetNamedConfigParm(track, bi, 'container_item.0') end
+    sp = okf and tonumber(sp)
+    if sp and sp ~= fx then A.SetParamNormalized(track, sp, param, v) end
+  end
+end
 function E.fx_param(track, fx, param, v01)
   local A = FA(track)
   A.SetParamNormalized(track, fx, param, math.max(0, math.min(1, v01)))
+  if fx >= 0x2000000 and not model.is_take(track) then band_mirror(track, fx, param, math.max(0, math.min(1, v01))) end
   if model then model.invalidate() end
 end
 -- значение по умолчанию (7 окт, двойной клик по параметру DSP): у REAPER
@@ -3217,6 +3243,47 @@ function E.drum_slot_add(track, c, k, name, pos)
   run('drumrs5k pad fx', function()
     if not E.drum_wrap(track, c, k) then return end
     local idx = add_fx(track, name, -1000 - grand_addr(track, c, k, pos or 1))
+    ok = idx ~= nil and idx >= 0
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+-- 23 окт: эффект в пэд параллельно — цепи (chain) внутри пэда, контейнер в контейнере: [RS5K, chain 1, = chain 2 …].
+-- Эффекты пэда за сэмплером (если есть и ещё не цепи) — в chain 1 (без них chain 1 пустая: сухой звук);
+-- новая цепь — параллельно (сумма с остальными), в ней эффект name
+local function ggrand_addr(obj, c, k, j, m)
+  local A = FA(obj)
+  local n0, n1 = A.GetCount(obj), cont_count(obj, c) or 0
+  local n2 = cont_count(obj, child_addr(obj, c, k)) or 0
+  return grand_addr(obj, c, k, j) + (m + 1) * (n0 + 1) * (n1 + 1) * (n2 + 1)
+end
+function E.pad_par_add(track, c, k, name)
+  local ok = false
+  run('drumrs5k pad parallel chain', function()
+    local A = FA(track)
+    local pad = E.drum_wrap(track, c, k)
+    if not pad then return end
+    local n2 = cont_count(track, pad) or 1
+    local chains = n2 >= 2
+    for j = 1, n2 - 1 do
+      local okj, id = A.GetNamedConfigParm(track, pad, 'container_item.' .. j)
+      local _, nm = A.GetFXName(track, tonumber(id) or -1, '')
+      if not (okj and cont_count(track, tonumber(id)) and (nm or ''):match('^chain')) then chains = false end
+    end
+    if not chains then                                   -- эффекты пэда (1..) → chain 1
+      local ch = add_fx(track, 'Container', -1000 - grand_addr(track, c, k, 1))
+      if not (ch and ch >= 0) then return end
+      A.SetNamedConfigParm(track, grand_addr(track, c, k, 1), 'renamed_name', 'chain 1')
+      for m = 0, n2 - 2 do copy_fx(track, grand_addr(track, c, k, 2), track, ggrand_addr(track, c, k, 1, m), true) end
+    end
+    local n3 = cont_count(track, pad) or 2
+    local nc = add_fx(track, 'Container', -1000 - grand_addr(track, c, k, n3))
+    if not (nc and nc >= 0) then return end
+    local ca = grand_addr(track, c, k, n3)
+    A.SetNamedConfigParm(track, ca, 'renamed_name', 'chain ' .. n3)
+    A.SetNamedConfigParm(track, ca, 'parallel', '1')
+    A.Show(track, ca, 2)
+    local idx = add_fx(track, name, -1000 - ggrand_addr(track, c, k, n3, 0))
     ok = idx ~= nil and idx >= 0
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end

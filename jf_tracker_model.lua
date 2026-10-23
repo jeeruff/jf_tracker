@@ -1673,6 +1673,7 @@ function build_one(tr, fx, out)
           local e = {}
           for k2, v2 in pairs(e0) do e[k2] = v2 end
           e.fx = e0.fx or kid.i      -- адрес ребёнка (внука — свой): fx_values / fx_param идут по нему
+          e.gkid = e0.kid            -- 23 окт: ребёнок-контейнер — номер внука в нём (полосы ÷N: цепь полосы)
           e.kid = ki
           params[#params + 1] = e
         end
@@ -1714,6 +1715,7 @@ function build_one(tr, fx, out)
       end
       out[#out + 1] = { i = fx, name = short, enabled = A.GetEnabled(tr, fx), np = np, params = params,
                         cols = kit and 2 or math.max(1, (has_m and 1 or 0) + #kids), container = true, kids = kids, has_macros = has_m, kit = kit or nil,
+                        bands = (not kit and short:match('^÷%d')) and true or nil,   -- 23 окт: ÷N bands — список полос + кроссовер + цепь полосы
                         fguid = A.GetFXGUID and A.GetFXGUID(tr, fx) or nil }   -- 19 окт: ключ курсора рэка (номер едет, когда чок встаёт первым)
     elseif um then
       -- пользовательский модуль (learn касанием): параметры по номерам
