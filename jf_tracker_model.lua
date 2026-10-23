@@ -1476,7 +1476,7 @@ local function container_children(tr, fx)
       local _, nm = A.GetFXName(tr, id, '')
       local _, par = A.GetNamedConfigParm(tr, id, 'parallel')
       local kid = { i = id, name = (nm or ''):gsub('^[^:]*: ', ''), enabled = A.GetEnabled(tr, id),
-                    parallel = tonumber(par) or 0, np = A.GetNumParams(tr, id) }
+                    parallel = tonumber(par) or 0, np = A.GetNumParams(tr, id), wet_i = A.GetParamFromIdent and A.GetParamFromIdent(tr, id, ':wet') or nil }   -- 23 окт: wet — громкость цепи в списке
       local ok3 = A.GetNamedConfigParm(tr, id, 'container_count')
       if ok3 then kid.container = true end
       kids[#kids + 1] = kid

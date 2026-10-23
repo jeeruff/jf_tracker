@@ -26265,12 +26265,12 @@ local function frame()
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'v' then   -- 23 окт: zv — рэк drumrs5k: сетка пэдов <-> список
             local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
-            if f0 and f0.kit then
+            if f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
               local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
               draw.kit_list = draw.kit_list or {}
               draw.kit_list[key] = (draw.kit_list[key] == 'list') and 'pads' or 'list'
-              vim.msg = 'drumrs5k: ' .. draw.kit_list[key] .. ' (zv - switch)'
-            else vim.msg = 'zv: put the DSP cursor on a drumrs5k rack' end
+              vim.msg = (f0.kit and 'drumrs5k: ' or 'container: ') .. draw.kit_list[key] .. ' (zv - switch)'
+            else vim.msg = 'zv: put the DSP cursor on a drumrs5k rack or a container' end
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
             local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }
             if state.dsp_zzflip then ids, fr = { 'dsp', 'mixer' }, { 0.7, 0.3 } end   -- z Tab — DSP сверху

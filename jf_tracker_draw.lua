@@ -9832,6 +9832,43 @@ function D.frame(L, snap, rows, state, info)
             else cl[pi] = { 99, 0 } end
           end
           ::kit_done::
+        elseif #f.kids > 0 and (D.kit_list or {})[tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)] == 'list' then
+          -- 23 окт: контейнер списком цепей (zv) — как рэк drumrs5k: строка на ребёнка — | за предыдущим / = параллельно,
+          -- имя, внутри N fx, wet (громкость цепи), on; щелчок — цепь, on — bypass; zv — обратно колонками
+          set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
+          local ly0 = by + L.rh + 1
+          local tr0 = info.pool_col and info.pool_col.track
+          local cw_par, cw_on, cw_wet, cw_n = ms('= '), ms('off') + L.pad, ms('100%') + L.pad, ms('99 fx') + L.pad
+          local nx0 = bx + L.pad + cw_par
+          local nw0 = bw - 2 * L.pad - cw_par - cw_on - cw_wet - cw_n
+          text(bx + L.pad, ly0, fit('chains: | serial  = parallel   zv - columns', bw - 2 * L.pad), U.GREY)
+          set(U.LINE); gfx.rect(bx + L.pad, ly0 + L.rh, bw - 2 * L.pad, 1, 1)
+          for ki, kid in ipairs(f.kids) do
+            local ry = ly0 + L.rh + 2 + (ki - 1) * L.rh
+            if ry + L.rh > by + bh - 2 then break end
+            local hotr = not drag and mx >= bx and mx < bx + bw and my >= ry and my < ry + L.rh
+            local issel = is_sel and info.dsp_kid == ki
+            if hotr or issel then set(issel and U.tint(U.AMBER, 0.25) or D.CURROW); gfx.rect(bx + 2, ry, bw - 4, L.rh, 1) end
+            local par = (kid.parallel or 0) > 0 and ki > 1
+            text(bx + L.pad, ry, par and '=' or '|', par and U.CYAN or U.GREY)
+            local nfx = kid.container and ((tr0 and select(2, reaper.TrackFX_GetNamedConfigParm(tr0, kid.i, 'container_count'))) or '?') or nil
+            text(nx0, ry, fit((kid.container and '[' or '') .. (kid.name or '') .. (kid.container and ']' or ''), nw0 - L.pad), kid.enabled and (hotr and U.AMBER or U.TEXT) or U.GREY)
+            local xn = nx0 + nw0
+            if nfx then text(xn, ry, fit(tostring(nfx) .. ' fx', cw_n - L.pad), U.GREY) end
+            local wv = kid.wet_i and kid.wet_i >= 0 and tr0 and reaper.TrackFX_GetParamNormalized(tr0, kid.i, kid.wet_i)
+            if wv then
+              local wx = xn + cw_n
+              set(U.mix(U.LINE, U.BG, 0.3)); gfx.rect(wx, ry + L.rh // 2, cw_wet - L.pad, 1, 1)
+              set(U.CYAN); gfx.rect(wx, ry + 3, math.floor((cw_wet - L.pad) * wv + 0.5), L.rh - 6, 1)
+            end
+            local ox = bx + bw - L.pad - cw_on
+            local hon = hotr and mx >= ox
+            text(ox, ry, kid.enabled and 'on' or 'off', hon and U.AMBER or (kid.enabled and U.GREEN or U.RED))
+            if hon then hover.dspbtn = { fx = k, f = f, what = 'kbypass', kid = kid }
+            elseif hotr then hover.dspkid = { k = k, f = f, ki = ki, kid = kid } end
+          end
+          cl = {}
+          for pi in ipairs(f.params) do cl[pi] = { 99, 0 } end
         elseif #f.kids > 0 and ncol >= ((f.has_macros and 1 or 0) + select(2, D.kid_pack(f, nfit - 2))) then
           -- развёрнут (6 окт): контейнер — рамка, внутри колонка на каждый
           -- плагин: имя (| за предыдущим, = параллельно, + с суммой) и его
