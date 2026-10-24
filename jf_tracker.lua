@@ -16960,6 +16960,7 @@ local function context_menu(hover, anchor)
   if hover.header_col and not hover.header_env and ctx.track_menu then ctx.track_menu(hover.header_col); return end
   local items = ctx.context_items(hover) or {}
   local used, hitems, have = { ['?'] = true }, {}, {}
+  local groups, gorder = nil, {}   -- 24 окт: и пункты действий с ключом из двух букв (dw) — в подменю первой буквы
   -- 18 окт: подменю по смыслу: g у пункта действия / строки справки → { name = { items } } по порядку
   local mg, mgo = {}, {}
   ctx.mgroup_add = function(g, key, label, fn, hk)
@@ -16995,6 +16996,12 @@ local function context_menu(hover, anchor)
       if hk then label = base; for t in hk:gmatch('[^%s/]+') do have[t] = true end end
       if it.g then   -- 18 окт: группа — своё подменю (меню не простыней)
         ctx.mgroup_add(it.g, it.key, label .. (on and '  (on)' or ''), it[2], hk)
+      elseif it.key and it.key:match('^%a%a$') then   -- 24 окт: dw — в подменю d, второй буквой
+        local p1 = it.key:sub(1, 1)
+        groups = groups or {}
+        if not groups[p1] then groups[p1] = {}; gorder[#gorder + 1] = p1 end
+        table.insert(groups[p1], { key = it.key:sub(2), label = label, fn = it[2] })
+        have[it.key] = true
       else
       local k = pick_key(it.key, label)
       if hk == k then hk = nil end                        -- хоткей = буква пункта: не дублировать (5 окт)
@@ -17022,7 +17029,6 @@ local function context_menu(hover, anchor)
   local own = hover.prevbtn and 'preview' or (hover.header_env and (hover.header_env.e.name or 'envelope')) or (pmcard and pmcard.name) or nil
   local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
-  local groups, gorder = nil, {}
   if page == 'tracker' then used['m'] = true end   -- 20 окт: m в меню трекера — только mute ноты (smart panel — Enter, своей буквой)
   if P then
     for _, e in ipairs(P.e) do
@@ -17051,7 +17057,7 @@ local function context_menu(hover, anchor)
           if not groups[p1] then groups[p1] = {}; gorder[#gorder + 1] = p1 end
           table.insert(groups[p1], { key = first:sub(2), label = lbl, fn = run_it })
         else
-          local k = pick_key(#first == 1 and first or nil, e.d)
+          local k = pick_key(e.mk or (#first == 1 and first or nil), e.d)   -- 24 окт: e.mk — буква в меню, если она не хоткей (module learn: K, в меню L)
           if k then hitems[#hitems + 1] = { key = k, label = lbl, hk = (e.k ~= k) and e.k or nil, fn = run_it } end
         end
       end
@@ -17292,7 +17298,7 @@ function ctx.context_items(hover)
       local id = p.fx or f.i
       local function flag(what) local ok, v = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.%s.active'):format(p.i, what)); return ok and v == '1' end
       add((flag('lfo') and '!' or '') .. 'Modulate: LFO', function() edit.mod_set(col.track, id, p.i, 'lfo') end)
-      add((flag('acs') and '!' or '') .. 'Modulate: audio control (ACS)', function() edit.mod_set(col.track, id, p.i, 'acs') end)
+      add((flag('acs') and '!' or '') .. 'Modulate: audio control (ACS)', function() edit.mod_set(col.track, id, p.i, 'acs') end, 'A')
       add((flag('plink') and '!' or '') .. 'Link to parameter … (fzf)', function()
         local items = {}
         for _, g in ipairs(col.fx or {}) do
@@ -17311,7 +17317,7 @@ function ctx.context_items(hover)
         local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
-      add('Show automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end)
+      add('Open automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end, 'a')
       add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
       add('--', function() end)
     end
@@ -17356,11 +17362,11 @@ function ctx.context_items(hover)
           ctx.dsp_pack(pk[1], pk[#pk]); DK.clear_pick()
         else ctx.dsp_pack(hover.dsp.fx, hover.dsp.fx) end
       end, 'p')
-      add('Edit: the FX window (e)', function() edit.fx_show(col.track, f.i) end, 'E')
+      add('Edit: the FX window (e)', function() edit.fx_show(col.track, f.i) end, 'e')
       if not f.container then add('In / out: the pin matrix', function() ctx.pins_open(hover.dsp.fx) end, 'I') end
-      add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
-      add('Add FX … (fzf)', function() ctx.fx_picker() end)
-      add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end)
+      add('Remove FX', function() edit.fx_remove(col.track, f.i) end, 'dw')
+      add('Add FX … (fzf)', function() ctx.fx_picker() end, 'f')
+      add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end, 'X')
       add((state.fxopen and '!' or '') .. 'Open the fx window after adding', function() state.fxopen = not state.fxopen; edit.open_on_add = state.fxopen; vim.msg = 'fx window after adding: ' .. (state.fxopen and 'open' or 'closed') end)
     end
   elseif hover.row and hover.fi then

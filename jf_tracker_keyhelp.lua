@@ -578,7 +578,7 @@ KH.PAGES = {
     { k = 'ap A', d = 'pick a parameter to automate (fzf; also click trim in the track header, rclick trim: all parameters)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
     { k = 'ai', d = 'automation item over the item under the tracker cursor (track fx)' },
-    { k = 'K', d = 'module learn (knobs): turn knobs in the plugin window - they join this block (saved per plugin); in learn x removes, J K move, < > columns, R resets to automatic, E / Esc done' },
+    { k = 'K', mk = 'L', d = 'module learn (knobs): turn knobs in the plugin window - they join this block (saved per plugin); in learn x removes, J K move, < > columns, R resets to automatic, E / Esc done' },
     { k = 'I', d = 'in / out: the pin matrix of the module (also the button right of its name, 2 in 2/6 out, and the menu); h j k l, Space, + -, r, Esc' },
     { k = 'pins', t = {}, d = 'the button right of a module name (2 in 2/6 out, as REAPER): a click - its pins (as the REAPER pin connector): track channels in rows, the plugin inputs (left) and outputs (right) in columns; click / Space a cell - connect, h j k l move, + - the track channels, r reset (pin N - channel N), Esc close' },
     { k = 'cursor frame', t = {}, d = 'the parameter under the tracker cursor has a contrasting frame in DSP: an envelope column - its fx parameter; a note command - the sampler parameter it moves (0M 0I 0O volume, 0P pan, 0U 0D 0G SF pitch, 0S start; drumrs5k rack or RS5K)' },
