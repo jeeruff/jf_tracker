@@ -15062,6 +15062,11 @@ ctx.mono_on = function(col)
   if not e or now - e.t > 0.5 then e = { t = now, v = edit.mono_on(col.track) }; ctx.mono_c[col.track] = e end
   return e.v
 end
+ctx.mono_lane_cur = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not (f and f.col and f.col.track) then vim.msg = 'z1: put the cursor on a track'; return end
+  ctx.mono_toggle(f.col, f.lane or f.col.lanes[1])
+end
 ctx.mono_toggle = function(col, lane)
   local on = not edit.mono_on(col.track)
   edit.run(on and 'track: one note lane' or 'track: note lanes free', function() edit.mono_set(col.track, on) end)

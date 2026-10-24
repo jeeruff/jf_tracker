@@ -7809,11 +7809,12 @@ function D.frame(L, snap, rows, state, info)
         text(ln.x + L.pad, hy + L.lane_row * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
       end
       if not c.folded and not c.master then
+        -- 24 окт: [1][−][+] — 1 первой (трек на одном нотном лейне), − + правее; места на три нет — только − +
+        local one = li == 1 and info.mono_on and nx + bw2 + L.btn_w + 2 <= ln.x + ln.w
         if nx + bw2 <= ln.x + ln.w then
-          pm(nx, 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
-          -- 24 окт: 1 — трек на одном нотном лейне (моно: новая нота обрывает звучащую), левее − +
-          local ox = nx - L.btn_w - 2
-          if li == 1 and ox >= ln.x and info.mono_on then
+          pm(nx + (one and (L.btn_w + 2) or 0), 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
+          local ox = nx
+          if one then
             local on = info.mono_on(col)
             local hot = mx >= ox and mx < ox + L.btn_w and my >= by and my < by + L.rh - 1
             set(hot and D.CURROW or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(ox, by, L.btn_w, L.rh - 2, 1)
