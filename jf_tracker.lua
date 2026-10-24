@@ -17208,6 +17208,45 @@ local function context_menu(hover, anchor)
   local page = (not own) and ctx.ctx_page(hover) or nil
   local P = page and KH.PAGES[page]
   if page == 'tracker' then used['m'] = true end   -- 20 окт: m в меню трекера — только mute ноты (smart panel — Enter, своей буквой)
+  -- 24 окт: у места щелчка свои пункты (параметр, модуль, нота …) — в меню только они; все клавиши страницы модуля —
+  -- одной строкой-подменю «all keys of …» (было: простыня из пунктов места и всей справки модуля)
+  -- 24 окт: группы (две буквы, подменю по смыслу) — в hitems; затем пусто (вызывается и для пунктов места, и для страницы)
+  local function flush_groups()
+    for _, p1 in ipairs(gorder) do
+      local list = groups[p1]
+      local k = (not used[p1] and p1) or (not used[p1:upper()] and p1:upper()) or pick_key(nil, 'menu ' .. p1)   -- буква занята одиночной командой — заглавная (d … → D), потом другая
+      if k then used[k] = true end
+      if k then
+        used[k] = true
+        -- 24 окт: группа — по смыслу префикса (было: первые слова подписей — «under», «pack, an»), и её клавиши
+        local PN = { d = 'delete / cut', y = 'copy', c = 'container', z = 'view', a = 'automation', g = 'go to', t = 'track',
+                     s = 'slice', m = 'mute', r = 'replace', x = 'cut', p = 'paste', v = 'select', w = 'width', f = 'find' }
+        local combos = {}
+        for i = 1, math.min(5, #list) do combos[#combos + 1] = p1 .. list[i].key end
+        local gname = PN[p1] or PN[p1:lower()] or (list[1].label:match('^(%S+)') or p1)
+        hitems[#hitems + 1] = { key = k, label = gname .. ' …  ' .. table.concat(combos, ' ') .. (#list > 5 and ' …' or ''), sub = function() return { title = p1 .. ' … ' .. gname, items = list } end }
+      end
+    end
+    for _, g in ipairs(mgo) do
+      local list = mg[g]
+      local k = mg_key[g] or pick_key(g:sub(1, 1), g)
+      if k and #list > 0 then
+        local names = {}
+        for i = 1, math.min(3, #list) do names[#names + 1] = (list[i].label:match('^(%S+)') or ''):lower() end
+        local sub = { title = g, items = {} }
+        for _, it in ipairs(list) do sub.items[#sub.items + 1] = { key = it.key, label = it.label, fn = it.fn, hk = it.hk } end
+        hitems[#hitems + 1] = { key = k, label = g .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return sub end }
+      end
+    end
+    groups, gorder, mg, mgo = nil, {}, {}, {}
+  end
+  local ctxmode = P and (#hitems > 0 or groups ~= nil or #mgo > 0) or false
+  local main_h, main_used
+  if ctxmode then
+    flush_groups()   -- группы самого места — в его меню, до клавиш страницы
+    main_h, main_used = hitems, used
+    hitems, used = {}, { ['?'] = true }
+  end
   if P then
     for _, e in ipairs(P.e) do
       local toks = {}
@@ -17242,32 +17281,15 @@ local function context_menu(hover, anchor)
       end
     end
   end
-  for _, p1 in ipairs(gorder) do
-    local list = groups[p1]
-    local k = (not used[p1] and p1) or (not used[p1:upper()] and p1:upper()) or pick_key(nil, 'menu ' .. p1)   -- буква занята одиночной командой — заглавная (d … → D), потом другая
-    if k then used[k] = true end
-    if k then
-      used[k] = true
-      -- 24 окт: группа — по смыслу префикса (было: первые слова подписей — «under», «pack, an»), и её клавиши
-      local PN = { d = 'delete / cut', y = 'copy', c = 'container', z = 'view', a = 'automation', g = 'go to', t = 'track',
-                   s = 'slice', m = 'mute', r = 'replace', x = 'cut', p = 'paste', v = 'select', w = 'width', f = 'find' }
-      local combos = {}
-      for i = 1, math.min(5, #list) do combos[#combos + 1] = p1 .. list[i].key end
-      local gname = PN[p1] or PN[p1:lower()] or (list[1].label:match('^(%S+)') or p1)
-      hitems[#hitems + 1] = { key = k, label = gname .. ' …  ' .. table.concat(combos, ' ') .. (#list > 5 and ' …' or ''), sub = function() return { title = p1 .. ' … ' .. gname, items = list } end }
+  if ctxmode then
+    flush_groups()
+    local page_items = hitems
+    hitems, used = main_h, main_used
+    if #page_items > 0 then
+      local k = pick_key('.', 'keys')
+      if k then hitems[#hitems + 1] = { key = k, label = 'all keys of ' .. tostring(page) .. ' …', sub = function() return { title = 'keys: ' .. tostring(page), items = page_items } end } end
     end
-  end
-  for _, g in ipairs(mgo) do
-    local list = mg[g]
-    local k = mg_key[g] or pick_key(g:sub(1, 1), g)
-    if k and #list > 0 then
-      local names = {}
-      for i = 1, math.min(3, #list) do names[#names + 1] = (list[i].label:match('^(%S+)') or ''):lower() end
-      local sub = { title = g, items = {} }
-      for _, it in ipairs(list) do sub.items[#sub.items + 1] = { key = it.key, label = it.label, fn = it.fn, hk = it.hk } end
-      hitems[#hitems + 1] = { key = k, label = g .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return sub end }
-    end
-  end
+  else flush_groups() end
   -- 10 окт: быстрое меню модуля (\ в модуле) — последним пунктом \ главное меню
   if anchor and anchor.quick and ctx.main_menu then hitems[#hitems + 1] = { key = '\\', label = 'main menu …', fn = function() ctx.main_menu() end } end
   if #hitems == 0 then return end
