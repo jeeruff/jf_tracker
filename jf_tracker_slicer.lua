@@ -663,7 +663,8 @@ function S.key(c)
     end
   end
   -- 14 окт: s — меню нарезки и в раскладке renoise (15 окт: весь нижний ряд renoise здесь — команды)
-  local pk = S.entry and not S.entry.file and piano_slice(c)
+  -- 24 окт: клавиатура (m) выключена — цифры не играют слайсы (цифры как цифры, без путаницы)
+  local pk = S.entry and not S.entry.file and (not ctx.piano_on or ctx.piano_on()) and piano_slice(c)
   if pk then
     if pk == 0 then ctx.preview_slice(S.track, S.entry, 0, S.entry.len); S.msg = 'q: the whole sample'   -- 5 окт
     elseif pk >= 1 and pk <= #(S.slices or {}) then S.preview(pk) else S.msg = ('no slice %d (%d slices)'):format(pk, #(S.slices or {})) end
