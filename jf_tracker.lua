@@ -21858,6 +21858,21 @@ local function frame()
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
+  elseif hover.mlink then   -- 24 окт: строка назначения макроса — полностью
+    local l = hover.mlink.l
+    state.status = ('M%d -> %s: %s  %+d %%  (rclick the parameter - M - x: unlink)'):format(hover.mlink.m, l.name or '?', l.pname or '?', math.floor((l.sc or 0) * 100 + 0.5))
+  elseif hover.dsp and hover.dsp.param and hover.dsp.f.params[hover.dsp.param] and hover.dsp.f.params[hover.dsp.param].mfader then
+    -- 24 окт: ручка макроса — полное имя и (у контейнера) всё, что она ведёт
+    local f, p = hover.dsp.f, hover.dsp.f.params[hover.dsp.param]
+    local txt = f.name .. '  ' .. (p.name or '') .. (p.mlabel and (': ' .. p.mlabel) or '')
+    local col = dsp_target()
+    if f.wrap and col and col.track then
+      local m = tonumber((p.name or ''):match('M(%d+)%s*$'))
+      local t = {}
+      for _, l in ipairs(m and ctx.macro_links_of(col.track, f)[m] or {}) do t[#t + 1] = ('%s: %s %+d%%'):format(l.name, l.pname, math.floor(l.sc * 100 + 0.5)) end
+      txt = f.name .. '  M' .. (m or '?') .. (#t > 0 and (' -> ' .. table.concat(t, ', ')) or ' - not assigned (rclick a parameter inside - M)')
+    end
+    state.status = txt .. '  - drag: value, dblclick: default'
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
   elseif hover.garden and hover.garden.ri then

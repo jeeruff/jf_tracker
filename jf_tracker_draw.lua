@@ -5575,6 +5575,7 @@ function D.macro_list(L, info, f, by, bh, k, drag, mx, my, hover)
     if y + 2 * L.rh > ymax and i < #rows then text(x, y, fit('+' .. (#rows - i + 1) .. ' more', w), U.DIM); y = y + L.rh; break end
     if y + L.rh > ymax then break end
     local mt = 'M' .. r.m .. ' '
+    if not drag and mx >= x and mx < x + w and my >= y and my < y + L.rh then hover.mlink = { m = r.m, l = r.l } end   -- 24 окт: полное — в статусе
     text(x, y, mt, U.AMBER)
     local amt = (' %+d'):format(math.floor(r.l.sc * 100 + 0.5))
     local aw = ms(amt)
