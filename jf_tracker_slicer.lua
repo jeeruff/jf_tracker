@@ -680,9 +680,12 @@ function S.key(c)
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
   -- 10 окт: zz — item на всё окно (как zz в других модулях); autotrim — T
-  elseif ch == 'z' then
-    if S.pend_z and R.time_precise() - S.pend_z < 0.8 then S.pend_z = nil; if ctx.sample_big then ctx.sample_big() end
-    else S.pend_z = R.time_precise(); S.msg = 'z: z - item on the whole window' end
+  elseif ch == 'z' and not S.pend_z then S.pend_z = R.time_precise(); S.msg = 'z: z - item on the whole window, x - across the whole width, X - taller'
+  elseif S.pend_z and (ch == 'z' or ch == 'x' or ch == 'X') then   -- 24 окт: как у DSP — zz / zx / zX
+    S.pend_z = nil
+    if ch == 'z' then if ctx.sample_big then ctx.sample_big() end
+    elseif ch == 'x' then if ctx.pane_wide then ctx.pane_wide('sample') end
+    else if ctx.dsp_tall then ctx.dsp_tall('sample') end end
   elseif ch == 'T' then S.autotrim()                                   -- autotrim: тишина в начале / конце (2 окт)
   elseif (ch == '<' or ch == '>' or ch == ',' or ch == '.') and S.entry and S.entry.item then
     S.vol_step((ch == '>' or ch == '.') and 1 or -1)

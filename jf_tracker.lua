@@ -15127,10 +15127,34 @@ ctx.mono_toggle = function(col, lane)
   model.invalidate()
   vim.msg = (col.name or 'track') .. (on and ': one note lane - a new note cuts the sounding one (1 again - free)' or ': note lanes free (overlaps open more columns)')
 end
+-- 24 окт: zx — панель полосой во всю ширину снизу (было только у DSP); ещё раз — раскладка как была
+ctx.pane_wide = function(id)
+    -- снимок до zx живёт в ExtState dsp_zx: раскладка с полосой сохраняется, и после перезапуска
+    -- второй zx снова делал полосу поверх полосы (лог 20:31 → 21:00), «назад» вело к полосе
+    if state.dsp_zx_saved and (state.zx_id or 'dsp') == id then
+      local saved, v = state.dsp_zx_saved, state.panes.v
+      state.dsp_zx_saved = nil; reaper.DeleteExtState(EXT, 'dsp_zx', true)
+      ctx.pane_do(function()
+        local m = draw.panes.decode(saved)
+        if not m then return draw.panes.unspan_bottom(state.panes, id) end
+        state.panes = m; state.panes.v = v + 1; return true
+      end, 'zx: panes as before')
+    elseif draw.panes.spanned_bottom(state.panes, id) then   -- полоса есть, снимка нет (старый запуск): снять структурно
+      ctx.pane_do(function() return draw.panes.unspan_bottom(state.panes, id) end, 'zx: strip removed, dsp back in its default pane (no snapshot from before the restart)')
+    else
+      local saved = draw.panes.encode(state.panes)
+      if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, id, 0.32) end, 'zx: ' .. id .. ' across the whole width, the side modules moved up (zx - back)') then
+        state.dsp_zx_saved, state.zx_id = saved, id; if id == 'dsp' then reaper.SetExtState(EXT, 'dsp_zx', saved, true) end
+      else vim.msg = 'zx: ' .. id .. ' is not in a pane here' end
+    end
+end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
-ctx.dsp_tall = function()
-  local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel.dsp
-  if not dc then vim.msg = 'zX: dsp is not in a pane here'; return end
+ctx.dsp_tall = function(id)
+  id = id or 'dsp'
+  local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
+  if not dc then vim.msg = 'zX: ' .. id .. ' is not in a pane here'; return end
+  state.tall_ids = state.tall_ids or {}
+  if id ~= 'dsp' then state.dsp_tall = state.tall_ids[id] end
   local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1
   local want = (state.dsp_tall and (state.dsp_snap_px or 250) or 600)
   local g0
@@ -15142,7 +15166,8 @@ ctx.dsp_tall = function()
   local delta = (dc.y + dc.h - (over + want)) - here
   draw.panes.drag_grip(state.panes, L.pn, g0, delta); relayout()
   state.dsp_tall = not state.dsp_tall or nil
-  local got = L.pn.by_panel.dsp
+  if id ~= 'dsp' then state.tall_ids[id] = state.dsp_tall; state.dsp_tall = nil end
+  local got = L.pn.by_panel[id]
   vim.msg = ('zX: dsp modules %d px%s (zX - %s)'):format(got and got.content and (got.content.h - L.rh - 1) or want, state.dsp_tall and ', upwards' or '', state.dsp_tall and 'back to ' .. (state.dsp_snap_px or 250) or 'up to 600')
 end
 -- 24 окт: назначения макросов контейнера (edit.macro_links) — для шапки; раз в секунду или после правки FX
@@ -21781,6 +21806,7 @@ local function frame()
     local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
+      or (SL.active and SL.pend_z and MX.WK.get('item_z'))   -- 24 окт: z во вкладке item
       or (state.focus == 'dsp' and state.dsp_zs and MX.WK.get('dsp_zs')) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
@@ -27322,25 +27348,7 @@ local function frame()
                 return true
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
-          elseif ch == 'x' then   -- 22 окт: zx — DSP полосой во всю ширину снизу, боковые модули поднимаются; ещё раз — как было
-            -- снимок до zx живёт в ExtState dsp_zx: раскладка с полосой сохраняется, и после перезапуска
-            -- второй zx снова делал полосу поверх полосы (лог 20:31 → 21:00), «назад» вело к полосе
-            if state.dsp_zx_saved then
-              local saved, v = state.dsp_zx_saved, state.panes.v
-              state.dsp_zx_saved = nil; reaper.DeleteExtState(EXT, 'dsp_zx', true)
-              ctx.pane_do(function()
-                local m = draw.panes.decode(saved)
-                if not m then return draw.panes.unspan_bottom(state.panes, 'dsp') end
-                state.panes = m; state.panes.v = v + 1; return true
-              end, 'zx: panes as before')
-            elseif draw.panes.spanned_bottom(state.panes, 'dsp') then   -- полоса есть, снимка нет (старый запуск): снять структурно
-              ctx.pane_do(function() return draw.panes.unspan_bottom(state.panes, 'dsp') end, 'zx: strip removed, dsp back in its default pane (no snapshot from before the restart)')
-            else
-              local saved = draw.panes.encode(state.panes)
-              if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, 'dsp', 0.32) end, 'zx: dsp across the whole width, the side modules moved up (zx - back)') then
-                state.dsp_zx_saved = saved; reaper.SetExtState(EXT, 'dsp_zx', saved, true)
-              else vim.msg = 'zx: dsp is not in a pane here' end
-            end
+          elseif ch == 'x' then ctx.pane_wide('dsp')   -- 22 окт: zx — DSP полосой во всю ширину снизу; 24 окт: общая для панелей
           elseif ch == 'X' then ctx.dsp_tall()   -- 24 окт: zX — DSP выше (до 600 px модулей), ещё раз — назад; zx — шире
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
