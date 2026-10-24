@@ -5592,7 +5592,7 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   if #chains == 0 or y + L.rh > ymax then return end
   -- 24 окт: заголовок отдела строкой (подписи горизонтально)
   set(U.LINE); gfx.rect(x0, y + L.rh - 2, w0, 1, 1)
-  text(x0, y, fit('CHAINS ' .. #chains, w0), U.AMBER)
+  text(x0, y, fit('CHAINS', w0), U.AMBER)   -- 24 окт: без числа («CHAINS 1» путал)
   y = y + L.rh + 1
   local x, w = x0, w0
   local function btn(bx0, lbl, what, extra)
@@ -5613,20 +5613,28 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     if y + L.rh > ymax then break end
     local kd = c.kd
     local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
-    local kx = x + r + 1
-    local khot = v and not drag and mx >= x and mx < x + 2 * r + 2 and my >= y and my < y + L.rh
-    if v then
-      D.knob(kx, y + math.floor(L.rh / 2), r, v, khot and U.AMBER or (kd.enabled and U.CYAN or U.GREY))
-      if khot then hover.knob = { fx = kd.i, idx = kd.wet_i, v = v, name = (kd.name or '') .. ' volume' } end
-    end
+    -- 24 окт: строка — | / = имя, m, s; под ней громкость цепи (Wet) горизонтальным слайдером во всю ширину
+    -- (ручка была мелкой — худший контроль); тянуть по горизонтали, щелчок — сразу туда
     local sw = ms('s') + 2 * L.pad
     local bxm = x + w - 2 * sw - 2
-    local nx = x + 2 * r + 2 + L.pad
     local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
-    text(nx, y, fit(glyph .. (kd.name or '?'), bxm - nx - 2), kd.enabled and U.TEXT or U.GREY)
+    text(x, y, fit(glyph .. (kd.name or '?'), bxm - x - 2), kd.enabled and U.TEXT or U.GREY)
     local bx2 = btn(bxm, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
     btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh
+    if v and y + L.rh <= ymax then
+      local vs = tostring(math.floor(v * 100 + 0.5))
+      local vw = ms('100') + L.pad
+      local sx, sww = x, w - vw
+      local shot = not drag and mx >= sx - 2 and mx < sx + sww + 2 and my >= y and my < y + L.rh
+      local cy = y + math.floor(L.rh / 2)
+      set(U.DIM); gfx.rect(sx, cy - 1, sww, 2, 1)
+      set(shot and U.AMBER or (kd.enabled and U.GREEN or U.GREY)); gfx.rect(sx, y + 4, math.max(1, math.floor(v * sww + 0.5)), L.rh - 8, 1)
+      text(sx + sww + L.pad, y, vs, shot and U.AMBER or U.GREY)
+      if shot then hover.cslide = { fx = kd.i, idx = kd.wet_i, x = sx, w = sww, name = (kd.name or 'chain') .. ' volume' } end
+      if D.hint then D.hint('dspbtn', sx, y, sww, L.rh, { fx = k, what = 'cslide' }) end
+      y = y + L.rh + 2
+    end
   end
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
@@ -5644,7 +5652,7 @@ function D.mac_w(L, info, f)
   -- сложенный отдел — узкий, по ширине своей подписи
   if f.wrap then
     vt = 0
-    if mpw == 0 then mpw = ms('MACRO ' .. f.nmacro) + 2 * L.pad + 2 end
+    if mpw == 0 then mpw = ms('MACROS') + 2 * L.pad + 2 end
     if xpw == 0 and f.nmacro >= 2 then xpw = ms('XY') + 2 * L.pad + 2 end
   end
   return vt + mpw + xpw, vt, mpw, xpw
@@ -9617,7 +9625,7 @@ function D.frame(L, snap, rows, state, info)
           if xopen == nil then xopen = true end
           xopen = xopen and f.nmacro >= 2
           -- 24 окт: контейнер — заголовки отделов строкой: MACRO N | XY (щелчок — сложить / раскрыть)
-          for _, tb in ipairs({ { 'MACRO ' .. f.nmacro, 'macfold', fopen, bx, mpw }, { 'XY', 'xyfold', xopen, bx + mpw, xpw } }) do
+          for _, tb in ipairs({ { 'MACROS', 'macfold', fopen, bx, mpw }, { 'XY', 'xyfold', xopen, bx + mpw, xpw } }) do
             if tb[5] > 0 then
               local tx, tw2 = tb[4] + L.pad, tb[5] - 2 * L.pad
               local hot = not drag and mx >= tb[4] and mx < tb[4] + tb[5] and my >= hy and my < hy + L.rh

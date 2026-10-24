@@ -21852,6 +21852,7 @@ local function frame()
   elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
   elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
+  elseif hover.cslide then state.status = (hover.cslide.name or 'chain volume') .. ' - click / drag left / right'
   elseif hover.knob then state.status = ('%s %d %% - drag up / down (Shift - fine)'):format(hover.knob.name or 'knob', math.floor((hover.knob.v or 0) * 100 + 0.5))
   elseif hover.capwet then state.status = (hover.capwet.f.name or 'container') .. ': mix of the container output (dry / wet) - drag up / down'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
@@ -24162,6 +24163,9 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
       dspview_drag = { f = hover.dspview.f, x = hover.dspview.x, w = hover.dspview.w }
       click = { t = now2, zone = 'dspview' }
+    elseif hover.cslide then   -- 24 окт: громкость цепи контейнера — горизонтальный слайдер: щелчок — туда, тянуть
+      ctx.set_focus('dsp'); ctx.cslide_drag = hover.cslide
+      click = { t = now2, zone = 'cslide' }
     elseif hover.knob then   -- 24 окт: ручка (громкость цепи контейнера) — тянуть вверх / вниз, Shift — мелко
       ctx.set_focus('dsp'); ctx.knob_drag = { fx = hover.knob.fx, idx = hover.knob.idx, v0 = hover.knob.v, y0 = gfx.mouse_y, name = hover.knob.name }
       click = { t = now2, zone = 'knob' }
@@ -24843,6 +24847,15 @@ local function frame()
     else dspview_drag = nil end
   end
   -- XY-пэд модуля DSP
+  if ctx.cslide_drag then   -- 24 окт: громкость цепи
+    local d = ctx.cslide_drag
+    local col = dsp_target()
+    if gfx.mouse_cap & 1 == 1 and col then
+      local v = math.max(0, math.min(1, (gfx.mouse_x - d.x) / math.max(1, d.w)))
+      edit.fx_param(col.track, d.fx, d.idx, v)
+      state.status = ('%s %d %%'):format(d.name or 'chain', math.floor(v * 100 + 0.5))
+    else ctx.cslide_drag = nil end
+  end
   if ctx.knob_drag then   -- 24 окт: ручка: 150 px — весь ход (Shift — 600)
     local d = ctx.knob_drag
     local col = dsp_target()
