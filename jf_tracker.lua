@@ -17387,7 +17387,7 @@ function ctx.context_items(hover)
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
       -- 24 окт: модуль внутри контейнера-обёртки — параметр на макрос контейнера (+ / − сила, база — где стоит)
-      if f.inner and f.inner.wrap and (f.inner.depth or 1) == 1 and f.inner.parent and f.inner.parent.i < 0x2000000 then
+      if f.inner and f.inner.wrap and f.inner.parent and f.inner.parent.i then   -- 24 окт: и во вложенном контейнере
         add('Macro of the container … (+ / - amount)', function() ctx.macro_assign(col.track, f.inner.parent, id, p.i, p.name) end, 'M')
       end
       add('Open automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end, 'a')

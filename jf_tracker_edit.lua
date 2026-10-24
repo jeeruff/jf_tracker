@@ -3092,11 +3092,21 @@ end
 -- НОМЕР СОСЕДА в контейнере (проверено живьём 24 окт: полный адрес не работает), scale со знаком, база —
 -- где стоял параметр. Ручка выводится наружу параметром контейнера (container_map) — шапка, XY, автоматизация
 E.MACRO = 'jf_tracker_macro'
+-- 24 окт: адрес ребёнка k контейнера c любой глубины: база контейнера + (k + 1) · шаг уровня; шаг — от
+-- первого ребёнка (container_item.0 − база); пустой верхнего уровня — по числу эффектов цепи (child_addr)
+local function child_any(obj, c, k)
+  if c < 0x2000000 then return child_addr(obj, c, k) end
+  local ok, a0 = FA(obj).GetNamedConfigParm(obj, c, 'container_item.0')
+  a0 = ok and tonumber(a0)
+  if not a0 then return nil end
+  return c + (k + 1) * (a0 - c)
+end
+E.child_any = child_any
 function E.macro_find(track, c)
   local A = FA(track)
   local n = cont_count(track, c) or 0
   for k = 0, n - 1 do
-    local a = child_addr(track, c, k)
+    local a = child_any(track, c, k)
     local _, nm = A.GetFXName(track, a, '')
     if (nm or ''):find(E.MACRO, 1, true) then return a, k end
   end
@@ -3131,8 +3141,8 @@ function E.macro_links(track, c)
   if not mk then return out end
   local kids = {}
   for k = 0, (cont_count(track, c) or 0) - 1 do
-    local a = child_addr(track, c, k)
-    local g = A.GetFXGUID(track, a)
+    local a = child_any(track, c, k)
+    local g = a and A.GetFXGUID(track, a)
     if g then kids[g] = a end
   end
   for _, r in ipairs(mrec_read(track)) do
@@ -3168,10 +3178,10 @@ function E.macro_link(track, c, tgt, tparam, m, scale)
     local maddr, mk = E.macro_find(track, c)
     if not maddr then
       local k = cont_count(track, c); if not k then return end
-      local at = child_addr(track, c, k)
+      local at = child_any(track, c, k); if not at then return end   -- 24 окт: и во вложенном контейнере
       local idx = add_fx(track, E.MACRO, -1000 - at)
       if not (idx and idx >= 0) then return end
-      maddr, mk = child_addr(track, c, k), k
+      maddr, mk = child_any(track, c, k), k
       A.Show(track, maddr, 2)
       for q = 1, 8 do A.SetParamNormalized(track, maddr, q - 1, 0) end
     end
