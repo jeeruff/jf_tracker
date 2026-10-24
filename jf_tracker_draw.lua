@@ -5458,7 +5458,8 @@ local function bracket(L, x0, x1, boxy, bh0, d)
   if ext < 4 then return end
   local y0 = boxy + bh0 + 2
   local yb = y0 + math.min(ext - 3, 2 * math.max(0, 2 - d))
-  gfx.rect(x0, y0, 1, yb - y0 + 1, 1); gfx.rect(x1, y0, 1, yb - y0 + 1, 1)
+  -- 24 окт: концы — от самого низа модулей (была щель в 2 px — «рваный угол»); зазор только у горизонтали
+  gfx.rect(x0, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
   gfx.rect(x0, yb, x1 - x0 + 1, 1, 1)
 end
 function D.lane_close(L, f, bx, boxy, bh0)
@@ -5492,21 +5493,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     local function mid(s) return x + math.floor((capw - ms(s)) / 2) end
     local y, sub = boxy + 2, false
     text(mid('out'), y, 'out', U.AMBER); y = y + L.rh
-    local w = st and D.info and D.info.cont_wet and D.info.cont_wet(c)
-    if w then
-      local vs = tostring(math.floor(w.v * 100 + 0.5))
-      local fh = math.min(math.floor(bh0 * 0.4), boxy + bh0 - y - 4 * L.rh)
-      if fh > L.rh then
-        local fhot = not drag and mx >= x and mx < x + capw and my >= y and my < y + L.rh + fh
-        text(mid(vs), y, vs, fhot and U.AMBER or U.GREY); y = y + L.rh
-        local fx0 = x + math.floor(capw / 2) - 2
-        set(U.DIM); gfx.rect(fx0, y, 4, fh, 1)
-        local hh = math.floor(w.v * fh + 0.5)
-        set(fhot and U.AMBER or U.CYAN); gfx.rect(fx0, y + fh - hh, 4, hh, 1)
-        if fhot then hover.capwet = { fx = st.k, f = c, idx = w.idx, y = y, h = fh }; sub = true end
-        y = y + fh + 3
-      end
-    end
+    -- 24 окт: без mix (dry / wet) — замыкание только закрывает рэк: out, i/o, имя
     if st and y + L.rh <= boxy + bh0 - 2 then
       local ihot = not drag and mx >= x + 1 and mx < x + capw - 1 and my >= y and my < y + L.rh
       set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(x + 2, y, capw - 4, L.rh - 1, 1)
@@ -8034,7 +8021,9 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     for _, c in ipairs(L.cols or {}) do
-      if c.x and c.ci and not c.master then set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(c.x, jy, 1, L.jr_h, 1) end
+      -- 24 окт: той же линией, что в строках и шапке, и у мастера (была вдвое бледнее и без мастера — линия «рвалась»
+      -- в этой строке, а у мастера разделитель Temp | cmd торчал только в шапке)
+      if c.x and c.ci then set(U.LINE); gfx.rect(c.x, jy, 1, L.jr_h, 1) end
     end
     -- 20 окт: сложенный мастер — и у него метка: через столько l курсор встанет на мастер (он раскроется)
     if L.mfold and D.jr_master_d and D.jr_master_d > 0 then
