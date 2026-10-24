@@ -24159,6 +24159,13 @@ local function frame()
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
+      elseif hover.dspbtn.what == 'cadd' then   -- 24 окт: «+» в конце рэка — эффект в конец контейнера
+        local col, f0 = dsp_target(), hover.dspbtn.f
+        if col and f0 then
+          vim.open_picker('add fx into ' .. (f0.name or 'the container'), ctx.fx_list(), function(it)
+            if edit.fx_add_into(col.track, f0.i, it.data) then vim.msg = '+ ' .. it.label .. ' -> ' .. (f0.name or 'container') end
+          end)
+        end
       elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end

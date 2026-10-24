@@ -5476,51 +5476,39 @@ function D.rack_open(L, f, k, bx, boxy, bh0)
     set(rack_col(inn.depth or 1)); gfx.rect(bx - L.pad, boxy, L.pad, bh0, 1)   -- щель перед эффектом — цветом рэка
   end
 end
--- 24 окт: замыкание рэка — выход контейнера: out, mix (Wet контейнера: вертикальный фейдер, тянуть), i/o — пины
--- выхода (матрица под кнопкой), имя — вертикально по центру остатка; щелчок по пустому — контейнер
+-- 24 окт (вечер): конец рэка — без колонки out: рэк закрывается рамкой, за ним — поле «+» (щелчок — эффект в
+-- конец контейнера, fzf; бросок эффекта на него — туда же); рамка и скобка — до конца поля
 function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
-  local capw = math.max(L.th + 2 * L.pad + 2, ms('100') + 2 * L.pad)
+  local pw = math.max(L.cw * 4, ms('+') + 4 * L.pad)
   for _, c in ipairs(f.cend) do
     local st = D.cst[c]
     local d = c.inner and c.inner.depth or 0
-    local x = bx - L.pad
+    local x = bx - L.pad + 2
     local same = st and st.y == boxy
-    if same then set(rack_col(d + 1)); gfx.rect(x, boxy, L.pad, bh0, 1) end
-    local hot = not drag and mx >= x and mx < x + capw and my >= boxy and my < boxy + bh0
-    local fill = rack_col(d)
-    set(fill); gfx.rect(x, boxy, capw, bh0, 1)
-    set(c.enabled and U.tint(U.AMBER, 0.6) or U.DIM); gfx.rect(x, boxy, capw, bh0, 0)
-    local function mid(s) return x + math.floor((capw - ms(s)) / 2) end
-    local y, sub = boxy + 2, false
-    text(mid('out'), y, 'out', U.AMBER); y = y + L.rh
-    -- 24 окт: без mix (dry / wet) — замыкание только закрывает рэк: out, i/o, имя
-    if st and y + L.rh <= boxy + bh0 - 2 then
-      local ihot = not drag and mx >= x + 1 and mx < x + capw - 1 and my >= y and my < y + L.rh
-      set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(x + 2, y, capw - 4, L.rh - 1, 1)
-      set(ihot and U.AMBER or U.LINE); gfx.rect(x + 2, y, capw - 4, L.rh - 1, 0)
-      text(mid('i/o'), y, 'i/o', ihot and U.AMBER or U.GREY)
-      D.io_btn = D.io_btn or {}; D.io_btn[st.k] = { x = x, y = y + L.rh }
-      if ihot then hover.dspbtn = { fx = st.k, f = c, what = 'pins' }; sub = true end
-      y = y + L.rh + 3
+    local fr = c.enabled and U.tint(U.AMBER, 0.6) or U.DIM
+    if same then   -- правая кромка рэка — сразу за последним модулем
+      set(fr); gfx.rect(x - 2, boxy, 1, bh0, 1)
     end
-    local rest = boxy + bh0 - 3 - y
-    if rest > L.cw then
-      local nm = c.name or ''
-      local nh = math.min(rest, ms(nm))
-      D.vtext(x + math.floor((capw - L.th) / 2), y + math.floor((rest - nh) / 2), nh, nm, (hot and not sub) and U.TEXT or U.AMBER, fill, true)
+    local hot = not drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
+    local lit = drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
+    set(hot and U.tint(U.AMBER, 0.2) or (lit and U.tint(U.CYAN, 0.25) or rack_col(d))); gfx.rect(x, boxy, pw, bh0, 1)
+    set(lit and U.CYAN or U.tint(fr, 0.8))
+    for dy = 0, bh0 - 1, 6 do gfx.rect(x, boxy + dy, 1, math.min(3, bh0 - dy), 1); gfx.rect(x + pw - 1, boxy + dy, 1, math.min(3, bh0 - dy), 1) end
+    for dx = 0, pw - 1, 6 do gfx.rect(x + dx, boxy, math.min(3, pw - dx), 1, 1); gfx.rect(x + dx, boxy + bh0 - 1, math.min(3, pw - dx), 1, 1) end
+    text(x + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', (hot or lit) and U.AMBER or U.tint(U.AMBER, 0.7))
+    if st then
+      D.rack_plus = D.rack_plus or {}
+      D.rack_plus[#D.rack_plus + 1] = { x = x, y = boxy, w = pw, h = bh0, k = st.k }
+      if hot then hover.dspbtn = { fx = st.k, f = c, what = 'cadd' } end
+      if D.hint then D.hint('dspbtn', x, boxy, pw, bh0, { fx = st.k, what = 'cadd' }) end
     end
-    hot = hot and not sub
-    if same then   -- рамка рэка: сверху и снизу от шапки до замыкания (24 окт: приглушённым янтарём — выбранный модуль ярче)
-      set(c.enabled and U.tint(U.AMBER, 0.6) or U.DIM)
-      gfx.rect(st.x, boxy - 3, x + capw - st.x, 1, 1)   -- 24 окт: сверху — через 2 px от рамок модулей; снизу — скобка
-      -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше;
-      -- контейнер — ветка параллельной группы: скобка цветом ветки
+    if same then
+      set(fr)
+      gfx.rect(st.x, boxy - 3, x + pw - st.x, 1, 1)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
-      bracket(L, st.x, x + capw - 1, boxy, bh0, d)
+      bracket(L, st.x, x + pw - 1, boxy, bh0, d)
     end
-    if hot and st then hover.dsp = { fx = st.k, f = c } end
-    if D.hint then D.hint('dsp', x, boxy, capw, bh0, { fx = st and st.k }) end
-    bx = x + capw + L.pad
+    bx = x + pw + L.pad
   end
   return bx
 end
@@ -9390,6 +9378,7 @@ function D.frame(L, snap, rows, state, info)
     if hint0 then D.hint = function(kind, x, y, w, h, data) if x + w > cx0 and x < cx1 then hint0(kind, x, y, w, h, data) end end end
     D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
     D.cst, D.info = {}, info
+    D.rack_plus = {}
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     for k, f in ipairs(fxs) do
@@ -11340,6 +11329,9 @@ function D.frame(L, snap, rows, state, info)
     -- бросок внутрь контейнера (6 окт): средняя половина блока-контейнера —
     -- двойная голубая рамка вместо черты; края блока — как раньше, до / после
     if drag and my >= dy and my < dy + DH and mx >= fbw then
+      for _, b in ipairs(D.rack_plus or {}) do   -- 24 окт: поле «+» в конце рэка — в конец контейнера
+        if b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then hover.dsp_into, hover.dsp_into_par = b.k, 0 end
+      end
       for _, b in ipairs(blocks) do
         if b.cont and not b.bands and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
           set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
