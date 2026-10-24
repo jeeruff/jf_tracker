@@ -1665,7 +1665,10 @@ end
 function M.cont_mode(tr, e)
   local m = M.cont_view and M.cont_view(tr, e)
   if m then return m end
-  local kids = e.kids or {}
+  local kids = {}
+  for _, kd in ipairs(e.kids or {}) do   -- ручки макросов (jf_tracker_macro) — не эффект: в счёт не идут
+    if not (kd.entry and (kd.entry.name or ''):find('jf_tracker_macro', 1, true)) then kids[#kids + 1] = kd end
+  end
   if #kids < 2 or #kids > 5 then return 'wrap' end
   for _, kd in ipairs(kids) do
     local en = kd.entry
@@ -1684,6 +1687,7 @@ local function wrap_kids(tr, e, view, depth)
   if #macros >= 2 then e.xy, e.xy_x, e.xy_y = true, 1, 2 end   -- XY на макросах 1 и 2
   for ki, kd in ipairs(e.kids or {}) do
     local en = kd.entry
+    if en and (en.name or ''):find('jf_tracker_macro', 1, true) then en = nil end   -- 24 окт: ручки макросов — в шапке контейнера
     if en then
       en.inner = { parent = e, wrap = true, ki = ki, par = kd.parallel or 0, depth = depth }
       view[#view + 1] = en
@@ -1760,7 +1764,7 @@ function build_one(tr, fx, out)
         local _, pn = A.GetParamName(tr, fx, pi, '')
         if pn and pn ~= '' and pn ~= 'Bypass' and pn ~= 'Wet' and pn ~= 'Delta' then
           local e = param_entry(tr, fx, pi)
-          e.name = 'M ' .. e.name
+          e.name = 'M ' .. (e.name:match(':%s*([^:]+)$') or e.name)   -- 24 окт: «jf_tracker_macro: M1» → «M M1»
           e.macro = true
           params[#params + 1] = e
         end

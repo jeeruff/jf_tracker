@@ -4147,6 +4147,31 @@ ctx = {
     end)
     return true
   end,
+  -- 24 окт: параметр модуля внутри контейнера → ручка макроса Mn (jf_tracker_macro в контейнере): сила со знаком
+  macro_assign = function(tr, cont, tgt, tparam, pname)
+    local P = ('param.%d.'):format(tparam)
+    local A = model.fxapi(tr)
+    local _, act = A.GetNamedConfigParm(tr, tgt, P .. 'plink.active')
+    local _, lp = A.GetNamedConfigParm(tr, tgt, P .. 'plink.param')
+    local _, sc = A.GetNamedConfigParm(tr, tgt, P .. 'plink.scale')
+    local cur = act == '1' and edit.macro_find(tr, cont.i) and (tonumber(lp) or -1) + 1 or nil
+    local items = {}
+    for m = 1, 8 do
+      items[#items + 1] = { key = tostring(m), label = ('M%d'):format(m) .. (cur == m and ('  (now %+d %%)'):format(math.floor((tonumber(sc) or 0) * 100 + 0.5)) or ''), fn = function()
+        local amt = {}
+        for _, a in ipairs({ { '1', 100 }, { '2', 50 }, { '3', 25 }, { '4', -25 }, { '5', -50 }, { '6', -100 } }) do
+          amt[#amt + 1] = { key = a[1], label = ('%+d %%'):format(a[2]) .. (a[2] < 0 and '  (the macro up - this down)' or ''), fn = function()
+            if edit.macro_link(tr, cont.i, tgt, tparam, m, a[2] / 100) then
+              vim.msg = ('M%d -> %s %+d %% (container %s; the macro at 0 - where it stands now)'):format(m, pname or '?', a[2], cont.name or '')
+            else vim.msg = 'macro: could not link (REAPER 7 containers)' end
+          end }
+        end
+        vim.open_hydra({ title = ('M%d -> %s: how much'):format(m, pname or '?'), items = amt })
+      end }
+    end
+    if cur then items[#items + 1] = { key = 'x', label = 'unlink from M' .. cur, fn = function() edit.macro_unlink(tr, tgt, tparam); vim.msg = (pname or '') .. ': not on a macro' end } end
+    vim.open_hydra({ title = (pname or 'parameter') .. ' -> a macro of ' .. (cont.name or 'the container'), items = items })
+  end,
   -- история касаний параметров трека: новые — сверху, 8 штук
   ptouch_push = function(guid, key)
     ctx.ptouch = ctx.ptouch or {}
@@ -17323,6 +17348,10 @@ function ctx.context_items(hover)
         local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
+      -- 24 окт: модуль внутри контейнера-обёртки — параметр на макрос контейнера (+ / − сила, база — где стоит)
+      if f.inner and f.inner.wrap and (f.inner.depth or 1) == 1 and f.inner.parent and f.inner.parent.i < 0x2000000 then
+        add('Macro of the container … (+ / - amount)', function() ctx.macro_assign(col.track, f.inner.parent, id, p.i, p.name) end, 'M')
+      end
       add('Open automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end, 'a')
       add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
       add('--', function() end)

@@ -1,0 +1,24 @@
+desc:jf_tracker_macro (container macros: 8 knobs, each linked to parameters of the effects in the same container)
+//tags: utility
+//author: jeeruff
+
+// Макросы контейнера (24 окт): ставится трекером последним в контейнер (номера соседей не сдвигаются).
+// Сам звук не трогает (пинов нет — каналы идут мимо). Его ручки M1..M8 — источники нативных ссылок
+// Parameter Modulation → Link (plink) у параметров соседей: у каждой цели свой масштаб со знаком
+// (+ одному эффекту, − другому) и база — значение, где стоял параметр. Ручки выведены наружу
+// параметрами контейнера (container_map): шапка контейнера в трекере, автоматизация, MIDI learn, XY.
+
+slider1:0<0,1,0.001>M1
+slider2:0<0,1,0.001>M2
+slider3:0<0,1,0.001>M3
+slider4:0<0,1,0.001>M4
+slider5:0<0,1,0.001>M5
+slider6:0<0,1,0.001>M6
+slider7:0<0,1,0.001>M7
+slider8:0<0,1,0.001>M8
+
+in_pin:none
+out_pin:none
+
+@init
+ext_noinit = 1;

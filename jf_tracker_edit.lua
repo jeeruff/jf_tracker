@@ -3076,6 +3076,66 @@ function E.container_new(track, pos, into)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 24 окт: макросы контейнера — jf_tracker_macro (8 ручек) последним в контейнер c (верхний уровень): номера
+-- соседей не сдвигаются. Цель — параметр прямого ребёнка: нативная ссылка plink на ручку макроса; plink.effect —
+-- НОМЕР СОСЕДА в контейнере (проверено живьём 24 окт: полный адрес не работает), scale со знаком, база —
+-- где стоял параметр. Ручка выводится наружу параметром контейнера (container_map) — шапка, XY, автоматизация
+E.MACRO = 'jf_tracker_macro'
+function E.macro_find(track, c)
+  local A = FA(track)
+  local n = cont_count(track, c) or 0
+  for k = 0, n - 1 do
+    local a = child_addr(track, c, k)
+    local _, nm = A.GetFXName(track, a, '')
+    if (nm or ''):find(E.MACRO, 1, true) then return a, k end
+  end
+end
+local function macro_map(track, c, maddr, m)
+  local A = FA(track)
+  -- уже выведена? container_map.get отвечает номером параметра контейнера (проверено 24 окт)
+  local okv, have = A.GetNamedConfigParm(track, c, ('container_map.get.%d.%d'):format(maddr, m - 1))
+  if okv and tonumber(have) and tonumber(have) >= 0 then return tonumber(have) end
+  local ok, idx = A.GetNamedConfigParm(track, c, ('container_map.add.%d.%d'):format(maddr, m - 1))
+  return ok and tonumber(idx)
+end
+function E.macro_link(track, c, tgt, tparam, m, scale)
+  local ok = false
+  run('macro ' .. m .. ' link', function()
+    local A = FA(track)
+    local maddr, mk = E.macro_find(track, c)
+    if not maddr then
+      local k = cont_count(track, c); if not k then return end
+      local at = child_addr(track, c, k)
+      local idx = add_fx(track, E.MACRO, -1000 - at)
+      if not (idx and idx >= 0) then return end
+      maddr, mk = child_addr(track, c, k), k
+      A.Show(track, maddr, 2)
+      for q = 1, 8 do A.SetParamNormalized(track, maddr, q - 1, 0) end
+    end
+    -- адрес цели после вставки макроса тот же: макрос — в конце, номера детей не меняются; но адреса считаются
+    -- от GetCount верхнего уровня — он не изменился (вставка внутрь)
+    local base = A.GetParamNormalized(track, tgt, tparam)
+    local P = ('param.%d.'):format(tparam)
+    A.SetNamedConfigParm(track, tgt, P .. 'mod.active', '1')
+    A.SetNamedConfigParm(track, tgt, P .. 'mod.baseline', tostring(base))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.effect', tostring(mk))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.param', tostring(m - 1))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.scale', tostring(scale))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.offset', '0')
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.active', '1')
+    macro_map(track, c, maddr, m)
+    ok = true
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+function E.macro_unlink(track, tgt, tparam)
+  run('macro unlink', function()
+    local A = FA(track)
+    A.SetNamedConfigParm(track, tgt, ('param.%d.plink.active'):format(tparam), '0')
+  end)
+  if model then model.invalidate() end
+end
 function E.fx_move_into(track, src, c, par)
   if src == c then return false end
   local ok = false
