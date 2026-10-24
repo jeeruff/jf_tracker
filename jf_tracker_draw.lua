@@ -11353,7 +11353,20 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
+    -- 24 окт: над модулем внутри рэка — место в его контейнере: левая половина — перед ним, правая — после
     if drag and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
+      for _, b in ipairs(blocks) do
+        local inn = b.inner
+        if inn and inn.wrap and inn.parent and b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then
+          local before = mx < b.x + b.w / 2
+          local gx = before and (b.x - math.floor(L.pad / 2) - 1) or (b.x + b.w + math.floor(L.pad / 2))
+          set(U.AMBER); gfx.rect(gx - 1, b.y, 3, b.h, 1); gfx.rect(gx - 4, b.y, 9, 2, 1); gfx.rect(gx - 4, b.y + b.h - 2, 9, 2, 1)
+          hover.dsp_gin = { c = inn.parent, pos = before and ((inn.ki or 1) - 1) or (inn.ki or 1), name = fxs[b.k] and fxs[b.k].name }
+          break
+        end
+      end
+    end
+    if drag and not hover.dsp_into and not hover.dsp_gin and my >= dy and my < dy + DH and mx >= fbw then
       local gap, gx = #blocks > 0 and blocks[#blocks].k or 0, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
       for _, b in ipairs(blocks) do   -- 23 окт: модули полосы (inner) — не щели верхнего уровня
         if not b.inner and mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end

@@ -25599,6 +25599,7 @@ local function frame()
         local cp = ctx.mods().alt and 'copy ' or 'move '
         state.status = (kd0 and (cp .. dsp_drag.f.name .. ' into ' .. (kd0.band and 'the band ' or (kd0.chain and '' or 'pad ')) .. ((kd0.chain and kd0.chain.name) or (kd0.kid and kd0.kid.name) or '')
             .. (kd0.band and '' or (kd0.chain and ' (its end)' or (kd0.par and ': = a parallel chain' or ': | serial, after its sampler and fx'))) .. '  (Opt - copy)'))
+          or hover.dsp_gin and ('move ' .. dsp_drag.f.name .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1))
           or hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
           or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)'))
           or (tc and ('move ' .. dsp_drag.f.name .. ' → ' .. (tc.name or 'track') .. ' (instrument - first slot, effect - end of the chain)'))
@@ -25638,6 +25639,15 @@ local function frame()
           or ('could not ' .. (copy and 'copy ' or 'move ') .. dd.f.name .. ' there')
         g = nil
         hover.dsp_into = nil
+      end
+      -- 24 окт: между модулями внутри рэка — в его контейнер на это место
+      local gin = dd.active and not tc and hover.dsp_gin
+      local gcol = gin and dsp_target()
+      if gcol and gin.c and gin.c.i and gin.c ~= dd.f then
+        if edit.fx_into_at(gcol.track, gin.c.i, gin.pos, nil, 0, dd.f.i) then
+          vim.msg = dd.f.name .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1)
+        else vim.msg = 'could not move ' .. dd.f.name .. ' there' end
+        g = nil; hover.dsp_into = nil
       end
       local col = dd.active and hover.dsp_into and dsp_target()
       local cf = col and (col.fx or {})[hover.dsp_into]
@@ -25699,6 +25709,7 @@ local function frame()
       if fxb_drag.active then
         state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
           or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
+          or hover.dsp_gin and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1))
           or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (right half)' or 'serial (left half)'))
           or (hover.kitdrop and hover.kitdrop.chain and ('drop ' .. FB.short(fxb_drag.it.label) .. ' at the end of ' .. (hover.kitdrop.chain.name or 'the chain')))
           or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.kitdrop.band and 'the band ' or 'pad ') .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '')
@@ -25748,6 +25759,15 @@ local function frame()
           else vim.msg = 'could not add into the pad' end
         end
         hover.dsp_into, hover.dsp_gap, hover.dbig = nil, nil, nil
+        rt = true
+      end
+      if drop.active and not rt and hover.dsp_gin and hover.dsp_gin.c then   -- 24 окт: между модулями рэка — в его контейнер на это место
+        local t = dsp_target(); local gin = hover.dsp_gin
+        if t and edit.fx_into_at(t.track, gin.c.i, gin.pos, drop.it.data, 0) then
+          FB.push_recent(drop.it); ctx.fxb_save()
+          vim.msg = '+ ' .. FB.short(drop.it.label) .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1)
+        else vim.msg = 'could not add into the container there' end
+        hover.dsp_into, hover.dsp_gap = nil, nil
         rt = true
       end
       local col = drop.active and not rt and hover.dsp_into and dsp_target()

@@ -3218,6 +3218,60 @@ function E.macro_links(track, c)
   end
   return out
 end
+-- 24 окт: после вставки внутрь контейнера номер макро-JSFX среди соседей сдвинулся — ссылки (plink.effect) его
+-- целей перевести на новый номер (иначе макросы молча отвязывались); цели — из записи назначений
+function E.macro_reindex(track, c)
+  local A = FA(track)
+  local cg = A.GetFXGUID(track, c)
+  local _, mk = E.macro_find(track, c)
+  if not (cg and mk) then return end
+  local kids = {}
+  for k = 0, (cont_count(track, c) or 0) - 1 do
+    local a = child_any(track, c, k)
+    local g = a and A.GetFXGUID(track, a)
+    if g then kids[g] = a end
+  end
+  for _, r in ipairs(mrec_read(track)) do
+    local a = r.cg == cg and kids[r.tg]
+    if a then
+      local P = ('param.%d.'):format(r.p)
+      local _, act = A.GetNamedConfigParm(track, a, P .. 'plink.active')
+      if act == '1' then A.SetNamedConfigParm(track, a, P .. 'plink.effect', tostring(mk)) end
+    end
+  end
+end
+-- 24 окт: эффект в контейнер c на место pos (0 — первым): name — новый (fx list), src — перенос модуля цепочки;
+-- par — параллельно. Макросы контейнера перепривязываются (номера соседей сдвинулись)
+function E.fx_into_at(track, c, pos, name, par, src)
+  local A = FA(track)
+  local ok = false
+  local cg = A.GetFXGUID(track, c)
+  run(src and 'fx move into container' or 'fx add into container', function()
+    local n = cont_count(track, c); if not n then return end
+    pos = math.max(0, math.min(n, pos or n))
+    local _, mk = E.macro_find(track, c)
+    if mk and pos > mk then pos = mk end   -- макро-JSFX — всегда последним
+    local addr = child_any(track, c, pos) or child_addr(track, c, pos)
+    if src then
+      local sg = A.GetFXGUID(track, src)
+      copy_fx(track, src, track, addr, false)
+      if (cont_count(track, c) or n) > n then
+        set_par(track, addr, par)
+        local so = sg and E.fx_by_guid(track, sg)   -- оригинал: его адрес мог сдвинуться вставкой
+        if so then A.Delete(track, so) end
+        ok = true
+      end
+    else
+      local idx = add_fx(track, name, -1000 - addr)
+      ok = idx ~= nil and idx >= 0
+      if ok then set_par(track, addr, par) end
+    end
+    local c2 = cg and E.fx_by_guid(track, cg) or c
+    if ok and c2 then E.macro_reindex(track, c2) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 local function macro_map(track, c, maddr, m)
   local A = FA(track)
   -- уже выведена? container_map.get отвечает номером параметра контейнера (проверено 24 окт)
