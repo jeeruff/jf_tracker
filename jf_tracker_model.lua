@@ -1659,13 +1659,53 @@ local function pad_inner(tr, e, view)
     for _, g2 in ipairs(sl.entry and sl.entry.kids or {}) do push(g2.entry, (pad.name or 'pad') .. ' > ' .. (sl.name or 'chain')) end
   else push(sl.entry, pad.name or 'pad') end
 end
+-- 24 окт: обычный контейнер — обёртка (папка) вокруг полноразмерных модулей: у блока — шапка, макросы, XY;
+-- дети — модулями следом (inner.wrap), вложенный контейнер — так же. Плотная пачка — когда детей 2..5 и у
+-- каждого не больше 6 параметров (несколько мелких эффектов). Вид руками — M.cont_view(tr, e): 'wrap' | 'pack' | 'list'
+function M.cont_mode(tr, e)
+  local m = M.cont_view and M.cont_view(tr, e)
+  if m then return m end
+  local kids = e.kids or {}
+  if #kids < 2 or #kids > 5 then return 'wrap' end
+  for _, kd in ipairs(kids) do
+    local en = kd.entry
+    if not en or en.kids or #(en.params or {}) > 6 then return 'wrap' end
+  end
+  return 'pack'
+end
+local function wrap_kids(tr, e, view, depth)
+  e.wrap = true
+  e.params_all = e.params_all or e.params    -- запись из кеша: полный список — на случай вида pack / list
+  local macros = {}
+  for _, p in ipairs(e.params_all or {}) do if p.macro then macros[#macros + 1] = p end end
+  e.params = macros
+  if e.xy_own == nil then e.xy_own = { e.xy or false, e.xy_x, e.xy_y } end
+  e.xy, e.xy_x, e.xy_y = nil, nil, nil
+  if #macros >= 2 then e.xy, e.xy_x, e.xy_y = true, 1, 2 end   -- XY на макросах 1 и 2
+  for ki, kd in ipairs(e.kids or {}) do
+    local en = kd.entry
+    if en then
+      en.inner = { parent = e, wrap = true, ki = ki, par = kd.parallel or 0, depth = depth }
+      view[#view + 1] = en
+      if en.container and en.kids and not en.kit and not en.bands and depth < 4 and M.cont_mode(tr, en) == 'wrap' then wrap_kids(tr, en, view, depth + 1) end
+    end
+  end
+end
+M.wrap_kids = wrap_kids
 function M.expand_inner(tr, out)
   local has = false
-  for _, e in ipairs(out) do if e.bands or e.kit then has = true; break end end
+  for _, e in ipairs(out) do if e.bands or e.kit or (e.container and e.kids) then has = true; break end end
   if not has then return out end
   local view = {}
   for _, e in ipairs(out) do
     view[#view + 1] = e
+    if e.container and e.kids and not e.kit and not e.bands then
+      if M.cont_mode(tr, e) == 'wrap' then wrap_kids(tr, e, view, 1)
+      elseif e.wrap then   -- вид pack / list: вернуть полный список параметров
+        e.wrap = nil; e.params = e.params_all or e.params
+        if e.xy_own then e.xy, e.xy_x, e.xy_y = e.xy_own[1] or nil, e.xy_own[2], e.xy_own[3] end
+      end
+    end
     if e.kit and e.kids then pad_inner(tr, e, view) end
     if e.bands and e.kids and #e.kids > 0 then
       local bi = math.max(1, math.min(#e.kids, (M.inner_sel and M.inner_sel(tr, e)) or 1))

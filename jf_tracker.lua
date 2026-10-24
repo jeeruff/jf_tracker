@@ -14869,6 +14869,12 @@ model.inner_sel = function(tr, e)
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.kit_sel or {})[g .. ':' .. tostring(e.fguid or e.i)]
 end
+-- 24 окт: вид обычного контейнера, выбранный руками (zv): 'wrap' | 'pack' | 'list'; nil — сам (model.cont_mode)
+model.cont_view = function(tr, e)
+  local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
+  local v = (draw.kit_list or {})[g .. ':' .. tostring(e.fguid or e.i)]
+  return (v == 'wrap' or v == 'pack' or v == 'list') and v or nil
+end
 model.inner_chain = function(tr, e, ki)   -- строка списка цепей пэда (ключ — как в draw.pad_chain_view)
   if not ki then return nil end   -- 24 окт: пэд не выбран — цепи нет (было: падал каждый кадр, чёрный экран)
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
@@ -25163,7 +25169,7 @@ local function frame()
       -- 23 окт: щель — в позициях верхнего уровня (модули полос ÷N в списке не считаются): s — место источника там же
       local tlist = {}
       do local col0 = dsp_target(); for _, e in ipairs(col0 and col0.fx or {}) do if not e.inner then tlist[#tlist + 1] = e end end end
-      if g and dd.f.inner then vim.msg = dd.f.name .. ' is inside ' .. (dd.f.inner.parent.name or 'the container') .. ' - drop it onto a band row, or onto a track'; g = nil end
+      if g and dd.f.inner then vim.msg = dd.f.name .. ' is inside ' .. (dd.f.inner.parent.name or 'the container') .. (dd.f.inner.wrap and ' - drop it onto another container or a track (moving out: its menu, Move out)' or ' - drop it onto a band row, or onto a track'); g = nil end
       if g then for i, e in ipairs(tlist) do if e == dd.f then s = i end end end
       if dd.active and g and g ~= s and g ~= s - 1 then
         local col = dsp_target()
@@ -26764,7 +26770,17 @@ local function frame()
           elseif ch == 'b' then ctx.dsp_bands(dsp_sel.fx)   -- 23 окт: zb — модуль в 3 / 4 / 5 полос
           elseif ch == 'v' then   -- 23 окт: zv — рэк drumrs5k: сетка пэдов <-> список
             local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
-            if f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
+            if f0 and f0.container and not f0.kit and not f0.bands then
+              -- 24 окт: обычный контейнер — вид на выбор: обёртка (модули целиком), пачка (мелкие эффекты), список цепей
+              local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
+              draw.kit_list = draw.kit_list or {}
+              local function set(v, what) return function() draw.kit_list[key] = v; model.invalidate(); vim.msg = 'container: ' .. what .. ' (zv)' end end
+              vim.open_hydra({ title = 'view of ' .. (f0.name or 'the container'), items = {
+                { key = 'w', label = 'wrap: the modules inside at full size', fn = set('wrap', 'wrap') },
+                { key = 'p', label = 'pack: small effects together in one block', fn = set('pack', 'pack') },
+                { key = 'l', label = 'list of the chains', fn = set('list', 'list') },
+                { key = 'a', label = 'auto: pack for 2-5 small effects, else wrap', fn = set(nil, 'auto') } } })
+            elseif f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
               local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
               draw.kit_list = draw.kit_list or {}
               draw.kit_list[key] = (draw.kit_list[key] == 'list') and 'pads' or 'list'

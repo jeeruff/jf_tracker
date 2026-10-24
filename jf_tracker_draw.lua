@@ -9066,6 +9066,7 @@ function D.frame(L, snap, rows, state, info)
         local _, nc = D.param_flow(f.params, f.heads, nfit2, 0)   -- 22 окт: тот же поток, что в раскладке
         return nc
       end
+      if f.container and f.wrap then return f.xy and 2 or 1 end   -- 24 окт: обёртка — шапка, макросы, XY; дети — модулями следом
       if f.container and f.kids and not f.kit then   -- 23 окт: маленькие дети — столбиком, колонок меньше
         local rows = math.floor((bh0 - L.rh - 2) / L.rh) - 2
         local _, nc = D.kid_pack(f, rows)
@@ -9307,7 +9308,7 @@ function D.frame(L, snap, rows, state, info)
         tw = tw - ptw - L.pad
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
-      local inp = f.inner and (f.inner.band .. ' > ') or ''
+      local inp = f.inner and (f.inner.wrap and (string.rep('.', (f.inner.depth or 1) - 1) .. ((f.inner.par or 0) > 0 and '= ' or '| ')) or ((f.inner.band or '') .. ' > ')) or ''   -- 24 окт: в обёртке — | / = (последовательно / параллельно)
       -- 24 окт: справа от имени — кнопка входов / выходов «2 in 2/6 out» (как у REAPER): щелчок — матрица пинов
       local iol = (not f.container) and info.fx_io and info.fx_io(f) or nil
       local iow = iol and (ms(iol) + 2 * L.pad) or 0
@@ -9486,7 +9487,30 @@ function D.frame(L, snap, rows, state, info)
           local glyph = kid.parallel == 1 and '=' or (kid.parallel == 2 and '+' or '|')
           return fit((kid.enabled and '' or '(off) ') .. glyph .. ' ' .. kid.name .. (kid.container and ' [..]' or ''), w0)
         end
-        if f.bands and #f.kids > 0 then
+        if f.wrap then
+          -- 24 окт: контейнер-обёртка: под шапкой — его макросы (и XY по двум первым); пусто — гнездо для броска;
+          -- дети — полноразмерными модулями следом, в рамке контейнера
+          local ky = by + L.rh + 1
+          if #f.kids == 0 then
+            local ex, ey, ew, eh = bx + L.pad, ky + 2, bw - 2 * L.pad, by + bh - ky - 6
+            local lit = drag and mx >= bx and mx < bx + bw and my >= by and my < by + bh
+            set(lit and U.tint(U.CYAN, 0.25) or U.tint(U.CYAN, 0.06)); gfx.rect(ex, ey, ew, eh, 1)
+            set(lit and U.CYAN or U.tint(U.CYAN, 0.5))
+            for dx = 0, ew - 1, 6 do gfx.rect(ex + dx, ey, math.min(3, ew - dx), 1, 1); gfx.rect(ex + dx, ey + eh - 1, math.min(3, ew - dx), 1, 1) end
+            for dy = 0, eh - 1, 6 do gfx.rect(ex, ey + dy, 1, math.min(3, eh - dy), 1); gfx.rect(ex + ew - 1, ey + dy, 1, math.min(3, eh - dy), 1) end
+            local lines = { { 'empty container', U.TEXT }, { 'drop an fx here', U.GREY }, { 'or a container', U.GREY }, { '[] a container inside', U.DIM }, { 'af add fx', U.DIM } }
+            local ty0 = ey + math.max(2, math.floor((eh - #lines * L.rh) / 2))
+            for li, ln in ipairs(lines) do
+              local yy = ty0 + (li - 1) * L.rh
+              if yy + L.rh <= ey + eh - 1 then text(ex + L.pad, yy, fit(ln[1], ew - 2 * L.pad), lit and U.CYAN or ln[2]) end
+            end
+          elseif #f.params == 0 then
+            text(bx + L.pad, ky, fit('macros: none yet', pw), U.GREY)
+            text(bx + L.pad, ky + L.rh, fit('am on a parameter of a', pw), U.DIM)
+            text(bx + L.pad, ky + 2 * L.rh, fit('module inside - here', pw), U.DIM)
+            text(bx + L.pad, ky + 4 * L.rh, fit(#f.kids .. ' fx inside ->', pw), U.GREY)
+          end
+        elseif f.bands and #f.kids > 0 then
           -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
           -- под ними — кроссовер (частоты сплиттера; правка идёт во все полосы); справа — эффекты выбранной полосы
           -- колонками (сплиттер в начале цепи не показан — он часть контейнера)

@@ -48,5 +48,24 @@ sel.drumrs5k = 3
 ok(names(M.expand_inner(nil, out)) == 'drumrs5k | Bus', 'rack: pad without fx')
 local v2 = M.expand_inner(nil, out)
 ok(v2[1] == rack, 'the container itself stays first')
+-- 24 окт: обычный контейнер — обёртка вокруг полноразмерных модулей / плотная пачка мелких
+local function pfx(name, np, macro) local e = { name = name, params = {} }; for i = 1, np do e.params[i] = { name = 'p' .. i, macro = macro } end; return e end
+local function names2(v) local t = {}; for _, e in ipairs(v) do t[#t + 1] = (e.inner and e.inner.wrap and ((e.inner.par > 0 and '=' or '|') .. e.inner.depth) or '') .. e.name end; return table.concat(t, ' ') end
+local syn = pfx('Serum', 200)
+local wrapc = { name = 'C', container = true, params = { { name = 'M cut', macro = true }, { name = 'M drv', macro = true }, { name = 'Serum: p1' } },
+  kids = { { name = 'Serum', parallel = 0, entry = syn }, { name = 'Verb', parallel = 1, entry = pfx('Verb', 3) } } }
+local vw = M.expand_inner(nil, { wrapc })
+ok(names2(vw) == 'C |1Serum =1Verb', 'wrap: a big synth - the kids follow as modules: ' .. names2(vw))
+ok(wrapc.wrap and #wrapc.params == 2 and wrapc.xy, 'wrap: the container keeps only its macros, XY on two')
+local packc = { name = 'P', container = true, params = { { name = 'a' } }, kids = { { name = 'D', entry = pfx('D', 3) }, { name = 'E', entry = pfx('E', 4) }, { name = 'F', entry = pfx('F', 2) } } }
+ok(names2(M.expand_inner(nil, { packc })) == 'P' and not packc.wrap, 'pack: three small effects stay one block')
+local nest = { name = 'N', container = true, params = {}, kids = { { name = 'In', entry = { name = 'In', container = true, params = {}, kids = { { name = 'Deep', entry = pfx('Deep', 40) } } } } } }
+ok(names2(M.expand_inner(nil, { nest })) == 'N |1In |2Deep', 'wrap: a container inside wraps too')
+M.cont_view = function(_, e) if e.name == 'C' then return 'pack' end end
+M.expand_inner(nil, { wrapc })
+ok(not wrapc.wrap and #wrapc.params == 3, 'wrap -> pack by hand: the full list back')
+local empty = { name = 'E0', container = true, params = {}, kids = {} }
+M.cont_view = nil
+ok(names2(M.expand_inner(nil, { empty })) == 'E0' and empty.wrap, 'an empty container is a wrap (the nest)')
 print(('test_expand_inner: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
