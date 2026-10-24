@@ -17215,6 +17215,7 @@ local function context_menu(hover, anchor)
       local first = toks[1]
       local nav = e.k:match('^h j k l') or e.k:match('^hjkl') or e.k == 'j k' or e.k == 'h l' or e.k == 'gg G' or e.k == 'g G'
                   or e.k == '?' or e.k:match('^Esc') or e.k:match('^%? ') or first == 'Space'   -- 23 окт: Space — транспорт везде, не пункт меню модуля
+                  or (first and first:match('^%u%u$'))   -- 24 окт: XY, MS … — название виджета в справке, не клавиши (давали группу «X … under»)
       local codes = first and ctx.tok_codes(first)
       if codes and not nav and not have[first] then
         have[first] = true
@@ -17247,9 +17248,13 @@ local function context_menu(hover, anchor)
     if k then used[k] = true end
     if k then
       used[k] = true
-      local names = {}
-      for i = 1, math.min(3, #list) do names[#names + 1] = list[i].label:match('^(%S+)') end
-      hitems[#hitems + 1] = { key = k, label = p1 .. ' …  ' .. table.concat(names, ', ') .. (#list > 3 and ' …' or ''), sub = function() return { title = p1 .. ' …', items = list } end }
+      -- 24 окт: группа — по смыслу префикса (было: первые слова подписей — «under», «pack, an»), и её клавиши
+      local PN = { d = 'delete / cut', y = 'copy', c = 'container', z = 'view', a = 'automation', g = 'go to', t = 'track',
+                   s = 'slice', m = 'mute', r = 'replace', x = 'cut', p = 'paste', v = 'select', w = 'width', f = 'find' }
+      local combos = {}
+      for i = 1, math.min(5, #list) do combos[#combos + 1] = p1 .. list[i].key end
+      local gname = PN[p1] or PN[p1:lower()] or (list[1].label:match('^(%S+)') or p1)
+      hitems[#hitems + 1] = { key = k, label = gname .. ' …  ' .. table.concat(combos, ' ') .. (#list > 5 and ' …' or ''), sub = function() return { title = p1 .. ' … ' .. gname, items = list } end }
     end
   end
   for _, g in ipairs(mgo) do
@@ -17575,6 +17580,16 @@ function ctx.context_items(hover)
     if MX.loops or (ctx.dev_on and ctx.dev_on()) then add((MX.loops and '!' or '') .. 'Loops layer (dev: Garden loops per cell)', function() ctx.mx_loops_toggle() end, 'l') end   -- 19 окт: непонятен — только dev, как в \\-меню
     add((MX.zoom == 'detail' and '!' or '') .. 'Detail view (z)', function() ctx.mx_zoom() end, 'z')
     add('Arrangement …', function() ctx.arr() end, 'a')
+  elseif ctx.ctx_page and ctx.ctx_page(hover) == 'dsp' then
+    -- 24 окт: пустое место DSP — свои пункты (было: общее меню вида — метры, тема, колонки FX, док, два help)
+    local col = dsp_target()
+    local f = col and col.fx and col.fx[dsp_sel.fx]
+    if f then
+      add('Pack ' .. (f.name or 'the module') .. ' into a container (cc)', function() ctx.dsp_pack(dsp_sel.fx, dsp_sel.fx) end, 'p')
+      add('Empty container after ' .. (f.name or 'it') .. ' (cn)', function() ctx.dsp_container_new(dsp_sel.fx) end, 'X')
+    end
+    add('Add FX … (fzf)', function() ctx.fx_picker() end, 'f')
+    add((state.khelp and '!' or '') .. 'Help panel of the focused module', function() ctx.toggle_help() end, 'K')
   else
     for _, a in ipairs(view_actions()) do add(a[1], a.fn, a.key) end
   end
