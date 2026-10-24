@@ -5472,6 +5472,14 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     if same then   -- рамка рэка: сверху и снизу от шапки до замыкания
       set(c.enabled and U.AMBER or U.DIM)
       gfx.rect(st.x, boxy - 1, x + capw - st.x, 1, 1); gfx.rect(st.x, boxy + bh0, x + capw - st.x, 1, 1)
+      -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше
+      local ext = D.rack_ext or 0
+      if ext >= 3 then
+        local yb = boxy + bh0 + 1 + math.min(ext - 2, 2 * math.max(0, 2 - d))
+        local x1 = x + capw - 1
+        gfx.rect(st.x, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
+        gfx.rect(st.x, yb, x1 - st.x + 1, 1, 1)
+      end
     end
     if hot and st then hover.dsp = { fx = st.k, f = c } end
     if D.hint then D.hint('dsp', x, boxy, capw, bh0, { fx = st and st.k }) end
@@ -9162,7 +9170,8 @@ function D.frame(L, snap, rows, state, info)
     local dest0, mx0 = gfx.dest, mx
     if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end
     gfx.dest = 700
-    gfx.blit(dest0, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)   -- фон под блоками
+    D.rack_ext = (not info.dsp_wide) and math.max(0, sbh - 2) or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки поверх)
+    gfx.blit(dest0, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext)   -- фон под блоками
     if mx < cx0 or mx >= cx1 then mx = -100000 end
     -- 23 окт: DSP развёрнут (zz) и высоко — модули рядами, как строки: слева направо, следующий ряд снова слева
     -- (сигнал идёт по рядам); рядов — сколько влезает модулей в высоту ≥ 16 строк, до трёх; прокрутки нет
@@ -10977,7 +10986,7 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_total = wrap > 1 and 0 or (bx + px - cx0)   -- рядами — без прокрутки
     boxy, bh0 = boxy0, bh00
     gfx.dest = dest0
-    gfx.blit(700, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3, cx0, boxy - 1, cx1 - cx0, bh0 + 3)
+    gfx.blit(700, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext)
     mx = mx0
     D.hint = hint0
     if D.slr then
