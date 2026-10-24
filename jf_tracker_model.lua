@@ -1641,6 +1641,18 @@ function M.track_fx(tr)
       end
     end
   end
+  -- 24 окт: эффекты внутри обычного контейнера (вид рэка) — тоже: макросы синта (Surge M1..M8) — колонкой слева,
+  -- первыми, а не секцией в конце; без этого Surge в контейнере показывал их страницей MACRO 1-6
+  local function deep(e, d)
+    for _, kd in ipairs(e.kids or {}) do
+      local en = kd.entry
+      if en then
+        M.discretize(tr, { en }); M.macroize({ en }, tr)
+        if en.container and not en.kit and not en.bands and d < 4 then deep(en, d + 1) end
+      end
+    end
+  end
+  for _, e in ipairs(out) do if e.container and not e.kit and not e.bands then deep(e, 1) end end
   M.bprof.fxmiss = (M.bprof.fxmiss or 0) + 1
   fx_cache[tr] = { key = key, out = out }
   local view = M.expand_inner(tr, out)
