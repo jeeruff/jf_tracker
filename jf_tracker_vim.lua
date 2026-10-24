@@ -3490,7 +3490,7 @@ function V.popup()
     local named = pk.tree and pk.query == '' and picker_prefix(pk) ~= nil   -- 16 окт: внутри папки — только имя
     for i = first, math.min(#pk.matches, first + nr - 1) do
       local m = pk.matches[i]
-      lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = named and (m.name or m.label) or m.label, col = m.col, code = m.code, tag = m.tag }   -- col: свой цвет строки (маршрутизация, 9 окт)
+      lines[#lines + 1] = { key = (i == pk.sel) and '>' or ' ', text = named and (m.name or m.label) or m.label, col = m.col, code = m.code, tag = m.tag, pn = m.pn, fxn = m.fxn }   -- col: свой цвет строки (маршрутизация, 9 окт)
     end
     local groups
     if pk.tree and pk.query == '' then   -- 18 окт: набор ищет по всему — папки прячутся, список во всю ширину

@@ -4106,7 +4106,10 @@ ctx = {
       if seen[key] then return end
       seen[key] = true
       local env = PP.env_of(tr, r, false)
-      items[#items + 1] = { label = (tag and (tag .. '  ') or '') .. (env and '● ' or '  ') .. r.label, data = { r = r }, tag = tag }
+      -- 24 окт: сначала параметр, потом эффект (тусклее): длинный путь пэда съедал имя параметра
+      local pn = r.kind == 'fx' and (r.pname or '') or r.label
+      local fxn = r.kind == 'fx' and (r.fxname or '') or ''
+      items[#items + 1] = { label = (tag and (tag .. '  ') or '') .. (env and '● ' or '  ') .. pn .. (fxn ~= '' and ('   ' .. fxn) or ''), data = { r = r }, tag = tag, pn = (env and '● ' or '  ') .. pn, fxn = fxn }
     end
     local t = dsp_target()
     if t and t.track == tr then
@@ -4119,6 +4122,7 @@ ctx = {
     for _, key in ipairs((ctx.ptouch or {})[col.guid] or {}) do if by[key] then add_r(by[key], 'recent') end end
     for _, it in ipairs(cmds or {}) do items[#items + 1] = { label = it.label, data = { cmd = it.v }, code = it.v } end   -- code — цветом команды (как в колонке)
     for _, r in ipairs(rows) do add_r(r, nil) end
+    ctx.fxp_track = tr   -- 24 окт: выбранная строка поиска — рамкой в DSP (кадр, ниже)
     vim.open_picker('command or parameter  ' .. col.name .. ' - a parameter: its envelope column, the cursor on it', items, function(it)
       if it.data.cmd then return on_cmd(it.data.cmd) end
       local r = it.data.r
@@ -22204,6 +22208,12 @@ local function frame()
         if role then ctx.cur_param_hl = { role = role } end
       end
     end
+    local pk = vim.picker   -- 24 окт: в поиске команды / параметра — рамка у выбранной строки
+    if pk and ctx.fxp_track and dt and dt.track == ctx.fxp_track then
+      local it = pk.matches and pk.matches[pk.sel]
+      local r = it and it.data and it.data.r
+      if r and r.kind == 'fx' then ctx.cur_param_hl = { fx = r.fx, pi = r.param } end
+    elseif not pk then ctx.fxp_track = nil end
     local j = ctx.env_jump   -- выбранный в fzf параметр: курсор на колонку его огибающей (после пересборки)
     if j then
       for i, fl in ipairs(L.flat or {}) do

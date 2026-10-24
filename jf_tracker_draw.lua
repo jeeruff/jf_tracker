@@ -11460,6 +11460,20 @@ function D.popup(L, p, anchor)
         set(U.AMBER); gfx.rect(cx, ly + L.rh - 2, ms(ch), 1, 1)
         text(cx + ms(ch), ly + 1, t:sub(at + 1), col)
       else text(tx0, ly + 1, t, col) end
+    elseif ln.pn then
+      -- 24 окт: параметр в поиске: [ярлык] ● имя параметра — ярко, эффект — тускло; не влезло — режется эффект
+      local tx0 = lx + L.pad + kw + 2 * L.pad + hcol
+      local hl2 = p.hl == i and p.kind == 'picker'
+      local cx = tx0
+      if ln.tag then
+        local tc = ln.tag == 'selected' and U.AMBER or (ln.tag == 'touched' and U.CYAN or U.GREEN)
+        text(cx, ly + 1, ln.tag, tc); cx = cx + ms(ln.tag .. '..') - ms('.')
+      end
+      local room = tx0 + tw - cx
+      local pn = fit(ln.pn, room)
+      text(cx, ly + 1, pn, hl2 and U.TEXT or U.mix(U.TEXT, U.GREY, 0.3))
+      local fx0 = cx + ms(pn .. '...') - ms('.')
+      if ln.fxn and ln.fxn ~= '' and tx0 + tw - fx0 > L.cw * 3 then text(fx0, ly + 1, fit(ln.fxn, tx0 + tw - fx0), U.DIM) end
     elseif ln.code or ln.tag then
       -- 24 окт: fzf команды / параметра — код команды её цветом (как в колонке), ярлык selected / touched / recent — своим
       local tx0 = lx + L.pad + kw + 2 * L.pad + hcol
