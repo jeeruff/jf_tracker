@@ -15004,6 +15004,32 @@ edit.on_off = function(track, pitch)
     end
   end
 end
+-- 24 окт: Opt+Tab — нижние (свои) вкладки модуля в фокусе по кругу: браузер — режимы, lib — разделы, automation —
+-- страницы; true — переключено (иначе Opt+Tab листает вкладки стека панели)
+ctx.inner_tab_cycle = function(dir)
+  local function nxt(list, cur)
+    local i = 1
+    for k, v in ipairs(list) do if v == cur then i = k end end
+    return list[(i - 1 + dir) % #list + 1]
+  end
+  local f = state.focus
+  if f == 'browser' and B.mode ~= 'fx' then
+    local L0 = B.pmpane and { 'files', 'db', 'proj', 'libs', 'presets' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' }
+    local m = nxt(L0, B.mode)
+    B.click(m); vim.msg = 'browser: ' .. m .. '  (Opt+Tab / Opt+Shift+Tab)'
+    return true
+  elseif f == 'inst' and state.libtabs then
+    state.libtab = nxt({ 'audio', 'instruments', 'automation', 'midi' }, state.libtab)
+    vim.msg = 'lib: ' .. state.libtab .. '  (Opt+Tab / Opt+Shift+Tab)'
+    return true
+  elseif f == 'top' and state.toptab == 'automation' then
+    local P = state.ai_edit and { 'ai', 'params', 'curve', 'mod' } or { 'params', 'curve', 'mod' }
+    mod_pane = nxt(P, mod_pane)
+    vim.msg = 'automation: ' .. (mod_pane == 'ai' and 'item' or mod_pane) .. '  (Opt+Tab / Opt+Shift+Tab)'
+    return true
+  end
+  return false
+end
 -- 24 окт: Opt+V — выделение колонки под курсором до конца субдоли; ещё раз — до конца доли, такта, паттерна
 -- (уровень, который ничего не добавляет, пропускается); начало — строка курсора при первом нажатии
 ctx.smart_select = function()
@@ -26802,6 +26828,8 @@ local function frame()
       -- 10 окт: Ctrl+Tab по вкладкам — пока выключен (возвращал спрятанные панели и сыпал ими);
       -- вкладку — щелчком, F2-F6 или Ctrl+W + буква
       vim.msg = 'Ctrl+Tab: off - Tab (next tab), gt, F4 or Ctrl+W + panel letter'
+    elseif m.alt and ctx.inner_tab_cycle(back and -1 or 1) then
+      -- 24 окт (вечер): Opt+Tab — сначала нижние вкладки модуля (браузер: files db pm …, lib, страницы automation)
     elseif m.alt then
       -- 24 окт: Opt+Tab / Opt+Shift+Tab — вкладки стека панели в фокусе по кругу; одна вкладка — следующая панель (как было)
       local PNs, cur = draw.panes, ctx.pane_cur()
