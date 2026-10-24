@@ -1438,7 +1438,7 @@ function M.macro_labels(tr, out)
   local A = M.fxapi(tr)
   if not A.GetParamName then return end
   for _, e in ipairs(out) do
-    if e.nmacro then
+    if e.nmacro and not e.wrap then   -- 24 окт: у контейнера подпись — то, на что назначен (draw, по связям)
       for _, p in ipairs(e.params) do
         if p.mfader then local _, nm = A.GetParamName(tr, p.fx or e.i, p.i, ''); p.mlabel = M.macro_label(nm) end
       end

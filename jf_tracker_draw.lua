@@ -9667,6 +9667,16 @@ function D.frame(L, snap, rows, state, info)
           local mi, mybot = 0, hy
           -- 22 окт: имена макросов из плагина (p.mlabel) — строкой над слайдером, если по высоте влезают все
           -- (номер + имя, слайдер во всю ширину); не влезают — как раньше: номер слева, имя — в статусе
+          -- 24 окт: макрос контейнера — подпись по назначению: имя параметра цели («cutoff», ещё — «+2»); без
+          -- назначения — только номер (было «jf_tracker_m…» у всех: имя выведенного параметра)
+          if f.wrap and info.macro_links and info.pool_col and info.pool_col.track then
+            local ml = info.macro_links(info.pool_col.track, f)
+            for _, p in ipairs(f.params) do
+              local m = tonumber((p.name or ''):match('M(%d+)%s*$'))
+              local l = m and ml[m]
+              p.mlabel = l and l[1] and (l[1].pname .. (#l > 1 and (' +' .. (#l - 1)) or '')) or nil
+            end
+          end
           local named = false
           for _, p in ipairs(f.params) do if p.mfader and p.mlabel then named = true; break end end
           local two = named and (hy + (1 + 2 * f.nmacro) * L.rh <= by + bh - 2)
