@@ -15138,21 +15138,21 @@ ctx.pane_wide = function(id)
         local m = draw.panes.decode(saved)
         if not m then return draw.panes.unspan_bottom(state.panes, id) end
         state.panes = m; state.panes.v = v + 1; return true
-      end, 'zx: panes as before')
+      end, 'zw: panes as before')
     elseif draw.panes.spanned_bottom(state.panes, id) then   -- полоса есть, снимка нет (старый запуск): снять структурно
-      ctx.pane_do(function() return draw.panes.unspan_bottom(state.panes, id) end, 'zx: strip removed, dsp back in its default pane (no snapshot from before the restart)')
+      ctx.pane_do(function() return draw.panes.unspan_bottom(state.panes, id) end, 'zw: strip removed, dsp back in its default pane (no snapshot from before the restart)')
     else
       local saved = draw.panes.encode(state.panes)
-      if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, id, 0.32) end, 'zx: ' .. id .. ' across the whole width, the side modules moved up (zx - back)') then
+      if ctx.pane_do(function() return draw.panes.span_bottom(state.panes, id, 0.32) end, 'zw: ' .. id .. ' across the whole width, the side modules moved up (zw - back)') then
         state.dsp_zx_saved, state.zx_id = saved, id; if id == 'dsp' then reaper.SetExtState(EXT, 'dsp_zx', saved, true) end
-      else vim.msg = 'zx: ' .. id .. ' is not in a pane here' end
+      else vim.msg = 'zw: ' .. id .. ' is not in a pane here' end
     end
 end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
 ctx.dsp_tall = function(id)
   id = id or 'dsp'
   local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
-  if not dc then vim.msg = 'zX: ' .. id .. ' is not in a pane here'; return end
+  if not dc then vim.msg = 'zx: ' .. id .. ' is not in a pane here'; return end
   state.tall_ids = state.tall_ids or {}
   if id ~= 'dsp' then state.dsp_tall = state.tall_ids[id] end
   local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1
@@ -15161,14 +15161,14 @@ ctx.dsp_tall = function(id)
   for _, g in ipairs(L.pn.grips or {}) do
     if g.ax == 'v' and math.abs((g.y + g.h / 2) - dc.y) <= 6 and g.x < dc.x + dc.w and g.x + g.w > dc.x then g0 = g; break end
   end
-  if not g0 then vim.msg = 'zX: nothing above the dsp to move'; return end
+  if not g0 then vim.msg = 'zx: nothing above the dsp to move'; return end
   local here = g0.y + g0.h / 2
   local delta = (dc.y + dc.h - (over + want)) - here
   draw.panes.drag_grip(state.panes, L.pn, g0, delta); relayout()
   state.dsp_tall = not state.dsp_tall or nil
   if id ~= 'dsp' then state.tall_ids[id] = state.dsp_tall; state.dsp_tall = nil end
   local got = L.pn.by_panel[id]
-  vim.msg = ('zX: dsp modules %d px%s (zX - %s)'):format(got and got.content and (got.content.h - L.rh - 1) or want, state.dsp_tall and ', upwards' or '', state.dsp_tall and 'back to ' .. (state.dsp_snap_px or 250) or 'up to 600')
+  vim.msg = ('zx: dsp modules %d px%s (zx - %s)'):format(got and got.content and (got.content.h - L.rh - 1) or want, state.dsp_tall and ', upwards' or '', state.dsp_tall and 'back to ' .. (state.dsp_snap_px or 250) or 'up to 600')
 end
 -- 24 окт: назначения макросов контейнера (edit.macro_links) — для шапки; раз в секунду или после правки FX
 ctx.macro_links_of = function(tr, f)
@@ -27351,8 +27351,8 @@ local function frame()
                 return true
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
-          elseif ch == 'x' then ctx.pane_wide('dsp')   -- 22 окт: zx — DSP полосой во всю ширину снизу; 24 окт: общая для панелей
-          elseif ch == 'X' then ctx.dsp_tall()   -- 24 окт: zX — DSP выше (до 600 px модулей), ещё раз — назад; zx — шире
+          elseif ch == 'w' then ctx.pane_wide('dsp')   -- 22 окт: полосой во всю ширину снизу; 24 окт: zw (wide), общая для панелей
+          elseif ch == 'x' then ctx.dsp_tall()   -- 24 окт: zx — DSP выше (до 600 px модулей), ещё раз — назад; zw — шире
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
