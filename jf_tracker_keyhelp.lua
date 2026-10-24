@@ -270,7 +270,7 @@ KH.PAGES = {
     { k = 'Cmd+ Cmd-', d = 'bitmap scale x1 / x1.5 / x2 / x3 (font size with a font)' },
   } },
   insert = { title = 'tracker INSERT (keyboard)', e = {
-    { k = '1 f1 2 f2 3 4 f4 ...', d = 'piano (layout frow, default): digits 1..0 - = white keys C..G, F1 F2 F4 F5 F6 F8 F9 F11 black; [ ] octave, { } velocity; F-key shortcuts are off while the keyboard plays; the letters stay Vim - in INSERT too (w x dd p ... act as in NORMAL, then INSERT again), digits are notes, not a count' },
+    { k = '1 f1 2 f2 3 4 f4 ...', d = 'piano (layout frow, default): digits 1..0 white keys C..E, F1 F2 F4 F5 F6 F8 F9 black (17 keys; - = F10 F11 F12 free); [ ] octave, { } velocity; F-key shortcuts are off while the keyboard plays; the letters stay Vim - in INSERT too (w x dd p ... act as in NORMAL, then INSERT again), digits are notes, not a count' },
     { k = 'q2w3er5t6y7ui9o0p', d = 'piano (layout qwerty, options): top row + digits, q = C of the octave',
       t = { 'q', '2', 'w', '3', 'e', 'r', '5', 't', '6', 'y', '7', 'u', 'i', '9', 'o', '0', 'p' } },
     { k = 'Shift+note', d = 'with the option Shift+keys preview: listen only, nothing written (off by default - leave INSERT to listen, the keyboard plays in KEYS)', t = { 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P' } },
