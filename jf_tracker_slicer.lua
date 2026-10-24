@@ -644,7 +644,6 @@ function S.key(c)
       S.msg = nm .. (st[tg] and ' on' or ' off') .. (tg == 'cutquant' and not st.cutsnap and ' (works with t-snap)' or '')
       return true
     end
-    if ch == 'S' and ctx.smk_at then ctx.smk_at(S.cross, S.cut_point(S.cross.t + S.cross.dt)); return true end
   end
   -- 14 окт: s — меню нарезки и в раскладке renoise (15 окт: весь нижний ряд renoise здесь — команды)
   local pk = S.entry and not S.entry.file and piano_slice(c)
@@ -674,7 +673,8 @@ function S.key(c)
   elseif ch == 's' and S.cross and ctx.cut_at then
     local te = S.cut_point(S.cross.t + S.cross.dt)
     ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
-  elseif (ch == 'S' or ch == 's') and ctx.slice_hydra then ctx.slice_hydra()
+  elseif ch == 'S' then S.button('snap')   -- 24 окт: S — snap (меню нарезки — s; stretch-маркер на прицеле — s m)
+  elseif ch == 's' and ctx.slice_hydra then ctx.slice_hydra()
   -- 24 окт: - + (чувствительность транзиентов) с клавиатуры убраны — слишком резко (нажал — нарезка пересобралась); кнопки - + остались
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
