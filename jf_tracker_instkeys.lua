@@ -55,6 +55,14 @@ function IK.key(c, cur, n, nslots)
     else ctx.msg(op .. ch .. ': not a lib command (? - help)') end
     return true
   end
+  -- 24 окт: x — удалить инструмент под курсором (или диапазон v), как dd (просьба: x ничего не делал)
+  if ch == 'x' then
+    local r0, r1 = IK.range(cur)
+    r1 = math.min(r1, n)
+    if r0 <= r1 then ctx.inst_cut(r0, r1) end
+    IK.anchor = nil
+    return true
+  end
   -- в диапазоне (v) d / y действуют сразу (x убран 5 окт: вырезать — только d)
   if IK.anchor and (ch == 'd' or ch == 'y') then
     local r0, r1 = IK.range(cur)

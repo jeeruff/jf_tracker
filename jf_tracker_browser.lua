@@ -1151,7 +1151,7 @@ function B.draw(U, L, x, y, w, h)
     -- play / keys — на строке плеера (5 окт): автопрослушивание и клавиатура
     -- с высотой выбранного файла
     local px0 = x0
-    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'drum', 'drum', B.drum } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end
+    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'cell', 'drum', B.drum } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end   -- 24 окт: подпись cell (файл — в выбранную ячейку / пэд)
     local lx0 = px0 + L.pad
     local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
     local sx0, sw = lx0 + lw, math.max(8, x0 + ww - lx0 - lw - vw)

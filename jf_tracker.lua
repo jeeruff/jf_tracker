@@ -17705,6 +17705,46 @@ function ctx.context_items(hover)
     end
     add('Add FX … (fzf)', function() ctx.fx_picker() end, 'f')
     add((state.khelp and '!' or '') .. 'Help panel of the focused module', function() ctx.toggle_help() end, 'K')
+  elseif ctx.ctx_page and ctx.ctx_page(hover) == 'browser' then
+    -- 24 окт: браузер — что сделать с файлом под курсором (отмеченными): было общее меню вида
+    local e = type(hover.browser) == 'number' and B.entries[hover.browser] or B.entries[B.cur]
+    local file = e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) and B.full(e) or nil
+    if file then
+      local nm = file:match('[^/]+$') or file
+      add('Into the lib - its own instrument (Enter)', function() ctx.add_to_depot(file) end, 'l')
+      add('Into a sampler - the whole file in one RS5K on the DSP track', function()
+        local col = dsp_target() or cur_col(); if not col then return end
+        edit.run('file to RS5K', function()
+          local fx = reaper.TrackFX_AddByName(col.track, 'ReaSamplOmatic5000 (Cockos)', false, -1)
+          if fx and fx >= 0 then
+            local p2 = edit.media_copy(file)
+            reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'FILE0', p2); reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'DONE', '')
+            reaper.TrackFX_SetNamedConfigParm(col.track, fx, 'renamed_name', (nm:gsub('%.%w+$', '')))
+          end
+        end)
+        model.invalidate(); vim.msg = nm .. ' -> RS5K on ' .. (col.name or 'track')
+      end, 's')
+      add('Slice into drumrs5k … (the slicer opens on transients, then s - to drumrs5k)', function()
+        ctx.add_to_depot(file); if ctx.slicer_dt then ctx.slicer_dt() end
+        vim.msg = nm .. ': slicer on transients - adjust, then convert slices (s - drumrs5k)'
+      end, 'k')
+      add('Drumrs5k - a pad per file (the marked ones too)', function()
+        local files = {}
+        for _, o in ipairs(B.sel_order or {}) do if o.full then files[#files + 1] = o.full end end
+        if #files == 0 then files[1] = file end
+        ctx.drum_add_files(files)
+      end, 'd')
+      add('Into an item at the tracker cursor', function()
+        local f = L and L.flat and L.flat[vim.cur.fi]
+        if not (f and f.col and f.col.track) then vim.msg = 'item: put the tracker cursor on a track'; return end
+        local lane = f.lane or f.col.lanes[1]
+        edit.drop(f.col.track, f.col.fixed and lane.idx or nil, state.lpb, vim.cur.row, file)
+        model.invalidate(); vim.msg = nm .. ' -> an item on ' .. (f.col.name or 'track') .. ' at row ' .. vim.cur.row
+      end, 'i')
+      add('More: layers, sampler list, slices of the instrument … (a)', function() ctx.browser_send_menu() end, 'a')
+    end
+  elseif ctx.ctx_page and ctx.ctx_page(hover) and ctx.ctx_page(hover) ~= 'tracker' and ctx.ctx_page(hover) ~= 'insert' then
+    -- 24 окт: модуль без своих пунктов — только его клавиши (общее меню вида — у трекера и в главном меню \ v)
   else
     for _, a in ipairs(view_actions()) do add(a[1], a.fn, a.key) end
   end
@@ -30181,7 +30221,7 @@ ctx.drum_audition = function(path)
   A.SetNamedConfigParm(col.track, kid.rs5k_i, 'FILE0', path)
   A.SetNamedConfigParm(col.track, kid.rs5k_i, 'DONE', '')
   if reaper.GetPlayState() & 1 == 0 and kid.note then ctx.preview(col.track, kid.note, 'midi') end
-  vim.msg = ('drum: %s on %s (drum off - keep it, one undo)'):format(path:match('[^/]+$') or path, kid.name or 'pad')
+  vim.msg = ('cell: %s on %s (cell off - keep it, one undo)'):format(path:match('[^/]+$') or path, kid.name or 'pad')
   return true
 end
 ctx.drum_audition_toggle = function(on)
@@ -30200,7 +30240,7 @@ ctx.drum_audition_toggle = function(on)
   end
   ctx.drum_aud = nil
   model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
-  vim.msg = n > 0 and ('drum off: %d pad(s) keep the new sample (u - back)'):format(n) or 'drum off'
+  vim.msg = n > 0 and ('cell off: %d pad(s) keep the new sample (u - back)'):format(n) or 'cell off'
 end
 -- 19 окт: буква параметра сэмплера выбранного пэда (D.PADKEYS) → sel.param на него; true — прыгнули
 ctx.pad_param_key = function(sel, ch)
