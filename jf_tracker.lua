@@ -1807,6 +1807,11 @@ ctx = {
     local pos, len, what
     if item then
       pos, len, what = reaper.GetMediaItemInfo_Value(item, 'D_POSITION'), reaper.GetMediaItemInfo_Value(item, 'D_LENGTH'), 'the item'
+      -- 24 окт: конец — на ближайшую долю (item 1.292 с при такте 1.333 — хвост такта был недосягаем для точек)
+      local q0 = reaper.TimeMap2_timeToQN(0, pos)
+      local q1 = math.floor(reaper.TimeMap2_timeToQN(0, pos + len) + 0.5)
+      if q1 <= q0 + 1e-6 then q1 = math.floor(q0) + 1 end
+      len = reaper.TimeMap2_QNToTime(0, q1) - pos
     else
       local rg = alias.region_at(regions, t0)
       if rg then pos, len, what = rg.pos, rg.rgnend - rg.pos, 'the pattern'
