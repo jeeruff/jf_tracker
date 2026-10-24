@@ -584,7 +584,7 @@ KH.PAGES = {
     { k = 'aa', d = 'automate or show the envelope of the selected parameter: none - it is made; then the tracker cursor goes to its column', t = { 'aa', 'a' } },
     { k = 'ap A', d = 'pick a parameter to automate (fzf; also click trim in the track header, rclick trim: all parameters)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
-    { k = 'ai', d = 'automation item of the selected parameter: as long as the item under the tracker cursor (none - the item of the DSP track at the cursor row, else the pattern, else the bar); its curve opens at once' },
+    { k = 'ai', d = 'automation item of the selected parameter: as long as the item under the tracker cursor (none - the item of the DSP track at the cursor row, else a bar); its curve opens at once' },
     { k = 'K', mk = 'L', d = 'module learn (knobs): turn knobs in the plugin window - they join this block (saved per plugin); in learn x removes, J K move, < > columns, R resets to automatic, E / Esc done' },
     { k = 'I', d = 'in / out: the pin matrix of the module (also the button right of its name, 2 in 2/6 out, and the menu); h j k l, Space, + -, r, Esc' },
     { k = 'pins', t = {}, d = 'the button right of a module name (2 in 2/6 out, as REAPER): a click - its pins (as the REAPER pin connector): track channels in rows, the plugin inputs (left) and outputs (right) in columns; click / Space a cell - connect, h j k l move, + - the track channels, r reset (pin N - channel N), Esc close' },

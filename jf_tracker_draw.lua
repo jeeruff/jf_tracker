@@ -7872,7 +7872,10 @@ function D.frame(L, snap, rows, state, info)
       local nb = (ei == #c.envs) and 2 or 1
       local bx0 = ev.x + ev.w - nb * (L.btn_w + 2) - 1
       local room = not c.compact and (bx0 - ev.x - 2 * L.pad) >= ms('WW')
-      text(ev.x + L.pad, ly2 + 2, fit(ev.e.name, room and (bx0 - ev.x - 2 * L.pad) or (ev.w - 2 * L.pad)), env_colour(ev.e))
+      -- 24 окт: имя параметра — коротко: «S01 сэмпл: Pitch adjust / drumrs5k …» → «Pitch adjust» (префикс съедал всё место)
+      local en = (ev.e.name or ''):gsub(' / .*$', '')
+      en = en:match(':%s*(.+)$') or en
+      text(ev.x + L.pad, ly2 + 2, fit(en, room and (bx0 - ev.x - 2 * L.pad) or (ev.w - 2 * L.pad)), env_colour(ev.e))
       local on_btn = false
       if room then
         for k, b in ipairs(nb == 2 and { { '+', 1 }, { '-', -1 } } or { { '-', -1 } }) do

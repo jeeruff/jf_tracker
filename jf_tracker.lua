@@ -1820,12 +1820,9 @@ ctx = {
       if q1 <= q0 + 1e-6 then q1 = math.floor(q0) + 1 end
       len = reaper.TimeMap2_QNToTime(0, q1) - pos
     else
-      local rg = alias.region_at(regions, t0)
-      if rg then pos, len, what = rg.pos, rg.rgnend - rg.pos, 'the pattern'
-      else
-        local r0, r1 = model.bar_of_row(vim.cur.row, state.lpb)
-        pos = edit.row_time(r0, state.lpb, 0); len = edit.row_time(r1, state.lpb, 0) - pos; what = 'the bar'
-      end
+      -- 24 окт: под курсором ничего — такт (было: паттерн, потом такт)
+      local r0, r1 = model.bar_of_row(vim.cur.row, state.lpb)
+      pos = edit.row_time(r0, state.lpb, 0); len = edit.row_time(r1, state.lpb, 0) - pos; what = 'the bar'
     end
     local idx = edit.auto_item(env, pos, len)
     state.envs = true
@@ -3590,6 +3587,13 @@ ctx = {
     local ae = state.ai_edit
     if ae and mod_pane == 'ai' and not ae.take and reaper.ValidatePtr(ae.env, 'TrackEnvelope*') then   -- огибающая take — время item, генератор пишет в проектном
       return { e = { env = ae.env, min = ae.min, max = ae.max, name = ae.label }, label = 'item ' .. (ae.label or ''), ai = ae }
+    end
+    local d = ctx.dsp_env_focus
+    if d and state.focus ~= 'tracker' and d.env and reaper.ValidatePtr(d.env, 'TrackEnvelope*') then
+      for _, c in ipairs(snap and snap.cols or {}) do
+        for _, e in ipairs(c.envs or {}) do if e.env == d.env then return { e = e, label = d.label } end end
+      end
+      return { e = { env = d.env, name = d.label, min = 0, max = 1 }, label = d.label }
     end
     local f = L and L.flat[vim.cur.fi]
     if f and f.env then return { e = f.env, label = (f.col and f.col.name or '') .. ' / ' .. (f.env.name or 'env') } end
@@ -16065,6 +16069,17 @@ ctx.acv_draw = function(Lx, x, y, w, h)
   local curves = ctx.acv_curves(sp)
   -- курсор холста следует за курсором трекера (один курсор, две картинки)
   if ctx.acv_row_seen ~= vim.cur.row then ctx.acv_row_seen = vim.cur.row; ACV.row = vim.cur.row end
+  -- 24 окт: параметр DSP без огибающей — пустой холст: щелчок — огибающая и automation item (item под курсором, иначе такт)
+  local d = ctx.dsp_env_focus
+  if d and not (d.env and reaper.ValidatePtr(d.env, 'TrackEnvelope*')) and state.focus ~= 'tracker' then
+    local hot = gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= y and gfx.mouse_y < y + h
+    U.set(hot and U.tint(U.AMBER, 0.08) or U.BG); gfx.rect(x, y, w, h, 1)
+    U.set(U.LINE); gfx.rect(x, y, w, h, 0)
+    U.text(x + Lx.pad, y + 2, ctx.fit(d.label .. ' - no automation yet', w - 2 * Lx.pad), U.AMBER)
+    local msg = 'click - the first point: an envelope and an automation item (the item under the cursor, else a bar)'
+    U.text(x + Lx.pad, y + math.floor(h / 2), ctx.fit(msg, w - 2 * Lx.pad), hot and U.TEXT or U.GREY)
+    return hot and { acv_new = d } or nil
+  end
   return ACV.draw(Lx, x, y, w, h, curves, sp, state.focus == 'top' and mod_pane == 'curve')
 end
 -- клавиша холста: движение → курсор трекера; op → запись
@@ -22601,6 +22616,11 @@ local function frame()
     local p = f and f.params and f.params[dsp_sel.param or 1]
     local dk = p and ((p.fx or f.i) .. ':' .. p.i)
     if dk and dk ~= ctx.ptouch_dsp then ctx.ptouch_dsp = dk; ctx.ptouch_push(reaper.GetTrackGUID(t.track), dk) end
+    -- 24 окт: параметр в фокусе DSP — его огибающая для вкладки automation (кривая на нём); трекер в фокусе — забыть
+    if state.focus == 'dsp' and p and not t.take then
+      local env = reaper.GetFXEnvelope(t.track, p.fx or f.i, p.i, false)
+      ctx.dsp_env_focus = { k = dsp_sel.fx, pi = dsp_sel.param or 1, env = env, label = (f.name or '') .. ' / ' .. (p.name or ''), track = t.track }
+    elseif state.focus == 'tracker' then ctx.dsp_env_focus = nil end
     -- 24 окт: параметр под курсором трекера — рамкой в DSP: колонка огибающей FX → её параметр; команда ноты
     -- (0M громкость, 0P пан, 0U 0D 0G SF высота, 0S старт) → параметр сэмплера (рэк / RS5K) по смыслу
     ctx.cur_param_hl = nil
@@ -23519,6 +23539,12 @@ local function frame()
       elseif MM.cur == i then MM.key(13)          -- второй клик по строке — learn
       else MM.cur = i end
       click = { t = now2, zone = 'midimap' }
+    elseif lfo_hover and lfo_hover.acv_new and state.top and state.toptab == 'automation' then
+      -- 24 окт: параметр DSP без огибающей — щелчок по холсту: огибающая + automation item (item под курсором / такт), его редактор
+      local d = lfo_hover.acv_new
+      ctx.dsp_autoitem(d.k, d.pi)
+      ctx.dsp_env_focus = nil
+      click = { t = now2, zone = 'acvnew' }
     elseif lfo_hover and state.top and state.toptab == 'automation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
