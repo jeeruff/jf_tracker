@@ -107,7 +107,7 @@ KH.PAGES = {
     { k = 'macros tab', t = {}, d = 'as lf: folders left (recorded / saved / shared / built-in, h l - between folders and the list, j k), the macros of the folder in the middle, the editor of the picked one right (buttons = keys): Enter play, a new, e edit the body, n name, K hotkey (press the keys, Esc removes; it plays the macro anywhere), r register (@x), t description, S share (a .jfm file in Data/jf_tracker_macros), i import a shared one into saved, d delete; dblclick plays' },
     { k = ':scramble', d = 'slice notes swap their slices randomly (VISUAL, else the track in the region; button in the item tab)' },
     { k = '{ }', d = 'bar back / forward' },
-    { k = 'x', d = 'delete event under cursor' },
+    { k = 'x', d = 'delete the cell under the cursor: on the note - the event; on vol / delay / a command - only that value (the note stays; dd and dl too); nothing moves' },
     { k = 'd', d = 'd + motion deletes events: dw d3j dG d}; dd - the rows (3dd), td - the track', t = { 'd' } },
     { k = 'dae', d = 'delete all automation of the cursor track in the song (points and automation items; the lib after =LIB stays)' },
     { k = 'dal daj dak dah', d = 'delete notes of the cursor track: dal on the cursor row (every subcolumn), daj below it, dak above it, dah all but the cursor row' },

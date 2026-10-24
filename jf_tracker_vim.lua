@@ -775,6 +775,15 @@ local function apply(op, f0, f1, r0, r1)
   end
   local heads = V.heads_in(f0, f1, r0, r1)
   local edited = true
+  -- 24 окт: d / x на поле громкости, задержки, команды (одна колонка) — строго ячейка: очистить это поле у нот
+  -- строк, ноты остаются (было: удалялось событие целиком)
+  local fld = V.cur.field or 1
+  if (op == 'd' or op == 'x') and f0 == f1 and fld >= 2 and V.cur.sub ~= 'inst' and V.cur.sub ~= 'wave' and V.mode ~= 'visual' and V.mode ~= 'vline' and V.field_set then
+    if #heads == 0 then V.msg = 'nothing in this cell'; return false end
+    E.run('clear the cell', function() for _, h in ipairs(heads) do V.field_set(h, fld, nil) end end)
+    V.msg = ('cell cleared: %d'):format(#heads)
+    return true
+  end
   if op == 'd' or op == 'x' or op == 'c' then
     V.regs['"'] = E.yank(heads, lpb(), r0, f0)
     E.delete(heads, lpb())
