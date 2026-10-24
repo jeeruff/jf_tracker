@@ -67,6 +67,13 @@ ok(not wrapc.wrap and #wrapc.params == 3, 'wrap -> pack by hand: the full list b
 local empty = { name = 'E0', container = true, params = {}, kids = {} }
 M.cont_view = nil
 ok(names2(M.expand_inner(nil, { empty })) == 'E0' and empty.wrap, 'an empty container is a wrap (the nest)')
+-- 24 окт: параллельные ветки — номер у участников группы, одиночный последовательный — без
+M.cont_view = function() return 'wrap' end
+local par3 = { name = 'PG', container = true, params = {}, kids = { { name = 'A', parallel = 0, entry = pfx('A', 9) }, { name = 'B', parallel = 1, entry = pfx('B', 9) },
+  { name = 'Cc', parallel = 1, entry = pfx('Cc', 9) }, { name = 'D', parallel = 0, entry = pfx('D', 9) } } }
+local pv = M.expand_inner(nil, { par3 })
+ok(pv[2].inner.lane == 1 and pv[3].inner.lane == 2 and pv[4].inner.lane == 3 and pv[5].inner.lane == nil, 'lanes: A B C parallel - 1 2 3, D after them - none')
+M.cont_view = nil
 -- 24 окт: рэк — замыкание «out» после последнего потомка, внутренний контейнер первым
 local nv = M.expand_inner(nil, { nest })
 local lastv = nv[#nv]

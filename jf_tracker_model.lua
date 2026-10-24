@@ -1695,6 +1695,19 @@ local function wrap_kids(tr, e, view, depth)
       if en.container and en.kids and not en.kit and not en.bands and depth < 4 and M.cont_mode(tr, en) == 'wrap' then wrap_kids(tr, en, view, depth + 1) end
     end
   end
+  -- 24 окт: параллельные ветки — свой номер (lane) у каждого участника группы: первый (последовательный) и все
+  -- следующие за ним с parallel; одиночный последовательный — без номера. Под модулем — скобка цветом ветки
+  local grp, lane = {}, 0
+  for i = 1, #view do
+    local en = view[i]
+    if en.inner and en.inner.parent == e then grp[#grp + 1] = en end
+  end
+  for i, en in ipairs(grp) do
+    local par = (en.inner.par or 0) > 0
+    local nxt = grp[i + 1] and (grp[i + 1].inner.par or 0) > 0
+    if par then lane = lane + 1 elseif nxt then lane = 1 else lane = 0 end
+    en.inner.lane = lane > 0 and lane or nil
+  end
   -- 24 окт: контейнер — рэк из трёх частей (шапка, эффекты, замыкание): после последнего потомка — колонка «out»
   -- (cend — контейнеры, которые тут кончаются, внутренний первым; пустой контейнер замыкается сам за собой)
   local last = view[#view]

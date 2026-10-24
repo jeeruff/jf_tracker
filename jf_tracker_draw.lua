@@ -5449,8 +5449,25 @@ end
 -- цвета контейнера (щели между ними залиты — видно, что это одно целое), справа — замыкание «out»; рамка сверху и снизу
 -- через все три части. Вложенный контейнер — подложка гуще (глубина). D.cst[f] — начало рэка (x, ряд, номер блока).
 local function rack_col(d) return U.tint(U.AMBER, 0.10 + 0.07 * math.min(3, d)) end
+-- 24 окт: цвет параллельной ветки (lane 1, 2, …) — скобка под её модулем / контейнером
+local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; return P[(n - 1) % #P + 1] end
+D.lane_col = lane_col
+local function bracket(L, x0, x1, boxy, bh0, d)
+  local ext = D.rack_ext or 0
+  if ext < 3 then return end
+  local yb = boxy + bh0 + 1 + math.min(ext - 2, 2 * math.max(0, 2 - d))
+  gfx.rect(x0, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
+  gfx.rect(x0, yb, x1 - x0 + 1, 1, 1)
+end
+function D.lane_close(L, f, bx, boxy, bh0)
+  local st = D.lst
+  if not (st and st.f == f and st.y == boxy) then return end
+  set(f.enabled and lane_col(f.inner.lane) or U.DIM)
+  bracket(L, st.x, bx - L.pad - 1, boxy, bh0, f.inner.depth or 1)
+end
 function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.wrap then D.cst[f] = { x = bx, y = boxy, k = k } end
+  if f.inner and f.inner.lane and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
   local inn = f.inner
   if inn and inn.wrap and D.cst[inn.parent] and D.cst[inn.parent].y == boxy then
     set(rack_col(inn.depth or 1)); gfx.rect(bx - L.pad, boxy, L.pad, bh0, 1)   -- щель перед эффектом — цветом рэка
@@ -5472,14 +5489,10 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     if same then   -- рамка рэка: сверху и снизу от шапки до замыкания
       set(c.enabled and U.AMBER or U.DIM)
       gfx.rect(st.x, boxy - 1, x + capw - st.x, 1, 1); gfx.rect(st.x, boxy + bh0, x + capw - st.x, 1, 1)
-      -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше
-      local ext = D.rack_ext or 0
-      if ext >= 3 then
-        local yb = boxy + bh0 + 1 + math.min(ext - 2, 2 * math.max(0, 2 - d))
-        local x1 = x + capw - 1
-        gfx.rect(st.x, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
-        gfx.rect(st.x, yb, x1 - st.x + 1, 1, 1)
-      end
+      -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше;
+      -- контейнер — ветка параллельной группы: скобка цветом ветки
+      if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
+      bracket(L, st.x, x + capw - 1, boxy, bh0, d)
     end
     if hot and st then hover.dsp = { fx = st.k, f = c } end
     if D.hint then D.hint('dsp', x, boxy, capw, bh0, { fx = st and st.k }) end
@@ -10980,6 +10993,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + bw + L.pad
       end
       ::next_block::
+      if f.inner and f.inner.lane and not f.wrap then D.lane_close(L, f, bx, boxy, bh0) end
       if f.cend then bx = D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover) end
     end
     -- окно цепочки — на экран; всё, что левее / правее, осталось в буфере
