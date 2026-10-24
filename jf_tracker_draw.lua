@@ -9303,14 +9303,22 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
       local inp = f.inner and (f.inner.band .. ' > ') or ''
-      local nmtxt = fit((f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw)
+      -- 24 окт: справа от имени — кнопка входов / выходов «2 in 2/6 out» (как у REAPER): щелчок — матрица пинов
+      local iol = (not f.container) and info.fx_io and info.fx_io(f) or nil
+      local iow = iol and (ms(iol) + 2 * L.pad) or 0
+      local full = (f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name)
+      if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
+      local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
-      -- 24 окт: имя — в рамке (кнопка): щелчок — матрица пинов (входы / выходы плагина), протяжка — перенос, как раньше
-      local nmw = math.min(tw, ms(nmtxt)) + 4
-      local nmhot = not drag and mx >= bx + L.pad - 2 and mx < bx + L.pad - 2 + nmw and my >= by + 1 and my < by + L.rh
-      set(nmhot and U.AMBER or U.mix(U.LINE, U.BG, 0.25)); gfx.rect(bx + L.pad - 2, by + 1, nmw, L.rh - 1, 0)
-      D.dsp_namehot = D.dsp_namehot or {}
-      D.dsp_namehot[k] = nmhot
+      if iol then
+        local ix0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
+        local ihot = not drag and mx >= ix0 and mx < ix0 + iow and my >= by + 1 and my < by + L.rh
+        set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(ix0, by + 1, iow, L.rh - 1, 1)
+        set(ihot and U.AMBER or U.LINE); gfx.rect(ix0, by + 1, iow, L.rh - 1, 0)
+        text(ix0 + L.pad, by + 1, iol, ihot and U.AMBER or U.GREY)
+        if ihot then hover.dspbtn = { fx = k, f = f, what = 'pins' }; on_btn = true end
+        hint('dspbtn', ix0, by + 1, iow, L.rh - 1, { fx = k, what = 'pins' })
+      end
       if f.inner then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
       if tw > 0 then
         for _, b in ipairs(bxs) do
@@ -9337,7 +9345,7 @@ function D.frame(L, snap, rows, state, info)
           hint('dspbtn', kx, by + 1, kb, L.rh - 1, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
       end
-      if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f, name = D.dsp_namehot and D.dsp_namehot[k] or nil } end
+      if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
       if mw > 0 then

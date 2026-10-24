@@ -14887,10 +14887,31 @@ ctx.pins_open = function(k)
   ctx.set_focus('dsp')
   vim.msg = f.name .. ' pins: h j k l move, Space toggle, + - track channels, r reset, Esc close (click a cell too)'
 end
+-- 24 окт: подпись кнопки пинов «2 in 2/6 out»: входы плагина; выходов занято / всего (как REAPER); кеш 1 с на модуль
+ctx.fx_io_c = {}
+ctx.fx_io = function(f)
+  local col = dsp_target(); local tr = col and col.track
+  if not tr then return nil end
+  local key = tostring(tr) .. ':' .. tostring(f.fguid or f.i)
+  local now = reaper.time_precise()
+  local c = ctx.fx_io_c[key]
+  if c and now - c.t < 1 then return c.s end
+  local A = model.fxapi(tr)
+  local ok, _, ni, no = pcall(A.GetIOSize, tr, f.i)
+  local s
+  if ok and ni and no and (ni > 0 or no > 0) then
+    local used = 0
+    for p = 0, no - 1 do if (tonumber((A.GetPinMappings(tr, f.i, 1, p))) or 0) ~= 0 then used = used + 1 end end
+    s = (used == no) and ('%d in %d out'):format(ni, no) or ('%d in %d/%d out'):format(ni, used, no)
+  end
+  ctx.fx_io_c[key] = { t = now, s = s }
+  return s
+end
 ctx.pins_write = function(side, pin)
   local m = ctx.pinmx; if not m then return end
   local A = model.fxapi(m.track)
   edit.run('pins ' .. m.name, function() A.SetPinMappings(m.track, m.fx, side == 'out' and 1 or 0, pin, (side == 'out' and m.st.outs or m.st.ins)[pin] or 0, 0) end)
+  ctx.fx_io_c = {}
 end
 ctx.pins_toggle = function(side, pin, ch)
   local m = ctx.pinmx; if not m then return end
@@ -20335,7 +20356,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -21627,7 +21648,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (zv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
@@ -23806,6 +23827,7 @@ local function frame()
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bands' then ctx.dsp_bands(hover.dspbtn.fx)   -- 23 окт: ÷ — в полосы
+      elseif hover.dspbtn.what == 'pins' then ctx.pins_open(hover.dspbtn.fx)   -- 24 окт: «2 in 2/6 out» — матрица пинов
       elseif hover.dspbtn.what == 'cnew' then ctx.dsp_container_new(hover.dspbtn.fx, true)   -- 24 окт: [] — контейнер внутрь
       elseif hover.dspbtn.what == 'lastp' then ctx.dsp_lastparam_menu(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
@@ -23972,7 +23994,7 @@ local function frame()
       ctx.set_focus('dsp')
       if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
-      if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, name = hover.dsp.name } end
+      if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
       if hover.dsp.param and col and dbl and click.zone == 'dsp' and click.param == hover.dsp.param and click.fx == hover.dsp.fx then
         -- двойной клик по параметру (7 окт): сброс к значению по умолчанию
@@ -25081,7 +25103,6 @@ local function frame()
       end
     else
       local dd = dsp_drag; dsp_drag = nil       -- снять ДО действия (6 окт): ошибка не повторит перенос
-      if dd and not dd.active and dd.name then ctx.pins_open(dd.fx) end   -- 24 окт: щелчок по имени в рамке — пины (протяжка — перенос)
       local g, s = hover.dsp_gap, dd.fx
       -- 11 окт: на колонку трека / полосу или шапку микшера — перенос на тот трек:
       -- инструмент — первым в цепь, эффект — в конец (как вставка в консоли)
