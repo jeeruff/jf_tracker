@@ -5488,7 +5488,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     local hot = not drag and mx >= x and mx < x + capw and my >= boxy and my < boxy + bh0
     local fill = rack_col(d)
     set(fill); gfx.rect(x, boxy, capw, bh0, 1)
-    set(c.enabled and U.AMBER or U.DIM); gfx.rect(x, boxy, capw, bh0, 0)
+    set(c.enabled and U.tint(U.AMBER, 0.6) or U.DIM); gfx.rect(x, boxy, capw, bh0, 0)
     local function mid(s) return x + math.floor((capw - ms(s)) / 2) end
     local y, sub = boxy + 2, false
     text(mid('out'), y, 'out', U.AMBER); y = y + L.rh
@@ -5523,8 +5523,8 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
       D.vtext(x + math.floor((capw - L.th) / 2), y + math.floor((rest - nh) / 2), nh, nm, (hot and not sub) and U.TEXT or U.AMBER, fill, true)
     end
     hot = hot and not sub
-    if same then   -- рамка рэка: сверху и снизу от шапки до замыкания
-      set(c.enabled and U.AMBER or U.DIM)
+    if same then   -- рамка рэка: сверху и снизу от шапки до замыкания (24 окт: приглушённым янтарём — выбранный модуль ярче)
+      set(c.enabled and U.tint(U.AMBER, 0.6) or U.DIM)
       gfx.rect(st.x, boxy - 3, x + capw - st.x, 1, 1)   -- 24 окт: сверху — через 2 px от рамок модулей; снизу — скобка
       -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше;
       -- контейнер — ветка параллельной группы: скобка цветом ветки
@@ -9495,7 +9495,9 @@ function D.frame(L, snap, rows, state, info)
       local in_rng = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
-      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)
+      -- 24 окт: выбранный — янтарь в 2 px, остальные — рамка тише (выбранный модуль терялся среди рамок рэка)
+      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.tint(U.LINE, 0.7)) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)
+      if is_sel and not ins_here then set(U.AMBER); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
       if info.dsp_learn == k or ins_here then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
       if vtw > 0 then
         local tx0, ty = bx + bw - vtw, by + L.rh + 2
