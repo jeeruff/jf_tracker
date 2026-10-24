@@ -97,6 +97,7 @@ function D.init(u, peaks_fn, matrix)
   D.HDRSEL = U.HDRSEL or U.theme('col_seltrack', U.mix(D.HDR, U.TEXT, 0.10))
   -- темы (3 окт, jf_tracker_themes.lua): mono — всё серым, кроме ячейки курсора
   D.mono = U.MONO and true or false
+  D.mono_tint = U.MONO_TINT   -- 24 окт: rednight / greennight — серый по яркости в оттенок
   -- цвета кнопок как в REAPER (3 окт): запись — фиолетовая, FX трека — зелёная;
   -- во всех темах, в mono тоже (исключения серого фильтра)
   D.ARM, D.FXG = { 0.66, 0.36, 0.90 }, { 0.40, 0.66, 0.30 }
@@ -1050,6 +1051,8 @@ end
 -- mono: серый по яркости, кроме ячейки курсора (D.CURCELL)
 local function mono(c)
   if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end   -- курсор, рамка INSERT, R и FX — цветные
+  local t = D.mono_tint
+  if t then local l = math.max(c[1], c[2], c[3]); return { l * t[1], l * t[2], l * t[3] } end   -- по наибольшему каналу: уже тонированное не темнеет
   local l = 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]
   return { l, l, l }
 end
@@ -1058,6 +1061,8 @@ D.mono_col = mono
 -- подсказки) иначе пропадали на тёмном фоне (3 окт); фон и линии — как есть
 local function mono_text(c)
   if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end
+  local t = D.mono_tint
+  if t then local l = math.max(0.40, c[1], c[2], c[3]); return { l * t[1], l * t[2], l * t[3] } end
   local l = math.max(0.40, 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3])
   return { l, l, l }
 end

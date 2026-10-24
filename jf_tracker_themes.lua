@@ -14,7 +14,7 @@
 
 local TH = {}
 
-TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'solarized-dark', 'solarized-light', 'gruvbox', 'catppuccin', 'mono', 'protracker', 'impulse' }
+TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'solarized-dark', 'solarized-light', 'gruvbox', 'catppuccin', 'mono', 'rednight', 'greennight', 'protracker', 'impulse' }
 
 local function hex(s)
   local r, g, b = s:match('#?(%x%x)(%x%x)(%x%x)')
@@ -41,6 +41,12 @@ TH.PAL = {
     amber = '#fab387', cyan = '#94e2d5', green = '#a6e3a1', red = '#f38ba8', hdr = '#313244', hdrsel = '#45475a' },
   mono = { bg = '#101010', panel = '#181818', text = '#d8d8d8', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true },
+  -- 24 окт: как mono, только всё одним цветом — красным (ночной режим: глаза не теряют темновую адаптацию) / зелёным
+  -- (фосфорный монитор); яркость — по светлоте цвета, оттенок — tint
+  rednight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
+    amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true, tint = { 1.0, 0.16, 0.10 }, cursor = '#ffffff' },
+  greennight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
+    amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true, tint = { 0.30, 1.0, 0.35 }, cursor = '#ffffff' },
   -- ProTracker 2 (4 окт): чёрное поле паттерна, серые панели в духе Amiga,
   -- светло-серый текст, жёлтый акцент (скопы), синий, малиновый курсор PT
   protracker = { bg = '#000000', panel = '#3a3a3a', text = '#cccccc', grey = '#a0a0a0', dim = '#2a2a2a', line = '#888888',
@@ -84,7 +90,7 @@ function TH.valid(name) return name == 'reaper' or TH.PAL[name] ~= nil end
 -- применить тему к U; false — reaper (нативная палитра, U не трогается)
 function TH.apply(U, name)
   local p = TH.PAL[name or '']
-  U.HDR, U.HDRSEL, U.MONO, U.MONO_CURSOR = nil, nil, nil, nil
+  U.HDR, U.HDRSEL, U.MONO, U.MONO_CURSOR, U.MONO_TINT = nil, nil, nil, nil, nil
   if not p then return false end
   U.BG, U.PANEL, U.TEXT, U.GREY = hex(p.bg), hex(p.panel), hex(p.text), hex(p.grey)
   U.DIM, U.LINE = hex(p.dim), hex(p.line)
@@ -95,7 +101,13 @@ function TH.apply(U, name)
   U.AMBER, U.CYAN, U.GREEN, U.RED = hex(p.amber), hex(p.cyan), hex(p.green), hex(p.red)
   U.HDR, U.HDRSEL = hex(p.hdr), hex(p.hdrsel)
   U.MONO = p.mono or nil
-  U.MONO_CURSOR = p.mono and TH.MONO_CURSOR or nil
+  U.MONO_CURSOR = p.mono and (p.cursor and hex(p.cursor) or TH.MONO_CURSOR) or nil
+  U.MONO_TINT = p.tint
+  if p.tint then   -- фон и панели — тоже в оттенке (иначе серые поля между красным)
+    -- все цвета палитры — в оттенок (модули, что рисуют U.* напрямую, тоже красные / зелёные)
+    local function tn(c) local l = math.max(c[1], c[2], c[3]); return { l * p.tint[1], l * p.tint[2], l * p.tint[3] } end
+    for _, k in ipairs({ 'BG', 'PANEL', 'DIM', 'LINE', 'HDR', 'HDRSEL', 'TEXT', 'GREY', 'AMBER', 'CYAN', 'GREEN', 'RED' }) do U[k] = tn(U[k]) end
+  end
   return true
 end
 

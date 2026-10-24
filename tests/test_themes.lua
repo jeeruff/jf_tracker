@@ -15,7 +15,8 @@ for _, name in ipairs(TH.LIST) do
   if name ~= 'reaper' then
     local u = {}
     eq(name .. ' applies', TH.apply(u, name), true)
-    eq(name .. ' text readable (7:1)', contrast(u.TEXT, u.BG) >= 7, true)
+    -- 24 окт: ночные (одним цветом: красный / зелёный) — 4.5:1 (чистый красный на чёрном выше не бывает)
+    eq(name .. ' text readable', contrast(u.TEXT, u.BG) >= ((name:match('night$')) and 4.5 or 7), true)
     eq(name .. ' accent readable (3:1)', contrast(u.AMBER, u.BG) >= 3, true)
     eq(name .. ' header set', u.HDR ~= nil and u.HDRSEL ~= nil, true)
   end
