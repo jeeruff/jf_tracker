@@ -16907,6 +16907,9 @@ local function hint_go(t)
   elseif t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar') then   -- 11 окт: фейдер транспорта по f — с клавиатуры
     state.kslider = { ctrl = d }
     vim.msg = (d == 'ratebar' and 'playrate' or 'swing') .. ': h l change (H L fine), 0 reset, Esc done'
+  elseif t.kind == 'ctrl' and d == 'bpm' then   -- 24 окт: f на BPM — ввод темпа цифрами (как двойной щелчок; было: ничего)
+    state.bpm_edit = ''
+    vim.msg = 'BPM: type the tempo, Enter - set, Esc - cancel'
   elseif t.kind == 'ctrl' and ctx.ctrl_menu and ctx.ctrl_menu(d) then   -- 12 окт: f на ячейке транспорта — её выпадашка (выбор с клавиатуры)
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
