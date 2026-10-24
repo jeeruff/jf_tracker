@@ -16957,6 +16957,7 @@ function track_actions(col)
     { 'Mute track', key = 'm', fn = function() edit.run('track mute', function() reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1 and 0 or 1) end) end },
     { 'Solo track', key = 's', fn = function() edit.run('track solo', function() reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0 and 0 or 1) end) end },
     { (state.folds[col.guid] and 'Unfold' or 'Fold') .. ' track (za)', key = 'f', fn = function() ctx.fold(col, not state.folds[col.guid]) end },
+    { (edit.mono_on(tr) and '!' or '') .. 'One note lane: a new note cuts the sounding one (z1)', key = '1', fn = function() ctx.mono_toggle(col, col.lanes and col.lanes[1]) end },   -- 24 окт
     { 'Select track in REAPER', key = 'L', fn = function() reaper.SetOnlyTrackSelected(tr) end },
     { 'CC lane (ReaControlMIDI, :cc)', key = 'C', fn = function() ctx.cc_lane() end },
     -- 10 окт: всё про трек и его вид — те же действия, что клавиши t…

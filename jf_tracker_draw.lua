@@ -7810,7 +7810,7 @@ function D.frame(L, snap, rows, state, info)
       end
       if not c.folded and not c.master then
         -- 24 окт: [1][−][+] — 1 первой (трек на одном нотном лейне), − + правее; места на три нет — только − +
-        local one = li == 1 and info.mono_on and nx + bw2 + L.btn_w + 2 <= ln.x + ln.w
+        local one = false   -- 24 окт (вечер): кнопка 1 убрана (лишние кнопки в шапке) — моно-лейн: z1 / меню трека
         if nx + bw2 <= ln.x + ln.w then
           pm(nx + (one and (L.btn_w + 2) or 0), 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
           local ox = nx
