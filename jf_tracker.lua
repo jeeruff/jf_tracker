@@ -12715,7 +12715,7 @@ ctx = {
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('panes_ui', 'panes', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs). Cmd+h j k l - focus, Cmd+Shift+h j k l - move, Ctrl+W - pane mode (split, stack, size, zoom, hide, layouts), :pane; click - focus, drag the line between panes - size. Off - the old fixed layout'),
-      flag('dspleft', 'module buttons left', 'DSP modules: the buttons (+ e ∆ on x) and the preset right after the name, not at the far right edge - on a wide module no reaching across; off - at the right edge'),
+      flag('dspleft', 'preset by the name', 'DSP modules: the preset (< name >) right after the module name, the buttons (+ e ∆ on x) at the right edge; off - the preset at the right too'),
       flag('offdim', 'dim off modules', 'DSP: a module switched off (on / off button, bypass) shows its parameters dimmed'),
       flag('eqgraph', 'reaeq graph only', 'ReaEQ in the DSP panel: the curve only, drag the band points (P in its header - parameters only)'),
       flag('dsptrackslim', 'slim DSP track header', 'the DSP track block as a narrow vertical column (vertical vol / pan faders, in / out) - more room for the modules; off - rows with the XY snapshot pad under them'),
@@ -23335,6 +23335,10 @@ local function frame()
   if U.click and state.kslider then state.kslider = nil end                -- клик — выход из режима слайдера
   if U.click and not vim.picker then ctx.focus_at(gfx.mouse_x, gfx.mouse_y) end
   if U.click or U.rclick then MX.spl_focus = nil end   -- 21 окт: строка секций — клавиатура отпускается щелчком
+  -- 24 окт: щелчок по параметру / кнопке / виджету модуля — выбор без прокрутки цепочки к нему (рэк уезжал из-под
+  -- мыши); по пустому месту модуля — как было: модуль целиком в поле зрения
+  if (U.click or U.rclick) and ((hover.dsp and hover.dsp.param) or hover.dspbtn or hover.dspxy or hover.cslide or hover.capwet
+     or hover.knob or hover.dspab or hover.rs5k or hover.dspkit or hover.dspeq) then draw.dsp_noscroll = reaper.time_precise() end
   if U.click then
     local now2 = reaper.time_precise()
     local dbl = (now2 - click.t) < 0.4

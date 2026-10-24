@@ -5695,7 +5695,7 @@ function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
   local tot = 0
   for _, b in ipairs(bs) do tot = tot + (b[3] or kb) + 2 end
   local nw = math.max(L.cw, w - tot - 2 * L.pad - 1)
-  if info.dspleft then x = cx + L.pad + ms(fit(kid.name or '', nw) .. '.') - ms('.') + L.pad + tot end
+  -- 24 окт (вечер): кнопки эффекта в цепи — снова справа
   for _, b in ipairs(bs) do
     local kb = b[3] or kb
     x = x - kb - 2
@@ -5707,7 +5707,6 @@ function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
     text(x + L.pad, hy, b[1], hb and (red and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
     if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
   end
-  if info.dspleft then return nw end
   return math.max(L.cw, x - cx - 2 * L.pad - 2)
 end
 function D.kid_pack(f, rows)
@@ -9591,10 +9590,10 @@ function D.frame(L, snap, rows, state, info)
         hint('dspbtn', ix0, by + 1, iow, L.rh - 1, { fx = k, what = 'pins' })
       end
       -- 24 окт: опция dspleft — кнопки и пресет сразу за именем (у большого модуля не тянуться в правый край)
+      -- 24 окт (вечер): кнопки — снова в правом краю (просьба), у имени — только пресет «< имя >»
       if info.dspleft and tw > 0 then
         local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
-        for i = #bxs, 1, -1 do bxs[i][3] = x; x = x + (bxs[i][4] or kb) + 2 end
-        if pre_at then pre_at(x + L.pad) end
+        if pre_at then pre_at(x) end
       end
       if f.inner and not f.inner.wrap then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end   -- 24 окт: в рэке — без второй рамки (слипалась)
       if tw > 0 then
@@ -11262,6 +11261,9 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_px = math.max(0, math.min(maxpx, D.dsp_px))
     if D.dsp_px_t then D.dsp_px_t = math.max(0, math.min(maxpx, D.dsp_px_t)) end
     -- выбранный модуль (w / W, щелчок, harpoon) — плавно в поле зрения, целиком, если влезает
+    if sel.fx ~= D.dsp_sel_last and D.dsp_noscroll and reaper.time_precise() - D.dsp_noscroll < 0.5 then
+      D.dsp_sel_last, D.dsp_noscroll = sel.fx, nil   -- 24 окт: выбор щелчком по параметру — без прокрутки
+    end
     if sel.fx ~= D.dsp_sel_last then
       D.dsp_sel_last = sel.fx
       local v = D.dsp_vx[sel.fx or 0]
