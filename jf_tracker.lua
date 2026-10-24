@@ -17730,7 +17730,7 @@ function ctx.context_items(hover)
         else ctx.dsp_pack(hover.dsp.fx, hover.dsp.fx) end
       end, 'p')
       add('Edit: the FX window (e)', function() edit.fx_show(col.track, f.i) end, 'e')
-      if not f.container then add('In / out: the pin matrix', function() ctx.pins_open(hover.dsp.fx) end, 'I') end
+      add('In / out: the pin matrix', function() ctx.pins_open(hover.dsp.fx) end, 'I')   -- 24 окт: и у контейнера
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end, 'dw')
       add('Add FX … (fzf)', function() ctx.fx_picker() end, 'f')
       add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end, 'X')

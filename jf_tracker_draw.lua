@@ -9580,7 +9580,7 @@ function D.frame(L, snap, rows, state, info)
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
       local inp = f.inner and (f.inner.wrap and (string.rep('.', (f.inner.depth or 1) - 1) .. ((f.inner.par or 0) > 0 and '= ' or '| ')) or ((f.inner.band or '') .. ' > ')) or ''   -- 24 окт: в обёртке — | / = (последовательно / параллельно)
       -- 24 окт: справа от имени — кнопка входов / выходов «2 in 2/6 out» (как у REAPER): щелчок — матрица пинов
-      local iol = (not f.container) and info.fx_io and info.fx_io(f) or nil
+      local iol = (not f.container or f.wrap) and info.fx_io and info.fx_io(f) or nil   -- 24 окт: и у контейнера-рэка (пины его выхода)
       local iow = iol and (ms(iol) + 2 * L.pad) or 0
       -- 24 окт: число эффектов — без jf_tracker_macro (ручки макросов — не эффект: «2 fx» при одном Surge)
       local nfx = 0
