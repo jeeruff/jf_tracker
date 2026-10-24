@@ -5475,8 +5475,10 @@ function D.rack_open(L, f, k, bx, boxy, bh0)
     set(rack_col(inn.depth or 1)); gfx.rect(bx - L.pad, boxy, L.pad, bh0, 1)   -- щель перед эффектом — цветом рэка
   end
 end
+-- 24 окт: замыкание рэка — выход контейнера: out, mix (Wet контейнера: вертикальный фейдер, тянуть), i/o — пины
+-- выхода (матрица под кнопкой), имя — вертикально по центру остатка; щелчок по пустому — контейнер
 function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
-  local capw = L.th + 2 * L.pad + 2
+  local capw = math.max(L.th + 2 * L.pad + 2, ms('100') + 2 * L.pad)
   for _, c in ipairs(f.cend) do
     local st = D.cst[c]
     local d = c.inner and c.inner.depth or 0
@@ -5484,10 +5486,43 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     local same = st and st.y == boxy
     if same then set(rack_col(d + 1)); gfx.rect(x, boxy, L.pad, bh0, 1) end
     local hot = not drag and mx >= x and mx < x + capw and my >= boxy and my < boxy + bh0
-    local fill = hot and U.tint(U.AMBER, 0.35) or rack_col(d)
+    local fill = rack_col(d)
     set(fill); gfx.rect(x, boxy, capw, bh0, 1)
     set(c.enabled and U.AMBER or U.DIM); gfx.rect(x, boxy, capw, bh0, 0)
-    D.vtext(x + math.floor((capw - L.th) / 2), boxy + 2, bh0 - 4, 'out  ' .. (c.name or ''), hot and U.TEXT or U.AMBER, fill)
+    local function mid(s) return x + math.floor((capw - ms(s)) / 2) end
+    local y, sub = boxy + 2, false
+    text(mid('out'), y, 'out', U.AMBER); y = y + L.rh
+    local w = st and D.info and D.info.cont_wet and D.info.cont_wet(c)
+    if w then
+      local vs = tostring(math.floor(w.v * 100 + 0.5))
+      local fh = math.min(math.floor(bh0 * 0.4), boxy + bh0 - y - 4 * L.rh)
+      if fh > L.rh then
+        local fhot = not drag and mx >= x and mx < x + capw and my >= y and my < y + L.rh + fh
+        text(mid(vs), y, vs, fhot and U.AMBER or U.GREY); y = y + L.rh
+        local fx0 = x + math.floor(capw / 2) - 2
+        set(U.DIM); gfx.rect(fx0, y, 4, fh, 1)
+        local hh = math.floor(w.v * fh + 0.5)
+        set(fhot and U.AMBER or U.CYAN); gfx.rect(fx0, y + fh - hh, 4, hh, 1)
+        if fhot then hover.capwet = { fx = st.k, f = c, idx = w.idx, y = y, h = fh }; sub = true end
+        y = y + fh + 3
+      end
+    end
+    if st and y + L.rh <= boxy + bh0 - 2 then
+      local ihot = not drag and mx >= x + 1 and mx < x + capw - 1 and my >= y and my < y + L.rh
+      set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(x + 2, y, capw - 4, L.rh - 1, 1)
+      set(ihot and U.AMBER or U.LINE); gfx.rect(x + 2, y, capw - 4, L.rh - 1, 0)
+      text(mid('i/o'), y, 'i/o', ihot and U.AMBER or U.GREY)
+      D.io_btn = D.io_btn or {}; D.io_btn[st.k] = { x = x, y = y + L.rh }
+      if ihot then hover.dspbtn = { fx = st.k, f = c, what = 'pins' }; sub = true end
+      y = y + L.rh + 3
+    end
+    local rest = boxy + bh0 - 3 - y
+    if rest > L.cw then
+      local nm = c.name or ''
+      local nh = math.min(rest, ms(nm))
+      D.vtext(x + math.floor((capw - L.th) / 2), y + math.floor((rest - nh) / 2), nh, nm, (hot and not sub) and U.TEXT or U.AMBER, fill, true)
+    end
+    hot = hot and not sub
     if same then   -- рамка рэка: сверху и снизу от шапки до замыкания
       set(c.enabled and U.AMBER or U.DIM)
       gfx.rect(st.x, boxy - 3, x + capw - st.x, 1, 1)   -- 24 окт: сверху — через 2 px от рамок модулей; снизу — скобка
@@ -9151,6 +9186,10 @@ function D.frame(L, snap, rows, state, info)
     local stubw = ms('99>') + 2 * L.pad
     -- 11 окт: под блоками — полоса прокрутки цепочки (вместо кнопок «<N» / «N>»)
     local bh0 = boxh
+    -- 24 окт: есть рэки контейнеров — под модулями полоса 7 px под их скобки, полоса прокрутки — ниже неё
+    D.rack_band = 0
+    for _, f in ipairs(fxs) do if f.wrap then D.rack_band = 7; break end end
+    bh0 = bh0 - D.rack_band
     local function ncol_of(f)
       -- 19 окт: рэк drumrs5k в низкой панели — параметры пэда расходятся колонками вправо
       if f.kit and D.DR and f.kids then
@@ -9237,7 +9276,7 @@ function D.frame(L, snap, rows, state, info)
     local dest0, mx0 = gfx.dest, mx
     if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end
     gfx.dest = 700
-    D.rack_ext = (not info.dsp_wide) and sbh or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки поверх)
+    D.rack_ext = (not info.dsp_wide) and D.rack_band or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки ниже)
     gfx.blit(dest0, 1, 0, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext)   -- фон под блоками (24 окт: и 3 px над — рамка рэка)
     if mx < cx0 or mx >= cx1 then mx = -100000 end
     -- 23 окт: DSP развёрнут (zz) и высоко — модули рядами, как строки: слева направо, следующий ряд снова слева
@@ -9257,7 +9296,7 @@ function D.frame(L, snap, rows, state, info)
     local hint0, nslr0 = D.hint, D.slr and #D.slr or 0
     if hint0 then D.hint = function(kind, x, y, w, h, data) if x + w > cx0 and x < cx1 then hint0(kind, x, y, w, h, data) end end end
     D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
-    D.cst = {}
+    D.cst, D.info = {}, info
     for k, f in ipairs(fxs) do
       D.rack_open(L, f, k, bx, boxy, bh0)
       do
@@ -9642,8 +9681,8 @@ function D.frame(L, snap, rows, state, info)
             end
           elseif #f.params == 0 then
             text(bx + L.pad, ky, fit('macros: none yet', pw), U.GREY)
-            text(bx + L.pad, ky + L.rh, fit('am on a parameter of a', pw), U.DIM)
-            text(bx + L.pad, ky + 2 * L.rh, fit('module inside - here', pw), U.DIM)
+            text(bx + L.pad, ky + L.rh, fit('rclick a parameter inside', pw), U.DIM)   -- 24 окт: было «am» — клавиши такой нет
+            text(bx + L.pad, ky + 2 * L.rh, fit('- M: a macro knob here', pw), U.DIM)
             text(bx + L.pad, ky + 4 * L.rh, fit(#f.kids .. ' fx inside ->', pw), U.GREY)
           end
         elseif f.bands and #f.kids > 0 then
@@ -11089,7 +11128,7 @@ function D.frame(L, snap, rows, state, info)
     hover.dsphsb = nil; D.dsp_sb_n = nil
     if not (info.dsp_router and info.draw_router) and #fxs > 0 and maxpx > 0 then
       local x0, w = cx0, cx1 - cx0 - L.pad
-      local sy = dy + 3 + L.rh + bh0 + 2
+      local sy = dy + 3 + L.rh + bh0 + 2 + (D.rack_band or 0)
       local h = D.SBW or 3
       if w > 20 then
         D.dsp_sb_n = #fxs   -- горизонтальное колесо над DSP листает цепочку

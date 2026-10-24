@@ -14929,6 +14929,15 @@ ctx.pins_open = function(k)
 end
 -- 24 окт: подпись кнопки пинов «2 in 2/6 out»: входы плагина; выходов занято / всего (как REAPER); кеш 1 с на модуль
 ctx.fx_io_c = {}
+-- 24 окт: замыкание рэка — Wet (mix) контейнера: индекс параметра и значение
+ctx.cont_wet = function(f)
+  local col = dsp_target(); local tr = col and col.track
+  if not (tr and f and f.i) then return nil end
+  local A = model.fxapi(tr)
+  local idx = A.GetParamFromIdent and A.GetParamFromIdent(tr, f.i, ':wet')
+  if not idx or idx < 0 then return nil end
+  return { idx = idx, v = A.GetParamNormalized(tr, f.i, idx) }
+end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
 ctx.dsp_tall = function()
   local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel.dsp
@@ -20458,7 +20467,7 @@ local function frame()
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -21761,6 +21770,7 @@ local function frame()
   elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
   elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
+  elseif hover.capwet then state.status = (hover.capwet.f.name or 'container') .. ': mix of the container output (dry / wet) - drag up / down'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
@@ -24064,6 +24074,9 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
       dspview_drag = { f = hover.dspview.f, x = hover.dspview.x, w = hover.dspview.w }
       click = { t = now2, zone = 'dspview' }
+    elseif hover.capwet then   -- 24 окт: mix контейнера в его замыкании — тянуть по вертикали
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.capwet.fx; ctx.capwet_drag = hover.capwet
+      click = { t = now2, zone = 'capwet' }
     elseif hover.dspxy then
       -- XY-пэд (TG33 vector): точка едет за мышью, X и Y одним жестом
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspxy.fx
@@ -24739,6 +24752,15 @@ local function frame()
     else dspview_drag = nil end
   end
   -- XY-пэд модуля DSP
+  if ctx.capwet_drag then   -- 24 окт: mix контейнера
+    local d = ctx.capwet_drag
+    local col = dsp_target()
+    if gfx.mouse_cap & 1 == 1 and col then
+      local v = math.max(0, math.min(1, 1 - (gfx.mouse_y - d.y) / math.max(1, d.h)))
+      edit.fx_param(col.track, d.f.i, d.idx, v)
+      state.status = ('%s: mix %d %%  (the container output: dry / wet)'):format(d.f.name or 'container', math.floor(v * 100 + 0.5))
+    else ctx.capwet_drag = nil end
+  end
   if dspxy_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspxy_drag
