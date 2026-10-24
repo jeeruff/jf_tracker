@@ -263,7 +263,8 @@ local state = {
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
   dspleft = flag('dspleft', true),
-  envwide = flag('envwide', false),   -- 24 окт: колонки огибающих широкими (полоса значения); выкл — узкие, 3 знака   -- 24 окт: кнопки модуля DSP (+ e ∆ on x) и пресет — сразу за именем, а не в правом краю
+  envwide = flag('envwide', false),
+  vkbkeys = flag('vkbkeys', false),   -- 24 окт: ввод нот через виртуальную MIDI-клавиатуру REAPER (работает и при фокусе в окне плагина)   -- 24 окт: колонки огибающих широкими (полоса значения); выкл — узкие, 3 знака   -- 24 окт: кнопки модуля DSP (+ e ∆ on x) и пресет — сразу за именем, а не в правом краю
   offdim = flag('offdim', true),     -- 24 окт: выключенный модуль — параметры приглушены   -- 24 окт: окна, которые REAPER открывает сам при добавлении эффекта, — закрыть (jf_tracker_fxfloat)
   focusback = flag('focusback', true),   -- 21 окт: мышь вернулась с окна плагина — клавиатура снова у трекера
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
@@ -758,7 +759,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'vkbkeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -12766,6 +12767,7 @@ ctx = {
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('panes_ui', 'panes', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs). Cmd+h j k l - focus, Cmd+Shift+h j k l - move, Ctrl+W - pane mode (split, stack, size, zoom, hide, layouts), :pane; click - focus, drag the line between panes - size. Off - the old fixed layout'),
+      { key = 'vkbkeys', label = 'notes via the REAPER MIDI keyboard', kind = 'toggle', desc = 'typing notes works even when a plugin window has the focus: REAPER sends every key to its virtual MIDI keyboard (Send all input to VKB), the cursor track is armed (auto-arm), the tracker records the MIDI in INSERT; the tracker keys get the same layout as the REAPER keyboard (z s x d c ... / q 2 w 3 e ...). Off - back to your layout', get = function() return state.vkbkeys end, set = function(v) ctx.vkb_keys(v) end },
       flag('envwide', 'wide envelope columns', 'envelope columns in the tracker wide (a value bar + the value); off - narrow, the value in 3 chars (edit in the automation tab or by points)'),
       flag('dspleft', 'preset by the name', 'DSP modules: the preset (< name >) right after the module name, the buttons (+ e ∆ on x) at the right edge; off - the preset at the right too'),
       flag('offdim', 'dim off modules', 'DSP: a module switched off (on / off button, bypass) shows its parameters dimmed'),
@@ -12847,7 +12849,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'vkbkeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
@@ -15148,6 +15150,25 @@ ctx.pane_wide = function(id)
       else vim.msg = 'zx: ' .. id .. ' is not in a pane here' end
     end
 end
+-- 24 окт: ноты через виртуальную MIDI-клавиатуру REAPER: окно плагина в фокусе — клавиши у REAPER, он шлёт их в VKB
+-- (устройство 62), взведённый трек звучит, трекер в INSERT пишет MIDI-вход. Раскладка трекера — как у VKB (qwerty)
+ctx.vkb_keys = function(on)
+  state.vkbkeys = on and true or false
+  reaper.SetExtState(EXT, 'vkbkeys', on and '1' or '0', true)
+  if on then
+    if keys.layout ~= 'qwerty' then state.vkb_prev_layout = keys.layout; reaper.SetExtState(EXT, 'vkbprev', keys.layout, true) end
+    keys.set_layout('qwerty'); draw.piano_layout(false)
+    if reaper.GetToggleCommandState(40637) ~= 1 then reaper.Main_OnCommand(40637, 0) end   -- Virtual MIDI keyboard: Send all input to VKB
+    if ctx.autoarm_all then ctx.autoarm_all(true) end
+    vim.msg = 'notes via the REAPER MIDI keyboard: on - type in a plugin window too (the cursor track armed, INSERT records); layout z s x d c / q 2 w 3 e'
+  else
+    local prev = state.vkb_prev_layout or reaper.GetExtState(EXT, 'vkbprev')
+    if prev == '' then prev = 'frow' end
+    keys.set_layout(prev); draw.piano_layout(prev == 'frow' and 'frow' or prev == 'renoise')
+    vim.msg = 'notes via the REAPER MIDI keyboard: off (layout ' .. prev .. ' back; REAPER still sends keys to its keyboard - Actions: Send all input to VKB)'
+  end
+  relayout()
+end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
 ctx.dsp_tall = function(id)
   id = id or 'dsp'
@@ -16834,7 +16855,8 @@ end
 -- 15 окт: опция выключена — раскладка всегда одна строка q2w3e, октава z x
 -- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
 -- qwerty — прежняя строка q2w3e, октава z x
-do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or kl == 'renoise') end   -- 17 окт: и renoise
+do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or kl == 'renoise') end
+if state.vkbkeys then keys.set_layout('qwerty'); draw.piano_layout(false) end   -- 24 окт: ноты через MIDI-клавиатуру REAPER — её раскладка   -- 17 окт: и renoise
 if reaper.GetExtState(EXT, 'hint_tabs15') ~= '1' then if state.hintpos == 'panes' then state.hintpos = 'tabs' end; reaper.SetExtState(EXT, 'hint_tabs15', '1', true) end   -- 15 окт: подсказки в строку вкладок — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
