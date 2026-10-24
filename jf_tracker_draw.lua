@@ -11442,6 +11442,18 @@ function D.popup(L, p, anchor)
         set(U.AMBER); gfx.rect(cx, ly + L.rh - 2, ms(ch), 1, 1)
         text(cx + ms(ch), ly + 1, t:sub(at + 1), col)
       else text(tx0, ly + 1, t, col) end
+    elseif ln.code or ln.tag then
+      -- 24 окт: fzf команды / параметра — код команды её цветом (как в колонке), ярлык selected / touched / recent — своим
+      local tx0 = lx + L.pad + kw + 2 * L.pad + hcol
+      local t = fit(ln.text or '', tw)
+      local head = ln.code or ln.tag
+      local hc = ln.code and (D.FX_COL[ln.code] or (ln.code:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER)
+                 or (ln.tag == 'selected' and U.AMBER or (ln.tag == 'touched' and U.CYAN or U.GREEN))
+      local rest = (p.hl == i and p.kind == 'picker') and U.TEXT or U.GREY
+      if t:sub(1, #head) == head then
+        text(tx0, ly + 1, head, hc)
+        text(tx0 + ms(head .. '.') - ms('.'), ly + 1, t:sub(#head + 1), rest)
+      else text(tx0, ly + 1, t, rest) end
     else text(lx + L.pad + kw + 2 * L.pad + hcol, ly + 1, fit(ln.text or '', tw), (p.hl == i and p.kind == 'picker') and U.TEXT or (ln.col or U.GREY)) end
   end
 end

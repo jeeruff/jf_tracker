@@ -4105,7 +4105,7 @@ ctx = {
       if seen[key] then return end
       seen[key] = true
       local env = PP.env_of(tr, r, false)
-      items[#items + 1] = { label = (tag and (tag .. '  ') or '') .. (env and '● ' or '  ') .. r.label, data = { r = r } }
+      items[#items + 1] = { label = (tag and (tag .. '  ') or '') .. (env and '● ' or '  ') .. r.label, data = { r = r }, tag = tag }
     end
     local t = dsp_target()
     if t and t.track == tr then
@@ -4116,7 +4116,7 @@ ctx = {
     local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
     if ok and reaper.CSurf_TrackFromID(tn, false) == tr and by[fxn .. ':' .. pn] then add_r(by[fxn .. ':' .. pn], 'touched') end
     for _, key in ipairs((ctx.ptouch or {})[col.guid] or {}) do if by[key] then add_r(by[key], 'recent') end end
-    for _, it in ipairs(cmds or {}) do items[#items + 1] = { label = it.label, data = { cmd = it.v } } end
+    for _, it in ipairs(cmds or {}) do items[#items + 1] = { label = it.label, data = { cmd = it.v }, code = it.v } end   -- code — цветом команды (как в колонке)
     for _, r in ipairs(rows) do add_r(r, nil) end
     vim.open_picker('command or parameter  ' .. col.name .. ' - a parameter: its envelope column, the cursor on it', items, function(it)
       if it.data.cmd then return on_cmd(it.data.cmd) end
