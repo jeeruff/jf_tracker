@@ -1060,7 +1060,10 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
                   { 'transients', 'trans' }, { '-', 'sens-' }, { '+', 'sens+' }, { 'clear', 'clear' }, { 'stretch', 'smkall' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
-      local bw = U.measure(b[1]) + 2 * L.pad
+      -- 24 окт: клавиша кнопки — тусклой припиской (с хинтами): s2 … s6 — равные части, st — транзиенты, - + — чувствительность
+      local KEY = { autotrim = 'T', eq2 = 's2', eq4 = 's4', eq8 = 's8', eq16 = 's1', eq32 = 's3', eq64 = 's6', trans = 'st', ['sens-'] = '-', ['sens+'] = '+', clear = 'x' }
+      local kk = ctx.state and ctx.state.hints and KEY[b[2]] or nil
+      local bw = U.measure(b[1] .. (kk and (' ' .. kk) or '')) + 2 * L.pad
       local lim = brow == 0 and (x + hint_w) or (x + w)
       if bx + bw > lim then
         if brow >= 1 then break end
@@ -1072,6 +1075,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
       U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, by, bw, rh, 0)
       U.text(bx + L.pad, by + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      if kk then U.text(bx + L.pad + U.measure(b[1] .. ' '), by + 1, kk, U.DIM) end
       if hot then hover_sbtn = b[2] end
       if ctx.hint then ctx.hint('slicebtn', bx, by, bw, rh, b[2]) end
       -- 12 окт: transients - + — одна группа: общая линия снизу (чувствительность — к детектору)

@@ -1783,7 +1783,10 @@ function V.key_impl(c)
     if (cpd == 8730 or (m1.alt and not m1.shift and c == 118)) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.smart_select then ctx.smart_select(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end
   end
-  if ctx.slicer_active and ctx.slicer_active() then
+  -- 24 окт: слайсер берёт клавиши, только когда фокус на нём (вкладка item / slices / свойства сэмпла); фокус в трекере —
+  -- клавиши трекеру (было: открытый слайсер съедал всё — «клавиатура слишком на него влияет»)
+  local sl_focus = st.focus == 'slices' or st.focus == 'sprops' or st.focus == 'sample' or (st.focus == 'top' and st.toptab == 'sample')
+  if sl_focus and ctx.slicer_active and ctx.slicer_active() then
     local m0 = ctx.mods and ctx.mods() or {}
     local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local SEL = { [729] = true, [8710] = true, [730] = true, [172] = true,
