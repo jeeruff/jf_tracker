@@ -9273,6 +9273,7 @@ function D.frame(L, snap, rows, state, info)
       D.dsp_px = D.dsp_px + (D.dsp_px_t - D.dsp_px) * 0.35
       if math.abs(D.dsp_px_t - D.dsp_px) < 0.5 then D.dsp_px, D.dsp_px_t = D.dsp_px_t, nil end
     end
+    if D.dsp_maxpx then D.dsp_px = math.max(0, math.min(D.dsp_maxpx, D.dsp_px)) end   -- 24 окт: до рисования, не после
     local px = math.floor(D.dsp_px + 0.5)
     local dest0, mx0 = gfx.dest, mx
     if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end

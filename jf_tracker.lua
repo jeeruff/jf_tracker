@@ -25127,7 +25127,8 @@ local function frame()
   if draw.dsphsb_drag then
     local d = draw.dsphsb_drag
     if gfx.mouse_cap & 1 == 1 then
-      draw.dsp_px = d.p0 + (gfx.mouse_x - d.x0) * (draw.dsp_maxpx or 0) / math.max(1, d.w - d.tw); draw.dsp_px_t = nil
+      -- 24 окт: в пределах цепочки — за край ползунок уводил её в пустоту (рисовалось до подрезки в draw)
+      draw.dsp_px = math.max(0, math.min(draw.dsp_maxpx or 0, d.p0 + (gfx.mouse_x - d.x0) * (draw.dsp_maxpx or 0) / math.max(1, d.w - d.tw))); draw.dsp_px_t = nil
     else draw.dsphsb_drag = nil end
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.tmpl then   -- 11 окт: колесо над < шаблон > — листать
