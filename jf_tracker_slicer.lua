@@ -1065,7 +1065,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     for _, b in ipairs(BTN) do
       -- 24 окт: клавиша кнопки — тусклой припиской (с хинтами): s2 … s6 — равные части, st — транзиенты, - + — чувствительность
       local KEY = { autotrim = 'T', eq2 = 's2', eq4 = 's4', eq8 = 's8', eq16 = 's1', eq32 = 's3', eq64 = 's6', trans = 'st', ['sens-'] = '-', ['sens+'] = '+', clear = 'x' }
-      local kk = ctx.state and ctx.state.hints and KEY[b[2]] or nil
+      local kk = KEY[b[2]]   -- 24 окт (вечер): всегда, яркой буквой (просьба)
       local bw = U.measure(b[1] .. (kk and (' ' .. kk) or '')) + 2 * L.pad
       local lim = brow == 0 and (x + hint_w) or (x + w)
       if bx + bw > lim then
@@ -1078,7 +1078,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
       U.set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(bx, by, bw, rh, 0)
       U.text(bx + L.pad, by + 1, b[1], hot and U.AMBER or (on and U.CYAN or U.TEXT))
-      if kk then U.text(bx + L.pad + U.measure(b[1] .. ' '), by + 1, kk, U.DIM) end
+      if kk then U.text(bx + L.pad + U.measure(b[1] .. ' '), by + 1, kk, hot and U.TEXT or U.AMBER) end
       if hot then hover_sbtn = b[2] end
       if ctx.hint then ctx.hint('slicebtn', bx, by, bw, rh, b[2]) end
       -- 12 окт: transients - + — одна группа: общая линия снизу (чувствительность — к детектору)
