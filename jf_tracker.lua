@@ -21006,7 +21006,9 @@ local function frame()
       end or nil
       if not B.fx_draw and B.mode == 'fx' then B.mode = 'files' end
       -- 15 окт: панели pm на экране нет — модуль сразу у браузера (вкладка browser была пустой с заглушкой)
-      if B.mode == 'pm' and state.panes and not draw.panes.visible(state.panes, 'pm') then B.mode = 'files' end
+      -- 24 окт: только когда pm — своя панель (опция pm as a pane); без неё pm — вкладка браузера, сброс её ломал
+      -- (режим files без нового списка — пустой браузер)
+      if B.mode == 'pm' and state.pmpane and state.panes and not draw.panes.visible(state.panes, 'pm') then B.set_mode('files') end
       if B.panes and B.mode == 'pm' then                -- 9 окт: модуль сейчас у панели pm
         U.text(x + Lx.pad, y + 2, ctx.fit('the browser and pm share one module - click here to show the files', w - 2 * Lx.pad), U.GREY)
         return 'browserhere'
