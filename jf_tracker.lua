@@ -15087,6 +15087,22 @@ ctx.theme_tab.init(U, {
       vim.msg = state.dsp_mfold[key(f)] and ('zf: %s folded (zf or a click on it - unfold)'):format(f.name) or ('zf: %s unfolded'):format(f.name)
     end
   end,
+  -- 24 окт: рэк-контейнер — развернуть модуль k, остальных детей того же контейнера сложить
+  dsp_accordion = function(k)
+    state.dsp_mfold = state.dsp_mfold or {}
+    local col = dsp_target(); local fxs = col and col.fx or {}
+    local f = fxs[k]
+    if not (f and f.inner) then return end
+    local n = 0
+    for _, g in ipairs(fxs) do
+      if g.inner and g.inner.parent == f.inner.parent then
+        local key = tostring(g.fguid or g.i)
+        if g == f then state.dsp_mfold[key] = nil
+        elseif not state.dsp_mfold[key] then state.dsp_mfold[key] = true; n = n + 1 end
+      end
+    end
+    vim.msg = ('%s open, %d other(s) in the container folded (Shift+click - unfold without folding the rest; zf - fold)'):format(f.name or '?', n)
+  end,
   mode_word = function(f) local t = draw.MODE_SCRIPT[f]; return t and t.INSERT or 'INSERT' end,
   mode_scale = function(f) return draw.MODE_FONT_SCALE[f] or 1 end,
   modefont_get = function() return ctx.modefont_get() end,
@@ -23900,7 +23916,10 @@ local function frame()
       elseif hover.dspbtn.what == 'macfold' then   -- 22 окт: MACRO — свернуть / развернуть
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
-      elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 22 окт: сложенный модуль — развернуть
+      elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx   -- 22 окт: сложенный модуль — развернуть
+        -- 24 окт: внутри рэка — как аккордеон: этот развернуть, соседей сложить (Shift — только развернуть)
+        if hover.dspbtn.f.inner and hover.dspbtn.f.inner.wrap and gfx.mouse_cap & 8 == 0 then ctx.dsp_accordion(hover.dspbtn.fx)
+        else ctx.dsp_mfold(hover.dspbtn.fx) end
       elseif hover.dspbtn.what == 'kpage' then   -- 16 окт: страница модуля DSP (Surge: main osc filter lfo fx macro)
         model.dsp_page[hover.dspbtn.f.name] = hover.dspbtn.page; model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       elseif hover.dspbtn.what == 'kslot' then ctx.drum_slot_menu(hover.dspbtn)   -- 16 окт: слот эффекта пэда / str

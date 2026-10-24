@@ -67,5 +67,12 @@ ok(not wrapc.wrap and #wrapc.params == 3, 'wrap -> pack by hand: the full list b
 local empty = { name = 'E0', container = true, params = {}, kids = {} }
 M.cont_view = nil
 ok(names2(M.expand_inner(nil, { empty })) == 'E0' and empty.wrap, 'an empty container is a wrap (the nest)')
+-- 24 окт: рэк — замыкание «out» после последнего потомка, внутренний контейнер первым
+local nv = M.expand_inner(nil, { nest })
+local lastv = nv[#nv]
+ok(lastv.cend and #lastv.cend == 2 and lastv.cend[1].name == 'In' and lastv.cend[2].name == 'N', 'rack: both containers close after the deepest kid, inner first')
+ok(empty.cend and empty.cend[1] == empty, 'rack: an empty container closes right after itself')
+M.expand_inner(nil, { nest })
+ok(#nv[#nv].cend == 2, 'rack: the close list does not grow on a rebuild')
 print(('test_expand_inner: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

@@ -1690,18 +1690,25 @@ local function wrap_kids(tr, e, view, depth)
     if en and (en.name or ''):find('jf_tracker_macro', 1, true) then en = nil end   -- 24 окт: ручки макросов — в шапке контейнера
     if en then
       en.inner = { parent = e, wrap = true, ki = ki, par = kd.parallel or 0, depth = depth }
+      en.cend = nil
       view[#view + 1] = en
       if en.container and en.kids and not en.kit and not en.bands and depth < 4 and M.cont_mode(tr, en) == 'wrap' then wrap_kids(tr, en, view, depth + 1) end
     end
   end
+  -- 24 окт: контейнер — рэк из трёх частей (шапка, эффекты, замыкание): после последнего потомка — колонка «out»
+  -- (cend — контейнеры, которые тут кончаются, внутренний первым; пустой контейнер замыкается сам за собой)
+  local last = view[#view]
+  last.cend = last.cend or {}
+  last.cend[#last.cend + 1] = e
 end
 M.wrap_kids = wrap_kids
 function M.expand_inner(tr, out)
   local has = false
   for _, e in ipairs(out) do if e.bands or e.kit or (e.container and e.kids) then has = true; break end end
-  if not has then return out end
+  if not has then for _, e in ipairs(out) do e.cend = nil end; return out end
   local view = {}
   for _, e in ipairs(out) do
+    e.cend = nil
     view[#view + 1] = e
     if e.container and e.kids and not e.kit and not e.bands then
       if M.cont_mode(tr, e) == 'wrap' then wrap_kids(tr, e, view, 1)
