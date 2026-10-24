@@ -5538,26 +5538,79 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
   return bx
 end
 -- 24 окт: назначения макросов контейнера строками под его ручками (M — янтарём, сила со знаком)
-function D.macro_list(L, info, f, by, bh)
+-- 24 окт: ручка — кольцо (как на Nagra / Kudelski): дуга 270°, тусклая — весь ход, яркая — значение, риска — указатель
+function D.knob(cx, cy, r, v, col)
+  local a0, a1 = -0.75 * math.pi, 0.75 * math.pi
+  local av = a0 + (a1 - a0) * math.max(0, math.min(1, v or 0))
+  set(U.DIM); gfx.arc(cx, cy, r, a0, a1, 1); gfx.arc(cx, cy, r - 1, a0, a1, 1)
+  set(col or U.CYAN); gfx.arc(cx, cy, r, a0, av, 1); gfx.arc(cx, cy, r - 1, a0, av, 1)
+  gfx.line(cx, cy, cx + math.sin(av) * (r - 1), cy - math.cos(av) * (r - 1), 1)
+end
+-- 24 окт: под ручками макросов: [+] [−] сколько; что на каком («M1 Serum cutoff +50»); цепи контейнера — строкой
+-- каждая: ручка громкости (Wet цепи, тянуть вверх / вниз), имя, m (выкл.), s (только она)
+function D.macro_list(L, info, f, by, bh, k, drag, mx, my, hover)
   local ml = info.macro_links(info.pool_col.track, f)
   local x, w, y = f._lx, f._lw, f._ybot + 3
   local ymax = by + bh - 3
+  local function btn(bx0, lbl, what, extra)
+    local w2 = ms(lbl) + 2 * L.pad
+    local hb = not drag and mx >= bx0 and mx < bx0 + w2 and my >= y and my < y + L.rh
+    local on = extra and extra.on
+    set(hb and U.tint(U.AMBER, 0.35) or (on and U.tint(extra.col or U.AMBER, 0.3) or U.BG)); gfx.rect(bx0, y, w2, L.rh - 1, 1)
+    set(hb and U.AMBER or (on and (extra.col or U.AMBER) or U.LINE)); gfx.rect(bx0, y, w2, L.rh - 1, 0)
+    text(bx0 + L.pad, y, lbl, hb and U.AMBER or (on and (extra.col or U.AMBER) or U.GREY))
+    if hb then hover.dspbtn = { fx = k, f = f, what = what, ki = extra and extra.ki } end
+    if D.hint then D.hint('dspbtn', bx0, y, w2, L.rh - 1, { fx = k, what = what }) end
+    return bx0 + w2 + 2
+  end
+  if not f._nomac and y + L.rh <= ymax then
+    local bx1 = btn(x, '+', 'macplus')
+    bx1 = btn(bx1, '-', 'macminus')
+    text(bx1 + L.pad, y, fit((f.macro_n or #f.params) .. ' macros', x + w - bx1 - L.pad), U.DIM)
+    y = y + L.rh + 2
+  end
   local rows = {}
   for m = 1, 8 do for _, l in ipairs(ml[m] or {}) do rows[#rows + 1] = { m = m, l = l } end end
-  if #rows == 0 then
-    if y + L.rh <= ymax then text(x, y, fit('M on a parameter inside - assign', w), U.DIM) end
-    return
-  end
-  set(U.LINE); gfx.rect(x, y - 2, w, 1, 1)
+  if #rows > 0 then set(U.LINE); gfx.rect(x, y - 2, w, 1, 1) end
   for i, r in ipairs(rows) do
-    if y + 2 * L.rh > ymax and i < #rows then text(x, y, fit('+' .. (#rows - i + 1) .. ' more', w), U.DIM); return end
-    if y + L.rh > ymax then return end
+    if y + 2 * L.rh > ymax and i < #rows then text(x, y, fit('+' .. (#rows - i + 1) .. ' more', w), U.DIM); y = y + L.rh; break end
+    if y + L.rh > ymax then break end
     local mt = 'M' .. r.m .. ' '
     text(x, y, mt, U.AMBER)
     local amt = (' %+d'):format(math.floor(r.l.sc * 100 + 0.5))
     local aw = ms(amt)
     text(x + ms(mt), y, fit(r.l.name .. ' ' .. r.l.pname, w - ms(mt) - aw - 2), U.GREY)
     text(x + w - aw, y, amt, r.l.sc < 0 and U.RED or U.CYAN)
+    y = y + L.rh
+  end
+  -- цепи
+  local chains = {}
+  for ki, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then chains[#chains + 1] = { ki = ki, kd = kd } end end
+  if #chains == 0 or y + 2 * L.rh > ymax then return end
+  y = y + 3
+  set(U.LINE); gfx.rect(x, y + L.rh - 2, w, 1, 1)
+  text(x, y, fit('CHAINS', w), U.AMBER)
+  y = y + L.rh
+  local r = math.max(3, math.floor(L.rh / 2) - 1)
+  local non = 0
+  for _, c in ipairs(chains) do if c.kd.enabled then non = non + 1 end end
+  for _, c in ipairs(chains) do
+    if y + L.rh > ymax then break end
+    local kd = c.kd
+    local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
+    local kx = x + r + 1
+    local khot = v and not drag and mx >= x and mx < x + 2 * r + 2 and my >= y and my < y + L.rh
+    if v then
+      D.knob(kx, y + math.floor(L.rh / 2), r, v, khot and U.AMBER or (kd.enabled and U.CYAN or U.GREY))
+      if khot then hover.knob = { fx = kd.i, idx = kd.wet_i, v = v, name = (kd.name or '') .. ' volume' } end
+    end
+    local sw = ms('s') + 2 * L.pad
+    local bxm = x + w - 2 * sw - 2
+    local nx = x + 2 * r + 2 + L.pad
+    local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
+    text(nx, y, fit(glyph .. (kd.name or '?'), bxm - nx - 2), kd.enabled and U.TEXT or U.GREY)
+    local bx2 = btn(bxm, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
+    btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh
   end
 end
@@ -9668,8 +9721,12 @@ function D.frame(L, snap, rows, state, info)
           -- 24 окт: контейнер-обёртка: под шапкой — его макросы (и XY по двум первым); пусто — гнездо для броска;
           -- дети — полноразмерными модулями следом, в рамке контейнера
           local ky = by + L.rh + 1
-          if #f.kids == 0 then
-            local ex, ey, ew, eh = bx + L.pad, ky + 2, bw - 2 * L.pad, by + bh - ky - 6
+          local nreal = 0   -- 24 окт: макро-JSFX — не эффект (пустой контейнер с макросами — всё ещё гнездо)
+          for _, kd in ipairs(f.kids) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nreal = nreal + 1 end end
+          if nreal == 0 then
+            -- макросы уже есть (новый контейнер — 4) — гнездо в нижней половине, под ними
+            local ey0 = #f.params > 0 and (by + math.floor(bh / 2)) or (ky + 2)
+            local ex, ey, ew, eh = bx + L.pad, ey0, bw - 2 * L.pad, by + bh - ey0 - 4
             local lit = drag and mx >= bx and mx < bx + bw and my >= by and my < by + bh
             set(lit and U.tint(U.CYAN, 0.25) or U.tint(U.CYAN, 0.06)); gfx.rect(ex, ey, ew, eh, 1)
             set(lit and U.CYAN or U.tint(U.CYAN, 0.5))
@@ -9682,10 +9739,16 @@ function D.frame(L, snap, rows, state, info)
               if yy + L.rh <= ey + eh - 1 then text(ex + L.pad, yy, fit(ln[1], ew - 2 * L.pad), lit and U.CYAN or ln[2]) end
             end
           elseif #f.params == 0 then
-            text(bx + L.pad, ky, fit('macros: none yet', pw), U.GREY)
-            text(bx + L.pad, ky + L.rh, fit('rclick a parameter inside', pw), U.DIM)   -- 24 окт: было «am» — клавиши такой нет
-            text(bx + L.pad, ky + 2 * L.rh, fit('- M: a macro knob here', pw), U.DIM)
-            text(bx + L.pad, ky + 4 * L.rh, fit(#f.kids .. ' fx inside ->', pw), U.GREY)
+            -- 24 окт: макросов ещё нет — кнопка «+ 4 macros» (ручки M1..M4, XY на M1 / M2); под ней цепи
+            local lbl = '+ 4 macros'
+            local w2 = ms(lbl) + 2 * L.pad
+            local hb = not drag and mx >= bx + L.pad and mx < bx + L.pad + w2 and my >= ky and my < ky + L.rh
+            set(hb and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx + L.pad, ky, w2, L.rh - 1, 1)
+            set(hb and U.AMBER or U.LINE); gfx.rect(bx + L.pad, ky, w2, L.rh - 1, 0)
+            text(bx + 2 * L.pad, ky, lbl, hb and U.AMBER or U.TEXT)
+            if hb then hover.dspbtn = { fx = k, f = f, what = 'macadd' } end
+            hint('dspbtn', bx + L.pad, ky, w2, L.rh - 1, { fx = k, what = 'macadd' })
+            f._lx, f._lw, f._ybot, f._nomac = bx + L.pad, pw, ky + L.rh, true
           end
         elseif f.bands and #f.kids > 0 then
           -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
@@ -11085,8 +11148,8 @@ function D.frame(L, snap, rows, state, info)
         ::next_param::
       end
       -- 24 окт: контейнер — под ручками макросов что на каком: «M1 Serum cutoff +50»
-      if f.wrap and f._ybot and info.macro_links and info.pool_col and info.pool_col.track then D.macro_list(L, info, f, by, bh) end
-      f._ybot = nil
+      if f.wrap and f._ybot and info.macro_links and info.pool_col and info.pool_col.track then D.macro_list(L, info, f, by, bh, k, drag, mx, my, hover) end
+      f._ybot, f._nomac = nil, nil
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
       if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов

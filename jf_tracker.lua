@@ -14949,6 +14949,44 @@ edit.on_off = function(track, pitch)
     end
   end
 end
+-- 24 окт: значение параметра эффекта трека DSP (ручки цепей контейнера)
+ctx.fxp_get = function(fx, idx)
+  local col = dsp_target(); local tr = col and col.track
+  if not (tr and fx and idx) then return nil end
+  return model.fxapi(tr).GetParamNormalized(tr, fx, idx)
+end
+-- 24 окт: шапка контейнера — макросы: + 4 / + / −; цепи: m (выкл.) / s (только она, ещё раз — все)
+ctx.cont_macros = function(f, what)
+  local col = dsp_target(); local tr = col and col.track
+  if not (tr and f) then return end
+  local n = f.macro_n or #f.params
+  if what == 'macadd' then n = 4 elseif what == 'macplus' then n = math.min(8, n + 1) else n = math.max(0, n - 1) end
+  if what == 'macminus' then
+    if f.fguid then edit.macro_count(tr, f.fguid, n) end
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = ('%s: %d macros shown (REAPER keeps the hidden one mapped; + shows it again)'):format(f.name or 'container', n)
+  elseif edit.macro_ensure(tr, f.i, n) then
+    vim.msg = ('%s: macros M1..M%d (XY on M1 / M2; M on a parameter inside - assign)'):format(f.name or 'container', n)
+  else vim.msg = 'macros: could not add (REAPER 7 containers)' end
+end
+ctx.chain_ms = function(f, ki, solo)
+  local col = dsp_target(); local tr = col and col.track
+  local kid = f and f.kids and f.kids[ki]
+  if not (tr and kid and kid.i) then return end
+  local A = model.fxapi(tr)
+  local function real(kd) return kd.i and not (kd.name or ''):find('jf_tracker_macro', 1, true) end
+  if not solo then edit.fx_bypass(tr, kid.i); vim.msg = (kid.name or 'chain') .. (kid.enabled and ': off' or ': on')
+  else
+    local others = false
+    for j, kd in ipairs(f.kids) do if j ~= ki and real(kd) and kd.enabled then others = true end end
+    local unsolo = not others and kid.enabled
+    edit.run(unsolo and 'chains: solo off' or ('chain solo ' .. (kid.name or '')), function()
+      for j, kd in ipairs(f.kids) do if real(kd) then A.SetEnabled(tr, kd.i, unsolo or j == ki) end end
+    end)
+    vim.msg = unsolo and 'chains: all on' or ((kid.name or 'chain') .. ' solo (s again - all on)')
+  end
+  model.invalidate()
+end
 -- 24 окт: замыкание рэка — Wet (mix) контейнера: индекс параметра и значение
 ctx.cont_wet = function(f)
   local col = dsp_target(); local tr = col and col.track
@@ -20487,7 +20525,7 @@ local function frame()
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -21790,6 +21828,7 @@ local function frame()
   elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
   elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
+  elseif hover.knob then state.status = ('%s %d %% - drag up / down (Shift - fine)'):format(hover.knob.name or 'knob', math.floor((hover.knob.v or 0) * 100 + 0.5))
   elseif hover.capwet then state.status = (hover.capwet.f.name or 'container') .. ': mix of the container output (dry / wet) - drag up / down'
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
@@ -23988,6 +24027,8 @@ local function frame()
       elseif hover.dspbtn.what == 'macfold' then   -- 22 окт: MACRO — свернуть / развернуть
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
+      elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
+      elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
       elseif hover.dspbtn.what == 'xyfold' then   -- 24 окт: вкладка xy — XY-пэд на макросах 1 и 2
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_xyopen = state.dsp_xyopen or {}; state.dsp_xyopen[nm] = (not state.dsp_xyopen[nm]) or nil
@@ -24094,6 +24135,9 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
       dspview_drag = { f = hover.dspview.f, x = hover.dspview.x, w = hover.dspview.w }
       click = { t = now2, zone = 'dspview' }
+    elseif hover.knob then   -- 24 окт: ручка (громкость цепи контейнера) — тянуть вверх / вниз, Shift — мелко
+      ctx.set_focus('dsp'); ctx.knob_drag = { fx = hover.knob.fx, idx = hover.knob.idx, v0 = hover.knob.v, y0 = gfx.mouse_y, name = hover.knob.name }
+      click = { t = now2, zone = 'knob' }
     elseif hover.capwet then   -- 24 окт: mix контейнера в его замыкании — тянуть по вертикали
       ctx.set_focus('dsp'); dsp_sel.fx = hover.capwet.fx; ctx.capwet_drag = hover.capwet
       click = { t = now2, zone = 'capwet' }
@@ -24772,6 +24816,16 @@ local function frame()
     else dspview_drag = nil end
   end
   -- XY-пэд модуля DSP
+  if ctx.knob_drag then   -- 24 окт: ручка: 150 px — весь ход (Shift — 600)
+    local d = ctx.knob_drag
+    local col = dsp_target()
+    if gfx.mouse_cap & 1 == 1 and col then
+      local span = gfx.mouse_cap & 8 == 8 and 600 or 150
+      local v = math.max(0, math.min(1, d.v0 + (d.y0 - gfx.mouse_y) / span))
+      edit.fx_param(col.track, d.fx, d.idx, v)
+      state.status = ('%s %d %%  (drag up / down, Shift - fine)'):format(d.name or 'knob', math.floor(v * 100 + 0.5))
+    else ctx.knob_drag = nil end
+  end
   if ctx.capwet_drag then   -- 24 окт: mix контейнера
     local d = ctx.capwet_drag
     local col = dsp_target()
