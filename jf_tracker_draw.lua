@@ -9565,7 +9565,10 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: справа от имени — кнопка входов / выходов «2 in 2/6 out» (как у REAPER): щелчок — матрица пинов
       local iol = (not f.container) and info.fx_io and info.fx_io(f) or nil
       local iow = iol and (ms(iol) + 2 * L.pad) or 0
-      local full = (f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name)
+      -- 24 окт: число эффектов — без jf_tracker_macro (ручки макросов — не эффект: «2 fx» при одном Surge)
+      local nfx = 0
+      if f.container then for _, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nfx = nfx + 1 end end end
+      local full = (f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
