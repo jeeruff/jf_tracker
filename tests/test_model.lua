@@ -296,6 +296,16 @@ do
   eq('midi sub 2 is not audio', lane.audio_sub and lane.audio_sub[2] or false, false)
   eq('audio sub 3 flagged', lane.audio_sub and lane.audio_sub[3], true)
 end
+-- 24 окт: нота с концом ровно там, где начинается следующая, — следующая в той же подколонке поверх OFF
+do
+  local lane = { subs = { {} } }
+  local h1 = { kind = 'midi' }
+  M._place(lane, 0, 6, h1, nil, { kind = 'off', of = h1, delay = 0 })
+  local h2 = { kind = 'midi', delay = 0 }
+  local sub, i = M._place(lane, 6, 12, h2, nil, { kind = 'off', of = h2, delay = 0 })
+  eq('next note: the same sub, over the OFF', i, 1)
+  eq('the cell is the new head', lane.subs[1][6], h2)
+end
 -- 12 окт: действующие команды на строках продолжения (бледно), 00 — стоп, своя строка — без дубля
 do
   local lane = { subs = { {} } }

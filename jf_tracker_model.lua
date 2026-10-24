@@ -168,6 +168,10 @@ local function sub_free(sub, r0, r1, d0, e1)
     if c then
       local ok = (r == r0 and d0 and c.end_d and c.end_d <= d0)
               or (r == r1 and e1 and c.kind ~= 'cont' and (c.delay or 0) >= e1)
+              -- 24 окт: OFF прошлой ноты в строке, где начинается новая (конец = начало), — место новой ноты, как
+              -- в трекере (новая нота обрывает прошлую); было: новая уезжала в соседнюю подколонку, и OFF курсором
+              -- в первой её не находил («OFF игнорирует»)
+              or (r == r0 and c.kind == 'off' and (c.delay or 0) <= (d0 or 0))
       if not ok then return false end
     end
   end
