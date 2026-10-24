@@ -19,5 +19,9 @@ near('scroll clamps at the end', S.vb, 4)
 S.wave.va, S.wave.vb = S.va, S.vb
 S.zoom(10, 3)
 near('zoom out to full resets', S.va, 0); n = n + 1; if S.vb ~= nil then bad = bad + 1; print('FAIL full view vb nil') end
+-- 24 окт: snap — граница равной части к ближайшему транзиенту (в пределах четверти части)
+S.trans = { 0.95, 2.4, 3.1 }
+local sl = S.snap_equal({ 0, 1, 2, 3 }, 4, 4)
+near('snap: 1 -> 0.95', sl[2], 0.95); near('snap: 2 stays (2.4 is too far)', sl[3], 2); near('snap: 3 -> 3.1', sl[4], 3.1)
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

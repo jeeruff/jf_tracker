@@ -22,7 +22,7 @@ S.entry = nil
 S.track = nil
 S.slices = {}        -- секунды от начала item
 S.trans = {}         -- найденные транзиенты (секунды)
-S.snap = false       -- кнопка snap (2 окт): края выделения, маркеры и зона липнут к транзиентам / маркерам
+S.snap = true        -- 24 окт: по умолчанию вкл. Кнопка snap (2 окт): края выделения, маркеры и зона липнут к транзиентам / маркерам
 S.sens = 0.5
 S.mode = ''
 S.env = nil          -- огибающая |пик| для волны и детекции
@@ -277,11 +277,28 @@ function S.remove(k)
   S.msg = ('slice %02X removed (%d left)'):format(k, #S.slices)
 end
 
+-- 24 окт: snap — граница равной части к ближайшему транзиенту в пределах четверти части (не дальше соседей)
+function S.snap_equal(sl, len, n)
+  local tr = S.trans or {}
+  if #tr == 0 or n < 2 then return sl, 0 end
+  local win, moved = len / n / 4, 0
+  for k = 2, #sl do
+    local best, bd = nil, win
+    for _, t in ipairs(tr) do local d = math.abs(t - sl[k]); if d < bd then best, bd = t, d end end
+    if best and best > sl[k - 1] + 1e-3 then sl[k] = best; moved = moved + 1 end
+  end
+  return sl, moved
+end
 function S.equal(n)
   S.slices = {}
   local len = S.entry.len
   for k = 0, n - 1 do S.slices[#S.slices + 1] = len * k / n end
-  S.mode = 'equal ' .. n
+  local moved = 0
+  if S.snap then
+    if #(S.trans or {}) == 0 and S.detect then S.detect() end
+    S.slices, moved = S.snap_equal(S.slices, len, n)
+  end
+  S.mode = 'equal ' .. n .. (moved > 0 and (' snapped ' .. moved) or '')
   commit()
 end
 
@@ -1021,7 +1038,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     vx = vx - 2
   end
   if e.muted and not e.depot then title = title .. '  (muted)' end   -- 10 окт: в lib заглушено всё — не пишем
-  U.text(x, y, ctx.fit(title, vx - x - L.pad), U.TEXT)
+  U.text(x, y, ctx.fit(title, vx - x - L.pad), U.GREY)   -- 24 окт: инфо над кнопками — тише
   local hint = editing
     and (e.file and 'Enter: insert @cursor  D: to lib  a: all  Space: play  g[ g]: edges'
          or 's: 2/4/8 1(16) 3(32) 6(64) equal, t transients  + - sens  x clear  v view')
