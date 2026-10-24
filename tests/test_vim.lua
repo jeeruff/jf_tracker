@@ -865,7 +865,9 @@ alt_down = true; V.key(8710); alt_down = false
 eq('slicer open: Option+J still picks the next instrument', last(), 'pool:3')
 alt_down = true; V.key(162); alt_down = false
 eq('slicer open: Option+4 picks instrument 4', last(), 'pool:4')
-V.key(('x'):byte()); eq('slicer open: other keys go to the slicer', last(), 'slkey:120')
+state.focus = 'slices'
+V.key(('x'):byte()); eq('slicer open, focus on it: other keys go to the slicer', last(), 'slkey:120')
+state.focus = nil   -- 24 окт: фокус в трекере — клавиши трекеру, не слайсеру
 SLICER = nil
 -- 10 окт: dp — до паузы (серия лейна без пустой строки), dP — всё выбранных треков
 reset(); V.cur = { fi = 1, row = 0, field = 1 }
