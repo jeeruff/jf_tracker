@@ -21600,6 +21600,11 @@ local function frame()
     elseif pa and pa.kind == 'inst' then
       anchor = { x = L.side_x or L.win_w, y = (L.side_y0 or 0) + 2 * L.rh }
     end
+    -- 24 окт: фокус в DSP — выпадашки и which-key под параметром курсора (без него — под шапкой модуля), не в углу
+    if not anchor and state.focus == 'dsp' and draw.dsp_sel_rect then
+      local r = draw.dsp_sel_rect
+      anchor = { x = r.x, y = r.y + r.h + 1 }
+    end
     if not anchor and (state.focus == 'tracker') then
       local f = L.flat[vim.cur.fi]
       local r = vim.cur.row - (rows[1] and rows[1].row or 0)

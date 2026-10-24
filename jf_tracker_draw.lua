@@ -9390,6 +9390,7 @@ function D.frame(L, snap, rows, state, info)
     if hint0 then D.hint = function(kind, x, y, w, h, data) if x + w > cx0 and x < cx1 then hint0(kind, x, y, w, h, data) end end end
     D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
     D.cst, D.info = {}, info
+    D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     for k, f in ipairs(fxs) do
       D.rack_open(L, f, k, bx, boxy, bh0)
@@ -9481,6 +9482,7 @@ function D.frame(L, snap, rows, state, info)
       nshown = nshown + 1
       local is_sel = sel.fx == k
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container, bands = f.bands, inner = f.inner }
+      if is_sel and not D.dsp_sel_rect then D.dsp_sel_rect = { x = bx + L.pad, y = by, w = bw, h = L.rh, mod = true } end   -- без параметра — под шапкой модуля
       local in_rng = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
@@ -11228,6 +11230,7 @@ function D.frame(L, snap, rows, state, info)
         end
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
+        if is_sel and sel.param == pi then D.dsp_sel_rect = { x = bxc + L.pad, y = py, w = pw, h = L.rh } end   -- 24 окт: выпадашки — под ним
         if f.wrap then f._lx, f._lw, f._ybot = bxc + L.pad, pw, py + L.rh end   -- 24 окт: под макросами — их назначения
         -- 14 окт: SLIDER (Ctrl+Cmd) — параметры колонки устройства одной группой
         if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
