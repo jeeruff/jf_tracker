@@ -14883,7 +14883,7 @@ ctx.pins_open = function(k)
   local nch = model.is_take(tr) and 2 or math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_NCHAN'))
   local st = ctx.PINS.read(model.fxapi(tr), tr, f.i, nch)
   if st.nin + st.nout == 0 then vim.msg = f.name .. ': no pins'; return end
-  ctx.pinmx = { track = tr, fx = f.i, name = f.name, st = st, cur = { side = st.nin > 0 and 'in' or 'out', pin = 0, ch = 0 } }
+  ctx.pinmx = { track = tr, fx = f.i, k = k, name = f.name, st = st, cur = { side = st.nin > 0 and 'in' or 'out', pin = 0, ch = 0 } }
   ctx.set_focus('dsp')
   vim.msg = f.name .. ' pins: h j k l move, Space toggle, + - track channels, r reset, Esc close (click a cell too)'
 end
@@ -17357,6 +17357,7 @@ function ctx.context_items(hover)
         else ctx.dsp_pack(hover.dsp.fx, hover.dsp.fx) end
       end, 'p')
       add('Edit: the FX window (e)', function() edit.fx_show(col.track, f.i) end, 'E')
+      if not f.container then add('In / out: the pin matrix', function() ctx.pins_open(hover.dsp.fx) end, 'I') end
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
       add('Add FX … (fzf)', function() ctx.fx_picker() end)
       add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end)
@@ -22757,6 +22758,15 @@ local function frame()
           local maph = vert and math.min(math.floor(gfx.h / 4), 8 * L.rh) or gfx.h
           local mx0, my0 = gfx.w - mapw, gfx.h - maph
           U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
+          -- 24 окт: общий хозяин (трек / эффект) — заголовком сверху, у слайдеров — только параметр (имя трека съедало его)
+          local own = SG.list[1] and SG.list[1].own
+          for _, r in ipairs(SG.list) do if r.own ~= own then own = nil; break end end
+          local function lab(r) return (own and r.pn) or r.name or '' end
+          if own and not vert then
+            U.text(mx0 + L.pad, my0 + 2, ctx.fit(own, mapw - 2 * L.pad), U.TEXT)
+            U.set(U.LINE); gfx.rect(mx0 + L.pad, my0 + L.rh + 2, mapw - 2 * L.pad, 1, 1)
+            my0, maph = my0 + L.rh + 4, maph - L.rh - 4
+          end
           U.set(U.AMBER); if vert then gfx.rect(mx0, my0, mapw, 1, 1) else gfx.rect(mx0, my0, 1, maph, 1) end
           local step = (vert and mapw or maph) / n
           for i, r in ipairs(SG.list) do
@@ -22770,14 +22780,14 @@ local function frame()
               U.set(U.LINE); gfx.rect(bx + a1 - a0 - 1, my0 + 1, 1, maph - 1, 1)
               local bh = math.floor((maph - L.rh - 6) * fr + 0.5)
               U.set(on and U.AMBER or U.CYAN, 0.7); gfx.rect(bx + 2, my0 + maph - 2 - bh, math.max(1, a1 - a0 - 5), bh, 1)
-              if a1 - a0 >= U.measure('mm') then U.text(bx + 2, my0 + 2, ctx.fit(r.name or '', a1 - a0 - 4), on and U.AMBER or U.GREY) end
+              if a1 - a0 >= U.measure('mm') then U.text(bx + 2, my0 + 2, ctx.fit(lab(r), a1 - a0 - 4), on and U.AMBER or U.GREY) end
             else
               local by0, by1 = my0 + a0, my0 + a1
               if on then U.set(U.AMBER, 0.30); gfx.rect(mx0 + 1, by0, mapw - 1, by1 - by0, 1) end
               U.set(U.LINE); gfx.rect(mx0 + 1, by1 - 1, mapw - 1, 1, 1)
               local cy = by0 + math.floor((by1 - by0) / 2)
               if by1 - by0 >= L.rh + 4 then
-                U.text(mx0 + L.pad, cy - L.rh, ctx.fit(r.name or '', mapw - 2 * L.pad), on and U.AMBER or U.GREY)
+                U.text(mx0 + L.pad, cy - L.rh, ctx.fit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY)
                 U.set(U.DIM); gfx.rect(mx0 + L.pad, cy + 2, mapw - 2 * L.pad, 2, 1)
                 U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, cy + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), 2, 1)
               else
@@ -22786,7 +22796,7 @@ local function frame()
             end
           end
           -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
-          local desc = ('%s  %s'):format(cur.name or '?', ts[1] and ctx.cm_io.show(ts[1]) or '')
+          local desc = ('%s  %s'):format(own and (own .. ': ' .. (cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
           local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Option: pan' or ''))
           local dy0 = vert and (my0 - 2 * L.rh - 2) or (gfx.h - 2 * L.rh - 2)
           local dw = vert and mapw or math.max(mapw, math.min(gfx.w, U.measure(desc) + 2 * L.pad))
@@ -26817,6 +26827,7 @@ local function frame()
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
         if ctx.pinmx and ctx.pins_key(c, ch) then return end   -- 24 окт: матрица пинов открыта — её клавиши
         if ch == 'K' and not DK.pending then ctx.dsp_learn_toggle(); return end   -- 24 окт: K — knobs learn (было E; e — окно)
+        if ch == 'I' and not DK.pending and not DK.pads then ctx.pins_open(dsp_sel.fx); return end   -- 24 окт: I — входы / выходы (пины)
         if dsp_learn and not DK.pending then
           if c == 27 then ctx.dsp_learn_toggle(); return end
           if ctx.dsp_learn_key(ch) then return end

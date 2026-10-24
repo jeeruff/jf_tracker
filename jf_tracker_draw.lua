@@ -2544,6 +2544,11 @@ function D.pins_draw(L, info, x, y, w, h, mx, my, hover)
   local bw2 = math.min(w - 4, lw + (st.nin + st.nout) * cs + gap + lw + 2 * L.pad)
   local bh2 = math.min(h - 4, L.rh * 3 + st.nch * cs + 2 * L.pad + L.rh)
   local bx, by = x + 2, y + 2
+  local at = m.k and D.io_btn and D.io_btn[m.k]   -- 24 окт: под кнопкой «in / out» своего модуля
+  if at then
+    bx = math.max(x + 2, math.min(x + w - bw2 - 2, at.x))
+    by = math.max(y + 2, math.min(y + h - bh2 - 2, at.y + 1))
+  end
   set(U.PANEL); gfx.rect(bx, by, bw2, bh2, 1)
   set(U.AMBER); gfx.rect(bx, by, bw2, bh2, 0)
   local inside = mx >= bx and mx < bx + bw2 and my >= by and my < by + bh2
@@ -7073,7 +7078,7 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
-        if D.slr then D.slr[#D.slr + 1] = { g = 'trs:' .. tostring(col.guid), col = col, trk = what, name = label .. ' ' .. (col.name or ''), x = wx0, y = sy, w = ww, h = L.rh } end   -- 14 окт: SLIDER
+        if D.slr then D.slr[#D.slr + 1] = { g = 'trs:' .. tostring(col.guid), col = col, trk = what, name = label .. ' ' .. (col.name or ''), own = col.name, pn = label, x = wx0, y = sy, w = ww, h = L.rh } end   -- 14 окт: SLIDER
         -- слайдер под клавиатурой (метка f, 5 окт): янтарная рамка
         local ks = info.kslider
         if ks and ks.what == what and ks.col and ks.col.guid == col.guid then set(U.AMBER); gfx.rect(wx0 - 2, sy + 1, ww + 4, L.rh - 2, 0) end
@@ -7497,7 +7502,7 @@ function D.frame(L, snap, rows, state, info)
         text(wx0 + ww + L.pad + vres - L.pad - ms(vt), wrow, vt, U.GREY)
         if hot then hover.trs = { col = col, what = 'width', x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         hint('trs', wx0, wrow, ww, L.rh, { col = col, what = 'width' })
-        if D.slr then D.slr[#D.slr + 1] = { g = 'trs:' .. tostring(col.guid), col = col, trk = 'width', name = 'w ' .. (col.name or ''), x = wx0, y = wrow, w = ww, h = L.rh } end
+        if D.slr then D.slr[#D.slr + 1] = { g = 'trs:' .. tostring(col.guid), col = col, trk = 'width', name = 'w ' .. (col.name or ''), own = col.name, pn = 'w', x = wx0, y = wrow, w = ww, h = L.rh } end
         local ks = info.kslider
         if ks and ks.what == 'width' and ks.col and ks.col.guid == col.guid then set(U.AMBER); gfx.rect(wx0 - 2, wrow + 1, ww + 4, L.rh - 2, 0) end
       end
@@ -9316,6 +9321,7 @@ function D.frame(L, snap, rows, state, info)
         set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(ix0, by + 1, iow, L.rh - 1, 1)
         set(ihot and U.AMBER or U.LINE); gfx.rect(ix0, by + 1, iow, L.rh - 1, 0)
         text(ix0 + L.pad, by + 1, iol, ihot and U.AMBER or U.GREY)
+        D.io_btn = D.io_btn or {}; D.io_btn[k] = { x = ix0, y = by + L.rh }   -- 24 окт: матрица пинов — под кнопкой
         if ihot then hover.dspbtn = { fx = k, f = f, what = 'pins' }; on_btn = true end
         hint('dspbtn', ix0, by + 1, iow, L.rh - 1, { fx = k, what = 'pins' })
       end
@@ -9390,7 +9396,7 @@ function D.frame(L, snap, rows, state, info)
               set((hot or psel) and U.AMBER or U.CYAN); gfx.rect(wx0, py + 4, math.max(1, math.floor(math.max(0, math.min(1, v.n)) * ww + 0.5)), L.rh - 8, 1)
               if hot then hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 } end
               hint('dspparam', hx, py, hw, L.rh, { fx = k, param = pi })
-              if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, x = wx0, y = py, w = ww, h = L.rh } end
+              if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, own = f.name, pn = p.name, x = wx0, y = py, w = ww, h = L.rh } end
             end
           end
         end
@@ -10741,7 +10747,7 @@ function D.frame(L, snap, rows, state, info)
             hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
           end
           hint('dspparam', gx, py, gw, L.rh, { fx = k, param = pi })
-          if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), x = gx, y = py, w = gw, h = L.rh } end
+          if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = gx, y = py, w = gw, h = L.rh } end
           goto next_param
         end
         local nw = math.floor(pw * 0.40)
@@ -10869,7 +10875,7 @@ function D.frame(L, snap, rows, state, info)
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
         -- 14 окт: SLIDER (Ctrl+Cmd) — параметры колонки устройства одной группой
-        if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
+        if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
         ::next_param::
       end
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
