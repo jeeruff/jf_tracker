@@ -5590,11 +5590,11 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local chains = {}
   for ki, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then chains[#chains + 1] = { ki = ki, kd = kd } end end
   if #chains == 0 or y + L.rh > ymax then return end
-  local vt = L.th + 2 * L.pad + 2
-  set(U.tint(U.AMBER, 0.12)); gfx.rect(x0, y, vt - 2, ymax - y, 1)
-  set(U.LINE); gfx.rect(x0, y, vt - 2, ymax - y, 0)
-  D.vtext(x0 + math.floor((vt - 2 - L.th) / 2), y + 2, ymax - y - 4, 'chains ' .. #chains, U.AMBER, U.tint(U.AMBER, 0.12), true)
-  local x, w = x0 + vt + L.pad, w0 - vt - L.pad
+  -- 24 окт: заголовок отдела строкой (подписи горизонтально)
+  set(U.LINE); gfx.rect(x0, y + L.rh - 2, w0, 1, 1)
+  text(x0, y, fit('CHAINS ' .. #chains, w0), U.AMBER)
+  y = y + L.rh + 1
+  local x, w = x0, w0
   local function btn(bx0, lbl, what, extra)
     local w2 = ms(lbl) + 2 * L.pad
     local hb = not drag and mx >= bx0 and mx < bx0 + w2 and my >= y and my < y + L.rh
@@ -5640,6 +5640,13 @@ function D.mac_w(L, info, f)
   local xo = info.xyopen and info.xyopen[nm]
   if xo == nil then xo = f.wrap and true or false end   -- у контейнера XY раскрыт сразу
   local xpw = (xo and f.nmacro >= 2) and (L.cw * 14 + 2 * L.pad) or 0
+  -- 24 окт: у контейнера подписи отделов горизонтально (заголовок строкой сверху), без полосы вкладок;
+  -- сложенный отдел — узкий, по ширине своей подписи
+  if f.wrap then
+    vt = 0
+    if mpw == 0 then mpw = ms('MACRO ' .. f.nmacro) + 2 * L.pad + 2 end
+    if xpw == 0 and f.nmacro >= 2 then xpw = ms('XY') + 2 * L.pad + 2 end
+  end
   return vt + mpw + xpw, vt, mpw, xpw
 end
 -- 24 окт: XY-пэд модуля на макросах 1 и 2 (Surge M1 / M2 …): тянуть — оба сразу
@@ -9603,7 +9610,26 @@ function D.frame(L, snap, rows, state, info)
         local hy = by + L.rh + 2
         -- вкладки: верхняя половина — macro N, нижняя — xy; раскрытая — янтарём на подложке
         local th2 = math.floor((bh - L.rh - 4) / 2)
-        for ti, tb in ipairs({ { 'macro ' .. f.nmacro, 'macfold', mpw > 0 }, { 'xy', 'xyfold', xpw > 0 } }) do
+        local fopen = f.wrap and not (info.macfold and info.macfold[f.fxname or f.name])
+        local xopen = xpw > 0
+        if f.wrap then
+          xopen = info.xyopen and info.xyopen[f.fxname or f.name]
+          if xopen == nil then xopen = true end
+          xopen = xopen and f.nmacro >= 2
+          -- 24 окт: контейнер — заголовки отделов строкой: MACRO N | XY (щелчок — сложить / раскрыть)
+          for _, tb in ipairs({ { 'MACRO ' .. f.nmacro, 'macfold', fopen, bx, mpw }, { 'XY', 'xyfold', xopen, bx + mpw, xpw } }) do
+            if tb[5] > 0 then
+              local tx, tw2 = tb[4] + L.pad, tb[5] - 2 * L.pad
+              local hot = not drag and mx >= tb[4] and mx < tb[4] + tb[5] and my >= hy and my < hy + L.rh
+              set(U.LINE); gfx.rect(tx, hy + L.rh - 2, tw2, 1, 1)
+              text(tx, hy, fit(tb[1], tw2), hot and U.TEXT or (tb[3] and U.AMBER or U.GREY))
+              if hot then hover.dspbtn = { fx = k, f = f, what = tb[2] } end
+              hint('dspbtn', tb[4], hy, tb[5], L.rh, { fx = k, what = tb[2] })
+            end
+          end
+          macfold = not fopen
+        end
+        for ti, tb in ipairs(f.wrap and {} or { { 'macro ' .. f.nmacro, 'macfold', mpw > 0 }, { 'xy', 'xyfold', xpw > 0 } }) do
           local ty = hy + (ti - 1) * th2
           local hot = not drag and mx >= bx and mx < bx + vt and my >= ty and my < ty + th2
           local fill = tb[3] and U.tint(U.AMBER, 0.22) or (hot and U.tint(U.AMBER, 0.12) or U.BG)
@@ -9613,10 +9639,13 @@ function D.frame(L, snap, rows, state, info)
           if hot then hover.dspbtn = { fx = k, f = f, what = tb[2] } end
           hint('dspbtn', bx, ty, vt, th2, { fx = k, what = tb[2] })
         end
-        if xpw > 0 then D.mac_xy(L, f, vals, bx + vt + mpw, hy, xpw, by + bh - hy - 2, k, drag, mx, my, hover) end
+        if xpw > 0 and (not f.wrap or xopen) then
+          local xy0 = f.wrap and (hy + L.rh + 1) or hy
+          D.mac_xy(L, f, vals, bx + vt + mpw, xy0, xpw, by + bh - xy0 - 2, k, drag, mx, my, hover)
+        end
         if not macfold then
           local hx, hw = bx + vt + L.pad, mpw - 2 * L.pad
-          local hy = hy - L.rh + 2   -- заголовок MACRO — во вкладке; слайдеры с верха
+          local hy = f.wrap and (hy + 1) or (hy - L.rh + 2)   -- заголовок MACRO — во вкладке (у контейнера — строкой над ними); слайдеры с верха
           local mi, mybot = 0, hy
           -- 22 окт: имена макросов из плагина (p.mlabel) — строкой над слайдером, если по высоте влезают все
           -- (номер + имя, слайдер во всю ширину); не влезают — как раньше: номер слева, имя — в статусе
