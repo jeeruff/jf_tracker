@@ -5565,8 +5565,7 @@ function D.macro_list(L, info, f, by, bh, k, drag, mx, my, hover)
   end
   if not f._nomac and y + L.rh <= ymax then
     local bx1 = btn(x, '+', 'macplus')
-    bx1 = btn(bx1, '-', 'macminus')
-    text(bx1 + L.pad, y, fit((f.macro_n or #f.params) .. ' macros', x + w - bx1 - L.pad), U.DIM)
+    bx1 = btn(bx1, '-', 'macminus')   -- 24 окт: без «N macros» — число видно по ручкам
     y = y + L.rh + 2
   end
   local rows = {}
