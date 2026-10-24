@@ -354,7 +354,7 @@ local state = {
   masterpos = reaper.GetExtState(EXT, 'masterpos') == 'left' and 'left' or 'right',   -- 11 окт: полоса мастера в микшере — справа (по умолчанию) / слева
   smlisten = reaper.GetExtState(EXT, 'smlisten') ~= '0',   -- 11 окт: кнопка listen смарт-панели   -- 11 окт: запись следует за выбором треков (B_AUTO_RECARM у всех треков)   -- 11 окт: курсор на треке — его инструмент (плагин или аудиоклип под курсором)
   automidi = reaper.GetExtState(EXT, 'automidi') ~= '0',   -- 10 окт: плагин-инструмент на треке с аудиовходом — вход на все MIDI
-  hintpos = ({ status = 'status', panes = 'panes' })[reaper.GetExtState(EXT, 'hintpos')] or 'tabs',   -- 10 окт: под каждым модулем / строкой внизу; 15 окт: tabs — в строке вкладок (умолчание)
+  hintpos = ({ status = 'status', tabs = 'tabs' })[reaper.GetExtState(EXT, 'hintpos')] or 'panes',   -- 24 окт: по умолчанию — строкой внизу каждого модуля   -- 10 окт: под каждым модулем / строкой внизу; 15 окт: tabs — в строке вкладок (умолчание)
   libtab = 'audio',
   slicefollow = reaper.GetExtState(EXT, 'slicefollow') == '1',
   slq = (function() local v = reaper.GetExtState(EXT, 'slq'); return (v == 'row' or v == '2row' or v == 'beat' or v == 'bar') and v or 'off' end)(),   -- 11 окт: старт слайсов по сетке
@@ -16835,7 +16835,7 @@ end
 -- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
 -- qwerty — прежняя строка q2w3e, октава z x
 do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or kl == 'renoise') end   -- 17 окт: и renoise
-if reaper.GetExtState(EXT, 'hint_tabs15') ~= '1' then if state.hintpos == 'panes' then state.hintpos = 'tabs' end; reaper.SetExtState(EXT, 'hint_tabs15', '1', true) end   -- 15 окт: подсказки в строку вкладок — один раз
+if reaper.GetExtState(EXT, 'hint_panes24') ~= '1' then if state.hintpos == 'tabs' then state.hintpos = 'panes' end; reaper.SetExtState(EXT, 'hint_panes24', '1', true) end   -- 24 окт: подсказки снова внизу модулей (в строке вкладок влезало только «\ menu») — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
 -- 20 окт: шрифт keycast — bitmap (по умолчанию) или один из mode font; выбор — выпадашкой (options)

@@ -1873,7 +1873,8 @@ D.PANE_KEYS = { { 'Cmd+hjkl', 'panel' }, { 'Cmd+Shift+hjkl', 'move' }, { 'Ctrl+W
 -- описание — текстом на 60 % (тускло, но читаемо); на фоне bg, с проверкой контраста
 function D.hint_colors(bg)
   bg = bg or U.PANEL
-  return U.readable(U.mix(bg, U.AMBER, 0.60), bg, 2.6), U.readable(U.mix(bg, U.TEXT, 0.55), bg, 2.6)   -- 15 окт: клавиша тише (60 %) — находится, но не отвлекает
+  -- 15 окт: клавиша тише (60 %); 24 окт: клавиша средней яркости, описание совсем тихое
+  return U.readable(U.mix(bg, U.AMBER, 0.70), bg, 3.0), U.readable(U.mix(bg, U.TEXT, 0.38), bg, 1.8)
 end
 -- строка подсказок одной строкой: куски через 2+ пробела; «клавиша: что» — по двоеточию,
 -- иначе последнее слово — что, остальное — клавиши («q whole», «2 w 3 e ... slices»)
