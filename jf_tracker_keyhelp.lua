@@ -578,6 +578,7 @@ KH.PAGES = {
     { k = 'ad', d = 'delete the automation of the selected parameter' },
     { k = 'ai', d = 'automation item over the item under the tracker cursor (track fx)' },
     { k = 'K', d = 'module learn (knobs): turn knobs in the plugin window - they join this block (saved per plugin); in learn x removes, J K move, < > columns, R resets to automatic, E / Esc done' },
+    { k = 'cursor frame', t = {}, d = 'the parameter under the tracker cursor has a contrasting frame in DSP: an envelope column - its fx parameter; a note command - the sampler parameter it moves (0M 0I 0O volume, 0P pan, 0U 0D 0G SF pitch, 0S start; drumrs5k rack or RS5K)' },
     { k = 'colours', d = 'parameter strip colour = category: green gain, cyan filter, amber time, purple pitch, grey mix, red dynamics, teal stereo, orange modulation' },
     { k = 'dm da', d = 'remove the modulation (LFO / ACS / link) / the automation of the selected parameter' },
     { k = 'am', d = 'container: map the selected child parameter to a native container macro (M ...); modulate the macro natively (right-click: LFO / ACS / link)' },

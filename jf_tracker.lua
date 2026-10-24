@@ -20271,7 +20271,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -22187,6 +22187,23 @@ local function frame()
     local p = f and f.params and f.params[dsp_sel.param or 1]
     local dk = p and ((p.fx or f.i) .. ':' .. p.i)
     if dk and dk ~= ctx.ptouch_dsp then ctx.ptouch_dsp = dk; ctx.ptouch_push(reaper.GetTrackGUID(t.track), dk) end
+    -- 24 окт: параметр под курсором трекера — рамкой в DSP: колонка огибающей FX → её параметр; команда ноты
+    -- (0M громкость, 0P пан, 0U 0D 0G SF высота, 0S старт) → параметр сэмплера (рэк / RS5K) по смыслу
+    ctx.cur_param_hl = nil
+    local fl = L and L.flat and L.flat[vim.cur.fi]
+    local dt = dsp_target()
+    if state.focus == 'tracker' and fl and dt and dt.track and fl.col and fl.col.track == dt.track then
+      if fl.env and fl.env.env then
+        local ptr, fxi, pi = reaper.Envelope_GetParentTrack(fl.env.env)
+        if ptr and fxi and fxi >= 0 then ctx.cur_param_hl = { fx = fxi, pi = pi } end
+      elseif (vim.cur.field or 1) >= 4 and vim.fx_cell then
+        local fc = vim.fx_cell(vim.cur.fi, vim.cur.row)
+        local code = fc and fc.fx and fc.fx[vim.cur.field - 3]
+        local ROLE = { ['0M'] = 'volume', ['0I'] = 'volume', ['0O'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch', ['0D'] = 'pitch', ['0G'] = 'pitch', SF = 'pitch', ['0S'] = 'start' }
+        local role = code and ROLE[code:sub(1, 2)]
+        if role then ctx.cur_param_hl = { role = role } end
+      end
+    end
     local j = ctx.env_jump   -- выбранный в fzf параметр: курсор на колонку его огибающей (после пересборки)
     if j then
       for i, fl in ipairs(L.flat or {}) do

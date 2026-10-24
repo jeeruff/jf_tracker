@@ -2520,6 +2520,15 @@ D.env_colour = function(e) return env_colour(e) end   -- для матрицы (
 
 -- формы сегмента REAPER 0..5 → сокращения (как меню Set segment shape)
 D.ENV_SHAPES = { [0] = 'lin', [1] = 'sqr', [2] = 'slo', [3] = 'fas', [4] = 'fae', [5] = 'bez' }
+-- 24 окт: команда ноты → параметр сэмплера по смыслу (рамка в DSP): модуль — рэк drumrs5k или RS5K
+local HL_PAT = { volume = { '^volume$', '^volume ' }, pan = { '^pan$', '^pan ' }, pitch = { '^pitch$', '^pitch adjust', '^pitch ~' }, start = { '^start', '^sample start' } }
+function D.hl_role(f, p, role)
+  local nm = ((f.fxname or '') .. ' ' .. (f.name or '')):lower()
+  if not (f.kit or nm:find('rs5k', 1, true) or nm:find('reasamplomatic', 1, true)) then return false end
+  local pn = (p.name or ''):lower()
+  for _, pat in ipairs(HL_PAT[role] or {}) do if pn:find(pat) then return true end end
+  return false
+end
 local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if not ev then return end
   if vals == 'steps' then
@@ -10584,6 +10593,11 @@ function D.frame(L, snap, rows, state, info)
         local acc = pins and U.RED or (psel and U.AMBER or U.TEXT)
         -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
         local tallh = spos and spos[pi] and spos[pi][3] or 1
+        -- 24 окт: параметр под курсором трекера (огибающая / команда ноты) — контрастная рамка
+        local hl = info.cur_param_hl
+        if hl and ((hl.pi and hl.pi == p.i and hl.fx == (p.fx or f.i)) or (hl.role and D.hl_role(f, p, hl.role))) then
+          set(U.TEXT); gfx.rect(bxc + L.pad - 2, py, pw + 3, tallh * L.rh, 0); gfx.rect(bxc + L.pad - 1, py + 1, pw + 1, tallh * L.rh - 2, 0)
+        end
         if tallh > 1 then
           local labs = (info.step_labels and info.step_labels(f, p)) or {}
           local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
