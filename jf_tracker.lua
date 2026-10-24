@@ -20743,10 +20743,12 @@ local function frame()
       -- клавиши идут в пианинку только из трекера / вкладки сэмпла (5 окт):
       -- в другом модуле — без подсветки нажатий, полоса блёклая; m off
       -- (6 окт) — клавиатура не прячется, тоже блёклая
-      local active = state.piano_show and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
+      -- 24 окт: и в DSP — там цифры при включённой клавиатуре тоже играют ноты (казалось, что она выключена)
+      local kfocus = state.focus == 'tracker' or state.focus == 'dsp' or (state.focus == 'top' and state.toptab == 'sample')
+      local active = state.piano_show and kfocus
       local held = {}
       -- 15 окт: клавиши играют ноты (INSERT или слой пианино) — нажатая подсвечивает клавиатуру: краем глаза видно, что идут ноты, не команды
-      local notemode = (vim.mode == 'insert' or vim.piano) and (state.focus == 'tracker' or (state.focus == 'top' and state.toptab == 'sample'))
+      local notemode = (vim.mode == 'insert' or vim.piano) and kfocus
       -- 19 окт: шаг сменился (Ctrl+цифра) — вспышка цифры step; клавиши этой цифрой не горят
       if vim.step ~= ctx.step_seen then ctx.step_seen = vim.step; if ctx.step_seen_once then draw.step_flash = reaper.time_precise() end; ctx.step_seen_once = true end
       local stepping = state.stepflash and draw.step_flash and reaper.time_precise() - draw.step_flash < 0.7 and ctx.mods().ctrl
