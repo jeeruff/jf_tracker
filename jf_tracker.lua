@@ -14800,6 +14800,7 @@ model.inner_sel = function(tr, e)
   return (draw.kit_sel or {})[g .. ':' .. tostring(e.fguid or e.i)]
 end
 model.inner_chain = function(tr, e, ki)   -- строка списка цепей пэда (ключ — как в draw.pad_chain_view)
+  if not ki then return nil end   -- 24 окт: пэд не выбран — цепи нет (было: падал каждый кадр, чёрный экран)
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.chain_sel or {})[g .. ':' .. tostring(e.fguid or e.i) .. ':' .. ki]
 end
@@ -22097,7 +22098,7 @@ local function frame()
     if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
   end
   if state.nofloat and not state.fxopen then pcall(ctx.FF.poll, reaper, reaper.time_precise()) end   -- 24 окт (open after adding — окна нужны)
-  do   -- 24 окт: история касаний параметров (последний тронутый в REAPER, выбранный в DSP) — для fzf команды ноты
+  pcall(function()   -- 24 окт: история касаний параметров (последний тронутый в REAPER, выбранный в DSP) — для fzf команды ноты
     local okt, tn, fxn, pn = reaper.GetLastTouchedFX()
     local key = okt and (tn .. ':' .. fxn .. ':' .. pn) or nil
     if key and key ~= ctx.ptouch_last then
@@ -22122,8 +22123,9 @@ local function frame()
       end
       if ctx.env_jump and reaper.time_precise() - j.t > 2 then ctx.env_jump = nil; vim.msg = j.label .. ': envelope shown (its column is folded or hidden)' end
     end
-  end
-  do   -- 23 окт: выбор пэда / полосы / цепи сменился (мышь, клавиши, бросок) — пересобрать развёртку модулей за контейнером
+  end)
+  pcall(function()   -- 23 окт: выбор пэда / полосы / цепи сменился (мышь, клавиши, бросок) — пересобрать развёртку модулей за контейнером
+    -- 24 окт: в pcall — ошибка здесь роняла каждый кадр (чёрное окно)
     local t = dsp_target()
     for _, e in ipairs(t and t.fx or {}) do
       if e._isel then
@@ -22132,7 +22134,7 @@ local function frame()
         if now ~= e._isel then e._isel = now; model.invalidate(); break end
       end
     end
-  end
+  end)
   do   -- ReaEQ: подсветка точки под мышью / в протяжке (кадр спустя)
     local e = ctx.eq_drag or hover.dspeq
     draw.eq_hot, draw.eq_hot_fx = e and e.band, e and e.f.i
