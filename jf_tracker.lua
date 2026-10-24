@@ -26311,11 +26311,17 @@ local function frame()
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
     elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' then ctx.acv_key(back and 25 or 9)   -- 15 окт: холст — активная кривая
-    elseif state.focus == 'fxb' then   -- 18 окт: браузер эффектов — по его вкладкам all fav dev type cat rec
-      local F, k = FB.FOLDERS, 1
-      for i, f in ipairs(F) do if f == FB.folder then k = i end end
-      FB.folder = F[(k - 1 + (back and -1 or 1)) % #F + 1]; FB.cur, FB.scroll = 1, 0; FB.skip_hdr(1)
-      vim.msg = 'fx: ' .. FB.folder .. '  (Tab / Shift+Tab)'
+    elseif state.focus == 'fxb' then
+      -- 24 окт: Tab — по зонам fx list: поиск (/) → список справа → дерево слева → поиск (Shift+Tab — обратно);
+      -- было: по папкам all fav dev … (они в дереве слева)
+      local zones = FB.tree_on and { 'find', 'list', 'tree' } or { 'find', 'list' }
+      local cur = FB.typing and 'find' or ((FB.tree_on and FB.col == 1) and 'tree' or 'list')
+      local k = 1
+      for i, z in ipairs(zones) do if z == cur then k = i end end
+      local nz = zones[(k - 1 + (back and -1 or 1)) % #zones + 1]
+      FB.typing = nz == 'find'
+      if nz == 'tree' then FB.col = 1 elseif nz == 'list' then FB.col = 2 end
+      vim.msg = 'fx: ' .. ({ find = 'find - type the name', list = 'the list - j k, Enter adds', tree = 'the folders - j k, Enter opens' })[nz] .. '  (Tab / Shift+Tab)'
     else
       -- 18 окт: панель в стеке вкладок — Tab / Shift+Tab по вкладкам стека (фокус — на новую)
       local id = ctx.pane_cur()
