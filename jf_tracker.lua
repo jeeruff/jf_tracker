@@ -14874,6 +14874,66 @@ model.inner_chain = function(tr, e, ki)   -- строка списка цепе�
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.chain_sel or {})[g .. ':' .. tostring(e.fguid or e.i) .. ':' .. ki]
 end
+ctx.PINS = dofile(DIR .. '/jf_tracker_pins.lua')   -- 24 окт: матрица пинов (щелчок по имени модуля)
+-- открыть / закрыть матрицу пинов модуля k DSP; клавиши — ctx.pins_key, мышь — ctx.pins_click
+ctx.pins_open = function(k)
+  local col = dsp_target(); local f = col and (col.fx or {})[k]
+  if not f then return end
+  local tr = col.track
+  local nch = model.is_take(tr) and 2 or math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_NCHAN'))
+  local st = ctx.PINS.read(model.fxapi(tr), tr, f.i, nch)
+  if st.nin + st.nout == 0 then vim.msg = f.name .. ': no pins'; return end
+  ctx.pinmx = { track = tr, fx = f.i, name = f.name, st = st, cur = { side = st.nin > 0 and 'in' or 'out', pin = 0, ch = 0 } }
+  ctx.set_focus('dsp')
+  vim.msg = f.name .. ' pins: h j k l move, Space toggle, + - track channels, r reset, Esc close (click a cell too)'
+end
+ctx.pins_write = function(side, pin)
+  local m = ctx.pinmx; if not m then return end
+  local A = model.fxapi(m.track)
+  edit.run('pins ' .. m.name, function() A.SetPinMappings(m.track, m.fx, side == 'out' and 1 or 0, pin, (side == 'out' and m.st.outs or m.st.ins)[pin] or 0, 0) end)
+end
+ctx.pins_toggle = function(side, pin, ch)
+  local m = ctx.pinmx; if not m then return end
+  ctx.PINS.toggle(m.st, side, pin, ch); ctx.pins_write(side, pin)
+  m.cur = { side = side, pin = pin, ch = ch }
+end
+ctx.pins_chan = function(d)
+  local m = ctx.pinmx; if not (m and not model.is_take(m.track)) then return end
+  local n = math.max(2, math.min(ctx.PINS.MAXCH, m.st.nch + 2 * d))
+  edit.run('track channels', function() reaper.SetMediaTrackInfo_Value(m.track, 'I_NCHAN', n) end)
+  m.st = ctx.PINS.read(model.fxapi(m.track), m.track, m.fx, n)
+  m.cur.ch = math.min(m.cur.ch, n - 1)
+  vim.msg = ('track channels: %d'):format(n)
+end
+ctx.pins_key = function(c, ch)
+  local m = ctx.pinmx; if not m then return false end
+  local st, cu = m.st, m.cur
+  if c == 27 or ch == 'q' then ctx.pinmx = nil; vim.msg = 'pins closed'; return true end
+  -- столбцы подряд: входы, потом выходы
+  local cols = {}
+  for p = 0, st.nin - 1 do cols[#cols + 1] = { 'in', p } end
+  for p = 0, st.nout - 1 do cols[#cols + 1] = { 'out', p } end
+  local ci = 1
+  for i, cc in ipairs(cols) do if cc[1] == cu.side and cc[2] == cu.pin then ci = i end end
+  if ch == 'h' or ch == 'l' then ci = math.max(1, math.min(#cols, ci + (ch == 'h' and -1 or 1))); cu.side, cu.pin = cols[ci][1], cols[ci][2]
+  elseif ch == 'j' or ch == 'k' then cu.ch = math.max(0, math.min(st.nch - 1, cu.ch + (ch == 'k' and -1 or 1)))
+  elseif ch == ' ' or c == 13 then ctx.pins_toggle(cu.side, cu.pin, cu.ch)
+  elseif ch == '+' or ch == '=' then ctx.pins_chan(1)
+  elseif ch == '-' then ctx.pins_chan(-1)
+  elseif ch == 'r' then
+    ctx.PINS.reset(st)
+    for p = 0, st.nin - 1 do ctx.pins_write('in', p) end
+    for p = 0, st.nout - 1 do ctx.pins_write('out', p) end
+    vim.msg = m.name .. ': pins reset (pin N - channel N)'
+  end
+  return true
+end
+ctx.pins_click = function(h)
+  if h.close then ctx.pinmx = nil; return end
+  if h.chan then ctx.pins_chan(h.chan); return end
+  if h.reset then ctx.pins_key(0, 'r'); return end
+  if h.cell then ctx.pins_toggle(h.cell.side, h.cell.pin, h.cell.ch) end
+end
 ctx.CV = dofile(DIR .. '/jf_tracker_curves.lua')   -- 24 окт: кривые выделения на огибающей
 ctx.FF = dofile(DIR .. '/jf_tracker_fxfloat.lua')   -- 24 окт: опция nofloat — окна эффектов, открытые REAPER при добавлении, закрыть
 draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
@@ -20275,7 +20335,7 @@ local function frame()
     eqgraph = state.eqgraph,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -23737,6 +23797,7 @@ local function frame()
         else local it = FB.selected(); if it then fxb_drag = { it = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end end
       end
       click = { t = now2, zone = 'fxb' }
+    elseif hover.pinmx then ctx.pins_click(hover.pinmx)   -- 24 окт: матрица пинов поверх DSP
     elseif hover.dspbtn then
       -- кнопки блока: O окно, B bypass, x удалить
       ctx.set_focus('dsp')
@@ -23911,7 +23972,7 @@ local function frame()
       ctx.set_focus('dsp')
       if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
-      if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
+      if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false, name = hover.dsp.name } end
       local col = dsp_target()
       if hover.dsp.param and col and dbl and click.zone == 'dsp' and click.param == hover.dsp.param and click.fx == hover.dsp.fx then
         -- двойной клик по параметру (7 окт): сброс к значению по умолчанию
@@ -25020,6 +25081,7 @@ local function frame()
       end
     else
       local dd = dsp_drag; dsp_drag = nil       -- снять ДО действия (6 окт): ошибка не повторит перенос
+      if dd and not dd.active and dd.name then ctx.pins_open(dd.fx) end   -- 24 окт: щелчок по имени в рамке — пины (протяжка — перенос)
       local g, s = hover.dsp_gap, dd.fx
       -- 11 окт: на колонку трека / полосу или шапку микшера — перенос на тот трек:
       -- инструмент — первым в цепь, эффект — в конец (как вставка в консоли)
@@ -26726,6 +26788,7 @@ local function frame()
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
+        if ctx.pinmx and ctx.pins_key(c, ch) then return end   -- 24 окт: матрица пинов открыта — её клавиши
         if ch == 'K' and not DK.pending then ctx.dsp_learn_toggle(); return end   -- 24 окт: K — knobs learn (было E; e — окно)
         if dsp_learn and not DK.pending then
           if c == 27 then ctx.dsp_learn_toggle(); return end

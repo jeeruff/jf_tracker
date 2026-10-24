@@ -1280,7 +1280,7 @@ end
 local FXNAMES = { 'GetCount', 'GetFXName', 'GetNumParams', 'GetNamedConfigParm', 'GetEnabled', 'SetEnabled',
   'GetParamName', 'GetParameterStepSizes', 'GetParamEx', 'GetParamNormalized', 'SetParamNormalized',
   'GetFormattedParamValue', 'Show', 'Delete', 'GetFXGUID', 'GetOpen', 'GetParamFromIdent', 'SetNamedConfigParm',
-  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings', 'GetFloatingWindow', 'FormatParamValueNormalized', 'GetParam', 'SetParam' }   -- 23 окт: GetParam / SetParam — слайдеры зон jf_tracker_zone в единицах 0..127   -- 22 окт: Format… — текст значения без записи в плагин (ноль в центре)   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
+  'GetPreset', 'GetPresetIndex', 'NavigatePresets', 'SetPreset', 'SetPinMappings', 'GetPinMappings', 'GetFloatingWindow', 'FormatParamValueNormalized', 'GetParam', 'SetParam', 'GetIOSize' }   -- 24 окт: GetIOSize — матрица пинов   -- 23 окт: GetParam / SetParam — слайдеры зон jf_tracker_zone в единицах 0..127   -- 22 окт: Format… — текст значения без записи в плагин (ноль в центре)   -- 16 окт: пины — вход RS5K в пэде drumrs5k   -- 11 окт: пресеты — и у take FX (строка < пресет > у всех)   -- Set… (6 окт): parallel / имя в контейнере
 local function fx_table(prefix)
   local t = { kind = prefix == 'TakeFX_' and 'take' or 'track' }
   for _, n in ipairs(FXNAMES) do t[n] = R[prefix .. n] end

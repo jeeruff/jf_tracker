@@ -2529,6 +2529,72 @@ function D.hl_role(f, p, role)
   for _, pat in ipairs(HL_PAT[role] or {}) do if pn:find(pat) then return true end end
   return false
 end
+-- 24 окт: матрица пинов (как Pin Connector REAPER, в стиле трекера): слева — каналы трека, столбцы — входы плагина,
+-- справа — выходы; клетка — квадрат, включённая — залита; курсор клавиш — янтарная рамка; + - каналы, r сброс
+function D.pins_draw(L, info, x, y, w, h, mx, my, hover)
+  local m = info.pinmx
+  local st, PINS = m.st, info.PINS
+  local cs = math.max(L.rh, L.cw * 2)
+  local lw = ms('track 32') + 3 * L.pad
+  local nameh = 0
+  for p = 0, st.nin - 1 do nameh = math.max(nameh, ms(st.inn[p] or '')) end
+  for p = 0, st.nout - 1 do nameh = math.max(nameh, ms(st.outn[p] or '')) end
+  nameh = math.min(nameh, 10 * L.cw)
+  local gap = 2 * L.cw
+  local bw2 = math.min(w - 4, lw + (st.nin + st.nout) * cs + gap + lw + 2 * L.pad)
+  local bh2 = math.min(h - 4, L.rh * 3 + st.nch * cs + 2 * L.pad + L.rh)
+  local bx, by = x + 2, y + 2
+  set(U.PANEL); gfx.rect(bx, by, bw2, bh2, 1)
+  set(U.AMBER); gfx.rect(bx, by, bw2, bh2, 0)
+  local inside = mx >= bx and mx < bx + bw2 and my >= by and my < by + bh2
+  if inside then   -- модули под матрицей щелчок не получают
+    local drop = {}
+    for k2 in pairs(hover) do if type(k2) == 'string' and (k2:match('^dsp') or k2:match('^kit') or k2 == 'zone' or k2:match('^eq') or k2 == 'dbparam') then drop[#drop + 1] = k2 end end
+    for _, k2 in ipairs(drop) do hover[k2] = nil end
+  end
+  text(bx + L.pad, by + 1, fit(m.name .. ' - pins: ' .. st.nin .. ' in, ' .. st.nout .. ' out', bw2 - 12 * L.cw), U.AMBER)
+  -- кнопки справа: + - (каналы трека), r сброс, x закрыть
+  local bx2 = bx + bw2 - L.pad
+  for _, b in ipairs({ { 'x', { close = true } }, { 'r', { reset = true } }, { '+', { chan = 1 } }, { '-', { chan = -1 } } }) do
+    local kw = ms(b[1]) + 2 * L.pad
+    bx2 = bx2 - kw - 2
+    local hot = mx >= bx2 and mx < bx2 + kw and my >= by + 1 and my < by + L.rh
+    set(hot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx2, by + 1, kw, L.rh - 1, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(bx2, by + 1, kw, L.rh - 1, 0)
+    text(bx2 + L.pad, by + 1, b[1], hot and U.AMBER or U.TEXT)
+    if hot then hover.pinmx = b[2] end
+  end
+  local gy = by + 2 * L.rh + 2
+  local cells, ix, ox = PINS.grid(st, bx + L.pad, gy, cs, cs, lw, gap)
+  -- подписи столбцов: «in» / «out» и номер пина; имя пина — в статусе под мышью (вертикальный текст — нет)
+  text(ix, by + L.rh + 1, fit('in', st.nin * cs), U.GREY)
+  text(ox, by + L.rh + 1, fit('out', st.nout * cs), U.GREY)
+  for ch = 0, st.nch - 1 do
+    local yy = gy + ch * cs
+    if yy + cs > by + bh2 then break end
+    text(bx + L.pad, yy + math.floor((cs - L.th) / 2), 'track ' .. (ch + 1), U.GREY)
+    text(ox + st.nout * cs + L.pad, yy + math.floor((cs - L.th) / 2), fit('track ' .. (ch + 1), lw), U.GREY)
+  end
+  local cu = m.cur
+  for _, c in ipairs(cells) do
+    if c.y + c.h <= by + bh2 then
+      local on = PINS.has((c.side == 'in' and st.ins or st.outs)[c.pin], c.ch)
+      local hot = mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h
+      set(U.mix(U.LINE, U.BG, 0.3)); gfx.rect(c.x, c.y, c.w, c.h, 0)
+      if on then set(hot and U.AMBER or U.TEXT); gfx.rect(c.x + 2, c.y + 2, c.w - 4, c.h - 4, 1)
+      elseif hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(c.x + 1, c.y + 1, c.w - 2, c.h - 2, 1) end
+      if cu.side == c.side and cu.pin == c.pin and cu.ch == c.ch then set(U.AMBER); gfx.rect(c.x, c.y, c.w, c.h, 0); gfx.rect(c.x + 1, c.y + 1, c.w - 2, c.h - 2, 0) end
+      if hot then
+        hover.pinmx = { cell = c }
+        D.aw_status = ('%s %s  <->  track channel %d: %s (click / Space)'):format(c.side == 'in' and 'input' or 'output', (c.side == 'in' and st.inn or st.outn)[c.pin] or '', c.ch + 1, on and 'connected' or 'off')
+      end
+    end
+  end
+  -- номера пинов над столбцами
+  for p = 0, st.nin - 1 do text(ix + p * cs + 2, gy - L.rh, tostring(p + 1), U.DIM) end
+  for p = 0, st.nout - 1 do text(ox + p * cs + 2, gy - L.rh, tostring(p + 1), U.DIM) end
+  if inside and not hover.pinmx then hover.pinmx = { none = true } end
+end
 local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if not ev then return end
   if vals == 'steps' then
@@ -9237,7 +9303,14 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
       local inp = f.inner and (f.inner.band .. ' > ') or ''
-      text(bx + L.pad, by + 1, fit((f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw), f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      local nmtxt = fit((f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. #f.kids .. ' fx') or f.name), tw)
+      text(bx + L.pad, by + 1, nmtxt, f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      -- 24 окт: имя — в рамке (кнопка): щелчок — матрица пинов (входы / выходы плагина), протяжка — перенос, как раньше
+      local nmw = math.min(tw, ms(nmtxt)) + 4
+      local nmhot = not drag and mx >= bx + L.pad - 2 and mx < bx + L.pad - 2 + nmw and my >= by + 1 and my < by + L.rh
+      set(nmhot and U.AMBER or U.mix(U.LINE, U.BG, 0.25)); gfx.rect(bx + L.pad - 2, by + 1, nmw, L.rh - 1, 0)
+      D.dsp_namehot = D.dsp_namehot or {}
+      D.dsp_namehot[k] = nmhot
       if f.inner then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
       if tw > 0 then
         for _, b in ipairs(bxs) do
@@ -9264,7 +9337,7 @@ function D.frame(L, snap, rows, state, info)
           hint('dspbtn', kx, by + 1, kb, L.rh - 1, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
       end
-      if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
+      if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f, name = D.dsp_namehot and D.dsp_namehot[k] or nil } end
       hint('dsp', bx, by, bw, L.rh, { fx = k })
       local vals = info.fx_values and info.fx_values(f) or {}
       if mw > 0 then
@@ -10919,6 +10992,7 @@ function D.frame(L, snap, rows, state, info)
     end
     L.dsp_rect = { fbw, dy, DR - fbw, DH }
     D.clip = nil
+    if info.pinmx and info.PINS then D.pins_draw(L, info, fbw, dy, DR - fbw, DH, mx, my, hover) end   -- 24 окт: матрица пинов поверх DSP
   end
 
   -- 11 окт: кнопка «<» и протяжка у линии трекер | браузер убраны — размеры и показ панелей у дерева (ручки, Ctrl+W)
