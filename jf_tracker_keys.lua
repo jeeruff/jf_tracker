@@ -49,8 +49,9 @@ keys.set_renoise(false)
 -- Пока клавиатура играет (видна или INSERT), F-хоткеи не работают (main).
 keys.layout = 'qwerty'
 local FCODE = { [1] = 26161, [2] = 26162, [4] = 26164, [5] = 26165, [6] = 26166, [8] = 26168, [9] = 26169, [11] = 6697265 }
-local frow_white = { ['1'] = 0, ['2'] = 2, ['3'] = 4, ['4'] = 5, ['5'] = 7, ['6'] = 9, ['7'] = 11, ['8'] = 12, ['9'] = 14, ['0'] = 16, ['-'] = 17, ['='] = 19 }
-local frow_black = { [1] = 1, [2] = 3, [4] = 6, [5] = 8, [6] = 10, [8] = 13, [9] = 15, [11] = 18 }
+-- 24 окт: - = и F11 — не ноты (освобождены вместе с F10 F12): клавиатура 1..0 и F1..F9
+local frow_white = { ['1'] = 0, ['2'] = 2, ['3'] = 4, ['4'] = 5, ['5'] = 7, ['6'] = 9, ['7'] = 11, ['8'] = 12, ['9'] = 14, ['0'] = 16 }
+local frow_black = { [1] = 1, [2] = 3, [4] = 6, [5] = 8, [6] = 10, [8] = 13, [9] = 15 }
 function keys.set_layout(name)
   keys.layout = (name == 'frow' or name == 'renoise') and name or 'qwerty'
   if keys.layout == 'qwerty' then keys.set_renoise(false); return end
