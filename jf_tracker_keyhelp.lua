@@ -441,6 +441,7 @@ KH.PAGES = {
     { k = 'p P', d = 'put a copy from the register into the cursor track library (new name if taken)' },
     { k = 'yp', d = 'duplicate the instrument (copy into the library)', t = { 'yp', 'yP' } },
     { k = 'v', d = 'range from here: j k extend, d / x cut, y yank, Esc' },
+    { k = 'Opt+V', d = 'smart selection of the column under the cursor: to the end of the sub-beat, again - of the beat, the bar, the pattern (a level that adds nothing is skipped)' },
     { k = 'Enter', d = 'open in the item tab (slicer)' },
     { k = 's', d = 'slice menu' },
     { k = '~~', t = {}, d = 'automation: the last row - automation items of the track as one instrument (j past the last slot); the slices list shows them, a note key / MIDI note inserts the selected one, rate by the key (C-4 = x1, octave up = x2); Opt+Enter on an automation item picks it' },

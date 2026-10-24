@@ -931,6 +931,17 @@ function M.row_of_time(t, lpb)
   return R.TimeMap2_timeToQN(0, t) * lpb
 end
 
+-- 24 окт: Opt+V — конец (первая строка за ним) единицы, в которой лежит строка: 1 субдоля (четверть доли, 16-я
+-- при 4/4), 2 доля, 3 такт (bar_end), 4 паттерн (pat_end); строки — QN · lpb (доля = lpb строк)
+M.SEL_UNITS = { 'sub-beat', 'beat', 'bar', 'pattern' }
+function M.sel_unit_end(row, lpb, lvl, bar_end, pat_end)
+  local sub = math.max(1, math.floor(lpb / 4))
+  if lvl == 1 then return (math.floor(row / sub + 1e-9) + 1) * sub end
+  if lvl == 2 then return (math.floor(row / lpb + 1e-9) + 1) * lpb end
+  if lvl == 3 then return bar_end end
+  return pat_end
+end
+
 -- Границы такта, в котором лежит строка: первая строка такта и первая
 -- строка следующего.
 function M.bar_of_row(row, lpb)

@@ -14949,6 +14949,30 @@ edit.on_off = function(track, pitch)
     end
   end
 end
+-- 24 окт: Opt+V — выделение колонки под курсором до конца субдоли; ещё раз — до конца доли, такта, паттерна
+-- (уровень, который ничего не добавляет, пропускается); начало — строка курсора при первом нажатии
+ctx.smart_select = function()
+  local S = ctx.ssel_v
+  local fi, row0, lvl, last = vim.cur.fi, vim.cur.row, 1, nil
+  if (vim.mode == 'visual' or vim.mode == 'vline') and S and S.fi == vim.cur.fi and vim.cur.row == S.last and vim.anchor and vim.anchor.row == S.row0 then
+    row0, lvl, last = S.row0, S.lvl + 1, S.last
+  end
+  local _, bar_end = model.bar_of_row(row0, state.lpb)
+  local pat_end = ctx.pattern_end_row(row0) or (math.floor(row0 / state.lpb) + 1) * state.lpb * 4
+  local e
+  while lvl <= 4 do
+    e = model.sel_unit_end(row0, state.lpb, lvl, math.floor(bar_end + 1e-6), pat_end)
+    if e and e - 1 > (last or row0 - 1) then break end
+    lvl = lvl + 1
+  end
+  if lvl > 4 then vim.msg = 'Opt+V: the whole pattern is selected already (Esc - off)'; return end
+  vim.mode = 'visual'; vim.vfield, vim.vtrack = nil, nil
+  vim.anchor = { fi = fi, row = row0 }
+  vim.cur.row = e - 1
+  ctx.ssel_v = { fi = fi, row0 = row0, lvl = lvl, last = e - 1 }
+  if vim.ensure_visible then vim.ensure_visible() end
+  vim.msg = ('Opt+V: to the end of the %s, rows %d-%d%s'):format(model.SEL_UNITS[lvl], row0, e - 1, lvl < 4 and (' (again - ' .. model.SEL_UNITS[lvl + 1] .. ')') or '')
+end
 -- 24 окт: значение параметра эффекта трека DSP (ручки цепей контейнера)
 ctx.fxp_get = function(fx, idx)
   local col = dsp_target(); local tr = col and col.track

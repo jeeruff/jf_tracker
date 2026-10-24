@@ -1770,6 +1770,8 @@ function V.key_impl(c)
     -- 20 окт: Shift+Opt+F (Ï) — выбрать базу для поиска сэмпла этого места (Shift+F — сразу поиск в базе)
     if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('pickdb'); return end
     if (cpd == 8721 or (m1.alt and c == 119)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
+    -- 24 окт: Opt+V (√) в NORMAL / VISUAL — умное выделение: до конца субдоли, доли, такта, паттерна; в INSERT — нота
+    if (cpd == 8730 or (m1.alt and not m1.shift and c == 118)) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.smart_select then ctx.smart_select(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end
   end
   if ctx.slicer_active and ctx.slicer_active() then
