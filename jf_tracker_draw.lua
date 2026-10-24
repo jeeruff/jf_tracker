@@ -5455,6 +5455,11 @@ function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
   if full then bs[3], bs[4], bs[5] = { '∆', 'kdelta' }, { 'e', 'kopen' }, { '+', 'klastp' } end
   local dl = full and info.fx_delta and info.fx_delta(kid)
   local x = cx + w - 1
+  -- 24 окт: опция dspleft — кнопки сразу за именем
+  local tot = 0
+  for _, b in ipairs(bs) do tot = tot + (b[3] or kb) + 2 end
+  local nw = math.max(L.cw, w - tot - 2 * L.pad - 1)
+  if info.dspleft then x = cx + L.pad + ms(fit(kid.name or '', nw) .. '.') - ms('.') + L.pad + tot end
   for _, b in ipairs(bs) do
     local kb = b[3] or kb
     x = x - kb - 2
@@ -5466,6 +5471,7 @@ function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
     text(x + L.pad, hy, b[1], hb and (red and U.RED or U.AMBER) or (lit and U.AMBER or U.GREY))
     if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid } end
   end
+  if info.dspleft then return nw end
   return math.max(L.cw, x - cx - 2 * L.pad - 2)
 end
 function D.kid_pack(f, rows)
@@ -9300,9 +9306,10 @@ function D.frame(L, snap, rows, state, info)
       local pre = info.fx_preset and not f.container and info.fx_preset(f)
       local ptw = 0
       local on_btn = false
+      local pre_at   -- 24 окт: кнопки слева (опция dspleft) — пресет рисуется после них
       if pre and tw > L.cw * 14 then
         ptw = math.min(math.floor(tw * 0.6), ms('< ' .. pre.name .. ' >') + L.pad)
-        local px = bx + L.pad + tw - ptw
+        pre_at = function(px)
         local aw = ms('<') + 2
         local parts = { { '<', 'pprev', px, aw }, { pre.name, 'preset', px + aw, ptw - 2 * aw }, { '>', 'pnext', px + ptw - aw, aw } }
         for _, pp in ipairs(parts) do
@@ -9311,6 +9318,8 @@ function D.frame(L, snap, rows, state, info)
           hint('dspbtn', pp[3], by + 1, pp[4], L.rh - 1, { fx = k, what = pp[2] })
           text(pp[3] + (pp[2] == 'preset' and 2 or 1), by + 1, fit(pp[1], pp[4] - 2), hot and U.AMBER or (pp[2] == 'preset' and (pre.none and U.GREY or U.CYAN) or U.GREY))
         end
+        end
+        if not info.dspleft then pre_at(bx + L.pad + tw - ptw) end
         tw = tw - ptw - L.pad
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
@@ -9331,6 +9340,12 @@ function D.frame(L, snap, rows, state, info)
         D.io_btn = D.io_btn or {}; D.io_btn[k] = { x = ix0, y = by + L.rh }   -- 24 окт: матрица пинов — под кнопкой
         if ihot then hover.dspbtn = { fx = k, f = f, what = 'pins' }; on_btn = true end
         hint('dspbtn', ix0, by + 1, iow, L.rh - 1, { fx = k, what = 'pins' })
+      end
+      -- 24 окт: опция dspleft — кнопки и пресет сразу за именем (у большого модуля не тянуться в правый край)
+      if info.dspleft and tw > 0 then
+        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
+        for i = #bxs, 1, -1 do bxs[i][3] = x; x = x + (bxs[i][4] or kb) + 2 end
+        if pre_at then pre_at(x + L.pad) end
       end
       if f.inner then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
       if tw > 0 then
@@ -10915,6 +10930,8 @@ function D.frame(L, snap, rows, state, info)
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
       if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов
+      -- 24 окт: опция offdim — у выключенного (off) модуля параметры приглушены пеленой фона
+      if info.offdim and not f.enabled and bh > L.rh + 2 then set(U.BG, D.OFFDIM or 0.4); gfx.rect(bx + 1, by + L.rh + 1, bw - 2, bh - L.rh - 2, 1); gfx.a = 1 end
       bx = bx + bw + L.pad
       end
       ::next_block::
