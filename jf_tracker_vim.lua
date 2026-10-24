@@ -3947,10 +3947,10 @@ function V.smart()
     if not h1 then V.msg = 'smart: an empty row - the instrument is chosen for the next notes' end
   elseif fld == 1 then
     local h1 = heads()[1]
-    items, cols, sel = SM.notes(h1 and h1.pitch, V.octave)
+    items, cols, sel = SM.notes(h1 and h1.pitch, V.octave, h1 and h1.micro)
     title = (h1 and ('note %s'):format(h1.note or '') or 'note') .. '  ' .. where
     listen = function(it)
-      if type(it.v) ~= 'number' or not ctx.preview then return end
+      if type(it.v) ~= 'number' or not ctx.preview then return end   -- микротон — слышен после выбора
       local inst = (f.col.pool or {})[V.inst]
       if ctx.inst_fx and ctx.inst_fx(f.col) then inst = nil end
       ctx.preview(f.col.track, it.v, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), row, 1)
@@ -3958,6 +3958,16 @@ function V.smart()
     pick = function(it)
       if it.v == nil then return SM.p end
       local hs = heads()
+      if type(it.v) == 'table' and it.v.micro then
+        -- 24 окт: микротон у нот строки: сдвиг до выбранной ступени (MIDI — MTS перед нотой, аудио — дробный pitch)
+        if #hs == 0 then V.msg = 'microtone: put a note in this row first'; return SM.p end
+        for _, h in ipairs(hs) do
+          local d = it.v.micro - (h.micro or 0)
+          if d ~= 0 then E.micro_nudge({ h }, lpb(), d) end
+        end
+        V.msg = ('microtone %s: %+.1f cents'):format(it.label, it.v.micro * 100 / 6)
+        done(); return
+      end
       if it.v == 'del' then E.delete(hs, lpb())
       elseif it.v == 'off' then E.note_off(V.covering(fi, row), lpb(), row)
       elseif #hs > 0 then E.set_pitch(hs, lpb(), it.v)

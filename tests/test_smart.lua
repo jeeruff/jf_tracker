@@ -8,8 +8,13 @@ local items, cols, sel = SM.notes(64, 4)
 eq(cols, 12, 'notes in 12 columns'); eq(items[sel].label, 'E-4', 'cursor on the current note')
 eq(items[sel].on, true, 'current note marked')
 eq(SM.note_label(60), 'C-4', 'C-4 = 60'); eq(SM.note_label(61), 'C#4', 'C#4')
-eq(items[#items].v, 'del', 'last = delete'); eq(items[#items - 1].v, 'off', 'then OFF')
-eq((#items - 2) % 12, 0, 'OFF starts a row')
+local ioff
+for i, it in ipairs(items) do if it.v == 'off' then ioff = i end end
+eq(items[ioff + 1].v, 'del', 'delete after OFF'); eq((ioff - 1) % 12, 0, 'OFF starts a row')
+-- 24 окт: строка микротонов v3 .. ^3 последней, с новой строки
+eq(items[#items].v.micro, 3, 'last = ^3'); eq(items[#items - 6].v.micro, -3, 'the microtone row from v3')
+eq((#items - 7) % 12, 0, 'microtones start a row')
+local mi = SM.notes(64, 4, 1); eq(mi[#mi - 2].on, true, 'the current microtone marked')
 items, cols, sel = SM.notes(nil, 3); eq(items[sel].v, 48, 'empty cell: C of the octave')
 -- значения
 items, cols, sel = SM.values(128, 0x40, true, 'clear'); eq(#items, 129, '128 + clear'); eq(items[sel].label, '40', 'hex label')

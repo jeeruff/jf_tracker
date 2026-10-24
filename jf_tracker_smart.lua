@@ -241,7 +241,7 @@ function SM.note_label(p) return SM.NAMES[p % 12 + 1] .. tostring(p // 12 - 1) e
 
 -- ноты: октавы 0..9 строками по 12, ниже OFF и --- (удалить). cur — высота
 -- ноты в ячейке (подсвечена), oct — октава ввода (выбор стартует там)
-function SM.notes(cur, oct)
+function SM.notes(cur, oct, micro)
   local items = {}
   for o = 0, 9 do
     for k = 0, 11 do
@@ -252,6 +252,14 @@ function SM.notes(cur, oct)
   while #items % 12 ~= 0 do items[#items + 1] = { label = '', v = nil, dim = true } end
   items[#items + 1] = { label = 'OFF', v = 'off', tip = 'note off: the sounding note ends in this row' }
   items[#items + 1] = { label = '---', v = 'del', tip = 'delete the event of this row' }
+  -- 24 окт: микротоны 72-EDO — ступень 1/6 тона (16.7 ц) от ноты: v3 vv v · ^ ^^ ^3 (выбор — у ноты строки,
+  -- панель остаётся открытой); метка как в трекере (C-4^)
+  while #items % 12 ~= 0 do items[#items + 1] = { label = '', v = nil, dim = true } end
+  for m = -3, 3 do
+    local lb = m == 0 and '0' or ((m > 0 and '^' or 'v') .. (math.abs(m) == 2 and (m > 0 and '^' or 'v') or (math.abs(m) == 3 and '3' or '')))
+    items[#items + 1] = { label = lb, v = { micro = m }, on = (micro or 0) == m and cur ~= nil,
+                          tip = m == 0 and 'microtone off: the note in 12-EDO' or ('%+.1f cents (%+d/6 tone, 72-EDO; MTS for Surge XT / MTS-ESP)'):format(m * 100 / 6, m) }
+  end
   local sel
   for i, it in ipairs(items) do if it.v == (cur or ((oct or 4) + 1) * 12) then sel = i end end
   return items, 12, sel
