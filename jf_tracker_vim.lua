@@ -4046,6 +4046,11 @@ function V.smart()
     local midi = h1 and h1.kind == 'midi'
     local kitn = midi and E.kit_pad and h1.item and h1.pitch and E.kit_pad(reaper.GetMediaItem_Track(h1.item), h1.pitch)
     items, cols, sel = SM.fx_letters(midi and function(code) return (E.cmds and E.cmds.CODES[code]) or (code == '0S' and kitn) end or nil)   -- нота кита: 0S — сдвиг окна пэда
+    -- 24 окт: fzf — команды ноты и параметры эффектов трека (сверху выбранный / последние тронутые);
+    -- параметр — его огибающая колонкой рядом, курсор (и выделение) — на неё
+    if ctx.fx_param_picker and f.col and f.col.track then
+      return ctx.fx_param_picker(f.col, items, function(code) return ctx.smart_open(vals(code, nil)) end, { row = row, r0 = r0, r1 = r1, vis = vis })
+    end
     title = 'command  ' .. where .. (midi and '  (MIDI note: 0S offset and item commands - audio only; drumrs5k: the note picks the pad)' or '')
     pick = function(it) return vals(it.v, nil) end
   end

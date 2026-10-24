@@ -4091,6 +4091,56 @@ ctx = {
   -- трек курсора): огибающие трека и каждый параметр каждого FX, включая
   -- детей контейнеров (перечень панели params). Есть огибающая — сверху, ●;
   -- выбор — создать / показать огибающую (уже видна — не прятать)
+  -- 24 окт: Enter на поле команды ноты — fzf: сверху параметр, выбранный в DSP, последний тронутый в REAPER и
+  -- история касаний трека (ctx.ptouch, кадр), дальше команды ноты, дальше все параметры трека (● — огибающая видна)
+  fx_param_picker = function(col, cmds, on_cmd, at)
+    local tr = col.track
+    local PP = MMX.PP
+    local rows = PP.build(tr, model.fx_addresses)
+    local by = {}
+    for _, r in ipairs(rows) do if r.kind == 'fx' then by[r.fx .. ':' .. r.param] = r end end
+    local items, seen = {}, {}
+    local function add_r(r, tag)
+      local key = r.kind == 'fx' and (r.fx .. ':' .. r.param) or r.label
+      if seen[key] then return end
+      seen[key] = true
+      local env = PP.env_of(tr, r, false)
+      items[#items + 1] = { label = (tag and (tag .. '  ') or '') .. (env and '● ' or '  ') .. r.label, data = { r = r } }
+    end
+    local t = dsp_target()
+    if t and t.track == tr then
+      local f = (t.fx or {})[dsp_sel.fx]
+      local p = f and f.params and f.params[dsp_sel.param or 1]
+      if p and by[(p.fx or f.i) .. ':' .. p.i] then add_r(by[(p.fx or f.i) .. ':' .. p.i], 'selected') end
+    end
+    local ok, tn, fxn, pn = reaper.GetLastTouchedFX()
+    if ok and reaper.CSurf_TrackFromID(tn, false) == tr and by[fxn .. ':' .. pn] then add_r(by[fxn .. ':' .. pn], 'touched') end
+    for _, key in ipairs((ctx.ptouch or {})[col.guid] or {}) do if by[key] then add_r(by[key], 'recent') end end
+    for _, it in ipairs(cmds or {}) do items[#items + 1] = { label = it.label, data = { cmd = it.v } } end
+    for _, r in ipairs(rows) do add_r(r, nil) end
+    vim.open_picker('command or parameter  ' .. col.name .. ' - a parameter: its envelope column, the cursor on it', items, function(it)
+      if it.data.cmd then return on_cmd(it.data.cmd) end
+      local r = it.data.r
+      local env = PP.env_of(tr, r, false)
+      local vis = env and select(2, reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)) == '1'
+      if not vis then PP.toggle_env(tr, r) end
+      state.trackenvs[col.guid] = true
+      if r.kind == 'fx' then ctx.ptouch_push(col.guid, r.fx .. ':' .. r.param) end
+      ctx.env_jump = { env = PP.env_of(tr, r, false), row = at.row, r0 = at.r0, r1 = at.r1, vis = at.vis, t = reaper.time_precise(), label = r.label }
+      if at.vis then vim.mode = 'normal' end
+      model.invalidate()
+    end)
+    return true
+  end,
+  -- история касаний параметров трека: новые — сверху, 8 штук
+  ptouch_push = function(guid, key)
+    ctx.ptouch = ctx.ptouch or {}
+    local l = ctx.ptouch[guid] or {}
+    for i = #l, 1, -1 do if l[i] == key then table.remove(l, i) end end
+    table.insert(l, 1, key)
+    while #l > 8 do l[#l] = nil end
+    ctx.ptouch[guid] = l
+  end,
   automation_picker = function(col, from_btn)
     col = col or cur_col(); if not col then return end
     local tr = col.track
@@ -22047,6 +22097,32 @@ local function frame()
     if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
   end
   if state.nofloat and not state.fxopen then pcall(ctx.FF.poll, reaper, reaper.time_precise()) end   -- 24 окт (open after adding — окна нужны)
+  do   -- 24 окт: история касаний параметров (последний тронутый в REAPER, выбранный в DSP) — для fzf команды ноты
+    local okt, tn, fxn, pn = reaper.GetLastTouchedFX()
+    local key = okt and (tn .. ':' .. fxn .. ':' .. pn) or nil
+    if key and key ~= ctx.ptouch_last then
+      ctx.ptouch_last = key
+      local tr = reaper.CSurf_TrackFromID(tn, false)
+      if tr then ctx.ptouch_push(reaper.GetTrackGUID(tr), fxn .. ':' .. pn) end
+    end
+    local t = dsp_target()
+    local f = t and t.track and (t.fx or {})[dsp_sel.fx]
+    local p = f and f.params and f.params[dsp_sel.param or 1]
+    local dk = p and ((p.fx or f.i) .. ':' .. p.i)
+    if dk and dk ~= ctx.ptouch_dsp then ctx.ptouch_dsp = dk; ctx.ptouch_push(reaper.GetTrackGUID(t.track), dk) end
+    local j = ctx.env_jump   -- выбранный в fzf параметр: курсор на колонку его огибающей (после пересборки)
+    if j then
+      for i, fl in ipairs(L.flat or {}) do
+        if fl.env and fl.env.env == j.env then
+          vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil
+          if j.vis then vim.mode = 'visual'; vim.anchor = { fi = i, row = j.r0 }; vim.cur.row = j.r1 else vim.cur.row = j.row end
+          vim.msg = j.label .. ': its envelope column - type values, gi interpolates the selection'
+          ctx.env_jump = nil; break
+        end
+      end
+      if ctx.env_jump and reaper.time_precise() - j.t > 2 then ctx.env_jump = nil; vim.msg = j.label .. ': envelope shown (its column is folded or hidden)' end
+    end
+  end
   do   -- 23 окт: выбор пэда / полосы / цепи сменился (мышь, клавиши, бросок) — пересобрать развёртку модулей за контейнером
     local t = dsp_target()
     for _, e in ipairs(t and t.fx or {}) do
