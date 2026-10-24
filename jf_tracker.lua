@@ -17709,6 +17709,16 @@ function ctx.context_items(hover)
         end)
       end, 'a')
       add('Empty container inside ([])', function() ctx.dsp_container_new(k, true) end, 'c')
+      if f.i < 0x2000000 then   -- 24 окт: chain select — одна ручка макроса выбирает, какие цепи звучат (зоны sel)
+        add('Chain select on a macro … (one knob picks the chains)', function()
+          local items = {}
+          for m = 1, 8 do items[#items + 1] = { key = tostring(m), label = 'M' .. m, fn = function()
+            local nch = edit.chain_select_macro(col.track, f.i, m, draw.Z and draw.Z.SELECT or 12)
+            vim.msg = nch > 0 and ('M%d selects the chains of %s (%d chains; their sel zones - zv chain)'):format(m, f.name or 'container', nch) or 'chain select: no chains'
+          end } end
+          vim.open_hydra({ title = 'chain select of ' .. (f.name or 'the container') .. ' on', items = items })
+        end, 'e')
+      end
       add('Preset … (container presets)', function() ctx.dsp_preset(k, 'pick') end, 'r')
       add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')

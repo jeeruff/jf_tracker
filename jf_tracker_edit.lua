@@ -3649,6 +3649,47 @@ function E.zone_ensure(track, c, k)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
 end
+-- 24 окт: chain select на макрос контейнера c (верхнего уровня): в каждой цепи — зона (jf_tracker_zone), её select
+-- выводится наружу параметром цепи (container_map), а он — ссылкой (plink) на ручку M макро-JSFX (соседи в c).
+-- Одна ручка выбирает, какие цепи звучат (зоны sel lo..hi у цепей). → число цепей
+function E.chain_select_macro(track, c, m, sel_i)
+  local A = FA(track)
+  local n = 0
+  run('chain select on M' .. m, function()
+    local maddr = macro_fx(track, c); if not maddr then return end
+    macro_map(track, c, maddr, m)
+    local cg = A.GetFXGUID(track, c)
+    local cnt = cont_count(track, c) or 0
+    for k = 0, cnt - 1 do
+      local ca = child_addr(track, c, k)
+      local _, nm = A.GetFXName(track, ca, '')
+      if not (nm or ''):find(E.MACRO, 1, true) then
+        local za = E.zone_ensure(track, c, k)
+        ca = child_addr(track, c, k)
+        local _, mk = E.macro_find(track, c)
+        if za and mk then
+          local okm, idx = A.GetNamedConfigParm(track, ca, ('container_map.add.%d.%d'):format(za, sel_i))
+          idx = okm and tonumber(idx)
+          if idx then
+            local P = ('param.%d.'):format(idx)
+            A.SetNamedConfigParm(track, ca, P .. 'mod.active', '1')
+            A.SetNamedConfigParm(track, ca, P .. 'mod.baseline', '0')
+            A.SetNamedConfigParm(track, ca, P .. 'plink.effect', tostring(mk))
+            A.SetNamedConfigParm(track, ca, P .. 'plink.param', tostring(m - 1))
+            A.SetNamedConfigParm(track, ca, P .. 'plink.scale', '1')
+            A.SetNamedConfigParm(track, ca, P .. 'plink.offset', '0')
+            A.SetNamedConfigParm(track, ca, P .. 'plink.active', '1')
+            local tg = A.GetFXGUID(track, ca)
+            if cg and tg then mrec_set(track, cg, tg, idx, m, 1) end
+            n = n + 1
+          end
+        end
+      end
+    end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return n
+end
 -- значения слайдеров зоны (с 0) — без undo на каждый шаг протяжки, как fx_param
 function E.zone_write(track, zaddr, vals)
   local A = FA(track)
