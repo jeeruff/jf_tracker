@@ -3110,6 +3110,8 @@ function E.container_new(track, pos, into)
     local idx = add_fx(track, 'Container', -1000 - addr)
     ok = idx ~= nil and idx >= 0
     if ok then FA(track).Show(track, addr, 2) end
+    -- 24 окт: сразу 4 макроса (ручки в шапке, XY на M1 / M2); вложенный пустой — адрес ребёнка ещё не считается
+    if ok and not into and E.macro_ensure then E.macro_ensure(track, addr, 4, true) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
@@ -3198,20 +3200,49 @@ local function macro_map(track, c, maddr, m)
   local ok, idx = A.GetNamedConfigParm(track, c, ('container_map.add.%d.%d'):format(maddr, m - 1))
   return ok and tonumber(idx)
 end
+-- макро-JSFX контейнера c: есть — его адрес и номер соседа, нет — вставить последним (ручки в 0)
+local function macro_fx(track, c)
+  local A = FA(track)
+  local maddr, mk = E.macro_find(track, c)
+  if maddr then return maddr, mk end
+  local k = cont_count(track, c); if not k then return nil end
+  local at = child_any(track, c, k); if not at then return nil end   -- 24 окт: и во вложенном контейнере
+  local idx = add_fx(track, E.MACRO, -1000 - at)
+  if not (idx and idx >= 0) then return nil end
+  maddr, mk = child_any(track, c, k), k
+  A.Show(track, maddr, 2)
+  for q = 1, 8 do A.SetParamNormalized(track, maddr, q - 1, 0) end
+  return maddr, mk
+end
+-- 24 окт: сколько макросов видно в шапке контейнера (P_EXT трека по GUID контейнера); REAPER вывод параметра
+-- в контейнер не снимает (container_map.delete нет — проверено) — «−» только прячет последний
+function E.macro_count(track, cguid, n)
+  local key = 'P_EXT:jf_macn:' .. tostring(cguid)
+  if n then R.GetSetMediaTrackInfo_String(track, key, tostring(n), true); return n end
+  local _, v = R.GetSetMediaTrackInfo_String(track, key, '', false)
+  return tonumber(v)
+end
+-- 24 окт: у контейнера c макросы M1..Mn выведены наружу (макро-JSFX — если нет); inrun — уже внутри undo-блока
+function E.macro_ensure(track, c, n, inrun)
+  local ok = false
+  local function go()
+    local maddr = macro_fx(track, c)
+    if not maddr then return end
+    for m = 1, n do macro_map(track, c, maddr, m) end
+    local g = FA(track).GetFXGUID(track, c)
+    if g then E.macro_count(track, g, n) end
+    ok = true
+  end
+  if inrun then go() else run('container macros ' .. n, go) end
+  if model and not inrun then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 function E.macro_link(track, c, tgt, tparam, m, scale)
   local ok = false
   run('macro ' .. m .. ' link', function()
     local A = FA(track)
-    local maddr, mk = E.macro_find(track, c)
-    if not maddr then
-      local k = cont_count(track, c); if not k then return end
-      local at = child_any(track, c, k); if not at then return end   -- 24 окт: и во вложенном контейнере
-      local idx = add_fx(track, E.MACRO, -1000 - at)
-      if not (idx and idx >= 0) then return end
-      maddr, mk = child_any(track, c, k), k
-      A.Show(track, maddr, 2)
-      for q = 1, 8 do A.SetParamNormalized(track, maddr, q - 1, 0) end
-    end
+    local maddr, mk = macro_fx(track, c)
+    if not maddr then return end
     -- адрес цели после вставки макроса тот же: макрос — в конце, номера детей не меняются; но адреса считаются
     -- от GetCount верхнего уровня — он не изменился (вставка внутрь)
     local base = A.GetParamNormalized(track, tgt, tparam)
@@ -4317,8 +4348,9 @@ end
 
 -- ── прочее ────────────────────────────────────────────────────────────────
 -- 15 окт: перед откатом — снимок узла, который покидаем (дерево undo: ветка не теряется)
-function E.undo() if E.before_undo then pcall(E.before_undo) end; R.Main_OnCommand(40029, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end end
-function E.redo() R.Main_OnCommand(40030, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end end   -- 15 окт: after_undo — слайсер перечитывает нарезку
+-- 24 окт: возвращают, что откатили / вернули (имя шага undo REAPER) — в статус
+function E.undo() local d = R.Undo_CanUndo2 and R.Undo_CanUndo2(0); if E.before_undo then pcall(E.before_undo) end; R.Main_OnCommand(40029, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end; return d end
+function E.redo() local d = R.Undo_CanRedo2 and R.Undo_CanRedo2(0); R.Main_OnCommand(40030, 0); if model then model.invalidate() end; if E.after_undo then pcall(E.after_undo) end; return d end   -- 15 окт: after_undo — слайсер перечитывает нарезку
 function E.save() R.Main_SaveProject(0, false) end
 -- 12 окт: старт — с курсора трекера (lock): main ставит E.start_at; иначе REAPER стартовал со своего курсора,
 -- который мог остаться старым (gg во время игры)

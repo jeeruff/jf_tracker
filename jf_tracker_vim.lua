@@ -3201,7 +3201,7 @@ function V.key_impl(c)
       for k = 0, n - 1 do E.paste(reg, lpb(), V.cur.row + k * ((reg and reg.rows) or 1), paste_targets(V.cur.fi), ch == 'P') end   -- 13 окт: p заменяет ноту строки, P — рядом
       finish_edit()
     end
-  elseif ch == 'u' then for _ = 1, n do E.undo() end; finish_move()   -- 15 окт: 3u — три шага
+  elseif ch == 'u' then local d; for _ = 1, n do d = E.undo() end; V.msg = d and ('undo: ' .. d) or 'nothing to undo'; finish_move()   -- 15 окт: 3u — три шага
   elseif c == ctrl('r') and not (ctx.mods and (ctx.mods().ctrl or ctx.mods().alt or ctx.mods().cmd)) then for _ = 1, n do E.redo() end; finish_move()   -- 5 окт: Ctrl+R — вкладка rec (main); 15 окт: со счётчиком
   elseif ch == '.' then
     -- 15 окт: счётчик — до повторов (иначе первый повтор брал его сам: 2. давало три раза)

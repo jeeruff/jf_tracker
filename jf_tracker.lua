@@ -27013,7 +27013,12 @@ local function frame()
           if ctx.dsp_learn_key(ch) then return end
         end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
-        if r == 'leave' then ctx.set_focus('tracker') end
+        if r == 'leave' then ctx.set_focus('tracker')
+        elseif not r and (c == 117 or c == 18) then   -- 24 окт: u / Ctrl+R в DSP — undo / redo, как везде (было: ничего)
+          local d
+          if c == 117 then d = edit.undo() else d = edit.redo() end
+          vim.msg = (c == 117 and 'undo: ' or 'redo: ') .. (d or 'nothing')
+        end
       elseif state.focus == 'top' and state.top and (vim.mode == 'cmd' or vim.mode == 'search') then
         -- набор команды / поиска: клавиши только в vim, вкладка их не видит (2 окт)
         return vim.key(c)

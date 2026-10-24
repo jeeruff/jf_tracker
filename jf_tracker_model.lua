@@ -1683,6 +1683,12 @@ local function wrap_kids(tr, e, view, depth)
   e.params_all = e.params_all or e.params    -- запись из кеша: полный список — на случай вида pack / list
   local macros = {}
   for _, p in ipairs(e.params_all or {}) do if p.macro then macros[#macros + 1] = p end end
+  -- 24 окт: по номеру ручки (M1 M2 …: порядок вывода в контейнер любой) и сколько видно (+ / − в шапке)
+  local function mnum(p) return tonumber((p.name or ''):match('M(%d+)%s*$')) or 99 end
+  table.sort(macros, function(a, b) return mnum(a) < mnum(b) end)
+  local nvis = tr and e.fguid and R.GetSetMediaTrackInfo_String and tonumber(select(2, R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_macn:' .. e.fguid, '', false)))
+  if nvis then while #macros > nvis do macros[#macros] = nil end end
+  e.macro_n = #macros
   e.params = macros
   if e.xy_own == nil then e.xy_own = { e.xy or false, e.xy_x, e.xy_y } end
   e.xy, e.xy_x, e.xy_y = nil, nil, nil

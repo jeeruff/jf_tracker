@@ -594,6 +594,7 @@ KH.PAGES = {
     { k = 'v', d = 'select a range of fx (h l extend), Esc clears' },
     { k = 'Enter b', d = 'toggle parameter / bypass fx' },
     { k = 'e', d = 'edit: the fx window (button e on the block, as in Cubase; on / off - bypass, x delete)' },
+    { k = 'u  Ctrl+R', d = 'undo / redo here too (the status says what was undone)' },
     { k = 't', d = 'track fx / take fx of the instrument (buttons track take)' },
     { k = 'Space', d = 'play / stop' },
     { k = 'drag title', d = 'move fx: the amber line shows where it lands' },
