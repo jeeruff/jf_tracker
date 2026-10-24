@@ -22009,6 +22009,19 @@ local function frame()
             if g.node == pd.g.node and g.i == pd.g.i then here = c0
             elseif state.snappanes ~= false and gfx.mouse_cap & 8 == 0 and g.ax == pd.g.ax and math.abs(c0 - cur) < 8 then want = c0 end
           end
+          -- 24 окт: мягкая защёлка размера DSP — модули (без вкладок, строки трека и строки клавиш) ровно 250 px
+          -- (state.dsp_snap_px), когда линия дока рядом (12 px); Shift — без
+          local dc = L.pn.by_panel and L.pn.by_panel.dsp
+          if dc and here and pd.g.ax == 'v' and state.snappanes ~= false and gfx.mouse_cap & 8 == 0 then
+            local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1   -- вкладки + строка клавиш + строка трека DSP
+            local th = over + (state.dsp_snap_px or 250)
+            local top, bot = dc.y, dc.y + dc.h
+            local tgt = math.abs(here - top) <= 6 and (bot - th) or (math.abs(here - bot) <= 6 and (top + th) or nil)
+            if tgt and math.abs(cur - tgt) < 12 then
+              want = tgt
+              vim.msg = ('dsp: %d px - the canonical size (dock %d px; Shift - free)'):format(state.dsp_snap_px or 250, th)
+            end
+          end
           local delta = here and (want - here) or (cur - pd.last)
           if math.abs(delta) >= 1 then draw.panes.drag_grip(state.panes, L.pn, pd.g, delta); relayout() end
           pd.last = cur
