@@ -675,8 +675,7 @@ function S.key(c)
     local te = S.cut_point(S.cross.t + S.cross.dt)
     ctx.cut_at(S.cross, te, ctx.state and ctx.state.cutsnap and ctx.state.cutquant); S.cross = nil
   elseif (ch == 'S' or ch == 's') and ctx.slice_hydra then ctx.slice_hydra()
-  elseif ch == '+' or ch == '=' then S.sens = math.min(1, S.sens + 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
-  elseif ch == '-' then S.sens = math.max(0, S.sens - 0.05); if S.mode:match('^transients') then S.use_transients() else S.detect(); S.mode = ('detect %d (sens %.2f)'):format(#S.trans, S.sens) end
+  -- 24 окт: - + (чувствительность транзиентов) с клавиатуры убраны — слишком резко (нажал — нарезка пересобралась); кнопки - + остались
   elseif ch == 'x' then S.clear()
   elseif ch == 'Q' then S.smart_quantize()                              -- smart quantize (2 окт)
   -- 10 окт: zz — item на всё окно (как zz в других модулях); autotrim — T

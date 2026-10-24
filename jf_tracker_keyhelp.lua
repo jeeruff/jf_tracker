@@ -698,7 +698,6 @@ KH.PAGES = {
     { k = 'Tab S-Tab', d = 'the wave cursor to the next / previous transient, the bit up to the next one plays (transients are found on the first Tab)' },
     { k = '$', d = 'Shift+4: 16 equal slices - the quick slicing (! @ # $ ...) takes $ first in the item tab; the slicer\'s own $ (cut a slice at the wave cursor) is hidden behind it - a key conflict' },
     { k = 'd', d = 'delete a slice: d + its key (1 f1 2 ...; qwerty 2 w 3 e), dd - the slice under the wave cursor (else the selected one)' },
-    { k = '+ -', d = 'transient sensitivity up / down (with frow - is a note: only + works)' },
     { k = 'x', d = 'clear slices' },
     { k = 'T', d = 'autotrim: cut the silence at the start and the end (button autotrim)' },
     { k = 'Opt+D', d = 'transient detector module left of the wave: sensitivity, threshold, min gap, pre-attack - transients show live; Enter slices, s smart, x clear, Esc / Opt+D close' },
