@@ -7836,6 +7836,17 @@ function D.frame(L, snap, rows, state, info)
       if not c.folded and not c.master then
         if nx + bw2 <= ln.x + ln.w then
           pm(nx, 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
+          -- 24 окт: 1 — трек на одном нотном лейне (моно: новая нота обрывает звучащую), левее − +
+          local ox = nx - L.btn_w - 2
+          if li == 1 and ox >= ln.x and info.mono_on then
+            local on = info.mono_on(col)
+            local hot = mx >= ox and mx < ox + L.btn_w and my >= by and my < by + L.rh - 1
+            set(hot and D.CURROW or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(ox, by, L.btn_w, L.rh - 2, 1)
+            set(on and U.CYAN or U.DIM); gfx.rect(ox, by, L.btn_w, L.rh - 2, 0)
+            text(ox + 2, by, '1', hot and U.AMBER or (on and U.CYAN or BTXT))
+            if hot then hover.lanemono = { col = col, lane = ln.lane } end
+            hint('lanebtn', ox, by, L.btn_w, L.rh, { col = col, lane = ln.lane, d = 0, n = ln.nsub, mono = true })
+          end
         end
         local fx0 = ln.x + ln.w - bw2 - 1
         if li == #c.lanes and fx0 > nx + bw2 + L.pad and not c.master then   -- 17 окт: у мастера колонок эффектов нет (кнопки ложились на cmd / visor); его a+ — ниже

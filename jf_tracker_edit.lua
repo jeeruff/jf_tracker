@@ -1947,6 +1947,30 @@ local function mono_cut(track, t, keep)
   end
 end
 
+-- 24 окт: кнопка 1 у − + нотных колонок — трек на одном нотном лейне (P_EXT jf_mono1): новое событие обрывает
+-- звучащие в этот момент (MIDI-ноты и аудио), как в моно-трекере; колонок не прибавляется
+function E.mono_on(track)
+  local _, v = R.GetSetMediaTrackInfo_String(track, 'P_EXT:jf_mono1', '', false)
+  return v == '1'
+end
+function E.mono_set(track, on) R.GetSetMediaTrackInfo_String(track, 'P_EXT:jf_mono1', on and '1' or '', true) end
+function E.mono_cut_at(track, lane_idx, t0)
+  mono_cut(track, t0, nil)
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local o = R.GetTrackMediaItem(track, i)
+    local tk = R.GetActiveTake(o)
+    if tk and R.TakeIsMIDI(tk) and same_lane(track, o, lane_idx) then
+      local _, nn = R.MIDI_CountEvts(tk)
+      local cut = false
+      local pc = R.MIDI_GetPPQPosFromProjTime(tk, t0)
+      for k = 0, nn - 1 do
+        local _, sel, mu, sp, ep, ch, p, v = R.MIDI_GetNote(tk, k)
+        if sp < pc - 1 and ep > pc + 1 then R.MIDI_SetNote(tk, k, sel, mu, sp, pc, ch, p, v, true); cut = true end
+      end
+      if cut then R.MIDI_Sort(tk) end
+    end
+  end
+end
 local function finish_insert(track, lane_idx, it)
   if not it then return end
   E.bsync_fit(it)                                     -- beatsync инструмента: под темп в этом месте
@@ -1957,7 +1981,8 @@ local function finish_insert(track, lane_idx, it)
     local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     if tc > p + 1e-4 and p + R.GetMediaItemInfo_Value(it, 'D_LENGTH') > tc + 1e-6 then R.SetMediaItemInfo_Value(it, 'D_LENGTH', tc - p) end
   end
-  if E.mono and not E.beside then mono_cut(track, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
+  if (E.mono or E.mono_on(track)) and not E.beside then mono_cut(track, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
+  if E.mono_on(track) and not E.beside then E.mono_cut_at(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION')) end
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
   if E.legato_auto(track) then E.legato(track, lane_idx) end   -- трек в легато: держится при вставке
@@ -2512,6 +2537,7 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
         made = it
       end
     end
+    if E.mono_on(track) then E.mono_cut_at(track, lane_idx, t0) end   -- 24 окт: трек на одном лейне — новая нота обрывает звучащую
   end)
   return made
 end
@@ -2690,7 +2716,7 @@ end
 function E.rec_note(track, lane_idx, lpb, row, pitch, vel, len_rows)
   local t0 = E.swing_time(row, lpb)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
-  run('rec note', function() insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false) end)
+  run('rec note', function() insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false); if E.mono_on(track) then E.mono_cut_at(track, lane_idx, t0) end end)
 end
 -- CC / aftertouch в MIDI-item, покрывающий t (status: 0xA0 poly AT, 0xD0 channel AT, 0xB0 CC)
 function E.rec_cc(track, lane_idx, t, status, chan, d1, d2)

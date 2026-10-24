@@ -15020,6 +15020,27 @@ ctx.cont_wet = function(f)
   if not idx or idx < 0 then return nil end
   return { idx = idx, v = A.GetParamNormalized(tr, f.i, idx) }
 end
+-- 24 окт: кнопка 1 в шапке трека — один нотный лейн (моно); кэш на кадр
+ctx.mono_on = function(col)
+  if not (col and col.track) then return false end
+  ctx.mono_c = ctx.mono_c or {}
+  local now = reaper.time_precise()
+  local e = ctx.mono_c[col.track]
+  if not e or now - e.t > 0.5 then e = { t = now, v = edit.mono_on(col.track) }; ctx.mono_c[col.track] = e end
+  return e.v
+end
+ctx.mono_toggle = function(col, lane)
+  local on = not edit.mono_on(col.track)
+  edit.run(on and 'track: one note lane' or 'track: note lanes free', function() edit.mono_set(col.track, on) end)
+  ctx.mono_c = nil
+  if on then
+    state.subs_min = state.subs_min or {}
+    state.subs_min[col.guid .. ':' .. tostring(lane and lane.idx or 0)] = 1
+    if ctx.unoverlap then ctx.unoverlap(col) end   -- наложения — подрезать: нота кончается, где началась следующая
+  end
+  model.invalidate()
+  vim.msg = (col.name or 'track') .. (on and ': one note lane - a new note cuts the sounding one (1 again - free)' or ': note lanes free (overlaps open more columns)')
+end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
 ctx.dsp_tall = function()
   local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel.dsp
@@ -20586,7 +20607,7 @@ local function frame()
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, mono_on = ctx.mono_on, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -22078,6 +22099,7 @@ local function frame()
   elseif hover.fxcolbtn then state.status = ('command columns of %s: %d - click - / + (0..4); keys z. / z, on the cursor track'):format(hover.fxcolbtn.col and hover.fxcolbtn.col.name or 'the track', ctx.fx_cols_of(hover.fxcolbtn.col))
   elseif hover.envpm then state.status = hover.envpm.d > 0 and 'add an automation lane: pick a parameter of the track or its fx'
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
+  elseif hover.lanemono then state.status = '1: the track on one note lane - a new note cuts the sounding one, overlaps trimmed (' .. (ctx.mono_on(hover.lanemono.col) and 'on' or 'off') .. ')'
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
   elseif hover.ctrl == 'wave' then state.status = 'wave column left of the note: spectral peaks (colour = frequency) + stretch markers (amber) - click: on/off, :wave'
   elseif hover.ctrl and hover.ctrl:match('^q_') then state.status = ({ q_dsp = 'DSP panel on / off (the fx chain of the cursor track)', q_side = 'browser sidebar on / off', q_mx = 'matrix (pattern sequencer) shown / folded', q_envs = 'envelope columns on / off (all tracks)', q_scopes = 'track scopes on / off', q_hints = 'module hints row on / off', q_wave = 'item waves on / off (back to the last wave mode)', q_meters = 'track meters on / off', q_ruler = 'timeline ruler (beats) on / off', q_names = 'item names in the cells on / off', q_colors = 'item colours on / off', q_input = 'input row in the track header on / off', q_preview = 'preview while inserting on / off', q_endstop = 'stop at =END on / off', q_captions = 'column captions on / off', q_keys = 'keycaster: the last keys pressed, in the empty right part of the tracker (right click - default size)', q_kcm = 'keycaster text smaller', q_sidel = 'browser on the left, under the matrix', q_mixup = 'mixer above the tracker, in the headers', q_mixdn = 'mixer under the tracker', q_sider = 'browser on the right, under the instruments', q_listen = 'step listen: with the transport stopped, the row under the moving cursor plays (all tracks)', q_kcp = 'keycaster text bigger' })[hover.ctrl]
@@ -23846,6 +23868,7 @@ local function frame()
     elseif hover.envpm then
       if hover.envpm.d > 0 then ctx.automation_picker(hover.envpm.col) else ctx.env_hide(hover.envpm.e) end
       click = { t = now2, zone = 'envpm' }
+    elseif hover.lanemono then ctx.mono_toggle(hover.lanemono.col, hover.lanemono.lane); click = { t = now2, zone = 'lanemono' }   -- 24 окт: 1
     elseif hover.lanebtn then
       ctx.lane_subs(hover.lanebtn.col, hover.lanebtn.lane, hover.lanebtn.d, hover.lanebtn.n)
       click = { t = now2, zone = 'lanebtn' }
