@@ -160,7 +160,7 @@ KH.PAGES = {
     { k = 'env: Ctrl+Opt+1..6', d = 'segment shape of the point on the row, in any field and mode: 1 lin 2 sqr 3 slo 4 fas 5 fae 6 bez' },
     { k = 'i', d = 'INSERT: the keyboard writes notes (layout frow / qwerty / renoise - options)' },
     { k = 'I', d = 'INSERT from the start of the row: the note field of the track (as in Vim)' },
-    { k = 'a', d = 'envelope columns of all tracks on / off' },
+    { k = 'a', d = 'envelopes: on a folded or narrowed track - its automation shown (unfolded); else - envelopes of all tracks on / off' },
     { k = 'A', d = 'automate: pick any parameter of the track (fzf) - envelope column, or a take envelope of the note' },
     { k = 'Opt+A', d = 'the last touched parameter (a knob you just moved, any track) - its envelope column, cursor there' },
     { k = 'ze', d = 'on an envelope column: its view - c curve, v values (like a command column), s steps (a fader on every row, as a 303 step sequencer: square points, drag across the rows with the mouse in any mode), b values and bars (the number and a line under it, longer - more, as MIDI CC)' },

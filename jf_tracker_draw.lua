@@ -946,7 +946,8 @@ function D.layout(snap, state, nregions)
       local show_env = state.trackenvs and state.trackenvs[col.guid]
       if show_env == nil then show_env = state.envs end
       if c.compact then show_env = true end         -- свёрнутый: автоматизация видна всегда, схемой
-      if lvl then show_env = (lx - (c.x or 0)) >= 50 * L.cw end   -- уровни: автоматизация — последней, когда колонка шире 50 знаков
+      -- уровни: автоматизация — последней, когда колонка шире 50 знаков; 24 окт: a на треке (огибающие трека явно вкл.) — видна всегда
+      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw end
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
         local ew = c.compact and L.env_cw or L.env_w

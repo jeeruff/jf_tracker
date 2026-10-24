@@ -3127,7 +3127,7 @@ function V.key_impl(c)
     local f = flat()[V.cur.fi]
     if f and f.col then for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end end
     V.cur.field = 1; clamp_cur(); V.mode = 'insert'; V.count = nil; return
-  elseif ch == 'a' then ctx.toggle_envs(); V.count = nil; return
+  elseif ch == 'a' then if not (ctx.envs_folded and ctx.envs_folded()) then ctx.toggle_envs() end; V.count = nil; return   -- 24 окт: на сложенном треке — его автоматизация
   elseif ch == 'o' then if ctx.reveal_item then ctx.reveal_item() end; V.count = nil; return
   elseif ch == '=' then
     -- beatsync (= как «выровнять» в Vim): конец события к ближайшей доле; N= — к N строкам

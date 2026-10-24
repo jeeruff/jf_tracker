@@ -3388,6 +3388,19 @@ ctx = {
     vim.open_hydra({ title = 'project tab (NgT - the Nth)', items = items })
   end,
   toggle_envs = function() state.envs = not state.envs; state.trackenvs = {}; vim.msg = 'envelopes ' .. (state.envs and 'on' or 'off') .. ' (all tracks)' end,
+  -- 24 окт: a на сложенном треке — раскрыть его и показать его огибающие (не переключать у всех); true — сделано
+  envs_folded = function()
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local col = f and f.col
+    if not (col and col.guid) then return false end
+    local folded = state.folds[col.guid]
+    local narrow = (state.wlevel and state.wlevel[col.guid]) or state.wzlevel
+    if not (folded or narrow) or state.trackenvs[col.guid] == true then return false end   -- уже показана — a как раньше
+    if folded then ctx.fold(col, false) end
+    state.trackenvs[col.guid] = true
+    vim.msg = (col.name or 'track') .. ': its automation shown (a again - envelopes of all tracks)'
+    return true
+  end,
   -- кнопка A в шапке — только этот трек
   toggle_track_envs = function(col)
     local cur = state.trackenvs[col.guid]; if cur == nil then cur = state.envs end
