@@ -3101,6 +3101,58 @@ function E.macro_find(track, c)
     if (nm or ''):find(E.MACRO, 1, true) then return a, k end
   end
 end
+-- 24 окт: запись назначений макросов — P_EXT трека jf_macros, строки «GUID контейнера GUID цели параметр M scale»;
+-- шапка контейнера показывает, что на каком макросе. При чтении связь сверяется с REAPER (снятые в REAPER — не видны)
+local MREC = 'P_EXT:jf_macros'
+local function mrec_read(track)
+  local ok, s = R.GetSetMediaTrackInfo_String(track, MREC, '', false)
+  local t = {}
+  for ln in ((ok and s) or ''):gmatch('[^\n]+') do
+    local cg, tg, p, m, sc = ln:match('^(%S+) (%S+) (%d+) (%d+) (%S+)$')
+    if cg then t[#t + 1] = { cg = cg, tg = tg, p = tonumber(p), m = tonumber(m), sc = tonumber(sc) or 0 } end
+  end
+  return t
+end
+local function mrec_set(track, cg, tg, p, m, sc)
+  local t = mrec_read(track)
+  for i = #t, 1, -1 do if t[i].tg == tg and t[i].p == p then table.remove(t, i) end end
+  if m then t[#t + 1] = { cg = cg, tg = tg, p = p, m = m, sc = sc } end
+  local o = {}
+  for _, r in ipairs(t) do o[#o + 1] = ('%s %s %d %d %.4f'):format(r.cg, r.tg, r.p, r.m, r.sc) end
+  R.GetSetMediaTrackInfo_String(track, MREC, table.concat(o, '\n'), true)
+end
+-- назначения контейнера c → { [M] = { { fx = адрес, name, pname, sc }, … } }; только живые связи
+function E.macro_links(track, c)
+  local A = FA(track)
+  local cg = A.GetFXGUID(track, c)
+  local out = {}
+  if not cg then return out end
+  local mk = select(2, E.macro_find(track, c))
+  if not mk then return out end
+  local kids = {}
+  for k = 0, (cont_count(track, c) or 0) - 1 do
+    local a = child_addr(track, c, k)
+    local g = A.GetFXGUID(track, a)
+    if g then kids[g] = a end
+  end
+  for _, r in ipairs(mrec_read(track)) do
+    local a = r.cg == cg and kids[r.tg]
+    if a then
+      local P = ('param.%d.'):format(r.p)
+      local _, act = A.GetNamedConfigParm(track, a, P .. 'plink.active')
+      local _, ef = A.GetNamedConfigParm(track, a, P .. 'plink.effect')
+      local _, lp = A.GetNamedConfigParm(track, a, P .. 'plink.param')
+      if act == '1' and tonumber(ef) == mk and tonumber(lp) == r.m - 1 then
+        local _, nm = A.GetFXName(track, a, '')
+        local _, pn = A.GetParamName(track, a, r.p, '')
+        local _, sc = A.GetNamedConfigParm(track, a, P .. 'plink.scale')
+        out[r.m] = out[r.m] or {}
+        table.insert(out[r.m], { fx = a, p = r.p, name = (nm or ''):gsub('^[^:]*: ', ''), pname = pn or ('p' .. r.p), sc = tonumber(sc) or r.sc })
+      end
+    end
+  end
+  return out
+end
 local function macro_map(track, c, maddr, m)
   local A = FA(track)
   -- уже выведена? container_map.get отвечает номером параметра контейнера (проверено 24 окт)
@@ -3135,6 +3187,8 @@ function E.macro_link(track, c, tgt, tparam, m, scale)
     A.SetNamedConfigParm(track, tgt, P .. 'plink.offset', '0')
     A.SetNamedConfigParm(track, tgt, P .. 'plink.active', '1')
     macro_map(track, c, maddr, m)
+    local cg, tg = A.GetFXGUID(track, c), A.GetFXGUID(track, tgt)
+    if cg and tg then mrec_set(track, cg, tg, tparam, m, scale) end
     ok = true
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
@@ -3144,6 +3198,8 @@ function E.macro_unlink(track, tgt, tparam)
   run('macro unlink', function()
     local A = FA(track)
     A.SetNamedConfigParm(track, tgt, ('param.%d.plink.active'):format(tparam), '0')
+    local tg = A.GetFXGUID(track, tgt)
+    if tg then mrec_set(track, nil, tg, tparam, nil) end
   end)
   if model then model.invalidate() end
 end

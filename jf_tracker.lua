@@ -14929,6 +14929,19 @@ ctx.pins_open = function(k)
 end
 -- 24 окт: подпись кнопки пинов «2 in 2/6 out»: входы плагина; выходов занято / всего (как REAPER); кеш 1 с на модуль
 ctx.fx_io_c = {}
+-- 24 окт: назначения макросов контейнера (edit.macro_links) — для шапки; раз в секунду или после правки FX
+ctx.macro_links_of = function(tr, f)
+  ctx.mlc = ctx.mlc or {}
+  local key = tostring(f.fguid or f.i)
+  local e = ctx.mlc[key]
+  local now = reaper.time_precise()
+  if not e or e.gen ~= model.fx_gen or now - e.t > 1 then
+    local ok, ml = pcall(edit.macro_links, tr, f.i)
+    e = { gen = model.fx_gen, t = now, ml = ok and ml or {} }
+    ctx.mlc[key] = e
+  end
+  return e.ml
+end
 ctx.fx_io = function(f)
   local col = dsp_target(); local tr = col and col.track
   if not tr then return nil end
@@ -20427,7 +20440,7 @@ local function frame()
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim,
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, macro_links = ctx.macro_links_of,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log

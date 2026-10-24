@@ -5500,6 +5500,30 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
   end
   return bx
 end
+-- 24 окт: назначения макросов контейнера строками под его ручками (M — янтарём, сила со знаком)
+function D.macro_list(L, info, f, by, bh)
+  local ml = info.macro_links(info.pool_col.track, f)
+  local x, w, y = f._lx, f._lw, f._ybot + 3
+  local ymax = by + bh - 3
+  local rows = {}
+  for m = 1, 8 do for _, l in ipairs(ml[m] or {}) do rows[#rows + 1] = { m = m, l = l } end end
+  if #rows == 0 then
+    if y + L.rh <= ymax then text(x, y, fit('M on a parameter inside - assign', w), U.DIM) end
+    return
+  end
+  set(U.LINE); gfx.rect(x, y - 2, w, 1, 1)
+  for i, r in ipairs(rows) do
+    if y + 2 * L.rh > ymax and i < #rows then text(x, y, fit('+' .. (#rows - i + 1) .. ' more', w), U.DIM); return end
+    if y + L.rh > ymax then return end
+    local mt = 'M' .. r.m .. ' '
+    text(x, y, mt, U.AMBER)
+    local amt = (' %+d'):format(math.floor(r.l.sc * 100 + 0.5))
+    local aw = ms(amt)
+    text(x + ms(mt), y, fit(r.l.name .. ' ' .. r.l.pname, w - ms(mt) - aw - 2), U.GREY)
+    text(x + w - aw, y, amt, r.l.sc < 0 and U.RED or U.CYAN)
+    y = y + L.rh
+  end
+end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
 function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
@@ -10981,10 +11005,14 @@ function D.frame(L, snap, rows, state, info)
         end
         if D.csel_on(D.csel_dsp_tid, p.fx or f.i, p.i) then csel_frame(bxc + L.pad - 1, py, pw + 2, L.rh) end
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
+        if f.wrap then f._lx, f._lw, f._ybot = bxc + L.pad, pw, py + L.rh end   -- 24 окт: под макросами — их назначения
         -- 14 окт: SLIDER (Ctrl+Cmd) — параметры колонки устройства одной группой
         if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
         ::next_param::
       end
+      -- 24 окт: контейнер — под ручками макросов что на каком: «M1 Serum cutoff +50»
+      if f.wrap and f._ybot and info.macro_links and info.pool_col and info.pool_col.track then D.macro_list(L, info, f, by, bh) end
+      f._ybot = nil
       -- ПКМ / клик в любом месте блока (6 окт) — этот блок, а не модуль в фокусе
       if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов
