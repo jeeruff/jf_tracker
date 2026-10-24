@@ -261,6 +261,7 @@ local state = {
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
+  nofloat = flag('nofloat', true),   -- 24 окт: окна, которые REAPER открывает сам при добавлении эффекта, — закрыть (jf_tracker_fxfloat)
   focusback = flag('focusback', true),   -- 21 окт: мышь вернулась с окна плагина — клавиатура снова у трекера
   autofocus = flag('autofocus', false),            -- autofocus: курсор клавиатуры на элементе — его модуль (6 окт)                   -- заливка automation items в колонках огибающих (6 окт)                -- tint channels on solo / mute (5 окт)             -- I really want to have transport buttons (5 окт; выкл — только rec / loop)
   zoommods = reaper.GetExtState(EXT, 'zoommods') ~= '' and reaper.GetExtState(EXT, 'zoommods') or 'cmd',   -- зум колесом: cmd (обе оси) | split (Cmd — гориз., Option — верт., как REAPER), 5 окт
@@ -754,7 +755,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -1638,6 +1639,22 @@ ctx = {
     edit.fx_copy(reg.track, si, col.track, di)
     dsp_sel.fx = f and (after and k + 1 or k) or 1
     vim.msg = 'fx copy: ' .. reg.name
+  end,
+  -- 24 окт: cn — пустой контейнер за выбранным модулем; into — внутрь контейнера k (кнопка [] в его заголовке)
+  dsp_container_new = function(k, into)
+    local col = dsp_target(); local fxs = col and col.fx or {}
+    local f = fxs[k]
+    if into then
+      if not (f and f.container) then vim.msg = '[]: not a container'; return end
+      if edit.container_new(col.track, nil, f.i) then vim.msg = 'an empty container inside ' .. f.name .. ' - drop fx or another container into it' end
+      return
+    end
+    local n = model.fxapi(col and col.track).GetCount(col and col.track)
+    local pos = f and not f.inner and f.i + 1 or n
+    if col and edit.container_new(col.track, pos) then
+      dsp_sel.fx = f and k + 1 or #fxs + 1
+      vim.msg = 'cn: an empty container - drop fx or another container into it ([] in its header - a container inside)'
+    end
   end,
   dsp_pack = function(k0, k1)
     local col = dsp_target(); local fxs = col and col.fx or {}
@@ -12554,6 +12571,7 @@ ctx = {
       flag('midilanes', 'midi lanes', 'columns of the MIDI items of a track: CC by number, program change, articulations (text / notation events), SysEx; hex per row edits CC / PC'),
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
+      flag('nofloat', 'no auto FX windows', 'a new effect (added by the tracker or in REAPER, inside containers too) opens no window: the window REAPER floats by itself (its option Auto-float newly created FX windows) closes at once; windows you open yourself (O, double click) stay'),
       flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
@@ -12623,7 +12641,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
@@ -14735,6 +14753,7 @@ model.inner_chain = function(tr, e, ki)   -- строка списка цепе�
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.chain_sel or {})[g .. ':' .. tostring(e.fguid or e.i) .. ':' .. ki]
 end
+ctx.FF = dofile(DIR .. '/jf_tracker_fxfloat.lua')   -- 24 окт: опция nofloat — окна эффектов, открытые REAPER при добавлении, закрыть
 draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
 -- зона цепи kid (ребёнок-контейнер): её первый — jf_tracker_zone? → { addr, key, vel, sel, select }; кеш 0.25 с / fx_gen
 ctx.zone_cache = {}
@@ -17113,6 +17132,7 @@ function ctx.context_items(hover)
           if edit.fx_add_into(col.track, f.i, it.data) then vim.msg = '+ ' .. it.label .. ' → ' .. f.name end
         end)
       end, 'a')
+      add('Empty container inside ([])', function() ctx.dsp_container_new(k, true) end, 'c')
       add('Preset … (container presets)', function() ctx.dsp_preset(k, 'pick') end, 'r')
       add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
@@ -17127,6 +17147,7 @@ function ctx.context_items(hover)
       add('Open FX window', function() edit.fx_show(col.track, f.i) end)
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
       add('Add FX … (fzf)', function() ctx.fx_picker() end)
+      add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end)
       add((state.fxopen and '!' or '') .. 'Open the fx window after adding', function() state.fxopen = not state.fxopen; edit.open_on_add = state.fxopen; vim.msg = 'fx window after adding: ' .. (state.fxopen and 'open' or 'closed') end)
     end
   elseif hover.row and hover.fi then
@@ -18739,6 +18760,7 @@ function ctrl_action(name, delta)
     end
   elseif name == 'oneclick' then state.oneclick = not state.oneclick; vim.msg = 'one click focus ' .. (state.oneclick and 'on' or 'off')
   elseif name == 'autofocus' then state.autofocus = not state.autofocus; vim.msg = 'autofocus ' .. (state.autofocus and 'on' or 'off')
+  elseif name == 'nofloat' then state.nofloat = not state.nofloat; ctx.FF.reset(); vim.msg = 'no auto FX windows ' .. (state.nofloat and 'on' or 'off')
   -- блок записи (5 окт): rec, punch (авто-панч по time selection), pre-roll, rec→lib
   elseif name == 'rec' then
     if reaper.GetPlayState() & 4 == 4 then if state.rec_sess then ctx.rec_stop(32) else reaper.Main_OnCommand(1016, 0) end
@@ -22024,6 +22046,7 @@ local function frame()
     state.ss_clip, state.ss_zone = nil, nil
     if cl.prev and cl.prev ~= vim.inst then local pp = state.poolprev; state.poolprev = false; pool_select(cl.prev); state.poolprev = pp end
   end
+  if state.nofloat and not state.fxopen then pcall(ctx.FF.poll, reaper, reaper.time_precise()) end   -- 24 окт (open after adding — окна нужны)
   do   -- 23 окт: выбор пэда / полосы / цепи сменился (мышь, клавиши, бросок) — пересобрать развёртку модулей за контейнером
     local t = dsp_target()
     for _, e in ipairs(t and t.fx or {}) do
@@ -23528,6 +23551,7 @@ local function frame()
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bands' then ctx.dsp_bands(hover.dspbtn.fx)   -- 23 окт: ÷ — в полосы
+      elseif hover.dspbtn.what == 'cnew' then ctx.dsp_container_new(hover.dspbtn.fx, true)   -- 24 окт: [] — контейнер внутрь
       elseif hover.dspbtn.what == 'lastp' then ctx.dsp_lastparam_menu(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')

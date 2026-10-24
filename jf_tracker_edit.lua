@@ -3049,6 +3049,20 @@ function E.fx_add_into(track, c, name, par)
   if model then model.invalidate() end
   return ok
 end
+-- 24 окт: пустой контейнер — на позицию pos верхнего уровня или (into = индекс контейнера) в конец контейнера;
+-- внутрь пустого можно снова контейнер — и так далее. Окно контейнера REAPER не открываем
+function E.container_new(track, pos, into)
+  local ok = false
+  run('new empty container', function()
+    local addr = pos
+    if into then local k = cont_count(track, into); if not k then return end; addr = child_addr(track, into, k) end
+    local idx = add_fx(track, 'Container', -1000 - addr)
+    ok = idx ~= nil and idx >= 0
+    if ok then FA(track).Show(track, addr, 2) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
 function E.fx_move_into(track, src, c, par)
   if src == c then return false end
   local ok = false
@@ -3720,6 +3734,13 @@ function E.band_container(obj, addr, n, move_fx)
       A.Show(obj, sa, 2)
     end
     if move_fx then copy_fx(obj, c + 1, obj, grand_addr(obj, c, 0, 1), true) end   -- эффект — в low, за сплиттером
+    -- 24 окт: «Auto-float newly created FX windows» открывал окна вложенных контейнеров (обёртка AddByName
+    -- закрывает только верхний уровень) — закрыть всё дерево: контейнер, полосы, их эффекты
+    A.Show(obj, c, 2)
+    for b = 0, n - 1 do
+      A.Show(obj, child_addr(obj, c, b), 2)
+      for j = 0, 2 do A.Show(obj, grand_addr(obj, c, b, j), 2) end
+    end
     ok = true
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end

@@ -92,6 +92,7 @@ function DK.key(c, sel, n, np, mods)
     elseif op == 'd' and ch == 'a' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'y' and ch == 'y' then ctx.dsp_yank(sel.fx)
     elseif op == 'c' and ch == 'c' then ctx.dsp_pack(r0, r1); DK.anchor = nil
+    elseif op == 'c' and ch == 'n' then ctx.dsp_container_new(sel.fx)   -- 24 окт: пустой контейнер
     elseif op == 'a' and ch == 'a' then ctx.dsp_automate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'p' then ctx.dsp_pick_param(sel.fx)
     elseif op == 'a' and ch == 'f' then if not (ctx.pad_fx_add and ctx.pad_fx_add()) then ctx.fx_picker() end   -- 23 окт: на рэке с выбранным пэдом — в пэд

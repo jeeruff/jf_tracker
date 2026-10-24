@@ -9197,6 +9197,12 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
+      -- 24 окт: [] — пустой контейнер внутрь этого (вложенность любая)
+      if f.container and not f.kit and not f.bands and not f.inner and #bxs > 2 and tw > L.cw * 8 + kb then
+        local cwb = ms('[]') + 2 * L.pad
+        bxs[#bxs + 1] = { '[]', 'cnew', bxs[#bxs][3] - cwb - 2, cwb }
+        tw = tw - cwb - 2
+      end
 
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
@@ -9223,6 +9229,7 @@ function D.frame(L, snap, rows, state, info)
       if tw > 0 then
         for _, b in ipairs(bxs) do
           local kx = b[3]
+          local kb = b[4] or kb   -- 24 окт: [] шире буквы
           local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
           -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
@@ -10197,6 +10204,27 @@ function D.frame(L, snap, rows, state, info)
           -- свёрнут (не влез / пустой): список детей и строка броска
           pcol0 = 1
           local ky = by + L.rh + 1
+          if #f.kids == 0 then
+            -- 24 окт: пустой контейнер — рамка-гнездо с подсказкой: что в него класть
+            local ex, ey, ew, eh = bx + L.pad, ky + 2, bw - 2 * L.pad, by + bh - ky - L.rh - 6
+            if eh >= 3 * L.rh then
+              local lit = drag and mx >= ex and mx < ex + ew and my >= ey and my < ey + eh
+              set(lit and U.tint(U.CYAN, 0.25) or U.tint(U.CYAN, 0.06)); gfx.rect(ex, ey, ew, eh, 1)
+              set(lit and U.CYAN or U.tint(U.CYAN, 0.5))
+              for dx = 0, ew - 1, 6 do gfx.rect(ex + dx, ey, math.min(3, ew - dx), 1, 1); gfx.rect(ex + dx, ey + eh - 1, math.min(3, ew - dx), 1, 1) end
+              for dy = 0, eh - 1, 6 do gfx.rect(ex, ey + dy, 1, math.min(3, eh - dy), 1); gfx.rect(ex + ew - 1, ey + dy, 1, math.min(3, eh - dy), 1) end
+              local lines = { { 'empty container', U.TEXT }, { 'drop an fx here', U.GREY }, { 'or a container', U.GREY }, { '[] - a container inside', U.DIM } }
+              local ty0 = ey + math.max(2, math.floor((eh - #lines * L.rh) / 2))
+              for li, ln in ipairs(lines) do
+                local yy = ty0 + (li - 1) * L.rh
+                if yy + L.rh <= ey + eh - 1 then
+                  local s0 = fit(ln[1], ew - 2 * L.pad)
+                  text(ex + math.max(L.pad, math.floor((ew - ms(s0)) / 2)), yy, s0, lit and U.CYAN or ln[2])
+                end
+              end
+              ky = ey + eh + 2
+            end
+          end
           for ki, kid in ipairs(f.kids) do
             if ki > nfit - 1 then break end
             local kx = bx + L.pad
