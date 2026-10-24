@@ -584,6 +584,9 @@ function D.layout(snap, state, nregions)
   L.env_w = L.env_bx + L.env_bar_w + L.pad + math.max(L.env_hex_w, L.env_shape_w) + L.pad
   L.env_cw = L.env_bx + L.cw + L.pad + L.env_hex_w + L.pad
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
+  -- 24 окт: узкая колонка по умолчанию — 3 знака значения (вид values) и тонкая ручка automation item слева
+  L.G3 = setmetatable({ env_bx = 4, env_bar_w = ms('000'), env_compact = true, env3 = true }, { __index = L })
+  L.env3_w = 4 + ms('000') + 2 * L.pad
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   -- браузер слева (7 окт, опция browserleft): lib + браузер — в левой колонке
@@ -952,11 +955,12 @@ function D.layout(snap, state, nregions)
       if show_env and col.envs then
         -- 24 окт: по умолчанию — узко (значение в 3 знака): правка — во вкладке automation или точками; опция envwide — как было
         local narrow_env = c.compact or not state.envwide
-        local ew = narrow_env and L.env_cw or L.env_w
+        local three = not c.compact and not state.envwide
+        local ew = three and L.env3_w or (narrow_env and L.env_cw or L.env_w)
         for _, e in ipairs(col.envs) do
           -- огибающая — тоже элемент L.flat (курсор заходит, INSERT правит точки)
           L.flat[#L.flat + 1] = { ci = ci, col = col, env = e, sub = {}, x = vis and lx or nil, w = ew, compact = narrow_env or nil }
-          c.envs[#c.envs + 1] = { e = e, x = lx, w = ew, fi = #L.flat, G = narrow_env and L.GE or nil }
+          c.envs[#c.envs + 1] = { e = e, x = lx, w = ew, fi = #L.flat, G = three and L.G3 or (narrow_env and L.GE or nil) }
           lx = lx + ew + 1
         end
       end
@@ -8328,7 +8332,7 @@ function D.frame(L, snap, rows, state, info)
                 gfx.rect(ev.x + 1, cy0, ev.w - 2, cy1 - cy0, 1)
                 gfx.a = 1
               end
-              local sw = L.th + 4
+              local sw = (ev.G and ev.G.env3) and 3 or (L.th + 4)   -- 24 окт: в узкой колонке — тонкая ручка
               local hw = nslot > 1 and math.max(3, math.floor(sw / nslot)) or sw
               local hx = ev.x + ((slot[ai] or 1) - 1) * hw
               set(U.mix(col, U.TEXT, ai.sel and 0.4 or 0.0)); gfx.rect(hx, cy0, ev.x + ev.w - hx, cy1 - cy0, 0)
@@ -8646,7 +8650,7 @@ function D.frame(L, snap, rows, state, info)
           set(info.focus == 'tracker' and U.AMBER or U.LINE)
           gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
-        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or (c.master and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
+        draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or ((c.master or EG.env3) and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
           hover.envx = math.max(0, math.min(1, (mx - ev.x - L.env_bx) / (EG.env_bar_w - 1)))
