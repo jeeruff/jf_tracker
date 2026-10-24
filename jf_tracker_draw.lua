@@ -10386,6 +10386,12 @@ function D.frame(L, snap, rows, state, info)
               cl[pi] = { colp, cnt }; cnt = cnt + 1
             else cl[pi] = { 99, 0 } end
           end
+          -- 24 окт: видимые параметры кита (выбранного пэда) — j / k ходят только по ним (были скрытые параметры
+          -- других пэдов: выбор «не двигался»)
+          D.kit_vis = D.kit_vis or {}
+          local kv0 = {}
+          for pi = 1, #f.params do if cl[pi] and cl[pi][1] ~= 99 then kv0[#kv0 + 1] = pi end end
+          D.kit_vis[k] = kv0
           -- 23 окт: цепочка пэда — его эффекты (за сэмплером) колонками справа: имя, B x, параметры (тянуть)
           if D.DR and ks > 0 and f.kids[ks] and info.db_params then
             local kd = f.kids[ks]

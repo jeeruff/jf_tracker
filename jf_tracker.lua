@@ -27240,6 +27240,18 @@ local function frame()
           if c == 27 then ctx.dsp_learn_toggle(); return end
           if ctx.dsp_learn_key(ch) then return end
         end
+        -- 24 окт: кит drumrs5k — j / k / стрелки по видимым параметрам выбранного пэда (не по скрытым соседних)
+        local kvis = f and f.kit and not DK.pads and not DK.pending and draw.kit_vis and draw.kit_vis[dsp_sel.fx]
+        if kvis and #kvis > 0 and (c == ('j'):byte() or c == ('k'):byte() or c == 1685026670 or c == 30064) then
+          local cur = 0
+          for i, pi in ipairs(kvis) do if pi == dsp_sel.param then cur = i end end
+          local down = c == ('j'):byte() or c == 1685026670
+          local ni = cur == 0 and 1 or math.max(1, math.min(#kvis, cur + (down and 1 or -1)))
+          dsp_sel.param = kvis[ni]; DK.pslider = true
+          local p = f.params[dsp_sel.param]
+          vim.msg = (p and p.name or '') .. '  (h l - value, j k - next, Esc - back)'
+          return
+        end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
         if r == 'leave' then ctx.set_focus('tracker')
         elseif not r and (c == 117 or c == 18) then   -- 24 окт: u / Ctrl+R в DSP — undo / redo, как везде (было: ничего)
