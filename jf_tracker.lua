@@ -14606,11 +14606,14 @@ ctx = {
       { key = 'v', label = 'view', sub = function() return group('view', view_actions()) end },
       -- P — проект (5 окт): n — заметки проекта
       { key = 'P', label = 'project', sub = function() return { title = 'project', items = {
-          { key = 'n', label = 'project notes', fn = function()
+          -- 24 окт: n — новый проект, N — в новой вкладке; заметки — m (memo), M (dev)
+          { key = 'n', label = 'new project', fn = function() reaper.Main_OnCommand(40023, 0); model.invalidate() end },
+          { key = 'N', label = 'new project in a new tab', fn = function() reaper.Main_OnCommand(40859, 0); model.invalidate() end },
+          { key = 'm', label = 'project notes', fn = function()
               if state.notes_open then ctx.notes_target('project') else NT.target = 'project'; ctx.notes_toggle() end end },
           { key = 'c', label = 'notes of the item under the cursor', fn = function()
               if state.notes_open then ctx.notes_target('context') else NT.target = 'context'; ctx.notes_toggle() end end },
-          { key = 'N', label = 'dev notes: what to check (with debug on)', fn = function()
+          { key = 'M', label = 'dev notes: what to check (with debug on)', fn = function()
               if not state.debug then vim.msg = 'dev notes live in debug mode: turn debug on'; return end
               if state.notes_open then ctx.notes_target('dev') else NT.target = 'dev'; ctx.notes_toggle() end end },
           { key = 's', label = 'save the project (:w)', fn = function() edit.save(); vim.msg = 'project saved' end },
