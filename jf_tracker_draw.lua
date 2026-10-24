@@ -5452,11 +5452,13 @@ local function rack_col(d) return U.tint(U.AMBER, 0.10 + 0.07 * math.min(3, d)) 
 -- 24 окт: цвет параллельной ветки (lane 1, 2, …) — скобка под её модулем / контейнером
 local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; return P[(n - 1) % #P + 1] end
 D.lane_col = lane_col
+-- 24 окт: скобка — 2 px ниже рамки модулей (не слипается с ней), уровни через 2 px: внешний — ниже всех
 local function bracket(L, x0, x1, boxy, bh0, d)
   local ext = D.rack_ext or 0
-  if ext < 3 then return end
-  local yb = boxy + bh0 + 1 + math.min(ext - 2, 2 * math.max(0, 2 - d))
-  gfx.rect(x0, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
+  if ext < 4 then return end
+  local y0 = boxy + bh0 + 2
+  local yb = y0 + math.min(ext - 3, 2 * math.max(0, 2 - d))
+  gfx.rect(x0, y0, 1, yb - y0 + 1, 1); gfx.rect(x1, y0, 1, yb - y0 + 1, 1)
   gfx.rect(x0, yb, x1 - x0 + 1, 1, 1)
 end
 function D.lane_close(L, f, bx, boxy, bh0)
@@ -5488,7 +5490,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     D.vtext(x + math.floor((capw - L.th) / 2), boxy + 2, bh0 - 4, 'out  ' .. (c.name or ''), hot and U.TEXT or U.AMBER, fill)
     if same then   -- рамка рэка: сверху и снизу от шапки до замыкания
       set(c.enabled and U.AMBER or U.DIM)
-      gfx.rect(st.x, boxy - 1, x + capw - st.x, 1, 1); gfx.rect(st.x, boxy + bh0, x + capw - st.x, 1, 1)
+      gfx.rect(st.x, boxy - 3, x + capw - st.x, 1, 1)   -- 24 окт: сверху — через 2 px от рамок модулей; снизу — скобка
       -- 24 окт: скобка под рэком (в полосе под блоками): внешний — ниже всех, вложенный — ступенькой выше;
       -- контейнер — ветка параллельной группы: скобка цветом ветки
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
@@ -5526,6 +5528,34 @@ function D.macro_list(L, info, f, by, bh)
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
+-- 24 окт: ширины колонки макросов модуля: всё, полоса вкладок, панель macro, панель xy (0 — закрыта)
+function D.mac_w(L, info, f)
+  if not (f.nmacro and not f.container) then return 0, 0, 0, 0 end
+  local nm = f.fxname or f.name
+  local vt = L.th + 2 * L.pad + 2
+  local mpw = (info.macfold and info.macfold[nm]) and 0 or (L.cw * 14 + 2 * L.pad)
+  local xpw = (info.xyopen and info.xyopen[nm] and f.nmacro >= 2) and (L.cw * 14 + 2 * L.pad) or 0
+  return vt + mpw + xpw, vt, mpw, xpw
+end
+-- 24 окт: XY-пэд модуля на макросах 1 и 2 (Surge M1 / M2 …): тянуть — оба сразу
+function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
+  local qx, qy
+  for pi, p in ipairs(f.params) do if p.mfader then if not qx then qx = pi elseif not qy then qy = pi end end end
+  if not (qx and qy) then return end
+  local side = math.max(L.rh * 2, math.min(w - 2 * L.pad, h - L.rh))
+  local px0, py0 = x + math.floor((w - side) / 2), y
+  local nx = vals[qx] and vals[qx].n or 0
+  local ny = vals[qy] and vals[qy].n or 0
+  set(U.PANEL); gfx.rect(px0, py0, side, side, 1)
+  set(U.LINE); gfx.rect(px0, py0, side, side, 0)
+  set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
+  local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
+  set(U.AMBER); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
+  if py0 + side + L.rh <= y + h + 2 then text(px0, py0 + side + 1, fit(('x M1 %d  y M2 %d'):format(math.floor(nx * 100 + 0.5), math.floor(ny * 100 + 0.5)), side), U.GREY) end
+  if not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
+    hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = qx, qy = qy }
+  end
+end
 function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
   local kb = ms('O') + 2 * L.pad
   local onw = ms('off') + 2 * L.pad   -- 24 окт: B → on / off (понятнее)
@@ -9207,8 +9237,8 @@ function D.frame(L, snap, rows, state, info)
     local dest0, mx0 = gfx.dest, mx
     if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end
     gfx.dest = 700
-    D.rack_ext = (not info.dsp_wide) and math.max(0, sbh - 2) or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки поверх)
-    gfx.blit(dest0, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext)   -- фон под блоками
+    D.rack_ext = (not info.dsp_wide) and sbh or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки поверх)
+    gfx.blit(dest0, 1, 0, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext)   -- фон под блоками (24 окт: и 3 px над — рамка рэка)
     if mx < cx0 or mx >= cx1 then mx = -100000 end
     -- 23 окт: DSP развёрнут (zz) и высоко — модули рядами, как строки: слева направо, следующий ряд снова слева
     -- (сигнал идёт по рядам); рядов — сколько влезает модулей в высоту ≥ 16 строк, до трёх; прокрутки нет
@@ -9290,8 +9320,7 @@ function D.frame(L, snap, rows, state, info)
       -- «не влезал» целиком и пропадал, хотя справа было пусто); один столбец не влез — столбец уже, до 10 знаков
       local tabpos0 = info.dsptabs or 'bottom'
       local vtw0 = (f.pages and f.page and tabpos0 == 'right') and (L.th + 2 * L.pad + 2) or 0
-      local macfold0 = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
-      local mw0 = (f.nmacro and not f.container) and (macfold0 and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
+      local mw0 = D.mac_w(L, info, f)
       local extra = vtw0 + mw0
       if ncol > 1 and bx + bw1 * ncol + extra > room and bx + bw1 + extra <= room then ncol = math.max(1, math.floor((room - bx - extra) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       if ncol == 1 and bx + bw1 + extra > room and room - bx - extra - L.pad >= L.cw * 10 then bw1 = room - bx - extra - L.pad end
@@ -9309,8 +9338,9 @@ function D.frame(L, snap, rows, state, info)
       bw = bw + vtw
       -- 22 окт: макросы (Macro 1..8) — колонка MACRO слева в модуле: горизонтальные слайдеры; щелчок по заголовку —
       -- свернуть в узкую полосу с вертикальной подписью (info.macfold по имени плагина)
-      local macfold = f.nmacro and info.macfold and info.macfold[f.fxname or f.name]
-      local mw = (f.nmacro and not f.container) and (macfold and (L.th + 2 * L.pad + 2) or (L.cw * 14 + 2 * L.pad)) or 0
+      -- 24 окт: слева — колонка вертикальных вкладок macro / xy, каждая раскрывает свою панель справа от себя
+      local mw, vt, mpw, xpw = D.mac_w(L, info, f)
+      local macfold = mpw == 0
       bw = bw + mw
       if wrap_next(bw) then by = boxy end   -- 23 окт: следующий ряд
       D.dsp_vx[k] = { bx + px - cx0, bw }
@@ -9429,7 +9459,7 @@ function D.frame(L, snap, rows, state, info)
         for i = #bxs, 1, -1 do bxs[i][3] = x; x = x + (bxs[i][4] or kb) + 2 end
         if pre_at then pre_at(x + L.pad) end
       end
-      if f.inner then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
+      if f.inner and not f.inner.wrap then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end   -- 24 окт: в рэке — без второй рамки (слипалась)
       if tw > 0 then
         for _, b in ipairs(bxs) do
           local kx = b[3]
@@ -9460,19 +9490,22 @@ function D.frame(L, snap, rows, state, info)
       local vals = info.fx_values and info.fx_values(f) or {}
       if mw > 0 then
         local hy = by + L.rh + 2
-        if macfold then
-          -- свёрнуто: полоса с вертикальной подписью macro, щелчок — развернуть
-          local hot = not drag and mx >= bx and mx < bx + mw and my >= hy and my < by + bh
-          D.vtext(bx + L.pad, hy + 2, bh - L.rh - 8, 'macro ' .. f.nmacro, hot and U.AMBER or U.AMBER, U.BG)
-          if hot then hover.dspbtn = { fx = k, f = f, what = 'macfold' } end
-          hint('dspbtn', bx, hy, mw, bh - L.rh - 4, { fx = k, what = 'macfold' })
-        else
-          local hx, hw = bx + L.pad, mw - 2 * L.pad
-          local hot_h = not drag and mx >= hx and mx < hx + hw and my >= hy and my < hy + L.rh
-          set(U.LINE); gfx.rect(hx, hy + L.rh - 2, hw, 1, 1)
-          text(hx, hy, fit('MACRO', hw), hot_h and U.TEXT or U.AMBER)
-          if hot_h then hover.dspbtn = { fx = k, f = f, what = 'macfold' } end
-          hint('dspbtn', hx, hy, hw, L.rh, { fx = k, what = 'macfold' })
+        -- вкладки: верхняя половина — macro N, нижняя — xy; раскрытая — янтарём на подложке
+        local th2 = math.floor((bh - L.rh - 4) / 2)
+        for ti, tb in ipairs({ { 'macro ' .. f.nmacro, 'macfold', mpw > 0 }, { 'xy', 'xyfold', xpw > 0 } }) do
+          local ty = hy + (ti - 1) * th2
+          local hot = not drag and mx >= bx and mx < bx + vt and my >= ty and my < ty + th2
+          local fill = tb[3] and U.tint(U.AMBER, 0.22) or (hot and U.tint(U.AMBER, 0.12) or U.BG)
+          set(fill); gfx.rect(bx + 1, ty, vt - 2, th2 - 1, 1)
+          set(tb[3] and U.AMBER or U.LINE); gfx.rect(bx + 1, ty, vt - 2, th2 - 1, 0)
+          D.vtext(bx + math.floor((vt - L.th) / 2), ty + 2, th2 - 6, tb[1], (hot or tb[3]) and U.AMBER or U.GREY, fill, true)
+          if hot then hover.dspbtn = { fx = k, f = f, what = tb[2] } end
+          hint('dspbtn', bx, ty, vt, th2, { fx = k, what = tb[2] })
+        end
+        if xpw > 0 then D.mac_xy(L, f, vals, bx + vt + mpw, hy, xpw, by + bh - hy - 2, k, drag, mx, my, hover) end
+        if not macfold then
+          local hx, hw = bx + vt + L.pad, mpw - 2 * L.pad
+          local hy = hy - L.rh + 2   -- заголовок MACRO — во вкладке; слайдеры с верха
           local mi = 0
           -- 22 окт: имена макросов из плагина (p.mlabel) — строкой над слайдером, если по высоте влезают все
           -- (номер + имя, слайдер во всю ширину); не влезают — как раньше: номер слева, имя — в статусе
@@ -11028,7 +11061,7 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_total = wrap > 1 and 0 or (bx + px - cx0)   -- рядами — без прокрутки
     boxy, bh0 = boxy0, bh00
     gfx.dest = dest0
-    gfx.blit(700, 1, 0, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext, cx0, boxy - 1, cx1 - cx0, bh0 + 3 + D.rack_ext)
+    gfx.blit(700, 1, 0, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext)
     mx = mx0
     D.hint = hint0
     if D.slr then

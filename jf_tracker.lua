@@ -14929,6 +14929,24 @@ ctx.pins_open = function(k)
 end
 -- 24 окт: подпись кнопки пинов «2 in 2/6 out»: входы плагина; выходов занято / всего (как REAPER); кеш 1 с на модуль
 ctx.fx_io_c = {}
+-- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
+ctx.dsp_tall = function()
+  local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel.dsp
+  if not dc then vim.msg = 'zX: dsp is not in a pane here'; return end
+  local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1
+  local want = (state.dsp_tall and (state.dsp_snap_px or 250) or 600)
+  local g0
+  for _, g in ipairs(L.pn.grips or {}) do
+    if g.ax == 'v' and math.abs((g.y + g.h / 2) - dc.y) <= 6 and g.x < dc.x + dc.w and g.x + g.w > dc.x then g0 = g; break end
+  end
+  if not g0 then vim.msg = 'zX: nothing above the dsp to move'; return end
+  local here = g0.y + g0.h / 2
+  local delta = (dc.y + dc.h - (over + want)) - here
+  draw.panes.drag_grip(state.panes, L.pn, g0, delta); relayout()
+  state.dsp_tall = not state.dsp_tall or nil
+  local got = L.pn.by_panel.dsp
+  vim.msg = ('zX: dsp modules %d px%s (zX - %s)'):format(got and got.content and (got.content.h - L.rh - 1) or want, state.dsp_tall and ', upwards' or '', state.dsp_tall and 'back to ' .. (state.dsp_snap_px or 250) or 'up to 600')
+end
 -- 24 окт: назначения макросов контейнера (edit.macro_links) — для шапки; раз в секунду или после правки FX
 ctx.macro_links_of = function(tr, f)
   ctx.mlc = ctx.mlc or {}
@@ -20498,7 +20516,7 @@ local function frame()
     track_snaps = function(col) return ctx.snaps_info(col) end,
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     msn_tog = ctx.MSN_TOG, msn_opt = ctx.MSN_OPT,
-    macfold = state.dsp_macfold,   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
+    macfold = state.dsp_macfold, xyopen = state.dsp_xyopen,   -- 24 окт: вкладка xy   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
     modedit = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3) (modsel занято строкой вкладки modulation): редактор модуляции выбранного параметра
     modtab = function() return state.modtab or 'lfo' end,
@@ -23940,6 +23958,9 @@ local function frame()
       elseif hover.dspbtn.what == 'macfold' then   -- 22 окт: MACRO — свернуть / развернуть
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
+      elseif hover.dspbtn.what == 'xyfold' then   -- 24 окт: вкладка xy — XY-пэд на макросах 1 и 2
+        local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
+        state.dsp_xyopen = state.dsp_xyopen or {}; state.dsp_xyopen[nm] = (not state.dsp_xyopen[nm]) or nil
       elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx   -- 22 окт: сложенный модуль — развернуть
         -- 24 окт: внутри рэка — как аккордеон: этот развернуть, соседей сложить (Shift — только развернуть)
         if hover.dspbtn.f.inner and hover.dspbtn.f.inner.wrap and gfx.mouse_cap & 8 == 0 then ctx.dsp_accordion(hover.dspbtn.fx)
@@ -24046,7 +24067,7 @@ local function frame()
     elseif hover.dspxy then
       -- XY-пэд (TG33 vector): точка едет за мышью, X и Y одним жестом
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspxy.fx
-      dspxy_drag = { f = hover.dspxy.f, x = hover.dspxy.x, y = hover.dspxy.y, s = hover.dspxy.s }
+      dspxy_drag = { f = hover.dspxy.f, x = hover.dspxy.x, y = hover.dspxy.y, s = hover.dspxy.s, qx = hover.dspxy.qx, qy = hover.dspxy.qy }
       click = { t = now2, zone = 'dspxy' }
     elseif hover.dspab then
       -- ползунок A / B: тянуть (4 окт)
@@ -24722,11 +24743,11 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       local d = dspxy_drag
       local col = dsp_target()
-      local px, py = d.f.params[d.f.xy_x], d.f.params[d.f.xy_y]
+      local px, py = d.f.params[d.qx or d.f.xy_x], d.f.params[d.qy or d.f.xy_y]   -- 24 окт: xy модуля — макросы 1 и 2
       if col and px and py then
         local nx = math.max(0, math.min(1, (gfx.mouse_x - d.x) / math.max(1, d.s - 1)))
         local ny = 1 - math.max(0, math.min(1, (gfx.mouse_y - d.y) / math.max(1, d.s - 1)))
-        edit.fx_param(col.track, d.f.i, px.i, nx); edit.fx_param(col.track, d.f.i, py.i, ny)
+        edit.fx_param(col.track, px.fx or d.f.i, px.i, nx); edit.fx_param(col.track, py.fx or d.f.i, py.i, ny)
         state.status = ('%s: x %d  y %d'):format(d.f.name, math.floor(nx * 127 + 0.5), math.floor(ny * 127 + 0.5))
       end
     else dspxy_drag = nil end
@@ -26914,6 +26935,7 @@ local function frame()
                 state.dsp_zx_saved = saved; reaper.SetExtState(EXT, 'dsp_zx', saved, true)
               else vim.msg = 'zx: dsp is not in a pane here' end
             end
+          elseif ch == 'X' then ctx.dsp_tall()   -- 24 окт: zX — DSP выше (до 600 px модулей), ещё раз — назад; zx — шире
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
