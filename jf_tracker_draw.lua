@@ -5449,12 +5449,14 @@ end
 -- (узко — только B x); возвращает ширину под имя
 function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
   local kb = ms('O') + 2 * L.pad
-  local full = w - 2 * L.pad - 5 * kb - 12 >= L.cw * 8
-  local bs = { { 'x', 'kdel' }, { 'B', 'kbypass' } }
+  local onw = ms('off') + 2 * L.pad   -- 24 окт: B → on / off (понятнее)
+  local full = w - 2 * L.pad - 4 * kb - onw - 12 >= L.cw * 8
+  local bs = { { 'x', 'kdel' }, { kid.enabled and 'on' or 'off', 'kbypass', onw } }
   if full then bs[3], bs[4], bs[5] = { '∆', 'kdelta' }, { 'e', 'kopen' }, { '+', 'klastp' } end
   local dl = full and info.fx_delta and info.fx_delta(kid)
   local x = cx + w - 1
   for _, b in ipairs(bs) do
+    local kb = b[3] or kb
     x = x - kb - 2
     local hb = not drag and mx >= x and mx < x + kb and my >= hy and my < hy + L.rh
     local lit = (b[2] == 'kbypass' and not kid.enabled) or (b[2] == 'kdelta' and dl)
@@ -9144,7 +9146,8 @@ function D.frame(L, snap, rows, state, info)
       -- 22 окт: модуль сложен (zf / zF) — узкая полоса во всю высоту: кнопки x B сверху, имя вертикально (щелчок — развернуть)
       if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
         local kb = ms('O') + 2 * L.pad
-        local fw = math.max(kb, L.th + 2 * L.pad) + 2
+        local onw = ms('off') + 2 * L.pad   -- 24 окт: on / off вместо B
+        local fw = math.max(onw, L.th + 2 * L.pad) + 2
         wrap_next(fw)
         D.dsp_vx[k] = { bx + px - cx0, fw }
         if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end   -- вне окна — только место
@@ -9155,7 +9158,8 @@ function D.frame(L, snap, rows, state, info)
         set(picked and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
         set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, boxy, fw, bh0, 0)
         local yy, on_btn = boxy + 1, false
-        for _, b in ipairs({ { 'x', 'del' }, { 'B', 'bypass' } }) do
+        for _, b in ipairs({ { 'x', 'del' }, { f.enabled and 'on' or 'off', 'bypass', onw } }) do
+          local kb = b[3] or kb
           local kx = bx + math.floor((fw - kb) / 2)
           local hot = not drag and mx >= kx and mx < kx + kb and my >= yy and my < yy + L.rh - 1
           local lit = b[2] == 'bypass' and not f.enabled
@@ -9266,12 +9270,14 @@ function D.frame(L, snap, rows, state, info)
       local kb = ms('O') + 2 * L.pad
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
       -- 11 окт: + — меню последнего тронутого параметра этого эффекта (как кнопка Param в REAPER)
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { '∆', 'delta', bx + bw - 3 * kb - 7 }, { 'e', 'open', bx + bw - 4 * kb - 8 },
-                    { '+', 'lastp', bx + bw - 5 * kb - 11 } }
+      -- 24 окт: B → on / off (понятнее; ширина — по «off», кнопка не прыгает)
+      local onw = ms('off') + 2 * L.pad
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { f.enabled and 'on' or 'off', 'bypass', bx + bw - kb - onw - 4, onw }, { '∆', 'delta', bx + bw - 2 * kb - onw - 7 }, { 'e', 'open', bx + bw - 3 * kb - onw - 8 },
+                    { '+', 'lastp', bx + bw - 4 * kb - onw - 11 } }
       local dlt = info.fx_delta and info.fx_delta(f)
-      local tw = bw - 2 * L.pad - 5 * kb - 12
+      local tw = bw - 2 * L.pad - 4 * kb - onw - 12
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
-      if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - 2 * kb - 5 end
+      if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - kb - onw - 5 end
       -- ReaEQ (7 окт): P — только параметры, G — только график
       if f.view == 'eq' and tw > L.cw * 8 + kb then
         bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
@@ -9942,7 +9948,9 @@ function D.frame(L, snap, rows, state, info)
           local kid = ks > 0 and f.kids[ks] or nil
           if kid then
             local kb2 = ms('x') + 2 * L.pad
-            for _, b in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }) do
+            local onw = ms('off') + 2 * L.pad   -- 24 окт: on / off вместо B
+            for _, b in ipairs({ { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { kid.enabled and 'on' or 'off', 'kbypass', cx + bw1 - kb2 - onw - 3, onw } }) do
+              local kb2 = b[4] or kb2
               local hb = not drag and mx >= b[3] and mx < b[3] + kb2 and my >= hy and my < hy + L.rh
               local lit = b[2] == 'kbypass' and not kid.enabled
               set(hb and U.tint(b[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b[3], hy, kb2, L.rh - 1, 1)
@@ -10295,9 +10303,11 @@ function D.frame(L, snap, rows, state, info)
             end
             -- B / x у каждого плагина внутри (6 окт): bypass / удалить без выбора блока
             local kb2 = ms('x') + 2 * L.pad
-            local kbx = { { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { 'B', 'kbypass', cx + bw1 - 2 * kb2 - 3 } }
+            local onw = ms('off') + 2 * L.pad   -- 24 окт: on / off вместо B
+            local kbx = { { 'x', 'kdel', cx + bw1 - kb2 - 1 }, { kid.enabled and 'on' or 'off', 'kbypass', cx + bw1 - kb2 - onw - 3, onw } }
             local onb = false
             for _, b in ipairs(kbx) do
+              local kb2 = b[4] or kb2
               local hb = not drag and mx >= b[3] and mx < b[3] + kb2 and my >= hy and my < hy + L.rh
               local lit = b[2] == 'kbypass' and not kid.enabled
               set(hb and U.tint(b[2] == 'kdel' and U.RED or U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(b[3], hy, kb2, L.rh - 1, 1)
