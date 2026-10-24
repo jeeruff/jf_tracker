@@ -8375,7 +8375,8 @@ function D.frame(L, snap, rows, state, info)
               local e = h.row + math.ceil(ph.rows_f)
               for k2 = k + 1, #hs do
                 local nx = hs[k2]
-                if nx.c.kind ~= 'off' or ph.obey then e = math.min(e, nx.row); break end
+                -- 24 окт: OFF обрывает волну, если пэд его слушает: obey без choke-группы — любой; в группе / «сам себя» — только явный
+                if nx.c.kind ~= 'off' or (ph.obey and ((ph.choke or 0) == 0 or nx.c.explicit)) then e = math.min(e, nx.row); break end
               end
               if e > r0 then
                 ph.muted = ph.muted or h.c.muted
@@ -9801,7 +9802,7 @@ function D.frame(L, snap, rows, state, info)
                 if c2[1] == 'name' then s2 = kid.name or ''
                 elseif c2[1] == 'note' then local nn = kid.note; s2 = nn and (({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[nn % 12 + 1] .. math.max(0, nn // 12 - 1)) or '---'
                 elseif c2[1] == 'grp' then s2 = (kid.group or 0) > 0 and ('grp' .. kid.group) or '-'; col2 = (kid.group or 0) > 0 and U.CYAN or U.DIM; what = 'kgroup'
-                elseif c2[1] == 'chk' then s2 = (kid.choke or 0) > 0 and ('chk' .. kid.choke) or '-'; col2 = (kid.choke or 0) > 0 and U.RED or U.DIM; what = 'kchoke'
+                elseif c2[1] == 'chk' then s2 = (kid.choke or 0) == 17 and 'off' or ((kid.choke or 0) > 0 and ('chk' .. kid.choke) or '-');   -- 24 окт: 17 — OFF обрывает col2 = (kid.choke or 0) > 0 and U.RED or U.DIM; what = 'kchoke'
                 elseif c2[1] == 'on' then s2 = kid.enabled and 'on' or 'off'; col2 = kid.enabled and U.GREEN or U.RED; what = 'kbypass'
                 else s2 = kv(ki, c2[2]) end
                 local hc = hotr and mx >= x2 and mx < x2 + cw3
@@ -10140,7 +10141,7 @@ function D.frame(L, snap, rows, state, info)
                   { 'kgroup', 'grp', kid.group, U.CYAN }, { 'kchoke', 'chk', kid.choke, U.RED }, { 'kroute', 'r', (kid.entry and kid.entry.container) and 1 or 0, U.CYAN } }) do
                 local n = gb[3] or 0
                 local one = gb[1] == 'kroute' or gb[1] == 'kall_m' or gb[1] == 'kall_s'
-                local gl = one and gb[2] or (n > 0 and (gb[2] .. n) or gb[2])
+                local gl = one and gb[2] or (n == 17 and gb[1] == 'kchoke' and 'off' or (n > 0 and (gb[2] .. n) or gb[2]))   -- 24 окт: choke 17 — «OFF обрывает»
                 local bw2 = one and (ms(gb[2]) + 2 * L.pad) or (ms(gb[2] .. '16') + 2 * L.pad)
                 if gx + bw2 > bx + bw1 - L.pad then break end
                 local hb = not drag and mx >= gx and mx < gx + bw2 and my >= by2 and my < by2 + L.rh

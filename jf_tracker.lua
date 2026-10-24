@@ -14929,6 +14929,26 @@ ctx.pins_open = function(k)
 end
 -- 24 окт: подпись кнопки пинов «2 in 2/6 out»: входы плагина; выходов занято / всего (как REAPER); кеш 1 с на модуль
 ctx.fx_io_c = {}
+-- 24 окт: явный OFF на пэде drumrs5k, который его не слушает (one-shot, без choke-группы) — пэд в режим «сам себя»:
+-- obey note-offs + choke 17 (jf_tracker_choke глушит обычные концы нот, пропускает явный OFF): удары звучат как
+-- раньше, до следующего удара, а OFF их обрывает
+edit.on_off = function(track, pitch)
+  local col
+  for _, c in ipairs(snap and snap.cols or {}) do if c.track == track then col = c; break end end
+  for _, f in ipairs(col and col.fx or {}) do
+    if f.kit and f.kids then
+      for _, kd in ipairs(f.kids) do
+        if kd.note == pitch and (kd.choke or 0) == 0 and not kd.obey then
+          if edit.drum_group(track, pitch, kd.rs5k_i, model.CHOKE_SELF, 'choke') then
+            kd.choke, kd.obey = model.CHOKE_SELF, true
+            vim.msg = ('%s: OFF now cuts this pad (it still rings to the next hit otherwise)'):format(kd.name or 'pad')
+          end
+          return
+        end
+      end
+    end
+  end
+end
 -- 24 окт: замыкание рэка — Wet (mix) контейнера: индекс параметра и значение
 ctx.cont_wet = function(f)
   local col = dsp_target(); local tr = col and col.track
@@ -28691,7 +28711,7 @@ ctx.kit_wave = function(col, pitch, row)
   if rows_f <= 0 then return nil end
   local file, a, b = kd.file, kd.pad_a or 0, kd.pad_b or 1
   local memo = {}   -- 19 окт: пики — раз на размер (draw_wave зовёт на каждую строку каждый кадр)
-  return { rows_f = rows_f, start_f = 0, obey = kd.obey, muted = not kd.enabled,
+  return { rows_f = rows_f, start_f = 0, obey = kd.obey, choke = kd.choke, muted = not kd.enabled,
     kpk = function(n, spec)
       local k2 = n * 2 + (spec and 1 or 0)
       local p = memo[k2]
@@ -29587,14 +29607,17 @@ ctx.pad_group_menu = function(kid, kind)
   end end
   local labels = { 'off' }
   for g = 1, 8 do labels[#labels + 1] = used[g] and ('%d  (%d pad%s)'):format(g, used[g], used[g] == 1 and '' or 's') or tostring(g) end
-  local cur = (kid[fld] or 0) > 0 and labels[kid[fld] + 1] or 'off'
+  local SELF = 'OFF cuts it (rings to the next hit otherwise)'   -- 24 окт: choke 17 — сам себя
+  if fld == 'choke' then labels[#labels + 1] = SELF end
+  local cur = (kid[fld] or 0) == 17 and SELF or ((kid[fld] or 0) > 0 and labels[kid[fld] + 1] or 'off')
   local title = fld == 'choke' and 'choke group (cg) of %s - a hit cuts the other pads of its choke group' or 'group (g) of %s - a hit plays every pad of its group together'
   ctx.choice_pick(title:format(kid.name or 'pad'), cur, labels, function(v)
-    local g = v == 'off' and 0 or tonumber((v or ''):match('^%s*(%d+)'))
-    if not g or g < 0 or g > 16 then vim.msg = 'pad group: off or 1..16'; return end
+    local g = v == 'off' and 0 or (v == SELF and 17) or tonumber((v or ''):match('^%s*(%d+)'))
+    if not g or g < 0 or g > 17 then vim.msg = 'pad group: off or 1..16'; return end
     if edit.drum_group(col.track, kid.note, kid.rs5k_i, g, fld) then
       if fld == 'choke' then
-        vim.msg = g > 0 and ('%s: choke group %d - cuts / is cut by the pads of cg %d (obeys note-offs)'):format(kid.name or 'pad', g, g) or ((kid.name or 'pad') .. ': no choke group (plays its sample out)')
+        vim.msg = g == 17 and ((kid.name or 'pad') .. ': an OFF cuts it; without OFF it rings to its next hit')
+          or (g > 0 and ('%s: choke group %d - cuts / is cut by the pads of cg %d (obeys note-offs)'):format(kid.name or 'pad', g, g) or ((kid.name or 'pad') .. ': no choke group (plays its sample out)'))
       else
         vim.msg = g > 0 and ('%s: group %d - a hit on any pad of g %d plays them all'):format(kid.name or 'pad', g, g) or ((kid.name or 'pad') .. ': no group')
       end

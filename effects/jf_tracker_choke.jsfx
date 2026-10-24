@@ -6,135 +6,137 @@ desc:jf_tracker_choke (drumrs5k pad groups: g - pads of a group play together, c
 // той же группы, её нота-оффы глушатся — пэд звучит до следующего удара; RS5K пэда — с Obey note-offs).
 // Слайдер 129+N — group ноты N (g: удар по одному пэду группы играет все её пэды — слой прямо в рэке).
 // Как стоковый MIDI Choke Group (Cockos), но группа — у каждой ноты. Слайдеры ставит трекер. Звук не трогает.
+// 24 окт: choke 17 — «сам себя»: удар обрывает свою прошлую ноту, нота-оффы глушатся, кроме явного OFF трекера
+// (note-off со скоростью отпускания 1) — пэд one-shot, но OFF его обрывает. Явный OFF проходит и в группах 1..16.
 
-slider1:0<0,16,1>-note 0 choke
-slider2:0<0,16,1>-note 1 choke
-slider3:0<0,16,1>-note 2 choke
-slider4:0<0,16,1>-note 3 choke
-slider5:0<0,16,1>-note 4 choke
-slider6:0<0,16,1>-note 5 choke
-slider7:0<0,16,1>-note 6 choke
-slider8:0<0,16,1>-note 7 choke
-slider9:0<0,16,1>-note 8 choke
-slider10:0<0,16,1>-note 9 choke
-slider11:0<0,16,1>-note 10 choke
-slider12:0<0,16,1>-note 11 choke
-slider13:0<0,16,1>-note 12 choke
-slider14:0<0,16,1>-note 13 choke
-slider15:0<0,16,1>-note 14 choke
-slider16:0<0,16,1>-note 15 choke
-slider17:0<0,16,1>-note 16 choke
-slider18:0<0,16,1>-note 17 choke
-slider19:0<0,16,1>-note 18 choke
-slider20:0<0,16,1>-note 19 choke
-slider21:0<0,16,1>-note 20 choke
-slider22:0<0,16,1>-note 21 choke
-slider23:0<0,16,1>-note 22 choke
-slider24:0<0,16,1>-note 23 choke
-slider25:0<0,16,1>-note 24 choke
-slider26:0<0,16,1>-note 25 choke
-slider27:0<0,16,1>-note 26 choke
-slider28:0<0,16,1>-note 27 choke
-slider29:0<0,16,1>-note 28 choke
-slider30:0<0,16,1>-note 29 choke
-slider31:0<0,16,1>-note 30 choke
-slider32:0<0,16,1>-note 31 choke
-slider33:0<0,16,1>-note 32 choke
-slider34:0<0,16,1>-note 33 choke
-slider35:0<0,16,1>-note 34 choke
-slider36:0<0,16,1>-note 35 choke
-slider37:0<0,16,1>-note 36 choke
-slider38:0<0,16,1>-note 37 choke
-slider39:0<0,16,1>-note 38 choke
-slider40:0<0,16,1>-note 39 choke
-slider41:0<0,16,1>-note 40 choke
-slider42:0<0,16,1>-note 41 choke
-slider43:0<0,16,1>-note 42 choke
-slider44:0<0,16,1>-note 43 choke
-slider45:0<0,16,1>-note 44 choke
-slider46:0<0,16,1>-note 45 choke
-slider47:0<0,16,1>-note 46 choke
-slider48:0<0,16,1>-note 47 choke
-slider49:0<0,16,1>-note 48 choke
-slider50:0<0,16,1>-note 49 choke
-slider51:0<0,16,1>-note 50 choke
-slider52:0<0,16,1>-note 51 choke
-slider53:0<0,16,1>-note 52 choke
-slider54:0<0,16,1>-note 53 choke
-slider55:0<0,16,1>-note 54 choke
-slider56:0<0,16,1>-note 55 choke
-slider57:0<0,16,1>-note 56 choke
-slider58:0<0,16,1>-note 57 choke
-slider59:0<0,16,1>-note 58 choke
-slider60:0<0,16,1>-note 59 choke
-slider61:0<0,16,1>-note 60 choke
-slider62:0<0,16,1>-note 61 choke
-slider63:0<0,16,1>-note 62 choke
-slider64:0<0,16,1>-note 63 choke
-slider65:0<0,16,1>-note 64 choke
-slider66:0<0,16,1>-note 65 choke
-slider67:0<0,16,1>-note 66 choke
-slider68:0<0,16,1>-note 67 choke
-slider69:0<0,16,1>-note 68 choke
-slider70:0<0,16,1>-note 69 choke
-slider71:0<0,16,1>-note 70 choke
-slider72:0<0,16,1>-note 71 choke
-slider73:0<0,16,1>-note 72 choke
-slider74:0<0,16,1>-note 73 choke
-slider75:0<0,16,1>-note 74 choke
-slider76:0<0,16,1>-note 75 choke
-slider77:0<0,16,1>-note 76 choke
-slider78:0<0,16,1>-note 77 choke
-slider79:0<0,16,1>-note 78 choke
-slider80:0<0,16,1>-note 79 choke
-slider81:0<0,16,1>-note 80 choke
-slider82:0<0,16,1>-note 81 choke
-slider83:0<0,16,1>-note 82 choke
-slider84:0<0,16,1>-note 83 choke
-slider85:0<0,16,1>-note 84 choke
-slider86:0<0,16,1>-note 85 choke
-slider87:0<0,16,1>-note 86 choke
-slider88:0<0,16,1>-note 87 choke
-slider89:0<0,16,1>-note 88 choke
-slider90:0<0,16,1>-note 89 choke
-slider91:0<0,16,1>-note 90 choke
-slider92:0<0,16,1>-note 91 choke
-slider93:0<0,16,1>-note 92 choke
-slider94:0<0,16,1>-note 93 choke
-slider95:0<0,16,1>-note 94 choke
-slider96:0<0,16,1>-note 95 choke
-slider97:0<0,16,1>-note 96 choke
-slider98:0<0,16,1>-note 97 choke
-slider99:0<0,16,1>-note 98 choke
-slider100:0<0,16,1>-note 99 choke
-slider101:0<0,16,1>-note 100 choke
-slider102:0<0,16,1>-note 101 choke
-slider103:0<0,16,1>-note 102 choke
-slider104:0<0,16,1>-note 103 choke
-slider105:0<0,16,1>-note 104 choke
-slider106:0<0,16,1>-note 105 choke
-slider107:0<0,16,1>-note 106 choke
-slider108:0<0,16,1>-note 107 choke
-slider109:0<0,16,1>-note 108 choke
-slider110:0<0,16,1>-note 109 choke
-slider111:0<0,16,1>-note 110 choke
-slider112:0<0,16,1>-note 111 choke
-slider113:0<0,16,1>-note 112 choke
-slider114:0<0,16,1>-note 113 choke
-slider115:0<0,16,1>-note 114 choke
-slider116:0<0,16,1>-note 115 choke
-slider117:0<0,16,1>-note 116 choke
-slider118:0<0,16,1>-note 117 choke
-slider119:0<0,16,1>-note 118 choke
-slider120:0<0,16,1>-note 119 choke
-slider121:0<0,16,1>-note 120 choke
-slider122:0<0,16,1>-note 121 choke
-slider123:0<0,16,1>-note 122 choke
-slider124:0<0,16,1>-note 123 choke
-slider125:0<0,16,1>-note 124 choke
-slider126:0<0,16,1>-note 125 choke
-slider127:0<0,16,1>-note 126 choke
-slider128:0<0,16,1>-note 127 choke
+slider1:0<0,17,1>-note 0 choke
+slider2:0<0,17,1>-note 1 choke
+slider3:0<0,17,1>-note 2 choke
+slider4:0<0,17,1>-note 3 choke
+slider5:0<0,17,1>-note 4 choke
+slider6:0<0,17,1>-note 5 choke
+slider7:0<0,17,1>-note 6 choke
+slider8:0<0,17,1>-note 7 choke
+slider9:0<0,17,1>-note 8 choke
+slider10:0<0,17,1>-note 9 choke
+slider11:0<0,17,1>-note 10 choke
+slider12:0<0,17,1>-note 11 choke
+slider13:0<0,17,1>-note 12 choke
+slider14:0<0,17,1>-note 13 choke
+slider15:0<0,17,1>-note 14 choke
+slider16:0<0,17,1>-note 15 choke
+slider17:0<0,17,1>-note 16 choke
+slider18:0<0,17,1>-note 17 choke
+slider19:0<0,17,1>-note 18 choke
+slider20:0<0,17,1>-note 19 choke
+slider21:0<0,17,1>-note 20 choke
+slider22:0<0,17,1>-note 21 choke
+slider23:0<0,17,1>-note 22 choke
+slider24:0<0,17,1>-note 23 choke
+slider25:0<0,17,1>-note 24 choke
+slider26:0<0,17,1>-note 25 choke
+slider27:0<0,17,1>-note 26 choke
+slider28:0<0,17,1>-note 27 choke
+slider29:0<0,17,1>-note 28 choke
+slider30:0<0,17,1>-note 29 choke
+slider31:0<0,17,1>-note 30 choke
+slider32:0<0,17,1>-note 31 choke
+slider33:0<0,17,1>-note 32 choke
+slider34:0<0,17,1>-note 33 choke
+slider35:0<0,17,1>-note 34 choke
+slider36:0<0,17,1>-note 35 choke
+slider37:0<0,17,1>-note 36 choke
+slider38:0<0,17,1>-note 37 choke
+slider39:0<0,17,1>-note 38 choke
+slider40:0<0,17,1>-note 39 choke
+slider41:0<0,17,1>-note 40 choke
+slider42:0<0,17,1>-note 41 choke
+slider43:0<0,17,1>-note 42 choke
+slider44:0<0,17,1>-note 43 choke
+slider45:0<0,17,1>-note 44 choke
+slider46:0<0,17,1>-note 45 choke
+slider47:0<0,17,1>-note 46 choke
+slider48:0<0,17,1>-note 47 choke
+slider49:0<0,17,1>-note 48 choke
+slider50:0<0,17,1>-note 49 choke
+slider51:0<0,17,1>-note 50 choke
+slider52:0<0,17,1>-note 51 choke
+slider53:0<0,17,1>-note 52 choke
+slider54:0<0,17,1>-note 53 choke
+slider55:0<0,17,1>-note 54 choke
+slider56:0<0,17,1>-note 55 choke
+slider57:0<0,17,1>-note 56 choke
+slider58:0<0,17,1>-note 57 choke
+slider59:0<0,17,1>-note 58 choke
+slider60:0<0,17,1>-note 59 choke
+slider61:0<0,17,1>-note 60 choke
+slider62:0<0,17,1>-note 61 choke
+slider63:0<0,17,1>-note 62 choke
+slider64:0<0,17,1>-note 63 choke
+slider65:0<0,17,1>-note 64 choke
+slider66:0<0,17,1>-note 65 choke
+slider67:0<0,17,1>-note 66 choke
+slider68:0<0,17,1>-note 67 choke
+slider69:0<0,17,1>-note 68 choke
+slider70:0<0,17,1>-note 69 choke
+slider71:0<0,17,1>-note 70 choke
+slider72:0<0,17,1>-note 71 choke
+slider73:0<0,17,1>-note 72 choke
+slider74:0<0,17,1>-note 73 choke
+slider75:0<0,17,1>-note 74 choke
+slider76:0<0,17,1>-note 75 choke
+slider77:0<0,17,1>-note 76 choke
+slider78:0<0,17,1>-note 77 choke
+slider79:0<0,17,1>-note 78 choke
+slider80:0<0,17,1>-note 79 choke
+slider81:0<0,17,1>-note 80 choke
+slider82:0<0,17,1>-note 81 choke
+slider83:0<0,17,1>-note 82 choke
+slider84:0<0,17,1>-note 83 choke
+slider85:0<0,17,1>-note 84 choke
+slider86:0<0,17,1>-note 85 choke
+slider87:0<0,17,1>-note 86 choke
+slider88:0<0,17,1>-note 87 choke
+slider89:0<0,17,1>-note 88 choke
+slider90:0<0,17,1>-note 89 choke
+slider91:0<0,17,1>-note 90 choke
+slider92:0<0,17,1>-note 91 choke
+slider93:0<0,17,1>-note 92 choke
+slider94:0<0,17,1>-note 93 choke
+slider95:0<0,17,1>-note 94 choke
+slider96:0<0,17,1>-note 95 choke
+slider97:0<0,17,1>-note 96 choke
+slider98:0<0,17,1>-note 97 choke
+slider99:0<0,17,1>-note 98 choke
+slider100:0<0,17,1>-note 99 choke
+slider101:0<0,17,1>-note 100 choke
+slider102:0<0,17,1>-note 101 choke
+slider103:0<0,17,1>-note 102 choke
+slider104:0<0,17,1>-note 103 choke
+slider105:0<0,17,1>-note 104 choke
+slider106:0<0,17,1>-note 105 choke
+slider107:0<0,17,1>-note 106 choke
+slider108:0<0,17,1>-note 107 choke
+slider109:0<0,17,1>-note 108 choke
+slider110:0<0,17,1>-note 109 choke
+slider111:0<0,17,1>-note 110 choke
+slider112:0<0,17,1>-note 111 choke
+slider113:0<0,17,1>-note 112 choke
+slider114:0<0,17,1>-note 113 choke
+slider115:0<0,17,1>-note 114 choke
+slider116:0<0,17,1>-note 115 choke
+slider117:0<0,17,1>-note 116 choke
+slider118:0<0,17,1>-note 117 choke
+slider119:0<0,17,1>-note 118 choke
+slider120:0<0,17,1>-note 119 choke
+slider121:0<0,17,1>-note 120 choke
+slider122:0<0,17,1>-note 121 choke
+slider123:0<0,17,1>-note 122 choke
+slider124:0<0,17,1>-note 123 choke
+slider125:0<0,17,1>-note 124 choke
+slider126:0<0,17,1>-note 125 choke
+slider127:0<0,17,1>-note 126 choke
+slider128:0<0,17,1>-note 127 choke
 slider129:0<0,16,1>-note 0 group
 slider130:0<0,16,1>-note 1 group
 slider131:0<0,16,1>-note 2 group
@@ -268,20 +270,28 @@ in_pin:none
 out_pin:none
 
 @init
-cur = 0; curch = 32; held = 64;
+cur = 0; curch = 32; held = 64; selfon = 200; selfch = 400;
 i = 0; loop(17, cur[i] = -1; curch[i] = 0; i += 1);
-i = 0; loop(128, held[i] = 0; i += 1);
+i = 0; loop(128, held[i] = 0; selfon[i] = 0; selfch[i] = 0; i += 1);
 
 function hit(ofs, ch, n, v) local(c) (
   c = slider(n + 1) | 0;
-  c > 0 ? (
+  c == 17 ? (
+    selfon[n] ? midisend(ofs, 0x80 | selfch[n], n, 0);
+    selfon[n] = 1; selfch[n] = ch;
+  ) : c > 0 ? (
     cur[c] >= 0 ? midisend(ofs, 0x80 | curch[c], cur[c], 0);
     cur[c] = n; curch[c] = ch;
   );
   midisend(ofs, 0x90 | ch, n, v);
 );
-function release(ofs, ch, n) (
-  (slider(n + 1) | 0) == 0 ? midisend(ofs, 0x80 | ch, n, 0);   // в choke-группе нота-офф глушится
+function release(ofs, ch, n, v) local(c) (
+  c = slider(n + 1) | 0;
+  c == 0 ? midisend(ofs, 0x80 | ch, n, v)
+  : v == 1 ? (   // явный OFF трекера — обрывает и в группе
+    midisend(ofs, 0x80 | ch, n, v);
+    c == 17 ? (selfon[n] = 0) : (cur[c] == n ? (cur[c] = -1));
+  );   // иначе в choke-группе нота-офф глушится
 );
 
 @block
@@ -295,7 +305,7 @@ while (midirecv(ofs, m1, m2, m3)) (
   ) : (st == 0x80 || (st == 0x90 && m3 == 0)) ? (
     g = slider(m2 + 129) | 0;
     g > 0 ? (
-      k = 0; loop(128, (slider(k + 129) | 0) == g ? release(ofs, ch, k); k += 1);
-    ) : release(ofs, ch, m2);
+      k = 0; loop(128, (slider(k + 129) | 0) == g ? release(ofs, ch, k, st == 0x80 ? m3 : 0); k += 1);
+    ) : release(ofs, ch, m2, st == 0x80 ? m3 : 0);
   ) : midisend(ofs, m1, m2, m3);
 );

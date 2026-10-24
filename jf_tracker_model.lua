@@ -136,7 +136,7 @@ function M.parse_midi(buf)
         active[key] = { ppq = ppq, pitch = pitch, vel = vel, ch = ch, muted = (flag & 2) == 2, cents = tu and tu.ppq >= ppq - 4 and tu.c or nil }
       elseif st == 0x80 or (st == 0x90 and vel == 0) then
         local a = active[key]
-        if a then a.ppq_end = ppq; notes[#notes + 1] = a; active[key] = nil end
+        if a then a.ppq_end = ppq; a.rel = st == 0x80 and vel or 0; notes[#notes + 1] = a; active[key] = nil end   -- 24 окт: rel 1 — явный OFF трекера
       end
     end
   end
@@ -501,7 +501,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
             end
           end
         end
-        local tail = { kind = 'off', of = head, delay = d1 }
+        local tail = { kind = 'off', of = head, delay = d1, explicit = nt.rel == M.OFF_REL or nil }   -- 24 окт: явный OFF (обрывает one-shot пэд)
         -- note-off ровно на границе строки — OFF стоит в этой строке с delay 0;
         -- если конец в той же строке, что и начало, OFF не помещается: нота
         -- короче строки, показываем только голову
@@ -1255,6 +1255,8 @@ M.DR = nil           -- 16 окт: jf_tracker_drumrack.lua (drumrs5k), став�
 local rs5k_pi
 -- 18 окт: mute groups drumrs5k — JSFX перед рэком: группа на каждую ноту (слайдер ноты N — параметр N, 0..16)
 M.CHOKE = 'jf_tracker_choke'
+M.OFF_REL = 1          -- 24 окт: скорость отпускания явного OFF трекера (jf_tracker_choke пропускает только её)
+M.CHOKE_SELF = 17      -- 24 окт: choke «сам себя» — one-shot пэд, который обрывает явный OFF
 function M.choke_fx(A, tr)
   for i = 0, A.GetCount(tr) - 1 do
     local _, nm = A.GetFXName(tr, i, '')
@@ -1827,7 +1829,7 @@ function build_one(tr, fx, out)
           kid.note = pi.note and math.floor(A.GetParamNormalized(tr, rid, pi.note) * 127 + 0.5) or nil
           kid.obey = pi.obey and A.GetParamNormalized(tr, rid, pi.obey) >= 0.5 or false   -- 19 окт: волна пэда на треке — до OFF (obey) / до конца сэмпла
           -- 18 окт: mute group пэда — слайдер его ноты в jf_tracker_choke (0 — без группы)
-          kid.choke = (chi and kid.note) and math.floor(A.GetParamNormalized(tr, chi, kid.note) * 16 + 0.5) or 0
+          kid.choke = (chi and kid.note) and math.floor((A.GetParam and A.GetParam(tr, chi, kid.note) or A.GetParamNormalized(tr, chi, kid.note) * 16) + 0.5) or 0   -- 24 окт: значение слайдера (0..17), не доля
           -- 19 окт: group (слайдер 129+ноты) — пэды группы звучат вместе (слой прямо в рэке)
           kid.group = (chi and kid.note and A.GetNumParams(tr, chi) > 128 + kid.note) and math.floor(A.GetParamNormalized(tr, chi, 128 + kid.note) * 16 + 0.5) or 0
           kid.slots = {}
