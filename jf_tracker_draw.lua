@@ -5297,7 +5297,7 @@ function D.draw_notepop(L, hover)
       set(n == hot and U.AMBER or (n == np.cur and U.CYAN or U.BG)); gfx.rect(x, ky0, math.max(2, math.floor(kw * 2 / 3)), bh, 1)
     end
   end
-  text(px + L.pad, py + L.pad, fit((np.name or 'note') .. ': ' .. (hot and nm(hot) or (np.cur and nm(np.cur) or '')) .. '   click - set, Esc / click outside - close', pw - 2 * L.pad), U.AMBER)
+  text(px + L.pad, py + L.pad, fit((np.name or 'note') .. ': ' .. (hot and nm(hot) or (np.cur and nm(np.cur) or '')) .. ((D.info and D.info.hints) and '   click - set, Esc / click outside - close' or ''), pw - 2 * L.pad), U.AMBER)
   if hot then hover.notepop = hot end
 end
 -- 22 окт: снапшоты микшера слева в пустом месте микшера — как окно SWS Snapshots: вкладки snapshots | xy;

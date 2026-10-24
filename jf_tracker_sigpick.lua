@@ -152,7 +152,7 @@ function SP.draw(U, D, L, W, H)
     if not dis then lay.scope[#lay.scope + 1] = { scope = o[1], x = sx, y = lay.scope_y, w = bw, h = L.rh } end
     sx = sx + bw + L.pad
   end
-  U.text(lay.x + L.pad, lay.hint_y, 'digits  Tab /  h l  j k  a  Enter  Esc', U.DIM)
+  if SP.hints then U.text(lay.x + L.pad, lay.hint_y, 'digits  Tab /  h l  j k  a  Enter  Esc', U.DIM) end   -- 24 окт: клавиши — только с хинтами
   SP.lay = lay
   SP.hover = SP.hit(lay, mx, my)
   return lay
