@@ -1791,15 +1791,36 @@ ctx = {
   dsp_autoitem = function(k, pi)
     local t = dsp_target()
     if t and t.take then vim.msg = 'ai: automation items exist only on track envelopes (switch DSP to track: t)'; return end
-    local item = ctx.item_at_cursor()
-    if not item then vim.msg = 'ai: put the tracker cursor on an item'; return end
+    -- 24 окт: длина — item под курсором трекера; нет под курсором — item трека DSP в строке курсора; нет и его —
+    -- паттерн (регион) курсора, иначе такт. После вставки — сразу редактор его кривой (было: «put the cursor on an item»)
     local env, _, f, p = ctx.dsp_param_env(k, pi, true)
     if not env then vim.msg = 'ai: no parameter'; return end
-    local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
-    local len = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
-    edit.auto_item(env, pos, len)
+    local item = ctx.item_at_cursor()
+    local t0 = edit.row_time(vim.cur.row, state.lpb, 0)
+    if not item and t and t.track then
+      for i = 0, reaper.CountTrackMediaItems(t.track) - 1 do
+        local o = reaper.GetTrackMediaItem(t.track, i)
+        local op = reaper.GetMediaItemInfo_Value(o, 'D_POSITION')
+        if op <= t0 + 1e-6 and op + reaper.GetMediaItemInfo_Value(o, 'D_LENGTH') > t0 + 1e-6 then item = o; break end
+      end
+    end
+    local pos, len, what
+    if item then
+      pos, len, what = reaper.GetMediaItemInfo_Value(item, 'D_POSITION'), reaper.GetMediaItemInfo_Value(item, 'D_LENGTH'), 'the item'
+    else
+      local rg = alias.region_at(regions, t0)
+      if rg then pos, len, what = rg.pos, rg.rgnend - rg.pos, 'the pattern'
+      else
+        local r0, r1 = model.bar_of_row(vim.cur.row, state.lpb)
+        pos = edit.row_time(r0, state.lpb, 0); len = edit.row_time(r1, state.lpb, 0) - pos; what = 'the bar'
+      end
+    end
+    local idx = edit.auto_item(env, pos, len)
     state.envs = true
-    vim.msg = ('automation item: %s / %s, %.3fs at %.3fs'):format(f.name, p.name, len, pos)
+    if not (idx and idx >= 0) then vim.msg = 'ai: REAPER did not insert the automation item'; return end
+    local pool = math.floor((reaper.GetSetAutomationItemInfo(env, idx, 'D_POOL_ID', 0, false) or 0) + 0.5)
+    ctx.ai_edit_open({ env = env, idx = idx, pos = pos, len = len, label = f.name .. ' / ' .. p.name, min = 0, max = 1, pool = pool })
+    vim.msg = ('automation item: %s / %s over %s (%.3fs at %.3fs) - its curve is open'):format(f.name, p.name, what, len, pos)
   end,
   dsp_pick_param = function(k)
     local col, f = ctx.dsp_fx(k)
