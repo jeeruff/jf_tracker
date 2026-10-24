@@ -5605,35 +5605,42 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     if D.hint then D.hint('dspbtn', bx0, y, w2, L.rh - 1, { fx = k, what = what }) end
     return bx0 + w2 + 2
   end
-  local r = math.max(3, math.floor(L.rh / 2) - 1)
+  -- 24 окт: таблица как Chain List в Drum Rack (Ableton): заголовки колонок Chain | Mix, строка на цепь —
+  -- имя (щелчок — курсор DSP на её модуль, выбранная — подложкой), Mix — поле с заливкой (Wet цепи: тянуть
+  -- по горизонтали, щелчок — сразу туда), m (выкл.), s (только она)
   local non = 0
   for _, c in ipairs(chains) do if c.kd.enabled then non = non + 1 end end
+  local sw = ms('s') + 2 * L.pad
+  local vbw = ms('100%') + 2 * L.pad
+  local bxs = x + w - 2 * sw - 2
+  local vbx = bxs - vbw - 3
+  local nw = vbx - x - 3
+  text(x, y, fit('chain', nw), U.DIM); text(vbx + L.pad, y, 'mix', U.DIM)
+  y = y + L.rh
   for _, c in ipairs(chains) do
     if y + L.rh > ymax then break end
     local kd = c.kd
-    local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
-    -- 24 окт: строка — | / = имя, m, s; под ней громкость цепи (Wet) горизонтальным слайдером во всю ширину
-    -- (ручка была мелкой — худший контроль); тянуть по горизонтали, щелчок — сразу туда
-    local sw = ms('s') + 2 * L.pad
-    local bxm = x + w - 2 * sw - 2
+    local selk = D.sel_i == kd.i
+    local nhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
+    set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
     local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
-    text(x, y, fit(glyph .. (kd.name or '?'), bxm - x - 2), kd.enabled and U.TEXT or U.GREY)
-    local bx2 = btn(bxm, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
-    btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
-    y = y + L.rh
-    if v and y + L.rh <= ymax then
-      local vs = tostring(math.floor(v * 100 + 0.5))
-      local vw = ms('100') + L.pad
-      local sx, sww = x, w - vw
-      local shot = not drag and mx >= sx - 2 and mx < sx + sww + 2 and my >= y and my < y + L.rh
-      local cy = y + math.floor(L.rh / 2)
-      set(U.DIM); gfx.rect(sx, cy - 1, sww, 2, 1)
-      set(shot and U.AMBER or (kd.enabled and U.GREEN or U.GREY)); gfx.rect(sx, y + 4, math.max(1, math.floor(v * sww + 0.5)), L.rh - 8, 1)
-      text(sx + sww + L.pad, y, vs, shot and U.AMBER or U.GREY)
-      if shot then hover.cslide = { fx = kd.i, idx = kd.wet_i, x = sx, w = sww, name = (kd.name or 'chain') .. ' volume' } end
-      if D.hint then D.hint('dspbtn', sx, y, sww, L.rh, { fx = k, what = 'cslide' }) end
-      y = y + L.rh + 2
+    text(x + L.pad, y, fit(glyph .. (kd.name or '?'), nw - 2 * L.pad), selk and U.TEXT or (kd.enabled and U.TEXT or U.GREY))
+    if nhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', ki = c.ki, kid = kd } end
+    if D.hint then D.hint('dspbtn', x, y, nw, L.rh - 1, { fx = k, what = 'cjump' }) end
+    local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
+    if v then
+      local shot = not drag and mx >= vbx and mx < vbx + vbw and my >= y and my < y + L.rh
+      set(U.BG); gfx.rect(vbx, y, vbw, L.rh - 1, 1)
+      set(shot and U.tint(U.AMBER, 0.45) or U.tint(kd.enabled and U.CYAN or U.GREY, 0.35)); gfx.rect(vbx, y, math.max(1, math.floor(v * vbw + 0.5)), L.rh - 1, 1)
+      set(shot and U.AMBER or U.LINE); gfx.rect(vbx, y, vbw, L.rh - 1, 0)
+      local vs = math.floor(v * 100 + 0.5) .. '%'
+      text(vbx + math.floor((vbw - ms(vs)) / 2), y, vs, shot and U.AMBER or U.TEXT)
+      if shot then hover.cslide = { fx = kd.i, idx = kd.wet_i, x = vbx, w = vbw, name = (kd.name or 'chain') .. ' mix' } end
+      if D.hint then D.hint('dspbtn', vbx, y, vbw, L.rh, { fx = k, what = 'cslide' }) end
     end
+    local bx2 = btn(bxs, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
+    btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
+    y = y + L.rh + 1
   end
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
@@ -9383,6 +9390,7 @@ function D.frame(L, snap, rows, state, info)
     if hint0 then D.hint = function(kind, x, y, w, h, data) if x + w > cx0 and x < cx1 then hint0(kind, x, y, w, h, data) end end end
     D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
     D.cst, D.info = {}, info
+    D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     for k, f in ipairs(fxs) do
       D.rack_open(L, f, k, bx, boxy, bh0)
       do

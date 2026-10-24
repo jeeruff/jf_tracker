@@ -24054,6 +24054,10 @@ local function frame()
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
+      elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
+        local col = dsp_target()
+        for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
+        vim.msg = (hover.dspbtn.kid.name or 'chain') .. ' (the module of this chain)'
       elseif hover.dspbtn.what == 'xyfold' then   -- 24 окт: вкладка xy — XY-пэд на макросах 1 и 2
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_xyopen = state.dsp_xyopen or {}
