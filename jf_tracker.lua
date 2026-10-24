@@ -26330,6 +26330,7 @@ local function frame()
   end
   if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
+  if c <= 0 then local fk = ctx.fxwin_keys(); if fk then c = fk end end   -- 24 окт: клавиши нот при окне плагина впереди
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
     local inj = reaper.GetExtState(EXT, 'inject')
@@ -27786,6 +27787,35 @@ ctx.auto_pattern = function(row)
     end
   end
   return false
+end
+-- 24 окт: впереди окно плагина (у трекера нет клавиатуры), включены KEYS (m) или INSERT — нажатые клавиши нот
+-- раскладки трекера читаются напрямую (JS_VKeys) и идут в трекер, как набранные: плагин слышно, в INSERT — пишется.
+-- Код первой клавиши (остальные — в очередь ctx.keyq) или nil
+ctx.fxwin_keys = function()
+  if not (reaper.JS_VKeys_GetDown and reaper.JS_Window_GetForeground and reaper.JS_Window_GetTitle) then return nil end
+  if (gfx.getchar(65536) & 2) ~= 0 then ctx.fwk_t = nil; return nil end   -- окно трекера в фокусе — клавиши и так его
+  if not (state.piano_show or vim.mode == 'insert') then ctx.fwk_t = nil; return nil end
+  local now = reaper.time_precise()
+  local fc = ctx.fwk_c
+  if not fc or now - fc.t > 0.3 then
+    local fg = reaper.JS_Window_GetForeground()
+    local title = fg and reaper.JS_Window_GetTitle(fg) or ''
+    fc = { t = now, fx = (title:match('^%u+i?: .* %- Track %d') or title:match('^FX: ') or title:match('^%u+i?: .* %- Master')) ~= nil }
+    ctx.fwk_c = fc
+  end
+  if not fc.fx then ctx.fwk_t = nil; return nil end
+  local since = ctx.fwk_t or now
+  ctx.fwk_t = now
+  local dn = reaper.JS_VKeys_GetDown(since)
+  if not dn then return nil end
+  local out
+  for code in pairs(keys.piano) do
+    local vk = keys.vk_of(code)
+    if vk and dn:byte(vk) and dn:byte(vk) ~= 0 then out = out or {}; out[#out + 1] = code end
+  end
+  if not out then return nil end
+  for i = 2, #out do ctx.keyq[#ctx.keyq + 1] = out[i] end
+  return out[1]
 end
 -- 21 окт: фокус назад с окна плагина: трекер без клавиатуры, мышь над ним 0.25 с без кнопок, а клавиатура — у окна FX
 -- (заголовок «VSTi: … - Track 4 …», «FX: Track …», CLAP / AU / JS) — забрать её (JS_Window_SetFocus). Диалоги REAPER,
