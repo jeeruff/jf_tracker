@@ -950,11 +950,13 @@ function D.layout(snap, state, nregions)
       if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw end
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
-        local ew = c.compact and L.env_cw or L.env_w
+        -- 24 окт: по умолчанию — узко (значение в 3 знака): правка — во вкладке automation или точками; опция envwide — как было
+        local narrow_env = c.compact or not state.envwide
+        local ew = narrow_env and L.env_cw or L.env_w
         for _, e in ipairs(col.envs) do
           -- огибающая — тоже элемент L.flat (курсор заходит, INSERT правит точки)
-          L.flat[#L.flat + 1] = { ci = ci, col = col, env = e, sub = {}, x = vis and lx or nil, w = ew, compact = c.compact or nil }
-          c.envs[#c.envs + 1] = { e = e, x = lx, w = ew, fi = #L.flat, G = c.compact and L.GE or nil }
+          L.flat[#L.flat + 1] = { ci = ci, col = col, env = e, sub = {}, x = vis and lx or nil, w = ew, compact = narrow_env or nil }
+          c.envs[#c.envs + 1] = { e = e, x = lx, w = ew, fi = #L.flat, G = narrow_env and L.GE or nil }
           lx = lx + ew + 1
         end
       end
