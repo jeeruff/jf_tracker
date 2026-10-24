@@ -3203,6 +3203,7 @@ ctx = {
       { key = 'c', label = ((cur == nil or cur == 'curve') and '* ' or '') .. 'curve (as in REAPER)', fn = set('curve', 'curve') },
       { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values (as a command column)', fn = set('vals', 'values') },
       { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
+      { key = 'b', label = (cur == 'bars' and '* ' or '') .. 'values and bars: the number and a line under it (longer - more), as MIDI CC', fn = set('bars', 'values and bars') },
     } })
   end,
   -- ── note mod (12 окт): модуляция, которую запускает нота ──────────────
@@ -4125,6 +4126,16 @@ ctx = {
       local vis = env and select(2, reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)) == '1'
       if not vis then PP.toggle_env(tr, r) end
       state.trackenvs[col.guid] = true
+      -- 24 окт: строка точек на выделении (или в строке курсора) — значением, где сейчас стоит фейдер параметра
+      local env2 = PP.env_of(tr, r, false)
+      if env2 then
+        local raw
+        if r.kind == 'fx' then raw = reaper.ScaleToEnvelopeMode(reaper.GetEnvelopeScalingMode(env2), reaper.TrackFX_GetParamNormalized(tr, r.fx, r.param))
+        else local _, v = reaper.Envelope_Evaluate(env2, edit.swing_time(at.row, state.lpb), 0, 0); raw = v end
+        local times = {}
+        for row = (at.vis and at.r0 or at.row), (at.vis and at.r1 or at.row) do times[#times + 1] = edit.swing_time(row, state.lpb) end
+        edit.env_fill(env2, times, raw, 'points of ' .. r.label)
+      end
       if r.kind == 'fx' then ctx.ptouch_push(col.guid, r.fx .. ':' .. r.param) end
       ctx.env_jump = { env = PP.env_of(tr, r, false), row = at.row, r0 = at.r0, r1 = at.r1, vis = at.vis, t = reaper.time_precise(), label = r.label }
       if at.vis then vim.mode = 'normal' end
@@ -4255,6 +4266,61 @@ ctx = {
   env_set = function(e, row, v)
     local t = edit.swing_time(row, state.lpb)                 -- свинг и для точек (6 окт)
     edit.env_set(e, t, v, (edit.row_time(row + 1, state.lpb, 0) - t) / 2, ctx.env_mode(e) == 'steps' and 1 or nil)   -- шаги — квадратные точки
+  end,
+  -- 24 окт: VISUAL на колонке огибающей, Enter — кривые (reform для автоматизации): клетки с превью — тусклая
+  -- линия — как сейчас, яркая — что станет; буквы — сразу; h — рисовать мышью (вид steps)
+  env_curves = function(fl, r0, r1)
+    local e = fl.env
+    local CV = ctx.CV
+    local vals = {}
+    for r = r0, r1 do
+      local _, raw = reaper.Envelope_Evaluate(e.env, edit.swing_time(r, state.lpb), 0, 0)
+      vals[#vals + 1] = (e.max and e.min and e.max > e.min) and math.max(0, math.min(1, (raw - e.min) / (e.max - e.min))) or 0
+    end
+    local seed = math.floor(reaper.time_precise() * 1000) % 100000
+    local function poly(vs, x, y, w, h)
+      local n = #vs
+      for k = 1, n do
+        local x0 = x + (n > 1 and (k - 1) / (n - 1) or 0) * (w - 1)
+        local y0 = y + h - 1 - vs[k] * (h - 1)
+        if k > 1 then
+          local x1 = x + (k - 2) / (n - 1) * (w - 1)
+          gfx.line(x1, y + h - 1 - vs[k - 1] * (h - 1), x0, y0)
+        elseif n == 1 then gfx.rect(x0, y0, 2, 1, 1) end
+      end
+    end
+    local items = {}
+    for _, c in ipairs(CV.LIST) do
+      local new = CV.apply(c.id, vals, seed)
+      local it = { label = c.key .. ' ' .. c.label, t = c.key:upper(), v = c.id, tip = c.label .. (c.kind == 'gen' and ' - in the range of the values (a flat line: from 0 to it)' or '') }
+      it.draw = function(x, y, w, h, on)
+        U.text(x + 2, y, ctx.fit(it.label, w - 4), on and U.TEXT or U.GREY)
+        local gy, gh = y + L.rh + 1, h - L.rh - 3
+        if gh < 4 then return end
+        U.set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(x + 2, gy, w - 4, gh, 0)
+        U.set(U.mix(U.GREY, U.BG, 0.45)); poly(vals, x + 3, gy + 1, w - 6, gh - 2)
+        U.set(on and U.CYAN or U.mix(U.CYAN, U.BG, 0.25)); poly(new, x + 3, gy + 1, w - 6, gh - 2)
+      end
+      items[#items + 1] = it
+    end
+    items[#items + 1] = { label = 'h draw by hand (the mouse)', t = 'H', v = 'draw', tip = 'the column as steps: a fader on every row, drag across the rows with the mouse',
+      draw = function(x, y, w, h, on) U.text(x + 2, y, ctx.fit('h draw by hand (the mouse)', w - 4), on and U.TEXT or U.GREY) end }
+    return ctx.smart_open({ title = ('%s  rows %04d-%04d - a curve (letter, or the mouse)'):format(e.name or 'envelope', r0, r1), items = items, cols = 4, sel = 1,
+      cell_w = L.cw * 16, cell_rows = 3,
+      on_pick = function(it)
+        if vim.mode == 'visual' or vim.mode == 'vline' then vim.mode = 'normal' end
+        if it.v == 'draw' then
+          state.envvals[(fl.col.guid or '') .. '/' .. (e.name or '')] = 'steps'
+          vim.msg = (e.name or 'envelope') .. ': steps - drag across the rows with the mouse (ze - the view back)'
+          return
+        end
+        local new = CV.apply(it.v, vals, seed)
+        edit.run('curve ' .. it.v .. ': ' .. (e.name or 'envelope'), function()
+          for k, r in ipairs((function() local l = {}; for r = r0, r1 do l[#l + 1] = r end; return l end)()) do ctx.env_set(e, r, new[k]) end
+        end)
+        model.invalidate()
+        vim.msg = ('%s: %s on %d rows (u - undo)'):format(e.name or 'envelope', CV.BY[it.v].label, r1 - r0 + 1)
+      end })
   end,
   env_ramp = function(e, r0, r1, v0, v1)
     local t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1, state.lpb, 0)
@@ -14804,6 +14870,7 @@ model.inner_chain = function(tr, e, ki)   -- строка списка цепе�
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
   return (draw.chain_sel or {})[g .. ':' .. tostring(e.fguid or e.i) .. ':' .. ki]
 end
+ctx.CV = dofile(DIR .. '/jf_tracker_curves.lua')   -- 24 окт: кривые выделения на огибающей
 ctx.FF = dofile(DIR .. '/jf_tracker_fxfloat.lua')   -- 24 окт: опция nofloat — окна эффектов, открытые REAPER при добавлении, закрыть
 draw.Z = dofile(DIR .. '/jf_tracker_zones.lua')   -- 23 окт: зоны цепей рэка (Key / Vel / Chain)
 -- зона цепи kid (ребёнок-контейнер): её первый — jf_tracker_zone? → { addr, key, vel, sel, select }; кеш 0.25 с / fx_gen
@@ -17195,7 +17262,16 @@ function ctx.context_items(hover)
     end
     if col and f then
       add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name, function() edit.fx_bypass(col.track, f.i) end)
-      add('Open FX window', function() edit.fx_show(col.track, f.i) end)
+      -- 24 окт: p — в контейнер (выбранные модули рядом, иначе этот), O — окно (как кнопка O в заголовке)
+      local pk = DK.picked(dsp_sel)
+      local pn = pk and #pk or 1
+      add(pn > 1 and ('Pack the %d picked modules into a container (cc)'):format(pn) or 'Pack into a container (cc)', function()
+        if pk and pn > 1 then
+          for q = 2, #pk do if pk[q] ~= pk[q - 1] + 1 then vim.msg = 'pack: the picked modules must stand side by side (Shift-click / v)'; return end end
+          ctx.dsp_pack(pk[1], pk[#pk]); DK.clear_pick()
+        else ctx.dsp_pack(hover.dsp.fx, hover.dsp.fx) end
+      end, 'p')
+      add('Open FX window (o)', function() edit.fx_show(col.track, f.i) end, 'O')
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
       add('Add FX … (fzf)', function() ctx.fx_picker() end)
       add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end)

@@ -3872,6 +3872,7 @@ function V.smart()
       done()
     end
   elseif f.env then
+    if vis and r1 > r0 and ctx.env_curves then return ctx.env_curves(f, r0, r1) end   -- 24 окт: выделение — кривые
     local n = hexf and 256 or 128
     items, cols, sel = SM.values(n, nil, hexf, 'delete the point of this row')
     title = ('%s  %s'):format(f.env.name or 'envelope', where)

@@ -2534,6 +2534,10 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
     end
     return
   end
+  if vals == 'bars' then
+    -- 24 окт: значения и полоски (ze b): под числом — линия длиной по значению строки, как у MIDI CC
+    set(U.mix(env_colour(e), U.BG, 0.35)); gfx.rect(x + L.env_bx, y + L.rh - 4, math.max(1, math.floor(ev.v * (L.env_bar_w - 1) + 0.5)), 3, 1)
+  end
   if vals then
     -- 12 окт: вид «значения» (ze) — как колонка команд: число в строке точки, иначе точки
     if ev.pt then

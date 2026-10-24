@@ -2685,6 +2685,19 @@ function E.env_set(e, t, v, tol, shape)
   end)
 end
 
+-- 24 окт: точки огибающей env во времена times значением raw (уже в шкале огибающей); точка на месте — заменить.
+-- fzf параметра на поле команды: строка точек на выделении там, где стоит фейдер параметра
+function E.env_fill(env, times, raw, desc)
+  run(desc or 'envelope points', function()
+    for _, t in ipairs(times) do
+      local idx = env_point_at(env, t, 0.001)
+      if idx then R.SetEnvelopePoint(env, idx, t, raw, nil, nil, nil, true)
+      else R.InsertEnvelopePoint(env, t, raw, 0, 0, false, true) end
+    end
+    R.Envelope_SortPoints(env)
+  end)
+  if model then model.invalidate() end
+end
 -- 22 окт: XY-пресет в INSERT — точки автоматизации в t для параметров FX трека (vals: «GUID|param» → 0..1,
 -- fxmap: GUID → индекс FX); огибающая создаётся, точка в t заменяется. Возвращает число точек
 function E.snap_points(tr, vals, fxmap, t, desc)
