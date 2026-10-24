@@ -4277,7 +4277,12 @@ ctx = {
     end)
     if from_btn then vim.picker.trim = col.guid; state.popup_at = { kind = 'trim', guid = col.guid } end
   end,
-  preview_slice = function(track, entry, t0, t1, semis) PV.slice(track, entry, t0, t1, semis) end,
+  preview_slice = function(track, entry, t0, t1, semis)
+    -- 24 окт: корень растянут маркерами — превью играет тот же кусок файла, что вставит insert_slice
+    local a, b, r
+    if entry and entry.item and edit.slice_src then a, b, r = edit.slice_src(entry.item, t0, t1) end
+    PV.slice(track, entry, t0, t1, semis, a and { a, b, r } or nil)
+  end,
   -- выбранный слайс (4 окт): последний выделенный мышкой / Option+J K / сыгранный;
   -- 0 — весь айтем. Option+нота играет и пишет его с питчем
   selected_slice = function(root) if root and ctx.ssel.item == root.item then return ctx.ssel.k or 0 end return nil end,
@@ -12483,7 +12488,7 @@ ctx = {
     spec.t0 = reaper.time_precise()
     spec.extra = 0
     spec.row_dur = math.max(0.01, edit.row_time(spec.row + 1, state.lpb, 0) - edit.row_time(spec.row, state.lpb, 0))
-    if spec.slice and spec.entry then PV.slice(spec.track, spec.entry, spec.entry.slices[spec.slice], spec.entry.slices[spec.slice + 1] or spec.entry.len)
+    if spec.slice and spec.entry then ctx.preview_slice(spec.track, spec.entry, spec.entry.slices[spec.slice], spec.entry.slices[spec.slice + 1] or spec.entry.len)
     elseif spec.pitch then ctx.preview(spec.track, spec.pitch, spec.item, spec.row, 64) end
     state.hold = spec
     vim.msg = 'hold: release to insert' .. (spec.stretch and ' (stretched)' or '') .. ' - j / down add a step, Esc cancels'
@@ -18216,7 +18221,7 @@ local function mm_apply(a)
     local src = (e.slices and e) or (p and p.slices and p) or nil
     if src then
       local k = a.k
-      if src.slices[k] then PV.slice(col.track, src, src.slices[k], src.slices[k + 1] or src.len); vim.msg = ('pad %d -> slice %d'):format(k, k) end
+      if src.slices[k] then ctx.preview_slice(col.track, src, src.slices[k], src.slices[k + 1] or src.len); vim.msg = ('pad %d -> slice %d'):format(k, k) end
     elseif e.item then PV.audio(col.track, e.item, a.k - 1); vim.msg = ('pad %d: %+d st'):format(a.k, a.k - 1) end
   elseif MM_TRIG[id] then
     local e = mm_entry(true)
@@ -18228,7 +18233,7 @@ local function mm_apply(a)
     local e, p, col = mm_entry(false)
     local z = mm_pend.zone
     local sa, sb = SL.span()
-    if z and e and z.e.item == e.item then PV.slice(col.track, p, z.a, z.b)
+    if z and e and z.e.item == e.item then ctx.preview_slice(col.track, p, z.a, z.b)
     elseif sa and SL.entry then ctx.preview_slice(SL.track, SL.entry, sa, sb)
     elseif e and e.item and col then PV.inst_preview(e, col.track) end
   elseif id == 'insert' then local sa, sb = SL.span(); if sa and SL.entry then ctx.drop_span_cursor(SL.entry, sa, sb) else vim.msg = 'insert: no selection' end
@@ -18372,11 +18377,11 @@ local function poll_midi_in()
           local idx = d1 - model.BASE_NOTE                               -- C-4 = весь сэмпл, C#4 = слайс 1 (5 окт)
           if idx == 0 and e.item then PV.audio(tr, e.item, 0); vim.msg = 'MIDI C-4 -> the whole sample'
           elseif idx >= 1 and idx <= #e.slices then
-            PV.slice(tr, e, e.slices[idx], e.slices[idx + 1] or e.len)
+            ctx.preview_slice(tr, e, e.slices[idx], e.slices[idx + 1] or e.len)
             vim.msg = ('MIDI %s -> slice %d'):format(model.note_name(d1), idx)
           end
         elseif e.item then PV.note_on(d1, tr, e.item, d1 - model.BASE_NOTE, nil, d2 / 127); vim.msg = 'MIDI ' .. model.note_name(d1)   -- 13 окт: голос, луп удержания
-        elseif e.file then PV.slice(tr, e, 0, e.len) end
+        elseif e.file then ctx.preview_slice(tr, e, 0, e.len) end
       elseif st and ((st & 0xF0) == 0x80 or ((st & 0xF0) == 0x90 and d2 == 0)) then PV.note_off(d1)
       end
     end
@@ -18395,9 +18400,12 @@ local function poll_midi_in()
     local kind = st and (st & 0xF0)
     if ok and not ((want_dev == 63 or e.dev == want_dev or e.dev == 62) and (want_ch == 0 or ((st & 0x0F) + 1) == want_ch)) then return end
     if kind == 0x90 and d2 > 0 then
-      local k = pinst.slices and #pinst.slices > 0 and (d1 - model.BASE_NOTE + 1) or nil
-      if k then
-        if k >= 1 and k <= #pinst.slices then PV.slice(col.track, pinst, pinst.slices[k], pinst.slices[k + 1] or pinst.len) end
+      -- 24 окт: слайс — от базы слайсов, как клавиши компьютера (ctx.slice_base: опция base octave и slice1);
+      -- было от C-4 — MIDI-клавиатура играла другие слайсы / весь сэмпл, не то, что набирается и вставляется
+      local k = pinst.slices and #pinst.slices > 0 and (d1 - ctx.slice_base() + 1) or nil
+      if k and k >= 1 then
+        if k <= #pinst.slices then ctx.preview_slice(col.track, pinst, pinst.slices[k], pinst.slices[k + 1] or pinst.len) end
+      elseif k == 0 then PV.note_on(d1, col.track, pinst.item, 0, nil, d2 / 127)   -- клавиша перед слайсом 1 — весь сэмпл без транспоза
       else PV.note_on(d1, col.track, pinst.item, d1 - model.BASE_NOTE, nil, d2 / 127) end
     elseif kind == 0x80 or (kind == 0x90 and d2 == 0) then PV.note_off(d1) end
   end
@@ -18440,7 +18448,8 @@ local function poll_midi_in()
         if not midiin.held[d1] then midiin.held[d1] = true; midiin.nheld = midiin.nheld + 1 end
         -- нарезанный инструмент (4 окт): нота = слайс (C-4 = 1, хроматически)
         local inst = col.pool and col.pool[vim.inst]
-        local k = inst and inst.slices and #inst.slices > 0 and (d1 - model.BASE_NOTE + 1) or nil
+        local k = inst and inst.slices and #inst.slices > 0 and (d1 - ctx.slice_base() + 1) or nil   -- 24 окт: как клавиши (было от C-4)
+        if k == 0 then d1 = model.BASE_NOTE end   -- весь сэмпл без транспоза
         if k and k >= 1 and k <= #inst.slices then
           edit.insert_slice(col.track, lane_idx, state.lpb, midiin.row, inst.item, k)
           vim.last_slice = k
@@ -26499,7 +26508,7 @@ local function frame()
       or ((state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
-    if e and (e.take or e.src) then PV.slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
+    if e and (e.take or e.src) then ctx.preview_slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
     else vim.msg = 'no instrument selected (empty slot)' end
     c = 0
   end

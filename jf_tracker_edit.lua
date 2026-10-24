@@ -1975,6 +1975,17 @@ function E.root_markers(take)
   table.sort(pts, function(x, y) return x.pos < y.pos end)
   return #pts > 0 and pts or nil
 end
+-- 24 окт: где в файле звучит кусок [t0, t1) секунд корня, растянутого stretch-маркерами (как его вставит
+-- insert_slice / unwarp_piece) → позиция начала, конца (секунды файла) и скорость; без маркеров — nil
+-- (превью слайса играло t × rate без маркеров — другой кусок, не тот, что вставлялся)
+function E.slice_src(item, t0, t1)
+  local tk = item and R.ValidatePtr(item, 'MediaItem*') and R.GetActiveTake(item)
+  local pts = tk and E.root_markers(tk)
+  if not pts or t1 <= t0 then return nil end
+  local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+  local sa, sb = smap_at(pts, t0), smap_at(pts, t1)
+  return math.max(0, sa * rate), sb * rate, math.max(0.01, (sb - sa) * rate / (t1 - t0))
+end
 function E.unwarp_piece(it, pts, rate, a, b)
   local tk = R.GetActiveTake(it)
   if not (tk and pts and b > a) then return false end

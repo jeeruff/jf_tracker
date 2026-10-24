@@ -30,6 +30,10 @@ function P.available() return R.CF_CreatePreview ~= nil end
 -- превью с выходом на трек закрытого проекта роняло REAPER (SWS CF_Preview::stopWatch →
 -- StopTrackPreview2 по освобождённому треку)
 local live = {}
+-- 24 окт: скорость проекта (Master playrate, x1.08 в транспорте) — превью звучит как проект (было без неё:
+-- клавиша звучала медленнее и ниже, чем вставленный слайс при воспроизведении)
+local function mrate(r) local m = R.Master_GetPlayRate and R.Master_GetPlayRate(0) or 1; return r * ((m and m > 0) and m or 1) end
+P.mrate = mrate
 local function new_preview(src)
   local pv = R.CF_CreatePreview(src)
   if pv then live[pv] = R.EnumProjects(-1) end
@@ -127,7 +131,7 @@ local function voice(track, item, semis, lp, gain)
     if not pv then return nil end
     R.CF_Preview_SetValue(pv, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') + (semis or 0))   -- нота поверх transpose инструмента (6 окт)
     R.CF_Preview_SetValue(pv, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * (gain or 1))
-    R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)                 -- как прозвучит нота (3 окт)
+    R.CF_Preview_SetValue(pv, 'D_PLAYRATE', mrate(rate))          -- как прозвучит нота (3 окт)
     R.CF_Preview_SetValue(pv, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH'))
     R.CF_Preview_SetValue(pv, 'D_POSITION', pos)
     if loop then R.CF_Preview_SetValue(pv, 'B_LOOP', 1) end
@@ -232,12 +236,12 @@ function P.inst(track, item, max_sec)
   if rate <= 0 then rate = 1 end
   local len = R.GetMediaItemInfo_Value(item, 'D_LENGTH')
   local dur = max_sec and math.min(max_sec, len) or len
-  audio_stop_at = R.time_precise() + math.max(0.05, dur)
+  audio_stop_at = R.time_precise() + math.max(0.05, dur / mrate(1))
   local pv = new_preview(src)
   if not pv then return false end
   local offs = R.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
   R.CF_Preview_SetValue(pv, 'D_POSITION', offs)
-  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
+  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', mrate(rate))
   R.CF_Preview_SetValue(pv, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH'))
   R.CF_Preview_SetValue(pv, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH'))
   local pm = R.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE'); if pm >= 0 then R.CF_Preview_SetValue(pv, 'I_PITCHMODE', pm) end
@@ -265,7 +269,7 @@ function P.live(items)
   if not take then return false end
   local rate = R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
   pcall(R.CF_Preview_SetValue, cur, 'D_PITCH', R.GetMediaItemTakeInfo_Value(take, 'D_PITCH') + (P.cur_semis_add or 0))
-  pcall(R.CF_Preview_SetValue, cur, 'D_PLAYRATE', rate)
+  pcall(R.CF_Preview_SetValue, cur, 'D_PLAYRATE', mrate(rate))
   pcall(R.CF_Preview_SetValue, cur, 'B_PPITCH', R.GetMediaItemTakeInfo_Value(take, 'B_PPITCH'))
   pcall(R.CF_Preview_SetValue, cur, 'D_VOLUME', R.GetMediaItemTakeInfo_Value(take, 'D_VOL') * R.GetMediaItemInfo_Value(P.cur_item, 'D_VOL'))
   pcall(R.CF_Preview_SetValue, cur, 'D_PAN', R.GetMediaItemTakeInfo_Value(take, 'D_PAN'))
@@ -298,7 +302,7 @@ function P.src_position()
 end
 
 -- слайс инструмента: от t0 до t1 секунд item (через трек)
-function P.slice(track, entry, t0, t1, semis)
+function P.slice(track, entry, t0, t1, semis, warp)
   if not P.available() or not entry then return false end
   local src = entry.take and R.GetMediaItemTake_Source(entry.take) or entry.src
   if not src then return false end
@@ -307,26 +311,30 @@ function P.slice(track, entry, t0, t1, semis)
   local dur = math.max(0.05, (t1 - t0))
   local pv = new_preview(src)
   if not pv then return false end
-  R.CF_Preview_SetValue(pv, 'D_POSITION', (entry.offs or 0) + t0 * rate)
+  -- 24 окт: warp = { начало, конец в файле, скорость } — корень растянут маркерами (E.slice_src)
+  local p0 = warp and warp[1] or ((entry.offs or 0) + t0 * rate)
+  local warped = warp and math.abs(warp[3] - rate) > 1e-6
+  if warp then rate = warp[3] end
+  R.CF_Preview_SetValue(pv, 'D_POSITION', p0)
   -- 8 окт: конец слайса — по позиции самого превью (D_POSITION в источнике),
   -- а не по таймеру от нажатия: таймер не учитывал задержку старта превью,
   -- и короткие слайсы обрывались раньше конца (D_LENGTH у SWS только для
   -- чтения). Таймер — страховка, если позиция не читается
   R.CF_Preview_SetValue(pv, 'D_FADEOUTLEN', 0.004)
-  P.stop_pos = (entry.offs or 0) + t1 * rate
-  audio_stop_at = R.time_precise() + dur + 0.5
-  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', rate)
+  P.stop_pos = warp and warp[2] or ((entry.offs or 0) + t1 * rate)
+  audio_stop_at = R.time_precise() + dur / mrate(1) + 0.5
+  R.CF_Preview_SetValue(pv, 'D_PLAYRATE', mrate(rate))
   -- transpose инструмента — база слайса (6 окт: слайс звучал без него); Option+нота — поверх
   local base = entry.take and R.GetMediaItemTakeInfo_Value(entry.take, 'D_PITCH') or 0
   local pp = entry.take and R.GetMediaItemTakeInfo_Value(entry.take, 'B_PPITCH') or 0
-  if semis and semis ~= 0 then pp = 1 end
-  if base + (semis or 0) ~= 0 then R.CF_Preview_SetValue(pv, 'B_PPITCH', pp); R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0)) end
+  if (semis and semis ~= 0) or warped then pp = 1 end   -- растянутый кусок — с сохранением высоты, как вставленный
+  if base + (semis or 0) ~= 0 or warped then R.CF_Preview_SetValue(pv, 'B_PPITCH', pp); R.CF_Preview_SetValue(pv, 'D_PITCH', base + (semis or 0)) end
   local out_tr = P.out_track(track); if out_tr then R.CF_Preview_SetOutputTrack(pv, 0, out_tr) end
   R.CF_Preview_Play(pv)
   if P.trace then P.trace(('slice preview %.3f-%.3f s (stop at src %.3f, rate %.2f, semis %s) from %s'):format(t0, t1, P.stop_pos, rate, tostring(semis), debug.traceback('', 2):gsub('%s+', ' '):sub(1, 300))) end   -- 18 окт: debug — кто и сколько
   cur = pv
   -- плейхед слайса на волне инструмента (3 окт: Shift+нота / MIDI-клавиатура)
-  P.cur_item, P.cur_offs, P.cur_rate = entry.item, entry.offs or 0, rate ~= 0 and rate or 1
+  P.cur_item, P.cur_offs, P.cur_rate = entry.item, warp and (p0 - t0 * rate) or (entry.offs or 0), rate ~= 0 and rate or 1   -- растянутый: плейхед на волне от начала слайса
   P.cur_t0 = t0                                                 -- 10 окт: откуда играет — след на волне
   return true
 end
