@@ -580,7 +580,7 @@ KH.PAGES = {
     { k = 'cn', d = 'an empty container after the selected module (empty chain: at the end); it says what goes in: drop an fx or another container into it, [] in a container header - an empty container inside it, and so on' },
     { k = 'rclick', d = 'container: unpack, add fx inside, presets, all serial / parallel, rename (:fxname); on a plugin inside: bypass, window, serial / parallel, move out, remove' },
     { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame; left half - serial, right half - parallel); the edges of a block - before / after it' },
-    { k = 'aa', d = 'automate the selected parameter (envelope)', t = { 'aa', 'a' } },
+    { k = 'aa', d = 'automate or show the envelope of the selected parameter: none - it is made; then the tracker cursor goes to its column', t = { 'aa', 'a' } },
     { k = 'ap A', d = 'pick a parameter to automate (fzf; also click trim in the track header, rclick trim: all parameters)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
     { k = 'ai', d = 'automation item of the selected parameter: as long as the item under the tracker cursor (none - the item of the DSP track at the cursor row, else the pattern, else the bar); its curve opens at once' },

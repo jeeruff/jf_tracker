@@ -41,7 +41,7 @@ local T = {
   dsp_z = { title = 'z - view / router / pages', items = { { 'z', 'dsp + mixer on the whole window' }, { 'v', 'rack / container: pads / list' }, { 'b', 'into 3 / 4 / 5 bands' }, { 'Tab', 'swap dsp and mixer (zz view)' }, { 'x', 'dsp across the whole width, side modules up' }, { 'X', 'dsp taller: up to 600 px (again - back)' }, { 'r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'l', 'list of all modules (fzf)' }, { 'f', 'fold the module (a strip: name vertically, x B)' }, { 'F', 'fold / unfold all modules' }, { 'p', 'presets of the module' }, { 'P', 'pages of any module: all sections in one pane / one page + tabs' }, { 's', 'size of the drumrs5k pads: s m l' }, { 'm', 'minimize the pane' } } },
   dsp_zs = { title = 'zs - pad size', items = { { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4 (default)' } } },
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
-        { 'a', 'automate the parameter' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
+        { 'a', 'automate or show the envelope' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
         { 'm', 'map to a container macro' } } },
   dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, { 'c', 'unpack the container' },
         { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },

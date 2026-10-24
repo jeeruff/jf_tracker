@@ -1685,9 +1685,16 @@ ctx = {
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
     if not p then vim.msg = 'aa: no parameter'; return end
+    -- 24 окт: aa — автоматизировать или показать: огибающая есть — курсор трекера на её колонку, нет — создать и туда же
+    local had = not col.take and reaper.GetFXEnvelope(col.track, p.fx or f.i, p.i, false)
     if edit.fx_envelope(col.track, p.fx or f.i, p.i) then
       if col.take then vim.msg = 'take envelope on the instrument item: ' .. f.name .. ' / ' .. p.name .. ' (see it in REAPER; placed notes are copies)'
-      else state.envs = true; vim.msg = 'automation: ' .. f.name .. ' / ' .. p.name .. ' (envelope column shown)' end
+      else
+        state.envs = true
+        local env = reaper.GetFXEnvelope(col.track, p.fx or f.i, p.i, false)
+        if env then ctx.env_jump = { env = env, name = f.name .. ' / ' .. p.name }; model.invalidate() end
+        vim.msg = (had and 'envelope ' or 'automation: ') .. f.name .. ' / ' .. p.name .. (had and ' - shown in the tracker' or ' - its column in the tracker')
+      end
     end
   end,
   -- ad — удалить автоматизацию параметра; ai — automation item по item под курсором трекера
