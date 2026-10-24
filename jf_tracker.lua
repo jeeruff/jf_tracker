@@ -1748,7 +1748,7 @@ ctx = {
     local _, tn, fxn, pn = reaper.GetLastTouchedFX()
     dsp_learn = { k = dsp_sel.fx, name = short, fx = f.i, track = t.track, last = ('%s|%s|%s'):format(tn, fxn, pn) }
     model.invalidate()
-    vim.msg = 'module learn: turn knobs in the plugin window - they join this block; x remove, J K move, < > columns, X / Y - XY pad axes, R reset, E / Esc done'
+    vim.msg = 'module learn: turn knobs in the plugin window - they join this block; x remove, J K move, < > columns, X / Y - XY pad axes, R reset, K / Esc done'
   end,
   -- ключи правки модуля в learn: x J K < > R; true — съедено
   dsp_learn_key = function(ch)
@@ -7706,7 +7706,7 @@ ctx = {
           end
           model.invalidate()
         end
-        if pi then dsp_sel.param = pi else vim.msg = 'harpoon: the parameter is not shown in the module - open the plugin window (o)'; DK.pslider = nil end
+        if pi then dsp_sel.param = pi else vim.msg = 'harpoon: the parameter is not shown in the module - open the plugin window (e)'; DK.pslider = nil end
         if state.panes_ui and L and L.pn then ctx.pane_focus('dsp') else state.dsp = true end
         ctx.set_focus('dsp')
       else
@@ -17271,7 +17271,7 @@ function ctx.context_items(hover)
           ctx.dsp_pack(pk[1], pk[#pk]); DK.clear_pick()
         else ctx.dsp_pack(hover.dsp.fx, hover.dsp.fx) end
       end, 'p')
-      add('Open FX window (o)', function() edit.fx_show(col.track, f.i) end, 'O')
+      add('Edit: the FX window (e)', function() edit.fx_show(col.track, f.i) end, 'E')
       add('Remove FX', function() edit.fx_remove(col.track, f.i) end)
       add('Add FX … (fzf)', function() ctx.fx_picker() end)
       add('Empty container after it (cn)', function() ctx.dsp_container_new(hover.dsp.fx) end)
@@ -21563,7 +21563,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'open the fx window (o)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (zv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
@@ -26686,7 +26686,7 @@ local function frame()
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
-        if ch == 'E' and not DK.pending then ctx.dsp_learn_toggle(); return end
+        if ch == 'K' and not DK.pending then ctx.dsp_learn_toggle(); return end   -- 24 окт: K — knobs learn (было E; e — окно)
         if dsp_learn and not DK.pending then
           if c == 27 then ctx.dsp_learn_toggle(); return end
           if ctx.dsp_learn_key(ch) then return end

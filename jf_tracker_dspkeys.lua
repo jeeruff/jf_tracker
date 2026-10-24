@@ -213,7 +213,7 @@ function DK.key(c, sel, n, np, mods)
     DK.pads = true; ctx.msg('pads: h l j k move, x cut, yy yp p, M mute, S solo, Enter listen, r router, Esc back')   -- 19 окт
   elseif c == 13 then ctx.dsp_enter(sel.fx, sel.param)
   elseif ch == 'b' then ctx.dsp_bypass(sel.fx)
-  elseif ch == 'o' then ctx.dsp_show(sel.fx)
+  elseif ch == 'e' then ctx.dsp_show(sel.fx)   -- 24 окт: e — editor (окно плагина, как в Cubase; было o)
   elseif ch == 'x' or c == 8 or c == 6579564 then ctx.dsp_delete(sel.fx, sel.fx)
   elseif ch == 'p' then ctx.dsp_paste(sel.fx, true)
   elseif ch == 'P' then ctx.dsp_paste(sel.fx, false)

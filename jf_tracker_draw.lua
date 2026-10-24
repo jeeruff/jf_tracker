@@ -5371,7 +5371,7 @@ function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
   local kb = ms('O') + 2 * L.pad
   local full = w - 2 * L.pad - 5 * kb - 12 >= L.cw * 8
   local bs = { { 'x', 'kdel' }, { 'B', 'kbypass' } }
-  if full then bs[3], bs[4], bs[5] = { '∆', 'kdelta' }, { 'O', 'kopen' }, { '+', 'klastp' } end
+  if full then bs[3], bs[4], bs[5] = { '∆', 'kdelta' }, { 'e', 'kopen' }, { '+', 'klastp' } end
   local dl = full and info.fx_delta and info.fx_delta(kid)
   local x = cx + w - 1
   for _, b in ipairs(bs) do
@@ -9185,7 +9185,7 @@ function D.frame(L, snap, rows, state, info)
       local kb = ms('O') + 2 * L.pad
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
       -- 11 окт: + — меню последнего тронутого параметра этого эффекта (как кнопка Param в REAPER)
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { '∆', 'delta', bx + bw - 3 * kb - 7 }, { 'O', 'open', bx + bw - 4 * kb - 8 },
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { 'B', 'bypass', bx + bw - 2 * kb - 4 }, { '∆', 'delta', bx + bw - 3 * kb - 7 }, { 'e', 'open', bx + bw - 4 * kb - 8 },
                     { '+', 'lastp', bx + bw - 5 * kb - 11 } }
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 5 * kb - 12
