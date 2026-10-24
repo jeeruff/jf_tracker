@@ -250,7 +250,7 @@ KH.PAGES = {
     { k = 'BS Ins', d = 'delete / insert time in region (Shift: all tracks; option BS mode: pattern - as Renoise, a clip up to the pattern end keeps its length / track - the whole track up to =LIB), in INSERT too: BS on the note field deletes the row, everything below moves up (Del - only the event); no Insert key (Mac) - :instime N, :deltime N' },
     { k = 'Enter on fx field', m = 'command or parameter (fzf)', d = 'Enter on a command field (a selection too) - fzf: on top the parameter selected in DSP, the one touched last in REAPER and the recent ones of the track, then the note commands (0S start offset ...), then every parameter of the track (● - its envelope shown); a command - its values, a parameter - its envelope column next to the track, the cursor (and the selection) on it' },
     { k = 'fx field', d = 'two halves, as in Renoise (l / h step between them): the left one is the code - one letter is 0x (D = 0D, U = 0U), S_ and Z_ are prefixes (SI, ZT), 0D works too; then the right one - two hex digits write it. On the value half alone the digits keep the code there (or the dim one running from above: 08 under 0D10 = 0D08). h j k l start no code, so they still move; Enter - the list of codes' },
-    { k = 'Opt+Tab Opt+S-Tab', d = 'focus the next / previous pane (in the tree order)' },
+    { k = 'Opt+Tab Opt+S-Tab', d = 'the next / previous tab of the pane in focus (round); a pane with one tab - the next / previous pane (in the tree order)' },
     { k = 'Cmd-Enter', d = 'focus the instruments (lib)' },
     { k = ':cc', t = {}, d = 'CC lane: ReaControlMIDI on the cursor track (its window opens the first time - set the CC numbers there), pick its parameter - the envelope becomes a column: hex per row, curves, automation items' },
     { k = 'S-Esc', t = {}, d = 'remove the REAPER time selection (any module)' },
@@ -358,7 +358,7 @@ KH.PAGES = {
     { k = 'loop zone', t = {}, d = 'the bar ruler on the left of the slots: double-click - loop this slot (on the section strip - the whole section), drag up / down - several, Cmd+click - pick slots (the loop jumps from one to the next, seamless), Shift+click - extend; the time selection / loop shows as a [ there' },
     { k = 'Cmd+wheel', t = {}, d = 'zoom: slots taller / shorter - the rows of the pattern inside (as in the tracker; option zoom with: split - Option + wheel)' },   -- 18 окт: зум вспыхивает здесь
     { k = 'wheel', t = {}, d = 'mouse over the matrix, no focus needed: wheel - slots, horizontal wheel / Shift - tracks; zoom as in the tracker (option zoom with: cmd - Cmd + multiscroll both ways; split - Cmd horizontal, Option vertical, as in REAPER); scroll bars right and bottom' },
-    { k = 'Esc Opt+Tab', m = 'back / next pane', d = 'back to the tracker / next pane' },
+    { k = 'Esc Opt+Tab', m = 'back / next tab', d = 'back to the tracker / next tab (one tab - next pane)' },
   } },
   reform = { title = 'reform - reshape the selected notes and automation live (gr in VISUAL; idea: Reform for Renoise, aqu.surf/reform)', e = {
     { k = 'j k', d = 'row: scale, curve, shift, redistribute, anchor (notes / selection), values on, value from / to, value curve, value mode (remap / even)' },
@@ -515,12 +515,12 @@ KH.PAGES = {
     { k = 'Shift+1..0', d = 'set bookmark 1..10 to this folder', t = { '!', '@', '#', '$', '%', '^', '&', '*', '(', ')' } },
     { k = 'H L', d = 'folder history back / forward (< > buttons)' },
     { k = ':mkdir', t = {}, d = 'new folder here (:mkdir name)' },
-    { k = 'Esc Opt+Tab', d = 'clear filter / next pane' },
+    { k = 'Esc Opt+Tab', d = 'clear filter / next tab' },
   } },
   notes = { title = 'notes (left of DSP)', e = {
     { k = 'type', d = 'write; Enter new line, BS Del erase, arrows Home End move' },
     { k = 'project context', d = 'buttons: project notes / notes of the item under the cursor (track with SWS)' },
-    { k = 'Esc Opt+Tab', d = 'leave (saved) / next pane; also saved a second after typing' },
+    { k = 'Esc Opt+Tab', d = 'leave (saved) / next tab; also saved a second after typing' },
   } },
   fxb = { title = 'fx list (left of DSP)', e = {
     { k = 'a A n', d = 'add the effect: a - to the cursor track (= Enter), A - to the selected tracks (Shift - the selected), n - on a new track' },
@@ -534,7 +534,7 @@ KH.PAGES = {
     { k = 'dblclick', d = 'add fx' },
     { k = 'drag', d = 'onto the DSP panel: insert at the amber line' },
     { k = 'BS', d = 'erase search' },
-    { k = 'Esc Opt+Tab', d = 'clear search / next pane' },
+    { k = 'Esc Opt+Tab', d = 'clear search / next tab' },
   } },
   dsp = { title = 'DSP (track fx)', e = {
     { k = 'N h l  N j k  N Enter', m = 'numbers on a param', d = 'on a parameter (slider): 20 h / l - step x20, 23 j / k - 23 params down / up, 23 Enter - set it to 23 in its units (Hz, dB, %), 023 Enter - 0.23; Esc - cancel the number. The same on the rows of reform / humanizer / bouncer (a number + Enter sets the row, Enter alone - keep / apply / bounce)' },

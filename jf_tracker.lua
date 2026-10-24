@@ -14674,7 +14674,7 @@ ctx = {
       { '> < N>', 'loop: item to region end / region to item end / period N rows' },
       { 'Opt 1..0 `', 'instrument / whole sample (` in INSERT - note-off)' }, { '[ ] ( )', 'octave / instrument' },
       { '/ n N *', 'search' }, { ':', 'command (Tab completes)' }, { '\\', 'hydra of actions' },
-      { 'F Space Enter', 'follow / play / edit cursor' }, { 'Tab', 'next track' }, { 'Opt+Tab', 'next pane' }, { 'o', 'reveal in REAPER' },
+      { 'F Space Enter', 'follow / play / edit cursor' }, { 'Tab', 'next track' }, { 'Opt+Tab', 'next tab here' }, { 'o', 'reveal in REAPER' },
       { 'BS Ins', 'delete / insert time (Shift: all)' }, { 'F1', 'help' },
     }
     local items = {}
@@ -26400,8 +26400,25 @@ local function frame()
       -- вкладку — щелчком, F2-F6 или Ctrl+W + буква
       vim.msg = 'Ctrl+Tab: off - Tab (next tab), gt, F4 or Ctrl+W + panel letter'
     elseif m.alt then
-      ctx.toggle_focus(back and -1 or 1)
-      vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
+      -- 24 окт: Opt+Tab / Opt+Shift+Tab — вкладки стека панели в фокусе по кругу; одна вкладка — следующая панель (как было)
+      local PNs, cur = draw.panes, ctx.pane_cur()
+      local st = state.panes_ui and state.panes and PNs.stack_of(state.panes, cur)
+      local nx
+      if st and #st > 1 then
+        local id = cur
+        for _ = 1, #st do
+          id = PNs.cycle(state.panes, id, back and -1 or 1)
+          local pp = id and PNs.BY[id]
+          if pp and (pp.avail ~= 'dev' or state.dev) then nx = id; break end
+        end
+      end
+      if nx and nx ~= cur then
+        ctx.pane_focus(nx)
+        vim.msg = 'tab: ' .. (PNs.BY[nx].label or nx) .. '  (Opt+Tab / Opt+Shift+Tab - the tabs here; a pane with one tab - the next pane)'
+      else
+        ctx.toggle_focus(back and -1 or 1)
+        vim.msg = 'focus: ' .. ((draw.panes.BY and draw.panes.BY[state.focus] or {}).label or state.focus):upper()
+      end
     elseif state.focus == 'tracker' and vim.cur.sub == 'wave' then vim.wave_step(back and -1 or 1)   -- 16 окт: в колонке волны — к удару (stretch-маркер / начало ноты)
     elseif state.focus == 'tracker' then ctx.col_step(back and -1 or 1)   -- 9 окт: Tab / Shift+Tab — соседний трек (как Renoise); клипы — zs / кнопка clips
     elseif state.focus == 'top' and state.toptab == 'sample' and SL.active then SL.trans_step(back and -1 or 1); vim.msg = SL.msg   -- 15 окт: к транзиенту
