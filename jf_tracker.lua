@@ -20604,7 +20604,7 @@ local function frame()
     step_labels = ctx.step_labels,
     smart_ok = reaper.file_exists(ctx.smart_input_path),
     dsptrack = state.dsptrack, presets = ctx.presets,
-    eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim,
+    eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim, hints = state.hints,   -- 24 окт: описания (гнездо пустого контейнера) — только с хинтами
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
     clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, mono_on = ctx.mono_on, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,

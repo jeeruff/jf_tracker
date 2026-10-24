@@ -9823,7 +9823,9 @@ function D.frame(L, snap, rows, state, info)
             set(lit and U.CYAN or U.tint(U.CYAN, 0.5))
             for dx = 0, ew - 1, 6 do gfx.rect(ex + dx, ey, math.min(3, ew - dx), 1, 1); gfx.rect(ex + dx, ey + eh - 1, math.min(3, ew - dx), 1, 1) end
             for dy = 0, eh - 1, 6 do gfx.rect(ex, ey + dy, 1, math.min(3, eh - dy), 1); gfx.rect(ex + ew - 1, ey + dy, 1, math.min(3, eh - dy), 1) end
-            local lines = { { 'empty container', U.TEXT }, { 'drop an fx here', U.GREY }, { 'or a container', U.GREY }, { '[] a container inside', U.DIM }, { 'af add fx', U.DIM } }
+            -- 24 окт: описание — только с хинтами; так — одна строка
+            local lines = info.hints and { { 'empty container', U.TEXT }, { 'drop an fx here', U.GREY }, { 'or a container', U.GREY }, { '[] a container inside', U.DIM }, { 'af add fx', U.DIM } }
+              or { { 'drop fx here', U.GREY } }
             local ty0 = ey + math.max(2, math.floor((eh - #lines * L.rh) / 2))
             for li, ln in ipairs(lines) do
               local yy = ty0 + (li - 1) * L.rh
