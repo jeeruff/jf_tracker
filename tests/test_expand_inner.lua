@@ -56,7 +56,7 @@ local wrapc = { name = 'C', container = true, params = { { name = 'M cut', macro
   kids = { { name = 'Serum', parallel = 0, entry = syn }, { name = 'Verb', parallel = 1, entry = pfx('Verb', 3) } } }
 local vw = M.expand_inner(nil, { wrapc })
 ok(names2(vw) == 'C |1Serum =1Verb', 'wrap: a big synth - the kids follow as modules: ' .. names2(vw))
-ok(wrapc.wrap and #wrapc.params == 2 and wrapc.xy, 'wrap: the container keeps only its macros, XY on two')
+ok(wrapc.wrap and #wrapc.params == 2 and wrapc.nmacro == 2 and wrapc.params[1].mfader, 'wrap: the container keeps only its macros - the macro / xy tabs')
 local packc = { name = 'P', container = true, params = { { name = 'a' } }, kids = { { name = 'D', entry = pfx('D', 3) }, { name = 'E', entry = pfx('E', 4) }, { name = 'F', entry = pfx('F', 2) } } }
 ok(names2(M.expand_inner(nil, { packc })) == 'P' and not packc.wrap, 'pack: three small effects stay one block')
 local nest = { name = 'N', container = true, params = {}, kids = { { name = 'In', entry = { name = 'In', container = true, params = {}, kids = { { name = 'Deep', entry = pfx('Deep', 40) } } } } } }

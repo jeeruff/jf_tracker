@@ -1703,7 +1703,9 @@ local function wrap_kids(tr, e, view, depth)
   e.params = macros
   if e.xy_own == nil then e.xy_own = { e.xy or false, e.xy_x, e.xy_y } end
   e.xy, e.xy_x, e.xy_y = nil, nil, nil
-  if #macros >= 2 then e.xy, e.xy_x, e.xy_y = true, 1, 2 end   -- XY на макросах 1 и 2
+  -- 24 окт: отделы вертикально, как у модуля с макросами: вкладки macro N / xy (XY на M1 / M2), справа — цепи
+  for _, p in ipairs(macros) do p.mfader = true end
+  e.nmacro = #macros > 0 and #macros or nil
   for ki, kd in ipairs(e.kids or {}) do
     local en = kd.entry
     if en and (en.name or ''):find('jf_tracker_macro', 1, true) then en = nil end   -- 24 окт: ручки макросов — в шапке контейнера
@@ -1747,6 +1749,8 @@ function M.expand_inner(tr, out)
       elseif e.wrap then   -- вид pack / list: вернуть полный список параметров
         e.wrap = nil; e.params = e.params_all or e.params
         if e.xy_own then e.xy, e.xy_x, e.xy_y = e.xy_own[1] or nil, e.xy_own[2], e.xy_own[3] end
+        for _, p in ipairs(e.params) do if p.macro then p.mfader = nil end end   -- 24 окт: в пачке — обычные параметры
+        e.nmacro = nil
       end
     end
     if e.kit and e.kids then pad_inner(tr, e, view) end

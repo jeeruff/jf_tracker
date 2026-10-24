@@ -24055,7 +24055,10 @@ local function frame()
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
       elseif hover.dspbtn.what == 'xyfold' then   -- 24 окт: вкладка xy — XY-пэд на макросах 1 и 2
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
-        state.dsp_xyopen = state.dsp_xyopen or {}; state.dsp_xyopen[nm] = (not state.dsp_xyopen[nm]) or nil
+        state.dsp_xyopen = state.dsp_xyopen or {}
+        local cur = state.dsp_xyopen[nm]
+        if cur == nil then cur = hover.dspbtn.f.wrap and true or false end   -- 24 окт: у контейнера XY раскрыт сразу
+        state.dsp_xyopen[nm] = not cur
       elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx   -- 22 окт: сложенный модуль — развернуть
         -- 24 окт: внутри рэка — как аккордеон: этот развернуть, соседей сложить (Shift — только развернуть)
         if hover.dspbtn.f.inner and hover.dspbtn.f.inner.wrap and gfx.mouse_cap & 8 == 0 then ctx.dsp_accordion(hover.dspbtn.fx)
