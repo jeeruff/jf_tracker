@@ -4054,6 +4054,7 @@ ctx = {
       if state.focus ~= 'fxb' then state.fxb_back = state.focus end
       FB.query, FB.cur, FB.scroll = '', 1, 0
       ctx.pane_cmd('fxb show')
+      FB.typing, FB.col = true, 2   -- 24 окт: сразу в поиск (как /), список справа
       vim.msg = ('fx: type to search, arrows / Ctrl+J K choose, Enter adds to %s, Esc back'):format(col.take and ('take fx of ' .. col.name) or col.name)
       return
     end
