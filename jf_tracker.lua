@@ -115,6 +115,7 @@ model.dspmods = dofile(DIR .. '/jf_tracker_dspmods.lua')
 model.DR = dofile(DIR .. '/jf_tracker_drumrack.lua')
 model.dsp_fold = reaper.GetExtState('jf_tracker', 'dspfold') == '1'   -- 16 окт: zf — страницы модулей свёрнуты
 draw.DR = model.DR
+draw.SX = dofile(DIR .. '/jf_tracker_slxpanel.lua')   -- 25 окт: пульт slixer в DSP, 1 в 1 с окном
 model.drum_favs = {}
 for _, cat in ipairs(model.DR.CATS) do model.drum_favs[cat] = model.DR.parse_fav(reaper.GetExtState('jf_tracker', 'drumfav_' .. cat), cat) end
 model.fxclass = dofile(DIR .. '/jf_tracker_fxclass.lua')   -- классификатор параметров, автомодуль (3 окт)
@@ -17013,6 +17014,7 @@ local function hint_go(t)
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
     -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
+  elseif t.kind == 'slx' then ctx.set_focus('dsp'); ctx.slx_do(d)   -- 25 окт: f на кнопке пульта slixer
   elseif t.kind == 'mmono' then reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
   elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
@@ -18172,6 +18174,78 @@ function ctx.slx_pending_tick()
     vim.msg = ('slixer: %d slice(s) from the tracker slicer'):format(n)
   end
 end
+-- 25 окт: команда экземпляру, показанному в DSP (владелец вида): см. jf_slixer.jsfx TRKV+6100
+function ctx.slx_cmd(code, arg)
+  with_ns('jf_slixer', function()
+    local B = 200000
+    reaper.gmem_write(B + 6101, code); reaper.gmem_write(B + 6102, arg or 0)
+    reaper.gmem_write(B + 6100, (math.floor(reaper.gmem_read(B + 6100)) % 16000000) + 1)
+  end)
+end
+-- 25 окт: параметр slixer по имени (номера сдвигаются от версии к версии): значение (как в слайдере) и индекс
+ctx.slx_pi = {}
+function ctx.slx_param(fxi, name)
+  local t = dsp_target()
+  local tr = t and not t.take and t.col and t.col.track
+  if not (tr and fxi) then return nil end
+  local g = reaper.TrackFX_GetFXGUID(tr, fxi) or ''
+  local c = ctx.slx_pi[g]
+  if not c then
+    c = {}
+    for p = 0, reaper.TrackFX_GetNumParams(tr, fxi) - 1 do local _, pn = reaper.TrackFX_GetParamName(tr, fxi, p, ''); c[pn] = p end
+    ctx.slx_pi[g] = c
+  end
+  local pi = c[name]
+  if not pi then return nil end
+  local v, lo, hi = reaper.TrackFX_GetParam(tr, fxi, pi)
+  return v, pi, lo, hi, tr
+end
+-- 25 окт: кнопка пульта slixer (jf_tracker_slxpanel.lua): параметр, команда экземпляру, клавиша окна, трекер
+function ctx.slx_do(h)
+  local it, f = h and h.it, h and h.f
+  if not (it and f) then return end
+  local fi = f.fx or f.i
+  local t = dsp_target(); local tr = t and t.col and t.col.track
+  if not tr then return end
+  local function setp(name, val) local _, pi = ctx.slx_param(fi, name); if pi then reaper.TrackFX_SetParam(tr, fi, pi, val) end end
+  if it.kind == 'menu' then
+    local items = {}
+    for k2, lab in ipairs(it.items) do
+      items[#items + 1] = { key = tostring(k2), label = lab, fn = function()
+        if it.src == 'p' then setp(it.name, k2 - 1) else ctx.slx_cmd(it.code, k2 - 1) end
+      end }
+    end
+    vim.open_hydra({ title = 'slixer: ' .. (it.name or it.lab), items = items })
+    state.popup_at = { kind = 'xy', x = h.x or gfx.mouse_x, y = (h.y or gfx.mouse_y) + (h.h or 12) + 1 }
+    return
+  end
+  if it.what == 'detect' then
+    local item = ctx.slx_item_of(reaper.TrackFX_GetFXGUID(tr, fi))
+    if not item then vim.msg = 'slixer detect: no sample from the tracker yet (x in the lib / browser menu)'; return end
+    ctx.slx_open_slicer(f)
+    if SL.active and SL.entry and SL.entry.item == item then SL.use_transients(); vim.msg = 'slixer: ' .. (SL.mode or 'transients') .. ' - sent to slixer (t / - + in the slicer to refine)' end
+    return
+  end
+  if it.src == 'p' then
+    local v = ctx.slx_param(fi, it.name)
+    if it.kind == 'tog' then setp(it.name, (v or 0) > 0.5 and 0 or 1) end
+  elseif it.src == 'op' then
+    if it.code == 7 then ctx.slx_cmd(7, it.arg)
+    elseif it.kind == 'tog' then ctx.slx_cmd(it.code, it.on and 0 or 1)
+    else ctx.slx_cmd(it.code, it.arg or 0) end
+  elseif it.src == 'press' then
+    reaper.TrackFX_Show(tr, fi, 3)   -- действие живёт в окне плагина: открыть и нажать там клавишу
+    ctx.slx_cmd(8, it.key and it.key:byte() or 0)
+    vim.msg = 'slixer: ' .. it.lab .. ' runs in the plugin window (opened)'
+  end
+end
+function ctx.slx_wheel(h, d)   -- колесо: число на кнопке val — шаг; над волной — зум к мыши
+  if h.it and h.it.kind == 'val' then
+    local f = h.f; local fi = f.fx or f.i
+    local v, pi, lo, hi, tr = ctx.slx_param(fi, h.it.name)
+    if pi then reaper.TrackFX_SetParam(tr, fi, pi, math.max(h.it.lo or lo, math.min(h.it.hi or hi, (v or 0) + d * (h.it.step or 1)))) end
+  end
+end
 function ctx.slixer_view(track, fxi)
   local S = ctx.slx
   if not (track and fxi and reaper.ValidatePtr(track, 'MediaTrack*')) then return nil end
@@ -18213,6 +18287,13 @@ function ctx.slixer_view(track, fxi)
       S.peaks = { n = n, max = mx, min = mn }
     end
     v.peaks = S.peaks
+    -- 25 окт: состояния пульта (окно 1 в 1): auto, keys, sync, артикулятор, занятые слоты, ноты и классы срезов
+    v.auto, v.keys = reaper.gmem_read(B + 60) > 0.5, reaper.gmem_read(B + 61) > 0.5
+    v.sync, v.art = math.floor(reaper.gmem_read(B + 62) + 0.5), math.floor(reaper.gmem_read(B + 63) + 0.5)
+    v.kmode = math.floor(reaper.gmem_read(B + 72) + 0.5)
+    v.artused, v.notes, v.classes = {}, {}, {}
+    for i = 0, 7 do v.artused[i + 1] = reaper.gmem_read(B + 64 + i) > 0.5 end
+    for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5) end
     local tick = reaper.gmem_read(B + 7)
     if tick ~= S.tick then S.tick, S.tick_t = tick, now end
     v.alive = now - S.tick_t < 1.5
@@ -21156,6 +21237,7 @@ local function frame()
     layer_src = function(g) return model.layer_src and model.layer_src[g] end,   -- 19 окт: слой ¥ по GUID
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
+    slx_param = function(fxi, name) return ctx.slx_param(fxi, name) end,   -- 25 окт: пульт slixer — параметр по имени
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
       -- данные (иначе две ширины слоя пиков спорят в gmem)
@@ -22619,6 +22701,9 @@ local function frame()
   elseif hover.btn and hover.btn.what == 'route' and hover.btn.send then   -- 16 окт: маршрут на микшере
     local e = hover.btn.send
     state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
+  elseif hover.slx then local it = hover.slx.it; state.status = 'slixer: ' .. (it.name or it.lab) .. (it.key and ('  (' .. it.key .. ' in the plugin window)') or '') .. (it.kind == 'menu' and ' - click: list' or it.kind == 'val' and ' - wheel: change' or it.src == 'press' and ' - opens the plugin window' or '')
+  elseif hover.slxpad then state.status = ('slixer slice %d - click: select and hear'):format(hover.slxpad.pad + 1)
+  elseif hover.slxwave then state.status = 'slixer wave - click: select the slice, wheel: zoom (Shift - scroll), dblclick: cut it in the tracker slicer, drop a file: new sample'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
@@ -24829,9 +24914,23 @@ local function frame()
         ctx.adsr_d = d
       end
       click = { t = now2, zone = 'dspadsr' }
-    elseif hover.slxwave and not B.drag then   -- 25 окт: волна slixer — его нарезка в слайсере трекера (зум, транзиенты, ровно)
+    elseif hover.slx and not B.drag then   -- 25 окт: кнопка пульта slixer
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.slx.fx
+      ctx.slx_do(hover.slx)
+      click = { t = now2, zone = 'slx' }
+    elseif hover.slxpad and not B.drag then   -- пэд: выбрать и послушать срез
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.slxpad.fx
+      ctx.slx_cmd(2, hover.slxpad.pad)
+      click = { t = now2, zone = 'slxpad' }
+    elseif hover.slxwave and not B.drag then   -- 25 окт: волна — выбрать срез; обзор — окно зума туда; двойной — слайсер трекера
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slxwave.fx
-      ctx.slx_open_slicer(hover.slxwave.f)
+      local w = hover.slxwave.w
+      if w and w.over == 'overview' and w.fn < w.fr then
+        draw.slx_zoom = draw.slx_zoom or {}
+        local fi = hover.slxwave.f.i
+        draw.slx_zoom[fi] = { fn = w.fn, f0 = math.max(0, math.min(w.fr - w.fn, (gfx.mouse_x - w.x) / w.w * w.fr - w.fn / 2)) }
+      elseif dbl and click.zone == 'slxwave' then ctx.slx_open_slicer(hover.slxwave.f)
+      elseif w and w.slice and w.slice >= 0 then ctx.slx_cmd(1, w.slice) end
       click = { t = now2, zone = 'slxwave' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
@@ -25891,6 +25990,22 @@ local function frame()
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.tmpl then   -- 11 окт: колесо над < шаблон > — листать
     ctx.tmpl_do(gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
+  end
+  if gfx.mouse_wheel ~= 0 and hover and hover.slx then ctx.slx_wheel(hover.slx, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0 end   -- 25 окт
+  if gfx.mouse_wheel ~= 0 and hover and hover.slxwave and hover.slxwave.w and hover.slxwave.w.over == 'wave' then   -- 25 окт: зум волны slixer к мыши
+    local w = hover.slxwave.w
+    draw.slx_zoom = draw.slx_zoom or {}
+    local fi = hover.slxwave.f.i
+    local fn, f0 = w.fn, w.f0
+    if gfx.mouse_cap & 8 == 8 then f0 = f0 + (gfx.mouse_wheel > 0 and -1 or 1) * fn * 0.15
+    else
+      local fa = f0 + (gfx.mouse_x - w.x) / w.w * fn
+      fn = math.max(w.w * 8, math.min(w.fr, fn * (gfx.mouse_wheel > 0 and 0.8 or 1.25)))
+      f0 = fa - (gfx.mouse_x - w.x) / w.w * fn
+    end
+    f0 = math.max(0, math.min(w.fr - fn, f0))
+    draw.slx_zoom[fi] = fn < w.fr and { f0 = f0, fn = fn } or nil
+    gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.dsphsb then
     draw.dsp_px_t = (draw.dsp_px_t or draw.dsp_px or 0) + (gfx.mouse_wheel > 0 and -1 or 1) * (draw.dsp_view or 400) / 5; gfx.mouse_wheel = 0

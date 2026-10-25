@@ -9767,7 +9767,24 @@ function D.frame(L, snap, rows, state, info)
       -- строк + строка статуса у slixer), параметры под ней во всех колонках;
       -- не влезает по высоте — прежняя колонка слева
       local wtop, wtop_wh = 0, 0
-      if (f.view == 'slixer' or f.view == 'grain' or f.rs5k) and not f.container then   -- 10 окт: RS5K — тоже полосой сверху
+      f.slx_geo = nil
+      if f.view == 'slixer' and D.SX and not f.container then
+        -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна, пэды; параметры — под ними
+        local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
+        local P = function(name) return info.slx_param and info.slx_param(f.i, name) end
+        local rows = D.SX.items(v0, P)
+        local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad, L.rh, ms, L.pad)
+        local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
+        local wr = math.min(10, nfit - need - nbr - 1 - 2 - 1)
+        if wr < 3 then need = 0; wr = math.min(10, nfit - nbr - 1 - 2 - 1) end
+        if wr >= 2 then
+          f.slx_geo = { lay = lay, nbr = nbr, wr = wr, v = v0, noparams = need == 0 }
+          wtop_wh = wr * L.rh
+          wtop = (nbr + 1 + wr + 2 + 1) * L.rh + 3
+          nfit = nfit - (nbr + 1 + wr + 2 + 1)
+          aw_off = wtop
+        end
+      elseif (f.view == 'slixer' or f.view == 'grain' or f.rs5k) and not f.container then   -- 10 окт: RS5K — тоже полосой сверху
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or math.ceil(#f.params / math.max(1, ncol))
         local srow = (f.view == 'slixer' or f.rs5k) and 1 or 0         -- RS5K: строка кнопок над волной
         local wrows = math.min(f.rs5k and 6 or 5, nfit - need - srow)
@@ -10770,7 +10787,33 @@ function D.frame(L, snap, rows, state, info)
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
       end
-      if f.view == 'slixer' then
+      if f.view == 'slixer' and f.slx_geo then
+        -- 25 окт: пульт 1 в 1 с окном плагина (jf_tracker_slxpanel.lua)
+        local G = f.slx_geo
+        local v = G.v
+        local x0, y0, w0 = bx + L.pad, by + L.rh + 1, bw - 2 * L.pad
+        local hb = D.SX.draw_buttons(U, L, G.lay, text, ms, set, mx, my, drag)
+        if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h } end
+        local wy = y0 + G.nbr * L.rh
+        D.slx_zoom = D.slx_zoom or {}
+        local zst = D.slx_zoom[f.i]
+        local ovh = L.rh - 3
+        local wh = G.wr * L.rh
+        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag)
+        if hw then hover.slxwave = { fx = k, f = f, w = hw } end
+        local py = wy + ovh + 1 + wh + 2
+        local hp = D.SX.draw_pads(U, L, v, x0, py, w0, 2 * L.rh - 2, text, ms, set, mx, my, zst, drag)
+        if hp then hover.slxpad = { fx = k, f = f, pad = hp.pad } end
+        local st
+        if v and v.frames and v.frames > 0 then
+          st = ('%d Hz  %.2fs  %d slices%s'):format(math.floor(v.sr or 0), v.frames / math.max(1, v.sr or 48000), v.nsl, v.sel >= 0 and ('  sel %d'):format(v.sel + 1) or '')
+        elseif v and v.other then st = 'shown on the first slixer of the chain'
+        elseif v and v.old then st = 'update jf_slixer (no tracker view)'
+        elseif v and v.wait then st = 'waiting for slixer...'
+        else st = 'empty - x in the lib / browser menu, or drop a file on the wave' end
+        text(x0, py + 2 * L.rh - 1, fit(st, w0), U.GREY)
+        for _, b in ipairs(G.lay) do if b.it.kind ~= 'zone' then hint('slx', b.x, b.y, b.w, L.rh - 1, { fx = k, f = f, it = b.it, x = b.x, y = b.y, w = b.w, h = L.rh - 1 }) end end
+      elseif f.view == 'slixer' then
         -- slixer (9 окт): волна деки во всю первую колонку; срезы — чередующейся
         -- подложкой и линией начала, выбранный — янтарём, играющие голоса —
         -- зелёными головками; внизу — число срезов и длина
