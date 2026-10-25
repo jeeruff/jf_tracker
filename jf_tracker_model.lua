@@ -1708,14 +1708,12 @@ end
 local function wrap_kids(tr, e, view, depth)
   e.wrap = true
   e.params_all = e.params_all or e.params    -- запись из кеша: полный список — на случай вида pack / list
+  -- 25 окт: шапка — ★-параметры (выведенные container_map); снятые ★ — список скрытых в P_EXT трека (REAPER вывод не снимает)
   local macros = {}
-  e.chain_p = nil
-  for _, p in ipairs(e.params_all or {}) do if p.macro then macros[#macros + 1] = p elseif p.chainsel then e.chain_p = p end end
-  -- 24 окт: по номеру ручки (M1 M2 …: порядок вывода в контейнер любой) и сколько видно (+ / − в шапке)
-  local function mnum(p) return tonumber((p.name or ''):match('M(%d+)%s*$')) or 99 end
-  table.sort(macros, function(a, b) return mnum(a) < mnum(b) end)
-  local nvis = tr and e.fguid and R.GetSetMediaTrackInfo_String and tonumber(select(2, R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_macn:' .. e.fguid, '', false)))
-  if nvis then while #macros > nvis do macros[#macros] = nil end end
+  local hid = {}
+  local hs = tr and e.fguid and R.GetSetMediaTrackInfo_String and select(2, R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_pinhide:' .. e.fguid, '', false)) or ''
+  for v in (hs or ''):gmatch('%d+') do hid[tonumber(v)] = true end
+  for _, p in ipairs(e.params_all or {}) do if p.macro and not hid[p.i] then macros[#macros + 1] = p end end
   e.macro_n = #macros
   e.params = macros
   if e.xy_own == nil then e.xy_own = { e.xy or false, e.xy_x, e.xy_y } end
@@ -1822,11 +1820,13 @@ function build_one(tr, fx, out)
       -- дети + их первые параметры (по 4 на ребёнка), 2 колонки
       for pi = 0, np - 1 do
         local _, pn = A.GetParamName(tr, fx, pi, '')
-        if pn and pn ~= '' and pn ~= 'Bypass' and pn ~= 'Wet' and pn ~= 'Delta' then
+        -- 25 окт: выведенные параметры детей (★ в шапке контейнера); ручки старого jf_tracker_macro — не показываем
+        if pn and pn ~= '' and pn ~= 'Bypass' and pn ~= 'Wet' and pn ~= 'Delta' and not pn:find('jf_tracker_macro', 1, true) then
           local e = param_entry(tr, fx, pi)
-          e.name = 'M ' .. (e.name:match(':%s*([^:]+)$') or e.name)   -- 24 окт: «jf_tracker_macro: M1» → «M M1»
+          local fxn, prn = pn:match('^(.-):%s*(.+)$')
+          e.pinfx, e.pinname = fxn, prn or pn
+          e.name = prn or pn
           e.macro = true
-          if pn:find('chain select', 1, true) then e.name, e.macro, e.chainsel = 'chain', nil, true end   -- 25 окт: своя ручка, не макрос
           params[#params + 1] = e
         end
       end

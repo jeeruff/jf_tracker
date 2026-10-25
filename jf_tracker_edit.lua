@@ -3136,8 +3136,6 @@ function E.container_new(track, pos, into)
     local idx = add_fx(track, 'Container', -1000 - addr)
     ok = idx ~= nil and idx >= 0
     if ok then FA(track).Show(track, addr, 2) end
-    -- 24 окт: сразу 4 макроса (ручки в шапке, XY на M1 / M2); вложенный пустой — адрес ребёнка ещё не считается
-    if ok and not into and E.macro_ensure then E.macro_ensure(track, addr, 4, true) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
@@ -3213,6 +3211,118 @@ function E.macro_links(track, c)
         local _, sc = A.GetNamedConfigParm(track, a, P .. 'plink.scale')
         out[r.m] = out[r.m] or {}
         table.insert(out[r.m], { fx = a, p = r.p, name = (nm or ''):gsub('^[^:]*: ', ''), pname = pn or ('p' .. r.p), sc = tonumber(sc) or r.sc })
+      end
+    end
+  end
+  return out
+end
+-- 25 окт: шапка контейнера — ★-параметры детей (нативный container_map, без JSFX) и связи «параметр следует за
+-- параметром» (нативный Link между соседями в контейнере: значение = база + масштаб × ведущий, обрезка 0..1)
+function E.pin_param(track, c, addr, p)
+  local A = FA(track)
+  local idx
+  run('pin a parameter to the container', function()
+    local okg, have = A.GetNamedConfigParm(track, c, ('container_map.get.%d.%d'):format(addr, p))
+    idx = okg and tonumber(have)
+    if not (idx and idx >= 0) then local ok, i = A.GetNamedConfigParm(track, c, ('container_map.add.%d.%d'):format(addr, p)); idx = ok and tonumber(i) end
+    local g = A.GetFXGUID(track, c)
+    if idx and g then E.pin_hide(track, g, idx, false) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return idx
+end
+-- снять ★: REAPER вывод не снимает — прячем (список номеров в P_EXT трека)
+function E.pin_hide(track, cguid, idx, on)
+  local key = 'P_EXT:jf_pinhide:' .. tostring(cguid)
+  local _, v = R.GetSetMediaTrackInfo_String(track, key, '', false)
+  local t, out = {}, {}
+  for n in (v or ''):gmatch('%d+') do t[tonumber(n)] = true end
+  t[idx] = on or nil
+  for n in pairs(t) do out[#out + 1] = tostring(n) end
+  R.GetSetMediaTrackInfo_String(track, key, table.concat(out, ','), true)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
+-- номер ребёнка addr среди детей контейнера c (для plink.effect)
+local function kid_index(track, c, addr)
+  for k = 0, (cont_count(track, c) or 0) - 1 do if child_any(track, c, k) == addr then return k end end
+end
+local LREC = 'P_EXT:jf_links'
+local function lrec_read(track)
+  local _, s = R.GetSetMediaTrackInfo_String(track, LREC, '', false)
+  local t = {}
+  for ln in (s or ''):gmatch('[^\n]+') do
+    local cg, tg, tp, sg, sp, sc = ln:match('^(%S+) (%S+) (%d+) (%S+) (%d+) (%S+)$')
+    if cg then t[#t + 1] = { cg = cg, tg = tg, tp = tonumber(tp), sg = sg, sp = tonumber(sp), sc = tonumber(sc) or 0 } end
+  end
+  return t
+end
+local function lrec_set(track, r)
+  local t = lrec_read(track)
+  for i = #t, 1, -1 do if t[i].tg == r.tg and t[i].tp == r.tp then table.remove(t, i) end end
+  if r.sg then t[#t + 1] = r end
+  local o = {}
+  for _, x in ipairs(t) do o[#o + 1] = ('%s %s %d %s %d %.4f'):format(x.cg, x.tg, x.tp, x.sg, x.sp, x.sc) end
+  R.GetSetMediaTrackInfo_String(track, LREC, table.concat(o, '\n'), true)
+end
+-- tgt.tp следует за src.sp (оба — дети контейнера c): база — где стоит сейчас (ведущий в 0 — ничего не сдвигает)
+-- base — своя база (кроссфейд: 1 и scale −1); → true
+function E.param_link(track, c, tgt, tp, src, sp, scale, base)
+  local A = FA(track)
+  local ok = false
+  run('link a parameter', function()
+    local sk = kid_index(track, c, src)
+    if not sk or tgt == src then return end
+    local P = ('param.%d.'):format(tp)
+    A.SetNamedConfigParm(track, tgt, P .. 'mod.active', '1')
+    A.SetNamedConfigParm(track, tgt, P .. 'mod.baseline', tostring(base or A.GetParamNormalized(track, tgt, tp)))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.effect', tostring(sk))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.param', tostring(sp))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.scale', tostring(scale))
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.offset', '0')
+    A.SetNamedConfigParm(track, tgt, P .. 'plink.active', '1')
+    local cg, tg, sg = A.GetFXGUID(track, c), A.GetFXGUID(track, tgt), A.GetFXGUID(track, src)
+    if cg and tg and sg then lrec_set(track, { cg = cg, tg = tg, tp = tp, sg = sg, sp = sp, sc = scale }) end
+    ok = true
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+  return ok
+end
+function E.param_unlink(track, tgt, tp)
+  local A = FA(track)
+  run('unlink a parameter', function()
+    A.SetNamedConfigParm(track, tgt, ('param.%d.plink.active'):format(tp), '0')
+    A.SetNamedConfigParm(track, tgt, ('param.%d.mod.active'):format(tp), '0')
+    local tg = A.GetFXGUID(track, tgt)
+    if tg then lrec_set(track, { tg = tg, tp = tp }) end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
+-- связи контейнера c (живые: сверка с REAPER) → { { t = addr, tp, tname, tpname, s = addr, sp, sname, spname, sc, base } }
+function E.links_of(track, c)
+  local A = FA(track)
+  local cg = A.GetFXGUID(track, c)
+  local out = {}
+  if not cg then return out end
+  local kids = {}
+  for k = 0, (cont_count(track, c) or 0) - 1 do
+    local a = child_any(track, c, k)
+    local g = a and A.GetFXGUID(track, a)
+    if g then kids[g] = { a = a, k = k } end
+  end
+  local function nm(a) local _, n = A.GetFXName(track, a, ''); return ((n or ''):gsub('^[^:]*: ', '')) end
+  for _, r in ipairs(lrec_read(track)) do
+    local t, sv = kids[r.tg], kids[r.sg]
+    if r.cg == cg and t and sv then
+      local P = ('param.%d.'):format(r.tp)
+      local _, act = A.GetNamedConfigParm(track, t.a, P .. 'plink.active')
+      local _, ef = A.GetNamedConfigParm(track, t.a, P .. 'plink.effect')
+      if act == '1' and tonumber(ef) == sv.k then
+        local _, sc = A.GetNamedConfigParm(track, t.a, P .. 'plink.scale')
+        local _, bs = A.GetNamedConfigParm(track, t.a, P .. 'mod.baseline')
+        local _, tpn = A.GetParamName(track, t.a, r.tp, '')
+        local _, spn = A.GetParamName(track, sv.a, r.sp, '')
+        out[#out + 1] = { t = t.a, tp = r.tp, tname = nm(t.a), tpname = tpn, s = sv.a, sp = r.sp, sname = nm(sv.a), spname = spn,
+                          sc = tonumber(sc) or r.sc, base = tonumber(bs) or 0 }
       end
     end
   end

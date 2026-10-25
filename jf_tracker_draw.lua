@@ -5536,44 +5536,10 @@ function D.knob(cx, cy, r, v, col)
 end
 -- 24 окт: под ручками макросов: [+] [−] сколько; что на каком («M1 Serum cutoff +50»); цепи контейнера — строкой
 -- каждая: ручка громкости (Wet цепи, тянуть вверх / вниз), имя, m (выкл.), s (только она)
-function D.macro_list(L, info, f, by, bh, k, drag, mx, my, hover)
-  local ml = info.macro_links(info.pool_col.track, f)
-  local x, w, y = f._lx, f._lw, f._ybot + 3
-  local ymax = by + bh - 3
-  local function btn(bx0, lbl, what, extra)
-    local w2 = ms(lbl) + 2 * L.pad
-    local hb = not drag and mx >= bx0 and mx < bx0 + w2 and my >= y and my < y + L.rh
-    local on = extra and extra.on
-    set(hb and U.tint(U.AMBER, 0.35) or (on and U.tint(extra.col or U.AMBER, 0.3) or U.BG)); gfx.rect(bx0, y, w2, L.rh - 1, 1)
-    set(hb and U.AMBER or (on and (extra.col or U.AMBER) or U.LINE)); gfx.rect(bx0, y, w2, L.rh - 1, 0)
-    text(bx0 + L.pad, y, lbl, hb and U.AMBER or (on and (extra.col or U.AMBER) or U.GREY))
-    if hb then hover.dspbtn = { fx = k, f = f, what = what, ki = extra and extra.ki } end
-    if D.hint then D.hint('dspbtn', bx0, y, w2, L.rh - 1, { fx = k, what = what }) end
-    return bx0 + w2 + 2
-  end
-  if not f._nomac and y + L.rh <= ymax then
-    local bx1 = btn(x, '+', 'macplus')
-    bx1 = btn(bx1, '-', 'macminus')   -- 24 окт: без «N macros» — число видно по ручкам
-    y = y + L.rh + 2
-  end
-  local rows = {}
-  for m = 1, 8 do for _, l in ipairs(ml[m] or {}) do rows[#rows + 1] = { m = m, l = l } end end
-  if #rows > 0 then set(U.LINE); gfx.rect(x, y - 2, w, 1, 1) end
-  for i, r in ipairs(rows) do
-    if y + 2 * L.rh > ymax and i < #rows then text(x, y, fit('+' .. (#rows - i + 1) .. ' more', w), U.DIM); y = y + L.rh; break end
-    if y + L.rh > ymax then break end
-    local mt = 'M' .. r.m .. ' '
-    if not drag and mx >= x and mx < x + w and my >= y and my < y + L.rh then hover.mlink = { m = r.m, l = r.l } end   -- 24 окт: полное — в статусе
-    text(x, y, mt, U.AMBER)
-    local amt = (' %+d'):format(math.floor(r.l.sc * 100 + 0.5))
-    local aw = ms(amt)
-    text(x + ms(mt), y, fit(r.l.name .. ' ' .. r.l.pname, w - ms(mt) - aw - 2), U.GREY)
-    text(x + w - aw, y, amt, r.l.sc < 0 and U.RED or U.CYAN)
-    y = y + L.rh
-  end
-end
+function D.macro_list() end   -- 25 окт: макросы контейнера убраны (★-параметры и связи — в CHAINS / LINKS)
 -- 24 окт: отдел цепей контейнера: слева вертикальная подпись chains, справа строка на цепь — ручка громкости
 -- (Wet цепи), | / = и имя, m, s
+local function tr0_of(info) return info.pool_col and info.pool_col.track end
 function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local chains = {}
   for ki, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then chains[#chains + 1] = { ki = ki, kd = kd } end end
@@ -5604,31 +5570,6 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local bxs = x + w - 2 * sw - 2
   local vbx = bxs - vbw - 3
   local nw = vbx - x - 3
-  -- 25 окт: chain select — своя ручка 0..127 (не макрос): какие цепи звучат — по их зонам (полоса под каждой)
-  local Z = D.Z
-  local tr0 = info.pool_col and info.pool_col.track
-  local sv
-  if f.chain_p and info.fxp_get then sv = math.floor((info.fxp_get(f.i, f.chain_p.i) or 0) * 127 + 0.5) end
-  if Z and y + L.rh <= ymax then
-    if sv then
-      local lw = ms('chain ') 
-      local sx, sww = x + lw, w - lw - ms(' 127') - L.pad
-      text(x, y, 'chain', U.AMBER)
-      local shot = not drag and mx >= sx - 2 and mx < sx + sww + 2 and my >= y and my < y + L.rh
-      set(U.DIM); gfx.rect(sx, y + math.floor(L.rh / 2) - 1, sww, 2, 1)
-      local kx = sx + math.floor(sv / 127 * (sww - 1) + 0.5)
-      set(shot and U.AMBER or U.TEXT); gfx.rect(kx - 1, y + 2, 3, L.rh - 4, 1)
-      text(sx + sww + L.pad, y, tostring(sv), shot and U.AMBER or U.GREY)
-      if shot then hover.chainknob = { f = f, idx = f.chain_p.i, x = sx, w = sww } end
-      y = y + L.rh
-      local b1 = btn(x, 'spread', 'cspread')
-      text(b1 + L.pad, y, fit('zones evenly, crossfades', x + w - b1 - L.pad), U.DIM)
-      y = y + L.rh + 1
-    else
-      btn(x, '+ chain select', 'cselnew')
-      y = y + L.rh + 1
-    end
-  end
   text(x, y, fit('chain', nw), U.DIM); text(vbx + L.pad, y, 'mix', U.DIM)
   y = y + L.rh
   for _, c in ipairs(chains) do
@@ -5655,40 +5596,42 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     local bx2 = btn(bxs, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
     btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh + 1
-    -- зона цепи (chain select есть): полоса 0..127 — скаты клиньями, полная часть заливкой, бегунок chain; справа текстом
-    if sv and Z and y + L.rh <= ymax then
-      local zz = info.zone_read and info.zone_read(tr0, kd)
-      local z = zz and zz.sel or { lo = 0, hi = 127, flo = 0, fhi = 127 }
-      local tt = Z.text(z)
-      local tw = ms('000..000 full 000..000')
-      local zx, zw = x + L.pad, w - tw - 2 * L.pad
-      if zw < L.cw * 6 then zw = w - 2 * L.pad; tt = nil end
-      local function X(v) return zx + math.floor(v / 128 * zw + 0.5) end
-      local y0, y1 = y + 2, y + L.rh - 2
-      local xl, xfl, xfh, xh = X(z.lo), X(z.flo), X(z.fhi + 1), X(z.hi + 1)
-      local on = Z.gain(sv, z) > 0
-      local colz = kd.enabled and (on and U.GREEN or U.GREY) or U.DIM
-      set(U.tint(colz, 0.55)); gfx.rect(xfl, y0, math.max(1, xfh - xfl), y1 - y0, 1)
-      if xfl > xl then gfx.triangle(xl, y1, xfl, y0, xfl, y1) end
-      if xh > xfh then gfx.triangle(xfh, y0, xh, y1, xfh, y1) end
-      set(colz); gfx.rect(xl, y0 - 1, math.max(1, xh - xl), 1, 1)
-      set(U.AMBER); gfx.rect(X(sv + 0.5), y0 - 1, 1, y1 - y0 + 2, 1)
-      if tt then
-        local thot = not drag and mx >= zx + zw + L.pad and mx < x + w and my >= y and my < y + L.rh
-        text(zx + zw + L.pad, y, fit(tt, tw), thot and U.AMBER or U.GREY)
-        if thot then hover.dspbtn = { fx = k, f = f, what = 'ztext', ki = c.ki, kid = kd, z = z } end
+  end
+  -- 25 окт: две цепи — кроссфейд одной ручкой нативно: mix второй цепи следует за mix первой с −100 % (база 1)
+  if #chains == 2 and y + L.rh <= ymax then
+    local b1 = btn(x, 'x-fade', 'cxfade')
+    text(b1 + L.pad, y, fit('the mix of ' .. (chains[1].kd.name or '1') .. ' crossfades them', x + w - b1 - L.pad), U.DIM)
+    y = y + L.rh + 2
+  end
+  -- связи «параметр следует за параметром» (нативный Link): строка — кто за кем и сила, справа — график зависимости
+  local links = info.links_of and tr0_of(info) and info.links_of(tr0_of(info), f) or {}
+  if #links > 0 and y + 2 * L.rh <= ymax then
+    y = y + 2
+    set(U.LINE); gfx.rect(x, y + L.rh - 2, w, 1, 1)
+    text(x, y, 'LINKS', U.AMBER)
+    y = y + L.rh
+    local gw = 2 * L.rh
+    for _, l in ipairs(links) do
+      if y + L.rh > ymax then break end
+      local hot = not drag and mx >= x and mx < x + w and my >= y and my < y + L.rh
+      local amt = (' %+d%%'):format(math.floor(l.sc * 100 + 0.5))
+      local aw = ms(amt)
+      text(x, y, fit((l.tpname or '?') .. ' <- ' .. (l.spname or '?'), w - gw - aw - 2 * L.pad), hot and U.AMBER or U.TEXT)
+      text(x + w - gw - aw - L.pad, y, amt, l.sc < 0 and U.RED or U.CYAN)
+      -- график: по X — ведущий 0..1, по Y — ведомый (база + сила × ведущий, обрезка 0..1)
+      local gx, gy, gh = x + w - gw, y + 1, L.rh - 3
+      set(U.PANEL); gfx.rect(gx, gy, gw, gh, 1); set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
+      local function Y(v) return gy + gh - 1 - math.floor(math.max(0, math.min(1, v)) * (gh - 1) + 0.5) end
+      set(U.CYAN)
+      local px, py
+      for i = 0, gw - 1 do
+        local xv = i / (gw - 1)
+        local yy = Y(l.base + l.sc * xv)
+        if px then gfx.line(px, py, gx + i, yy) end
+        px, py = gx + i, yy
       end
-      if not drag and my >= y and my < y + L.rh and mx >= zx and mx < zx + zw then
-        local what
-        local top = my < y + L.rh // 2
-        if top and math.abs(mx - xfl) <= 4 then what = 'flo'
-        elseif top and math.abs(mx - xfh) <= 4 then what = 'fhi'
-        elseif math.abs(mx - xl) <= 4 then what = 'lo'
-        elseif math.abs(mx - xh) <= 4 then what = 'hi'
-        elseif mx > xl and mx < xh then what = 'move' end
-        if what then hover.zone = { kind = 'sel', what = what, zaddr = zz and zz.addr, z = z, x0 = zx, w = zw, c = f.i, k = c.ki - 1 } end
-      end
-      y = y + L.rh + 2
+      if hot then hover.dspbtn = { fx = k, f = f, what = 'linkrow', link = l } end
+      y = y + L.rh
     end
   end
 end
@@ -5707,7 +5650,7 @@ function D.mac_w(L, info, f)
   -- сложенный отдел — узкий, по ширине своей подписи
   if f.wrap then
     vt = 0
-    if mpw == 0 then mpw = ms('MACROS') + 2 * L.pad + 2 end
+    if mpw == 0 then mpw = ms('★') + 2 * L.pad + 2 end
     if xpw == 0 and f.nmacro >= 2 then xpw = ms('XY') + 2 * L.pad + 2 end
   end
   return vt + mpw + xpw, vt, mpw, xpw
@@ -9705,7 +9648,7 @@ function D.frame(L, snap, rows, state, info)
           if xopen == nil then xopen = true end
           xopen = xopen and f.nmacro >= 2
           -- 24 окт: контейнер — заголовки отделов строкой: MACRO N | XY (щелчок — сложить / раскрыть)
-          for _, tb in ipairs({ { 'MACROS', 'macfold', fopen, bx, mpw }, { 'XY', 'xyfold', xopen, bx + mpw, xpw } }) do
+          for _, tb in ipairs({ { '★', 'macfold', fopen, bx, mpw }, { 'XY', 'xyfold', xopen, bx + mpw, xpw } }) do
             if tb[5] > 0 then
               local tx, tw2 = tb[4] + L.pad, tb[5] - 2 * L.pad
               local hot = not drag and mx >= tb[4] and mx < tb[4] + tb[5] and my >= hy and my < hy + L.rh
@@ -9739,14 +9682,7 @@ function D.frame(L, snap, rows, state, info)
           -- (номер + имя, слайдер во всю ширину); не влезают — как раньше: номер слева, имя — в статусе
           -- 24 окт: макрос контейнера — подпись по назначению: имя параметра цели («cutoff», ещё — «+2»); без
           -- назначения — только номер (было «jf_tracker_m…» у всех: имя выведенного параметра)
-          if f.wrap and info.macro_links and info.pool_col and info.pool_col.track then
-            local ml = info.macro_links(info.pool_col.track, f)
-            for _, p in ipairs(f.params) do
-              local m = tonumber((p.name or ''):match('M(%d+)%s*$'))
-              local l = m and ml[m]
-              p.mlabel = l and l[1] and (l[1].pname .. (#l > 1 and (' +' .. (#l - 1)) or '')) or nil
-            end
-          end
+          if f.wrap then for _, p in ipairs(f.params) do p.mlabel = p.pinname end end   -- 25 окт: ★ — имя параметра (эффект — в статусе)
           local named = false
           for _, p in ipairs(f.params) do if p.mfader and p.mlabel then named = true; break end end
           local two = named and (hy + (1 + 2 * f.nmacro) * L.rh <= by + bh - 2)
@@ -9890,20 +9826,9 @@ function D.frame(L, snap, rows, state, info)
               local yy = ty0 + (li - 1) * L.rh
               if yy + L.rh <= ey + eh - 1 then text(ex + L.pad, yy, fit(ln[1], ew - 2 * L.pad), lit and U.CYAN or ln[2]) end
             end
-          elseif #f.params == 0 then
-            -- 24 окт: макросов ещё нет — кнопка «+ 4 macros» (ручки M1..M4, XY на M1 / M2); под ней цепи
-            local lbl = '+ 4 macros'
-            local w2 = ms(lbl) + 2 * L.pad
-            local hb = not drag and mx >= bx + L.pad and mx < bx + L.pad + w2 and my >= ky and my < ky + L.rh
-            set(hb and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx + L.pad, ky, w2, L.rh - 1, 1)
-            set(hb and U.AMBER or U.LINE); gfx.rect(bx + L.pad, ky, w2, L.rh - 1, 0)
-            text(bx + 2 * L.pad, ky, lbl, hb and U.AMBER or U.TEXT)
-            if hb then hover.dspbtn = { fx = k, f = f, what = 'macadd' } end
-            hint('dspbtn', bx + L.pad, ky, w2, L.rh - 1, { fx = k, what = 'macadd' })
-            f._lx, f._lw, f._ybot, f._nomac = bx + L.pad, pw, ky + L.rh, true
           end
           -- 24 окт: отдел цепей — правее вкладок макросов / xy, во всю высоту
-          if nreal > 0 then D.cont_chains(L, info, f, bx + L.pad, ky + (#f.params == 0 and (L.rh + 3) or 1), bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover) end
+          if nreal > 0 then D.cont_chains(L, info, f, bx + L.pad, ky + 1, bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover) end
         elseif f.bands and #f.kids > 0 then
           -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
           -- под ними — кроссовер (частоты сплиттера; правка идёт во все полосы); справа — эффекты выбранной полосы

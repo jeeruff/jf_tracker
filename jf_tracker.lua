@@ -4220,6 +4220,32 @@ ctx = {
     return true
   end,
   -- 24 окт: параметр модуля внутри контейнера → ручка макроса Mn (jf_tracker_macro в контейнере): сила со знаком
+  -- 25 окт: «следует за …»: выбрать ведущий параметр соседа в контейнере (сначала ★ шапки), потом силу со знаком
+  link_pick = function(tr, cf, tgt, tparam, pname)
+    local items = {}
+    local A = model.fxapi(tr)
+    for _, kd in ipairs(cf.kids or {}) do
+      if kd.i ~= tgt and not (kd.name or ''):find('jf_tracker_macro', 1, true) then
+        local np = math.min(400, A.GetNumParams(tr, kd.i) or 0)
+        for q = 0, np - 1 do
+          local _, qn = A.GetParamName(tr, kd.i, q, '')
+          if qn and qn ~= '' then items[#items + 1] = { label = (kd.name or '?') .. ': ' .. qn, data = { s = kd.i, sp = q } } end
+        end
+      end
+    end
+    if #items == 0 then vim.msg = 'follows: no other module in ' .. (cf.name or 'the container'); return end
+    vim.open_picker((pname or 'parameter') .. ' follows …', items, function(it)
+      local amt = {}
+      for _, a in ipairs({ { '1', 100 }, { '2', 50 }, { '3', 25 }, { '4', -25 }, { '5', -50 }, { '6', -100 } }) do
+        amt[#amt + 1] = { key = a[1], label = ('%+d %%'):format(a[2]) .. (a[2] < 0 and '  (it up - this down)' or ''), fn = function()
+          if edit.param_link(tr, cf.i, tgt, tparam, it.data.s, it.data.sp, a[2] / 100) then
+            vim.msg = ('%s follows %s %+d %%'):format(pname or '?', it.label, a[2])
+          else vim.msg = 'follows: REAPER did not link (the same container only)' end
+        end }
+      end
+      vim.open_hydra({ title = (pname or '?') .. ' follows ' .. it.label .. ': how much', items = amt })
+    end)
+  end,
   macro_assign = function(tr, cont, tgt, tparam, pname)
     local P = ('param.%d.'):format(tparam)
     local A = model.fxapi(tr)
@@ -15212,6 +15238,19 @@ ctx.macro_links_of = function(tr, f)
   end
   return e.ml
 end
+-- 25 окт: связи контейнера (edit.links_of) — раз в секунду или после правки FX
+ctx.links_of = function(tr, f)
+  ctx.lkc = ctx.lkc or {}
+  local key = tostring(f.fguid or f.i)
+  local e = ctx.lkc[key]
+  local now = reaper.time_precise()
+  if not e or e.gen ~= model.fx_gen or now - e.t > 1 then
+    local ok, l = pcall(edit.links_of, tr, f.i)
+    e = { gen = model.fx_gen, t = now, l = ok and l or {} }
+    ctx.lkc[key] = e
+  end
+  return e.l
+end
 ctx.fx_io = function(f)
   local col = dsp_target(); local tr = col and col.track
   if not tr then return nil end
@@ -17700,9 +17739,20 @@ function ctx.context_items(hover)
         local cmd = ctx.cmd_by_text('parameter modulation/link') or ctx.cmd_by_text('parameter modulation')
         if cmd then reaper.Main_OnCommand(cmd, 0) else vim.msg = 'no modulation window action found' end
       end)
-      -- 24 окт: модуль внутри контейнера-обёртки — параметр на макрос контейнера (+ / − сила, база — где стоит)
-      if f.inner and f.inner.wrap and f.inner.parent and f.inner.parent.i then   -- 24 окт: и во вложенном контейнере
-        add('Macro of the container … (+ / - amount)', function() ctx.macro_assign(col.track, f.inner.parent, id, p.i, p.name) end, 'M')
+      -- 25 окт: модуль внутри контейнера — ★ в шапку контейнера (нативный вывод параметра) и «следует за …» (нативный Link)
+      if f.inner and f.inner.wrap and f.inner.parent and f.inner.parent.i then
+        local cf = f.inner.parent
+        add('★ Pin to the header of ' .. (cf.name or 'the container'), function()
+          local idx = edit.pin_param(col.track, cf.i, id, p.i)
+          vim.msg = idx and ('★ ' .. (p.name or '') .. ' in the header of ' .. (cf.name or 'the container')) or 'pin: REAPER did not map it'
+        end, 'P')
+        add('Follows another parameter … (+ / - amount)', function() ctx.link_pick(col.track, cf, id, p.i, p.name) end, 'F')
+        local okl, la = reaper.TrackFX_GetNamedConfigParm(col.track, id, ('param.%d.plink.active'):format(p.i))
+        if okl and la == '1' then add('Stop following (unlink)', function() edit.param_unlink(col.track, id, p.i); vim.msg = (p.name or '') .. ': free' end, 'U') end
+      end
+      -- 25 окт: ★-параметр в шапке контейнера — снять
+      if f.wrap and p.macro then
+        add('Unpin ★ from the header', function() edit.pin_hide(col.track, f.fguid, p.i, true); vim.msg = (p.name or '') .. ': not in the header' end, 'P')
       end
       add('Open automation envelope', function() edit.run('show envelope', function() reaper.GetFXEnvelope(col.track, id, p.i, true) end); state.envs = true; model.invalidate() end, 'a')
       add((ctx.param_in_tcp(col.track, id, p.i) and '!' or '') .. 'Show in track header (TCP, param)', function() ctx.param_tcp_toggle(col.track, id, p.i, p.name) end)
@@ -20806,7 +20856,7 @@ local function frame()
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim, hints = state.hints,   -- 24 окт: описания (гнездо пустого контейнера) — только с хинтами
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
     hdr_info = state.hdrinfo and function(col) return ctx.hdr_info(col) end or nil,
-    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, mono_on = ctx.mono_on, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,
+    clipsview = state.clipsview, dsp_big = state.dsp_big, fxrow = state.fxrow, fxparams = state.fxparams, fx_stack = ctx.fx_stack, cur_param_hl = ctx.cur_param_hl, pinmx = ctx.pinmx, PINS = ctx.PINS, fx_io = ctx.fx_io, links_of = ctx.links_of, mono_on = ctx.mono_on, macro_links = ctx.macro_links_of, cont_wet = ctx.cont_wet, fxp_get = ctx.fxp_get,
     -- роутер в панели DSP FX (7 окт): схема вместо блоков
     dsp_router = state.dsp_big,
     dlog = ctx.dlog,                                  -- 9 окт: ошибки вкладок — в debug log
@@ -22121,6 +22171,9 @@ local function frame()
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
+  elseif hover.dspbtn and hover.dspbtn.what == 'linkrow' then
+    local l = hover.dspbtn.link
+    state.status = ('%s: %s follows %s: %s  %+d %%  (click - amount / unlink)'):format(l.tname or '?', l.tpname or '?', l.sname or '?', l.spname or '?', math.floor(l.sc * 100 + 0.5))
   elseif hover.mlink then   -- 24 окт: строка назначения макроса — полностью
     local l = hover.mlink.l
     state.status = ('M%d -> %s: %s  %+d %%  (rclick the parameter - M - x: unlink)'):format(hover.mlink.m, l.name or '?', l.pname or '?', math.floor((l.sc or 0) * 100 + 0.5))
@@ -22128,13 +22181,7 @@ local function frame()
     -- 24 окт: ручка макроса — полное имя и (у контейнера) всё, что она ведёт
     local f, p = hover.dsp.f, hover.dsp.f.params[hover.dsp.param]
     local txt = f.name .. '  ' .. (p.name or '') .. (p.mlabel and (': ' .. p.mlabel) or '')
-    local col = dsp_target()
-    if f.wrap and col and col.track then
-      local m = tonumber((p.name or ''):match('M(%d+)%s*$'))
-      local t = {}
-      for _, l in ipairs(m and ctx.macro_links_of(col.track, f)[m] or {}) do t[#t + 1] = ('%s: %s %+d%%'):format(l.name, l.pname, math.floor(l.sc * 100 + 0.5)) end
-      txt = f.name .. '  M' .. (m or '?') .. (#t > 0 and (' -> ' .. table.concat(t, ', ')) or ' - not assigned (rclick a parameter inside - M)')
-    end
+    if f.wrap then txt = f.name .. '  ★ ' .. (p.pinfx and (p.pinfx .. ': ') or '') .. (p.pinname or p.name or '') .. '  (rclick - unpin)' end
     state.status = txt .. '  - drag: value, dblclick: default'
   elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
@@ -24377,6 +24424,24 @@ local function frame()
         ctx.zone_target = { c = hover.dspbtn.f.i, k = hover.dspbtn.ki - 1, name = hover.dspbtn.kid.name }
         local z = hover.dspbtn.z
         vim.open_prompt('zone ', ('%d %d %d %d'):format(z.lo, z.hi, z.flo, z.fhi))
+      elseif hover.dspbtn.what == 'cxfade' then   -- 25 окт: две цепи — mix второй следует за mix первой (−100 %, база 1)
+        local col, f0 = dsp_target(), hover.dspbtn.f
+        local ch = {}
+        for _, kd in ipairs(f0 and f0.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then ch[#ch + 1] = kd end end
+        if col and #ch == 2 and ch[1].wet_i and ch[2].wet_i then
+          if edit.param_link(col.track, f0.i, ch[2].i, ch[2].wet_i, ch[1].i, ch[1].wet_i, -1, 1) then
+            vim.msg = ('x-fade: the mix of %s crossfades %s and %s (100 %% - only %s)'):format(ch[1].name or '1', ch[1].name or '1', ch[2].name or '2', ch[1].name or '1')
+          end
+        end
+      elseif hover.dspbtn.what == 'linkrow' then   -- 25 окт: строка связи — сила / снять
+        local col, l = dsp_target(), hover.dspbtn.link
+        if col and l then
+          local items = { { key = 'x', label = 'unlink: ' .. (l.tpname or '') .. ' free', fn = function() edit.param_unlink(col.track, l.t, l.tp) end } }
+          for _, a in ipairs({ { '1', 100 }, { '2', 50 }, { '3', 25 }, { '4', -25 }, { '5', -50 }, { '6', -100 } }) do
+            items[#items + 1] = { key = a[1], label = ('%+d %%'):format(a[2]), fn = function() edit.param_link(col.track, hover.dspbtn.f.i, l.t, l.tp, l.s, l.sp, a[2] / 100, l.base) end }
+          end
+          vim.open_hydra({ title = (l.tpname or '?') .. ' follows ' .. (l.sname or '') .. ': ' .. (l.spname or ''), items = items })
+        end
       elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
