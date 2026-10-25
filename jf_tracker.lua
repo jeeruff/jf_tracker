@@ -22308,7 +22308,7 @@ local function frame()
   elseif hover.ctrl == 'xfade' then state.status = 'x-fade of inserted notes: click on/off, wheel: length (ms); off = overlaps without crossfade; \\x: menu'
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
-  elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick: type the number, wheel: +-1'
+  elseif hover.ctrl == 'bpm' then state.status = 'BPM - click: tempo list (take from selected item on top), dblclick / digits: type the number (Enter - the tempo, Opt+Enter - a tempo change at the cursor row), wheel: +-1'
   elseif hover.fxb then state.status = 'fx list - / to find, j k h l, Enter / dblclick: add to the cursor track, drag onto the DSP panel: insert at the amber line'
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
@@ -26504,6 +26504,40 @@ local function frame()
     elseif dn and dn:byte(77) ~= 0 then c = 13; c_raw = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
   end
   ctx.ctrlj_t = reaper.time_precise()
+  -- 25 окт: ввод темпа и выпадашка BPM — раньше всех: Enter после цифр шёл в трекер (выпадашка нот), темп не ставился
+  if state.bpm_edit and c ~= 0 then
+    local ch = c < 256 and string.char(c) or ''
+    if c == 27 then state.bpm_edit = nil
+    elseif c == 13 and ctx.mods().alt then   -- 25 окт: Opt+Enter — точка смены темпа на строке курсора трекера
+      local v = tonumber(state.bpm_edit); state.bpm_edit = nil
+      if v then
+        v = math.max(20, math.min(400, v))
+        local t = edit.row_time(vim.cur.row, state.lpb, 0)
+        edit.run('tempo change', function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, false) end)
+        reaper.UpdateTimeline(); model.invalidate()
+        vim.msg = ('tempo change %.2f BPM at row %d (Enter - the project tempo)'):format(v, vim.cur.row)
+      end
+      if state.focus == 'ctrl' then ctx.set_focus('tracker') end
+    elseif c == 13 then   -- 16 окт: Enter — темп поставлен, выделение уходит (фокус обратно в трекер)
+      local v = tonumber(state.bpm_edit); state.bpm_edit = nil; if v then set_bpm(v) end
+      if state.focus == 'ctrl' then ctx.set_focus('tracker') end
+    elseif c == 8 then state.bpm_edit = state.bpm_edit:sub(1, -2)
+    elseif ch:match('[%d%.]') and #state.bpm_edit < 7 then state.bpm_edit = state.bpm_edit .. ch end
+    c = 0
+  end
+  if bpm_menu and c ~= 0 then
+    local ch = c < 256 and string.char(c) or ''
+    if c == 27 then bpm_menu = nil
+    elseif ch == 'j' or c == keys.down then bpm_menu.sel = math.min(#BPM_LIST, bpm_menu.sel + 1)
+    elseif ch == 'k' or c == keys.up then bpm_menu.sel = math.max(1, bpm_menu.sel - 1)
+    elseif c == 13 then
+      local it = BPM_LIST[bpm_menu.sel]
+      if it[2] == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end else set_bpm(it[2]) end
+      bpm_menu = nil
+    elseif ch:match('%d') then bpm_menu = nil; state.bpm_edit = ch      -- цифра — сразу ввод числа
+    end
+    c = 0
+  end
   -- 25 окт: Ctrl+` на маке приходит кодом 0 ('0') — шаг становился 0; физически ` (VK 0xC0) без 0 — это Ctrl+` (шаг next)
   if c == 48 and reaper.JS_VKeys_GetState and gfx.mouse_cap & 4 ~= 0 then
     local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.3)
@@ -26911,31 +26945,8 @@ local function frame()
   end
   if OPT.ask.active and c ~= 0 then OPT.ask.key(c); c = 0 end
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
-  if state.bpm_edit and c ~= 0 then
-    local ch = c < 256 and string.char(c) or ''
-    if c == 27 then state.bpm_edit = nil
-    elseif c == 13 then   -- 16 окт: Enter — темп поставлен, выделение уходит (фокус обратно в трекер)
-      local v = tonumber(state.bpm_edit); state.bpm_edit = nil; if v then set_bpm(v) end
-      if state.focus == 'ctrl' then ctx.set_focus('tracker') end
-    elseif c == 8 then state.bpm_edit = state.bpm_edit:sub(1, -2)
-    elseif ch:match('[%d%.]') and #state.bpm_edit < 7 then state.bpm_edit = state.bpm_edit .. ch end
-    c = 0
-  end
   if ctx.SP and ctx.SP.on and c ~= 0 then
     if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
-    c = 0
-  end
-  if bpm_menu and c ~= 0 then
-    local ch = c < 256 and string.char(c) or ''
-    if c == 27 then bpm_menu = nil
-    elseif ch == 'j' or c == keys.down then bpm_menu.sel = math.min(#BPM_LIST, bpm_menu.sel + 1)
-    elseif ch == 'k' or c == keys.up then bpm_menu.sel = math.max(1, bpm_menu.sel - 1)
-    elseif c == 13 then
-      local it = BPM_LIST[bpm_menu.sel]
-      if it[2] == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end else set_bpm(it[2]) end
-      bpm_menu = nil
-    elseif ch:match('%d') then bpm_menu = nil; state.bpm_edit = ch      -- цифра — сразу ввод числа
-    end
     c = 0
   end
   -- Tab / Shift-Tab — переход между модулями из ЛЮБОГО места (в INSERT,

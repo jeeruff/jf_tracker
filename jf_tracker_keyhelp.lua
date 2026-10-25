@@ -828,7 +828,7 @@ KH.PAGES = {
     { k = 'h j k l', d = 'move between cells (arrows too); focus lands on BPM' },
     { k = '+ -', d = 'value up / down (like the wheel): BPM, LPB, oct, step, vel, x-fade, font...' },
     { k = 'Enter Space', d = 'press the cell (like a click); on BPM - type the number, Enter applies' },
-    { k = '0-9', d = 'on BPM: start typing the tempo' },
+    { k = '0-9', d = 'on BPM: start typing the tempo; Enter - the project tempo, Opt+Enter - a tempo change point at the tracker cursor row' },
     { k = 'Esc', d = 'back to tracker' },
   } },
   master = { title = 'master', e = {
