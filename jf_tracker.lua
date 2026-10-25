@@ -6484,6 +6484,7 @@ ctx = {
     vim.open_hydra({ title = 'add ' .. nf .. ' to', items = {
       { key = 'l', label = 'the lib - each file its own instrument (= Enter)', fn = function() for _, f in ipairs(files) do ctx.add_to_depot(f) end; done(); vim.msg = #files .. ' file(s) into the lib' end },
       { key = 'd', label = 'drumrs5k - a pad per file, a key each (the rack on the DSP track, or a new one)', fn = function() ctx.drum_add_files(files); done() end },
+      { key = 'X', label = 'sliXer - jf_slixer on the DSP track slices it and plays on its own (the first file)', fn = function() ctx.to_slixer(files[1]); done() end },   -- 25 окт
       { key = 'y', label = 'layers (¥) of the selected lib instrument - they sound together with it on one note', fn = function() ctx.layer_add_files(files); done() end },   -- 19 окт
       { key = 's', label = 'sampler - one RS5K per file on the DSP track, played by pitch', fn = function()
         local col = dsp_target() or cur_col(); if not col then return end
@@ -6667,6 +6668,10 @@ ctx = {
       { key = 'w', label = 'sampler - the whole sample, one RS5K played by pitch', fn = function() ctx.slices_render('whole') end },
       { key = 'p', label = 'sampler with a loop - the whole sample, loop on, obeys note-offs (sustain while held)', fn = function() ctx.slices_render('loop') end },
       { key = 'm', label = 'sampler list - the selected samples into one RS5K (each note - the next file)', fn = function() ctx.rs5k_list() end },
+      { key = 'X', label = 'sliXer - the whole sample into jf_slixer on the cursor track (its own slices, plays without the tracker)', fn = function()   -- 25 окт
+        local root = ctx.slice_root(); local pf = root and ctx.item_file(root.item)
+        if pf then ctx.to_slixer(pf, cur_col()) else vim.msg = 'slixer: no audio file on the selected instrument' end
+      end },
     } })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
@@ -17240,6 +17245,7 @@ function event_actions(hover)
     end, 'i')
     add('Select item in REAPER', function() select_item_in_reaper(head.item) end, 'l')
     if head.kind == 'audio' then add('To the sampler (RS5K on this track)', function() ctx.to_sampler(head.item, nil, nil, head.name) end, 'S') end   -- 10 окт
+    if head.kind == 'audio' and ctx.item_file(head.item) then add('To sliXer (jf_slixer on this track slices and plays it)', function() ctx.to_slixer(ctx.item_file(head.item), cur_col()) end, 'X') end   -- 25 окт
     if head.kind == 'audio' then
       add('Quantize the nearest peak to the row grid', function() ctx.peak_quantize() end, 'q')
       add('Move the nearest peak to ... (j k a row, Enter)', function() ctx.peak_pick() end, 'Q')
@@ -17704,6 +17710,8 @@ function ctx.context_items(hover)
         local t0, t1 = 0, e.len
         if e.parent and e.slice_k and e.parent.slices then local p0 = e.parent; t0, t1 = p0.slices[e.slice_k] or 0, p0.slices[e.slice_k + 1] or p0.len; add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(p0.item, t0, t1, e.name) end, 'S')
         else add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(e.item, t0, t1, e.name) end, 'S') end
+        local pf = ctx.item_file((e.parent or e).item)
+        if pf then add('To sliXer - jf_slixer on the cursor track slices and plays it on its own', function() ctx.to_slixer(pf, cur_col()) end, 'X') end   -- 25 окт
       end
       add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
       do   -- 25 окт: нарезанный (или его слайс) — сразу в drumrs5k, как c s в слайсере
@@ -17989,6 +17997,60 @@ function ctx.slixer_load(f, path)
     reaper.gmem_write(B + 5000, (math.floor(reaper.gmem_read(B + 5000)) % 16000000) + 1)
   end)
   vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. (v.wait and ' (when the view is ready)' or '')
+end
+-- 25 окт: файл в jf_slixer трека (свой слайсер: режет и играет сам, без трекера). Нет slixer на треке — ставится.
+-- Путь уходит, когда экземпляр стал владельцем вида (slixer_view) — заказ ждёт до 6 с (ctx.slx_pending_tick)
+function ctx.item_file(item)
+  local tk = item and reaper.ValidatePtr(item, 'MediaItem*') and reaper.GetActiveTake(item)
+  if not tk or reaper.TakeIsMIDI(tk) then return nil end
+  local src = reaper.GetMediaItemTake_Source(tk)
+  if reaper.GetMediaSourceParent(src) then src = reaper.GetMediaSourceParent(src) end   -- секция / реверс — исходный файл
+  local p = reaper.GetMediaSourceFileName(src, '')
+  return p ~= '' and p or nil
+end
+function ctx.to_slixer(path, col)
+  col = col or dsp_target() or cur_col()
+  if not (col and col.track and path and path ~= '') then vim.msg = 'slixer: no file / no track'; return end
+  local tr = col.track
+  local fx
+  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+    local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+    local _, on = reaper.TrackFX_GetNamedConfigParm(tr, i, 'original_name')
+    if ((nm or '') .. ' ' .. (on or '')):lower():find('jf_slixer', 1, true) then fx = i; break end
+  end
+  if not fx then
+    edit.run('slixer on the track', function() fx = reaper.TrackFX_AddByName(tr, 'JS:jf_slixer', false, -1) end)
+    if not (fx and fx >= 0) then vim.msg = 'slixer: jf_slixer.jsfx not found in Effects'; return end
+    model.invalidate()
+  end
+  ctx.slx_pending = { tr = tr, fx = fx, guid = reaper.TrackFX_GetFXGUID(tr, fx), path = path, t = reaper.time_precise() }
+  vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. ' into ' .. (col.name or 'the track') .. ' (it slices and plays on its own)'
+end
+function ctx.slx_pending_tick()
+  local P = ctx.slx_pending
+  if not P then return end
+  if reaper.time_precise() - P.t > 6 or not reaper.ValidatePtr(P.tr, 'MediaTrack*') then ctx.slx_pending = nil; vim.msg = 'slixer: no answer - drop the file on its window'; return end
+  local fx = P.fx
+  if reaper.TrackFX_GetFXGUID(P.tr, fx) ~= P.guid then   -- цепь сдвинулась — найти по GUID
+    fx = nil
+    for i = 0, reaper.TrackFX_GetCount(P.tr) - 1 do if reaper.TrackFX_GetFXGUID(P.tr, i) == P.guid then fx = i end end
+    if not fx then ctx.slx_pending = nil; return end
+    P.fx = fx
+  end
+  local v = ctx.slixer_view(P.tr, fx)
+  if not v then return end
+  if v.old then ctx.slx_pending = nil; vim.msg = 'slixer: old plugin version - drop the file on its window'; return end
+  if v.wait then return end
+  local path = P.path
+  ctx.slx_pending = nil
+  with_ns('jf_slixer', function()
+    local B = 200000
+    local n = math.min(#path, 255)
+    reaper.gmem_write(B + 5001, n)
+    for i = 1, n do reaper.gmem_write(B + 5001 + i, path:byte(i)) end
+    reaper.gmem_write(B + 5000, (math.floor(reaper.gmem_read(B + 5000)) % 16000000) + 1)
+  end)
+  vim.msg = 'slixer: ' .. (path:match('[^/]+$') or path) .. ' loaded'
 end
 function ctx.slixer_view(track, fxi)
   local S = ctx.slx
@@ -26495,6 +26557,7 @@ local function frame()
     if ctx.solo_proj ~= pj and not ctx.mx_solo then ctx.solo_proj = pj; pcall(ctx.solo_restore_pending) end
   end
   if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
+  if ctx.slx_pending then pcall(ctx.slx_pending_tick) end   -- 25 окт: файл ждёт свой slixer
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
   if c <= 0 and ctx.keyq and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end   -- 25 окт: клавиши из меню (меню матрицы) — по одной в кадр
   if c <= 0 then local fk = ctx.fxwin_keys(); if fk then c = fk end end   -- 24 окт: клавиши нот при окне плагина впереди
