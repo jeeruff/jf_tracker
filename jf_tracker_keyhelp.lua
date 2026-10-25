@@ -121,7 +121,7 @@ KH.PAGES = {
     { k = 'dW', d = 'delete the whole item under the cursor' },
     { k = 'dp', d = 'delete up to the pause: the run of events of the cursor lane from the cursor down to the first empty row (like d} in Vim); on an empty row - the next run' },
     { k = 'dP', d = 'delete every item and all automation (envelope points, automation items) of the selected tracks in the whole project (no selection - the cursor track); one undo' },
-    { k = 'C-A-j', d = 'repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track; :repeat all - all tracks (Paketti)' },
+    { k = 'C-A-j', d = 'repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track; on the first row of a pattern - the previous pattern into this one; :repeat all - all tracks (Paketti)' },
     { k = 'S-A-j S-A-k', d = 'transpose the instrument selected in the lib -1 / +1 semitone (a count - by N)' },
     { k = 'S-A-h S-A-l', d = 'playrate of the instrument selected in the lib -0.01 / +0.01 (a count - by N)' },
     { k = ':mcmd', d = 'master column cmd = project markers on rows: Enter - edit the command of the row, ! - a REAPER action (marker !<id> - REAPER runs it when playback passes), BS / Del / x - delete; :mcmd <text> sets it, :mcmd alone deletes' },

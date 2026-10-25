@@ -100,10 +100,13 @@ DM.modules = {
 
       { 'Master gain',           'gain' },
       { 'Stretch (all slices)',  'stretch' },
-      { 'FX dry/wet',            'dry/wet' },
+      -- 25 окт: слоты Airwindows выпилены (обработка — в контейнере), и
+      -- «FX dry/wet» вместе с ними. Его место занял режим выхода: срезы
+      -- уходят каждый в свой моно-канал, дальше разбирается контейнер.
+      { 'Output routing',        'out',     labels = { 'mix', 'class', 'slice' } },
       { 'Playthrough',           'thru',    labels = { 'off', 'on' } },
       { 'Pitch wheel range',     'bend' },
-      { 'Input passthrough',     'input',   labels = { 'off', 'pass' } },   -- 11 окт: аудио трека сквозь slixer (Max capture — в окне плагина)
+      { 'Input passthrough',     'input',   labels = { 'off', 'pass' } },   -- 11 окт: аудио трека сквозь slixer
 
       { 'ARP: on',               'arp',     labels = { 'off', 'on' } },
       { 'ARP: rate',             'rate',    labels = { '1', '2', '4', '8', '8T', '16', '32' } },

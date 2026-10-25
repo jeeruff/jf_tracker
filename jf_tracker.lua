@@ -1061,6 +1061,28 @@ ctx = {
       r1 = te and model.row_of_time(te, state.lpb) or (snap and snap.last_row or rc) + 1
     end
     r0, r1 = math.floor(r0 + 0.5), math.floor(r1 + 0.5)
+    -- 25 окт: курсор в начале паттерна — повторить предыдущий паттерн (его строки) в этот, по треку / всем
+    local src0
+    if rc <= r0 and rg then
+      local best
+      for _, g in ipairs(regions or {}) do
+        if not g.gap and g.r1 and g.r0 and math.floor(g.r1 + 0.5) <= r0 and (not best or g.r1 > best.r1) and g.r0 < r0 then best = g end
+      end
+      if best then src0 = math.floor(best.r0 + 0.5) end
+      if not src0 then vim.msg = 'repeat: no pattern before this one'; return end
+    end
+    if src0 then
+      local tracks = {}
+      if all then for _, c in ipairs(snap.cols) do tracks[#tracks + 1] = c.track end
+      else local c = cur_col(); if c then tracks[1] = c.track end end
+      local n = 0
+      edit.run(all and 'repeat the previous pattern (all tracks)' or 'repeat the previous pattern', function()
+        for _, tr in ipairs(tracks) do n = n + edit.repeat_above(tr, state.lpb, src0, r0, r1) end
+      end)
+      model.invalidate()
+      vim.msg = ('repeat: the previous pattern (rows %d-%d) into this one%s: %d copies'):format(src0, r0 - 1, all and ' on all tracks' or '', n)
+      return
+    end
     if rc <= r0 then vim.msg = 'repeat: put the cursor below the part to repeat (the region starts here)'; return end
     if rc >= r1 then vim.msg = 'repeat: the cursor is at the end of the region'; return end
     local tracks = {}
