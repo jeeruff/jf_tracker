@@ -17013,6 +17013,7 @@ local function hint_go(t)
     draw.trspop = (not open) and { guid = d.col.guid, what = d.what } or nil
     -- 8 окт: открылся — клавиатура на нём (h l, Shift мелко, 0 сброс, Esc)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
+  elseif t.kind == 'mmono' then reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
   elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
   elseif t.kind == 'btn' then
@@ -22618,6 +22619,7 @@ local function frame()
   elseif hover.btn and hover.btn.what == 'route' and hover.btn.send then   -- 16 окт: маршрут на микшере
     local e = hover.btn.send
     state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
+  elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
     state.status = 'instrument plugin: click - note keys write MIDI to it, DSP shows it; dblclick - its window'
@@ -24977,6 +24979,10 @@ local function frame()
         vim.msg = 'routing removed: ' .. (hover.btn.col.name or 'track') .. ' ' .. (e.dir or '>') .. ' ' .. (e.name or '') .. ' (u - back)'
       end
       click = { t = now2, zone = 'btn' }
+    elseif hover.mmono then   -- 25 окт: mono мастера (как MONO в микшере REAPER)
+      reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
+      vim.msg = 'master: ' .. (reaper.GetToggleCommandState(40917) == 1 and 'mono (L+R)' or 'stereo')
+      click = { t = now2, zone = 'mmono' }
     elseif hover.btn and hover.btn.what == 'route' then
       -- 9 окт: SRO / дорожка схемы — нативное меню маршрутизации (как ROUTE в REAPER)
       ctx.route_menu(hover.btn.col)

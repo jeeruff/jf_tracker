@@ -7183,6 +7183,22 @@ function D.frame(L, snap, rows, state, info)
           rest[#rest + 1] = b
         elseif not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
       end
+      -- 25 окт: мастер — кнопка mono (как MONO в микшере REAPER: действие 40917, сумма L+R)
+      if c.master and not mixcol then
+        D.mmono = D.mmono or { t = 0 }
+        local now = reaper.time_precise()
+        if now - D.mmono.t > 0.25 then D.mmono.t = now; D.mmono.on = reaper.GetToggleCommandState(40917) == 1 end
+        local mw = ms('mono') + 6
+        if bx + mw <= c.x + c.w - 1 then
+          local on = D.mmono.on
+          local hot = mx >= bx and mx < bx + mw and my >= by and my < by + bhh + 2
+          set(hot and D.CURROW or (on and U.tint(U.AMBER, 0.3) or U.PANEL)); gfx.rect(bx, by, mw, bhh, 1)
+          set(hot and U.AMBER or (on and U.AMBER or U.DIM)); gfx.rect(bx, by, mw, bhh, 0)
+          text(bx + 3, by + math.floor((bhh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0), 'mono', (hot or on) and U.AMBER or BTXT)
+          if hot then hover.mmono = true end
+          hint('mmono', bx, by, mw, bhh + 2, true)
+        end
+      end
       local by2 = hy + (L.lane_row - 1) * L.rh
       local x2 = bx
       local function row2(w) if mixcol or L.hr_info > 0 or x2 + w > c.x + c.w - 1 then return nil end; local x = x2; x2 = x2 + w + 1; return x end
