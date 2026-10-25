@@ -26957,13 +26957,10 @@ local function frame()
   -- 13 окт: Ctrl+` — шаг next (на следующий объект трека) вкл / выкл, в любом режиме;
   -- note-off: ~ (Shift+`) — все треки, Ctrl+~ — весь трек (17 окт)
   if c == 96 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().shift and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    if ctx.mods().alt then   -- 18 окт: Ctrl+Opt+` — step auto (до конца вставленного звука)
-      vim.step_auto = not vim.step_auto; vim.step_next = false
-      vim.msg = 'step: ' .. (vim.step_auto and 'auto - to the end of the inserted item / slice (Ctrl+Opt+` back)' or tostring(vim.step))
-    else
-      vim.step_next = not vim.step_next; vim.step_auto = false
-      vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track (Ctrl+` back)' or tostring(vim.step))
-    end
+    -- 25 окт: Ctrl+` — next ↔ auto (число — Ctrl - / +, Ctrl+0..9); Ctrl+Opt+` убран: одна функция — одна клавиша
+    if vim.step_next then vim.step_next = false; vim.step_auto = true
+    else vim.step_next = true; vim.step_auto = false end
+    vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or 'auto - to the end of the inserted item / slice') .. '  (Ctrl+` next / auto, Ctrl+0..9 a number)'
     c = 0
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then

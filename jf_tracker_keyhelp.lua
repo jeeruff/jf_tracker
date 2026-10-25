@@ -54,8 +54,7 @@ KH.PAGES = {
     { k = 'Ctrl+Opt + -', d = 'continue: the command above in this column (or the volume) again with value +1 / -1, on this row, the cursor a step on' },
     { k = 'Ctrl+Enter', d = 'the note under the cursor: all its properties in a box (only this note): j k row, h l value, a letter - jumps to the row (its lighter letter), Space - its list, R reset, W the REAPER item window, Enter / Esc close; Shift+Space - listen. A double click on a note and the menu item properties open the same box' },
     { k = 'Shift+Space', d = 'play the note under the cursor (its track solo, with fx); Shift+Option+Space - at x0.5; works with the note properties open' },
-    { k = 'Ctrl+`', d = 'step next on / off: the cursor goes to the next note / item / command / envelope point of the track; Ctrl - / + back to a number' },
-    { k = 'Ctrl+Opt+`', d = 'step auto on / off: the cursor goes past the inserted item / slice (its length); Ctrl - / + back to a number' },
+    { k = 'Ctrl+`', d = 'step next / auto, one key toggles them: next - the cursor goes to the next note / item / command / envelope point of the track, auto - to the end of the inserted item / slice; Ctrl - / + or Ctrl+0..9 back to a number' },
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
     -- 15 окт: опция keys: renoise выключена (закомментирована в опциях)
     { k = 'gm', d = 'metronome menu: m on / off, speed, accents, pre-roll (:metro toggles too)' },
