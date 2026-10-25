@@ -9910,7 +9910,9 @@ ctx = {
       { key = 'b', label = 'bpm column: the tempo at the pattern start' .. on(MX.bpm), fn = function() MX.bpm = not MX.bpm; reaper.SetExtState(EXT, 'mxbpm', MX.bpm and '1' or '0', true); relayout() end },
       -- 23 окт: размер такта всегда (по умолчанию — только когда у паттернов разный) и полоса секций — отдельно от ruler
       { key = 'g', label = 'signature column' .. on(MX.sig_always), fn = function() MX.sig_always = not MX.sig_always; reaper.SetExtState(EXT, 'mxsig', MX.sig_always and '1' or '0', true); relayout() end },
-      { key = 'e', label = 'sections strip: the section names on the left (also without the ruler)' .. on(MX.sections ~= false), fn = function() MX.sections = MX.sections == false; reaper.SetExtState(EXT, 'mxsec', MX.sections and '1' or '0', true); relayout() end },
+      { key = 'e', label = 'sections strip: the section names on the left (also without the ruler)' .. on(MX.sections ~= false), fn = function() MX.sections = MX.sections == false; reaper.SetExtState(EXT, 'mxsec', MX.sections and '1' or '0', true); relayout()
+        -- 25 окт: секций ещё нет — полоса пустая и не видна: сказать (было — «не реагирует»)
+        vim.msg = 'sections strip ' .. (MX.sections and 'on' or 'off') .. ((MX.sections and not MX.has_sec) and ' - no sections yet: Tr in the matrix makes one (a section = several patterns in a row)' or '') end },
       -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
       { key = 'm', label = 'minimize the pane (zm)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
