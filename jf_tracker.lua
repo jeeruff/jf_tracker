@@ -17028,6 +17028,7 @@ local function hint_go(t)
     state.kslider = { ctrl = d }
     vim.msg = (d == 'ratebar' and 'playrate' or 'swing') .. ': h l change (H L fine), 0 reset, Esc done'
   elseif t.kind == 'ctrl' and d == 'bpm' then   -- 24 окт: f на BPM — его выпадашка (как щелчок): j k Enter, цифры — ввод числа
+    ctx.set_focus('ctrl'); state.ctrl_sel = 'bpm'   -- 25 окт: и фокус — на BPM (модуль транспорта, курсор на нём)
     bpm_menu = { sel = 1 }
     vim.msg = 'BPM: j k Enter - pick, digits - type the tempo, Esc'
   elseif t.kind == 'ctrl' and ctx.ctrl_menu and ctx.ctrl_menu(d) then   -- 12 окт: f на ячейке транспорта — её выпадашка (выбор с клавиатуры)
