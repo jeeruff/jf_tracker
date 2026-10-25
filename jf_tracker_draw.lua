@@ -2638,6 +2638,7 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
       local vt = tempo and ('%d'):format(math.floor(e.min + ev.v * (e.max - e.min) + 0.5))
         or (D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or ('%3d'):format(math.floor(ev.v * 127 + 0.5)))
       text(x + L.env_bx, ty, vt, env_colour(e))
+    elseif prev and prev.pt and prev.ramp then text(x + L.env_bx, ty, prev.ramp, U.CYAN)   -- 25 окт: темп плавно растёт / падает
     else text(x + L.env_bx, ty, D.envfmt == 'hex' and '..' or '...', D.EMPTY) end
     return
   end
@@ -2662,6 +2663,7 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
     local vt = tempo and ('%d'):format(math.floor(e.min + ev.v * (e.max - e.min) + 0.5))
       or (D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)))
     text(tx, ty, vt, U.TEXT)
+  elseif prev and prev.pt and prev.ramp then text(tx, ty, prev.ramp, U.CYAN)   -- 25 окт: темп — ^ подъём, v спад
   elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
     -- форма сегмента точки строкой выше — под её значением, только если не lin
     text(tx, ty, D.ENV_SHAPES[prev.shape] or '?', U.CYAN)

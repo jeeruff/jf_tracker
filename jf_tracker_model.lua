@@ -2303,8 +2303,12 @@ function M.env_values(e, rows)
     if v < 0 then v = 0 elseif v > 1 then v = 1 end
     return v
   end
+  -- 25 окт: темп мастера — по карте темпа REAPER (TimeMap), не по точкам огибающей: смены темпа видны,
+  -- даже когда точек нет (карта и огибающая разошлись); ramp — плавный подъём / спад после смены (^ / v)
+  local tempo = (e.name or ''):lower():find('tempo', 1, true) and R.TimeMap2_GetNextChangeTime
   for i, r in ipairs(rows) do
     local _, raw = R.Envelope_Evaluate(e.env, r.t, 0, 0)
+    if tempo then raw = R.TimeMap2_GetDividedBpmAtTime(0, r.t + 1e-6) end
     local v = norm(raw)
     local nxt = rows[i + 1] and rows[i + 1].t or (r.t + (r.t - (rows[i - 1] and rows[i - 1].t or (r.t - 0.1))))
     local sub = {}
@@ -2334,7 +2338,20 @@ function M.env_values(e, rows)
         if ok and pt_t >= r.t - 1e-6 then pt = true; shape = shp end
       end
     end
-    out[i] = { v = v, pt = pt, raw = raw, sub = sub, shape = shape }
+    local ramp
+    if tempo then
+      local ct = i == 1 and r.t < 1e-6 and 0 or R.TimeMap2_GetNextChangeTime(0, r.t - 1e-6)
+      if ct and ct >= r.t - 1e-6 and ct < nxt - 1e-9 then
+        pt = true
+        local nc = R.TimeMap2_GetNextChangeTime(0, ct + 1e-6)
+        local b0 = R.TimeMap2_GetDividedBpmAtTime(0, ct + 1e-4)
+        local t1 = (nc and nc > ct) and (nc - 1e-4) or (ct + 4)
+        local b1 = R.TimeMap2_GetDividedBpmAtTime(0, t1)
+        if math.abs(b1 - b0) > 0.5 then ramp = b1 > b0 and '^' or 'v' end
+        raw = b0; v = norm(raw)
+      end
+    end
+    out[i] = { v = v, pt = pt, raw = raw, sub = sub, shape = shape, ramp = ramp }
   end
   return out
 end
