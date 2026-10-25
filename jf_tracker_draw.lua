@@ -11786,7 +11786,7 @@ end
 -- содержимого, высота — от числа строк (до половины окна).
 -- anchor = { x, y } — место правки: всплывашка под ним (не влезает — над ним)
 function D.popup(L, p, anchor)
-  D.popup_hot, D.popup_rect, D.popup_pick, D.popup_group = nil, nil, nil, nil
+  D.popup_hot, D.popup_rect, D.popup_pick, D.popup_group, D.popup_gcols = nil, nil, nil, nil, nil
   if not p or not p.lines then return end
   local W = gfx.w
   local sy = L.body_y + L.body_h
@@ -11891,6 +11891,7 @@ function D.popup(L, p, anchor)
         text(cx + 2 * L.pad, ly + 1, fit(t, cw - 3 * L.pad), on and U.AMBER or (foc and U.TEXT or U.GREY))
       end
       set(U.LINE); gfx.rect(cx + cw - L.pad, y + L.pad + L.rh, 1, h - 2 * L.pad - L.rh, 1)
+      D.popup_gcols = D.popup_gcols or {}; D.popup_gcols[#D.popup_gcols + 1] = { x0 = cx, x1 = cx + cw, k = k, sel = G.sel, n = G.n or #G.lines }   -- 25 окт: колесо — своя колонка
       cx = cx + cw
     end
   end

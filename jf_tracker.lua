@@ -22694,7 +22694,16 @@ local function frame()
     elseif U.click or U.rclick then U.click, U.rclick = false, false end
     if inside and gfx.mouse_wheel ~= 0 and vim.picker then
       local pk = vim.picker
-      pk.sel = math.max(1, math.min(#pk.matches, pk.sel + (gfx.mouse_wheel > 0 and -1 or 1)))
+      local d = gfx.mouse_wheel > 0 and -1 or 1
+      -- 25 окт: колесо над колонкой папок — листает её (папка за папкой), над списком — список
+      local gc
+      for _, g in ipairs(draw.popup_gcols or {}) do if gfx.mouse_x >= g.x0 and gfx.mouse_x < g.x1 then gc = g end end
+      if gc and pk.tree and pk.query == '' then
+        local gi = (pk.gpath and pk.gpath[gc.k]) or gc.sel or 1
+        vim.picker_pick(gc.k, math.max(1, gi + d)); pk.col = gc.k
+      else
+        pk.sel = math.max(1, math.min(#pk.matches, pk.sel + d))
+      end
       gfx.mouse_wheel = 0
     end
   end
