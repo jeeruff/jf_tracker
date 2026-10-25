@@ -17910,6 +17910,9 @@ function ctx.context_items(hover)
         edit.drop(f.col.track, f.col.fixed and lane.idx or nil, state.lpb, vim.cur.row, file)
         model.invalidate(); vim.msg = nm .. ' -> an item on ' .. (f.col.name or 'track') .. ' at row ' .. vim.cur.row
       end, 'i')
+      add('To sliXer - jf_slixer on the DSP track slices and plays it', function() ctx.to_slixer(file) end, 'x')   -- 25 окт
+      add('Show in Finder', function() if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(file) else vim.msg = 'Finder: needs SWS' end end, 'f')   -- 25 окт
+      add('Open in Media Explorer (drag it from there into any plugin)', function() reaper.OpenMediaExplorer(file, false) end, 'e')   -- 25 окт
       add('More: layers, sampler list, slices of the instrument … (a)', function() ctx.browser_send_menu() end, 'a')
     end
   elseif ctx.ctx_page and ctx.ctx_page(hover) and ctx.ctx_page(hover) ~= 'tracker' and ctx.ctx_page(hover) ~= 'insert' then
@@ -25538,6 +25541,7 @@ local function frame()
         elseif hover.dspkit and B.is_marked(B.drag.e) and B.nmarked() > 1 then state.status = ('drop %d marked files → the pads from this note on, %s'):format(B.nmarked(), ctx.mods().shift and 'Shift: the old ones stay, into the free notes' or 'over the old ones (hold Shift - keep the old ones)')
         elseif hover.dspkit then state.status = 'drop ' .. B.drag.e.name .. (hover.dspkit.ki > 0 and ' → this pad (its sample)' or ' → a new pad of the drumrs5k')
         elseif ctx.layer_drop_target(hover) and not B.drag.e.dir then state.status = 'drop ' .. B.drag.e.name .. ' → a layer of ' .. (ctx.layer_drop_target(hover).e.name or '')   -- 19 окт
+        elseif hover.dsp and hover.dsp.f and not hover.dspwave then state.status = 'drop ' .. B.drag.e.name .. ' → ' .. (hover.dsp.f.name or 'plugin') .. ((hover.dsp.f.rs5k or hover.dsp.f.view == 'slixer') and ' (its sample)' or ' (its window + Media Explorer on the file: drag it in)')   -- 25 окт
         elseif hover.pool then state.status = 'drop ' .. B.drag.e.name .. ' → the lib (a new instrument)'
         elseif hover.sess or (hover.matrix and hover.matrix.ri) then state.status = 'drop ' .. B.drag.e.name .. ' → a clip in this slot'
         else state.status = 'drag ' .. B.drag.e.name .. ' - drop on a track column, the lib, the slices, the item wave or a clip' end
@@ -25566,6 +25570,19 @@ local function frame()
         elseif hover.dspkit.ki > 0 and hover.dspkid then ctx.drum_pad_file(hover.dspkid.kid, pth) else ctx.drum_add_files({ pth }) end
       elseif bd.active and hover.dspwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
         ctx.rs5k_file(hover.dspwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- файл на волну RS5K — его сэмпл
+      elseif bd.active and hover.dsp and hover.dsp.f and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not bd.e.pm then
+        -- 25 окт: файл на любой модуль DSP: RS5K / slixer берут сами; прочим плагинам API файл не отдаёт —
+        -- их окно и Media Explorer на этом файле: перетащить оттуда (нативный drag, без эмуляции)
+        local f, pth = hover.dsp.f, B.full(bd.e)
+        local t = dsp_target()
+        if f.rs5k then ctx.rs5k_file(f, pth)
+        elseif f.view == 'slixer' then ctx.slixer_load(f, pth)
+        elseif t and t.col and t.col.track then
+          local id = f.fx or f.i
+          if not t.take then reaper.TrackFX_Show(t.col.track, id, 3) end
+          reaper.OpenMediaExplorer(pth, false)
+          vim.msg = (f.name or 'plugin') .. ': its window and the Media Explorer are open on ' .. (bd.e.name or '') .. ' - drag it from there into the plugin (no API to hand it a file)'
+        end
       elseif bd.active and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not state.midi_inst and not state.auto_inst
              and (type(hover.slices) == 'number' or (hover.sample and (hover.sample.wave or hover.sample.frac))) then
         ctx.lib_append_slice(bd.e.pm and bd.e.path or B.full(bd.e))   -- 10 окт: на слайсы / волну item — новым слайсом (набор &)
