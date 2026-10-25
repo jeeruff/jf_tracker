@@ -1668,6 +1668,21 @@ ctx = {
   end,
   -- :fxname (6 окт): имя эффекта / контейнера в цепочке (renamed_name); цель —
   -- из меню (плагин внутри контейнера) или выбранный блок DSP
+  -- 25 окт: :zone lo hi [flo fhi] — зона sel цепи (цель — щелчок по числам зоны в CHAINS)
+  zone_cmd = function(arg)
+    local t = ctx.zone_target; ctx.zone_target = nil
+    local col = dsp_target()
+    local z = draw.Z.parse(arg)
+    if not (t and col) then vim.msg = 'zone: click the numbers of a chain zone (CHAINS of a container)'; return end
+    if not z then vim.msg = 'zone: lo hi [full-lo full-hi], 0..127'; return end
+    local za = edit.zone_ensure(col.track, t.c, t.k)
+    if za then
+      local sl = draw.Z.SL.sel
+      edit.run('chain zone', function() edit.zone_write(col.track, za, { [sl[1]] = z.lo, [sl[2]] = z.hi, [sl[3]] = z.flo, [sl[4]] = z.fhi }) end)
+      ctx.zone_cache = {}
+      vim.msg = (t.name or 'chain') .. ': zone ' .. draw.Z.text(z)
+    end
+  end,
   fx_rename = function(name)
     local t = state.fxname_target; state.fxname_target = nil
     if not t then
@@ -17282,6 +17297,7 @@ function ctx.ctx_page(hover)
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
   if hover.btn and hover.btn.what == 'arm' then return nil end   -- 11 окт: меню записи — только своё
   if hover.only then return nil end
+  if hover.hdrfx or hover.hdrparam or hover.hdrinst then return 'dsp' end   -- 25 окт: эффект в шапке трека — меню DSP (было lib)
   if hover.pool then return 'inst' elseif hover.dsp then return 'dsp' elseif type(hover.matrix) == 'table' and hover.matrix.inside then return 'matrix'   -- 22 окт: hover.matrix почти всегда {} (истина) — над DSP было меню матрицы   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
   elseif hover.row or hover.header_col then return vim.mode == 'insert' and 'insert' or 'tracker' end
@@ -17710,16 +17726,6 @@ function ctx.context_items(hover)
         end)
       end, 'a')
       add('Empty container inside ([])', function() ctx.dsp_container_new(k, true) end, 'c')
-      if f.i < 0x2000000 then   -- 24 окт: chain select — одна ручка макроса выбирает, какие цепи звучат (зоны sel)
-        add('Chain select on a macro … (one knob picks the chains)', function()
-          local items = {}
-          for m = 1, 8 do items[#items + 1] = { key = tostring(m), label = 'M' .. m, fn = function()
-            local nch = edit.chain_select_macro(col.track, f.i, m, draw.Z and draw.Z.SELECT or 12)
-            vim.msg = nch > 0 and ('M%d selects the chains of %s (%d chains; their sel zones - zv chain)'):format(m, f.name or 'container', nch) or 'chain select: no chains'
-          end } end
-          vim.open_hydra({ title = 'chain select of ' .. (f.name or 'the container') .. ' on', items = items })
-        end, 'e')
-      end
       add('Preset … (container presets)', function() ctx.dsp_preset(k, 'pick') end, 'r')
       add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
@@ -24347,6 +24353,27 @@ local function frame()
             if edit.fx_add_into(col.track, f0.i, it.data) then vim.msg = '+ ' .. it.label .. ' -> ' .. (f0.name or 'container') end
           end)
         end
+      elseif hover.dspbtn.what == 'cselnew' or hover.dspbtn.what == 'cspread' then   -- 25 окт: chain select
+        local col, f0 = dsp_target(), hover.dspbtn.f
+        if col and f0 and f0.i < 0x2000000 then
+          if hover.dspbtn.what == 'cselnew' then
+            local nch = edit.chain_select(col.track, f0.i, draw.Z.SELECT)
+            if nch > 0 then
+              local nz = 0; for _, kd in ipairs(f0.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nz = nz + 1 end end
+              edit.chain_spread(col.track, f0.i, draw.Z.spread(nz, 0.25), draw.Z.SL.sel)
+            end
+            vim.msg = nch > 0 and ('chain select: %d chains, zones spread with crossfades - drag the edges / click the numbers'):format(nch) or 'chain select: no chains'
+          else
+            local nz = 0; for _, kd in ipairs(f0.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nz = nz + 1 end end
+            edit.chain_spread(col.track, f0.i, draw.Z.spread(nz, 0.25), draw.Z.SL.sel)
+            vim.msg = ('chain zones: %d chains evenly over 0..127, neighbours crossfade'):format(nz)
+          end
+          ctx.zone_cache = {}
+        elseif f0 then vim.msg = 'chain select: a container of the top chain only' end
+      elseif hover.dspbtn.what == 'ztext' then   -- 25 окт: зона цепи числами
+        ctx.zone_target = { c = hover.dspbtn.f.i, k = hover.dspbtn.ki - 1, name = hover.dspbtn.kid.name }
+        local z = hover.dspbtn.z
+        vim.open_prompt('zone ', ('%d %d %d %d'):format(z.lo, z.hi, z.flo, z.fhi))
       elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
@@ -24460,6 +24487,9 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspview.fx
       dspview_drag = { f = hover.dspview.f, x = hover.dspview.x, w = hover.dspview.w }
       click = { t = now2, zone = 'dspview' }
+    elseif hover.chainknob then   -- 25 окт: ручка chain select — щелчок туда, тянуть
+      ctx.set_focus('dsp'); ctx.chainknob_drag = hover.chainknob
+      click = { t = now2, zone = 'chainknob' }
     elseif hover.cslide then   -- 24 окт: громкость цепи контейнера — горизонтальный слайдер: щелчок — туда, тянуть
       ctx.set_focus('dsp'); ctx.cslide_drag = hover.cslide
       click = { t = now2, zone = 'cslide' }
@@ -25144,6 +25174,15 @@ local function frame()
     else dspview_drag = nil end
   end
   -- XY-пэд модуля DSP
+  if ctx.chainknob_drag then   -- 25 окт: chain select
+    local d = ctx.chainknob_drag
+    local col = dsp_target()
+    if gfx.mouse_cap & 1 == 1 and col then
+      local v = math.max(0, math.min(127, math.floor((gfx.mouse_x - d.x) / math.max(1, d.w - 1) * 127 + 0.5)))
+      edit.fx_param(col.track, d.f.i, d.idx, v / 127)
+      state.status = ('chain select %d - the chains whose zone holds it sound'):format(v)
+    else ctx.chainknob_drag = nil end
+  end
   if ctx.cslide_drag then   -- 24 окт: громкость цепи
     local d = ctx.cslide_drag
     local col = dsp_target()

@@ -1709,7 +1709,8 @@ local function wrap_kids(tr, e, view, depth)
   e.wrap = true
   e.params_all = e.params_all or e.params    -- запись из кеша: полный список — на случай вида pack / list
   local macros = {}
-  for _, p in ipairs(e.params_all or {}) do if p.macro then macros[#macros + 1] = p end end
+  e.chain_p = nil
+  for _, p in ipairs(e.params_all or {}) do if p.macro then macros[#macros + 1] = p elseif p.chainsel then e.chain_p = p end end
   -- 24 окт: по номеру ручки (M1 M2 …: порядок вывода в контейнер любой) и сколько видно (+ / − в шапке)
   local function mnum(p) return tonumber((p.name or ''):match('M(%d+)%s*$')) or 99 end
   table.sort(macros, function(a, b) return mnum(a) < mnum(b) end)
@@ -1825,6 +1826,7 @@ function build_one(tr, fx, out)
           local e = param_entry(tr, fx, pi)
           e.name = 'M ' .. (e.name:match(':%s*([^:]+)$') or e.name)   -- 24 окт: «jf_tracker_macro: M1» → «M M1»
           e.macro = true
+          if pn:find('chain select', 1, true) then e.name, e.macro, e.chainsel = 'chain', nil, true end   -- 25 окт: своя ручка, не макрос
           params[#params + 1] = e
         end
       end

@@ -45,6 +45,37 @@ function Z.drag(z, what, v, kind)
   return Z.norm(r)
 end
 
+-- 25 окт: n цепей поровну по 0..127, соседи перекрываются кроссфейдом xf (доля части, 0..0.5): у края
+-- диапазона скатов нет (первая звучит с 0, последняя до 127)
+function Z.spread(n, xf)
+  local out = {}
+  if n < 1 then return out end
+  local w = 128 / n
+  local x = math.floor(w * (xf or 0.25) + 0.5)
+  for i = 1, n do
+    local a, b = math.floor((i - 1) * w + 0.5), math.floor(i * w + 0.5) - 1
+    local lo = i == 1 and 0 or math.max(0, a - x)
+    local hi = i == n and 127 or math.min(127, b + x)
+    local flo = i == 1 and 0 or math.min(b, a + x)
+    local fhi = i == n and 127 or math.max(flo, b - x)
+    out[i] = Z.norm({ lo = lo, hi = hi, flo = flo, fhi = fhi })
+  end
+  return out
+end
+-- текст зоны: «0..63» без скатов, «0..63 fade 48..72»: полная сила — flo..fhi
+function Z.text(z)
+  z = Z.norm(z)
+  if z.flo == z.lo and z.fhi == z.hi then return ('%d..%d'):format(z.lo, z.hi) end
+  return ('%d..%d full %d..%d'):format(z.lo, z.hi, z.flo, z.fhi)
+end
+-- разбор «lo hi [flo fhi]» → зона или nil
+function Z.parse(s)
+  local t = {}
+  for v in (s or ''):gmatch('%d+') do t[#t + 1] = math.max(0, math.min(127, tonumber(v))) end
+  if #t < 2 then return nil end
+  return Z.norm({ lo = t[1], hi = t[2], flo = t[3] or t[1], fhi = t[4] or t[2] })
+end
+
 local NN = { 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B' }
 function Z.label(kind, v)
   if kind == 'key' then return NN[v % 12 + 1] .. (v // 12 - 1) end   -- как в REAPER: 60 = C4, 0 = C-1

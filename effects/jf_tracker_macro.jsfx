@@ -7,6 +7,7 @@ desc:jf_tracker_macro (container macros: 8 knobs, each linked to parameters of t
 // Parameter Modulation → Link (plink) у параметров соседей: у каждой цели свой масштаб со знаком
 // (+ одному эффекту, − другому) и база — значение, где стоял параметр. Ручки выведены наружу
 // параметрами контейнера (container_map): шапка контейнера в трекере, автоматизация, MIDI learn, XY.
+// 25 окт: slider9 chain select 0..127 — своя ручка (не макрос): select зоны каждой цепи ссылкой на него.
 
 slider1:0<0,1,0.001>M1
 slider2:0<0,1,0.001>M2
@@ -16,6 +17,7 @@ slider5:0<0,1,0.001>M5
 slider6:0<0,1,0.001>M6
 slider7:0<0,1,0.001>M7
 slider8:0<0,1,0.001>M8
+slider9:0<0,127,1>chain select
 
 in_pin:none
 out_pin:none

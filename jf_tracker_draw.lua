@@ -5604,6 +5604,31 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local bxs = x + w - 2 * sw - 2
   local vbx = bxs - vbw - 3
   local nw = vbx - x - 3
+  -- 25 окт: chain select — своя ручка 0..127 (не макрос): какие цепи звучат — по их зонам (полоса под каждой)
+  local Z = D.Z
+  local tr0 = info.pool_col and info.pool_col.track
+  local sv
+  if f.chain_p and info.fxp_get then sv = math.floor((info.fxp_get(f.i, f.chain_p.i) or 0) * 127 + 0.5) end
+  if Z and y + L.rh <= ymax then
+    if sv then
+      local lw = ms('chain ') 
+      local sx, sww = x + lw, w - lw - ms(' 127') - L.pad
+      text(x, y, 'chain', U.AMBER)
+      local shot = not drag and mx >= sx - 2 and mx < sx + sww + 2 and my >= y and my < y + L.rh
+      set(U.DIM); gfx.rect(sx, y + math.floor(L.rh / 2) - 1, sww, 2, 1)
+      local kx = sx + math.floor(sv / 127 * (sww - 1) + 0.5)
+      set(shot and U.AMBER or U.TEXT); gfx.rect(kx - 1, y + 2, 3, L.rh - 4, 1)
+      text(sx + sww + L.pad, y, tostring(sv), shot and U.AMBER or U.GREY)
+      if shot then hover.chainknob = { f = f, idx = f.chain_p.i, x = sx, w = sww } end
+      y = y + L.rh
+      local b1 = btn(x, 'spread', 'cspread')
+      text(b1 + L.pad, y, fit('zones evenly, crossfades', x + w - b1 - L.pad), U.DIM)
+      y = y + L.rh + 1
+    else
+      btn(x, '+ chain select', 'cselnew')
+      y = y + L.rh + 1
+    end
+  end
   text(x, y, fit('chain', nw), U.DIM); text(vbx + L.pad, y, 'mix', U.DIM)
   y = y + L.rh
   for _, c in ipairs(chains) do
@@ -5630,6 +5655,41 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     local bx2 = btn(bxs, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
     btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh + 1
+    -- зона цепи (chain select есть): полоса 0..127 — скаты клиньями, полная часть заливкой, бегунок chain; справа текстом
+    if sv and Z and y + L.rh <= ymax then
+      local zz = info.zone_read and info.zone_read(tr0, kd)
+      local z = zz and zz.sel or { lo = 0, hi = 127, flo = 0, fhi = 127 }
+      local tt = Z.text(z)
+      local tw = ms('000..000 full 000..000')
+      local zx, zw = x + L.pad, w - tw - 2 * L.pad
+      if zw < L.cw * 6 then zw = w - 2 * L.pad; tt = nil end
+      local function X(v) return zx + math.floor(v / 128 * zw + 0.5) end
+      local y0, y1 = y + 2, y + L.rh - 2
+      local xl, xfl, xfh, xh = X(z.lo), X(z.flo), X(z.fhi + 1), X(z.hi + 1)
+      local on = Z.gain(sv, z) > 0
+      local colz = kd.enabled and (on and U.GREEN or U.GREY) or U.DIM
+      set(U.tint(colz, 0.55)); gfx.rect(xfl, y0, math.max(1, xfh - xfl), y1 - y0, 1)
+      if xfl > xl then gfx.triangle(xl, y1, xfl, y0, xfl, y1) end
+      if xh > xfh then gfx.triangle(xfh, y0, xh, y1, xfh, y1) end
+      set(colz); gfx.rect(xl, y0 - 1, math.max(1, xh - xl), 1, 1)
+      set(U.AMBER); gfx.rect(X(sv + 0.5), y0 - 1, 1, y1 - y0 + 2, 1)
+      if tt then
+        local thot = not drag and mx >= zx + zw + L.pad and mx < x + w and my >= y and my < y + L.rh
+        text(zx + zw + L.pad, y, fit(tt, tw), thot and U.AMBER or U.GREY)
+        if thot then hover.dspbtn = { fx = k, f = f, what = 'ztext', ki = c.ki, kid = kd, z = z } end
+      end
+      if not drag and my >= y and my < y + L.rh and mx >= zx and mx < zx + zw then
+        local what
+        local top = my < y + L.rh // 2
+        if top and math.abs(mx - xfl) <= 4 then what = 'flo'
+        elseif top and math.abs(mx - xfh) <= 4 then what = 'fhi'
+        elseif math.abs(mx - xl) <= 4 then what = 'lo'
+        elseif math.abs(mx - xh) <= 4 then what = 'hi'
+        elseif mx > xl and mx < xh then what = 'move' end
+        if what then hover.zone = { kind = 'sel', what = what, zaddr = zz and zz.addr, z = z, x0 = zx, w = zw, c = f.i, k = c.ki - 1 } end
+      end
+      y = y + L.rh + 2
+    end
   end
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа

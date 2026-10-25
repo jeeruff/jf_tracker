@@ -1146,6 +1146,7 @@ V.COMMANDS = {
   { 'fxdump', '', 'DSP: dump the parameters of the module under the cursor (names, steps, value texts at 0 .25 .5 .75 1) into tests/fixtures/fxdump - samples for the parameter parser' },
   { 'snapname', 'text', 'name of the mixer snapshot just saved (prompt for name in the snapshots panel)' },
   { 'fxname', 'text', 'rename the selected fx or container in the chain (empty - its own name back)' },
+  { 'zone', 'lo hi [full-lo full-hi]', 'the chain zone of a container (0..127): where the chain sounds for chain select, full in the middle, fades at the edges (click the numbers in CHAINS)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
   { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
   { '!', 'text', 'REAPER actions (all, incl. scripts / custom): fzf, recent first - kept apart from tracker commands; also \\ a' },
@@ -1256,6 +1257,7 @@ local function run_cmd(line)
   elseif cmd == 'fxdump' then if ctx.fxdump then ctx.fxdump() end   -- 22 окт: снимок параметров модуля DSP под курсором (PLAN_DSP этап 0)
   elseif cmd == 'snapname' then if ctx.msn_name then ctx.msn_name(arg) end   -- 22 окт: имя снапшота микшера (prompt for name)
   elseif cmd == 'fxname' then if ctx.fx_rename then ctx.fx_rename(arg) end
+  elseif cmd == 'zone' then if ctx.zone_cmd then ctx.zone_cmd(arg) end   -- 25 окт
   elseif cmd == 'iname' then ctx.rename_inst(arg)
   elseif cmd == 'garden' or cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
   elseif cmd == 'midi' then st.top = true; st.toptab = 'midi'; if ctx.set_focus then ctx.set_focus('top') end
