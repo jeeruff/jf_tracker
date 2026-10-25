@@ -12635,6 +12635,25 @@ ctx = {
   end,
   inst_cut = function(i0, i1)
     local col = cur_col(); local pool = col and col.pool or {}
+    -- 25 окт: номера после сэмплов — плагины-инструменты: dd убирает плагин с его трека (u — назад), как любой инструмент lib
+    local nsamp = #pool + draw.empty_slots(#pool) + ctx.inst_off(col)
+    if i1 > #pool + draw.empty_slots(#pool) then
+      local del, names = {}, {}
+      for i = math.max(i0, #pool + draw.empty_slots(#pool) + 1), i1 do
+        local oc, k = ctx.inst_owner(i - (nsamp - ctx.inst_off(col)))
+        local fi = oc and ctx.track_insts(oc)[k]
+        if fi then del[#del + 1] = { tr = oc.track, fx = fi.fx }; local _, nm = reaper.TrackFX_GetFXName(oc.track, fi.fx, ''); names[#names + 1] = (nm or ''):gsub('^[^:]*: ', '') end
+      end
+      if #del > 0 then
+        table.sort(del, function(a, b2) return a.fx > b2.fx end)   -- с конца цепи: номера остальных не сдвигаются
+        edit.run('remove instrument plugin', function() for _, d in ipairs(del) do reaper.TrackFX_Delete(d.tr, d.fx) end end)
+        if state.instfx and col then state.instfx[col.guid] = nil end
+        model.invalidate()
+        vim.msg = 'removed the instrument plugin(s): ' .. table.concat(names, ', ') .. ' - u undo'
+        if i0 > #pool + draw.empty_slots(#pool) then return end
+        i1 = #pool + draw.empty_slots(#pool)
+      end
+    end
     ctx.inst_yank(i0, i1, true)
     local items = {}
     for i = i0, i1 do for _, it in ipairs(ctx.inst_items(i)) do items[#items + 1] = it end end
