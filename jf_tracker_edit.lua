@@ -1155,6 +1155,7 @@ function E.set_slices(it, slices)
       end
     end
   end)
+  if E.slices_hook then pcall(E.slices_hook, it, slices) end   -- 25 окт: нарезка — в связанный slixer
 end
 
 -- команды-огибающие/генераторы (jf_tracker_cmds): хранятся в P_EXT:jf_cmds,

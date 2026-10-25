@@ -936,7 +936,7 @@ local function pool_select(n)
     local g = n - nsamp
     local oc, k = ctx.inst_owner(g)
     if oc then
-      if col and oc.guid ~= col.guid then ctx.goto_track(oc) end
+      if col and oc.guid ~= col.guid then ctx.goto_col(oc) end
       ctx.inst_fx_pick(oc, ctx.track_insts(oc)[k].fx, false, true)
     elseif ctx and ctx.auto_select then ctx.auto_select() end
     return
@@ -6692,7 +6692,7 @@ ctx = {
       { key = 'm', label = 'sampler list - the selected samples into one RS5K (each note - the next file)', fn = function() ctx.rs5k_list() end },
       { key = 'x', label = 'sliXer - the whole sample into jf_slixer on the cursor track (its own slices, plays without the tracker)', fn = function()   -- 25 окт
         local root = ctx.slice_root(); local pf = root and ctx.item_file(root.item)
-        if pf then ctx.to_slixer(pf, cur_col()) else vim.msg = 'slixer: no audio file on the selected instrument' end
+        if pf then ctx.to_slixer(pf, cur_col(), root.item) else vim.msg = 'slixer: no audio file on the selected instrument' end
       end },
     } })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
@@ -17733,7 +17733,7 @@ function ctx.context_items(hover)
         if e.parent and e.slice_k and e.parent.slices then local p0 = e.parent; t0, t1 = p0.slices[e.slice_k] or 0, p0.slices[e.slice_k + 1] or p0.len; add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(p0.item, t0, t1, e.name) end, 'S')
         else add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(e.item, t0, t1, e.name) end, 'S') end
         local pf = ctx.item_file((e.parent or e).item)
-        if pf then add('To sliXer - jf_slixer on the cursor track slices and plays it on its own', function() ctx.to_slixer(pf, cur_col()) end, 'x') end   -- 25 окт
+        if pf then add('To sliXer - jf_slixer on the cursor track plays it, this slicer cuts it', function() ctx.to_slixer(pf, cur_col(), (e.parent or e).item) end, 'x') end   -- 25 окт
       end
       add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
       do   -- 25 окт: нарезанный (или его слайс) — сразу в drumrs5k, как c s в слайсере
@@ -18033,7 +18033,66 @@ function ctx.item_file(item)
   local p = reaper.GetMediaSourceFileName(src, '')
   return p ~= '' and p or nil
 end
-function ctx.to_slixer(path, col)
+-- 25 окт: slixer — «чем играть», слайсер трекера — «где резать». Айтем lib связан со slixer трека
+-- (P_EXT:jf_slx = GUID экземпляра): каждая правка его нарезки (edit.set_slices) уходит в slixer заказом
+-- TRKV+6000 (только владелец вида берёт). Загрузка: путь → дека наполнилась и устоялась → нарезка
+function ctx.slx_find(guid)
+  if not guid or guid == '' then return nil end
+  for ti = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, ti)
+    for i = 0, reaper.TrackFX_GetCount(tr) - 1 do if reaper.TrackFX_GetFXGUID(tr, i) == guid then return tr, i end end
+  end
+end
+function ctx.slx_starts(item)
+  local tk = item and reaper.ValidatePtr(item, 'MediaItem*') and reaper.GetActiveTake(item)
+  if not tk then return {} end
+  local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+  local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+  local out = {}
+  for _, t in ipairs(edit.item_slices(item) or {}) do out[#out + 1] = offs + t * rate end
+  if #out == 0 then out[1] = offs end   -- без нарезки — один срез: весь кусок
+  return out
+end
+function ctx.slx_push(item)
+  local _, guid = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_slx', '', false)
+  local tr, fx = ctx.slx_find(guid)
+  if not tr then return end
+  local P = ctx.slx_pending
+  if P and P.guid == guid and P.stage ~= 'slices' then P.item = item; return end   -- загрузка идёт — нарезка уйдёт за ней
+  ctx.slx_pending = { tr = tr, fx = fx, guid = guid, item = item, stage = 'slices', t = reaper.time_precise() }
+end
+edit.slices_hook = function(item)
+  local ok, g = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_slx', '', false)
+  if ok and g ~= '' then ctx.slx_push(item) end
+end
+function ctx.slx_item_of(guid)   -- связанный айтем lib экземпляра
+  for ti = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, ti)
+    for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, ii)
+      local _, g = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slx', '', false)
+      if g == guid then return it end
+    end
+  end
+end
+-- 25 окт: волна slixer в DSP → слайсер трекера на связанном айтеме lib (правки уходят в slixer)
+function ctx.slx_open_slicer(f)
+  local t = dsp_target()
+  local col = t and t.col
+  if not (col and col.track and f) then return end
+  local item = ctx.slx_item_of(reaper.TrackFX_GetFXGUID(col.track, f.fx or f.i))
+  if not item then vim.msg = 'slixer: no sample from the tracker yet - x in the lib / browser menu, or drop a file on the wave'; return end
+  for k, e in ipairs(col.pool or {}) do
+    if e.item == item then
+      if cur_col() ~= col then ctx.goto_col(col) end
+      ctx.open_slicer(k)
+      vim.msg = 'slixer: cut here (zoom, t transients, 8 1 3 6 equal) - every change goes to slixer'
+      return
+    end
+  end
+  vim.msg = 'slixer: its sample is not in the lib of ' .. (col.name or 'this track')
+end
+function ctx.to_slixer(path, col, item)
   col = col or dsp_target() or cur_col()
   if not (col and col.track and path and path ~= '') then vim.msg = 'slixer: no file / no track'; return end
   local tr = col.track
@@ -18048,13 +18107,34 @@ function ctx.to_slixer(path, col)
     if not (fx and fx >= 0) then vim.msg = 'slixer: jf_slixer.jsfx not found in Effects'; return end
     model.invalidate()
   end
-  ctx.slx_pending = { tr = tr, fx = fx, guid = reaper.TrackFX_GetFXGUID(tr, fx), path = path, t = reaper.time_precise() }
-  vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. ' into ' .. (col.name or 'the track') .. ' (it slices and plays on its own)'
+  local guid = reaper.TrackFX_GetFXGUID(tr, fx)
+  -- айтем lib — то, что режет слайсер трекера: есть (из lib / item) — его, нет (из браузера) — новый в lib трека
+  if not item then item = edit.depot_add(path, tr) end
+  if item then
+    local old = ctx.slx_item_of(guid)
+    if old and old ~= item then reaper.GetSetMediaItemInfo_String(old, 'P_EXT:jf_slx', '', true) end   -- один экземпляр — один айтем
+    reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_slx', guid, true)
+    model.invalidate()
+  end
+  ctx.slx_pending = { tr = tr, fx = fx, guid = guid, path = path, item = item, stage = 'path', t = reaper.time_precise() }
+  vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. ' into ' .. (col.name or 'the track') .. ' - cut it in the lib slicer, slixer plays'
+end
+function ctx.slx_send_slices(item)
+  local st = ctx.slx_starts(item)
+  with_ns('jf_slixer', function()
+    local B = 200000
+    local n = math.min(#st, 64)
+    reaper.gmem_write(B + 6001, n)
+    for k = 1, n do reaper.gmem_write(B + 6001 + k, st[k]) end
+    reaper.gmem_write(B + 6000, (math.floor(reaper.gmem_read(B + 6000)) % 16000000) + 1)
+  end)
+  return #st
 end
 function ctx.slx_pending_tick()
   local P = ctx.slx_pending
   if not P then return end
-  if reaper.time_precise() - P.t > 6 or not reaper.ValidatePtr(P.tr, 'MediaTrack*') then ctx.slx_pending = nil; vim.msg = 'slixer: no answer - drop the file on its window'; return end
+  local now = reaper.time_precise()
+  if now - P.t > 10 or not reaper.ValidatePtr(P.tr, 'MediaTrack*') then ctx.slx_pending = nil; vim.msg = 'slixer: no answer - drop the file on its window'; return end
   local fx = P.fx
   if reaper.TrackFX_GetFXGUID(P.tr, fx) ~= P.guid then   -- цепь сдвинулась — найти по GUID
     fx = nil
@@ -18066,16 +18146,30 @@ function ctx.slx_pending_tick()
   if not v then return end
   if v.old then ctx.slx_pending = nil; vim.msg = 'slixer: old plugin version - drop the file on its window'; return end
   if v.wait then return end
-  local path = P.path
-  ctx.slx_pending = nil
-  with_ns('jf_slixer', function()
-    local B = 200000
-    local n = math.min(#path, 255)
-    reaper.gmem_write(B + 5001, n)
-    for i = 1, n do reaper.gmem_write(B + 5001 + i, path:byte(i)) end
-    reaper.gmem_write(B + 5000, (math.floor(reaper.gmem_read(B + 5000)) % 16000000) + 1)
-  end)
-  vim.msg = 'slixer: ' .. (path:match('[^/]+$') or path) .. ' loaded'
+  if P.stage == 'path' then
+    local path = P.path
+    with_ns('jf_slixer', function()
+      local B = 200000
+      local n = math.min(#path, 255)
+      reaper.gmem_write(B + 5001, n)
+      for i = 1, n do reaper.gmem_write(B + 5001 + i, path:byte(i)) end
+      reaper.gmem_write(B + 5000, (math.floor(reaper.gmem_read(B + 5000)) % 16000000) + 1)
+    end)
+    if not P.item then ctx.slx_pending = nil; vim.msg = 'slixer: ' .. (path:match('[^/]+$') or path) .. ' loaded'; return end
+    P.stage, P.fr0, P.fr, P.ft, P.t2 = 'load', v.frames, v.frames, now, now
+    return
+  end
+  if P.stage == 'load' then   -- дека наполняется (демон стримит): ждать, пока кадры сменятся и устоятся 0.6 с
+    if v.frames ~= P.fr then P.fr, P.ft = v.frames, now; return end
+    local changed = v.frames ~= P.fr0 or now - P.t2 > 2
+    if not (v.frames > 0 and changed and now - P.ft > 0.6) then return end
+    P.stage = 'slices'
+  end
+  if P.stage == 'slices' and v.frames > 0 then
+    local n = ctx.slx_send_slices(P.item)
+    ctx.slx_pending = nil
+    vim.msg = ('slixer: %d slice(s) from the tracker slicer'):format(n)
+  end
 end
 function ctx.slixer_view(track, fxi)
   local S = ctx.slx
@@ -24729,6 +24823,10 @@ local function frame()
         ctx.adsr_d = d
       end
       click = { t = now2, zone = 'dspadsr' }
+    elseif hover.slxwave and not B.drag then   -- 25 окт: волна slixer — его нарезка в слайсере трекера (зум, транзиенты, ровно)
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.slxwave.fx
+      ctx.slx_open_slicer(hover.slxwave.f)
+      click = { t = now2, zone = 'slxwave' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
       ctx.set_focus('dsp'); dsp_sel.fx = hover.dspwave.fx
@@ -25576,7 +25674,7 @@ local function frame()
         local it = c and edit.depot_add(bd.e.pm and bd.e.path or B.full(bd.e), c.track)
         if it then orca_pending = { item = it, ox = hover.garden.ox, oy = hover.garden.oy, t = reaper.time_precise() }; model.invalidate() end
       elseif bd.active and hover.slxwave and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir then
-        ctx.slixer_load(hover.slxwave.f, bd.e.pm and bd.e.path or B.full(bd.e))   -- 11 окт: файл на волну slixer — его сэмпл
+        ctx.to_slixer(bd.e.pm and bd.e.path or B.full(bd.e), dsp_target() and dsp_target().col)   -- 11 окт: файл на волну slixer — его сэмпл; 25 окт: и в lib для нарезки
       elseif bd.active and hover.dspkit and not bd.e.trk and not bd.e.rgn and not bd.e.mark and not bd.e.dir and not bd.e.pm then
         -- 16 окт: drumrs5k — файл на пэд: его сэмпл; на all / пустое место сетки — новый пэд
         local pth = B.full(bd.e)
@@ -28192,7 +28290,8 @@ ctx.inst_off = function(col) return (col and ctx.inst_map().off[col.guid]) or 0 
 ctx.inst_total = function() return ctx.inst_map().total or 0 end
 ctx.inst_owner = function(g) local e = ctx.inst_map().list[g]; if e then return e.col, e.k end end
 -- курсор трекера на трек (первая его подколонка), вид — туда
-ctx.goto_track = function(col)
+-- 25 окт: goto_col — не goto_track: то поле — трек «курсор на него после пересборки», оно затирало функцию
+ctx.goto_col = function(col)
   for i, f in ipairs(L.flat or {}) do
     if f.col and f.col.guid == col.guid and not f.env then vim.cur.fi = i; vim.cur.field = 1; vim.cur.sub = nil; if vim.ensure_visible then vim.ensure_visible() end; return true end
   end
