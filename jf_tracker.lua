@@ -21653,8 +21653,12 @@ local function frame()
       -- 15 окт: панели pm на экране нет — модуль сразу у браузера (вкладка browser была пустой с заглушкой)
       -- 24 окт: только когда pm — своя панель (опция pm as a pane); без неё pm — вкладка браузера, сброс её ломал
       -- (режим files без нового списка — пустой браузер)
-      if B.mode == 'pm' and state.pmpane and state.panes and not draw.panes.visible(state.panes, 'pm') then B.set_mode('files') end
-      if B.panes and B.mode == 'pm' then                -- 9 окт: модуль сейчас у панели pm
+      -- 25 окт: у pm есть своя панель в раскладке, но её не видно (вкладка стека, свёрнута) — модуль назад браузеру
+      -- (pm_draw забирал его, пока браузер был за вкладкой fx, и браузер оставался пустой заглушкой)
+      local pm_leaf = state.panes and draw.panes.find and draw.panes.find(state.panes, 'pm')
+      local pm_vis = pm_leaf and draw.panes.visible(state.panes, 'pm')
+      if B.mode == 'pm' and ((state.pmpane and state.panes and not draw.panes.visible(state.panes, 'pm')) or (pm_leaf and not pm_vis)) then B.set_mode('files') end
+      if B.panes and B.mode == 'pm' and pm_vis then                -- 9 окт: модуль сейчас у панели pm
         U.text(x + Lx.pad, y + 2, ctx.fit('the browser and pm share one module - click here to show the files', w - 2 * Lx.pad), U.GREY)
         return 'browserhere'
       end
