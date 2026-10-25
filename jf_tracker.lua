@@ -6484,7 +6484,7 @@ ctx = {
     vim.open_hydra({ title = 'add ' .. nf .. ' to', items = {
       { key = 'l', label = 'the lib - each file its own instrument (= Enter)', fn = function() for _, f in ipairs(files) do ctx.add_to_depot(f) end; done(); vim.msg = #files .. ' file(s) into the lib' end },
       { key = 'd', label = 'drumrs5k - a pad per file, a key each (the rack on the DSP track, or a new one)', fn = function() ctx.drum_add_files(files); done() end },
-      { key = 'X', label = 'sliXer - jf_slixer on the DSP track slices it and plays on its own (the first file)', fn = function() ctx.to_slixer(files[1]); done() end },   -- 25 окт
+      { key = 'x', label = 'sliXer - jf_slixer on the DSP track slices it and plays on its own (the first file)', fn = function() ctx.to_slixer(files[1]); done() end },   -- 25 окт
       { key = 'y', label = 'layers (¥) of the selected lib instrument - they sound together with it on one note', fn = function() ctx.layer_add_files(files); done() end },   -- 19 окт
       { key = 's', label = 'sampler - one RS5K per file on the DSP track, played by pitch', fn = function()
         local col = dsp_target() or cur_col(); if not col then return end
@@ -6668,7 +6668,7 @@ ctx = {
       { key = 'w', label = 'sampler - the whole sample, one RS5K played by pitch', fn = function() ctx.slices_render('whole') end },
       { key = 'p', label = 'sampler with a loop - the whole sample, loop on, obeys note-offs (sustain while held)', fn = function() ctx.slices_render('loop') end },
       { key = 'm', label = 'sampler list - the selected samples into one RS5K (each note - the next file)', fn = function() ctx.rs5k_list() end },
-      { key = 'X', label = 'sliXer - the whole sample into jf_slixer on the cursor track (its own slices, plays without the tracker)', fn = function()   -- 25 окт
+      { key = 'x', label = 'sliXer - the whole sample into jf_slixer on the cursor track (its own slices, plays without the tracker)', fn = function()   -- 25 окт
         local root = ctx.slice_root(); local pf = root and ctx.item_file(root.item)
         if pf then ctx.to_slixer(pf, cur_col()) else vim.msg = 'slixer: no audio file on the selected instrument' end
       end },
@@ -17711,7 +17711,7 @@ function ctx.context_items(hover)
         if e.parent and e.slice_k and e.parent.slices then local p0 = e.parent; t0, t1 = p0.slices[e.slice_k] or 0, p0.slices[e.slice_k + 1] or p0.len; add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(p0.item, t0, t1, e.name) end, 'S')
         else add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(e.item, t0, t1, e.name) end, 'S') end
         local pf = ctx.item_file((e.parent or e).item)
-        if pf then add('To sliXer - jf_slixer on the cursor track slices and plays it on its own', function() ctx.to_slixer(pf, cur_col()) end, 'X') end   -- 25 окт
+        if pf then add('To sliXer - jf_slixer on the cursor track slices and plays it on its own', function() ctx.to_slixer(pf, cur_col()) end, 'x') end   -- 25 окт
       end
       add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
       do   -- 25 окт: нарезанный (или его слайс) — сразу в drumrs5k, как c s в слайсере
@@ -24305,7 +24305,10 @@ local function frame()
       click = { t = now2, zone = 'chainbtn' }
     elseif hover.matrix and hover.matrix.sketchbtn then
       local b = hover.matrix.sketchbtn
-      if b == 'after' or b == 'before' then ctx.sketch_insert(b == 'before')
+      if b == 'make' then ctx.sketch_add()
+      elseif b == 'hear' then local by = {}; for _, pk in pairs(MX.pal_pick or {}) do by[pk.ci] = pk end; if next(by) then ctx.palette_mix(by) else vim.msg = 'sketch: pick cells first' end
+      elseif b == 'done' then MX.sk_show = false; MX.sk_pickmode = nil; MX.pal_kb = false; MX.pal_pick = {}; ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); vim.msg = 'sketch: off'
+      elseif b == 'after' or b == 'before' then ctx.sketch_insert(b == 'before')
       elseif b == 'play' then ctx.sketch_play()   -- 21 окт: > — слушать (= Ctrl+Space)
       elseif b == 'edit' then ctx.sketch_edit()
       else
@@ -24363,6 +24366,18 @@ local function frame()
       click = { t = now2, zone = 'mxdur', row = hover.matrix.dur }
     elseif hover.matrix and hover.matrix.prev then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.prev, -1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.next then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.next, 1); click = { t = now2, zone = 'mxarrow' }
+    elseif hover.matrix and hover.matrix.ri and hover.matrix.ci and MX.sk_pickmode and MX.sk_show then   -- 25 окт: набор эскиза мышью
+      ctx.set_focus('matrix')
+      local rg, ci = seq[hover.matrix.ri], hover.matrix.ci
+      if rg and not rg.gap and snap.cols[ci] then
+        local p = { name = rg.name, src = rg, key = (rg.name or '') .. '@' .. rg.pos }
+        local key = p.key .. ':' .. ci
+        MX.pal_pick = MX.pal_pick or {}
+        if MX.pal_pick[key] then MX.pal_pick[key] = nil else MX.pal_pick[key] = { p = p, ci = ci } end
+        local n = 0; for _ in pairs(MX.pal_pick) do n = n + 1 end
+        vim.msg = ('sketch: %d cell(s) picked - make: a sketch, hear: listen, click again: unpick'):format(n)
+      end
+      click = { t = now2, zone = 'skpick' }
     elseif hover.matrix and hover.matrix.ri and hover.matrix.ci then
       ctx.set_focus('matrix'); ctx.pl_help = nil
       -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки; Cmd+щелчок —
@@ -28362,7 +28377,11 @@ ctx.mx_btn_do = function(b)
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'timesel' then ctx.tsel_menu()
-  elseif b == 'sketch' then MX.sk_show = not MX.sk_show; vim.msg = 'sketchpad: c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch'
+  elseif b == 'sketch' then   -- 25 окт: кнопка — сразу набор: щелчок по клеткам (или Shift + клавиши clipkb), make — эскиз
+    MX.sk_show = not MX.sk_show
+    if MX.sk_show then ctx.set_focus('matrix'); MX.pal_kb = true; MX.pal_pick = {}; MX.sk_pickmode = true
+      vim.msg = 'sketch: click cells of any patterns (or Shift + clipkb keys), then make - a sketch X1; hear - listen to the picks'
+    else MX.sk_pickmode = nil; MX.pal_kb = false; MX.pal_pick = {}; vim.msg = 'sketch: off' end
   elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
     MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
     vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
@@ -29692,14 +29711,31 @@ end
 ctx.sketch_draw = function(Lx, x, y, w)
   local hv = {}
   ctx.sketch_ensure()   -- 21 окт: эскизы проекта (после рестарта / смены вкладки)
-  if #MX.sketch == 0 then   -- 23 окт: пустая — строки нет (кнопка sketch в ряду кнопок; как начать — в статусе над ней)
-    if not MX.sk_show then return 0, hv end
-    U.text(x + Lx.pad, y, 'sketch', U.GREY)
-    return Lx.rh + 2, hv
-  end
+  if #MX.sketch == 0 and not MX.sk_show then return 0, hv end   -- 23 окт: пустая и выключена — строки нет
   local mx, my = gfx.mouse_x, gfx.mouse_y
   U.text(x + Lx.pad, y, 'sketch', U.GREY)
   local bx = x + Lx.pad + U.measure('sketch ') + Lx.pad
+  -- 25 окт: набор — кнопки make / hear / done и подсказка, сколько выбрано
+  if MX.sk_show and MX.sk_pickmode then
+    local n = 0; for _ in pairs(MX.pal_pick or {}) do n = n + 1 end
+    for _, b in ipairs({ { 'make', 'make' }, { 'hear', 'hear' }, { 'done', 'done' } }) do
+      local bw = U.measure(b[1]) + 2 * Lx.pad
+      if bx + bw > x + w then break end
+      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+      local lit = b[2] == 'make' and n > 0
+      U.set(hot and U.tint(U.AMBER, 0.3) or (lit and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
+      U.set(lit and U.CYAN or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
+      U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or (lit and U.CYAN or U.TEXT))
+      if hot then hv.sketchbtn = b[2] end
+      bx = bx + bw + 2
+    end
+    if #MX.sketch == 0 then
+      local tip = n > 0 and (n .. ' picked - make') or 'click cells'
+      if bx + U.measure(tip) + Lx.pad <= x + w then U.text(bx + Lx.pad, y, tip, U.GREY) end
+      return Lx.rh + 2, hv
+    end
+    bx = bx + Lx.pad
+  end
   for k, sk in ipairs(MX.sketch) do
     local bw = U.measure(sk.name) + 2 * Lx.pad
     if bx + bw > x + w - U.measure('> e P p x') - 6 * Lx.pad then break end
