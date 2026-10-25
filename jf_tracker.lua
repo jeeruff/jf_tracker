@@ -26502,6 +26502,11 @@ local function frame()
     elseif dn and dn:byte(77) ~= 0 then c = 13; c_raw = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
   end
   ctx.ctrlj_t = reaper.time_precise()
+  -- 25 окт: Ctrl+` на маке приходит кодом 0 ('0') — шаг становился 0; физически ` (VK 0xC0) без 0 — это Ctrl+` (шаг next)
+  if c == 48 and reaper.JS_VKeys_GetState and gfx.mouse_cap & 4 ~= 0 then
+    local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.3)
+    if ks and ks:byte(192) ~= 0 and ks:byte(48) == 0 then c = 96; c_raw = 96 end
+  end
   -- 13 окт: Ctrl+M — метроном вкл / выкл из любого модуля (как в FL Studio; меню настроек — gm)
   -- Ctrl+M и Ctrl+Enter дают один код 13 — метроном, только если физически нажата M (иначе Ctrl+Enter — свойства ноты)
   local mdown = false

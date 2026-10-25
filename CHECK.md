@@ -1812,3 +1812,4 @@
 - [ ] 25 окт: шапка трека — кнопка fx (после s, на узком треке — во второй строке рядом с ///): зелёная, если есть звучащие эффекты; серая — пусто / цепь выключена / всё в bypass; щелчок — вся цепь вкл / выкл
 - [ ] 25 окт: ПКМ на нарезанном инструменте lib (или его слайсе) — k slice to drumrs5k (как c s в слайсере)
 - [ ] 25 окт: кнопка menu матрицы — все команды матрицы подменю: slot (o O + Ctrl+Up/Down yy p P yp A U n = [ ] { } Ctrl+Shift+h/l t dd), cell / block (v ^C x ^V M), section (s, Tr), song / chain (S C :pl unstack), keyboard (clipkb, patternkb, sketch), patternize, codes, play, undo; пункт выполняет ту же клавишу
+- [ ] 25 окт: Ctrl+` — шаг next вкл / выкл (раньше на маке приходил как Ctrl+0 и ставил шаг 0); Ctrl+Opt+` — auto; Ctrl+0 — по-прежнему шаг 0
