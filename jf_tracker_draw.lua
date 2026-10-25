@@ -5075,8 +5075,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     { 'bpm', c.bpm_edit and ((c.bpm_edit ~= '' and c.bpm_edit or '...') .. ' BPM') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },   -- 16 окт: при вводе слово BPM остаётся
     { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
   } or nil
-  -- 25 окт: full — размер не крупно, а в строке метронома слева от него (sig_line ниже)
-  if big and c.tpfull then table.remove(big, 3) end
   local bigw = 0
   -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
   local BKT = c.bigbpm and 2 or 1   -- 19 окт: опция big time and BPM — крупно (x2) / обычным текстом на том же месте
@@ -5132,12 +5130,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local mt = { 'metro', 'metro', c.metro and U.CYAN or U.GREY }
     local bt = {}; for k2, v2 in pairs(g[2][1]) do bt[k2] = v2 end; bt[2] = ''
     bt.bres = 15   -- 25 окт: место под 15 долей заранее — длинный размер не двигает соседей
-    local st = { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT }   -- 25 окт: размер — слева от metro
-    D.sig_line = { { st, mt, bt } }
+    -- 25 окт: swing — слева от metro (размер — крупно справа от BPM, как BPM по опции)
+    local sw = by_id.swing
+    D.sig_line = sw and { { sw[1][1], sw[2][1], mt, bt } } or { { mt, bt } }
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
-  D.swing_line = (big and c.tpfull and D.sig_line and by_id.swing) and { { by_id.swing[1][1], by_id.swing[2][1] } } or nil
+  D.swing_line = nil   -- 25 окт: swing теперь в строке метронома (sig_line)
   -- 15 окт: swing — в строку с метрономом, только если влезает в ширину BPM; иначе — у правого края, как раньше
   if D.swing_line and group_w(D.sig_line) + 3 * L.pad + group_w(D.swing_line) > bigw then D.swing_line = nil end
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
@@ -5146,7 +5145,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
   if not (c.tpfull and c.tptext) then addg('punch') end   -- 9 окт: LPB — в блоке step (15 окт: full — под rec)
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
-  local last = (by_id.swing and not D.swing_line) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
+  local last = (by_id.swing and not D.swing_line and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
