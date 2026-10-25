@@ -25385,6 +25385,7 @@ local function frame()
   elseif U.rclick and hover.matrix and hover.matrix.secloop then ctx.sec_menu(hover.matrix.secloop); U.rclick = false   -- 18 окт: меню секции — ПКМ
   elseif U.rclick and hover.tlist then local c2 = snap and snap.cols[hover.tlist.ci]; if c2 then ctx.track_menu(c2) end   -- 11 окт: tracks — меню трека (скрыть — столбец T)
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
+  elseif U.rclick and hover.ctrl == 'bpm' then bpm_menu = bpm_menu and nil or { sel = 1 }   -- 25 окт: ПКМ на BPM — его выпадашка (как щелчок)
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
   elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then

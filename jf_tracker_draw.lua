@@ -4781,6 +4781,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         local iw = cw_of(it)
         local ih = it.big and (2 * L.rh) or L.rh
         local hot = it[1]:sub(1, 1) ~= '_' and cell_hot(cx, cy, iw, ih)
+        local kbd = info.focus == 'ctrl' and info.ctrl_sel == it[1]   -- 25 окт: курсор клавиатуры виден и в полосе транспорта
+        if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(cx - 2, cy, iw + 4, ih, 1) end
+        if it[1]:sub(1, 1) ~= '_' then D.ctrl_rect = D.ctrl_rect or {}; D.ctrl_rect[it[1]] = { cx, cy + ih - L.rh, iw, L.rh } end
         if hot then set(D.CURROW); gfx.rect(cx - 2, cy, iw + 4, ih, 1); hover.ctrl = it[1] end
         if it.big and it.vlab then
           -- 16 окт: подпись длиннее двух строк (step) — выше, в верхний отступ полосы (до 3 px), не в строку listen
@@ -5080,7 +5083,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local bx0 = bx
     for _, b in ipairs(big) do
       local hot = cell_hot(bx, ly, b.w, 2 * L.rh)
-      D.big_text(bx, ly + (BKT == 1 and math.floor(L.rh / 2) or 0), b[2], hot and U.AMBER or b[3], BKT)
+      -- 25 окт: курсор клавиатуры (фокус транспорта, f на BPM) — подложкой и янтарём; прямоугольник — для выпадашки под ним
+      local kbd = info.focus == 'ctrl' and info.ctrl_sel == b[1]
+      if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(bx - 2, ly, b.w + 4, 2 * L.rh, 1) end
+      D.ctrl_rect = D.ctrl_rect or {}; D.ctrl_rect[b[1]] = { bx, ly + L.rh, b.w, L.rh }
+      D.big_text(bx, ly + (BKT == 1 and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT)
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
       bx = bx + b.w + 3 * L.pad
