@@ -28080,6 +28080,46 @@ ctx.wheel_vbar = function(step)
   ctx.vbar_scroll(best, ctx.vbar_get(best) + step)
   return true
 end
+-- 25 окт: длина слайса, который играет нота pitch на треке: RS5K (и в контейнерах — пэды drumrs5k) с этой нотой
+-- в диапазоне — (end - start) × длина файла, секунды; nil — нота не на сэмплере. Кеш 2 с
+ctx.note_slice_secs = function(tr, pitch)
+  if not (tr and pitch and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
+  local now = reaper.time_precise()
+  ctx.nss = ctx.nss or {}
+  local ck = tostring(tr) .. ':' .. math.floor(pitch)
+  local hit = ctx.nss[ck]
+  if hit and now - hit.t < 2 then return hit.v end
+  local best
+  local function scan(addr, depth)
+    if best then return end
+    local _, nm = reaper.TrackFX_GetFXName(tr, addr, '')
+    local _, on = reaper.TrackFX_GetNamedConfigParm(tr, addr, 'original_name')   -- пэды переименованы (S01 …)
+    nm = ((nm or '') .. ' ' .. (on or '')):lower()
+    if nm:find('reasamplomatic', 1, true) or nm:find('rs5k', 1, true) then
+      local P = model.rs5k_pidx(model.fxapi(tr), tr, addr)
+      if not (P.note and P.start and P.stop) then return end
+      local lo = math.floor(reaper.TrackFX_GetParamNormalized(tr, addr, P.note) * 127 + 0.5)
+      local hi = P.note_end and math.floor(reaper.TrackFX_GetParamNormalized(tr, addr, P.note_end) * 127 + 0.5) or lo
+      if pitch < lo or pitch > hi then return end
+      local ok, f = reaper.TrackFX_GetNamedConfigParm(tr, addr, 'FILE0')
+      if not (ok and f ~= '') then return end
+      local src = reaper.PCM_Source_CreateFromFile(f)
+      if not src then return end
+      local len = reaper.GetMediaSourceLength(src); reaper.PCM_Source_Destroy(src)
+      local a, b = reaper.TrackFX_GetParamNormalized(tr, addr, P.start), reaper.TrackFX_GetParamNormalized(tr, addr, P.stop)
+      best = math.max(0, (b - a) * len)
+    elseif depth < 5 then
+      local okc, n = reaper.TrackFX_GetNamedConfigParm(tr, addr, 'container_count')
+      for k = 0, (okc and tonumber(n) or 0) - 1 do
+        local ok2, ci = reaper.TrackFX_GetNamedConfigParm(tr, addr, 'container_item.' .. k)
+        if ok2 and tonumber(ci) then scan(tonumber(ci), depth + 1) end
+      end
+    end
+  end
+  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do scan(i, 0) end
+  ctx.nss[ck] = { t = now, v = best }
+  return best
+end
 ctx.wheel_owner = function()
   local R = draw.module_rects
   if not R then return nil end

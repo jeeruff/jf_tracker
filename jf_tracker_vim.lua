@@ -73,7 +73,14 @@ V.step_next = false   -- шаг next (3 окт): курсор на следую�
 -- шаг после правки поля (hex, огибающие): next — до следующего объекта, иначе V.step
 local function step_rows() if V.step_next then return V.next_rows and V.next_rows() or 1 end return V.step end
 -- строк, на сколько двигать курсор после вставки инструмента e (слайс k)
-local function adv_rows(e, k)
+local function adv_rows(e, k, tr, pitch)
+  -- 25 окт: нота играет слайс сэмплера (пэд drumrs5k / RS5K с этой нотой) — next и auto шагают на длину слайса
+  if (V.step_next or V.step_auto) and tr and pitch and ctx.note_slice_secs and ctx.edit and ctx.edit.row_time then
+    local secs = ctx.note_slice_secs(tr, pitch)
+    local lp = ctx.state.lpb or 4
+    local rs = ctx.edit.row_time(V.cur.row + 1, lp, 0) - ctx.edit.row_time(V.cur.row, lp, 0)
+    if secs and secs > 0 and rs > 0 then return math.max(1, math.floor(secs / rs + 0.5)) end
+  end
   if V.step_next then return V.next_rows and V.next_rows() or 1 end
   if not V.step_auto then return V.step end
   if not e or not e.len or not ctx.edit or not ctx.edit.row_time then return 1 end
@@ -2567,7 +2574,7 @@ function V.key_impl(c)
             if src == nil or src == 'midi' then
               E.set_pitch({ cell }, lpb(), pitch)
               if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, src, V.cur.row, V.step_auto and 1 or V.step) end
-              V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
+              V.cur.row = V.cur.row + adv_rows(inst, nil, f.col.track, pitch); ensure_visible()
               return
             end
             E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil
@@ -2586,7 +2593,7 @@ function V.key_impl(c)
         E.beside = false
         if st.preview and ctx.preview then ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)), V.cur.row, stp) end
         if newpat and ctx.auto_pat_msg then V.msg = ctx.auto_pat_msg end
-        V.cur.row = V.cur.row + adv_rows(inst); ensure_visible()
+        V.cur.row = V.cur.row + adv_rows(inst, nil, f.col.track, pitch); ensure_visible()
       end
     end
     return
