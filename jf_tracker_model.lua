@@ -1340,6 +1340,7 @@ end
 function M.steps_from_texts(texts)
   local labels, norms, cur, a = {}, {}, nil, nil
   local n = #texts
+  if n < 2 then return nil end   -- 25 окт: пусто — падал на a = nil (чёрное окно трекера)
   for k = 1, n do
     local t = texts[k]
     if t == nil or t == '' then return nil end

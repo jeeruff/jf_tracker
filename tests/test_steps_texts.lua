@@ -19,4 +19,6 @@ eq(M.steps_from_texts(cat(rep('a', 10), rep('b', 10), rep('a', 13))), nil, 'a la
 local nine = {}; for k = 1, 33 do nine[#nine + 1] = 'v' .. math.min(9, math.ceil(k / 3.7)) end
 eq(M.steps_from_texts(nine), nil, '9 labels - not steps (dropdown handled elsewhere)')
 eq(M.step_index({ nsteps = 5 }, 0.5), 2, 'plain steps index unchanged')
+eq(M.steps_from_texts({}), nil, 'no texts - nil, not an error (black tracker 25 Oct)')
+eq(M.steps_from_texts({ 'x' }), nil, 'one text - nil')
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
