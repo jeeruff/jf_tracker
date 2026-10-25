@@ -344,7 +344,7 @@ local state = {
   bsmode = reaper.GetExtState(EXT, 'bsmode') == 'track' and 'track' or 'pattern',
   foldfast = reaper.GetExtState(EXT, 'foldfast') == '1',   -- 19 окт: fold быстрых нот (кнопка fd)   -- 19 окт: BS / Ins — в паттерне (Renoise) / по дорожке   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
-  libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',
+  libtabs = reaper.GetExtState(EXT, 'libtabs') == '1' and reaper.GetExtState(EXT, 'libtabs_off25') == '1',   -- 25 окт: lib — одним списком с папками разделов (вкладки — опцией)
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
@@ -16862,6 +16862,7 @@ end
 -- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
 -- qwerty — прежняя строка q2w3e, октава z x
 do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or kl == 'renoise') end   -- 17 окт: и renoise
+if reaper.GetExtState(EXT, 'libtabs_off25') ~= '1' then state.libtabs = false; reaper.SetExtState(EXT, 'libtabs', '0', true); reaper.SetExtState(EXT, 'libtabs_off25', '1', true) end
 if reaper.GetExtState(EXT, 'hint_panes24') ~= '1' then if state.hintpos == 'tabs' then state.hintpos = 'panes' end; reaper.SetExtState(EXT, 'hint_panes24', '1', true) end   -- 24 окт: подсказки снова внизу модулей (в строке вкладок влезало только «\ menu») — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
