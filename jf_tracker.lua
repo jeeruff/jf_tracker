@@ -26475,6 +26475,7 @@ local function frame()
   end
   if ctx.shiftrec then pcall(ctx.shift_rec_tick) end   -- 12 окт: shift rec — конец записи, первая нота на место
   if ctx.slowrec then pcall(ctx.slow_rec_tick) end   -- 11 окт: slow rec кончилась — playrate назад   -- 10 окт: отдать странице ReaVisor   -- 10 окт: мост к модели / MCP
+  if c <= 0 and ctx.keyq and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1) end   -- 25 окт: клавиши из меню (меню матрицы) — по одной в кадр
   if c <= 0 then local fk = ctx.fxwin_keys(); if fk then c = fk end end   -- 24 окт: клавиши нот при окне плагина впереди
   -- живые тесты: ExtState jf_tracker/inject = «код#n» — клавиша как с клавиатуры
   if c <= 0 then
@@ -31033,7 +31034,48 @@ ctx.mx_menu = function(pick)
     { key = 'd', label = 'codes: to decimal (AC -> A12)', fn = function() ctx.codes_convert('dec') end },
   }
   if pick then for _, it in ipairs(items) do if it.key == pick then it.fn(); return true end end; return false end
-  vim.open_hydra({ title = 'matrix menu - patternize the empty parts / convert pattern codes', items = items })
+  -- 25 окт: меню матрицы — все её команды (кроме вида: это view / z), подменю по смыслу; пункт = клавиша матрицы,
+  -- она и выполняется (ctx.keyq — как с клавиатуры, фокус в матрице), в подписи — сама клавиша
+  local function keys(str) return function() ctx.set_focus('matrix'); ctx.keyq = ctx.keyq or {}; for k = 1, #str do ctx.keyq[#ctx.keyq + 1] = str:byte(k) end end end
+  local function K(key, label, str) return { key = key, label = label .. '  (' .. str .. ')', fn = keys(str) } end
+  local function F(key, label, fn) return { key = key, label = label, fn = function() ctx.set_focus('matrix'); fn() end } end
+  local pz, cv = {}, {}
+  for _, it in ipairs(items) do if it.label:find('^codes') then cv[#cv + 1] = it elseif it.label:find('^patternize') then pz[#pz + 1] = it end end
+  local top = {
+    { key = 'l', label = 'slot …', sub = function() return { title = 'matrix: slot', items = {
+      K('o', 'new slot after', 'o'), K('O', 'new slot before', 'O'), K('+', 'new region at the end', '+'),
+      F('j', 'duplicate the slot below, muted tracks empty (Ctrl+Down)', function() ctx.slot_new('clone_nomute', false) end),
+      F('k', 'duplicate the slot above, muted tracks empty (Ctrl+Up)', function() ctx.slot_new('clone_nomute', true) end),
+      K('y', 'yank slot', 'yy'), K('p', 'put after', 'p'), K('P', 'put before', 'P'),
+      K('u', 'duplicate: a free copy', 'yp'), K('A', 'alias: a linked repeat', 'A'), K('U', 'unique: unlink the repeat', 'U'),
+      K('n', 'rename the region', 'n'), K('=', 'type the length (N steps, Ns, Nb)', '='),
+      K('[', 'length -1 bar', '['), K(']', 'length +1 bar', ']'), K('{', 'length -1 step', '{'), K('}', 'length +1 step', '}'),
+      F('h', 'previous pattern of the slot (Ctrl+Shift+h)', function() ctx.slot_cycle(MX.cur.ri, -1) end),
+      F('L', 'next pattern of the slot (Ctrl+Shift+l)', function() ctx.slot_cycle(MX.cur.ri, 1) end),
+      K('t', 'trim items past the region', 't'), K('d', 'delete slot (to the register)', 'dd'),
+    } } end },
+    { key = 'c', label = 'cell / block …', sub = function() return { title = 'matrix: cell / block', items = {
+      K('v', 'block select (then H J K L)', 'v'), { key = 'y', label = 'block copy  (^C)', fn = keys('\3') }, K('x', 'cut the cell / block', 'x'),
+      { key = 'p', label = 'paste at the cursor  (^V)', fn = keys('\22') }, K('M', 'mute / unmute the cell', 'M'),
+    } } end },
+    { key = 's', label = 'section …  (s)', fn = function() ctx.set_focus('matrix'); ctx.mx_sec_menu() end },
+    { key = 'T', label = 'section from the time selection  (Tr)', fn = keys('Tr') },
+    { key = 'g', label = 'song / chain …', sub = function() return { title = 'matrix: song / chain', items = {
+      K('S', 'song: the section row above the playlist', 'S'), K('C', 'chain: type the order (A1 A1 B1x2 …)', 'C'),
+      F('p', 'playlist as text (:pl)', function() vim.run_cmd('pl') end),
+      F('u', 'unstack: patterns at one place play one after the other', function() ctx.unstack() end),
+    } } end },
+    { key = 'k', label = 'keyboard …', sub = function() return { title = 'matrix: keyboard', items = {
+      K('c', 'clipkb: 1qaz 2wsx … play the cells, Shift picks a sketch', 'c'),
+      F('p', 'patternkb: the note keys play the patterns (:patternkb)', function() vim.run_cmd('patternkb') end),
+      F('h', 'hear the sketch (Ctrl+Space)', function() ctx.sketch_play() end),
+    } } end },
+    { key = 'p', label = 'patternize the empty parts …', sub = function() return { title = 'matrix: patternize', items = pz } end },
+    { key = 'o', label = 'pattern codes …', sub = function() return { title = 'matrix: pattern codes', items = cv } end },
+    { key = 'P', label = 'play from the slot / queue it  (Space)', fn = keys(' ') },
+    { key = 'u', label = 'undo  (u)', fn = keys('u') },
+  }
+  vim.open_hydra({ title = 'matrix menu (view - the view button / z)', items = top })
   state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
 -- 12 окт: переименовать паттерны по коду (все регионы с этим именем — алиасы — вместе), один undo
