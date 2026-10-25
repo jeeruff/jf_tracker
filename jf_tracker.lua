@@ -17686,6 +17686,12 @@ function ctx.context_items(hover)
         else add('To the sampler (RS5K on the cursor track)', function() ctx.to_sampler(e.item, t0, t1, e.name) end, 'S') end
       end
       add('Slice … (virtual)', function() ctx.open_slicer(i) end, 'l')
+      do   -- 25 окт: нарезанный (или его слайс) — сразу в drumrs5k, как c s в слайсере
+        local root = e.parent or e
+        if root.item and root.slices and #root.slices > 0 then
+          add('Slice to drumrs5k - a pad (RS5K) per slice on the cursor track', function() pool_select(i); ctx.slices_render('rs5k') end, 'k')
+        end
+      end
       add('Rename … (:iname)', function() pool_select(i); ctx.rename_inst_prompt() end, 'n')
       add('Copy (yy)', function() ctx.inst_yank(i, i) end, 'y')
       add('Duplicate (yp)', function() ctx.inst_yank(i, i, true); pool_select(i); ctx.inst_put(false) end, 'u')
