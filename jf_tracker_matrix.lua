@@ -713,7 +713,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
     if pk and nw > U.measure(pk) + 4 then U.text(nx + nw - U.measure(pk), y + 1, pk, (ctx.PADS and ctx.PADS.rec) and U.RED or U.AMBER) end
     if hot_name then hover.name = ri end
-    if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub ~= 'len' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени (18 окт: и без фокуса янтарём): Enter / i — имя
+    if MX.cur.ri == ri and MX.cur.ci == 0 and not MX.cur.sub and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.mix(U.AMBER, U.GREY, 0.3)); gfx.rect(nx - 2, y, nw + 2, L.rh, 0) end   -- курсор на имени (18 окт: и без фокуса янтарём): Enter / i — имя
     -- 18 окт: выделение (блок / ячейки вразброс) — и на имени паттерна: видно, какие слоты взяты
     do
       local insel = false
@@ -745,8 +745,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local ss = ('%d/%d'):format(n or 4, d or 4)
         local beat = MX.vismetro and playing and info.play_row and ctx.state
         if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
-        right(ss, beat and U.AMBER or U.DIM, 'sig')
-      end
+        local sx2 = right(ss, beat and U.AMBER or U.DIM, 'sig')
+        if sx2 and MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'sig' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(sx2 - 2, y2, U.measure(ss) + 4, L.rh, 0) end
+        MX.subs = { 'len', 'sig' }
+      else MX.subs = { 'len' } end
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
@@ -755,7 +757,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if MX.bpm and ctx.bpm_at and not rg.gap then
         local bpm = ctx.bpm_at(rg.pos)
         local bs = (math.abs(bpm - math.floor(bpm + 0.5)) < 0.05) and tostring(math.floor(bpm + 0.5)) or ('%.1f'):format(bpm)
-        right(bs, MX.bpm_diff and U.TEXT or U.DIM, 'bpm')
+        local bx2 = right(bs, MX.bpm_diff and U.TEXT or U.DIM, 'bpm')
+        if bx2 then
+          table.insert(MX.subs, 1, 'bpm')
+          if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'bpm' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(bx2 - 2, y2, U.measure(bs) + 4, L.rh, 0) end
+        end
       end
       if info.bar_label then
         local bl = info.bar_label(rg.pos)
@@ -767,6 +773,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       -- длина в шагах по LPB (просьба 1 окт: без тактов и секунд)
       local ds = tostring(math.floor((rg.r1 - rg.r0) + 0.5))
       local dx = L.mx_label_w - L.mx_dur_w
+      -- 25 окт: курсор с имени по l: темп, размер, длина (как видно слева направо), дальше — клетки
+      MX.subs = {}
+      if (L.mx_bpm_w or 0) > 0 and ctx.bpm_at then MX.subs[#MX.subs + 1] = 'bpm' end
+      if L.mx_sig_w > 0 and info.sig_at then MX.subs[#MX.subs + 1] = 'sig' end
+      MX.subs[#MX.subs + 1] = 'len'
       -- 12 окт: длина — ячейка ввода: курсор встаёт (l с имени), цифры — набор шагов
       local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
@@ -783,6 +794,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local beat = MX.vismetro and playing and info.play_row and ctx.state
         if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
         local sx = dx - L.mx_sig_w
+        if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'sig' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(sx + 1, y, L.mx_sig_w - 2, L.rh, 0) end
         local hot_sig = hover.ri == ri and mx >= sx and mx < dx
         U.text(dx - L.pad - U.measure(ss), y + 1, ss, (hot_sig or beat) and U.AMBER or U.DIM)
         if hot_sig then hover.sig = ri end
@@ -794,6 +806,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local bs = (math.abs(bpm - math.floor(bpm + 0.5)) < 0.05) and tostring(math.floor(bpm + 0.5)) or ('%.1f'):format(bpm)
         local bx1 = dx - L.mx_sig_w
         local bx0 = bx1 - L.mx_bpm_w
+        if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'bpm' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(bx0 + 1, y, L.mx_bpm_w - 2, L.rh, 0) end
         local hot_bpm = hover.ri == ri and mx >= bx0 and mx < bx1
         if bs:find('.', 1, true) then MX.bpm_frac = true end   -- 18 окт: дробный темп — колонка шире со следующего кадра
         U.text(bx1 - L.pad - U.measure(bs), y + 1, bs, hot_bpm and U.AMBER or (MX.bpm_diff and U.TEXT or U.DIM))
@@ -1216,7 +1229,7 @@ function MX.key(c, regions, snap)
     if ch == ' ' then if sc and ctx.sec_launch then ctx.sec_launch(sc) end; return true end
     if ch == 'h' or c == 1818584692 then return true end
   end
-  if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and MX.cur.sub ~= 'len' and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then   -- с длины h — сначала на имя
+  if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and not MX.cur.sub and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then   -- с длины h — сначала на имя
     MX.cur.sec = true
     ctx.msg('section ' .. (MX.sec_at(regions, MX.cur.ri).name or '') .. ': Enter menu, c change name, x remove (patterns stay), Space launch, l back')
     return true
@@ -1268,10 +1281,21 @@ function MX.key(c, regions, snap)
   -- цифры — шаги (Enter или третья цифра пишет; другая клавиша — сброс)
   if MX.cur.ci == 0 and not MX.fold then
     local right, left = ch == 'l' or c == 1919379572, ch == 'h' or c == 1818584692
-    if MX.cur.sub ~= 'len' and right then MX.cur.sub = 'len'; MX.lenbuf = nil; return true end
+    -- 25 окт: и темп, и размер — по порядку на экране (MX.subs из отрисовки), не мимо них
+    local subs = MX.subs or { 'len' }
+    local idx
+    for k, sb in ipairs(subs) do if sb == MX.cur.sub then idx = k end end
+    if right then
+      MX.lenbuf = nil
+      if not idx then MX.cur.sub = subs[1]
+      elseif idx < #subs then MX.cur.sub = subs[idx + 1]
+      else MX.goto_cell(regions, snap, MX.cur.ri, 1) end
+      return true
+    end
+    if left and idx then MX.lenbuf = nil; MX.cur.sub = subs[idx - 1]; return true end
+    if MX.cur.sub == 'bpm' and (c == 13 or ch:match('^%d$')) then ctx.bpm_prompt(regions[MX.cur.ri]); return true end
+    if MX.cur.sub == 'sig' and c == 13 then ctx.sig_prompt(regions[MX.cur.ri]); return true end
     if MX.cur.sub == 'len' then
-      if right then MX.lenbuf = nil; MX.goto_cell(regions, snap, MX.cur.ri, 1); return true end
-      if left then MX.cur.sub = nil; MX.lenbuf = nil; return true end
       if ch:match('^%d$') then
         MX.lenbuf = (MX.lenbuf or '') .. ch
         if #MX.lenbuf >= 3 then local b = MX.lenbuf; MX.lenbuf = nil; ctx.mx_len(b) else ctx.msg(('length %s_ steps - Enter, or a third digit'):format(MX.lenbuf)) end
@@ -1285,7 +1309,7 @@ function MX.key(c, regions, snap)
       MX.lenbuf = nil
     end
   end
-  if MX.cur.ci == 1 and (ch == 'h' or c == 1818584692) and not MX.fold and not MX.count then MX.goto_cell(regions, snap, MX.cur.ri, 0); MX.cur.sub = 'len'; return true end
+  if MX.cur.ci == 1 and (ch == 'h' or c == 1818584692) and not MX.fold and not MX.count then MX.goto_cell(regions, snap, MX.cur.ri, 0); local sb = MX.subs or { 'len' }; MX.cur.sub = sb[#sb]; return true end
   -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
   -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
   if MX.cur.ci == -1 and ch:match('^%d$') and ctx.slot_pattern_num then
