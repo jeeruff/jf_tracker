@@ -87,7 +87,7 @@ function DK.key(c, sel, n, np, mods)
     end
     local r0, r1 = DK.range(sel)
     if op == 'd' and ch == 'd' then ctx.dsp_delete(r0, r1); DK.anchor = nil
-    elseif op == 'd' and ch == 'c' then ctx.dsp_unpack(sel.fx)
+    elseif op == 'c' and ch == 'u' then ctx.dsp_unpack(sel.fx)   -- 25 окт: cu — unpack (было dc)
     elseif op == 'd' and ch == 'm' then ctx.dsp_unmodulate(sel.fx, sel.param)
     elseif op == 'd' and ch == 'a' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'y' and ch == 'y' then ctx.dsp_yank(sel.fx)

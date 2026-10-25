@@ -17722,7 +17722,7 @@ function ctx.context_items(hover)
     end
     if col and f and f.container then
       local k = hover.dsp.fx
-      add('Unpack: plugins into the chain (dc)', function() ctx.dsp_unpack(k) end, 'u')
+      add('Unpack: plugins into the chain (cu)', function() ctx.dsp_unpack(k) end, 'u')
       add('Add fx inside … (fzf)', function()
         vim.open_picker('add fx into ' .. f.name, ctx.fx_list(), function(it)
           if edit.fx_add_into(col.track, f.i, it.data) then vim.msg = '+ ' .. it.label .. ' → ' .. f.name end

@@ -88,7 +88,7 @@ local sel = { fx = 2, param = 1 }
 eq(dk('dd', sel), 'dsp_delete:2:2', 'dsp dd')
 eq(DK.pending_hint(), nil, 'dsp hint cleared')
 DK.key(('d'):byte(), sel, 4, 8, {}); eq((DK.pending_hint() or ''):match('^d: d delete fx') ~= nil, true, 'dsp d hint'); DK.key(27, sel, 4, 8, {})
-eq(dk('dc', sel), 'dsp_unpack:2', 'dsp dc')
+eq(dk('cu', sel), 'dsp_unpack:2', 'dsp cu (25 Oct: was dc)')
 eq(dk('yy', sel), 'dsp_yank:2', 'dsp yy')
 eq(dk('p', sel), 'dsp_paste:2:true', 'dsp p')
 eq(dk('cc', sel), 'dsp_pack:2:2', 'dsp cc')

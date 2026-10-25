@@ -575,7 +575,7 @@ KH.PAGES = {
     { k = 'j k g G', d = 'parameter down / up / first / last' },
     { k = '+ - ^A ^X', d = 'value up / down (Shift: coarse)', t = { '+', '-', '=', '^A', '^X' } },
     { k = 'dd x', d = 'delete fx (v: range)', t = { 'dd', 'd', 'x' } },
-    { k = 'dc', d = 'unpack container: children into the chain' },
+    { k = 'cu', d = 'unpack container: children into the chain' },
     { k = 'yy p P', d = 'copy fx, paste after / before (any track)', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'cc', d = 'pack fx (v: range) into a new container', t = { 'cc', 'c' } },
     { k = 'cn', d = 'an empty container after the selected module (empty chain: at the end); it says what goes in: drop an fx or another container into it, [] in a container header - an empty container inside it, and so on' },

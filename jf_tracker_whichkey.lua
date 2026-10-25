@@ -44,10 +44,10 @@ local T = {
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
         { 'a', 'automate or show the envelope' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
         { 'm', 'map to a container macro' } } },
-  dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, { 'c', 'unpack the container' },
+  dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, 
         { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },
   dsp_y = { title = 'y - copy', items = { { 'y', 'the fx' } } },
-  dsp_c = { title = 'c - container', items = { { 'c', 'pack the fx (v: range)' } } },
+  dsp_c = { title = 'c - container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' } } },
 }
 
 -- p — ожидающий префикс; op — оператор, если ждём g после него (dgg)
