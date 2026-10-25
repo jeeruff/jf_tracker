@@ -65,6 +65,9 @@ AUTO = true; IK.key(('j'):byte(), cur, 3, 8); eq('j from automation -> midi', lo
 local nm = #log; IK.key(('j'):byte(), cur, 3, 8); eq('j on midi stays', #log, nm)
 IK.key(('G'):byte(), cur, 3, 8); eq('G on midi stays', #log, nm)
 IK.key(('k'):byte(), cur, 3, 8); eq('k from midi -> automation', log[#log], 'auto')
+eq('dd on a plugin row (9 of 10, 2 plugins) reaches it', IK.clip(9, 9, 3, 10, 2), 9)
+eq('dd on samples stops at the last sample', IK.clip(2, 6, 3, 10, 2), 3)
+eq('empty slot is not a plugin row', IK.clip(6, 6, 3, 10, 2), 3)
 AUTO = false; MIDI = false
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

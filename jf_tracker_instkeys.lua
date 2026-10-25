@@ -39,14 +39,21 @@ end
 -- c — код клавиши; cur — выбранный номер; n — инструментов (без пустых);
 -- nslots — вместе с пустыми слотами. true — съедено; 'leave' — в трекер;
 -- false — не наше (main отдаёт в vim).
-function IK.key(c, cur, n, nslots)
+-- 25 окт: диапазон d / y / x: сэмплы — до n (пустые слоты не трогаются); строки инструментов-плагинов
+-- (последние ninst из nslots) — до конца (dd их не удалял: диапазон резался по n)
+function IK.clip(r0, r1, n, nslots, ninst)
+  local p0 = (nslots or n) - (ninst or 0) + 1
+  if (ninst or 0) > 0 and r0 >= p0 then return math.min(r1, nslots) end
+  return math.min(r1, n)
+end
+function IK.key(c, cur, n, nslots, ninst)
   local ch = c < 256 and string.char(c) or ''
   if IK.pending then
     local op = IK.pending
     IK.pending = nil
     if c == 27 then return true end
     local r0, r1 = IK.range(cur)
-    r1 = math.min(r1, n)
+    r1 = IK.clip(r0, r1, n, nslots, ninst)
     if op == 'd' and ch == 'd' then if r0 <= r1 then ctx.inst_cut(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and ch == 'y' then if r0 <= r1 then ctx.inst_yank(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and (ch == 'p' or ch == 'P') then
@@ -58,7 +65,7 @@ function IK.key(c, cur, n, nslots)
   -- 24 окт: x — удалить инструмент под курсором (или диапазон v), как dd (просьба: x ничего не делал)
   if ch == 'x' then
     local r0, r1 = IK.range(cur)
-    r1 = math.min(r1, n)
+    r1 = IK.clip(r0, r1, n, nslots, ninst)
     if r0 <= r1 then ctx.inst_cut(r0, r1) end
     IK.anchor = nil
     return true
@@ -66,7 +73,7 @@ function IK.key(c, cur, n, nslots)
   -- в диапазоне (v) d / y действуют сразу (x убран 5 окт: вырезать — только d)
   if IK.anchor and (ch == 'd' or ch == 'y') then
     local r0, r1 = IK.range(cur)
-    r1 = math.min(r1, n)
+    r1 = IK.clip(r0, r1, n, nslots, ninst)
     if r0 <= r1 then if ch == 'y' then ctx.inst_yank(r0, r1) else ctx.inst_cut(r0, r1) end end
     IK.anchor = nil
     return true

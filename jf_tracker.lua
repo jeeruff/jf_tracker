@@ -27573,7 +27573,7 @@ local function frame()
         if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
         local col = cur_col()
         local n = #(col and col.pool or {})
-        local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n) + ctx.inst_total())   -- 25 окт: и плагины-инструменты (j k не перескакивают)
+        local r = IK.key(c, vim.inst, n, n + draw.empty_slots(n) + ctx.inst_total(), ctx.inst_total())   -- 25 окт: и плагины-инструменты (j k не перескакивают, dd удаляет)
         if r == 'leave' then ctx.set_focus('tracker')
         elseif not r then return vim.key(c) end
       elseif state.focus == 'ctrl' and state.top then
