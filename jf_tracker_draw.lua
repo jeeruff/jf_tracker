@@ -2967,34 +2967,6 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       if not j.done then text(x + 3, y + 2, ('%d%%'):format(math.floor(j.col / j.cols * 100)), U.GREY) end
     else text(x + 3, y + 2, fit('no impulse file (load one in ReaVerb)', w - 6), U.DIM) end
     if nm then text(x + 3, y + h - VRH - 1, fit(nm, w - 6), U.GREY) end
-  elseif kind == 'amigo' then
-    -- лента сэмпла: Start..End — играемая часть, Loop Start — метка; ниже —
-    -- режимы буквами и Sample Rate шкалой (лоу-фай: левее — грязнее)
-    local function pn(label) for i, p in ipairs(f.params or {}) do if p.name == label then return vals[i] and vals[i].n or 0, vals[i] and vals[i].s or '' end end; return 0, '' end
-    local st, en, lp = pn('start'), pn('end'), pn('loop at')
-    local loopon = (select(2, pn('loop')) or ''):lower():find('on') ~= nil
-    local th = math.max(6, math.floor(h * 0.45))
-    local sx0, sw = x + 2, w - 4
-    set(U.mix(U.PANEL, U.LINE, 0.5)); gfx.rect(sx0, y + 2, sw, th, 1)
-    local a, b = math.min(st, en), math.max(st, en)
-    set(U.mix(U.PANEL, U.AMBER, 0.45)); gfx.rect(sx0 + math.floor(a * sw), y + 2, math.max(1, math.floor((b - a) * sw)), th, 1)
-    set(U.AMBER); gfx.rect(sx0 + math.floor(a * sw), y + 2, 1, th, 1); gfx.rect(sx0 + math.floor(b * sw) - 1, y + 2, 1, th, 1)
-    if loopon then set(U.CYAN); gfx.rect(sx0 + math.floor(lp * sw), y + 2, 1, th, 1) end
-    local ry = y + th + 4
-    local flags = { { 'rev', (select(2, pn('reverse')) or ''):lower():find('on') }, { 'pp', (select(2, pn('ping pong')) or ''):lower():find('on') },
-                    { 'loop', loopon }, { 'gate', (select(2, pn('gate')) or ''):lower():find('on') } }
-    local fx0 = x + 3
-    for _, fl in ipairs(flags) do
-      if fx0 + ms(fl[1]) > x + w - 2 then break end
-      text(fx0, ry, fl[1], fl[2] and U.AMBER or U.DIM); fx0 = fx0 + ms(fl[1]) + ms(' ')
-    end
-    local srn, srs = pn('rate hz')
-    local by3 = ry + VRH + 3
-    if by3 + VRH < y + h then
-      set(U.LINE); gfx.rect(x + 3, by3 + math.floor(VRH / 2), w - 6, 1, 1)
-      set(U.mix(U.RED, U.GREEN, srn)); gfx.rect(x + 3, by3 + 2, math.max(1, math.floor(srn * (w - 6))), VRH - 4, 1)
-      text(x + 3, by3 + VRH + 1, fit('sr ' .. srs, w - 6), U.GREY)
-    end
   elseif kind == 'verb' then
     local room = math.max(0, math.min(1, (pnum(f, vals, 'room') or 50) / 100))
     local damp = math.max(0, math.min(1, (pnum(f, vals, 'damp') or 50) / 100))

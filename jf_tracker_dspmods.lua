@@ -387,8 +387,7 @@ DM.modules = {
     -- плагина — в основном MIDI-назначения, здесь только звук
     match = 'amigo',
     title = 'Amigo',
-    cols = 3,
-    view = 'amigo',
+    cols = 3,   -- 25 окт: без вида — волну Amigo наружу не отдаёт, лента Start / End была пустой коробкой
     params = {
       { 'Sample Start', 'start' }, { 'Sample End', 'end' }, { 'Loop Start', 'loop at' }, { 'Loop', 'loop', exact = true },
       { 'Sample Rate', 'rate hz' }, { 'Lin Interp', 'smooth' }, { 'Pitch', 'pitch' }, { 'Finetune', 'fine' },
