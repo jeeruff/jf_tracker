@@ -4751,7 +4751,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function cw_of(it)
     if it.big then return math.max(D.big_measure(it[2], 2), it.res and D.big_measure(it.res, 2) or 0) + (it.vlab and (L.th + L.pad) or 0) end   -- 15 окт: vlab — подпись вертикально слева
     if it.w then return it.w end
-    return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (it.beats.num * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
+    return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (math.max(it.beats.num, it.bres or 0) * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
   local function gap_of(g) return g.boxed and (gap + 6) or gap end
   -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
@@ -4805,7 +4805,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if it.beats then
           local bs = math.max(4, L.rh - 6)
           local bx = cx + ms(it[2]) + L.pad
-          for k = 1, it.beats.num do
+          for k = 1, (it.bres and math.min(it.beats.num, it.bres) or it.beats.num) do   -- 25 окт: не шире зарезервированного
             set(k == it.beats.cur and U.AMBER or U.DIM)
             gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
           end
@@ -5075,6 +5075,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     { 'bpm', c.bpm_edit and ((c.bpm_edit ~= '' and c.bpm_edit or '...') .. ' BPM') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },   -- 16 окт: при вводе слово BPM остаётся
     { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
   } or nil
+  -- 25 окт: full — размер не крупно, а в строке метронома слева от него (sig_line ниже)
+  if big and c.tpfull then table.remove(big, 3) end
   local bigw = 0
   -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
   local BKT = c.bigbpm and 2 or 1   -- 19 окт: опция big time and BPM — крупно (x2) / обычным текстом на том же месте
@@ -5129,7 +5131,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- (позиция крупно рядом); swing — туда же, если влезает
     local mt = { 'metro', 'metro', c.metro and U.CYAN or U.GREY }
     local bt = {}; for k2, v2 in pairs(g[2][1]) do bt[k2] = v2 end; bt[2] = ''
-    D.sig_line = { { mt, bt } }
+    bt.bres = 15   -- 25 окт: место под 15 долей заранее — длинный размер не двигает соседей
+    local st = { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT }   -- 25 окт: размер — слева от metro
+    D.sig_line = { { st, mt, bt } }
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
