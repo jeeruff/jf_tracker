@@ -248,6 +248,67 @@ local function sections_post(c)
 end
 
 E.last_ms, E.last_desc = 0, ''     -- длительность последней внешней правки (пульс hb)
+-- 25 окт: паттерны держатся долей. Правка сменила карту темпа (колонка Temp, BPM, Opt+Enter, ZT…) —
+-- регионы, маркеры и айтемы, которых сама правка не трогала, встают на прежние доли (QN): паттерн
+-- в 16 строк остаётся 16 строками. REAPER сам так делает только для правок мышью, не для API
+local function tempo_sig()
+  if not (R.CountTempoTimeSigMarkers and R.TimeMap2_GetNextChangeTime) then return '' end
+  local p = { R.CountTempoTimeSigMarkers(0) }
+  for k = 0, p[1] - 1 do
+    local _, tp, _, _, bpm, num, den, lin = R.GetTempoTimeSigMarker(0, k)
+    p[#p + 1] = ('%.6f:%.4f:%d:%d:%s'):format(tp, bpm, num, den, tostring(lin))
+  end
+  local t = 0
+  for _ = 1, 64 do
+    local nt = R.TimeMap2_GetNextChangeTime(0, t)
+    if not nt or nt <= t then break end
+    p[#p + 1] = ('%.6f=%.4f'):format(nt, R.TimeMap2_GetDividedBpmAtTime(0, nt + 1e-4)); t = nt
+  end
+  return table.concat(p, ' ')
+end
+E.tempo_sig = tempo_sig
+local function tempo_pre()
+  if not R.TimeMap2_timeToQN then return nil end
+  local q = R.TimeMap2_timeToQN
+  local st = { sig = tempo_sig(), marks = {}, items = {} }
+  local i = 0
+  while R.EnumProjectMarkers3 do
+    local ret, isr, pos, rend, name, idx, col = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    st.marks[#st.marks + 1] = { i = i, isr = isr, pos = pos, rend = rend, name = name, idx = idx, col = col, q0 = q(0, pos), q1 = isr and q(0, rend) or nil }
+    i = i + 1
+  end
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, ii)
+      local p, l = R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local tk = R.GetActiveTake(it)
+      st.items[#st.items + 1] = { it = it, p = p, l = l, q0 = q(0, p), q1 = q(0, p + l), midi = tk and R.TakeIsMIDI(tk) }
+    end
+  end
+  return st
+end
+local function tempo_post(st)
+  if not st or tempo_sig() == st.sig then return end
+  R.UpdateTimeline()
+  local qt = R.TimeMap2_QNToTime
+  local near = function(a, b) return math.abs(a - b) < 1e-7 end
+  for _, m in ipairs(st.marks) do
+    local ret, isr, pos, rend = R.EnumProjectMarkers3(0, m.i)
+    if ret and ret ~= 0 and isr == m.isr and near(pos, m.pos) and (not isr or near(rend, m.rend)) then   -- правка его не двигала
+      R.SetProjectMarkerByIndex(0, m.i, m.isr, qt(0, m.q0), m.isr and qt(0, m.q1) or 0, m.idx, m.name, m.col)
+    end
+  end
+  for _, e in ipairs(st.items) do
+    if R.ValidatePtr(e.it, 'MediaItem*') and near(R.GetMediaItemInfo_Value(e.it, 'D_POSITION'), e.p) and near(R.GetMediaItemInfo_Value(e.it, 'D_LENGTH'), e.l) then
+      local np = qt(0, e.q0)
+      R.SetMediaItemInfo_Value(e.it, 'D_POSITION', np)
+      if e.midi then R.SetMediaItemInfo_Value(e.it, 'D_LENGTH', qt(0, e.q1) - np) end   -- аудио — своя длительность (без смены скорости)
+    end
+  end
+  R.UpdateTimeline()
+end
 local function run(desc, fn)
   depth = depth + 1
   local pre
@@ -272,6 +333,7 @@ local function run(desc, fn)
     E.nm_pre = nil
     if E.NM.on() then local okn, c = pcall(E.NM.census); if okn then E.nm_pre = c end end
     local oks, sc = pcall(sections_pre); E.sec_pre = oks and sc or nil
+    if not E.no_tempo_keep then local okt, tp = pcall(tempo_pre); E.tempo_pre = okt and tp or nil end
   end
   R.Undo_BeginBlock2(0)
   R.PreventUIRefresh(1)
@@ -281,6 +343,7 @@ local function run(desc, fn)
     local okn, en = pcall(E.NM.sync, E.nm_pre or {})
     if not okn then E.nm_err = en end
   end
+  if ok and depth == 1 and E.tempo_pre then local okt, et = pcall(tempo_post, E.tempo_pre); if not okt then E.tempo_err = et end end
   if ok and depth == 1 and E.sec_pre then pcall(sections_post, E.sec_pre) end
   if ok and E.after and not E.in_after then
     E.in_after = true
@@ -295,7 +358,7 @@ local function run(desc, fn)
   if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: premod — за нотами трека
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
-  if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil end
+  if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil; E.tempo_pre = nil end
   R.PreventUIRefresh(-1)
   R.Undo_EndBlock2(0, 'jf_tracker: ' .. desc, -1)
   R.UpdateArrange()

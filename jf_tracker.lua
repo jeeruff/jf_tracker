@@ -28257,6 +28257,55 @@ ctx.note_slice_secs = function(tr, pitch)
   ctx.nss[ck] = { t = now, v = best }
   return best
 end
+-- 25 окт: :tempoclean — карта темпа разошлась с маркерами (смены без маркера): переписать маркеры заново,
+-- REAPER перестраивает карту; паттерны — на своих долях (edit.run держит QN)
+ctx.tempo_clean = function()
+  local before = edit.tempo_sig()
+  local list = {}
+  for k = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do list[#list + 1] = { reaper.GetTempoTimeSigMarker(0, k) } end
+  -- лишние маркеры: тот же темп и размер, что у предыдущего, без рампы — ничего не меняют
+  local keep, dropped = {}, 0
+  for k, m in ipairs(list) do
+    local p = keep[#keep]
+    if k > 1 and p and math.abs(m[5] - p[5]) < 1e-6 and (m[6] <= 0 or m[6] == p[6]) and (m[7] <= 0 or m[7] == p[7]) and not m[8] and not p[8] then dropped = dropped + 1
+    else keep[#keep + 1] = m end
+  end
+  local fixed = 0
+  edit.run('tempo map: clean', function()
+    for k = reaper.CountTempoTimeSigMarkers(0) - 1, 0, -1 do reaper.DeleteTempoTimeSigMarker(0, k) end
+    for _, m in ipairs(keep) do reaper.SetTempoTimeSigMarker(0, -1, m[2], -1, -1, m[5], m[6], m[7], m[8]) end
+    reaper.UpdateTimeline()
+  end)
+  -- MIDI-айтемы, укороченные прошлыми сменами темпа (конец не на сетке строк, источник длиннее): полная длина,
+  -- но не дальше конца региона, в котором стоят
+  edit.run('tempo map: restore MIDI lengths', function()
+    local lpb = state.lpb or 4
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, ii)
+        local tk = reaper.GetActiveTake(it)
+        if tk and reaper.TakeIsMIDI(tk) then
+          local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local l = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+          local q0, q1 = reaper.TimeMap2_timeToQN(0, p), reaper.TimeMap2_timeToQN(0, p + l)
+          local er = q1 * lpb
+          if math.abs(er - math.floor(er + 0.5)) > 0.02 then
+            local slen, isq = reaper.GetMediaSourceLength(reaper.GetMediaItemTake_Source(tk))
+            local sq = isq and slen or (reaper.TimeMap2_timeToQN(0, p + slen) - q0)
+            local rg = alias.region_at(regions, p + 1e-6)
+            local lim = rg and reaper.TimeMap2_timeToQN(0, rg.rgnend) or (q0 + sq)
+            local nq = math.min(q0 + sq, lim)
+            if nq > q1 + 1e-6 then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', reaper.TimeMap2_QNToTime(0, nq) - p); fixed = fixed + 1 end
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  local after = edit.tempo_sig()
+  vim.msg = ('tempo map: %d marker(s), %d without a change removed%s; %d MIDI item(s) back to full length; patterns stay on their beats (u - undo)'):format(#keep, dropped, before ~= after and ', map rebuilt' or '', fixed)
+end
 ctx.wheel_owner = function()
   local R = draw.module_rects
   if not R then return nil end
