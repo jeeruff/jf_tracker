@@ -7057,6 +7057,20 @@ function D.frame(L, snap, rows, state, info)
                        { 'm', col.muted, U.AMBER, 'mute' }, { 's', col.solo, U.GREEN, 'solo' },
                        { 'ø', col.phase, U.AMBER, 'phase' },          -- 8 окт: инверсия фазы (буква, как в блоке трека DSP)
                        { '~', nenv > 0, U.CYAN or U.AMBER, 'auto' } }   -- 15 окт: ~ — автоматизация (было trim), знак из глоссария справки
+      -- 25 окт: fx — зелёная, когда на треке есть звучащие эффекты; серая — пусто, вся цепь выключена или все в bypass. Щелчок — цепь вкл / выкл
+      if not c.master and col.track then
+        D.hfx = D.hfx or {}
+        local now = reaper.time_precise()
+        local hc = D.hfx[col.guid]
+        if not hc or now - hc.t > 0.25 then
+          local n, live = reaper.TrackFX_GetCount(col.track), false
+          if reaper.GetMediaTrackInfo_Value(col.track, 'I_FXEN') ~= 0 then
+            for i = 0, n - 1 do if reaper.TrackFX_GetEnabled(col.track, i) then live = true; break end end
+          end
+          hc = { t = now, n = n, live = live }; D.hfx[col.guid] = hc
+        end
+        table.insert(labels, 5, { 'fx', hc.live, U.GREEN, 'fxen', fxn = hc.n })
+      end
       -- trim (огибающие трека, бывшая A) — справа от всех кнопок, у края шапки (3 окт)
       local trim_w = ms('~') + 4
       local trim_x = c.x + c.w - L.pad - trim_w
@@ -7103,6 +7117,15 @@ function D.frame(L, snap, rows, state, info)
           if hot then hover.btn = { col = col, what = 'auto' } end
           hint('btn', x, by, bwk, bh + 2, { col = col, what = 'auto' })
           D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk }
+          return
+        end
+        if b[4] == 'fxen' then   -- 25 окт: fx — буквами в рамке, зелёным при звучащих эффектах
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          set(hot and D.CURROW or (on and U.tint(U.GREEN, 0.3) or U.PANEL)); gfx.rect(x, by, bwk, bh, 1)
+          set(hot and U.AMBER or (on and U.GREEN or U.DIM)); gfx.rect(x, by, bwk, bh, 0)
+          text(x + math.floor((bwk - ms('fx')) / 2), tyc, 'fx', hot and U.AMBER or (on and U.GREEN or U.GREY))
+          if hot then hover.trkio = { col = col, what = 'fxen' } end
+          hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'fxen' })
           return
         end
         -- 15 окт: круглые — запись (кружок внутри; A — автоарм при выборе трека) и фаза (ø)
@@ -7160,12 +7183,19 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 16 окт: не влезло в строку кнопок — во вторую, свободную строку над − + (узкий трек: m s ø ~ sro не пропадают)
       local rest = {}
+      local fxw = ms('fx') + 6
+      local sro0 = ms(D.sroslash and '///' or 'sro') + 4
+      D.hfx_row1 = nil
       for k, b in ipairs(c.master and {} or labels) do
         local x = bx + (k - 1) * (bwh + 1) + (k >= 3 and gap or 0)
         local bwk = bwh
         if b[4] == 'phase' then x, bwk = ph_x, phw end
         if b[4] == 'auto' then x, bwk = trim_x, trim_w end
-        if ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
+        if b[4] == 'fxen' then bwk = fxw end   -- 25 окт: сразу за s; не влезает до /// и ø — во вторую строку
+        if b[4] == 'fxen' and (mixcol or x + fxw + L.pad + sro0 > ph_x - L.pad) then
+          rest[#rest + 1] = b
+        elseif b[4] == 'fxen' then D.hfx_row1 = fxw + 1; hbtn(b, x, by, bwk, bhh, false)
+        elseif ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
           rest[#rest + 1] = b
         elseif not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
       end
@@ -7180,8 +7210,9 @@ function D.frame(L, snap, rows, state, info)
             local x = c.x + c.w - L.pad - bwh
             if not mixcol and L.hr_info == 0 and x >= x2 then hbtn(b, x, by2, bwh, bhh, false) end
           else
-            local x = row2(bwh)
-            if x then hbtn(b, x, by2, bwh, bhh, b[4] == 'phase') end
+            local bw2 = b[4] == 'fxen' and fxw or bwh
+            local x = row2(bw2)
+            if x then hbtn(b, x, by2, bw2, bhh, b[4] == 'phase') end
           end
         end
       end
@@ -7245,7 +7276,7 @@ function D.frame(L, snap, rows, state, info)
         end
         -- 15 окт: SRO — после M S (фаза ушла к trim)
         local hw1 = (D.hbtn_w or L.btn_w) + 1
-        local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad)
+        local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad + (D.hfx_row1 or 0))
         local lim = mixcol and (c.x + c.w - 1) or (ph_x - L.pad)
         local sw0 = ms(D.sroslash and '///' or 'sro') + 4               -- 16 окт: по настоящей ширине (было по заглавным SRO — не влезало между s и ø)
         local rw = D.sroslash ~= false and sw0 or math.max(sw0, math.min(2 * sw0, lim - rx))   -- 12 окт: SRO шире, сколько влезает; 20 окт: /// — плотно, не растягивать
@@ -9930,7 +9961,11 @@ function D.frame(L, snap, rows, state, info)
             local nrow = math.max(1, math.floor((by + bh - ly0 - L.rh - 4) / L.rh))
             D.kit_lscroll = D.kit_lscroll or {}
             local sc = math.max(0, math.min(#f.kids - nrow, D.kit_lscroll[kkey] or 0))
-            if ks > 0 and ks - 1 < sc then sc = ks - 1 elseif ks > sc + nrow then sc = ks - nrow end
+            D.kit_lks = D.kit_lks or {}   -- 25 окт: к выбору — только когда он сменился (колесо / полоса не возвращаются)
+            if ks ~= D.kit_lks[kkey] then
+              if ks > 0 and ks - 1 < sc then sc = ks - 1 elseif ks > sc + nrow then sc = ks - nrow end
+              D.kit_lks[kkey] = ks
+            end
             D.kit_lscroll[kkey] = sc
             for r = 1, nrow do
               local ki = sc + r
