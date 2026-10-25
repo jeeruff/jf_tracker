@@ -241,7 +241,7 @@ function MX.width(L, nregions, ncols)
   L.mx_arrow_w = U.measure('<')
   -- линейка слева (2 окт): «такт.доля» начала слота, риски тактов и долей
   -- 18 окт: секции — полоса их цвета с вертикальным именем слева от номеров тактов
-  MX.sec_w = (MX.sections ~= false and not MX.fold and MX.has_sec) and (L.th + 4) or 0   -- 23 окт: своя опция view (было — только с ruler)
+  MX.sec_w = (MX.sections ~= false and not MX.fold) and (L.th + 4) or 0   -- 25 окт: и без секций — пустая полоса с подсказкой   -- 23 окт: своя опция view (было — только с ruler)
   -- 19 окт: stack — такт / размер / длина второй строкой под именем: линейка — только риски, колонок справа нет
   -- 20 окт: самый мелкий зум (слот не выше двух строк) — stack в одну строку колонками: строка на паттерн, метка шире
   local st = MX.stack and not MX.fold and math.floor(L.rh * MX.vz + 0.5) >= 2 * L.rh + 1
@@ -1001,6 +1001,17 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
     local xr = math.min(W - 4, L.mx_label_w + (ncols - MX.hs) * L.mx_cell_w)
+    -- 25 окт: слоты без секции — полоса пустая, тусклая; без секций вовсе — подсказка вертикально
+    do
+      local sw = MX.sec_w or 0
+      if sw > 0 and ndraw > 0 then
+        local y0, y1 = top, top + ndraw * rh
+        U.set(U.tint(U.LINE, 0.25)); gfx.rect(2, y0 + 1, sw - 2, y1 - y0 - 2, 1)
+        if not MX.has_sec and ctx.vtext and y1 - y0 > L.th * 6 then
+          ctx.vtext(2 + math.floor((sw - 2 - L.th) / 2), y0 + 3, y1 - y0 - 6, 'Tr - a section', U.DIM, U.tint(U.LINE, 0.25), true)
+        end
+      end
+    end
     for sc, b in pairs(box) do
       local c = (info.region_rgb and info.region_rgb(sc.color)) or U.CYAN
       -- 18 окт: полоса цвета секции слева во всю её высоту, имя — вертикально
