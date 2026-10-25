@@ -5669,7 +5669,12 @@ function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
   set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
   local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
   set(U.AMBER); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
-  if py0 + side + L.rh <= y + h + 2 then text(px0, py0 + side + 1, fit(('x M1 %d  y M2 %d'):format(math.floor(nx * 100 + 0.5), math.floor(ny * 100 + 0.5)), side), U.GREY) end
+  if py0 + side + L.rh <= y + h + 2 then
+    -- 25 окт: подпись — имена параметров (★ контейнера / макросы плагина), не M1 / M2
+    local an = (f.params[qx].pinname or f.params[qx].mlabel or 'x'):sub(1, 6)
+    local bn = (f.params[qy].pinname or f.params[qy].mlabel or 'y'):sub(1, 6)
+    text(px0, py0 + side + 1, fit(('%s %d  %s %d'):format(an, math.floor(nx * 100 + 0.5), bn, math.floor(ny * 100 + 0.5)), side), U.GREY)
+  end
   if not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
     hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = qx, qy = qy }
   end
