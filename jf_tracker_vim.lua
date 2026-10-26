@@ -1139,7 +1139,7 @@ V.COMMANDS = {
   { 'tempoclean', '', 'tempo map: write every tempo marker again (REAPER rebuilds a stale map - a tempo change without a marker); the patterns stay on their beats' },
   { 'patternkb', '[quant|sudden|rec|off]', 'MPC style: the note keys play the patterns of the song (quant - seamless after the playing one, sudden - at once); rec - record the order, rec again - write it after the song (= :pads)' }, { 'chain', 'text|play|stop|write|new [name]|dup|name N|del|next|prev', 'chain of patterns (was playlist; :ch, :pl too): the order as text - A1 A1 B1x2 C1:16 D1-8 D1/2 B2+8 verse 4 (pattern / section name, region number; xN repeat, :N first N rows, /N a part, -N skip N rows, +N then its first N rows again); Tab completes names; play - seamless on whole patterns; write - after the song' }, { 'tsec', 'name', 'a section over the REAPER time selection (Tr in the matrix picks a quick name: intro verse chorus drop break …)' }, { 'section', 'name', 'a section (a region without a code) over the selected pattern slots of the matrix (Shift+J K on the names)' }, { 'unstack', '', 'patterns that start at the same place: the extra one becomes a linked repeat after the original' }, { 'human', '[all|nopitch|notime] [N%]', 'humanizer: the notes of the block / track in the region get small random timing, pitch, volume, pan, attack and length' }, { 'scale', 'N', 'bitmap scale x1..3 (Cmd +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'off', '[all]', 'note off at the cursor row on the whole track (all - on every track); in INSERT ` subcolumn, ~ (Shift+`) all tracks, Ctrl+~ the track' }, { 'repeat', '[all]', 'repeat the part of the region above the cursor down to the region end (Ctrl+Opt+J; all - every track)' }, { 'mac', 'name', 'play a macro by name (saved, built-in or @a) at the cursor; \\ q - all of them in a menu' }, { 'macsave', 'a name', 'keep register a as a named macro (macros tab, Data/jf_tracker_macros.txt)' }, { 'tcolor', '#rrggbb', 'colour of the cursor track by its code (tc - the colour grid)' }, { 'transients', '', 'transient detector module in the item tab (= Opt+D): sensitivity, threshold, min gap, pre-attack, live; Enter slices' }, { 'arr', '[new [name]|name text|dup|clear|del|next|prev|N]', 'arrangements: named sets of the fixed lanes that play (\\ P a)' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | solarized-dark | solarized-light | gruvbox | catppuccin | mono | protracker | impulse' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'sec', '[show|repeat|copy|loop|move N|copyto N|aliasto N]', 'the section of the cursor slot of the matrix: show it in the tracker, repeat it after itself (linked) / copy, loop, move before slot N (copy / alias); no argument - its menu (a click on its strip)' }, { 'gain', '', 'router gain staging: level meters (jf_tracker_probe) before and after every row of the chain, the dB change above the row; again - off (also when the router closes)' }, { 'pal', 'render|playlist|kb', 'palette of the matrix: the picked cells as a new pattern at the end / their patterns to the playlist / clipkb on-off' }, { 'pnote', 'text', 'a note on the pattern (kept in the project, shown under its name in the palette; empty - delete); dblclick a name in the palette' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|automation|modulation|midi|grid|retro|orca|master', 'top panel tab' }, { 'optsave', 'name', 'save all options as a profile' }, { 'optload', 'name', 'load an options profile' }, { 'optdel', 'name', 'delete an options profile' }, { 'redo', '', 'redo (also Cmd+Shift+Z; Ctrl+R is the rec tab)' }, { 'undo', '', 'undo (also u, Cmd+Z)' }, { 'sig', 'N/D [all|here]', 'time signature for the whole project or this pattern; a longer bar - fill the missing beats empty / with the last beat / keep' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '[big]', 'bottom DSP panel (track fx); big - the chain with its routing on the whole window (zz in DSP)' }, { 'patternize', '1|2|4|8|16|items|markers', 'the empty parts of the project become patterns (regions A1 A2 …): every N bars, by the items of the cursor track, or by markers; existing patterns stay (matrix menu)' }, { 'shiftrec', '', 'shift rec (the shift button under rec): waits for a MIDI note, then records from the cursor row at the project rate (x0.5 - slow, plays back fast); again - cancel / stop' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'z', '<words>', 'zoxide: jump the browser to the most used / recent folder matching the words (last word - in the folder name)' }, { 'zi', '', 'zoxide: pick from the visited folders (fzf), best first' }, { 'pane', '<panel> left|right|top|bottom|with <p>|swap <p>|hide|show|zoom, reset, <layout>', 'panes (tmux / zellij): move, stack, hide, layouts; no argument - layout string' }, { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
-  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto|fill', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); fill - only the length grows to the next note, not stretched (the instrument loop plays on); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|0X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'fxa', '', 'store all parameters of the selected DSP fx as A' }, { 'fxb', '', 'store them as B' }, { 'morph', 'N', 'morph the selected fx from A (0) to B (100)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'xf', 'op [n]', 'transform the block (VISUAL) or the cursor track in the region: stretch k (time x k), reverse, rotate n, shuffle, gravity g (denser to the end, as a fall; g<1 to the start), bounce r (intervals shrink x r), fib (Fibonacci rows), tuplet n (n notes evenly), golden (volume / phi each), vel k' }, { 'arcforget', '', 'monome arc: forget the rings of the effect in DSP - they follow the DSP cursor again' }, { 'mackey', 'name x', 'give a saved macro the register letter x: @x plays it, 3@x three times' }, { 'reload', '', 'restart the tracker from its files (after an update) - the layout and options stay' }, { 'shotpane', '<panel|window|x,y,w,h> [file.png]', 'a picture of a panel (or the window, a rectangle) into help/ - the pictures of the help; works with the window off screen' }, { 'keys', '', 'write every key of every module as text: Data/jf_tracker_keys.md (options - :optsave name, macros - Data/jf_tracker_macros.txt)' }, { 'dedouble', '', 'doubled notes (same note at the same time) on the cursor row of the track - one is kept (VISUAL - in the selection)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in twelve points' }, { 'swing', 'N | on | off | 1/16', 'REAPER grid swing: amount -100..100 % (33 = triplet), division; no argument - the menu' }, { 'pm', '[big | grid | list | sort date|name|bpm|status | daw all|rpp|other]', 'jf_pm project cards in the browser (pm tab); big - over the whole window' }, { 'font', 'name | next | prev | off | <family> [px]', 'tracker font: off - the REAPER bitmap, any installed family by name (custom), or a terminal monospace font (bigblue, bb437, departure, gohu11, gohu14, terminess, proggy, profont, 3270, monocraft, iosevka, jetbrains, hack, plex ...); next / prev - step through them' }, { 'audio', 'dev <name> | bs N | sr N | sr off | bs off', 'audio device of REAPER (CoreAudio): device by name, buffer size, sample rate - applied at once (the audio restarts); no argument - the options tab audio' }, { 'mem', '', 'what holds the memory of the tracker: the heap before / after a full collect, the biggest parts (status, debug log)' }, { 'memprof', '[sec]', 'which code lines make the most garbage: a sampling hook for N seconds (5), KB/s per file:line (status, debug log)' }, { 'jftop', '', 'what in the tracker takes the time: each part of the frame in ms (top module, rows, matrix, browser, keys ...); r - reset, t - performance view, Esc - close' }, { 'logo', '[name]', 'one of the jf_tracker artworks in the middle of the tracker; any key or click closes it' }, { 'session', '[big | stop | quant bar|beat|now | bars N | off]', 'clips over the whole window (zz in the matrix): launch clips and scenes on the quantize boundary into the =SESSION loop zone; stop - all clips; off - transport stop, zone cleared' }, { 'dev', '[on|off]', 'developer copy only: off shows the tracker as release users get it (no grid, orca, pm cards); takes effect after reopening the tracker' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'zoom out: a row is a beat (LPB 1); again - back to the previous LPB' }, { 'unfold', '', 'zoom in (= zu): LPB rises to the smallest one where the folded notes of the selection / cursor row get their own rows (up to 128); again - back' }, { 'harmonize', '[beat|half]', 'the melody of the cursor track (the V selection, else the pattern) -> the best chord of the key (:key) for every bar (beat / half bar) into the chord lane of the master' }, { 'pitch', '', 'pitch of the sample: the audio note on the cursor row (or the lib sample) gets take markers - a note per slice (A3, +cents) or a chord (Am); again - replaced' }, { 'transcribe', '', 'audio solo under the cursor -> MIDI: selects the item and opens jf_transcribe (aubionotes; Transcribe, tune, Apply - the notes land on a new track)' }, { 'bass', '[fifth]', 'a bass line on the cursor track from the chord lane of the master (the pattern or the V selection): the root of every chord, fifth - root then fifth' }, { 'voice2', '3|6|-3|-6', 'a second voice in the key for the notes of the selection (else the row): a third / sixth above (+) or below (-)' }, { 'prog', '[notes] I V vi IV | Am 2 | F 2 | G7', 'a progression from the bar of the cursor (lengths in bars, default 1) into the chord lane of the master; notes - also the chords as notes on the cursor track (voice leading)' }, { 'key', '[Am | D dorian | mark | snap | off]', 'key of the song: empty - from the MIDI notes of every track (not kits); a name - set it; mark - notes out of the key red; snap - typing in the key; off - no key' }, { 'chd', 'Am7', 'a chord on the cursor row of the chord column of the master (empty - remove)' }, { 'chord', '[Cm7 | off | lane | read [beat] | hear [beat] | lead]', 'no argument - the cursor track as one chord lane (names from its notes, OFF ends); a symbol - write that chord at the cursor row (replaces the notes starting there). The chord lane track drives JS jf_tracker_chordfollow: put it on other tracks - their notes snap to the chord of the moment' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
+  { 'poolprev', '', 'preview instrument on select' }, { 'side', '', 'sidebar browser' }, { 'legato', 'off|auto|fill', 'notes of the track join the next note (stretched, pitch kept, follows the tempo); fill - only the length grows to the next note, not stretched (the instrument loop plays on); off - back; auto - keep it while inserting' }, { 'pmtag', 'words', 'jf_pm tags of the project picked with T in the pm tab' }, { 'interp', 'vol|delay|note|0X', 'VISUAL: values from the first to the last event, linear by rows (Paketti)' }, { 'note', 'C-4 [rows]', 'a note of the instrument at the cursor' }, { 'sl', 'N [rows] [+semis]', 'slice N at the cursor' }, { 'whole', '[rows]', 'the whole sample (mother item)' }, { 'fxa', '', 'store all parameters of the selected DSP fx as A' }, { 'fxb', '', 'store them as B' }, { 'morph', 'N', 'morph the selected fx from A (0) to B (100)' }, { 'scramble', '', 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' }, { 'xf', 'op [n]', 'transform the block (VISUAL) or the cursor track in the region: stretch k (time x k), reverse, rotate n, shuffle, gravity g (denser to the end, as a fall; g<1 to the start), bounce r (intervals shrink x r), fib (Fibonacci rows), tuplet n (n notes evenly), golden (volume / phi each), vel k' }, { 'arcforget', '', 'monome arc: forget the rings of the effect in DSP - they follow the DSP cursor again' }, { 'mackey', 'name x', 'give a saved macro the register letter x: @x plays it, 3@x three times' }, { 'reload', '', 'restart the tracker from its files (after an update) - the layout and options stay' }, { 'shotpane', '<panel|window|x,y,w,h> [file.png]', 'a picture of a panel (or the window, a rectangle) into help/ - the pictures of the help; works with the window off screen' }, { 'keys', '', 'write every key of every module as text: Data/jf_tracker_keys.md (options - :optsave name, macros - Data/jf_tracker_macros.txt)' }, { 'dedouble', '', 'doubled notes (same note at the same time) on the cursor row of the track - one is kept (VISUAL - in the selection)' }, { 'sw', 'N', 'swap the event under the cursor with the Nth below (= Ngw)' }, { 'tutorial', '', 'first steps in twelve points' }, { 'swing', 'N | on | off | 1/16', 'REAPER grid swing: amount -100..100 % (33 = triplet), division; no argument - the menu' }, { 'pm', '[big | grid | list | sort date|name|bpm|status | daw all|rpp|other]', 'jf_pm project cards in the browser (pm tab); big - over the whole window' }, { 'font', 'name | next | prev | off | <family> [px]', 'tracker font: off - the REAPER bitmap, any installed family by name (custom), or a terminal monospace font (bigblue, bb437, departure, gohu11, gohu14, terminess, proggy, profont, 3270, monocraft, iosevka, jetbrains, hack, plex ...); next / prev - step through them' }, { 'audio', 'dev <name> | bs N | sr N | sr off | bs off', 'audio device of REAPER (CoreAudio): device by name, buffer size, sample rate - applied at once (the audio restarts); no argument - the options tab audio' }, { 'mem', '', 'what holds the memory of the tracker: the heap before / after a full collect, the biggest parts (status, debug log)' }, { 'memprof', '[sec]', 'which code lines make the most garbage: a sampling hook for N seconds (5), KB/s per file:line (status, debug log)' }, { 'jftop', '', 'what in the tracker takes the time: each part of the frame in ms (top module, rows, matrix, browser, keys ...); r - reset, t - performance view, Esc - close' }, { 'logo', '[name]', 'one of the jf_tracker artworks in the middle of the tracker; any key or click closes it' }, { 'session', '[big | stop | quant bar|beat|now | bars N | off]', 'clips over the whole window (zz in the matrix): launch clips and scenes on the quantize boundary into the =SESSION loop zone; stop - all clips; off - transport stop, zone cleared' }, { 'dev', '[on|off]', 'developer copy only: off shows the tracker as release users get it (no grid, orca, pm cards); takes effect after reopening the tracker' }, { 'ssave', 'name', 'save the view (options + module layout) as a screenset' }, { 'sload', 'name', 'load a screenset' }, { 'libsave', 'name', 'save the lib as a kit (REAPER track template, browser tab kits)' }, { 'big', '', 'big sample editor: the item tab over the whole window, wheel zoom' }, { 'macro', '', 'zoom out: a row is a beat (LPB 1); again - back to the previous LPB' }, { 'unfold', '', 'zoom in (= zu): LPB rises to the smallest one where the folded notes of the selection / cursor row get their own rows (up to 128); again - back' }, { 'harmonize', '[beat|half]', 'the melody of the cursor track (the V selection, else the pattern) -> the best chord of the key (:key) for every bar (beat / half bar) into the chord lane of the master' }, { 'tr', '[sel|col|track|all] +3|-12|o1|d2|^1|chord [Am]|ji', 'transpose, Vim style: semitones, o octaves, d degrees of the key, ^ 1/6 tones, to the chord of the row, just intonation; no argument - the transposer dropdown' }, { 'nooff', '[all]', 'remove every OFF in what you see (project / sec / pat): the cursor track, all - every track; the notes ring to the next event' }, { 'pitch', '', 'pitch of the sample: the audio note on the cursor row (or the lib sample) gets take markers - a note per slice (A3, +cents) or a chord (Am); again - replaced' }, { 'transcribe', '', 'audio solo under the cursor -> MIDI: selects the item and opens jf_transcribe (aubionotes; Transcribe, tune, Apply - the notes land on a new track)' }, { 'bass', '[fifth]', 'a bass line on the cursor track from the chord lane of the master (the pattern or the V selection): the root of every chord, fifth - root then fifth' }, { 'voice2', '3|6|-3|-6', 'a second voice in the key for the notes of the selection (else the row): a third / sixth above (+) or below (-)' }, { 'prog', '[notes] I V vi IV | Am 2 | F 2 | G7', 'a progression from the bar of the cursor (lengths in bars, default 1) into the chord lane of the master; notes - also the chords as notes on the cursor track (voice leading)' }, { 'key', '[Am | D dorian | mark | snap | off]', 'key of the song: empty - from the MIDI notes of every track (not kits); a name - set it; mark - notes out of the key red; snap - typing in the key; off - no key' }, { 'chd', 'Am7', 'a chord on the cursor row of the chord column of the master (empty - remove)' }, { 'chord', '[Cm7 | off | lane | read [beat] | hear [beat] | lead]', 'no argument - the cursor track as one chord lane (names from its notes, OFF ends); a symbol - write that chord at the cursor row (replaces the notes starting there). The chord lane track drives JS jf_tracker_chordfollow: put it on other tracks - their notes snap to the chord of the moment' }, { 'pt', 'new', 'PT-mode: 4 channels big (x4), note / sample / vol / one command, scopes on top; :pt new creates CH1..CH4; again - back' }, { 'arp', 'live | [up|down|updown|random|played] [step] [oct] [gate%]', 'chord on the cursor row -> arpeggio over its length' }, { 'fixslices', '', 'repair slice notes copied from a stretch-marked sample (they all played its start)' },
   { 'start', '[bar[.beat]]', '=START marker of the sequence (empty = cursor row)' }, { 'end', '[bar[.beat]]', '=END marker of the sequence' },
   { 'cc', '[N]', 'CC lane: N - a MIDI-item CC column (events of the MIDI items of the track); empty - ReaControlMIDI on the track, its parameter as an envelope column' }, { 'pc', '', 'program change column of the MIDI items of the cursor track' }, { 'curvesave', 'name', 'save the open automation item curve (Data/jf_tracker_curves)' }, { 'curves', '', 'browser on the saved curves - Enter loads one into the open automation item' },
   { 'browse', 'path', 'browser root' }, { 'dock', '', 'dock <-> fullscreen (Cmd+F11)' }, { 'preview', '', 'preview on input' },
@@ -1538,6 +1538,8 @@ local function run_cmd(line)
   elseif cmd == 'prog' then if ctx.prog_cmd then ctx.prog_cmd(arg) end   -- 21 окт: прогрессия в колонку chord мастера
   elseif cmd == 'harmonize' then if ctx.harmonize_cmd then ctx.harmonize_cmd(arg) end   -- 21 окт: мелодия → аккорды
   elseif cmd == 'pitch' then if ctx.pitch_mark then ctx.pitch_mark() end   -- 26 окт: высота сэмпла → take-маркеры
+  elseif cmd == 'tr' then V.tr_cmd(arg)   -- 26 окт: транспоз в стиле Vim (:tr +3, :tr track d2, :tr chord, :tr ji)
+  elseif cmd == 'nooff' then V.nooff(arg == 'all')   -- 26 окт: убрать все OFF (трек / all) в том, что видно
   elseif cmd == 'transcribe' then if ctx.transcribe_cmd then ctx.transcribe_cmd() end   -- 21 окт: соло → MIDI (jf_transcribe)
   elseif cmd == 'bass' then if ctx.bass_cmd then ctx.bass_cmd(arg) end   -- 21 окт: бас по колонке chord
   elseif cmd == 'voice2' then if ctx.voice2_cmd then ctx.voice2_cmd(arg) end   -- 21 окт: второй голос в ладу
@@ -3612,25 +3614,122 @@ function V.transpose_scope(scope, d, micro, diat)   -- 16 окт: micro — d с
   V.msg = ('transpose %s %+d%s: %d note(s)'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes)
   return true
 end
--- умная выпадашка транспозиции (контекстное меню, :transpose): −24 … +24 и где (выделение / колонка / трек / паттерн)
+-- 26 окт: ноты области (как transpose_scope): sel / col / track / pattern (все треки; строки — то, что видно)
+function V.scope_notes(scope)
+  local F = flat()
+  local f0, f1, r0, r1
+  if scope == 'sel' then
+    if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range()
+    else f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row end
+  else
+    local a, b = (ctx.view_rows or ctx.region_rows)()
+    r0, r1 = a or 0, b or ((ctx.snap().last_row or 0))
+    if scope == 'col' then f0, f1 = V.cur.fi, V.cur.fi
+    elseif scope == 'track' then
+      local ci = F[V.cur.fi] and F[V.cur.fi].ci
+      for i, f in ipairs(F) do if f.ci == ci and not f.env then f0 = f0 or i; f1 = i end end
+    else f0, f1 = 1, #F end
+  end
+  if not f0 then return {}, nil end
+  local notes = {}
+  for _, h in ipairs(V.heads_in(f0, f1, r0, r1)) do if h.kind == 'midi' or h.kind == 'audio' then notes[#notes + 1] = h end end
+  return notes, f0, f1, r0, r1
+end
+-- 26 окт: ТРАНСПОЗИТОР — выпадашка в паре с harmonizer: полутоны −12…+12, октавы, ступени лада, к аккорду строки
+-- (колонка аккордов мастера), JI (натуральный строй аккорда удара), области; listen — выбор звучит со сдвигом
 function V.transpose_smart(scope)
   if not ctx.smart_open then return end
-  scope = scope or 'sel'
+  scope = scope or ((V.mode == 'visual' or V.mode == 'vline') and 'sel' or V.tr_scope or 'sel')
+  V.tr_scope = scope
+  local notes = V.scope_notes(scope)
   local items = {}
-  for d = -24, 24 do
-    items[#items + 1] = { label = d == 0 and '0' or ('%+d'):format(d), v = d, on = d == 0, dim = d == 0,
-      tip = ('transpose the %s %+d semitone(s)'):format(V.TSCOPE[scope], d) }
-  end
+  for d = -12, -1 do items[#items + 1] = { label = ('%d'):format(d), v = d, tip = ('%s %+d semitone(s)'):format(V.TSCOPE[scope], d) } end
+  for d = 1, 12 do items[#items + 1] = { label = ('+%d'):format(d), v = d, tip = ('%s %+d semitone(s)'):format(V.TSCOPE[scope], d) } end
+  for _, d in ipairs({ -36, -24, -12, 12, 24, 36 }) do items[#items + 1] = { label = ('oct %+d'):format(d // 12), v = d, tip = ('%s %+d octave(s)'):format(V.TSCOPE[scope], d // 12) } end
+  for _, d in ipairs({ -3, -2, -1, 1, 2, 3 }) do items[#items + 1] = { label = ('deg %+d'):format(d), v = 'deg:' .. d, tip = ('%s %+d degree(s) of the key (harmonizer / :key)'):format(V.TSCOPE[scope], d) } end
+  items[#items + 1] = { label = 'to chord', v = 'chord', tip = 'every note to the nearest tone of the chord of its row (chord column of the master, :chord read / hear)' }
+  items[#items + 1] = { label = 'just', v = 'ji', tip = 'just intonation: the chord of every hit gets its microtones (72-EDO, MTS-ESP Master on the track)' }
+  items[#items + 1] = { label = 'micro -', v = 'micro:-1', tip = '1/6 tone down' }
+  items[#items + 1] = { label = 'micro +', v = 'micro:1', tip = '1/6 tone up' }
   while #items % 12 ~= 0 do items[#items + 1] = { label = '', dim = true } end
   for _, sc in ipairs({ 'sel', 'col', 'track', 'pattern' }) do
-    items[#items + 1] = { label = V.TSCOPE[sc], v = 'scope:' .. sc, on = sc == scope, tip = 'transpose the ' .. V.TSCOPE[sc] .. ' (F1 F2: Opt sel, Shift+Ctrl column, Shift track, Ctrl pattern)' }
+    items[#items + 1] = { label = sc == 'pattern' and 'all tracks' or V.TSCOPE[sc], v = 'scope:' .. sc, on = sc == scope, tip = 'transpose the ' .. V.TSCOPE[sc] .. ' (what you see: project / sec / pat)' }
   end
-  local sel = 25
-  ctx.smart_open({ title = 'transpose - ' .. V.TSCOPE[scope] .. ' (h j k l, Enter)', items = items, cols = 12, sel = sel,
+  ctx.smart_open({ title = ('transpose - %s: %d note(s) (listen - hear it moved)'):format(V.TSCOPE[scope], #notes), items = items, cols = 12, sel = 13,
+    on_sel = function(it) if type(it.v) == 'number' and ctx.tr_listen then ctx.tr_listen(notes, it.v) end end,
     on_pick = function(it)
       if type(it.v) == 'string' and it.v:match('^scope:') then V.transpose_smart(it.v:sub(7)); return nil end
-      if type(it.v) == 'number' and it.v ~= 0 then V.transpose_scope(scope, it.v) end
+      V.tr_apply(scope, it.v)
     end })
+end
+-- одно действие транспозитора (выпадашка и :tr): число — полутоны, deg:N, chord, ji, micro:N
+function V.tr_apply(scope, v)
+  if type(v) == 'number' then return V.transpose_scope(scope, v) end
+  if type(v) ~= 'string' then return false end
+  local dg = v:match('^deg:(%-?%d+)$')
+  if dg then return V.transpose_scope(scope, tonumber(dg), nil, true) end
+  local mc = v:match('^micro:(%-?%d+)$')
+  if mc then return V.transpose_scope(scope, tonumber(mc), true) end
+  local notes = V.scope_notes(scope)
+  if #notes == 0 then V.msg = 'transpose: no notes in the ' .. (V.TSCOPE[scope] or scope); return false end
+  if v == 'chord' or v:match('^chord ') then
+    local n = ctx.tr_to_chord(notes, v:match('^chord%s+(%S+)'))
+    V.last_edit = nil
+    V.msg = ('to chord: %d of %d note(s) moved to the chord of their row%s'):format(n, #notes, n == 0 and ' (no chord column? :chord read / hear)' or '')
+    return true
+  end
+  if v == 'ji' then
+    local n, mts = ctx.tr_ji(notes)
+    V.msg = ('just: %d hit(s) in just intonation%s'):format(n, mts and ' + MTS-ESP Master on the track' or '')
+    return true
+  end
+  return false
+end
+-- :tr [sel|col|track|all] +3 | -12 | d2 | chord [Am] | ji | ^1 — быстро, в стиле Vim; без аргумента — выпадашка
+function V.tr_cmd(arg)
+  local w = {}
+  for t in (arg or ''):gmatch('%S+') do w[#w + 1] = t end
+  local SC = { sel = 'sel', col = 'col', column = 'col', track = 'track', all = 'pattern', pattern = 'pattern' }
+  local scope = (V.mode == 'visual' or V.mode == 'vline') and 'sel' or 'sel'
+  if w[1] and SC[w[1]] then scope = SC[table.remove(w, 1)] end
+  local a = w[1]
+  if not a then return V.transpose_smart(scope) end
+  if tonumber(a) then return V.tr_apply(scope, math.floor(tonumber(a))) end
+  local d = a:match('^d([%+%-]?%d+)$'); if d then return V.tr_apply(scope, 'deg:' .. tonumber(d)) end
+  local m = a:match('^%^([%+%-]?%d+)$'); if m then return V.tr_apply(scope, 'micro:' .. tonumber(m)) end
+  local o = a:match('^o([%+%-]?%d+)$'); if o then return V.tr_apply(scope, 12 * tonumber(o)) end
+  if a == 'chord' then return V.tr_apply(scope, w[2] and ('chord ' .. w[2]) or 'chord') end
+  if a == 'ji' or a == 'just' then return V.tr_apply(scope, 'ji') end
+  V.msg = ':tr [sel|col|track|all] +3 | -12 | o1 (octave) | d2 (degrees) | ^1 (1/6 tone) | chord [Am] | ji'
+end
+-- 26 окт: :nooff [all] — убрать все OFF в том, что видно (project / sec / pat): трек курсора, all — все треки;
+-- нота звучит до следующего события (как dd на OFF)
+function V.nooff(all)
+  local F = flat()
+  local a, b = (ctx.view_rows or ctx.region_rows)()
+  local r0, r1 = a or 0, b or ((ctx.snap().last_row or 0))
+  local ci = F[V.cur.fi] and F[V.cur.fi].ci
+  local n = 0
+  ctx.edit.run('remove OFFs', function()
+    for fi, fl in ipairs(F) do
+      if (all or fl.ci == ci) and not fl.env then
+        for _, sub in ipairs(subs_of(fl)) do
+          for r = r0, r1 do
+            local c = sub[r]
+            if c and c.kind == 'off' and c.of then
+              local nxt
+              for r2 = r + 1, r + 4096 do local c2 = sub[r2]; if c2 and (c2.kind == 'audio' or c2.kind == 'midi') then nxt = r2; break end end
+              local last = nxt and (nxt - 1) or (ctx.region_end_row and ctx.region_end_row(r)) or (r + 16)
+              ctx.edit.note_off({ c.of }, lpb(), last + (ctx.edit.OFF_END and 0 or 1))
+              n = n + 1
+            end
+          end
+        end
+      end
+    end
+  end)
+  ctx.model.invalidate()
+  V.msg = ('nooff: %d OFF(s) removed %s in the %s'):format(n, all and 'on all tracks' or 'on the track', ctx.view_cur and ctx.view_cur() or 'pattern')
 end
 -- 17 окт: умное выделение (как Paketti): v в VISUAL по кругу — колонка в доле → колонка в такте → такт (все
 -- треки) → половина паттерна (региона курсора) → весь паттерн → снова колонка в доле. Отсчёт — от клетки, где начали

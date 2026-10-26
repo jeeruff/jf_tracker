@@ -11530,6 +11530,7 @@ ctx = {
   harm_do = function(r)
     if r == 'leave' then ctx.set_focus('tracker'); return end
     if type(r) == 'table' then
+      if r.tr then vim.transpose_smart(); return end   -- 26 окт: транспозитор из harmonizer
       if r.write then ctx.chord_cmd(r.write) elseif r.lane then ctx.chord_cmd('')
       elseif r.keyauto then ctx.key_cmd('') elseif r.key then ctx.key_cmd(r.key) end   -- 21 окт
       if r.keyauto or r.key then return end
@@ -18735,6 +18736,76 @@ function ctx.pitch_mark()
   for i = 1, math.min(8, #res) do names[#names + 1] = res[i].name end
   vim.msg = ('pitch: %d marker(s) - %s%s (take markers of the sample; u - undo)'):format(#res, table.concat(names, ' '), #res > 8 and ' ...' or '')
 end
+-- 26 окт: ТРАНСПОЗИТОР в паре с harmonizer (V.transpose_smart, :tr): аккорд строки, подгон к нему, JI, слушать
+-- аккорд строки t: колонка аккордов мастера (маркер ch:), иначе nil
+ctx.chord_sym_at = function(t)
+  local best, bt
+  local i = 0
+  while true do
+    local ret, isrgn, pos, _, nm = reaper.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if not isrgn and (nm or ''):match('^ch:') and pos <= t + 1e-6 and (not bt or pos > bt) then best, bt = nm:sub(4), pos end
+    i = i + 1
+  end
+  return best
+end
+ctx.head_pitch = function(h) return h.pitch or (h.semis and (model.BASE_NOTE + h.semis)) end
+-- ноты → к ближайшему звуку аккорда своей строки (колонка аккордов мастера); sym — один аккорд на всё
+ctx.tr_to_chord = function(notes, sym)
+  local CHM = MMX.CH
+  local n = 0
+  edit.transpose_map(notes, state.lpb, function(p, h)
+    local s = sym or ctx.chord_sym_at(edit.row_time(h and h.row0 or vim.cur.row, state.lpb, 0))
+    local c = s and CHM.parse(s)
+    if not c then return p end
+    local best, bd
+    for _, iv in ipairs(c.ints) do
+      local pc = (c.root + iv) % 12
+      for o = -1, 1 do
+        local q = p - ((p - pc) % 12) + o * 12
+        local d = math.abs(q - p)
+        if not bd or d < bd then best, bd = q, d end
+      end
+    end
+    if best ~= p then n = n + 1 end
+    return best
+  end, 'transpose to the chord')
+  return n
+end
+-- JI: каждый удар (строка + трек) — аккорд по его нотам, микротоны натурального строя (как just в harmonizer)
+ctx.tr_ji = function(notes)
+  local HM, CHM = MMX.HM, MMX.CH
+  local groups = {}
+  for _, h in ipairs(notes) do
+    local p = ctx.head_pitch(h)
+    if p and h.kind == 'midi' and h.item then
+      local tr = reaper.GetMediaItem_Track(h.item)
+      local k = tostring(tr) .. ':' .. (h.row0 or 0)
+      groups[k] = groups[k] or { tr = tr, row = h.row0 or 0, ps = {} }
+      table.insert(groups[k].ps, p)
+    end
+  end
+  local n, mts = 0, false
+  edit.run('just intonation', function()
+    for _, g in pairs(groups) do
+      local sym = #g.ps >= 2 and CHM.name(g.ps) or ctx.chord_sym_at(edit.row_time(g.row, state.lpb, 0))
+      local jm = sym and HM.ji_micro(sym, g.ps)
+      if jm and next(jm) then edit.micro_set_at(g.tr, g.row, state.lpb, jm); n = n + 1; mts = edit.mts_master(g.tr) or mts end
+    end
+  end)
+  model.invalidate()
+  return n, mts
+end
+-- слушать выделение со сдвигом d полутонов (до 8 звуков; инструмент трека курсора)
+ctx.tr_listen = function(notes, d)
+  local col = cur_col()
+  if not (col and col.track) then return end
+  local seen, k = {}, 0
+  for _, h in ipairs(notes) do
+    local p = ctx.head_pitch(h)
+    if p and not seen[p] and k < 8 then seen[p] = true; k = k + 1; ctx.preview(col.track, p + (d or 0), nil, nil) end
+  end
+end
 ctx.transcribe_cmd = function()
   local col = cur_col()
   if not (col and col.track) then vim.msg = 'transcribe: no track under the cursor'; return end
@@ -22739,7 +22810,7 @@ local function frame()
     state.status = ('orca (%d,%d) %s'):format(hover.garden.ox, hover.garden.oy, ORCA.DOC[ch] or ORCA.DOC[ch:upper()] or 'click to place the cursor, type to write')
   elseif hover.video then state.status = hover.video.tip or 'video'
   elseif hover.visor then state.status = hover.visor.tip or 'visor'
-  elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
+  elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', tr = 'transposer (T, :tr): semitones, octaves, degrees of the key, to the chord of the row, just intonation; listen - hear the selection moved', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
   elseif hover.midimap then
     local t = MM.TARGETS[hover.midimap.row]
     state.status = t and (t.label .. ': ' .. t.d .. (hover.midimap.btn == 'mode' and ' - click: abs / rel / rel64' or ' - click: select, click again / Enter: learn, d: clear')) or ''

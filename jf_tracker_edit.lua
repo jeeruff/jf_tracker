@@ -643,7 +643,7 @@ function E.transpose(heads, lpb, semis, map, label)
         local p0
         if h.kind == 'midi' then local _, n = midi_note(h, lpb); p0 = n and n.pitch
         elseif h.kind == 'audio' and h.take then p0 = 60 + audio_semis(h) end
-        semis = p0 and (map(p0) - p0) or 0
+        semis = p0 and (map(p0, h) - p0) or 0   -- 26 окт: и сама нота (к аккорду её строки)
       end
       if semis == 0 then goto next_head end
       local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
