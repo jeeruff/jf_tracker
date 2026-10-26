@@ -9504,6 +9504,8 @@ function D.frame(L, snap, rows, state, info)
       if ncol > 1 and bx + bw1 * ncol + extra > room and bx + bw1 + extra <= room then ncol = math.max(1, math.floor((room - bx - extra) / bw1)) end   -- 13 окт: сколько влезает (было — сразу одна)
       if ncol == 1 and bx + bw1 + extra > room and room - bx - extra - L.pad >= L.cw * 10 then bw1 = room - bx - extra - L.pad end
       local bw = bw1 * ncol
+      -- 26 окт: пульт slixer — во всю ширину DSP: кнопки в меньше рядов, волне и прицелу больше высоты
+      if f.view == 'slixer' and D.SX and not f.container then bw = math.max(bw, cx1 - cx0 - 2 * L.pad) end
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
       if f.kit and D.DR then
         local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)
@@ -10810,7 +10812,15 @@ function D.frame(L, snap, rows, state, info)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
         local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
         if not atop then aim_y = sy end
-        if zr > 0 and v and v.frames and v.frames > 0 then
+        -- 26 окт: по высоте не влез (стандартная высота DSP) — прицел справа от групп параметров, на их высоту
+        local ax, aw2, ah = x0, w0, zr * L.rh
+        local side = false
+        if zr == 0 and not G.noparams and f.groups and f.rows then
+          local px = bx + #f.groups * bw1 + L.pad
+          local pw2 = bx + bw - L.pad - px
+          if pw2 >= L.cw * 24 then side = true; ax, aw2, ah, aim_y = px, pw2, (f.rows + 1) * L.rh - 2, by + L.rh + 1 + wtop end
+        end
+        if (zr > 0 or side) and v and v.frames and v.frames > 0 then
           D.slx_aim = D.slx_aim or {}
           local edge = (dr and dr.edge) or (hw and hw.edge) or D.slx_aim[f.i]
           if not edge or not (v.starts and v.starts[edge]) then edge = (v.sel and v.sel >= 0) and (v.sel + 1) or nil end
@@ -10819,11 +10829,11 @@ function D.frame(L, snap, rows, state, info)
           local w2 = math.floor((D.slx_zwin or 0.04) * sr)
           local center = edge and ((dr and dr.edge == edge and dr.fine and dr.fine.base) or v.starts[edge]) or 0
           local A = edge and { edge = edge, center = center, w2 = w2, spam = info.slx_spam and info.slx_spam(), fine = dr and dr.edge == edge and dr.frame or nil } or nil
-          if A and info.slx_aim then A.pk = info.slx_aim(center - w2, 2 * w2, math.min(w0, 2 * w2)) end
+          if A and info.slx_aim then A.pk = info.slx_aim(center - w2, 2 * w2, math.min(aw2, 2 * w2)) end
           local zy = aim_y
-          local ha = D.SX.draw_aim(U, L, v, x0, zy, w0, zr * L.rh, text, ms, set, mx, my, A, drag or dr)
+          local ha = D.SX.draw_aim(U, L, v, ax, zy, aw2, ah, text, ms, set, mx, my, A, drag or dr)
           if ha then hover.slxaim = { fx = k, f = f, a = ha } end
-          if not atop then sy = zy + zr * L.rh + 1 end
+          if not atop and not side then sy = zy + zr * L.rh + 1 end
         end
         local st
         if v and v.frames and v.frames > 0 then
