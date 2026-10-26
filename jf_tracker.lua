@@ -264,7 +264,8 @@ local state = {
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
   dspleft = flag('dspleft', true),
-  slicekeys = flag('slicekeys', false),   -- 24 окт: фокус в слайсере — клавиатура (KEYS) сама включается
+  slicekeys = flag('slicekeys', false),
+  fxontop = flag('fxontop', true),   -- 26 окт: окна плагинов, открытые трекером, — поверх (pin)   -- 24 окт: фокус в слайсере — клавиатура (KEYS) сама включается
   envwide = flag('envwide', false),   -- 24 окт: колонки огибающих широкими (полоса значения); выкл — узкие, 3 знака   -- 24 окт: кнопки модуля DSP (+ e ∆ on x) и пресет — сразу за именем, а не в правом краю
   offdim = flag('offdim', true),     -- 24 окт: выключенный модуль — параметры приглушены   -- 24 окт: окна, которые REAPER открывает сам при добавлении эффекта, — закрыть (jf_tracker_fxfloat)
   focusback = flag('focusback', true),   -- 21 окт: мышь вернулась с окна плагина — клавиатура снова у трекера
@@ -3283,7 +3284,7 @@ ctx = {
       end
       if ins < 0 then vim.msg = 'ze: no instrument on ' .. (col.name or 'this track') .. ' (on an envelope column: its view)'; return end
       local open = reaper.TrackFX_GetFloatingWindow(tr, ins) ~= nil
-      reaper.TrackFX_Show(tr, ins, open and 2 or 3)
+      if open then reaper.TrackFX_Show(tr, ins, 2) else edit.fx_show(tr, ins) end
       local _, nm = reaper.TrackFX_GetFXName(tr, ins, '')
       vim.msg = ('ze: %s %s (ze again - %s)'):format(nm or 'instrument', open and 'closed' or 'opened', open and 'open' or 'close')
       return
@@ -12885,6 +12886,7 @@ ctx = {
       flag('hdrinfo', 'header info', 'track headers show the instruments of the track (lib), its inserts (click - DSP, dblclick - window) and its sends (click - routing window)'),
       flag('whichkey', 'whichkey', 'after a prefix key (d y c g z r q @, z in DSP) a popup at the cursor lists what can follow'),
       flag('panes_ui', 'panes', 'layout as tmux / zellij panes: a tree of splits, every module a pane (stacks = tabs). Cmd+h j k l - focus, Cmd+Shift+h j k l - move, Ctrl+W - pane mode (split, stack, size, zoom, hide, layouts), :pane; click - focus, drag the line between panes - size. Off - the old fixed layout'),
+      flag('fxontop', 'plugin windows on top', 'plugin windows the tracker opens (ze, the module menu, a drop, slixer actions ...) stay above the tracker - pinned, like the pin of a REAPER FX window. Off - ordinary windows the tracker can cover'),
       flag('slicekeys', 'slicer: keys on', 'the focus on the slicer (item tab) turns the keyboard (KEYS, m) on - the digits play slices; leaving it - back as it was. Off - with KEYS off the digits do not play slices'),
       flag('envwide', 'wide envelope columns', 'envelope columns in the tracker wide (a value bar + the value); off - narrow, the value in 3 chars (edit in the automation tab or by points)'),
       flag('dspleft', 'preset by the name', 'DSP modules: the preset (< name >) right after the module name, the buttons (+ e ∆ on x) at the right edge; off - the preset at the right too'),
@@ -13847,7 +13849,7 @@ ctx = {
     if #names == 0 then
       -- 23 окт: свои пресеты плагин держит в своём браузере (Serum 2 — .SerumPreset, закрытый формат: REAPER их не
       -- загружает) — окно плагина, где этот браузер; сохранённые в REAPER пресеты (+ в окне FX) — появятся здесь
-      if A.Show then A.Show(t.track, f.i, 3) end
+      edit.fx_show(t.track, f.i)
       vim.msg = f.name .. ': REAPER lists no presets - its own preset browser is in its window (opened); presets saved in REAPER show here'
       return
     end
@@ -18111,6 +18113,7 @@ function ctx.slx_push(item)
   if P and P.guid == guid and P.stage ~= 'slices' then P.item = item; return end   -- загрузка идёт — нарезка уйдёт за ней
   ctx.slx_pending = { tr = tr, fx = fx, guid = guid, item = item, stage = 'slices', t = reaper.time_precise() }
 end
+edit.ontop_fn = function() return state.fxontop end   -- 26 окт: опция plugin windows on top
 edit.slices_hook = function(item)
   local ok, g = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_slx', '', false)
   if ok and g ~= '' then ctx.slx_push(item) end
@@ -18340,7 +18343,7 @@ function ctx.slx_do(h)
     elseif it.kind == 'tog' then ctx.slx_cmd(it.code, it.on and 0 or 1)
     else ctx.slx_cmd(it.code, it.arg or 0) end
   elseif it.src == 'press' then
-    reaper.TrackFX_Show(tr, fi, 3)   -- действие живёт в окне плагина: открыть и нажать там клавишу
+    edit.fx_show(tr, fi)   -- действие живёт в окне плагина: открыть и нажать там клавишу
     ctx.slx_cmd(8, it.key and it.key:byte() or 0)
     vim.msg = 'slixer: ' .. it.lab .. ' runs in the plugin window (opened)'
   end
@@ -25929,7 +25932,7 @@ local function frame()
         elseif f.view == 'slixer' then ctx.slixer_load(f, pth)
         elseif t and t.col and t.col.track then
           local id = f.fx or f.i
-          if not t.take then reaper.TrackFX_Show(t.col.track, id, 3) end
+          if not t.take then edit.fx_show(t.col.track, id) end
           reaper.OpenMediaExplorer(pth, false)
           vim.msg = (f.name or 'plugin') .. ': its window and the Media Explorer are open on ' .. (bd.e.name or '') .. ' - drag it from there into the plugin (no API to hand it a file)'
         end

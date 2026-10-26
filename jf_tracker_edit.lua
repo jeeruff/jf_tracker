@@ -3185,7 +3185,7 @@ function E.fx_add_into(track, c, name, par)
     local idx = add_fx(track, name, -1000 - addr)
     ok = idx ~= nil and idx >= 0
     if ok then set_par(track, addr, par) end
-    if ok and E.open_on_add then FA(track).Show(track, idx, 3) end
+    if ok and E.open_on_add then E.fx_show(track, idx) end
   end)
   if model then model.invalidate() end
   return ok
@@ -4020,6 +4020,8 @@ end
 function E.fx_show(track, fx)
   local A = FA(track)
   A.Show(track, fx, 3)
+  -- 26 окт: опция plugin windows on top (E.ontop_fn — из трекера); выкл — обычное окно
+  if E.ontop_fn and not E.ontop_fn() then return end
   local hw = A.GetFloatingWindow and A.GetFloatingWindow(track, fx)
   if hw and R.JS_Window_SetZOrder then R.JS_Window_SetZOrder(hw, 'TOPMOST') end
 end
@@ -4192,7 +4194,7 @@ function E.fx_insert(track, c, pos, name, par)
     local idx = add_fx(track, name, -1000 - addr)
     ok = idx ~= nil and idx >= 0
     if ok then set_par(track, addr, par) end
-    if ok and E.open_on_add then FA(track).Show(track, idx, 3) end
+    if ok and E.open_on_add then E.fx_show(track, idx) end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
@@ -4217,7 +4219,7 @@ function E.band_insert(obj, pos, name, band, n)
   run('fx into band ' .. (band + 1), function()
     local idx = add_fx(obj, name, -1000 - pos)
     ok = idx ~= nil and idx >= 0
-    if ok then ensure_nch(obj, n); set_band_pins(obj, idx, band); if E.open_on_add then FA(obj).Show(obj, idx, 3) end end
+    if ok then ensure_nch(obj, n); set_band_pins(obj, idx, band); if E.open_on_add then E.fx_show(obj, idx) end end
   end)
   if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
   return ok
