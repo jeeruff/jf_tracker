@@ -27806,6 +27806,13 @@ local function frame()
       if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         ctx.context_here(); return                       -- 10 окт: \ в модуле — его быстрое меню, в нём \ — главное
       end
+      -- 26 окт: стрелки = h j k l во всех модулях (Shift — H J K L, как Shift+hjkl), без Ctrl / Cmd / Opt;
+      -- не трекер (там INSERT — ноты), не набор текста / числа
+      if not typing and state.focus ~= 'tracker' and not DK.ins and not (FB and FB.typing) then
+        local AR = { [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l' }
+        local m1 = ctx.mods()
+        if AR[c] and not (m1.ctrl or m1.cmd or m1.alt) then c = (m1.shift and AR[c]:upper() or AR[c]):byte() end
+      end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       -- док session в фокусе (7 окт): клип-мод — клавиатура запускает клипы;
       -- : и / команды — в vim, Esc / Tab — в трекер
