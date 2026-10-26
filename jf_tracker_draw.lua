@@ -6043,10 +6043,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local hy2 = iy + 2 + L.rh
     local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad   -- 19 окт: колонки pt (транспозиция) и bs (beatsync)
     local cols_h = { { '#', ix + 6, sort == 'track' or sort == 'mark', sort == 'mark' and '#@' or '#', 'index' },
-                     { 'name', ix + 6 + ms('00 @ '), sort == 'name', 'name', 'name' },
-                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len' },
-                     { 'pt', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'pt', nil },
-                     { 'bs', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW, false, 'bs', nil } }
+                     { 'name', ix + 6 + ms('00+ 16$ '), sort == 'name', 'name', 'name' },   -- 26 окт: над именами (после «01+ 16$»)
+                     -- 26 окт: len / pt / bs — по правому краю, как их значения (6-е поле — правый край)
+                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len', ix + 6 + label_w + L.pad + ms('88.88s') },
+                     { 'pt', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'pt', nil, ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW - L.pad },
+                     { 'bs', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW, false, 'bs', nil, ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW + XBW - L.pad } }
     if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad + XPW + XBW, false, TILDE, nil } end
     cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW + XBW + tew, false, 'preview', nil }
     -- type (9 окт): у правого края строки заголовков — сортировка по типу
@@ -6063,7 +6064,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local x1 = cols_h[k + 1] and cols_h[k + 1][2] or (ix + w - L.pad)
       if h2[2] + ms(h2[4]) <= x1 then
         local hot = h2[5] and mx >= h2[2] and mx < x1 and my >= hy2 and my < hy2 + L.rh
-        text(h2[2], hy2, h2[4], h2[3] and U.AMBER or (hot and U.TEXT or U.GREY))
+        text(h2[6] and (h2[6] - ms(h2[4])) or h2[2], hy2, h2[4], h2[3] and U.AMBER or (hot and U.TEXT or U.GREY))
         if hot then hover.poolsortcol = h2[5] end
         if h2[5] then hint('poolsortcol', h2[2], hy2, x1 - h2[2], L.rh, h2[5]) end
       end
