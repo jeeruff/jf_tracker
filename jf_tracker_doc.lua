@@ -184,7 +184,7 @@ function DOC.draw(L, x, y, w, h)
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
   local secs = DOC.secs or {}
   -- шапка
-  local head = 'F1 help'
+  local head = 'help'
   U.text(x + L.pad, y + 2, head, U.AMBER)
   local qx = x + L.pad + U.measure(head) + 3 * L.pad
   local qs

@@ -17417,7 +17417,7 @@ function view_actions()
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
-    { 'Help (F1)', key = 'h', fn = function() ctx.help_big() end },
+    { 'Help', key = 'h', fn = function() ctx.help_big() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { (state.khelp and '!' or '') .. 'Help panel of the focused module', key = 'K', fn = function() ctx.toggle_help() end },
   }
@@ -22853,7 +22853,7 @@ local function frame()
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
   elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes == 'drag' and 'notes: drag the header to move the window' or hover.notes == 'resize' and 'notes: drag the corner to resize' or hover.notes:match('^zoom') and 'notes text size' or hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
   elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
-  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (the help button; F1 - the whole help); pressed keys light up'
+  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (the help button - the whole help); pressed keys light up'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
@@ -27311,7 +27311,7 @@ local function frame()
       c = 0
     end
   end
-  if c == keys.f1 then ctx.help_big(); c = 0 end   -- 10 окт: Shift+F1 — транспоз трека (туториал — в меню и :tutorial)
+  if c == keys.f1 then c = 0 end   -- 26 окт: справки на клавише нет (кнопка help, :help); простое F1 пока свободно
   if c == keys.f11 and ctx.mods().cmd then toggle_dock(); c = 0 end   -- 17 окт: весь экран — Cmd+F11 (Cmd = окно; F11 в frow — нота)
   -- F2..F6 (5 окт, мышечная память трекеров): F2 — трекер ↔ item (из любой
   -- вкладки — в трекер); F3 — modulate, ещё раз — следующая вкладка по кругу;

@@ -174,7 +174,7 @@ KH.PAGES = {
     { k = '\\ k', t = {}, d = 'keyboard modes: m - notes, p - patternkb (the note keys play the patterns), c - clipkb (1qaz 2wsx ... play the matrix cells); the mode word shows it (УЗОРКЛАВЪ / ОТРЫВКЛАВЪ)' },
     { k = '\\\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
     { k = '?', d = 'any REAPER action in the tracker style (fuzzy, the recent ones on top)' },
-    { k = 'F1', d = 'the help (all modules): j k line by line through all sections, J K section, / search, o - the help in the browser; :tutorial - the tour' },
+    { k = 'help', d = 'the help (all modules): the help button of the main module - j k line by line through all sections, J K section, / search, o - the help in the browser; :tutorial - the tour (no hotkey: F1 is free)' },
     { k = '^/ ⌥/ ⌘/', d = 'search: all effects / the DSP chain of the track / files' },
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters; the tracker first - every note, every beat row (darker dots) of each track; in INSERT too, on the note field (where f is not a note; in vol / fx it is hex F)' },
@@ -262,13 +262,12 @@ KH.PAGES = {
     { k = '\\\\q \\\\Q', t = {}, d = 'context menu on a sample: q - the nearest peak onto the row grid; Q - pick the peak, j k to a row, Enter moves it there (stretch marker)' },
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
-    { k = 'F1', d = 'manual' },
     { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - the help pane lists what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere' },
     { k = 'F2', d = 'back to the tracker from anywhere (closes the routing diagram, big router / chain); the item tab is in the F4 circle' },
     { k = 'F3', d = 'mixer on / off (in its routing strip Option+click on a routing name or a wire removes it)' },
     { k = 'F4', d = 'the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)' },
     { k = 'F5 F6', d = 'scopes / master; the same key again - back to the tracker' },
-    { k = 'help', d = 'this panel: the help button of the main module; F1 - the whole help' },
+    { k = 'help', d = 'this panel: the help button of the main module - the whole help' },
     { k = 'Cmd+ Cmd-', d = 'bitmap scale x1 / x1.5 / x2 / x3 (font size with a font)' },
   } },
   insert = { title = 'tracker INSERT (keyboard)', e = {
@@ -302,7 +301,6 @@ KH.PAGES = {
     { k = 'Cmd+F1 F2', m = 'microtone', g = 'transpose', d = 'microtone 1/6 tone down / up: the selection (else the note of the row); Cmd+Shift - the track' },
     { k = ':transpose', m = 'transpose popup', g = 'transpose', d = 'popup -24..+24 and where (selection / column / track / pattern); :transpose N - the selection by N; :transpose dN - by N degrees of the key' },
     { k = 'BS', m = 'delete note / row', d = 'INSERT, the note field: on a note - delete the note; on an empty row - delete the row (below moves up; Shift - all tracks)' },
-    { k = 'F1', d = 'the whole help (with frow F1 is a note in INSERT - Esc first; ? - REAPER actions)' },
   } },
   matrix = { title = 'matrix of regions (slots)', e = {
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
@@ -845,7 +843,6 @@ KH.PAGES = {
     { k = 'Up Down', d = 'scroll' },
     { k = 'BS', d = 'erase search' },
     { k = 'Esc', d = 'clear search / back to module' },
-    { k = 'F1', d = 'the whole help' },
     { k = 'hold Shift Ctrl Opt Cmd', t = {}, d = 'hold a modifier (or two) half a second, no key - the help pane lists what it does here and everywhere' },
   } },
 }
@@ -857,9 +854,9 @@ KH.BARS = {
   reform = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { '0', 'reset' }, { 'Space', 'listen' }, { 'Enter', 'keep' }, { 'Esc', 'revert' }, { 'f', 'jump' } },
   renderer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'toggle' }, { '0', 'defaults' }, { 'Enter', 'bounce' }, { 'Esc', 'back' }, { 'f', 'jump' } },
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
-              { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' }, { 'F1', 'help' } },
+              { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
-             { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' }, { 'F1', 'help' } },
+             { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' } },
   -- 14 окт: keys renoise — ноты двумя рядами, октава [ ], громкость { } (z x c — ноты)
   -- 16 окт: раскладка frow — ноты цифрами и F-рядом, октава [ ], громкость { }
   -- 17 окт: в INSERT с frow буквы — команды NORMAL; F1 — нота, поэтому ? (действия) вместо help
@@ -871,18 +868,18 @@ KH.BARS = {
   perf = { { 't', 'jftop / perf' }, { 'n', 'REAPER meter' }, { 'r', 'reset' }, { 'j k', 'scroll' }, { 'Esc', 'tracker' } },
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
-             { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' }, { 'F1', 'help' } },
+             { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
-           { 'Space', 'listen' }, { '/', 'find' }, { 'F1', 'help' } },
+           { 'Space', 'listen' }, { '/', 'find' } },
   session = { { 'c', 'clipkb' }, { 'click > x', 'launch / stop' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'a', 'add to' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { "'1..'0", 'marks' },
-              { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' }, { 'F1', 'help' } },
+              { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
-          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'find' }, { 'af', 'add' }, { 'zz', 'big' }, { 'F1', 'help' } },
+          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 't', 'track/take' }, { '/', 'find' }, { 'af', 'add' }, { 'zz', 'big' } },
   -- 9 окт: роутер (zR) и цепочка на всё окно (zz) — подсказки в строке статуса
   router = { { 'h l', 'signal' }, { 'j k', 'row' }, { 'a A', 'add' }, { '|', 'join row' }, { 's', 'solo' }, { '=', 'unity' }, { 'b', 'bypass' },
              { 'd', 'delete' }, { 'o', 'window' }, { 'drag', 'slider' }, { 'dblclick', 'default' }, { 'zR Esc', 'back' } },
@@ -892,9 +889,9 @@ KH.BARS = {
   fxb = { { 'type', 'search' }, { 'Up Down', 'move' }, { 'Enter', 'add' }, { 'drag', 'insert' }, { 'Esc', 'clear' } },
   nmod = { { 't', 'midi trig' }, { 'a', 'add (last touched)' }, { 'Enter', 'curve' }, { 'r', 'rate' }, { 'l', 'loop' }, { 'd', 'delete' }, { 'Esc', 'tracker' } },
   sprops = { { 'J K', 'row' }, { 'H L', 'value' }, { 'Shift', 'fine' }, { 'R', 'reset' }, { 'v', 'fit all rows' }, { 'Esc', 'tracker' } },
-  visor = { { 'p', 'on' }, { 'o', 'page' }, { 'a e', 'add' }, { 'j k', 'row' }, { 'J K', 'param' }, { 'H L', 'value' }, { 'h l', 'level' }, { 'm', 'mod' }, { 'M', 'matrix' }, { '=', 'type' }, { 's', 'scene' }, { 'i', 'presets' }, { 'n N', 'preset' }, { 'zz', 'big' }, { 'F1', 'help' } },
+  visor = { { 'p', 'on' }, { 'o', 'page' }, { 'a e', 'add' }, { 'j k', 'row' }, { 'J K', 'param' }, { 'H L', 'value' }, { 'h l', 'level' }, { 'm', 'mod' }, { 'M', 'matrix' }, { '=', 'type' }, { 's', 'scene' }, { 'i', 'presets' }, { 'n N', 'preset' }, { 'zz', 'big' } },
   sample = { { 's', 'cut at aim' }, { 'S', 'smk / slices' }, { '0 t q', 'aim toggles' }, { 'Enter', 'insert sel' }, { 'v', 'view' }, { '< >', 'vol' },
-             { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' }, { 'F1', 'help' } },
+             { 'n', 'normalize' }, { 'jk', 'param' }, { 'hl', 'value' } },
   automation = { { 'Opt+A', 'last touched' }, { 'C', 'canvas' }, { 'M', 'mod' }, { 'L', 'shape' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
   autocanvas = { { 'hl', 'row' }, { '{ }', 'cell' }, { 'jk', 'value' }, { '0-9', 'level' }, { 'v', 'range' }, { 'f r s t q n', 'shape' }, { '[ ]', 'grid' }, { 'Tab', 'curve' }, { 'zp', 'project' }, { 'x', 'remove' }, { 'P L', 'pages' }, { 'Esc', 'back' } },
   modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
@@ -1183,7 +1180,7 @@ function KH.draw(U, L, x, y, w, h, now, focused, fit, bare)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local P = KH.PAGES[KH.page] or KH.PAGES.tracker
   -- шапка: ? HELP · страница · поиск
-  local head = bare and '' or ('F1 help: %s'):format(P.title)
+  local head = bare and '' or ('help: %s'):format(P.title)
   if not bare then U.text(x + L.pad, y + 3, head, U.AMBER) end
   local qx = bare and (x + L.pad) or (x + L.pad + U.measure(head) + 3 * L.pad)
   local qend = x + w - L.pad

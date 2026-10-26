@@ -46,7 +46,7 @@ T.STEPS = {
     text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',
     check = function(e) return e.playing end },
   { mod = 'dsp', focus = 'tracker', title = 'Help',
-    text = 'F1 - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live. Press F1',
+    text = 'the help button - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live. Press F1',
     check = function(e) return e.khelp_big end },
 }
 
