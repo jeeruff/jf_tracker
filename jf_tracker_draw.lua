@@ -5458,8 +5458,9 @@ local function bracket(L, x0, x1, boxy, bh0, d)
   local y0 = boxy + bh0 + 2
   local yb = y0 + math.min(ext - 3, 2 * math.max(0, 2 - d))
   -- 24 окт: концы — от самого низа модулей (была щель в 2 px — «рваный угол»); зазор только у горизонтали
-  gfx.rect(x0, boxy + bh0, 1, yb - boxy - bh0 + 1, 1); gfx.rect(x1, boxy + bh0, 1, yb - boxy - bh0 + 1, 1)
-  gfx.rect(x0, yb, x1 - x0 + 1, 1, 1)
+  -- 26 окт: 2 px (была 1 px — терялась); концы снаружи модулей: от их низа вниз, не поверх
+  gfx.rect(x0, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1)
+  gfx.rect(x0, yb, x1 - x0 + 1, 2, 1)
 end
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
@@ -5485,8 +5486,8 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     local x = bx - L.pad + 2
     local same = st and st.y == boxy
     local fr = c.enabled and U.tint(U.AMBER, 0.6) or U.DIM
-    if same then   -- правая кромка рэка — сразу за последним модулем
-      set(fr); gfx.rect(x - 2, boxy, 1, bh0, 1)
+    if same then   -- правая кромка рэка — в зазоре за последним модулем (26 окт: 2 px, не на модуле)
+      set(fr); gfx.rect(x - 2, boxy, 2, bh0, 1)
     end
     local hot = not drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
     local lit = drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
@@ -5503,7 +5504,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     end
     if same then
       set(fr)
-      gfx.rect(st.x, boxy - 3, x + pw - st.x, 1, 1)
+      gfx.rect(st.x, boxy - 4, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px, над модулями (не на их рамке)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
       bracket(L, st.x, x + pw - 1, boxy, bh0, d)
     end
