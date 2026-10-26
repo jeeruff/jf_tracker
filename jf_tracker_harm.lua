@@ -53,11 +53,25 @@ function HM.ji_micro(sym, pitches)
 end
 
 -- обозначение ступени k (1..7) лада: трезвучие / септаккорд
+-- 26 окт: написание по ладу — в бемольных ладах (F Bb Eb Ab Db Gb мажор и их параллельные миноры) D# → Eb
+local FLAT = { 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B' }
+function HM.flats()
+  local tonic = HM.minor and (HM.root + 3) % 12 or HM.root
+  return ({ [5] = true, [10] = true, [3] = true, [8] = true, [1] = true, [6] = true })[tonic] or false
+end
+function HM.pc_name(pc) return (HM.flats() and FLAT or CH.NAMES)[pc % 12 + 1] end
+-- имя аккорда (C#m7, A#/G …) — корень и бас по ладу
+function HM.spell(name)
+  if not (name and HM.flats()) then return name end
+  local SH = { ['C#'] = 'Db', ['D#'] = 'Eb', ['F#'] = 'Gb', ['G#'] = 'Ab', ['A#'] = 'Bb' }
+  name = name:gsub('^(%u#)', function(r) return SH[r] or r end)
+  return (name:gsub('/(%u#)', function(r) return '/' .. (SH[r] or r) end))
+end
 function HM.degree(k, seventh)
   local pc = (HM.root + SCALE[HM.minor][k]) % 12
-  return CH.NAMES[pc + 1] .. (seventh and SEV[HM.minor][k] or TRI[HM.minor][k])
+  return HM.pc_name(pc) .. (seventh and SEV[HM.minor][k] or TRI[HM.minor][k])
 end
-function HM.key_name() return CH.NAMES[HM.root + 1] .. (HM.minor and ' minor' or ' major') end
+function HM.key_name() return HM.pc_name(HM.root) .. (HM.minor and ' minor' or ' major') end
 
 -- лад по высотам нот (счёт по ступеням, тоника — с бонусом): лучший мажор / минор
 function HM.detect(pitches)
@@ -78,45 +92,154 @@ end
 
 -- нотный стан (9 окт): скрипичный ключ, ноты аккорда столбиком (секунды —
 -- сдвиг вправо), диезы буквой #, добавочные линии. Возвращает ширину
+-- 26 окт: НОТНЫЙ СТАН ПО-НАСТОЯЩЕМУ — глифы SMuFL из Reavura (Bravura внутри REAPER.app):
+-- скрипичный ключ всегда, низкая одиночная нота — басовый, аккорд — два стана со скобкой;
+-- головки noteheadBlack, общий штиль на стан, добавочные линии, ♯ ♭ глифами.
+-- Где глиф встаёт по высоте, меряется один раз на размер: рисунок в скрытый буфер, верхний
+-- пиксель + высота над базовой линией из рамок SMuFL (staff spaces) → смещение базовой линии.
+local SM = { g = utf8.char(0xE050), f = utf8.char(0xE062), head = utf8.char(0xE0A4), sharp = utf8.char(0xE262), flat = utf8.char(0xE260) }
+local SM_TOP = { g = 4.392, f = 1.048, head = 0.5, sharp = 1.4, flat = 1.756 }   -- bBoxNE.y, staff spaces
+local SM_CACHE = {}
+local SM_FONT, SM_IMG = 12, 86   -- шрифт 12, картинка 86 — свободны (0..9 шрифты трекера; картинки — список в jf_tracker_draw.lua:140)
+-- замер одного глифа: верх и низ рисунка от точки gfx.y (пиксели), в скрытой картинке
+local function scan(g, fsz, want_bot)
+  local W, H = math.ceil(fsz * 1.2) + 8, math.ceil(fsz * 1.6) + 8
+  gfx.setimgdim(SM_IMG, -1, -1); gfx.setimgdim(SM_IMG, W, H)
+  gfx.dest = SM_IMG
+  gfx.set(0, 0, 0, 1); gfx.rect(0, 0, W, H, 1)
+  gfx.set(1, 1, 1, 1); gfx.x, gfx.y = 0, 0; gfx.drawstr(g)
+  -- gfx.getpixel() читает точку gfx.x, gfx.y (не аргументы)
+  local function row_hit(yy)
+    for xx = 0, W - 1, 2 do gfx.x, gfx.y = xx, yy; if gfx.getpixel() > 0.4 then return true end end
+    return false
+  end
+  local top, bot
+  for yy = 0, H - 1 do if row_hit(yy) then top = yy; break end end
+  if want_bot and top then for yy = H - 1, top, -1 do if row_hit(yy) then bot = yy; break end end end
+  return top, bot
+end
+-- метрики под промежуток стана sp: размер шрифта подбирается так, чтобы головка была ровно sp
+-- (размер gfx.setfont — высота строки шрифта, а не кегль em; у Bravura строка намного выше em)
+local function smufl_metrics(sp)
+  local c = SM_CACHE[sp]
+  if c ~= nil then return c end
+  local pd = gfx.dest
+  local fi = gfx.getfont and gfx.getfont() or 0
+  c = false
+  local f0 = 16 * sp
+  gfx.setfont(SM_FONT, 'Reavura', f0)
+  local gw = gfx.measurestr(SM.g)
+  if gw and gw > 0 then
+    local t0, b0 = scan(SM.head, f0, true)
+    if t0 and b0 and b0 > t0 then
+      local fsz = math.max(4, math.floor(f0 * sp / (b0 - t0 + 1) + 0.5))
+      gfx.setfont(SM_FONT, 'Reavura', fsz)
+      c = { w = {}, fsz = fsz }
+      for k, g in pairs(SM) do
+        local t = scan(g, fsz)
+        c[k] = t or 0
+        c.w[k] = gfx.measurestr(g)
+      end
+    end
+  end
+  gfx.dest = pd
+  gfx.setfont(fi)
+  SM_CACHE[sp] = c
+  return c
+end
+
 function HM.staff(L, x, y, h, sym)
   local ps = CH.voicing(sym, 4)
   if not ps then return 0 end
-  local st = {}
-  local lo, hi = 30, 38
-  for i, p in ipairs(ps) do
-    local s, acc = CH.staff_step(p)
-    st[i] = { s = s, acc = acc }
-    lo, hi = math.min(lo, s), math.max(hi, s)
+  local notes = {}
+  -- 26 окт: знаки по ладу — в ладах с бемолями (F Bb Eb Ab Db Gb мажор, d g c f bb eb минор) D# пишется Eb
+  local flats = HM.flats()
+  for _, p in ipairs(ps) do
+    local s0, acc = CH.staff_step(p)
+    if acc and flats then s0, acc = s0 + 1, 'b' end                   -- D# → E♭ (ступень выше, бемоль)
+    notes[#notes + 1] = { s = s0, acc = acc }
   end
-  -- полшага — по высоте панели (стан крупный), но не больше строки
-  local hs = math.max(3, math.min(L.rh, math.floor(h / (hi - lo + 3))))
-  table.sort(st, function(a, b) return a.s < b.s end)
-  local yb = y + hs + (hi - 30) * hs                       -- нижняя линия (E4)
-  if yb + (30 - lo) * hs + hs > y + h then yb = y + h - hs - (30 - lo) * hs end
-  local function sy(s) return yb - (s - 30) * hs end
-  local aw = U.measure('#')
-  local cw = U.measure('G')
-  local nx = x + cw + 2 * aw + 6                            -- столбец нот
-  local r = math.max(2, hs - 1)                            -- головка чуть меньше промежутка: терции не слипаются
-  local w = nx - x + 4 * r + 6
+  table.sort(notes, function(a, b) return a.s < b.s end)
+  -- станы: скрипичный — линии 30..38 (E4..F5), басовый — 18..26 (G2..A3); до первой октавы — 28
+  local both = #notes > 1
+  local use_t = both or notes[1].s >= 28
+  local use_b = both or not use_t
+  local top, bot = use_t and 38 or 26, use_b and 18 or 30
+  for _, n in ipairs(notes) do top = math.max(top, n.s); bot = math.min(bot, n.s) end
+  local hs = math.max(2, math.min(math.floor(L.rh * 0.45), math.floor(h / (top - bot + 9))))   -- полпромежутка (26 окт: мельче — баланс с панелью)
+  local sp = 2 * hs
+  local function sy(st) return y + (top + 4 - st) * hs end
+  local M = smufl_metrics(sp)
+  local fi = gfx.getfont and gfx.getfont() or 0
+  local function glyph(k, gx, line_y)   -- k встаёт базовой линией на line_y
+    gfx.setfont(SM_FONT, 'Reavura', M.fsz)
+    gfx.x, gfx.y = math.floor(gx), math.floor(line_y - SM_TOP[k] * sp - M[k])
+    gfx.drawstr(SM[k])
+    gfx.setfont(fi)
+  end
+  local headw = M and M.w.head or math.floor(sp * 1.2)
+  local clefw = M and math.max(M.w.g, M.w.f) or U.measure('G')
+  local accw = M and math.max(M.w.sharp, M.w.flat) or U.measure('#')
+  local nx = x + sp + clefw + sp + 2 * accw + 2
+  local w = nx - x + 2 * headw + 2 * sp
+  -- линии станов, скобка системы
   U.set(U.GREY)
-  for k = 0, 4 do gfx.rect(x, sy(30 + 2 * k), w, 1, 1) end
-  U.text(x, sy(32) - math.floor(L.th / 2), 'G', U.DIM)       -- ключ соль — буквой (на линии G4)
-  local prev, shifted, accn = nil, false, 0
-  for _, e in ipairs(st) do
-    local dx = 0
-    if prev and e.s == prev + 1 and not shifted then dx = 2 * r + 1; shifted = true else shifted = false end
-    local cx, cy = nx + r + dx, sy(e.s)
-    -- добавочные линии
-    U.set(U.GREY)
-    for ls = 28, e.s, -2 do gfx.rect(cx - r - 2, sy(ls), 2 * r + 5, 1, 1) end
-    for ls = 40, e.s, 2 do gfx.rect(cx - r - 2, sy(ls), 2 * r + 5, 1, 1) end
-    U.set(U.TEXT); gfx.circle(cx, cy, r, 1, 0)
-    if e.acc then
-      accn = accn + 1
-      U.text(nx - aw - 2 - ((accn % 2 == 0) and aw + 1 or 0), cy - math.floor(L.th / 2), '#', U.TEXT)
+  if use_t then for k = 0, 4 do gfx.rect(x, sy(30 + 2 * k), w, 1, 1) end end
+  if use_b then for k = 0, 4 do gfx.rect(x, sy(18 + 2 * k), w, 1, 1) end end
+  if use_t and use_b then gfx.rect(x, sy(38), 1, sy(18) - sy(38) + 1, 1); gfx.rect(x + w - 1, sy(38), 1, sy(18) - sy(38) + 1, 1) end
+  -- ключи
+  U.set(U.TEXT)
+  if M then
+    if use_t then glyph('g', x + sp * 0.6, sy(32)) end
+    if use_b then glyph('f', x + sp * 0.6, sy(24)) end
+  else
+    if use_t then U.text(x + 2, sy(32) - math.floor(L.th / 2), 'G', U.DIM) end
+    if use_b then U.text(x + 2, sy(24) - math.floor(L.th / 2), 'F', U.DIM) end
+  end
+  -- ноты по станам: стан, сдвиг секунды, штиль
+  local groups = { t = {}, b = {} }
+  for _, n in ipairs(notes) do
+    local g = (use_t and (not use_b or n.s >= 28)) and 't' or 'b'
+    table.insert(groups[g], n)
+  end
+  local accn = 0
+  for gk, gr in pairs(groups) do
+    if #gr > 0 then
+      local mid = gk == 't' and 34 or 22
+      local sum = 0; for _, n in ipairs(gr) do sum = sum + n.s end
+      local up = sum / #gr < mid                       -- ниже середины — штиль вверх
+      local prev, shifted = nil, false
+      local lo_y, hi_y
+      for _, n in ipairs(gr) do
+        local dx = 0
+        if prev and n.s == prev + 1 and not shifted then dx = up and (headw - 1) or -(headw - 1); shifted = true else shifted = false end
+        prev = n.s
+        local hx, hy = nx + dx, sy(n.s)
+        -- добавочные линии
+        U.set(U.GREY)
+        if gk == 't' then
+          for ls = 28, n.s, -2 do gfx.rect(hx - 3, sy(ls), headw + 6, 1, 1) end
+          for ls = 40, n.s, 2 do gfx.rect(hx - 3, sy(ls), headw + 6, 1, 1) end
+        else
+          for ls = 28, n.s, 2 do gfx.rect(hx - 3, sy(ls), headw + 6, 1, 1) end
+          for ls = 16, n.s, -2 do gfx.rect(hx - 3, sy(ls), headw + 6, 1, 1) end
+        end
+        U.set(U.TEXT)
+        if M then glyph('head', hx, hy)
+        else for d = -hs + 1, hs - 1 do local k = math.floor(headw / 2 * math.sqrt(1 - (d / hs) ^ 2)); gfx.rect(hx + headw / 2 - k + d * 0.3, hy + d, 2 * k, 1, 1) end end
+        if n.acc then
+          accn = accn + 1
+          local ax = nx - accw - 2 - ((accn % 2 == 0) and accw or 0)
+          if M then glyph(n.acc == 'b' and 'flat' or 'sharp', ax, hy) else U.text(ax, hy - math.floor(L.th / 2), n.acc, U.TEXT) end
+        end
+        lo_y = math.max(lo_y or hy, hy); hi_y = math.min(hi_y or hy, hy)
+      end
+      -- штиль: вверх — справа от головок, вниз — слева; длина 3.5 промежутка за крайней нотой
+      U.set(U.TEXT)
+      local stw = math.max(1, math.floor(sp / 9))
+      if up then gfx.rect(nx + headw - stw, hi_y - math.floor(3.5 * sp), stw, lo_y - hi_y + math.floor(3.5 * sp), 1)
+      else gfx.rect(nx, hi_y, stw, lo_y - hi_y + math.floor(3.5 * sp), 1) end
     end
-    prev = e.s
   end
   return w
 end
@@ -175,7 +298,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   -- 21 окт: лад в трекере — ноты вне лада красноватые (o), набор в ладу (i)
   cx = btn(cx, y, bw_of('out'), 'out', info.keymark, { kind = 'kmark' })
   cx = btn(cx, y, bw_of('in key'), 'in key', info.keysnap, { kind = 'ksnap' })
-  if info.col_name then U.text(cx + L.pad, y, fit(info.col_name .. (info.here and ('  now: ' .. info.here) or '  now: -'), x + w - cx - L.pad), info.here and U.TEXT or U.GREY) end
+  if info.col_name then U.text(cx + L.pad, y, fit(info.col_name .. (info.here and ('  now: ' .. HM.spell(info.here)) or '  now: -'), x + w - cx - L.pad), info.here and U.TEXT or U.GREY) end
   -- строки 2..3: ступени — одна ширина на все (по самой длинной подписи)
   local roman = true
   local cw = bw_of('vii° G#dim')
@@ -188,7 +311,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
     for k = 1, 7 do
       local sym = HM.degree(k, row == 1)
       local lab = (row == 0 and roman and (ROM[HM.minor][k] .. ' ') or '') .. sym
-      btn(x + (k - 1) * (cw + 2), by, cw, lab, info.here == sym, { kind = 'deg', k = k, seventh = row == 1 })
+      btn(x + (k - 1) * (cw + 2), by, cw, lab, HM.spell(info.here) == sym, { kind = 'deg', k = k, seventh = row == 1 })
     end
   end
   -- аккорды трека в паттерне — под кнопками, в ширину их группы
@@ -199,7 +322,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
     local tx0 = x + U.measure('chords ') + L.pad
     local tx = tx0
     for _, e in ipairs(info.list or {}) do
-      local s = ('%04d %s'):format(e.row, e.name)
+      local s = ('%04d %s'):format(e.row, HM.spell(e.name))
       local sw = U.measure(s) + 2 * L.pad
       if tx + sw > gx1 then ty = ty + rh; tx = tx0; if ty + rh > y + h then break end end
       U.text(tx, ty, s, e.cur and U.AMBER or U.TEXT)
@@ -208,7 +331,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
     if #(info.list or {}) == 0 then U.text(tx, ay, fit('no notes on this track in the pattern', gx1 - tx), U.DIM) end
   end
   -- справа: стан и таб
-  local show = (hv and hv.kind == 'deg') and HM.degree(hv.k, hv.seventh) or info.here
+  local show = (hv and hv.kind == 'deg') and HM.degree(hv.k, hv.seventh) or HM.spell(info.here)
   local px = gx1 + 2 * L.cw
   local py = y + rh + 2
   -- 26 окт: справа не влезает (узкая панель) — стан и таб под списком аккордов, во всю ширину

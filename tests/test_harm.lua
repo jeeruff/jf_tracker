@@ -8,7 +8,7 @@ local function eq(a, b, m) n = n + 1; if a ~= b then bad = bad + 1; print('FAIL 
 HM.root, HM.minor = 0, false
 eq(HM.degree(1), 'C', 'I in C'); eq(HM.degree(2), 'Dm', 'ii'); eq(HM.degree(7), 'Bdim', 'vii°'); eq(HM.degree(5, true), 'G7', 'V7')
 HM.root, HM.minor = 10, true                 -- A# minor (пад пользователя)
-eq(HM.degree(1), 'A#m', 'i in A# minor'); eq(HM.degree(6), 'F#', 'VI'); eq(HM.degree(2, true), 'Cm7b5', 'ii°7')
+eq(HM.degree(1), 'Bbm', 'i in Bb minor (flats key)'); eq(HM.degree(6), 'Gb', 'VI'); eq(HM.degree(2, true), 'Cm7b5', 'ii°7')
 local r, m = HM.detect({ 58, 61, 65, 58, 61, 65, 56, 60, 63, 65 })
 eq(CH.NAMES[r + 1] .. (m and 'm' or ''), 'A#m', 'detect A# minor from A#m + G#6')
 eq(HM.key(('3'):byte()).write, HM.degree(3), 'key 3 writes iii')
@@ -31,5 +31,10 @@ eq(jm[60], nil, 'root untouched'); eq(jm[64], -1, 'C7: E lower'); eq(jm[70], -2,
 local jm2 = HM.ji_micro('Am7', { 57, 60, 64, 67 })
 eq(jm2[60], 1, 'Am7: C higher (6/5)'); eq(jm2[67], 1, 'Am7: G 9/5')
 eq(HM.key(('j'):byte()), true, 'j toggles just'); eq(HM.ji, true, 'just on')
+-- 26 окт: написание по ладу
+HM.root, HM.minor = 0, true      -- C minor: бемоли
+eq(HM.degree(3), 'Eb', 'III in C minor = Eb'); eq(HM.spell('A#7'), 'Bb7', 'spell A#7 -> Bb7'); eq(HM.spell('C#m/G#'), 'Dbm/Ab', 'spell bass too')
+HM.root, HM.minor = 7, false     -- G major: диезы
+eq(HM.degree(7), 'F#dim', 'vii in G major = F#dim'); eq(HM.spell('A#7'), 'A#7', 'sharps key keeps sharps')
 print(('%d checks, %d failed'):format(n, bad))
 if bad > 0 then os.exit(1) end
