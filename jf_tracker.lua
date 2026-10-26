@@ -6665,8 +6665,8 @@ ctx = {
   drum_size_menu = function()
     local items = {}
     for _, m in ipairs({ { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4' } }) do
-      items[#items + 1] = { key = m[1], label = m[2] .. ' (zs' .. m[1] .. ')' .. ((state.kitsize or 'l') == m[1] and '  (on)' or ''), fn = function()
-        state.kitsize = m[1]; reaper.SetExtState(EXT, 'kitsize', m[1], true); vim.msg = 'drumrs5k pads: ' .. m[2] .. ' (zs' .. m[1] .. ')'
+      items[#items + 1] = { key = m[1], label = m[2] .. ' (cs' .. m[1] .. ')' .. ((state.kitsize or 'l') == m[1] and '  (on)' or ''), fn = function()
+        state.kitsize = m[1]; reaper.SetExtState(EXT, 'kitsize', m[1], true); vim.msg = 'drumrs5k pads: ' .. m[2] .. ' (cs' .. m[1] .. ')'
       end }
     end
     vim.open_hydra({ title = 'drumrs5k pad size', items = items })
@@ -15753,6 +15753,28 @@ ctx.pad_fx_add = function()
 end
 -- 23 окт: ÷ в шапке модуля DSP — эффект в 3 / 4 / 5 полос (нативные 3/4/5-Band Splitter + Joiner REAPER);
 -- в роутере видно полосами, a на полосе — эффект в неё
+-- 26 окт: меню рэка / контейнера c (было в z): cv — вид пэды / список (обычный контейнер — выбор вида),
+-- cb — в полосы (ctx.dsp_bands), cs — размер пэдов drumrs5k
+ctx.dsp_kview = function()
+  local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
+  if f0 and f0.container and not f0.kit and not f0.bands then
+    -- 24 окт: обычный контейнер — вид на выбор: обёртка (модули целиком), пачка (мелкие эффекты), список цепей
+    local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
+    draw.kit_list = draw.kit_list or {}
+    local function set(v, what) return function() draw.kit_list[key] = v; model.invalidate(); vim.msg = 'container: ' .. what .. ' (cv)' end end
+    vim.open_hydra({ title = 'view of ' .. (f0.name or 'the container'), items = {
+      { key = 'w', label = 'wrap: the modules inside at full size', fn = set('wrap', 'wrap') },
+      { key = 'p', label = 'pack: small effects together in one block', fn = set('pack', 'pack') },
+      { key = 'l', label = 'list of the chains', fn = set('list', 'list') },
+      { key = 'a', label = 'auto: pack for 2-5 small effects, else wrap', fn = set(nil, 'auto') } } })
+  elseif f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
+    local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
+    draw.kit_list = draw.kit_list or {}
+    draw.kit_list[key] = (draw.kit_list[key] == 'list') and 'pads' or 'list'
+    vim.msg = (f0.kit and 'drumrs5k: ' or 'container: ') .. draw.kit_list[key] .. ' (cv - switch)'
+  else vim.msg = 'cv: put the DSP cursor on a drumrs5k rack or a container' end
+end
+ctx.dsp_kitsize_arm = function() state.dsp_zs = true; vim.msg = 'cs - size of the drumrs5k pads: s small, m medium, l large' end
 ctx.dsp_bands = function(k)
   local col = dsp_target(); local f = col and (col.fx or {})[k]
   if not f then return end
@@ -15762,7 +15784,7 @@ ctx.dsp_bands = function(k)
       -- 23 окт: контейнер «÷N bands» из N параллельных цепей (по сплиттеру с одной полосой в каждой), эффект — в low
       if edit.band_container(col.track, f.i, n, true) then
         draw.kit_list = draw.kit_list or {}
-        vim.msg = ('%s ÷%d: a container of %d bands (low ... high), it is in low; zv - the bands as a list, af / drop - into a band'):format(f.name, n, n)
+        vim.msg = ('%s ÷%d: a container of %d bands (low ... high), it is in low; cv - the bands as a list, af / drop - into a band'):format(f.name, n, n)
       else vim.msg = 'bands: could not build the container' end
     end }
   end
@@ -17845,7 +17867,7 @@ function ctx.context_items(hover)
       add('--', function() end)
     end
     if col and f and not f.container and hover.dsp and not hover.dsp.param then   -- 23 окт: в полосы (было кнопкой ÷ — непонятно)
-      add('Split into bands ... (3 / 4 / 5 band splitter, zb)', function() ctx.dsp_bands(hover.dsp.fx) end, nil)
+      add('Split into bands ... (3 / 4 / 5 band splitter, cb)', function() ctx.dsp_bands(hover.dsp.fx) end, nil)
     end
     if col and f then
       add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name, function() edit.fx_bypass(col.track, f.i) end)
@@ -22481,7 +22503,7 @@ local function frame()
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
-    kview = 'pads / list of the rack (zv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
+    kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
@@ -27833,13 +27855,13 @@ local function frame()
         local ch = c < 256 and string.char(c) or ''
         if not DK.pending and (ch == ':' ) then return vim.key(c) end
         if ctx.mods().cmd and c >= 48 and c <= 57 then return vim.key(c) end   -- 22 окт: Cmd+1..0 — выбор трека и из DSP (модуль — ^ $ N|)
-        -- 19 окт: zs + s / m / l — размер пэдов drumrs5k (size)
+        -- 19 окт: cs + s / m / l — размер пэдов drumrs5k (size; было zs, 26 окт)
         if state.dsp_zs and not DK.pending then
           state.dsp_zs = nil
           if ch == 's' or ch == 'm' or ch == 'l' then
             state.kitsize = ch; reaper.SetExtState(EXT, 'kitsize', ch, true)
             vim.msg = 'drumrs5k pads: ' .. ({ s = 'small (more rows)', m = 'medium 4 x 4', l = 'large 4 x 4' })[ch]
-          else vim.msg = 'zs: s / m / l - pad size' end
+          else vim.msg = 'cs: s / m / l - pad size' end
           return
         end
         -- 19 окт: m (KEYS) и ноты клавиатуры при KEYS — общие, DSP их не глотает (пэды drumrs5k играются отсюда)
@@ -27861,28 +27883,8 @@ local function frame()
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
-          if ch == 's' then state.dsp_zs = true; vim.msg = 'zs - size of the drumrs5k pads: s small, m medium, l large'; return end
           if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
-          elseif ch == 'b' then ctx.dsp_bands(dsp_sel.fx)   -- 23 окт: zb — модуль в 3 / 4 / 5 полос
-          elseif ch == 'v' then   -- 23 окт: zv — рэк drumrs5k: сетка пэдов <-> список
-            local col0 = dsp_target(); local f0 = col0 and (col0.fx or {})[dsp_sel.fx]
-            if f0 and f0.container and not f0.kit and not f0.bands then
-              -- 24 окт: обычный контейнер — вид на выбор: обёртка (модули целиком), пачка (мелкие эффекты), список цепей
-              local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
-              draw.kit_list = draw.kit_list or {}
-              local function set(v, what) return function() draw.kit_list[key] = v; model.invalidate(); vim.msg = 'container: ' .. what .. ' (zv)' end end
-              vim.open_hydra({ title = 'view of ' .. (f0.name or 'the container'), items = {
-                { key = 'w', label = 'wrap: the modules inside at full size', fn = set('wrap', 'wrap') },
-                { key = 'p', label = 'pack: small effects together in one block', fn = set('pack', 'pack') },
-                { key = 'l', label = 'list of the chains', fn = set('list', 'list') },
-                { key = 'a', label = 'auto: pack for 2-5 small effects, else wrap', fn = set(nil, 'auto') } } })
-            elseif f0 and (f0.kit or f0.container) then   -- 23 окт: и любой контейнер — список цепей
-              local key = tostring(col0.guid or '') .. ':' .. tostring(f0.fguid or f0.i)
-              draw.kit_list = draw.kit_list or {}
-              draw.kit_list[key] = (draw.kit_list[key] == 'list') and 'pads' or 'list'
-              vim.msg = (f0.kit and 'drumrs5k: ' or 'container: ') .. draw.kit_list[key] .. ' (zv - switch)'
-            else vim.msg = 'zv: put the DSP cursor on a drumrs5k rack or a container' end
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
             local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }
             if state.dsp_zzflip then ids, fr = { 'dsp', 'mixer' }, { 0.7, 0.3 } end   -- z Tab — DSP сверху

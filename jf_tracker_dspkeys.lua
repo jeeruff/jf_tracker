@@ -37,7 +37,7 @@ function DK.init(c) ctx = c end
 local HINT = {
   d = 'd: d delete fx (v: range) | w delete forward (d3w - three) | b delete the one before | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
-  c = 'c: c pack fx (v: range) into a new container | Esc',
+  c = 'c: c pack fx (v: range) into a new container | u unpack | n empty container | v rack view: pads / list | b into 3 / 4 / 5 bands | s pad size | Esc',
   a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | F take fx on the note | Esc',
 }
 function DK.pending_hint() return DK.pending and HINT[DK.pending] or nil end
@@ -93,6 +93,9 @@ function DK.key(c, sel, n, np, mods)
     elseif op == 'y' and ch == 'y' then ctx.dsp_yank(sel.fx)
     elseif op == 'c' and ch == 'c' then ctx.dsp_pack(r0, r1); DK.anchor = nil
     elseif op == 'c' and ch == 'n' then ctx.dsp_container_new(sel.fx)   -- 24 окт: пустой контейнер
+    elseif op == 'c' and ch == 'v' then ctx.dsp_kview()   -- 26 окт: меню рэка / контейнера (было zv zb zs)
+    elseif op == 'c' and ch == 'b' then ctx.dsp_bands(sel.fx)
+    elseif op == 'c' and ch == 's' then ctx.dsp_kitsize_arm()
     elseif op == 'a' and ch == 'a' then ctx.dsp_automate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'p' then ctx.dsp_pick_param(sel.fx)
     elseif op == 'a' and ch == 'f' then if not (ctx.pad_fx_add and ctx.pad_fx_add()) then ctx.fx_picker() end   -- 23 окт: на рэке с выбранным пэдом — в пэд

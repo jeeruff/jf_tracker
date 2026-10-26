@@ -39,15 +39,15 @@ local T = {
   q = { title = 'q - record a macro', items = { { 'a..z', 'into this register; q again stops' } } },
   ['@'] = { title = '@ - play a macro', items = { { 'a..z', 'from this register' }, { '@', 'the last one again' }, { 'Opt+Shift+2', 'big panel' } } },
   item_z = { title = 'z - view of the item', items = { { 'z', 'item on the whole window (again - back)' }, { 'w', 'wide: across the whole width at the bottom (again - back)' }, { 'x', 'taller: up to 600 px (again - back)' } } },
-  dsp_z = { title = 'z - view / router / pages', items = { { 'z', 'dsp + mixer on the whole window' }, { 'v', 'rack / container: pads / list' }, { 'b', 'into 3 / 4 / 5 bands' }, { 'Tab', 'swap dsp and mixer (zz view)' }, { 'w', 'wide: dsp across the whole width, side modules up' }, { 'x', 'dsp taller: up to 600 px (again - back)' }, { 'r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'l', 'list of all modules (fzf)' }, { 'f', 'fold the module (a strip: name vertically, x B)' }, { 'F', 'fold / unfold all modules' }, { 'p', 'presets of the module' }, { 'P', 'pages of any module: all sections in one pane / one page + tabs' }, { 's', 'size of the drumrs5k pads: s m l' }, { 'm', 'minimize the pane' } } },
-  dsp_zs = { title = 'zs - pad size', items = { { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4 (default)' } } },
+  dsp_z = { title = 'z - view / router / pages', items = { { 'z', 'dsp + mixer on the whole window' }, { 'Tab', 'swap dsp and mixer (zz view)' }, { 'w', 'wide: dsp across the whole width, side modules up' }, { 'x', 'dsp taller: up to 600 px (again - back)' }, { 'r', 'router in the DSP FX panel on / off' }, { 'R', 'big router' }, { 'l', 'list of all modules (fzf)' }, { 'f', 'fold the module (a strip: name vertically, x B)' }, { 'F', 'fold / unfold all modules' }, { 'p', 'presets of the module' }, { 'P', 'pages of any module: all sections in one pane / one page + tabs' }, { 'm', 'minimize the pane' } } },
+  dsp_zs = { title = 'cs - pad size', items = { { 's', 'small - more rows' }, { 'm', 'medium 4 x 4' }, { 'l', 'large 4 x 4 (default)' } } },
   dsp_a = { title = 'a - add / automate', items = { { 'f', 'add fx (fzf)' }, { 'F', 'take fx on the note under the cursor' },
         { 'a', 'automate or show the envelope' }, { 'p', 'pick a parameter' }, { 'i', 'automation item' }, { 'd', 'remove automation' },
         { 'm', 'map to a container macro' } } },
   dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, 
         { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },
   dsp_y = { title = 'y - copy', items = { { 'y', 'the fx' } } },
-  dsp_c = { title = 'c - container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' } } },
+  dsp_c = { title = 'c - rack / container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' }, { 'v', 'view: pads / list (container: wrap / pack / list)' }, { 'b', 'into 3 / 4 / 5 bands' }, { 's', 'size of the drumrs5k pads: s m l' } } },
 }
 
 -- p — ожидающий префикс; op — оператор, если ждём g после него (dgg)

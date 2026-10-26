@@ -106,7 +106,7 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
   for _, b in ipairs(lay) do
     local it, x, y, w = b.it, b.x, b.y, b.w
     local h = L.rh - 1
-    local ty = y + math.floor((h - th) / 2) - (U.SPACE or 0)
+    local ty = y   -- 26 окт: как у кнопок трекера — от верха рамки (по центру высоты шрифта вылезало вниз)
     if it.kind == 'zone' then
       local zc = ({ SLICE = U.AMBER, SYNC = U.GREEN, MIDI = U.CYAN, ARP = U.AMBER, ARTIC = U.GREEN })[it.lab] or U.GREY
       text(x + L.pad, ty, it.lab, zc)
