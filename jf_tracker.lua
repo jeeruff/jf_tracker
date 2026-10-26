@@ -7310,7 +7310,7 @@ ctx = {
     local function nextkey() while pi <= #pool and used[pool:sub(pi, pi)] do pi = pi + 1 end; local k = pool:sub(pi, pi); pi = pi + 1; return k end
     for _, r in ipairs(ctx.mac_rows()) do
       if r.kind then
-        local k = (r.kind == 'rec' and not used[r.name]) and r.name or nextkey()
+        local k = (r.kind == 'rec' and not used[r.name]) and r.name or ((r.hk and not used[r.hk]) and r.hk) or nextkey()   -- 26 окт: hk — своя клавиша (` off all, ~ nooff all)
         if k and k ~= '' then
           used[k] = true
           local row = r

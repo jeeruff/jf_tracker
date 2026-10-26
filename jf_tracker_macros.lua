@@ -22,7 +22,8 @@ MR.BUILTIN = {
   { name = 'repeat down', body = ':repeat',       keys = 'Ctrl+Opt+J', desc = 'the cursor track: what is above the cursor in the pattern repeats down to its end' },
   { name = 'repeat all',  body = ':repeat all',   desc = 'every track: what is above the cursor row in the pattern repeats down to its end (:repeat all)' },   -- 16 окт
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
-  { name = 'off all',     body = ':off all',      desc = 'note off at the cursor row on every track' },
+  { name = 'off all',     body = ':off all',      hk = '`', desc = 'note off at the cursor row on every track' },
+  { name = 'nooff all',   body = ':nooff all',    hk = '~', desc = 'remove every OFF on every track in what you see (project / sec / pat); the notes ring to the next event' },   -- 26 окт
   { name = 'dedouble',    body = ':dedouble',     desc = 'doubled notes (same note at the same time) on the cursor row of the track - one is kept; VISUAL - in the selection' },
   -- 15 окт: модификаторы (jf_tracker_xform) — время и громкость блока / трека в регионе
   { name = 'stretch x2',  body = ':xf stretch 2',  desc = 'time x2 from the block start (twice slower); :xf stretch 0.5 - twice faster' },
@@ -154,7 +155,7 @@ function MR.rows(regs, saved, builtin, shared)
     for _, m in ipairs(shared) do rows[#rows + 1] = { kind = 'shared', name = m.name, body = m.body, key = m.key, desc = m.desc, by = m.by, file = m.file } end
   end
   rows[#rows + 1] = { hdr = 'built-in' }
-  for _, m in ipairs(builtin or MR.BUILTIN) do rows[#rows + 1] = { kind = 'builtin', name = m.name, body = m.body, desc = m.desc, keys = m.keys, hotkey = m.hotkey } end
+  for _, m in ipairs(builtin or MR.BUILTIN) do rows[#rows + 1] = { kind = 'builtin', name = m.name, body = m.body, desc = m.desc, keys = m.keys, hotkey = m.hotkey, hk = m.hk } end
   return rows
 end
 local function selectable(r) return r and r.kind ~= nil end
