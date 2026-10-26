@@ -3268,25 +3268,29 @@ ctx = {
       if f.env == e and f.col then return state.envvals[(f.col.guid or '') .. '/' .. (e.name or '')] end
     end
   end,
+  -- 26 окт: окно инструмента трека (ze в трекере и в DSP); ещё раз — закрыть
+  inst_window = function(col)
+    -- 26 окт: не огибающая — окно инструмента трека (ещё раз — закрыть); slixer (JSFX) — тоже инструмент
+    local tr = col and col.track
+    if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'ze: no track at the cursor'; return end
+    local ins = reaper.TrackFX_GetInstrument(tr)
+    if ins < 0 then
+      for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+        local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+        if (nm or ''):lower():find('slixer', 1, true) or (nm or ''):match('^VSTi') or (nm or ''):match('^AUi') or (nm or ''):match('^CLAPi') or (nm or ''):match('^VST3i') then ins = i; break end
+      end
+    end
+    if ins < 0 then vim.msg = 'ze: no instrument on ' .. (col.name or 'this track') .. ' (on an envelope column: its view)'; return end
+    local open = reaper.TrackFX_GetFloatingWindow(tr, ins) ~= nil
+    if open then reaper.TrackFX_Show(tr, ins, 2) else edit.fx_show(tr, ins) end
+    local _, nm = reaper.TrackFX_GetFXName(tr, ins, '')
+    vim.msg = ('ze: %s %s (ze again - %s)'):format(nm or 'instrument', open and 'closed' or 'opened', open and 'open' or 'close')
+
+  end,
   env_view = function()
     local f = L and L.flat and L.flat[vim.cur.fi]
     if not (f and f.env and f.col) then
-      -- 26 окт: не огибающая — окно инструмента трека (ещё раз — закрыть); slixer (JSFX) — тоже инструмент
-      local col = cur_col()
-      local tr = col and col.track
-      if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'ze: no track at the cursor'; return end
-      local ins = reaper.TrackFX_GetInstrument(tr)
-      if ins < 0 then
-        for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
-          local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
-          if (nm or ''):lower():find('slixer', 1, true) or (nm or ''):match('^VSTi') or (nm or ''):match('^AUi') or (nm or ''):match('^CLAPi') or (nm or ''):match('^VST3i') then ins = i; break end
-        end
-      end
-      if ins < 0 then vim.msg = 'ze: no instrument on ' .. (col.name or 'this track') .. ' (on an envelope column: its view)'; return end
-      local open = reaper.TrackFX_GetFloatingWindow(tr, ins) ~= nil
-      if open then reaper.TrackFX_Show(tr, ins, 2) else edit.fx_show(tr, ins) end
-      local _, nm = reaper.TrackFX_GetFXName(tr, ins, '')
-      vim.msg = ('ze: %s %s (ze again - %s)'):format(nm or 'instrument', open and 'closed' or 'opened', open and 'open' or 'close')
+      ctx.inst_window(cur_col())
       return
     end
     local k = (f.col.guid or '') .. '/' .. (f.env.name or '')
@@ -27983,6 +27987,7 @@ local function frame()
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'w' then ctx.pane_wide('dsp')   -- 22 окт: полосой во всю ширину снизу; 24 окт: zw (wide), общая для панелей
           elseif ch == 'x' then ctx.dsp_tall()   -- 24 окт: zx — DSP выше (до 600 px модулей), ещё раз — назад; zw — шире
+          elseif ch == 'e' then local t0 = dsp_target(); ctx.inst_window(t0 and t0.col)   -- 26 окт: ze и в DSP — окно инструмента трека
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)

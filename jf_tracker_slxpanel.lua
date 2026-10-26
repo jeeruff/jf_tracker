@@ -40,18 +40,15 @@ function SX.items(v, P)
       { kind = 'act', lab = 'undo', key = 'z', src = 'press' },
       { kind = 'act', lab = 'midi', key = 'e', src = 'press' },
       { kind = 'act', lab = 'names', key = 'n', src = 'press' },
-    },
-    {
-      { kind = 'zone', lab = 'SYNC' },
-      { kind = 'tog', lab = 'thru', key = 'h', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
+      -- 26 окт: группы SYNC нет — sync (луп в темпе) здесь, к сэмплу; q — в MIDI, thru — в ARP
       { kind = 'menu', lab = 'sync: ' .. SY[sy + 1], key = 's', on = sy > 0, src = 'op', code = 6, items = SY },
-      { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
     },
   }
   -- 26 окт: MIDI · ARP — под волной, как в окне плагина (SX.items отдаёт их вторым списком)
   local low = {
     {
       { kind = 'zone', lab = 'MIDI' },
+      { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
       { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM },
       { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity' },
       { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16 },
@@ -60,6 +57,7 @@ function SX.items(v, P)
     {
       { kind = 'zone', lab = 'ARP' },
       { kind = 'tog', lab = 'arp', key = 'b', on = (pv('ARP: on') or 0) > 0.5, src = 'p', name = 'ARP: on' },
+      { kind = 'tog', lab = 'thru', key = 'h', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
       { kind = 'menu', lab = AR[math.floor(ar + 0.5) + 1] or '1/8', src = 'p', name = 'ARP: rate', items = AR },
       { kind = 'menu', lab = AO[math.floor(ao + 0.5) + 1] or 'up', src = 'p', name = 'ARP: order', items = AO },
       { kind = 'menu', lab = 'ped: ' .. (AP[math.floor(ap + 0.5) + 1] or 'thru'), on = ap > 0.5, src = 'p', name = 'Pedal role', items = AP },
