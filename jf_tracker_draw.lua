@@ -5459,8 +5459,19 @@ local function bracket(L, x0, x1, boxy, bh0, d)
   local yb = y0 + math.min(ext - 3, 2 * math.max(0, 2 - d))
   -- 24 окт: концы — от самого низа модулей (была щель в 2 px — «рваный угол»); зазор только у горизонтали
   -- 26 окт: 2 px (была 1 px — терялась); концы снаружи модулей: от их низа вниз, не поверх
-  gfx.rect(x0, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1)
-  gfx.rect(x0, yb, x1 - x0 + 1, 2, 1)
+  local R = D.round_rack and math.min(4, yb - boxy - bh0) or 0   -- 26 окт: опция rounded racks — углы скобки дугой
+  if R < 2 then
+    gfx.rect(x0, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1)
+    gfx.rect(x0, yb, x1 - x0 + 1, 2, 1)
+    return
+  end
+  local cy = yb + 1 - R                          -- центр дуг: внешний край штриха — x0 / x1 и yb + 1
+  gfx.rect(x0, boxy + bh0 + 1, 2, cy - boxy - bh0, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, cy - boxy - bh0, 1)
+  gfx.rect(x0 + R, yb, x1 - x0 + 1 - 2 * R, 2, 1)
+  for t = 0, 1 do
+    gfx.arc(x0 + R, cy, R - t, math.pi, 1.5 * math.pi, 1)
+    gfx.arc(x1 - R, cy, R - t, 0.5 * math.pi, math.pi, 1)
+  end
 end
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
@@ -5504,7 +5515,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     end
     if same then
       set(fr)
-      gfx.rect(st.x, boxy - 4, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px, над модулями (не на их рамке)
+      gfx.rect(st.x, boxy - 2, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px в зазоре над модулями (boxy - 4 наезжал на шапку DSP: зазор 3 px)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
       bracket(L, st.x, x + pw - 1, boxy, bh0, d)
     end
