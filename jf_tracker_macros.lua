@@ -16,14 +16,15 @@
 local MR = { sel = 1, scroll = 0, hot = nil }
 
 MR.BUILTIN = {
+  -- 26 окт: OFF-макросы — первыми в списке
+  { name = 'off all',     body = ':offnotes all', hk = '`', desc = 'an OFF right after every note on every track in what you see (V - the selection)' },
+  { name = 'nooff all',   body = ':nooff all',    hk = '~', desc = 'remove every OFF on every track in what you see (V - the selection); the notes ring to the next event' },
   { name = 'scramble',    body = ':scramble',     desc = 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' },
   { name = 'arp up',      body = ':arp up',       desc = 'the chord on the cursor row becomes an arpeggio up over its length' },
   { name = 'arp random',  body = ':arp random',   desc = 'the chord on the cursor row - a random arpeggio' },
   { name = 'repeat down', body = ':repeat',       keys = 'Ctrl+Opt+J', desc = 'the cursor track: what is above the cursor in the pattern repeats down to its end' },
   { name = 'repeat all',  body = ':repeat all',   desc = 'every track: what is above the cursor row in the pattern repeats down to its end (:repeat all)' },   -- 16 окт
   { name = 'off track',   body = ':off',          desc = 'note off at the cursor row on the whole track (all its subcolumns)' },
-  { name = 'off all',     body = ':off all',      hk = '`', desc = 'note off at the cursor row on every track' },
-  { name = 'nooff all',   body = ':nooff all',    hk = '~', desc = 'remove every OFF on every track in what you see (project / sec / pat); the notes ring to the next event' },   -- 26 окт
   { name = 'dedouble',    body = ':dedouble',     desc = 'doubled notes (same note at the same time) on the cursor row of the track - one is kept; VISUAL - in the selection' },
   -- 15 окт: модификаторы (jf_tracker_xform) — время и громкость блока / трека в регионе
   { name = 'stretch x2',  body = ':xf stretch 2',  desc = 'time x2 from the block start (twice slower); :xf stretch 0.5 - twice faster' },

@@ -679,6 +679,18 @@ function M.build(lpb)
       end
       for _, lane in ipairs(col.lanes) do
         if lane.last_row and lane.last_row > snap.last_row then snap.last_row = lane.last_row end
+        -- 26 окт: OFF в конце строки — нота встык со следующей (конец = её начало) звучит через строку OFF и не
+        -- обрывается: это легато, OFF не показывать; явный OFF (скорость отпускания OFF_REL) остаётся
+        if M.OFF_END then
+          for _, s in ipairs(lane.subs) do
+            for r, c in pairs(s) do
+              local nx = s[r + 1]
+              if c.kind == 'off' and not c.explicit and (c.delay or 0) == 0 and c.of and nx and (nx.kind == 'midi' or nx.kind == 'audio') and (nx.delay or 0) == 0 then
+                s[r] = { kind = 'cont', of = c.of, i = r - (c.of.row0 or r), legato = true }
+              end
+            end
+          end
+        end
       end
       -- части пересборки — в M.bprof (пульс hb: что дорого на большом проекте)
       local t0 = R.time_precise()
