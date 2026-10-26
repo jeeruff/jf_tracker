@@ -11366,7 +11366,7 @@ function D.frame(L, snap, rows, state, info)
         hint('dspparam', bxc + L.pad, py, pw, L.rh, { fx = k, param = pi })
         if is_sel and sel.param == pi then D.dsp_sel_rect = { x = bxc + L.pad, y = py, w = pw, h = L.rh } end   -- 24 окт: выпадашки — под ним
         if f.wrap then f._lx, f._lw, f._ybot = bxc + L.pad, pw, py + L.rh end   -- 24 окт: под макросами — их назначения
-        -- 14 окт: SLIDER (Ctrl+Cmd) — параметры колонки устройства одной группой
+        -- 14 окт: SLIDER (Opt+Cmd с 26 окт) — параметры колонки устройства одной группой
         if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
         ::next_param::
       end

@@ -12838,7 +12838,7 @@ ctx = {
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
-      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Ctrl+Cmd (SLIDER, + Option - pan), Ctrl+Opt+Cmd over selected notes (REFORM gestures). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
+      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Opt+Cmd (SLIDER, + Ctrl - pan), Ctrl+Opt+Cmd over selected notes (REFORM gestures). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -21414,7 +21414,7 @@ local function frame()
       else gfx.mouse_y = my - L.rh end
     end
   end
-  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Ctrl+Cmd)
+  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Opt+Cmd с 26 окт)
   draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
   ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
@@ -23780,7 +23780,8 @@ local function frame()
       ctx.im = nil
     end
     local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
-    local sl_raw = (gfx.mouse_cap & 52 == 36 or sl_pan) and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не SLIDER
+    local sl_raw = (gfx.mouse_cap & 52 == 20 or sl_pan)   -- 26 окт: SLIDER — Opt+Cmd (было Ctrl+Cmd), + Ctrl — пан
+    sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не SLIDER
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local SG = ctx.sl
@@ -23890,7 +23891,7 @@ local function frame()
         if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
         local cur = SG.list[k]
         local ts = tgts(cur)
-        -- 16 окт: Ctrl+Cmd+Option на фейдере — пан его канала, вбок (значение сразу, без порога)
+        -- 16 окт: Ctrl+Cmd+Option на фейдере (26 окт: к держимому Opt+Cmd добавить Ctrl) — пан его канала, вбок (значение сразу, без порога)
         if sl_pan and cur.trk and ts[1] and ts[1].kind == 'trk' then
           ts = { trk(tcol(cur), 'pan') }
           if not SG.pan then SG.pan, SG.x0, SG.y0 = true, SG.mx, SG.my end
@@ -23926,7 +23927,7 @@ local function frame()
           U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
           local fx_, fy_ = ts[1] and frac(ts[1]) or 0.5, ts[2] and frac(ts[2]) or 0.5
           gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4, 1, 1)
-          state.status = ('-- SLIDER XY --  %s  X %d  Y %d   (move: both; let Ctrl+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
+          state.status = ('-- SLIDER XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
           local mapw = vert and gfx.w or math.min(math.floor(gfx.w / 4), L.cw * 26)
           local maph = vert and math.min(math.floor(gfx.h / 4), 8 * L.rh) or gfx.h
@@ -23971,7 +23972,7 @@ local function frame()
           end
           -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
           local desc = ('%s  %s'):format(own and (own .. ': ' .. (cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
-          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Option: pan' or ''))
+          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Ctrl: pan' or ''))
           local dy0 = vert and (my0 - 2 * L.rh - 2) or (gfx.h - 2 * L.rh - 2)
           local dw = vert and mapw or math.max(mapw, math.min(gfx.w, U.measure(desc) + 2 * L.pad))
           local dx0 = gfx.w - dw
@@ -23979,7 +23980,7 @@ local function frame()
           U.set(U.AMBER); gfx.rect(dx0, dy0, dw, 1, 1)
           U.text(dx0 + L.pad, dy0 + 1, ctx.fit(desc, dw - 2 * L.pad), U.AMBER)
           U.text(dx0 + L.pad, dy0 + 1 + L.rh, ctx.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
-          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s, Shift fine; let Ctrl+Cmd go - done)'):format(cur.name or '?', k, n,
+          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s, Shift fine; let Opt+Cmd go - done)'):format(cur.name or '?', k, n,
             ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
       else
