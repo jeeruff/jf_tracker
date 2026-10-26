@@ -9774,13 +9774,16 @@ function D.frame(L, snap, rows, state, info)
         -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна (пэдов нет, 26 окт); параметры — под ними
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
         local P = function(name) return info.slx_param and info.slx_param(f.i, name) end
-        local rows = D.SX.items(v0, P)
+        local rows, low = D.SX.items(v0, P)
         local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad, L.rh, ms, L.pad)
+        local _, nb2 = D.SX.layout(low or {}, 0, 0, bw - 2 * L.pad, L.rh, ms, L.pad)   -- 26 окт: MIDI · ARP под волной
+        if not (low and #low > 0) then nb2 = 0 end
+        nbr = nbr + nb2
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
         local wr = math.min(16, nfit - need - nbr - 1 - 1)   -- 26 окт: до 16 строк — волна + прицел
         if wr < 3 then need = 0; wr = math.min(16, nfit - nbr - 1 - 1) end
         if wr >= 2 then
-          f.slx_geo = { lay = lay, nbr = nbr, wr = wr, v = v0, noparams = need == 0 }
+          f.slx_geo = { lay = lay, nbr = nbr, nb2 = nb2, low = low, wr = wr, v = v0, noparams = need == 0 }
           wtop_wh = wr * L.rh
           wtop = (nbr + 1 + wr + 1) * L.rh + 3
           nfit = nfit - (nbr + 1 + wr + 1)
@@ -10796,7 +10799,7 @@ function D.frame(L, snap, rows, state, info)
         local x0, y0, w0 = bx + L.pad, by + L.rh + 1, bw - 2 * L.pad
         local hb = D.SX.draw_buttons(U, L, G.lay, text, ms, set, mx, my, drag)
         if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h } end
-        local wy = y0 + G.nbr * L.rh
+        local wy = y0 + (G.nbr - (G.nb2 or 0)) * L.rh
         D.slx_zoom = D.slx_zoom or {}
         local zst = D.slx_zoom[f.i]
         local ovh = L.rh - 3
@@ -10811,6 +10814,14 @@ function D.frame(L, snap, rows, state, info)
         local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
         local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
+        -- 26 окт: MIDI · ARP — рядами под волной (как в окне плагина)
+        local lay2 = {}
+        if (G.nb2 or 0) > 0 then
+          lay2 = D.SX.layout(G.low, x0, sy, w0, L.rh, ms, L.pad)
+          local hb2 = D.SX.draw_buttons(U, L, lay2, text, ms, set, mx, my, drag)
+          if hb2 then hover.slx = { fx = k, f = f, it = hb2.it, x = hb2.x, y = hb2.y, w = hb2.w, h = hb2.h } end
+          sy = sy + G.nb2 * L.rh
+        end
         if not atop then aim_y = sy end
         -- 26 окт: по высоте не влез (стандартная высота DSP) — прицел справа от групп параметров, на их высоту
         local ax, aw2, ah = x0, w0, zr * L.rh
@@ -10843,7 +10854,9 @@ function D.frame(L, snap, rows, state, info)
         elseif v and v.wait then st = 'waiting for slixer...'
         else st = 'empty - x in the lib / browser menu, or drop a file on the wave' end
         text(x0, sy, fit(st, w0), U.GREY)
-        for _, b in ipairs(G.lay) do if b.it.kind ~= 'zone' then hint('slx', b.x, b.y, b.w, L.rh - 1, { fx = k, f = f, it = b.it, x = b.x, y = b.y, w = b.w, h = L.rh - 1 }) end end
+        for _, ly in ipairs({ G.lay, lay2 }) do
+          for _, b in ipairs(ly) do if b.it.kind ~= 'zone' then hint('slx', b.x, b.y, b.w, L.rh - 1, { fx = k, f = f, it = b.it, x = b.x, y = b.y, w = b.w, h = L.rh - 1 }) end end
+        end
       elseif f.view == 'slixer' then
         -- slixer (9 окт): волна деки во всю первую колонку; срезы — чередующейся
         -- подложкой и линией начала, выбранный — янтарём, играющие голоса —

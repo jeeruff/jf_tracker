@@ -28,7 +28,7 @@ function SX.items(v, P)
   local SY = { 'off', 'pitch', 'str' }
   local rows = {
     {
-      { kind = 'zone', lab = 'SLICE' },
+      -- 26 окт: подписи SLICE нет — и так ясно (кнопки нарезки первые)
       { kind = 'act', lab = 'detect', key = 'd', what = 'detect' },
       { kind = 'menu', lab = 'm: ' .. ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 'm', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' } },
       { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1 },
@@ -46,6 +46,11 @@ function SX.items(v, P)
       { kind = 'tog', lab = 'thru', key = 't', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
       { kind = 'menu', lab = 'sync: ' .. SY[sy + 1], key = 's', on = sy > 0, src = 'op', code = 6, items = SY },
       { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
+    },
+  }
+  -- 26 окт: MIDI · ARP — под волной, как в окне плагина (SX.items отдаёт их вторым списком)
+  local low = {
+    {
       { kind = 'zone', lab = 'MIDI' },
       { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM },
       { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity' },
@@ -63,7 +68,7 @@ function SX.items(v, P)
     },
   }
   -- 26 окт: в DSP — только нужное: ARTIC (артикуляторы), tala и keys (клавиатура — у трекера своя) — в окне плагина
-  return rows
+  return rows, low
 end
 
 local function bw_of(it, ms, pad)
