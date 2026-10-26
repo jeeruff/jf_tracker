@@ -6219,8 +6219,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local nkids = child and 0 or (#(e.layers or {}) + #(e.slices or {}))   -- 19 окт: папка (как lf): + закрыта, - открыта
-      -- 26 окт: число слайсов — сразу после + / - («01+16 amenbro»), не «16$» в конце
-      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. ('%-2d'):format(nkids)) or '   ')
+      -- 26 окт: число слайсов — сразу после + / - («01+ 16$ amenbro»), не в конце строки
+      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or '     ')
       if nkids > 0 and mx >= ix + 6 + ms('00') and mx < ix + 6 + ms('00+') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
       local suf = ''   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
@@ -6327,7 +6327,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
-    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  +N slices  # drumrs5k  ~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
+    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  N$ slices  # drumrs5k  ~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
   end
   D.pool_dbg = table.concat(dbg, ' | ')
 end
