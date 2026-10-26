@@ -18382,7 +18382,7 @@ function ctx.slixer_view(track, fxi)
                 sel = math.floor(reaper.gmem_read(B + 4)), starts = {}, ends = {}, voices = {}, vslice = {} }
     for i = 0, math.min(v.nsl, 64) - 1 do v.starts[i + 1] = reaper.gmem_read(B + 100 + i); v.ends[i + 1] = reaper.gmem_read(B + 200 + i) end
     for i = 0, math.min(16, math.floor(reaper.gmem_read(B + 6))) - 1 do
-      v.voices[i + 1] = reaper.gmem_read(B + 8 + i); v.vslice[i + 1] = math.floor(reaper.gmem_read(B + 24 + i))
+      v.voices[i + 1] = reaper.gmem_read(B + 8 + i); v.vslice[i + 1] = math.floor(reaper.gmem_read(B + 24 + i)); v.vats = v.vats or {}; v.vats[i + 1] = reaper.gmem_read(B + 41 + i)   -- 26 окт: стретч давлением 0..1
     end
     local pkv = reaper.gmem_read(B + 40)
     if pkv ~= S.pkv then

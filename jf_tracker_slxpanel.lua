@@ -48,8 +48,6 @@ function SX.items(v, P)
       { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
       { kind = 'zone', lab = 'MIDI' },
       { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM },
-      { kind = 'tog', lab = 'tala', on = (pv('Tala browser and map') or 0) > 0.5, src = 'p', name = 'Tala browser and map' },
-      { kind = 'tog', lab = 'keys', key = 'k', on = v and v.keys, src = 'op', code = 5 },
       { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity' },
       { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16 },
       { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 24) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127 },
@@ -62,15 +60,9 @@ function SX.items(v, P)
       { kind = 'menu', lab = 'ped: ' .. (AP[math.floor(ap + 0.5) + 1] or 'thru'), on = ap > 0.5, src = 'p', name = 'Pedal role', items = AP },
       { kind = 'val', lab = 'gate', val = ('%d%%'):format(math.floor((pv('ARP: gate (note length)') or 0.5) * 100 + 0.5)), src = 'p', name = 'ARP: gate (note length)', step = 0.05, lo = 0.05, hi = 1 },
       { kind = 'menu', lab = 'out: ' .. OM[math.floor(om + 0.5) + 1], key = 'o', on = om > 0.5, src = 'p', name = 'Output routing', items = OM },
-      { kind = 'zone', lab = 'ARTIC' },
     },
   }
-  local NM = { 'arp', 'soft', 'stac' }
-  for i = 1, 8 do
-    local used = v and v.artused and v.artused[i]
-    local lab = (used and NM[i]) or tostring(i)
-    rows[3][#rows[3] + 1] = { kind = 'tog', lab = lab, key = lab ~= tostring(i) and tostring(i) or nil, on = v and v.art == i - 1, src = 'op', code = 7, arg = i - 1 }   -- пустой слот: цифра и есть клавиша
-  end
+  -- 26 окт: в DSP — только нужное: ARTIC (артикуляторы), tala и keys (клавиатура — у трекера своя) — в окне плагина
   return rows
 end
 
@@ -193,10 +185,23 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
     if b > a then set(U.tint(U.TEXT, 0.06)); gfx.rect(a, wy, b - a, wh, 1) end
   end
   local cy, hh = wy + wh / 2, wh / 2 - 1
-  set(U.GREY)
+  -- 26 окт: плейхед заливкой — сыгранная часть звучащего среза ярко-жёлтая, стретч давлением к концу краснее
+  local play = {}
+  for k, p in ipairs(v.voices or {}) do
+    local s0 = starts[(v.vslice[k] or -1) + 1]
+    if s0 then play[#play + 1] = { a = math.min(s0, p), b = math.max(s0, p), s0 = s0, p = p, ats = (v.vats and v.vats[k]) or 0 } end
+  end
   for px = 0, w - 1 do
-    local a, b = peak_at(f0 + px / w * fn, f0 + (px + 1) / w * fn)
+    local fa, fb = f0 + px / w * fn, f0 + (px + 1) / w * fn
+    local a, b = peak_at(fa, fb)
     if a < b then a, b = 0.005, -0.005 end
+    local hit
+    local fc = (fa + fb) / 2
+    for _, q in ipairs(play) do if fc >= q.a and fc <= q.b then hit = q end end
+    if hit then
+      local t = math.abs(fc - hit.s0) / math.max(1, math.abs(hit.p - hit.s0)) * hit.ats
+      gfx.set(1, 0.86 - 0.70 * t, 0.22 - 0.16 * t, 1)
+    else set(U.GREY) end
     gfx.line(x + px, cy - math.min(1, a) * hh, x + px, cy - math.max(-1, b) * hh)
   end
   local th = L.th or (L.rh - 2)
@@ -213,7 +218,7 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
       local n = v.notes and v.notes[i]
       if n and n >= 0 then
         local nm = NN[n % 12 + 1] .. math.floor(n / 12)
-        if ms(nm) + 4 < room then text(sx + 3, wy + wh - th - 1, nm, U.GREY) end
+        if ms(nm) + 4 < room then text(sx + 3, wy + wh - th - 3, nm, U.GREY) end   -- 26 окт: выше — низ букв не срезается
       end
     end
   end
