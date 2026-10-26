@@ -5307,7 +5307,9 @@ function D.draw_mixsnaps(L, info, hover)
   if not x1 then return end
   local y0, h = L.mix_y + 3, L.mix_h - 6
   local x, w = x0 + L.pad, x1 - x0 - 2 * L.pad
-  if w < ms('snapshots xy') + 6 * L.pad or h < 3 * L.rh then return end
+  -- 26 окт: узко (united stepruler сужает место слева от полос) — вкладка «snap» вместо «snapshots»
+  local narrow = w < ms('snapshots xy') + 6 * L.pad
+  if w < ms('snap xy') + 6 * L.pad or h < 3 * L.rh then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local rh = L.rh
   local function btn(bx, by, label, on, sel, h2)
@@ -5332,7 +5334,7 @@ function D.draw_mixsnaps(L, info, hover)
   local yy = y0
   -- вкладки
   local tx = x
-  for _, t in ipairs({ { 'snapshots', 'list' }, { 'xy', 'xy' } }) do
+  for _, t in ipairs({ { narrow and 'snap' or 'snapshots', 'list' }, { 'xy', 'xy' } }) do
     tx = tx + btn(tx, yy, t[1], false, ms0.tab == t[2], { what = 'tab', arg = t[2] }) + 2
   end
   set(U.LINE); gfx.rect(x, yy + rh, w, 1, 1)   -- 23 окт: вкладки отделены полоской от кнопок

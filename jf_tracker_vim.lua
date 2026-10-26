@@ -2751,6 +2751,7 @@ function V.key_impl(c)
       if c == ('z'):byte() and ctx.zz_zoom and ctx.zz_zoom() then
       elseif c == ('z'):byte() then st.row0 = math.max(0, V.cur.row - math.floor(L.nrows / 2))
       elseif c == ('x'):byte() then if ctx.xfade_native then ctx.xfade_native(V.covering(V.cur.fi, V.cur.row)) end   -- 13 окт: zx — редактор кроссфейдов REAPER
+      elseif c == ('X'):byte() then if ctx.dsp_tall then ctx.dsp_tall('mixer') end   -- 26 окт: zX — микшер в 1.5 раза выше, ещё раз — назад
       elseif c == ('1'):byte() then if ctx.mono_lane_cur then ctx.mono_lane_cur() end   -- 24 окт: z1 — трек курсора на одном нотном лейне (моно), ещё раз — свободно
       elseif c == ('p'):byte() then if ctx.view_reg then ctx.view_reg() end   -- 20 окт: zp — вид: паттерн курсора / весь проект
       elseif c == ('u'):byte() then V.unfold_zoom()   -- 20 окт: zu — раскрыть сложенные ноты (LPB до 128), ещё раз — назад

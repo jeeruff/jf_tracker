@@ -15287,14 +15287,22 @@ ctx.pane_wide = function(id)
     end
 end
 -- 24 окт: zX — DSP вверх до 600 px модулей (линия над доком DSP поднимается); ещё раз — назад к 250 (мягкая защёлка)
+-- 26 окт: канонический размер нижней панели — DSP: вкладки + строка трека + 250 px модулей; микшер — тот же
+-- размер целиком (линии DSP и микшера встают в одни пиксели)
+ctx.pane_canon_h = function()
+  local dd = L and L.pn and L.pn.by_panel and (L.pn.by_panel.dsp or L.pn.by_panel.mixer)
+  local over = dd and ((dd.content and (dd.h - dd.content.h) or 0) + L.rh + 1) or (2 * L.rh + 1)
+  return over + (state.dsp_snap_px or 250)
+end
 ctx.dsp_tall = function(id)
   id = id or 'dsp'
   local dc = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
-  if not dc then vim.msg = 'zx: ' .. id .. ' is not in a pane here'; return end
+  if not dc then vim.msg = 'zX: ' .. id .. ' is not in a pane here'; return end
   state.tall_ids = state.tall_ids or {}
   if id ~= 'dsp' then state.dsp_tall = state.tall_ids[id] end
-  local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1
-  local want = (state.dsp_tall and (state.dsp_snap_px or 250) or 600)
+  -- 26 окт: zX — в полтора раза выше канонического размера (было: до 600 px модулей), ещё раз — назад
+  local over = 0
+  local want = math.floor(ctx.pane_canon_h() * (state.dsp_tall and 1 or 1.5) + 0.5)
   local g0
   for _, g in ipairs(L.pn.grips or {}) do
     if g.ax == 'v' and math.abs((g.y + g.h / 2) - dc.y) <= 6 and g.x < dc.x + dc.w and g.x + g.w > dc.x then g0 = g; break end
@@ -15306,7 +15314,7 @@ ctx.dsp_tall = function(id)
   state.dsp_tall = not state.dsp_tall or nil
   if id ~= 'dsp' then state.tall_ids[id] = state.dsp_tall; state.dsp_tall = nil end
   local got = L.pn.by_panel[id]
-  vim.msg = ('zx: dsp modules %d px%s (zx - %s)'):format(got and got.content and (got.content.h - L.rh - 1) or want, state.dsp_tall and ', upwards' or '', state.dsp_tall and 'back to ' .. (state.dsp_snap_px or 250) or 'up to 600')
+  vim.msg = ('zX: %s %d px%s (zX - %s)'):format(id, got and got.h or want, state.dsp_tall and ' (x1.5)' or '', state.dsp_tall and 'back' or 'x1.5')
 end
 -- 24 окт: назначения макросов контейнера (edit.macro_links) — для шапки; раз в секунду или после правки FX
 ctx.macro_links_of = function(tr, f)
@@ -23058,15 +23066,17 @@ local function frame()
           end
           -- 24 окт: мягкая защёлка размера DSP — модули (без вкладок, строки трека и строки клавиш) ровно 250 px
           -- (state.dsp_snap_px), когда линия дока рядом (12 px); Shift — без
-          local dc = L.pn.by_panel and L.pn.by_panel.dsp
-          if dc and here and pd.g.ax == 'v' and state.snappanes ~= false and gfx.mouse_cap & 8 == 0 then
-            local over = (dc.content and (dc.h - dc.content.h) or 0) + L.rh + 1   -- вкладки + строка клавиш + строка трека DSP
-            local th = over + (state.dsp_snap_px or 250)
-            local top, bot = dc.y, dc.y + dc.h
-            local tgt = math.abs(here - top) <= 6 and (bot - th) or (math.abs(here - bot) <= 6 and (top + th) or nil)
-            if tgt and math.abs(cur - tgt) < 12 then
-              want = tgt
-              vim.msg = ('dsp: %d px - the canonical size (dock %d px; Shift - free)'):format(state.dsp_snap_px or 250, th)
+          -- 26 окт: и микшер — к тому же размеру целиком, что DSP (ctx.pane_canon_h)
+          for _, pid in ipairs({ 'dsp', 'mixer' }) do
+            local dc = L.pn.by_panel and L.pn.by_panel[pid]
+            if dc and here and pd.g.ax == 'v' and state.snappanes ~= false and gfx.mouse_cap & 8 == 0 then
+              local th = ctx.pane_canon_h()
+              local top, bot = dc.y, dc.y + dc.h
+              local tgt = math.abs(here - top) <= 6 and (bot - th) or (math.abs(here - bot) <= 6 and (top + th) or nil)
+              if tgt and math.abs(cur - tgt) < 12 then
+                want = tgt
+                vim.msg = ('%s: %d px - the canonical size (as the dsp; Shift - free)'):format(pid, th)
+              end
             end
           end
           local delta = here and (want - here) or (cur - pd.last)
@@ -28012,7 +28022,7 @@ local function frame()
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'w' then ctx.pane_wide('dsp')   -- 22 окт: полосой во всю ширину снизу; 24 окт: zw (wide), общая для панелей
-          elseif ch == 'x' then ctx.dsp_tall()   -- 24 окт: zx — DSP выше (до 600 px модулей), ещё раз — назад; zw — шире
+          elseif ch == 'X' then ctx.dsp_tall()   -- 26 окт: zX — DSP в 1.5 раза выше канонического, ещё раз — назад (было zx); zw — шире
           elseif ch == 'e' then local t0 = dsp_target(); ctx.inst_window(t0 and t0.col)   -- 26 окт: ze и в DSP — окно инструмента трека
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
