@@ -131,7 +131,9 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
 end
 
 -- волна как слайсер трекера: полоса-обзор + основная; zst = { f0, fn } (окно зума в кадрах, на модуль)
-function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, drag)
+-- 26 окт: пэдов нет — срез на волне сам интерактивный: под мышью светлее, у границы — ручка
+-- (hv.edge = номер среза, чью начальную границу тянуть); dr = { edge, frame } — граница в протяжке
+function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, drag, dr)
   local hv
   local fr = v and v.frames or 0
   set(U.mix(U.BG, U.PANEL, 0.5)); gfx.rect(x, y, w, ovh, 1)
@@ -163,10 +165,30 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
   end
   -- основная
   local function xof(p) return x + (p - f0) / fn * w end
+  local starts = v.starts
+  if dr and dr.edge and starts[dr.edge] then
+    starts = {}
+    for i = 1, v.nsl do starts[i] = v.starts[i] end
+    starts[dr.edge] = dr.frame
+  end
+  local function endof(i) return i < v.nsl and starts[i + 1] or (v.ends[i] or fr) end
+  local inw = not drag and mx >= x and mx < x + w and my >= wy and my < wy + wh
+  local fpos = f0 + (mx - x) / w * fn
+  local hs, he = -1, nil   -- срез под мышью; граница рядом (±4 px, кроме первой)
+  if inw then
+    for i = 1, v.nsl do
+      if fpos >= (starts[i] or 0) then hs = i - 1 end
+      if i > 1 and math.abs(xof(starts[i] or 0) - mx) <= 4 then he = i end
+    end
+  end
   local sel = v.sel
-  if sel and sel >= 0 and v.starts[sel + 1] then
-    local a, b = math.max(x, xof(v.starts[sel + 1])), math.min(x + w, xof(v.ends[sel + 1] or fr))
+  if sel and sel >= 0 and starts[sel + 1] then
+    local a, b = math.max(x, xof(starts[sel + 1])), math.min(x + w, xof(endof(sel + 1)))
     if b > a then set(U.tint(U.AMBER, 0.14)); gfx.rect(a, wy, b - a, wh, 1) end
+  end
+  if hs >= 0 and not he and hs ~= sel then
+    local a, b = math.max(x, xof(starts[hs + 1])), math.min(x + w, xof(endof(hs + 1)))
+    if b > a then set(U.tint(U.TEXT, 0.06)); gfx.rect(a, wy, b - a, wh, 1) end
   end
   local cy, hh = wy + wh / 2, wh / 2 - 1
   set(U.GREY)
@@ -176,13 +198,13 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
     gfx.line(x + px, cy - math.min(1, a) * hh, x + px, cy - math.max(-1, b) * hh)
   end
   local th = L.th or (L.rh - 2)
-  local KEYS = 'q2w3er5t6y7ui9o0p'
   local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
   for i = 1, v.nsl do
-    local sx = xof(v.starts[i] or 0)
-    local ex = i < v.nsl and xof(v.starts[i + 1] or fr) or (x + w)
+    local sx = xof(starts[i] or 0)
+    local ex = i < v.nsl and xof(starts[i + 1] or fr) or (x + w)
     if sx >= x - 1 and sx <= x + w then
-      set(U.AMBER); gfx.rect(math.floor(sx), wy, (i - 1 == sel) and 2 or 1, wh, 1)
+      local grab = he == i or (dr and dr.edge == i)
+      set(grab and U.TEXT or U.AMBER); gfx.rect(math.floor(sx) - (grab and 1 or 0), wy, (grab or i - 1 == sel) and 2 or 1, wh, 1)
       local room = math.min(ex, x + w) - sx
       local lb = ('%02X'):format(i)
       if ms(lb) + 4 < room then text(sx + 3, wy + 1, lb, U.AMBER) end
@@ -191,48 +213,12 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
         local nm = NN[n % 12 + 1] .. math.floor(n / 12)
         if ms(nm) + 4 < room then text(sx + 3, wy + wh - th - 1, nm, U.GREY) end
       end
-      local kc = i <= #KEYS and KEYS:sub(i, i)
-      if kc and ms(kc) + 4 < room and wh > 3 * th then text(sx + 3, wy + wh - 2 * th - 2, kc, U.TEXT) end
     end
   end
   set(U.GREEN)
   for _, p in ipairs(v.voices or {}) do local px = xof(p); if px >= x and px < x + w then gfx.rect(px, wy, 1, wh, 1) end end
   if not drag and mx >= x and mx < x + w and my >= y and my < wy + wh then
-    local fpos = f0 + (mx - x) / w * fn
-    local si = -1
-    for i = 1, v.nsl do if fpos >= (v.starts[i] or 0) then si = i - 1 end end
-    hv = { over = my < wy and 'overview' or 'wave', slice = si, frame = fpos, fr = fr, f0 = f0, fn = fn, x = x, w = w }
-  end
-  return hv
-end
-
--- пэды: срез = клетка шириной по волне (как в окне); номер и нота, выбранный — янтарём
-function SX.draw_pads(U, L, v, x, y, w, h, text, ms, set, mx, my, zst, drag)
-  local hv
-  local fr = v and v.frames or 0
-  if not (fr and fr > 0 and v.nsl > 0) then return nil end
-  local f0, fn = 0, fr
-  if zst and zst.fn and zst.fn > 0 and zst.fn < fr then f0, fn = zst.f0 or 0, zst.fn end
-  local NN = { 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B' }
-  local th = L.th or (L.rh - 2)
-  for i = 1, v.nsl do
-    local a = math.max(x, x + ((v.starts[i] or 0) - f0) / fn * w)
-    local b = math.min(x + w, x + ((i < v.nsl and v.starts[i + 1] or fr) - f0) / fn * w)
-    if b - a >= 3 then
-      local on = v.sel == i - 1
-      local hot = not drag and mx >= a and mx < b and my >= y and my < y + h
-      set(on and U.tint(U.AMBER, 0.55) or (hot and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(a + 1, y, b - a - 2, h, 1)
-      set(on and U.AMBER or U.LINE); gfx.rect(a + 1, y, b - a - 2, h, 0)
-      local tc = on and U.BG or U.TEXT
-      local lb = tostring(i)
-      if ms(lb) + 4 < b - a then text(a + 3, y + 1, lb, tc) end
-      local n = v.notes and v.notes[i]
-      if n and n >= 0 then
-        local nm = NN[n % 12 + 1] .. math.floor(n / 12)
-        if ms(nm) + 4 < b - a and h >= 2 * th + 2 then text(a + 3, y + h - th - 1, nm, on and U.BG or U.GREY) end
-      end
-      if hot then hv = { pad = i - 1 } end
-    end
+    hv = { over = my < wy and 'overview' or 'wave', slice = hs, edge = he, frame = fpos, fr = fr, f0 = f0, fn = fn, x = x, w = w }
   end
   return hv
 end

@@ -9769,19 +9769,19 @@ function D.frame(L, snap, rows, state, info)
       local wtop, wtop_wh = 0, 0
       f.slx_geo = nil
       if f.view == 'slixer' and D.SX and not f.container then
-        -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна, пэды; параметры — под ними
+        -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна (пэдов нет, 26 окт); параметры — под ними
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
         local P = function(name) return info.slx_param and info.slx_param(f.i, name) end
         local rows = D.SX.items(v0, P)
         local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad, L.rh, ms, L.pad)
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
-        local wr = math.min(10, nfit - need - nbr - 1 - 2 - 1)
-        if wr < 3 then need = 0; wr = math.min(10, nfit - nbr - 1 - 2 - 1) end
+        local wr = math.min(10, nfit - need - nbr - 1 - 1)
+        if wr < 3 then need = 0; wr = math.min(10, nfit - nbr - 1 - 1) end
         if wr >= 2 then
           f.slx_geo = { lay = lay, nbr = nbr, wr = wr, v = v0, noparams = need == 0 }
           wtop_wh = wr * L.rh
-          wtop = (nbr + 1 + wr + 2 + 1) * L.rh + 3
-          nfit = nfit - (nbr + 1 + wr + 2 + 1)
+          wtop = (nbr + 1 + wr + 1) * L.rh + 3
+          nfit = nfit - (nbr + 1 + wr + 1)
           aw_off = wtop
         end
       elseif (f.view == 'slixer' or f.view == 'grain' or f.rs5k) and not f.container then   -- 10 окт: RS5K — тоже полосой сверху
@@ -10799,11 +10799,10 @@ function D.frame(L, snap, rows, state, info)
         local zst = D.slx_zoom[f.i]
         local ovh = L.rh - 3
         local wh = G.wr * L.rh
-        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag)
+        local dr = D.slx_drag and D.slx_drag.fi == f.i and D.slx_drag or nil
+        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
-        local py = wy + ovh + 1 + wh + 2
-        local hp = D.SX.draw_pads(U, L, v, x0, py, w0, 2 * L.rh - 2, text, ms, set, mx, my, zst, drag)
-        if hp then hover.slxpad = { fx = k, f = f, pad = hp.pad } end
+        local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
         local st
         if v and v.frames and v.frames > 0 then
           st = ('%d Hz  %.2fs  %d slices%s'):format(math.floor(v.sr or 0), v.frames / math.max(1, v.sr or 48000), v.nsl, v.sel >= 0 and ('  sel %d'):format(v.sel + 1) or '')
@@ -10811,7 +10810,7 @@ function D.frame(L, snap, rows, state, info)
         elseif v and v.old then st = 'update jf_slixer (no tracker view)'
         elseif v and v.wait then st = 'waiting for slixer...'
         else st = 'empty - x in the lib / browser menu, or drop a file on the wave' end
-        text(x0, py + 2 * L.rh - 1, fit(st, w0), U.GREY)
+        text(x0, sy, fit(st, w0), U.GREY)
         for _, b in ipairs(G.lay) do if b.it.kind ~= 'zone' then hint('slx', b.x, b.y, b.w, L.rh - 1, { fx = k, f = f, it = b.it, x = b.x, y = b.y, w = b.w, h = L.rh - 1 }) end end
       elseif f.view == 'slixer' then
         -- slixer (9 окт): волна деки во всю первую колонку; срезы — чередующейся

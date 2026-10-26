@@ -18122,8 +18122,36 @@ function ctx.to_slixer(path, col, item)
   ctx.slx_pending = { tr = tr, fx = fx, guid = guid, path = path, item = item, stage = 'path', t = reaper.time_precise() }
   vim.msg = 'slixer: loading ' .. (path:match('[^/]+$') or path) .. ' into ' .. (col.name or 'the track') .. ' - cut it in the lib slicer, slixer plays'
 end
-function ctx.slx_send_slices(item)
-  local st = ctx.slx_starts(item)
+-- 26 окт: граница среза на волне DSP. Пока кнопка зажата — рисуется на месте мыши (draw.slx_drag);
+-- отпустил: есть связанный айтем lib с той же нарезкой — правится он (уйдёт в slixer хуком), иначе
+-- нарезка заказом прямо в slixer
+function ctx.slx_drag_tick()
+  local d = draw.slx_drag
+  local w = d.w
+  local v = d.f.slx_geo and d.f.slx_geo.v
+  if not (v and v.starts and v.starts[d.edge]) then draw.slx_drag = nil; return end
+  local lo = (v.starts[d.edge - 1] or 0) + 64
+  local hi = (v.starts[d.edge + 1] or v.frames) - 64
+  d.frame = math.max(lo, math.min(hi, w.f0 + (gfx.mouse_x - w.x) / w.w * w.fn))
+  state.status = ('slixer: slice %d starts at %.3fs - release to keep'):format(d.edge, d.frame / math.max(1, v.sr or 48000))
+  if gfx.mouse_cap & 1 == 1 then return end
+  draw.slx_drag = nil
+  local sr = math.max(1, v.sr or 48000)
+  local secs = {}
+  for i = 1, v.nsl do secs[i] = (i == d.edge and d.frame or v.starts[i]) / sr end
+  local t = dsp_target()
+  local col = t and t.col
+  local item = col and col.track and ctx.slx_item_of(reaper.TrackFX_GetFXGUID(col.track, d.f.fx or d.f.i))
+  local tk = item and reaper.GetActiveTake(item)
+  if tk and #(edit.item_slices(item) or {}) == v.nsl then
+    local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+    local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+    local ts = {}
+    for i = 1, #secs do ts[i] = math.max(0, (secs[i] - offs) / rate) end
+    edit.set_slices(item, ts)
+  else ctx.slx_send_starts(secs) end
+end
+function ctx.slx_send_starts(st)
   with_ns('jf_slixer', function()
     local B = 200000
     local n = math.min(#st, 64)
@@ -18133,6 +18161,7 @@ function ctx.slx_send_slices(item)
   end)
   return #st
 end
+function ctx.slx_send_slices(item) return ctx.slx_send_starts(ctx.slx_starts(item)) end
 function ctx.slx_pending_tick()
   local P = ctx.slx_pending
   if not P then return end
@@ -22702,8 +22731,8 @@ local function frame()
     local e = hover.btn.send
     state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
   elseif hover.slx then local it = hover.slx.it; state.status = 'slixer: ' .. (it.name or it.lab) .. (it.key and ('  (' .. it.key .. ' in the plugin window)') or '') .. (it.kind == 'menu' and ' - click: list' or it.kind == 'val' and ' - wheel: change' or it.src == 'press' and ' - opens the plugin window' or '')
-  elseif hover.slxpad then state.status = ('slixer slice %d - click: select and hear'):format(hover.slxpad.pad + 1)
-  elseif hover.slxwave then state.status = 'slixer wave - click: select the slice, wheel: zoom (Shift - scroll), dblclick: cut it in the tracker slicer, drop a file: new sample'
+  elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
+  elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: cut it in the tracker slicer, drop a file: new sample'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
@@ -24918,19 +24947,16 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slx.fx
       ctx.slx_do(hover.slx)
       click = { t = now2, zone = 'slx' }
-    elseif hover.slxpad and not B.drag then   -- пэд: выбрать и послушать срез
-      ctx.set_focus('dsp'); dsp_sel.fx = hover.slxpad.fx
-      ctx.slx_cmd(2, hover.slxpad.pad)
-      click = { t = now2, zone = 'slxpad' }
-    elseif hover.slxwave and not B.drag then   -- 25 окт: волна — выбрать срез; обзор — окно зума туда; двойной — слайсер трекера
+    elseif hover.slxwave and not B.drag then   -- 25 окт: волна — срез слушать; граница — тянуть (26 окт); обзор — окно зума туда; двойной — слайсер трекера
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slxwave.fx
       local w = hover.slxwave.w
       if w and w.over == 'overview' and w.fn < w.fr then
         draw.slx_zoom = draw.slx_zoom or {}
         local fi = hover.slxwave.f.i
         draw.slx_zoom[fi] = { fn = w.fn, f0 = math.max(0, math.min(w.fr - w.fn, (gfx.mouse_x - w.x) / w.w * w.fr - w.fn / 2)) }
+      elseif w and w.edge then draw.slx_drag = { fi = hover.slxwave.f.i, f = hover.slxwave.f, edge = w.edge, frame = w.frame, w = w }
       elseif dbl and click.zone == 'slxwave' then ctx.slx_open_slicer(hover.slxwave.f)
-      elseif w and w.slice and w.slice >= 0 then ctx.slx_cmd(1, w.slice) end
+      elseif w and w.slice and w.slice >= 0 then ctx.slx_cmd(2, w.slice) end
       click = { t = now2, zone = 'slxwave' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
@@ -25655,6 +25681,7 @@ local function frame()
       state.status = d.f.name .. ': ' .. ({ a = 'attack', ds = 'decay / sustain', r = 'release' })[d.part or 'a'] .. ' - drag, Shift: fine'
     else ctx.adsr_d = nil end
   end
+  if draw.slx_drag then ctx.slx_drag_tick() end   -- 26 окт: граница среза slixer за мышью
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspwave_drag
