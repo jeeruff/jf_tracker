@@ -9789,7 +9789,7 @@ function D.frame(L, snap, rows, state, info)
         if wr >= 2 then
           f.slx_geo = { lay = lay, nbr = nbr, nb2 = nb2, low = low, wr = wr, v = v0, noparams = need == 0 }
           wtop_wh = wr * L.rh
-          wtop = (nbr + 1 + wr + 1) * L.rh + 3
+          wtop = (nbr - nb2 + 1 + wr + 1) * L.rh + 3   -- 26 окт: ряды MIDI · ARP — внизу модуля, не над параметрами
           nfit = nfit - (nbr + 1 + wr + 1)
           aw_off = wtop
         end
@@ -10818,13 +10818,12 @@ function D.frame(L, snap, rows, state, info)
         local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
         local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
-        -- 26 окт: MIDI · ARP — рядами под волной (как в окне плагина)
+        -- 26 окт: MIDI · ARP — в самом низу модуля, под группами параметров (как в окне плагина)
         local lay2 = {}
         if (G.nb2 or 0) > 0 then
-          lay2 = D.SX.layout(G.low, x0, sy, w0, L.rh, ms, L.pad)
+          lay2 = D.SX.layout(G.low, x0, by + bh - G.nb2 * L.rh - 2, w0, L.rh, ms, L.pad)
           local hb2 = D.SX.draw_buttons(U, L, lay2, text, ms, set, mx, my, drag)
           if hb2 then hover.slx = { fx = k, f = f, it = hb2.it, x = hb2.x, y = hb2.y, w = hb2.w, h = hb2.h } end
-          sy = sy + G.nb2 * L.rh
         end
         if not atop then aim_y = sy end
         -- 26 окт: по высоте не влез (стандартная высота DSP) — прицел справа от групп параметров, на их высоту
