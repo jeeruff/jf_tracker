@@ -690,6 +690,17 @@ function M.build(lpb)
       col.mods = M.track_mods(tr)
       local t3 = R.time_precise()
       col.fx = M.track_fx(tr)
+      -- 26 окт: служебный мост скопов (jf_tracker_scope) — не эффект трека для глаз: не в шапке, не в микшере, не в DSP
+      -- (сам стоит в цепи; f.i у остальных — настоящие номера, действия не сдвигаются)
+      do
+        local hid
+        for _, f in ipairs(col.fx) do if (f.name or ''):find('jf_tracker_scope', 1, true) or (f.full or ''):find('jf_tracker_scope', 1, true) then hid = true; break end end
+        if hid then
+          local t = {}
+          for _, f in ipairs(col.fx) do if not ((f.name or ''):find('jf_tracker_scope', 1, true) or (f.full or ''):find('jf_tracker_scope', 1, true)) then t[#t + 1] = f end end
+          col.fx = t
+        end
+      end
       local t4 = R.time_precise()
       M.bprof.envs = M.bprof.envs + (t1 - t0); M.bprof.pool = M.bprof.pool + (t2 - t1)
       M.bprof.mods = M.bprof.mods + (t3 - t2); M.bprof.fx = M.bprof.fx + (t4 - t3)
