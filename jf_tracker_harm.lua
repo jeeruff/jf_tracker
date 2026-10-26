@@ -314,22 +314,9 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
       btn(x + (k - 1) * (cw + 2), by, cw, lab, HM.spell(info.here) == sym, { kind = 'deg', k = k, seventh = row == 1 })
     end
   end
-  -- аккорды трека в паттерне — под кнопками, в ширину их группы
+  -- 26 окт: аккорды трека в паттерне — колонкой сбоку от стана и таба (под кнопками места не занимают)
   local ay = y + 3 * (rh + 2) + 2
-  local ty = ay
-  if ay + rh <= y + h then
-    U.text(x, ay, 'chords', U.GREY)
-    local tx0 = x + U.measure('chords ') + L.pad
-    local tx = tx0
-    for _, e in ipairs(info.list or {}) do
-      local s = ('%04d %s'):format(e.row, HM.spell(e.name))
-      local sw = U.measure(s) + 2 * L.pad
-      if tx + sw > gx1 then ty = ty + rh; tx = tx0; if ty + rh > y + h then break end end
-      U.text(tx, ty, s, e.cur and U.AMBER or U.TEXT)
-      tx = tx + sw
-    end
-    if #(info.list or {}) == 0 then U.text(tx, ay, fit('no notes on this track in the pattern', gx1 - tx), U.DIM) end
-  end
+  local ty = ay - rh - 4
   -- справа: стан и таб
   local show = (hv and hv.kind == 'deg') and HM.degree(hv.k, hv.seventh) or HM.spell(info.here)
   local px = gx1 + 2 * L.cw
@@ -342,12 +329,28 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
       local qx = px
       local ph = y + h - py - rh
       if HM.show_staff then qx = qx + HM.staff(L, qx, py + rh, ph, show) + 2 * L.cw end
-      if HM.show_tab and qx + U.measure('e 10') + 4 * L.pad <= x + w and 6 * rh <= y + h - py - rh then HM.tab(L, qx, py + rh, show) end
+      if HM.show_tab and qx + U.measure('e 10') + 4 * L.pad <= x + w and 6 * rh <= y + h - py - rh then qx = qx + HM.tab(L, qx, py + rh, show) + 2 * L.cw end
+      HM.chord_column(L, qx, py, x + w - qx, y + h - py, info)
     else
       U.text(px, py, fit('hover a chord, or put the cursor on one', x + w - px), U.DIM)
+      HM.chord_column(L, px, py + rh, x + w - px, y + h - py - rh, info)
     end
   end
   return hv
+end
+
+-- аккорды трека в паттерне — вертикально: «0080 Eb», текущий янтарём; не влезает по ширине — нет
+function HM.chord_column(L, x, y, w, h, info)
+  local list = info.list or {}
+  if #list == 0 or w < U.measure('0000 C#m7b5') + L.pad then return end
+  local rh = L.rh
+  local n = math.max(0, math.floor(h / rh))
+  local first = 1
+  for i, e in ipairs(list) do if e.cur then first = math.max(1, i - math.floor(n / 2)) end end
+  for i = first, math.min(#list, first + n - 1) do
+    local e = list[i]
+    U.text(x, y + (i - first) * rh, ('%04d %s'):format(e.row, HM.spell(e.name)), e.cur and U.AMBER or U.TEXT)
+  end
 end
 
 -- действие по кнопке

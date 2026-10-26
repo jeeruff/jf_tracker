@@ -7030,7 +7030,7 @@ function D.frame(L, snap, rows, state, info)
     if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
     if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
-    if not c.folded then
+    if not c.folded or c.chord then   -- 26 окт: и лейн аккордов (у него своя полоса микшера, кнопки)
       local by = hy + L.rh + 1
       local bx = c.x + L.pad + indent
       -- A — индикатор автоматизации: есть огибающие у трека; залит, когда
@@ -8120,9 +8120,12 @@ function D.frame(L, snap, rows, state, info)
     -- ряд 0: proj | region (5 окт: было all | reg); не влезает — region → rgn
     local x0 = bx
     -- 20 окт: project | pattern (было proj | region); узко — proj | pat; zp переключает
-    local wide = ms('project') + ms('pattern') + 6 <= bw
-    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', not info.view_reg, 'viewbtn')
-    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', info.view_reg, 'viewbtn')
+    -- 26 окт: + section (zs): project | sec | pattern — что видно, то и правит транспозиция
+    local wide = ms('project') + ms('sec') + ms('pattern') + 9 <= bw
+    local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
+    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn')
+    x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn')
+    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn')
     -- ряд 1 (7 окт): session (клипы вместо строк трекера)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
@@ -8876,7 +8879,7 @@ function D.frame(L, snap, rows, state, info)
     local by = L.body_y + L.nrows * rh
     local cwm = math.max(3, L.cw - 1)
     for _, c in ipairs(L.cols) do
-      if c.x and not c.folded then
+      if c.x and (not c.folded or c.chord) then
         local pl, pr = info.peaks(c.col)
         for k, v in ipairs({ pl or 0, pr or 0 }) do
           v = math.min(1, math.max(0, v))
@@ -8906,7 +8909,7 @@ function D.frame(L, snap, rows, state, info)
     local by = L.body_y + L.nrows * L.rh
     local hh = math.floor(L.body_h * 0.575)
     for _, c in ipairs(L.cols) do
-      if c.x and not c.folded and c.col and not c.col.master then
+      if c.x and (not c.folded or c.chord) and c.col and not c.col.master then
         local age, vel = info.midi_in_age(c.col)
         local DEC = 0.4
         if age and age < DEC then

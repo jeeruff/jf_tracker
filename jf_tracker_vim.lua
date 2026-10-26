@@ -2755,6 +2755,7 @@ function V.key_impl(c)
       elseif c == ('X'):byte() then if ctx.dsp_tall then ctx.dsp_tall('mixer') end   -- 26 окт: zX — микшер в 1.5 раза выше, ещё раз — назад
       elseif c == ('1'):byte() then if ctx.mono_lane_cur then ctx.mono_lane_cur() end   -- 24 окт: z1 — трек курсора на одном нотном лейне (моно), ещё раз — свободно
       elseif c == ('p'):byte() then if ctx.view_reg then ctx.view_reg() end   -- 20 окт: zp — вид: паттерн курсора / весь проект
+      elseif c == ('s'):byte() then if ctx.view_mode then ctx.view_mode(ctx.view_cur() == 'section' and 'project' or 'section') end   -- 26 окт: zs — вид: секция курсора / весь проект
       elseif c == ('u'):byte() then V.unfold_zoom()   -- 20 окт: zu — раскрыть сложенные ноты (LPB до 128), ещё раз — назад
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
@@ -3583,7 +3584,7 @@ function V.transpose_scope(scope, d, micro, diat)   -- 16 окт: micro — d с
     if V.mode == 'visual' or V.mode == 'vline' then f0, f1, r0, r1 = V.visual_range()
     else f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row end
   else
-    local a, b = ctx.region_rows and ctx.region_rows()
+    local a, b = (ctx.view_rows or ctx.region_rows)()   -- 26 окт: то, что видно (project / section / pattern)
     r0, r1 = a or 0, b or ((ctx.snap().last_row or 0))
     if scope == 'col' then f0, f1 = V.cur.fi, V.cur.fi
     elseif scope == 'track' then

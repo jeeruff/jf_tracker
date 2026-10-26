@@ -393,7 +393,8 @@ local state = {
   fxb = flag('fxb', true),
   hints = flag('hints', true),
   notes_open = flag('notes', false),            -- редактор заметок в главном модуле (3 окт; раньше — на месте списка эффектов)
-  view_reg = flag('viewreg', false),            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
+  view_reg = flag('viewreg', false),
+  view_secmode = flag('viewsec', false),   -- 26 окт: вид — секция курсора (zs); с view_reg — project / section / pattern            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
   thide = {},                                   -- 11 окт: guid → скрыт в трекере (track list, ПКМ)
 }
@@ -758,7 +759,7 @@ local function save_win()
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
-  S('viewreg', state.view_reg and '1' or '0')
+  S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
   for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
@@ -1520,9 +1521,34 @@ ctx = {
     ctx.notes_save(); NT.target = t; ctx.notes_load(); ctx.set_focus('notes')
   end,
   view_reg = function(on)
-    if on == nil then on = not state.view_reg end
-    state.view_reg = on
-    vim.msg = on and 'view: the pattern of the cursor only (zp - the whole project)' or 'view: the whole project (zp - the pattern only)'
+    if on == nil then on = not (state.view_reg and not state.view_secmode) end
+    ctx.view_mode(on and 'pattern' or 'project')
+  end,
+  -- 26 окт: вид — project (весь трек) / section (секция курсора, zs) / pattern (паттерн курсора, zp); транспозиция
+  -- и чистка трека берут то, что видно (WYSIWYG, ctx.view_rows)
+  view_mode = function(m)
+    state.view_reg = m ~= 'project'
+    state.view_secmode = m == 'section' or nil
+    state.view_sec = nil
+    vim.msg = ({ project = 'view: the whole project (zs - the section, zp - the pattern)',
+      section = 'view: the section of the cursor (zs again - the whole project, zp - the pattern)',
+      pattern = 'view: the pattern of the cursor only (zp again - the whole project, zs - the section)' })[m]
+  end,
+  view_cur = function() return not state.view_reg and 'project' or (state.view_secmode and 'section' or 'pattern') end,
+  -- секция курсора: { pos, rgnend, name } или nil
+  section_at = function(t)
+    for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then return sc end end
+  end,
+  -- строки того, что видно: project — весь трек, section — секция, pattern — паттерн курсора
+  view_rows = function()
+    local m = ctx.view_cur()
+    local t = edit.row_time(vim.cur.row, state.lpb, 0)
+    if m == 'section' then
+      local sc = ctx.section_at(t)
+      if sc then return math.floor(model.row_of_time(sc.pos, state.lpb) + 1e-6), math.ceil(model.row_of_time(sc.rgnend, state.lpb) - 1e-6) - 1, sc end
+    end
+    if m ~= 'project' then return ctx.region_rows() end
+    return 0, (snap and snap.last_row or 0)
   end,
   -- браузер: * / :mkdir — новая папка в текущей
   browser_mkdir_prompt = function()
@@ -17111,7 +17137,7 @@ local function hint_go(t)
   elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
   elseif t.kind == 'viewbtn' and d == 'session' then ctx.clips_toggle()
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
-  elseif t.kind == 'viewbtn' then ctx.view_reg(d == 'reg')
+  elseif t.kind == 'viewbtn' then ctx.view_mode(d == 'reg' and 'pattern' or (d == 'sec' and 'section' or 'project'))
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
   elseif t.kind == 'envpm' then if d.d > 0 then ctx.automation_picker(d.col) else ctx.env_hide(d.e) end
@@ -21157,6 +21183,11 @@ local function frame()
   -- прокрутка в его пределах, строки вне региона пустые
   local view_clip
   if not state.view_reg then state.view_sec = nil end
+  if state.view_reg and state.view_secmode then   -- 26 окт: вид section — секция под курсором (плейхедом при follow)
+    local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
+    local sc = ctx.section_at(edit.row_time(ref, state.lpb, 0))
+    state.view_sec = sc and { sc.pos, sc.rgnend } or nil
+  end
   if state.view_reg and state.view_sec then   -- 18 окт: показ секции целиком (меню секции)
     local r0, r1 = math.floor(model.row_of_time(state.view_sec[1], state.lpb) + 1e-6), math.ceil(model.row_of_time(state.view_sec[2], state.lpb) - 1e-6)
     if not state.fixed then state.row0 = math.max(r0, math.min(state.row0, math.max(r0, r1 - L.nrows))) end
@@ -21444,7 +21475,7 @@ local function frame()
     end,   -- 19 окт: индикатор входа   -- 19 окт: zf — у рэка мелкие пэды (свёрнуто) / крупные 4 × 4
     dsp_wide = state.panes and (state.panes.zoom == 'dsp' or (function() for _, id in ipairs(state.panes.zoomv or {}) do if id == 'dsp' then return true end end end)()),   -- 23 окт: DSP развёрнут (zz) — модули рядами
     dsp_zoomed = state.panes and state.panes.zoom == 'dsp',   -- 19 окт: рэк на всё окно — вкладки pads | list
-    view_reg = state.view_reg, view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле
+    view_reg = state.view_reg, view_mode = ctx.view_cur(), view_clip = view_clip, region_rgb = region_rgb, sections = regions.sections,   -- 21 окт: границы секций в теле
     sig_at = ctx.sig_at, kslider = state.kslider, mx_bar_label = mx_bar_label, mx_ticks = mx_ticks, mx_marks = mx_marks(),   -- 23 окт: были за комментарием — колонка размера, линейка, маркеры не получали данных
     inst_range = IK.anchor and { IK.range(vim.inst) } or nil,
     file_peaks = ctx.file_peaks,
@@ -22732,8 +22763,8 @@ local function frame()
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
-  elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (zs, Tab)'
-  elseif hover.viewbtn then state.status = hover.viewbtn == 'reg' and 'pattern: view only the pattern of the cursor (the playing one with follow) - zp / :reg' or 'project: view the whole project - zp / :reg'
+  elseif hover.viewbtn == 'session' then state.status = 'clips: the clips of the session zone instead of the rows - scenes x tracks, Enter launches (Tab)'
+  elseif hover.viewbtn then state.status = ({ reg = 'pattern: view only the pattern of the cursor (the playing one with follow) - zp; transpose (F1 F2) takes what you see', sec = 'section: view the section of the cursor (intro, hook ...) - zs; transpose takes what you see', all = 'project: view the whole project - zp / zs back; transpose takes the whole track' })[hover.viewbtn] or ''
   elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.dsptrkname then state.status = ctx.hover_tip_dsptrk
   elseif hover.tlist_tip then state.status = 'tracks: ' .. hover.tlist_tip .. ' - click toggles, drag down the column sets the same, header - whole column'
@@ -24477,7 +24508,7 @@ local function frame()
       if state.fxparams and not state.fxrow then state.fxrow = true; reaper.SetExtState(EXT, 'fxrow', '1', true) end
       ctx.hdr_cache = {}; relayout()
     elseif hover.viewbtn == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
-    elseif hover.viewbtn then ctx.view_reg(hover.viewbtn == 'reg')
+    elseif hover.viewbtn then ctx.view_mode(hover.viewbtn == 'reg' and 'pattern' or (hover.viewbtn == 'sec' and 'section' or 'project'))
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) else ctx.region_len_menu() end
@@ -31420,7 +31451,7 @@ ctx.sec_insert = function(sc, t, linked)
   return t1
 end
 ctx.sec_show = function(sc)
-  state.view_reg = true; state.view_sec = { sc.pos, sc.rgnend }
+  state.view_reg = true; state.view_secmode = true; state.view_sec = { sc.pos, sc.rgnend }   -- 26 окт: = вид section
   local r0 = model.row_of_time(sc.pos, state.lpb)
   vim.cur.row = math.floor(r0 + 0.5); state.row0 = vim.cur.row
   local r1 = model.row_of_time(sc.rgnend, state.lpb)
@@ -31588,6 +31619,26 @@ ctx.sec_remove_all = function(sc)
   MX.cur.sec = nil
   vim.msg = ('section %s removed with its patterns (u - undo)'):format(sc.name or '')
 end
+-- 26 окт: section to pattern — секция и её паттерны → один большой паттерн на всю длину секции (новый код + имя
+-- секции: «E1 hook»); ноты и айтемы на месте
+ctx.sec_to_pattern = function(sc)
+  local p0, p1 = sc.pos, sc.rgnend
+  local nm = model.SEC.next_family(regions) .. ((sc.name or '') ~= '' and (' ' .. sc.name) or '')
+  local n = 0
+  ctx.slot_op('section to pattern ' .. (sc.name or ''), function()
+    local i = 0
+    while true do
+      local ret, isrgn, pos, rend, name = reaper.EnumProjectMarkers3(0, i)
+      if not ret or ret == 0 then break end
+      if isrgn and pos >= p0 - 1e-6 and rend <= p1 + 1e-6 and name ~= model.SESSION_REGION then reaper.DeleteProjectMarkerByIndex(0, i); n = n + 1
+      else i = i + 1 end
+    end
+    reaper.AddProjectMarker2(0, true, p0, p1, nm, -1, 0)
+  end)
+  ctx.mx_refresh()
+  MX.cur.sec = nil
+  vim.msg = ('section %s is one pattern now: %s (%d region(s) joined; u - undo)'):format(sc.name or '', nm, n)
+end
 ctx.sec_menu = function(sc)
   local items = {
     -- 20 окт: duplicate — этим словом и наверх (искали «дублировать», а было «copy after it»); набор букв меню: d — duplicate
@@ -31597,6 +31648,7 @@ ctx.sec_menu = function(sc)
     { label = 'show in the tracker', v = 'show' },
     { label = 'loop it', v = 'loop' },
     { label = 'rename', v = 'name' },
+    { label = 'to one pattern (join its patterns)', v = 'join' },   -- 26 окт
     { label = 'remove the section (patterns stay)', v = 'del' },
     { label = 'remove the section and its patterns', v = 'delall' },   -- 21 окт
   }
@@ -31608,6 +31660,7 @@ ctx.sec_menu = function(sc)
     elseif it.v == 'copy' then ctx.sec_repeat(sc, false)
     elseif it.v == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend); vim.msg = 'loop: section ' .. (sc.name or '')
     elseif it.v == 'name' then ctx.sec_rename(sc)
+    elseif it.v == 'join' then ctx.sec_to_pattern(sc)
     elseif it.v == 'del' then ctx.sec_remove(sc)
     elseif it.v == 'delall' then ctx.sec_remove_all(sc)
     end

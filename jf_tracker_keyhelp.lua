@@ -208,6 +208,7 @@ KH.PAGES = {
     { k = 'tw', m = 'wave column of track', d = 'the wave column of the cursor track: show / hide; again - auto (only with audio or a drumrs5k kit with samples)' },
     { k = 'g12 Enter', t = {}, m = 'go to row number', d = 'go to row 0012 (also 12gg)' },
     { k = 'Opt+W', d = 'the cursor to the master columns (∑); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
+    { k = 'zs', d = 'view: only the section of the cursor (intro, hook ...) / the whole project (the sec button); transpose (F1 F2 ...) takes what you see' },
     { k = 'zp', d = 'view: only the pattern of the cursor / the whole project (the project | pattern buttons, :reg)' },
     { k = 'zu', d = 'unfold: the folded notes (cyan line under the row, +N) of the selection / cursor row - LPB rises to the smallest one that gives each its row (up to 128); zu again - the previous LPB (:unfold)' },
     { k = 'zw', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },
