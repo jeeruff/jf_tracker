@@ -30,7 +30,7 @@ function SX.items(v, P)
     {
       -- 26 окт: подписи SLICE нет — и так ясно (кнопки нарезки первые)
       { kind = 'act', lab = 'detect', key = 'd', what = 'detect' },
-      { kind = 'menu', lab = 'm: ' .. ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 'm', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' } },
+      { kind = 'menu', lab = ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 't', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' } },
       { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1 },
       { kind = 'act', lab = 'classify', key = 'c', src = 'press' },
       { kind = 'tog', lab = 'auto', key = 'a', on = v and v.auto, src = 'op', code = 4 },
@@ -43,7 +43,7 @@ function SX.items(v, P)
     },
     {
       { kind = 'zone', lab = 'SYNC' },
-      { kind = 'tog', lab = 'thru', key = 't', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
+      { kind = 'tog', lab = 'thru', key = 'h', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
       { kind = 'menu', lab = 'sync: ' .. SY[sy + 1], key = 's', on = sy > 0, src = 'op', code = 6, items = SY },
       { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
     },
@@ -71,9 +71,15 @@ function SX.items(v, P)
   return rows, low
 end
 
+-- 26 окт: буква клавиши — частью слова (первая такая буква подписи); нет в подписи — дописана после
+local function key_at(it)
+  if not it.key then return nil end
+  return it.lab:lower():find(it.key, 1, true)
+end
+SX.key_at = key_at
 local function bw_of(it, ms, pad)
   local w = ms(it.lab) + 2 * pad
-  if it.key then w = w + ms(it.key) + 3 end
+  if it.key and not key_at(it) then w = w + ms(it.key) + 3 end
   if it.kind == 'val' then w = w + ms(' ' .. (it.val or '')) end
   if it.kind == 'menu' then w = w + 7 end
   return w
@@ -116,9 +122,16 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
       set(hot and U.AMBER or (on and U.AMBER or U.LINE)); gfx.rect(x, y, w, h, 0)
       local tc = on and U.BG or (hot and U.AMBER or U.TEXT)
       local tx = x + L.pad
-      text(tx, ty, it.lab, tc); tx = tx + ms(it.lab)
+      text(tx, ty, it.lab, tc)
+      local ki = key_at(it)
+      if ki then
+        local px = tx + ms(it.lab:sub(1, ki - 1))
+        text(px, ty, it.lab:sub(ki, ki), on and U.BG or U.AMBER)
+        if on then set(U.BG); gfx.rect(px, y + h - 3, ms(it.lab:sub(ki, ki)), 1, 1) end
+      end
+      tx = tx + ms(it.lab)
       if it.kind == 'val' then text(tx, ty, ' ' .. (it.val or ''), on and U.BG or U.CYAN); tx = tx + ms(' ' .. (it.val or '')) end
-      if it.key then text(tx + 3, ty, it.key, on and U.BG or U.AMBER); tx = tx + 3 + ms(it.key) end
+      if it.key and not ki then text(tx + 3, ty, it.key, on and U.BG or U.AMBER); tx = tx + 3 + ms(it.key) end
       if it.kind == 'menu' then
         set(tc); local ax, ay = x + w - 7, y + math.floor(h / 2) - 1
         gfx.triangle(ax, ay, ax + 4, ay, ax + 2, ay + 3)
