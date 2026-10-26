@@ -6104,15 +6104,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
-      local tw = ms(row.hdr)
-      text(ix + 6, y + 1, fit(row.hdr, w - 12), U.TEXT)
+      -- 26 окт: значок типа — в заголовке раздела, не в каждой строке
+      local glyph = ({ audio = '@ ', instruments = '# ', midi = D.mu() .. ' ', automation = '~ ' })[row.hdr] or ''
+      local tw = ms(glyph .. row.hdr)
+      text(ix + 6, y + 1, fit(glyph .. row.hdr, w - 12), U.TEXT)
       -- разделитель: длинная линия после имени
       set(U.LINE); gfx.rect(ix + 6 + tw + L.pad, y + math.floor(L.rh / 2), w - 8 - tw - 2 * L.pad, 1, 1)
     elseif row.auto then
       local sel = info.auto_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, fit(('%02d ~ automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
+      text(ix + 6, y + 1, fit(('%02d    automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
     elseif row.sep then
@@ -6125,7 +6127,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local sel = info.midi_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
-      text(ix + 6, y + 1, fit(('%02d ' .. D.mu() .. ' midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
+      text(ix + 6, y + 1, fit(('%02d    midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
     elseif row.instfx then
@@ -6217,10 +6219,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local nkids = child and 0 or (#(e.layers or {}) + #(e.slices or {}))   -- 19 окт: папка (как lf): + закрыта, - открыта
-      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and ((D.LIBO or {})[e.gkey or ''] and '-' or '+') or ' ')
+      -- 26 окт: число слайсов — сразу после + / - («01+16 amenbro»), не «16$» в конце
+      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. ('%-2d'):format(nkids)) or '   ')
       if nkids > 0 and mx >= ix + 6 + ms('00') and mx < ix + 6 + ms('00+') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
-      local suf = ((not child and e.slices) and (' ' .. #e.slices .. '$') or '')   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
-      if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '@ ')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 16 окт: @ — аудио, & — набор файлов
+      local suf = ''   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
+      if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
       local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
       local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf)))
@@ -6324,7 +6327,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
-    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  N$ slices  # drumrs5k  ~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
+    text(ix + 6, iy + 2 + 2 * L.rh, fit('@ audio  & files kit  +N slices  # drumrs5k  ~ automation  ' .. D.mu() .. ' midi clips  (muted)', w - 12), U.GREY)
   end
   D.pool_dbg = table.concat(dbg, ' | ')
 end
