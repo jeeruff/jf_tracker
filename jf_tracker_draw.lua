@@ -10802,9 +10802,14 @@ function D.frame(L, snap, rows, state, info)
         local zr = G.wr >= 6 and math.floor(G.wr * 0.42) or 0
         local wh = (G.wr - zr) * L.rh - (zr > 0 and 2 or 0)
         local dr = D.slx_drag and D.slx_drag.fi == f.i and D.slx_drag or nil
+        -- 26 окт: опция aim zoom on top (общая со слайсером) — прицел над волной
+        local atop = zr > 0 and info.slx_aimtop and info.slx_aimtop()
+        local aim_y = wy
+        if atop then wy = wy + zr * L.rh + 1 end
         local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
         local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
+        if not atop then aim_y = sy end
         if zr > 0 and v and v.frames and v.frames > 0 then
           D.slx_aim = D.slx_aim or {}
           local edge = (dr and dr.edge) or (hw and hw.edge) or D.slx_aim[f.i]
@@ -10815,10 +10820,10 @@ function D.frame(L, snap, rows, state, info)
           local center = edge and ((dr and dr.edge == edge and dr.fine and dr.fine.base) or v.starts[edge]) or 0
           local A = edge and { edge = edge, center = center, w2 = w2, spam = info.slx_spam and info.slx_spam(), fine = dr and dr.edge == edge and dr.frame or nil } or nil
           if A and info.slx_aim then A.pk = info.slx_aim(center - w2, 2 * w2, math.min(w0, 2 * w2)) end
-          local zy = sy
+          local zy = aim_y
           local ha = D.SX.draw_aim(U, L, v, x0, zy, w0, zr * L.rh, text, ms, set, mx, my, A, drag or dr)
           if ha then hover.slxaim = { fx = k, f = f, a = ha } end
-          sy = zy + zr * L.rh + 1
+          if not atop then sy = zy + zr * L.rh + 1 end
         end
         local st
         if v and v.frames and v.frames > 0 then

@@ -12826,7 +12826,7 @@ ctx = {
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines - impossible to miss that the keys go elsewhere', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
-      { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
+      { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
       { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - an o in a narrow column at the side of the cell (O - several) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
@@ -21348,7 +21348,8 @@ local function frame()
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     slx_param = function(fxi, name) return ctx.slx_param(fxi, name) end,   -- 25 окт: пульт slixer — параметр по имени
     slx_aim = function(a, n, np) return ctx.slx_aim_peaks(a, n, np) end,
-    slx_spam = function() return state.sliceaudition end,   -- 26 окт: прицел — сэмплы окна у границы
+    slx_spam = function() return state.sliceaudition end,
+    slx_aimtop = function() return state.zoomtop ~= false end,   -- 26 окт: прицел пульта slixer над волной   -- 26 окт: прицел — сэмплы окна у границы
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
       -- данные (иначе две ширины слоя пиков спорят в gmem)
