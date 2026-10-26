@@ -6966,7 +6966,7 @@ function D.frame(L, snap, rows, state, info)
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
     ncol = U.readable(ncol, nbg, 4.5)
-    if c.folded then
+    if c.folded and not c.chord then   -- 26 окт: лейн аккордов широкий — обычная шапка и полоса микшера, не свёрнутая
       -- свёрнут в полоску (4 окт): имя вертикально во всю высоту шапки
       hset(rbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
       -- 9 окт: в микшере у полоски — фейдер в знак шириной (метр + риска
