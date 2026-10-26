@@ -1015,7 +1015,7 @@ function B.key(c)
   if MARK_SHIFT[ch] then B.mark(MARK_SHIFT[ch], 'set')
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
-  elseif ch == '/' or ch == 'f' then B.start_find()                           -- поиск прямо в списке (2 окт)
+  elseif ch == '/' then B.start_find()                           -- поиск прямо в списке (2 окт); 26 окт: f — прыжок по меткам, как в других модулях
   elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'libs', libs = 'presets', presets = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end

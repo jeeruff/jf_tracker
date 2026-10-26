@@ -487,7 +487,7 @@ KH.PAGES = {
     { k = 'a', d = 'add the project as a subproject at the tracker cursor (drag a card onto a track column does the same)' },
     { k = 'S d', d = 'sort: date / name / bpm / status; daw filter: all / REAPER only / other DAWs' },
     { k = 'b', d = 'big: the cards over the whole window (:pm big); Esc or b - back' },
-    { k = '/ f', d = 'filter the cards: name, #tags, bpm, key, [status], daw (ableton, flstudio ...)' },
+    { k = '/', d = 'filter the cards: name, #tags, bpm, key, [status], daw (ableton, flstudio ...)' },
     { k = 'r', d = 'reload the jf_pm index' },
   } },
   browser = { title = 'browser', e = {
@@ -508,7 +508,7 @@ KH.PAGES = {
     { k = '*.* .*', d = 'buttons: all file types / hidden files; Enter on MIDI / video inserts it, others open in their app' },
     { k = 'Space', d = 'preview (mini player below)' },
     { k = 'cell (player)', t = {}, d = 'the cell button of the player: a selected file goes straight into the active drumrs5k pad - while the song plays you hear it in the groove, stopped - the pad sounds; drum off keeps the last one (one undo). Dropping a file on a pad - its sample too' },
-    { k = '/ f', d = 'fzf find: ^start end$ \'exact !not' },
+    { k = '/', d = 'fzf find: ^start end$ \'exact !not (f - jump by hints, as in every module)' },
     { k = 't', d = 'mode: files / db / projects' },
     { k = 'p', d = 'auto preview on / off' },
     { k = 'v', d = 'show file in sample tab' },
