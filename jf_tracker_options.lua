@@ -189,7 +189,12 @@ function O.key(c)
   -- поиск: набор прямо в окне
   if O.typing then
     if c == 27 then O.typing = false; O.query = ''; O.rebuild()
-    elseif c == 13 then O.typing = false
+    elseif c == 13 then   -- 26 окт: Enter в поиске — сразу менять подсвеченную опцию (не только закрыть поиск)
+      O.typing = false
+      local it0 = O.items[O.sel]
+      if it0 and not it0.sep and not it0.blockrow then
+        if it0.masked and it0.masked() then it0.unmask() else O.adjust(it0, 0) end
+      end
     elseif c == 8 then O.query = TX.bs(O.query); O.sel = 1; O.rebuild()
     elseif c == 1685026670 then O.sel = math.min(#O.items, O.sel + 1)
     elseif c == 30064 then O.sel = math.max(1, O.sel - 1)
