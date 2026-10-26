@@ -4198,7 +4198,7 @@ ctx = {
     if cell and cell.kind == 'cont' then cell = cell.of end
     local it = cell and cell.item
     local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
-    if not tk then vim.msg = 'T f: put the tracker cursor on a note / slice first'; return end
+    if not tk then vim.msg = 'Opt+T f: put the tracker cursor on a note / slice first'; return end
     vim.open_picker('take fx of the note under the cursor', ctx.fx_list(), function(x)
       edit.run('take fx on the slice', function() reaper.TakeFX_AddByName(tk, x.data, -1) end)
       model.invalidate()

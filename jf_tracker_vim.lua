@@ -3177,7 +3177,8 @@ function V.key_impl(c)
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'R' and V.mode == 'normal' and ctx.retro_insert then ctx.retro_insert(); V.count = nil; return   -- 21 окт: R — последнее сыгранное (ретро-буфер MIDI REAPER) с курсора
-  elseif ch == 'T' and V.mode == 'normal' then V.pending = 'T'; return   -- 11 окт: T — take ноты под курсором (t — трек)
+  elseif ch == 'T' and V.mode == 'normal' then V.transpose_smart(); return   -- 26 окт: Shift+T — транспозитор (выпадашка, как :tr)
+  elseif c == 8224 and V.mode == 'normal' then V.pending = 'T'; return   -- 26 окт: Opt+T — take ноты под курсором (было T; t — трек)
   elseif V.is_mac_key(c) and V.mode ~= 'insert' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: Option+Shift+2 — большая панель макросов у курсора (@a — регистр, как в Vim)
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then
