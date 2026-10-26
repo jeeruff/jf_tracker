@@ -27410,6 +27410,27 @@ local function frame()
       c = 0
     end
   end
+  -- 26 окт: Cmd+C / Cmd+X / Cmd+V — копировать / вырезать / вставить в любом модуле (как везде): клавиши копии
+  -- модуля через очередь — yy / dd / p (в VISUAL — y / d); матрица — свои коды блока; набор текста не трогаем
+  do
+    local m = ctx.mods()
+    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or DK.ins or OPT.active
+    if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
+      local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
+      if what then
+        if state.focus == 'matrix' then
+          c = what == 'y' and 3 or (what == 'd' and 24 or 22)   -- матрица: Ctrl+C / X / V блока (MX.key)
+        else
+          local vis = vim.mode == 'visual' or vim.mode == 'vline'
+          local seq = what == 'p' and { 112 } or (vis and { what:byte() } or { what:byte(), what:byte() })
+          local ins = state.focus == 'tracker' and vim.mode == 'insert'
+          if ins then table.insert(seq, 1, 27); seq[#seq + 1] = 105 end   -- INSERT: буквы — ноты; Esc … i
+          for _, k in ipairs(seq) do ctx.keyq[#ctx.keyq + 1] = k end
+          c = 0
+        end
+      end
+    end
+  end
   -- \Q (5 окт): пик ждёт строку-цель — Enter переносит, Esc отменяет
   if ctx.qmove and state.focus == 'tracker' and (c == 13 or c == 27) and not vim.picker and not vim.hydra then
     local q = ctx.qmove; ctx.qmove = nil

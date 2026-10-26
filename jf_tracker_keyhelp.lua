@@ -179,6 +179,7 @@ KH.PAGES = {
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters; the tracker first - every note, every beat row (darker dots) of each track; in INSERT too, on the note field (where f is not a note; in vol / fx it is hex F)' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three)' },
+    { k = 'Cmd+C X V', d = 'copy / cut / paste in every module, as everywhere: the copy keys of the module (yy / dd / p, in VISUAL y / d; the matrix - its block); in INSERT the tracker steps out and back' },
     { k = 'F1 F2', d = 'in the tracker: transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise); F2 from another module - to the tracker' },
     { k = 'Opt+F1 F2', d = 'transpose the selection (else the note of the row) -1 / +1 from any module; Opt+F11 F12 - an octave' },
     { k = 'h (wave)', d = 'wave column (wave mode column): h from the note goes into the wave, l back; there s - cut the note at the row, S - a stretch marker at the row start (one in the row - snapped there), x - remove it, J K - pull the hit a row down / up (3J - three); the mouse drags the amber line too' },
