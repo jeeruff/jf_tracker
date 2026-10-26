@@ -237,6 +237,7 @@ KH.PAGES = {
     { k = 'm', d = 'KEYS on / off (the keyboard; the mode word shows KEYS): on - it has priority, 1 f1 2 f2 3 ... play notes (layout qwerty: q 2 w 3 e), [ ] octave (qwerty: z x), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'zm', d = 'minimize the pane in focus to its tab row (any pane but the tracker; in the matrix - z then m); again, a click on its tab or focusing it - open' },
     { k = 'zx', d = 'crossfade editor of REAPER: the note under the cursor and the notes of the track overlapping it' },
+    { k = ':pitch', d = 'pitch of the sample under the cursor (audio note on the row, or the lib sample): a take marker per slice - the note (A3, +cents) or, for a chord, its name (Am); again - replaced. No processes (YIN / chroma)' },
     { k = 'zX', d = 'the mixer pane x1.5 taller than the canonical size (the size of the dsp), again - back' },
     { k = 'Tab Shift+Tab', d = 'next / previous track (in the tracker); in the wave column - the next / previous hit: a stretch marker or a note start' },
     { k = 'Opt+note', d = 'chord typing on a not sliced sound (on a sliced one Option+note = the selected slice at that pitch, Option+Shift - listen): the note goes to the next subcolumn of the row (a new one if needed), the cursor follows; all chord notes ring while you type, a 1.5 s pause ends the chord (length = typing time) and the cursor goes below it' },

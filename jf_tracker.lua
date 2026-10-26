@@ -18638,6 +18638,77 @@ ctx.harmonize_cmd = function(arg)
 end
 -- 21 окт: :transcribe — соло аудио → MIDI: айтем под курсором выбирается, запускается jf_transcribe.lua
 -- (экшен REAPER; aubionotes он зовёт сам — по этой явной команде; трекер процессов не порождает)
+-- 26 окт: :pitch — высота сэмпла → take-маркеры (PLAN_HARM этап 1): аудио-айтем в строке курсора, иначе
+-- сэмпл lib под курсором lib; на каждый срез (или весь сэмпл) — нота «A3» (+центы) или аккорд «Am».
+-- Свои маркеры — своего цвета (повтор их заменяет). Без процессов: YIN / хрома (jf_tracker_theory)
+ctx.PITCH_MK_COLOR = reaper.ColorToNative(230, 150, 60) | 0x1000000
+function ctx.pitch_target()
+  local col = cur_col()
+  if col and col.track and state.focus == 'tracker' then
+    local t, tn = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
+    for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+      local it = reaper.GetTrackMediaItem(col.track, i)
+      local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local tk = reaper.GetActiveTake(it)
+      if tk and not reaper.TakeIsMIDI(tk) and p < tn - 1e-6 and p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > t + 1e-6 then return it end
+    end
+  end
+  local e = col and col.pool and vim.inst and col.pool[vim.inst]
+  local it = e and (e.item or (e.parent and e.parent.item))
+  if it and reaper.ValidatePtr(it, 'MediaItem*') then
+    local tk = reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) then return it end
+  end
+end
+function ctx.pitch_mark()
+  local it = ctx.pitch_target()
+  if not it then vim.msg = 'pitch: put the cursor on an audio note (or a sample in the lib)'; return end
+  local tk = reaper.GetActiveTake(it)
+  local TH, CHM = MMX.TH, MMX.CH
+  local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+  local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+  local cuts = {}
+  for _, t in ipairs(edit.item_slices(it) or {}) do cuts[#cuts + 1] = t end
+  if #cuts == 0 or cuts[1] > 1e-6 then table.insert(cuts, 1, 0) end
+  local acc = reaper.CreateTakeAudioAccessor(tk)
+  local NP, NC = 2048, 1200
+  local bp, bc = reaper.new_array(NP * 2), reaper.new_array(NC * 2)
+  local res = {}
+  for k, t in ipairs(cuts) do
+    local t1 = cuts[k + 1] or len
+    local a = t + math.min(0.015, (t1 - t) * 0.1)               -- мимо атаки
+    if t1 - a > 0.03 then
+      bp.clear(); reaper.GetAudioAccessorSamples(acc, TH.PITCH_SR, 2, a, NP, bp)
+      bc.clear(); reaper.GetAudioAccessorSamples(acc, TH.SR, 2, a, NC, bc)
+      local tp, tc = bp.table(1, NP * 2), bc.table(1, NC * 2)
+      local np = math.min(NP, math.floor((t1 - a) * TH.PITCH_SR))
+      local nc = math.min(NC, math.floor((t1 - a) * TH.SR))
+      local mp, mc = {}, {}
+      for i = 1, np do mp[i] = 0.5 * (tp[2 * i - 1] + tp[2 * i]) end
+      for i = 1, nc do mc[i] = 0.5 * (tc[2 * i - 1] + tc[2 * i]) end
+      local r = np > 512 and TH.sample_root(mp, np, mc, nc) or nil
+      if r then
+        local nm = r.chord or (CHM.NAMES[r.pitch % 12 + 1] .. (r.pitch // 12 - 1) .. (math.abs(r.cents) >= 10 and ('%+d'):format(r.cents) or ''))
+        res[#res + 1] = { t = t, name = nm, r = r }
+      end
+    end
+  end
+  reaper.DestroyAudioAccessor(acc)
+  if #res == 0 then vim.msg = 'pitch: no pitch found (silence or noise)'; return end
+  edit.run('pitch markers', function()
+    for i = reaper.GetNumTakeMarkers(tk) - 1, 0, -1 do
+      local _, _, col = reaper.GetTakeMarker(tk, i)
+      if col == ctx.PITCH_MK_COLOR then reaper.DeleteTakeMarker(tk, i) end
+    end
+    for _, e in ipairs(res) do reaper.SetTakeMarker(tk, -1, e.name, offs + e.t * rate, ctx.PITCH_MK_COLOR) end
+    reaper.UpdateItemInProject(it)
+  end)
+  model.invalidate()
+  local names = {}
+  for i = 1, math.min(8, #res) do names[#names + 1] = res[i].name end
+  vim.msg = ('pitch: %d marker(s) - %s%s (take markers of the sample; u - undo)'):format(#res, table.concat(names, ' '), #res > 8 and ' ...' or '')
+end
 ctx.transcribe_cmd = function()
   local col = cur_col()
   if not (col and col.track) then vim.msg = 'transcribe: no track under the cursor'; return end

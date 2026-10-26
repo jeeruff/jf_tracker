@@ -238,6 +238,54 @@ function TH.best_chord(chroma, quals)
   end
   return best, bs
 end
+-- 26 окт: ВЫСОТА ЗВУКА — YIN (de Cheveigné, Kawahara 2002) по моно-окну при частоте sr.
+-- → f0 (Гц) и cmnd (0 — чистый тон, чем больше, тем менее периодичен) или nil (тишина / нет периода)
+TH.PITCH_SR = 11025
+function TH.yin(mono, N, sr, fmin, fmax)
+  N = N or #mono; sr = sr or TH.PITCH_SR
+  fmin, fmax = fmin or 40, fmax or 1600
+  local tmax = math.min(math.floor(sr / fmin), math.floor(N / 2))
+  local tmin = math.max(2, math.floor(sr / fmax))
+  if tmax <= tmin + 2 then return nil end
+  local acc = 0
+  for i = 1, N do acc = acc + math.abs(mono[i]) end
+  if acc / N < TH.SILENCE then return nil end
+  local W = N - tmax
+  local d, cm = {}, {}
+  local run = 0
+  for tau = 1, tmax do
+    local sum = 0
+    for j = 1, W do local df = mono[j] - mono[j + tau]; sum = sum + df * df end
+    d[tau] = sum; run = run + sum
+    cm[tau] = run > 0 and (sum * tau / run) or 1
+  end
+  local best
+  for tau = tmin, tmax - 1 do
+    if cm[tau] < 0.15 and cm[tau] <= cm[tau + 1] then best = tau; break end
+  end
+  if not best then
+    local mv = math.huge
+    for tau = tmin, tmax - 1 do if cm[tau] < mv then mv, best = cm[tau], tau end end
+  end
+  if not best then return nil end
+  local a, b, c = cm[best - 1] or cm[best], cm[best], cm[best + 1] or cm[best]
+  local den = a - 2 * b + c
+  local t = best + ((math.abs(den) > 1e-12) and (0.5 * (a - c) / den) or 0)
+  return sr / t, cm[best]
+end
+-- высота сэмпла: нота (pitch MIDI + центы), если звук периодичен; иначе аккорд по хроме
+-- mono_p — окно при TH.PITCH_SR, mono_c — при TH.SR (для хромы); → { pitch, cents } | { chord } | nil
+function TH.sample_root(mono_p, Np, mono_c, Nc)
+  local f0, cm = TH.yin(mono_p, Np, TH.PITCH_SR)
+  if f0 and cm < 0.2 then
+    local m = 69 + 12 * math.log(f0 / 440, 2)
+    local p = math.floor(m + 0.5)
+    return { pitch = p, cents = math.floor((m - p) * 100 + 0.5), f0 = f0, conf = 1 - cm }
+  end
+  local ch = mono_c and TH.window_chroma(mono_c, Nc)
+  if ch then local sym = TH.best_chord(ch); if sym then return { chord = sym } end end
+  return nil
+end
 -- метки окон → сегменты { s, e, lab } (индексы окон); короче min_dur секунд — в соседа (jf_chorddetect)
 function TH.segments(labels, hop, min_dur)
   local segs = {}

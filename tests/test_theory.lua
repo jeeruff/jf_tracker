@@ -33,4 +33,24 @@ local h = TH.harmonize({ { pitch = 64, w = 2 }, { pitch = 67, w = 1 }, { pitch =
 eq('harmonize E G C -> C', h[1].sym, 'C')
 eq('second voice third above E = G', TH.second_voice(64, 3, 0, 'major'), 67)
 eq('in scale', TH.in_scale(66, 0, 'major'), false)
+-- 26 окт: YIN — высота синуса, пилы, тишина
+local function synth(f, n, sr, kind)
+  local t = {}
+  for i = 1, n do
+    local ph = (i - 1) * f / sr
+    t[i] = kind == 'saw' and (2 * (ph - math.floor(ph)) - 1) * 0.5 or 0.5 * math.sin(2 * math.pi * ph)
+  end
+  return t
+end
+local sr = TH.PITCH_SR
+local f0 = TH.yin(synth(220, 2048, sr), 2048, sr)
+eq('yin sine 220', f0 and math.floor(f0 + 0.5), 220)
+local r = TH.sample_root(synth(220, 2048, sr), 2048)
+eq('sample root A3', r and r.pitch, 57)
+local r2 = TH.sample_root(synth(98, 2048, sr, 'saw'), 2048)
+eq('sample root saw G2', r2 and r2.pitch, 43)
+local z = {}; for i = 1, 2048 do z[i] = 0 end
+eq('silence', TH.yin(z, 2048, sr), nil)
+local r3 = TH.sample_root(synth(261.63 * 2 ^ (14 / 1200), 2048, sr), 2048)
+eq('cents +14 near C4', r3 and (r3.pitch == 60 and math.abs(r3.cents - 14) <= 2), true)
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
