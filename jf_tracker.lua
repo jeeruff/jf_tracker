@@ -13871,10 +13871,29 @@ ctx = {
         local nx = ((cur - 1 + (what == 'next' and 1 or -1)) % #list) + 1
         ctx.surge_load(t.track, f.i, list[nx]); return
       end
+      -- 26 окт: Opt+H / L — главная папка (первая часть пути: Bass, Keys ...): первый патч соседней
+      if what == 'prevdir' or what == 'nextdir' then
+        local function top(e) return (e.label:match('^(.-) / ') or e.label):lower() end
+        local cur = 1
+        for i, e in ipairs(list) do if e.label == ctx.surge_name[g] then cur = i end end
+        local n, i = #list, cur
+        if what == 'nextdir' then
+          repeat i = i % n + 1 until top(list[i]) ~= top(list[cur]) or i == cur
+        else
+          local t0 = top(list[cur])
+          while top(list[i]) == t0 do i = (i - 2) % n + 1; if i == cur then break end end   -- в конец предыдущей папки
+          local t1 = top(list[i])
+          while top(list[(i - 2) % n + 1]) == t1 and (i - 2) % n + 1 ~= cur do i = (i - 2) % n + 1 end   -- к её началу
+        end
+        ctx.surge_load(t.track, f.i, list[i])
+        vim.msg = 'Surge XT: ' .. list[i].label .. '   (Opt+H L - folder, Opt+J K - patch)'
+        return
+      end
       vim.open_picker('Surge XT patch (' .. #list .. ')', list, function(it) ctx.surge_load(t.track, f.i, it) end)
       state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
       return
     end
+    if what == 'prevdir' or what == 'nextdir' then vim.msg = f.name .. ': REAPER keeps its presets in one list - no folders (Opt+J K - preset)'; return end
     if what == 'prev' or what == 'next' then
       A.NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
       local _, nm = A.GetPreset(t.track, f.i, '')
@@ -28288,6 +28307,12 @@ local function frame()
           local p = f.params[dsp_sel.param]
           vim.msg = (p and p.name or '') .. '  (h l - value, j k - next, Esc - back)'
           return
+        end
+        -- 26 окт: Opt+J / K — пресет модуля под курсором, Opt+H / L — главная папка пресетов (Surge)
+        do
+          local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
+          local OPTP = { [8710] = 'next', [730] = 'prev', [729] = 'prevdir', [172] = 'nextdir' }
+          if OPTP[cp] and not DK.pending and f then ctx.dsp_preset(dsp_sel.fx, OPTP[cp]); return end
         end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
         if r == 'leave' then ctx.set_focus('tracker')
