@@ -785,6 +785,24 @@ function A.put_alias(src, t)
   return n
 end
 
+-- 26 окт: items паттерна отвязать от повторов (свой пул MIDI, без группы, метка = name).
+-- Переименование повтора в имя, которого нет у других паттернов, делает то же:
+-- иначе разные имена оставались связанными (правка нот в B1 меняла A1 … D2)
+function A.unlink_items(rg, name)
+  local n = 0
+  for _, tr in ipairs(tracks()) do
+    for _, it in ipairs(items_in(tr, rg.pos, rg.rgnend)) do
+      local ok, chunk = R.GetItemStateChunk(it, '', false)
+      local linked = (ok and chunk:find('POOLEDEVTS')) or R.GetMediaItemInfo_Value(it, 'I_GROUPID') > 0
+      if ok and chunk:find('POOLEDEVTS') then R.SetItemStateChunk(it, unlink_chunk(chunk), false) end
+      R.SetMediaItemInfo_Value(it, 'I_GROUPID', 0)
+      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_pattern', name, true)
+      if linked then n = n + 1 end
+    end
+  end
+  return n
+end
+
 -- make unique (3 окт, как в Renoise): повтор отвязывается — новое имя
 -- (свой паттерн), MIDI — свой пул, items — без группы. Без своего undo.
 function A.make_unique(regions, rg)

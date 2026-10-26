@@ -10133,9 +10133,16 @@ ctx = {
       edit.run('add region', function() reaper.AddProjectMarker2(0, true, rg.pos, rg.rgnend, text, -1, 0) end)
       ctx.mx_refresh(); vim.msg = 'region: ' .. text; return
     end
-    edit.run('rename region', function() alias.rename(rg, text) end)
-    ctx.mx_refresh()
-    vim.msg = 'region: ' .. text
+    -- 26 окт: новое имя, которого нет у других паттернов, — это свой паттерн: items отвязываются от повторов
+    local taken = false
+    for _, r2 in ipairs(seq) do if r2 ~= rg and not r2.gap and r2.name == text then taken = true end end
+    local nu = 0
+    edit.run('rename region', function()
+      alias.rename(rg, text)
+      if not taken and text ~= rg.name then nu = alias.unlink_items(rg, text) end
+    end)
+    ctx.mx_refresh(); model.invalidate()
+    vim.msg = 'region: ' .. text .. (nu > 0 and (' - its own pattern now (%d item(s) unlinked from the repeats)'):format(nu) or '')
   end,
   mx_len = function(text)
     local rg = seq[MX.cur.ri]
