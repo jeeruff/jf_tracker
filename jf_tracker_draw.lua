@@ -9775,8 +9775,8 @@ function D.frame(L, snap, rows, state, info)
         local rows = D.SX.items(v0, P)
         local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad, L.rh, ms, L.pad)
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
-        local wr = math.min(10, nfit - need - nbr - 1 - 1)
-        if wr < 3 then need = 0; wr = math.min(10, nfit - nbr - 1 - 1) end
+        local wr = math.min(16, nfit - need - nbr - 1 - 1)   -- 26 окт: до 16 строк — волна + прицел
+        if wr < 3 then need = 0; wr = math.min(16, nfit - nbr - 1 - 1) end
         if wr >= 2 then
           f.slx_geo = { lay = lay, nbr = nbr, wr = wr, v = v0, noparams = need == 0 }
           wtop_wh = wr * L.rh
@@ -10798,11 +10798,28 @@ function D.frame(L, snap, rows, state, info)
         D.slx_zoom = D.slx_zoom or {}
         local zst = D.slx_zoom[f.i]
         local ovh = L.rh - 3
-        local wh = G.wr * L.rh
+        -- 26 окт: прицел (снайперский зум края, как в слайсере) — под волной, ~40 % высоты при 6+ строках
+        local zr = G.wr >= 6 and math.floor(G.wr * 0.42) or 0
+        local wh = (G.wr - zr) * L.rh - (zr > 0 and 2 or 0)
         local dr = D.slx_drag and D.slx_drag.fi == f.i and D.slx_drag or nil
         local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
         local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
+        if zr > 0 and v and v.frames and v.frames > 0 then
+          D.slx_aim = D.slx_aim or {}
+          local edge = (dr and dr.edge) or (hw and hw.edge) or D.slx_aim[f.i]
+          if not edge or not (v.starts and v.starts[edge]) then edge = (v.sel and v.sel >= 0) and (v.sel + 1) or nil end
+          if edge and v.starts[edge] then D.slx_aim[f.i] = edge end
+          local sr = math.max(1, v.sr or 48000)
+          local w2 = math.floor((D.slx_zwin or 0.04) * sr)
+          local center = edge and ((dr and dr.edge == edge and dr.fine and dr.fine.base) or v.starts[edge]) or 0
+          local A = edge and { edge = edge, center = center, w2 = w2, spam = info.slx_spam and info.slx_spam(), fine = dr and dr.edge == edge and dr.frame or nil } or nil
+          if A and info.slx_aim then A.pk = info.slx_aim(center - w2, 2 * w2, math.min(w0, 2 * w2)) end
+          local zy = sy
+          local ha = D.SX.draw_aim(U, L, v, x0, zy, w0, zr * L.rh, text, ms, set, mx, my, A, drag or dr)
+          if ha then hover.slxaim = { fx = k, f = f, a = ha } end
+          sy = zy + zr * L.rh + 1
+        end
         local st
         if v and v.frames and v.frames > 0 then
           st = ('%d Hz  %.2fs  %d slices%s'):format(math.floor(v.sr or 0), v.frames / math.max(1, v.sr or 48000), v.nsl, v.sel >= 0 and ('  sel %d'):format(v.sel + 1) or '')

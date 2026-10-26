@@ -82,19 +82,21 @@ local function bw_of(it, ms, pad)
   return w
 end
 
--- раскладка кнопок: { {x, y, w, it}, ... } и число строк; переносит, если не влезает
+-- раскладка кнопок: { {x, y, w, it}, ... } и число строк. 26 окт: потоком — группы идут друг за другом
+-- и переносятся по ширине (пустых хвостов у рядов нет, лишние строки уходят волне); подпись группы
+-- не остаётся в конце строки — переносится вместе со своей первой кнопкой
 function SX.layout(rows, x0, y0, w, rh, ms, pad)
-  local out, y, nrow = {}, y0, 0
-  for _, row in ipairs(rows) do
-    local x = x0
-    nrow = nrow + 1
-    for _, it in ipairs(row) do
-      local bw = it.kind == 'zone' and (ms(it.lab) + 2 * pad) or bw_of(it, ms, pad)
-      if x > x0 and x + bw > x0 + w then x = x0; y = y + rh; nrow = nrow + 1 end
-      out[#out + 1] = { x = x, y = y, w = bw, it = it }
-      x = x + bw + (it.kind == 'zone' and 0 or 2)
-    end
-    y = y + rh
+  local flat = {}
+  for _, row in ipairs(rows) do for _, it in ipairs(row) do flat[#flat + 1] = it end end
+  local function wof(it) return it.kind == 'zone' and (ms(it.lab) + 2 * pad) or bw_of(it, ms, pad) end
+  local out, x, y, nrow = {}, x0, y0, 1
+  for i, it in ipairs(flat) do
+    local bw = wof(it)
+    local need = bw
+    if it.kind == 'zone' and flat[i + 1] then need = bw + wof(flat[i + 1]) end
+    if x > x0 and x + need > x0 + w then x = x0; y = y + rh; nrow = nrow + 1 end
+    out[#out + 1] = { x = x, y = y, w = bw, it = it }
+    x = x + bw + (it.kind == 'zone' and 0 or 2)
   end
   return out, nrow
 end
@@ -219,6 +221,70 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
   for _, p in ipairs(v.voices or {}) do local px = xof(p); if px >= x and px < x + w then gfx.rect(px, wy, 1, wh, 1) end end
   if not drag and mx >= x and mx < x + w and my >= y and my < wy + wh then
     hv = { over = my < wy and 'overview' or 'wave', slice = hs, edge = he, frame = fpos, fr = fr, f0 = f0, fn = fn, x = x, w = w }
+  end
+  return hv
+end
+
+-- 26 окт: прицел — снайперский зум у границы, как в слайсере трекера: окно ±W2 кадров вокруг края
+-- A = { edge, center, w2 (кадров), pk = { max, min, n } (настоящие сэмплы slixer), spam, fine }
+-- → hover { spam = true } | { aim = true, edge, base, span } (тянуть — точно двигать, колесо — шире / ближе)
+function SX.draw_aim(U, L, v, x, y, w, h, text, ms, set, mx, my, A, drag)
+  local hv
+  set(U.BG); gfx.rect(x, y, w, h, 1)
+  set(U.LINE); gfx.rect(x, y, w, h, 0)
+  local fr = v and v.frames or 0
+  if not (fr > 0 and A and A.edge) then
+    text(x + 4, y + 1, 'aim: point at a slice edge (or select a slice) - its edge up close here', U.GREY)
+    return nil
+  end
+  local span = 2 * A.w2
+  local t0 = A.center - A.w2
+  local function xof(p) return x + (p - t0) / span * w end
+  local pk = A.pk
+  local cy, hh = y + h / 2, h / 2 - 2
+  if pk and pk.n > 0 then
+    local amp = 0.02
+    for i = 1, pk.n do amp = math.max(amp, math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0)) end
+    set(U.mix(U.TEXT, U.BG, 0.25))
+    if pk.n < w / 2 then   -- мало сэмплов на окно — линия через сэмплы
+      local px0, py0
+      for i = 1, pk.n do
+        local xx, yy = x + (i - 0.5) / pk.n * w, cy - (pk.max[i] or 0) / amp * hh
+        if px0 then gfx.line(px0, py0, xx, yy, 1) end
+        px0, py0 = xx, yy
+      end
+    else
+      for px = 0, w - 1 do
+        local i = math.min(pk.n, math.floor(px / w * pk.n) + 1)
+        gfx.line(x + px, cy - (pk.max[i] or 0) / amp * hh, x + px, cy - (pk.min[i] or 0) / amp * hh)
+      end
+    end
+    if t0 < 0 then set(U.BG); gfx.rect(x + 1, y + 1, math.min(w - 2, xof(0) - x), h - 2, 1) end
+    if t0 + span > fr then local ex = math.max(x + 1, xof(fr)); set(U.BG); gfx.rect(ex, y + 1, x + w - 1 - ex, h - 2, 1) end
+  else text(x + 4, y + h - (L.th or L.rh) - 2, 'reading slixer...', U.GREY) end
+  set(U.DIM); gfx.rect(x, math.floor(cy), w, 1, 1)
+  for i = 1, v.nsl do   -- соседние границы — бирюзой, своя — янтарём
+    local p = (i == A.edge and A.fine) and A.fine or v.starts[i]
+    if p and p >= t0 and p <= t0 + span then
+      local px = math.floor(xof(p))
+      if i == A.edge then set(U.AMBER); gfx.rect(px, y, 2, h, 1) else set(U.CYAN); gfx.rect(px, y, 1, h, 1) end
+    end
+  end
+  local sr = math.max(1, v.sr or 48000)
+  local ep = A.fine or v.starts[A.edge] or 0
+  local lb = ('slice %02X  %.4fs  ±%d ms'):format(A.edge, ep / sr, math.floor(A.w2 / sr * 1000 + 0.5))
+  local spl = 'spam'
+  local sw = ms(spl) + 2 * L.pad
+  local sx, sy = x + w - sw - 2, y + 1
+  set(U.BG); gfx.rect(x + 3, y + 1, ms(lb) + 2, L.rh - 1, 1)
+  text(x + 4, y + 1, lb, U.GREY)
+  local shot = not drag and mx >= sx and mx < sx + sw and my >= sy and my < sy + L.rh - 1
+  set(A.spam and U.tint(U.CYAN, 0.3) or (shot and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(sx, sy, sw, L.rh - 1, 1)
+  set(A.spam and U.CYAN or (shot and U.AMBER or U.LINE)); gfx.rect(sx, sy, sw, L.rh - 1, 0)
+  text(sx + L.pad, sy, spl, A.spam and U.CYAN or (shot and U.AMBER or U.TEXT))
+  if shot then return { spam = true, x = sx, y = sy, w = sw } end
+  if not drag and mx >= x and mx < x + w and my >= y and my < y + h then
+    hv = { aim = true, edge = A.edge, base = v.starts[A.edge], span = span, x = x, w = w }
   end
   return hv
 end

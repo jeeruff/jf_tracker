@@ -18148,16 +18148,22 @@ end
 -- отпустил: есть связанный айтем lib с той же нарезкой — правится он (уйдёт в slixer хуком), иначе
 -- нарезка заказом прямо в slixer
 function ctx.slx_drag_tick()
+  local sp = ctx.slx_spam
+  if sp and reaper.time_precise() >= sp.t then ctx.slx_spam = nil; ctx.slx_cmd(2, sp.slice) end   -- spam: сдвинутый срез играет сам
   local d = draw.slx_drag
+  if not d then return end
   local w = d.w
   local v = d.f.slx_geo and d.f.slx_geo.v
   if not (v and v.starts and v.starts[d.edge]) then draw.slx_drag = nil; return end
-  local lo = (v.starts[d.edge - 1] or 0) + 64
+  local lo = d.edge > 1 and (v.starts[d.edge - 1] + 64) or 0
   local hi = (v.starts[d.edge + 1] or v.frames) - 64
-  d.frame = math.max(lo, math.min(hi, w.f0 + (gfx.mouse_x - w.x) / w.w * w.fn))
+  local nf = d.fine and (d.fine.base + (gfx.mouse_x - d.fine.mx0) / math.max(1, d.fine.ww) * d.fine.span) or (w.f0 + (gfx.mouse_x - w.x) / w.w * w.fn)
+  d.frame = math.max(lo, math.min(hi, nf))
   state.status = ('slixer: slice %d starts at %.3fs - release to keep'):format(d.edge, d.frame / math.max(1, v.sr or 48000))
   if gfx.mouse_cap & 1 == 1 then return end
   draw.slx_drag = nil
+  if math.abs(d.frame - v.starts[d.edge]) < 1 then return end   -- щелчок без сдвига — ничего не менять
+  if state.sliceaudition then ctx.slx_spam = { slice = d.edge - 1, t = reaper.time_precise() + 0.15 } end
   local sr = math.max(1, v.sr or 48000)
   local secs = {}
   for i = 1, v.nsl do secs[i] = (i == d.edge and d.frame or v.starts[i]) / sr end
@@ -18172,6 +18178,30 @@ function ctx.slx_drag_tick()
     for i = 1, #secs do ts[i] = math.max(0, (secs[i] - offs) / rate) end
     edit.set_slices(item, ts)
   else ctx.slx_send_starts(secs) end
+end
+-- 26 окт: прицел пульта — сэмплы окна a..a+n (кадры деки) в np точек, заказом slixer (TRKV+1590..1594, +1600..);
+-- ответ приходит кадром позже — до него рисуется прошлый (без мигания)
+function ctx.slx_aim_peaks(a, n, np)
+  local Z = ctx.slx_zq or {}
+  ctx.slx_zq = Z
+  a, n, np = math.floor(a), math.max(1, math.floor(n)), math.max(1, math.min(1024, math.floor(np)))
+  local key = a .. ':' .. n .. ':' .. np
+  with_ns('jf_slixer', function()
+    local B = 200000
+    if Z.key == key then
+      if not Z.ready and reaper.gmem_read(B + 1594) == Z.serial then
+        local mx, mn = {}, {}
+        for i = 1, np do mx[i] = reaper.gmem_read(B + 1598 + 2 * i); mn[i] = reaper.gmem_read(B + 1599 + 2 * i) end
+        Z.ready, Z.prev = true, { max = mx, min = mn, n = np }
+      end
+    else
+      Z.serial = (math.floor(reaper.gmem_read(B + 1590)) % 16000000) + 1
+      reaper.gmem_write(B + 1591, a); reaper.gmem_write(B + 1592, n); reaper.gmem_write(B + 1593, np)
+      reaper.gmem_write(B + 1590, Z.serial)
+      Z.key, Z.ready = key, false
+    end
+  end)
+  return Z.prev
 end
 function ctx.slx_send_starts(st)
   with_ns('jf_slixer', function()
@@ -21289,6 +21319,8 @@ local function frame()
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     slx_param = function(fxi, name) return ctx.slx_param(fxi, name) end,   -- 25 окт: пульт slixer — параметр по имени
+    slx_aim = function(a, n, np) return ctx.slx_aim_peaks(a, n, np) end,
+    slx_spam = function() return state.sliceaudition end,   -- 26 окт: прицел — сэмплы окна у границы
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
       -- данные (иначе две ширины слоя пиков спорят в gmem)
@@ -22753,6 +22785,8 @@ local function frame()
     local e = hover.btn.send
     state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
   elseif hover.slx then local it = hover.slx.it; state.status = 'slixer: ' .. (it.name or it.lab) .. (it.key and ('  (' .. it.key .. ' in the plugin window)') or '') .. (it.kind == 'menu' and ' - click: list' or it.kind == 'val' and ' - wheel: change' or it.src == 'press' and ' - opens the plugin window' or '')
+  elseif hover.slxaim and hover.slxaim.a.spam then state.status = 'spam: a moved slice edge plays its slice by itself (the tracker slicer shares it)'
+  elseif hover.slxaim then state.status = 'slixer aim - the edge up close: drag - fine move, wheel - wider / closer'
   elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
   elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: cut it in the tracker slicer, drop a file: new sample'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
@@ -24969,6 +25003,16 @@ local function frame()
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slx.fx
       ctx.slx_do(hover.slx)
       click = { t = now2, zone = 'slx' }
+    elseif hover.slxaim and not B.drag then   -- 26 окт: прицел — spam / точный сдвиг границы
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.slxaim.fx
+      local a = hover.slxaim.a
+      if a.spam then
+        state.sliceaudition = not state.sliceaudition
+        vim.msg = 'spam ' .. (state.sliceaudition and 'on: a moved slice edge plays its slice' or 'off')
+      elseif a.edge and a.base then
+        draw.slx_drag = { fi = hover.slxaim.f.i, f = hover.slxaim.f, edge = a.edge, frame = a.base, fine = { base = a.base, mx0 = gfx.mouse_x, ww = a.w, span = a.span } }
+      end
+      click = { t = now2, zone = 'slxaim' }
     elseif hover.slxwave and not B.drag then   -- 25 окт: волна — срез слушать; граница — тянуть (26 окт); обзор — окно зума туда; двойной — слайсер трекера
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slxwave.fx
       local w = hover.slxwave.w
@@ -24978,7 +25022,10 @@ local function frame()
         draw.slx_zoom[fi] = { fn = w.fn, f0 = math.max(0, math.min(w.fr - w.fn, (gfx.mouse_x - w.x) / w.w * w.fr - w.fn / 2)) }
       elseif w and w.edge then draw.slx_drag = { fi = hover.slxwave.f.i, f = hover.slxwave.f, edge = w.edge, frame = w.frame, w = w }
       elseif dbl and click.zone == 'slxwave' then ctx.slx_open_slicer(hover.slxwave.f)
-      elseif w and w.slice and w.slice >= 0 then ctx.slx_cmd(2, w.slice) end
+      elseif w and w.slice and w.slice >= 0 then
+        ctx.slx_cmd(2, w.slice)
+        draw.slx_aim = draw.slx_aim or {}; draw.slx_aim[hover.slxwave.f.i] = w.slice + 1   -- прицел — на начало выбранного
+      end
       click = { t = now2, zone = 'slxwave' }
     elseif hover.dspwave then
       -- волна сэмплера (RS5K): ближайшая ручка start / end едет за мышью
@@ -25703,7 +25750,7 @@ local function frame()
       state.status = d.f.name .. ': ' .. ({ a = 'attack', ds = 'decay / sustain', r = 'release' })[d.part or 'a'] .. ' - drag, Shift: fine'
     else ctx.adsr_d = nil end
   end
-  if draw.slx_drag then ctx.slx_drag_tick() end   -- 26 окт: граница среза slixer за мышью
+  if draw.slx_drag or ctx.slx_spam then ctx.slx_drag_tick() end   -- 26 окт: граница среза slixer за мышью
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspwave_drag
@@ -26041,6 +26088,10 @@ local function frame()
     ctx.tmpl_do(gfx.mouse_wheel > 0 and -1 or 1); gfx.mouse_wheel = 0
   end
   if gfx.mouse_wheel ~= 0 and hover and hover.slx then ctx.slx_wheel(hover.slx, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0 end   -- 25 окт
+  if gfx.mouse_wheel ~= 0 and hover and hover.slxaim then   -- 26 окт: колесо над прицелом — окно шире / ближе
+    draw.slx_zwin = math.max(0.002, math.min(1, (draw.slx_zwin or 0.04) * (gfx.mouse_wheel > 0 and 0.8 or 1.25)))
+    state.status = ('slixer aim: ±%d ms'):format(math.floor(draw.slx_zwin * 1000 + 0.5)); gfx.mouse_wheel = 0
+  end
   if gfx.mouse_wheel ~= 0 and hover and hover.slxwave and hover.slxwave.w and hover.slxwave.w.over == 'wave' then   -- 25 окт: зум волны slixer к мыши
     local w = hover.slxwave.w
     draw.slx_zoom = draw.slx_zoom or {}
