@@ -896,7 +896,7 @@ function D.layout(snap, state, nregions)
     -- уровень ширины (7 окт): задан — колонка по нему, свёртка za не действует
     local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
     if lvl and state.autozoom and state.az_full == col.guid and not (state.wlevel and state.wlevel[col.guid]) then lvl = nil end   -- 20 окт: autozoom — трек курсора во всю ширину
-    if lvl then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end
+    if lvl and fs ~= 'chord' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека

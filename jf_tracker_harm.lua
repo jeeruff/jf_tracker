@@ -193,10 +193,11 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   end
   -- аккорды трека в паттерне — под кнопками, в ширину их группы
   local ay = y + 3 * (rh + 2) + 2
+  local ty = ay
   if ay + rh <= y + h then
     U.text(x, ay, 'chords', U.GREY)
     local tx0 = x + U.measure('chords ') + L.pad
-    local tx, ty = tx0, ay
+    local tx = tx0
     for _, e in ipairs(info.list or {}) do
       local s = ('%04d %s'):format(e.row, e.name)
       local sw = U.measure(s) + 2 * L.pad
@@ -210,7 +211,9 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   local show = (hv and hv.kind == 'deg') and HM.degree(hv.k, hv.seventh) or info.here
   local px = gx1 + 2 * L.cw
   local py = y + rh + 2
-  if (HM.show_staff or HM.show_tab) and px + 10 * L.cw <= x + w then
+  -- 26 окт: справа не влезает (узкая панель) — стан и таб под списком аккордов, во всю ширину
+  if px + 10 * L.cw > x + w then px, py = x, ty + rh + 4 end
+  if (HM.show_staff or HM.show_tab) and px + 10 * L.cw <= x + w and py + 3 * rh <= y + h then
     if show and CH.parse((show:gsub('%?$', ''))) then
       U.text(px, py, show, (hv and hv.kind == 'deg') and U.AMBER or U.TEXT)
       local qx = px
