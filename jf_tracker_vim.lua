@@ -3065,6 +3065,7 @@ function V.key_impl(c)
     elseif c == ('o'):byte() then V.cur, V.anchor = V.anchor, V.cur; done = true
     elseif c == ('R'):byte() and ctx.razor_from then   -- 16 окт: R — выделение в razor edit REAPER (те же строки × треки)
       ctx.razor_from(f0, f1, r0, r1); V.mode = 'normal'; finish_move(); done = true
+    elseif c == ('T'):byte() then V.transpose_smart('sel'); done = true   -- 26 окт: Shift+T и в VISUAL — транспозитор выделения
     elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
         or c == ('M'):byte() or c == ('s'):byte()) and not (V.vfield and (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte())) then   -- 23 окт: поле-колонка — своя ветка ниже (было — удалялись ноты целиком)
       local e = apply(c == ('M'):byte() and 'm' or string.char(c), f0, f1, r0, r1)
@@ -3718,14 +3719,18 @@ function V.nooff(all)
     for fi, fl in ipairs(F) do
       if ((sf0 and fi >= sf0 and fi <= sf1) or (not sf0 and (all or fl.ci == ci))) and not fl.env then
         for _, sub in ipairs(subs_of(fl)) do
+          -- 26 окт: по головам нот, не по клеткам OFF: у ноты короче строки OFF сложен в голову (клетки нет) —
+          -- её пропускали; сложенные в клетку ноты (c.fold) — туда же
           for r = r0, r1 do
             local c = sub[r]
-            if c and c.kind == 'off' and c.of then
+            if c and (c.kind == 'midi' or c.kind == 'audio') then
               local nxt
               for r2 = r + 1, r + 4096 do local c2 = sub[r2]; if c2 and (c2.kind == 'audio' or c2.kind == 'midi') then nxt = r2; break end end
               local stop = nxt or ((ctx.region_end_row and ctx.region_end_row(r) or (r + 15)) + 1)
-              ctx.edit.unoff({ c.of }, lpb(), stop)   -- 26 окт: до начала следующего события, без метки OFF
-              n = n + 1
+              local hs = { c }
+              for _, h in ipairs(c.fold or {}) do hs[#hs + 1] = h end
+              ctx.edit.unoff(hs, lpb(), stop)   -- до начала следующего события, без метки OFF
+              n = n + #hs
             end
           end
         end
@@ -3734,7 +3739,7 @@ function V.nooff(all)
   end)
   ctx.model.invalidate()
   if sf0 then V.mode = 'normal' end
-  V.msg = ('nooff: %d OFF(s) removed %s'):format(n, sf0 and 'in the selection' or ((all and 'on all tracks' or 'on the track') .. ' in the ' .. (ctx.view_cur and ctx.view_cur() or 'pattern')))
+  V.msg = ('nooff: %d note(s) ring to the next one %s'):format(n, sf0 and 'in the selection' or ((all and 'on all tracks' or 'on the track') .. ' in the ' .. (ctx.view_cur and ctx.view_cur() or 'pattern')))
 end
 -- 26 окт: OFF сразу после каждой ноты (строкой ниже головы) — в выделении, иначе на треке / всех треках в том, что видно;
 -- следующее событие в той же строке — нота остаётся как есть
@@ -3754,8 +3759,10 @@ function V.offnotes(all)
             local c = sub[r]
             local nx = sub[r + 1]
             if c and (c.kind == 'midi' or c.kind == 'audio') and not (nx and (nx.kind == 'midi' or nx.kind == 'audio')) then
-              ctx.edit.note_off({ c }, lpb(), r + 1)
-              n = n + 1
+              local hs = { c }
+              for _, h in ipairs(c.fold or {}) do hs[#hs + 1] = h end   -- сложенные в клетку ноты — тоже
+              ctx.edit.note_off(hs, lpb(), r + 1)
+              n = n + #hs
             end
           end
         end

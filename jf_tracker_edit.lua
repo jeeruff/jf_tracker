@@ -1463,7 +1463,7 @@ function E.unoff(heads, lpb, end_row)
   for _, h in ipairs(heads) do
     if h.kind == 'audio' and h.item then
       local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
-      if t > pos + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end
+      if t > pos + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end   -- только длиннее
     elseif h.kind == 'midi' and h.take then
       local ip = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
       if t > ip + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 and R.MIDI_SetItemExtents then
@@ -1472,11 +1472,11 @@ function E.unoff(heads, lpb, end_row)
       local i, n = midi_note(h, lpb)
       if i then
         local ppq = R.MIDI_GetPPQPosFromProjTime(h.take, t)
-        if ppq > n.sppq + 1 then
+        if ppq > n.eppq + 1 then   -- 26 окт: только длиннее (нота уже до следующей — не трогать)
           R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, ppq, n.ch, n.pitch, n.vel, false)
           R.MIDI_Sort(h.take)
           E.mark_off(h.take, n.ch, n.pitch, ppq, 0)
-        end
+        else E.mark_off(h.take, n.ch, n.pitch, n.eppq, 0) end   -- снять метку явного OFF
       end
     end
   end
