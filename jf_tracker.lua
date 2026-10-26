@@ -27303,6 +27303,12 @@ local function frame()
       if vim.transpose_scope(m.shift and 'track' or 'sel', TK[c], true) then model.invalidate() end
       c = 0
     end
+    -- 26 окт: как в Renoise — без модификаторов F1 / F2 полутон, F11 / F12 октава у выделения (иначе ноты строки);
+    -- только в трекере: из других модулей F2 — по-прежнему «в трекер»
+    if TK[c] and not (m.cmd or m.alt or m.shift or m.ctrl) and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if vim.transpose_scope('sel', TK[c]) then model.invalidate() end
+      c = 0
+    end
     if TK[c] and not m.cmd and (m.alt or m.shift or m.ctrl) and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       local scope = m.alt and 'sel' or ((m.shift and m.ctrl) and 'col' or (m.shift and 'track' or 'pattern'))
       -- 21 окт: Opt+Shift+F1 F2 — по ступеням лада (:key); F11 F12 — октава как была
