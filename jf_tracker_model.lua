@@ -124,6 +124,9 @@ function M.parse_midi(buf)
       if b1 == 0xFF and msg:byte(2) == 0x0F then
         local nch, np2, xx = msg:match('^..NOTE (%d+) (%d+) .-jf_soff=(%x%x)')
         if nch then soff = soff or {}; soff[#soff + 1] = { ppq = ppq, key = tonumber(nch) * 128 + tonumber(np2), xx = tonumber(xx, 16) } end
+        -- 26 окт: команды ноты slixer — «NOTE ch pitch text jf_nx=0S80,0P40» (CC 102..108 трекер строит по ним)
+        local xch, xp, xs = msg:match('^..NOTE (%d+) (%d+) .-jf_nx=([%w,]+)')
+        if xch then soff = soff or {}; soff[#soff + 1] = { ppq = ppq, key = tonumber(xch) * 128 + tonumber(xp), nx = xs } end
       elseif b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
         local t = M.mts_parse(msg)
         if t then tune = tune or {}; for kk, c in pairs(t) do tune[kk] = { ppq = ppq, c = c } end end
@@ -144,7 +147,7 @@ function M.parse_midi(buf)
   if soff then
     for _, nt in ipairs(notes) do
       local k = nt.ch * 128 + nt.pitch
-      for _, so in ipairs(soff) do if so.key == k and math.abs(so.ppq - nt.ppq) <= 60 then nt.soff = so.xx end end
+      for _, so in ipairs(soff) do if so.key == k and math.abs(so.ppq - nt.ppq) <= 60 then if so.nx then nt.nx = so.nx else nt.soff = so.xx end end end
     end
   end
   table.sort(notes, function(a, b)
@@ -488,8 +491,9 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
           vol = M.hex2(nt.vel), delay = d0, ch = nt.ch,
           muted = muted_item or nt.muted, row0 = r0, fx = (function()
             local nf = (k == 0) and note_fx(nt.qn - qn0) or nil
-            if not nt.soff and not nf then return midi_fx end
+            if not nt.soff and not nt.nx and not nf then return midi_fx end
             local t = nt.soff and { ('0S%02X'):format(nt.soff) } or {}   -- 19 окт: 0Sxx ноты кита
+            for tok in (nt.nx or ''):gmatch('[^,]+') do t[#t + 1] = tok end   -- 26 окт: команды ноты slixer
             for _, x in ipairs(nf or {}) do t[#t + 1] = x end
             return t
           end)(),
@@ -2124,7 +2128,7 @@ function M.track_midilanes(tr, lpb, guid)
         local _, _, _, ppq, typ, msg = R.MIDI_GetTextSysexEvt(tk, k)
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
         if typ == -1 then put(lane('sx', 'sx'), row, #(msg or ''), ('%02X'):format((msg or ''):byte(1) or 0))
-        elseif typ == 15 and (msg or ''):find('jf_soff=', 1, true) then
+        elseif typ == 15 and ((msg or ''):find('jf_soff=', 1, true) or (msg or ''):find('jf_nx=', 1, true)) then
           -- 19 окт: служебная метка 0Sxx ноты кита — видна командой у ноты, не текстом в лейне
         elseif typ and typ >= 1 then
           -- нотация REAPER: «NOTE ch pitch articulation staccato …» — слово после articulation

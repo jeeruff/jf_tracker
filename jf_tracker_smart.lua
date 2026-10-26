@@ -284,17 +284,17 @@ end
 -- порядок: часто нужные сперва). 0 — эффекты, S — свойства сэмпла (item),
 -- Z — песня. Единственный список кодов для ввода, меню и подсказок
 SM.FX = {
-  { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
+  { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx; slixer: of the slice)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
   { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
   { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
   { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0O', 'volume down xx/256 per row' },
   { '0R', 'retrigger every y/16 row, volume falls by x/16 each' }, { '0Y', 'maybe: probability xx/FF' },
-  { 'SI', 'sample fade in xx/16 row' }, { 'SO', 'sample fade out xx/16 row' }, { 'SB', 'beatsync to xx rows' },
+  { 'SI', 'sample fade in xx/16 row' }, { 'SO', 'sample fade out xx/16 row' }, { 'SB', 'beatsync to xx rows (slixer: the slice stretched to xx rows)' }, { '0B', 'backwards: reverse (slixer note)' },
   { 'SF', 'finetune in cents (80 = 0)' }, { 'SL', 'SL00: loop source off' }, { 'SM', 'channel mode 0..4' },
   { 'ZT', 'tempo: BPM = xx' }, { 'ZJ', 'jump to sequence slot xx' },
 }
 -- 12 окт: короткие имена — список команд читается словами (0U pitch up), не только кодами
-SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
+SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['0B'] = 'reverse', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 -- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
@@ -315,6 +315,7 @@ SM.FX_MEAN = {
   SI = function(v) return ('fade in %s row'):format(st(v / 16):gsub('^%+', '')) end,
   SO = function(v) return ('fade out %s row'):format(st(v / 16):gsub('^%+', '')) end,
   SB = function(v) return v == 0 and 'beatsync off' or ('fits %d rows'):format(v) end,
+  ['0B'] = function(v) return v == 0 and 'forward' or 'backwards' end,
   SF = function(v) return ('%+d cents'):format(v - 128) end,
   SL = function(v) return v == 0 and 'loop off' or 'loop on' end,
   SM = function(v) return ({ 'normal', 'reverse stereo', 'mono (mix)', 'mono left', 'mono right' })[v + 1] or ('mode ' .. v) end,

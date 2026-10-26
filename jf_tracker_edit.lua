@@ -903,7 +903,7 @@ function E.retime(heads, lpb, rows, vols, label)
           local _, _, _, ntx = R.MIDI_CountEvts(h.take)
           for k = 0, ntx - 1 do
             local _, _, _, pp, ty, msg = R.MIDI_GetTextSysexEvt(h.take, k)
-            local ch2, pi2 = (ty == 15) and (msg or ''):match('^NOTE (%d+) (%d+) .-jf_soff=') or nil, nil
+            local ch2, pi2 = (ty == 15) and ((msg or ''):match('^NOTE (%d+) (%d+) .-jf_soff=') or (msg or ''):match('^NOTE (%d+) (%d+) .-jf_nx=')) or nil, nil   -- 26 окт: и jf_nx (slixer)
             if ch2 then pi2 = tonumber((msg or ''):match('^NOTE %d+ (%d+)')); tags[h.take][#tags[h.take] + 1] = { k = k, ppq = pp, key = tonumber(ch2) * 128 + pi2, ty = ty, msg = msg } end
           end
         end
@@ -937,6 +937,7 @@ function E.retime(heads, lpb, rows, vols, label)
     end
     for _, h in ipairs(heads) do if h.kind == 'midi' and h.take then R.MIDI_Sort(h.take) end end
     for tr, ps in pairs(kits) do for pitch in pairs(ps) do E.kit_soff_rebuild(tr, pitch) end end   -- автоматизация пэда — за метками
+    for tk in pairs(tags) do if E.nx_has(tk) then E.nx_rebuild(tk, lpb) end end   -- 26 окт: CC команд slixer — за метками
   end)
   return n
 end
@@ -1305,6 +1306,68 @@ function E.midi_cmd_off(h, lpb, off)
   local q = R.MIDI_GetProjQNFromPPQPos(h.take, head_ppq(h, lpb)) - R.TimeMap2_timeToQN(0, R.GetMediaItemInfo_Value(h.item, 'D_POSITION'))
   return math.max(0, q) + (off or 0)
 end
+-- ── 26 окт: команды трекера на ноту slixer ─────────────────────────────
+-- Те же коды, что у аудио-нот: 0S offset в срезе, 0P pan, 0M громкость, SF подстройка (80 = 0),
+-- SB растянуть срез на xx строк, 0B реверс. Хранятся меткой у ноты «NOTE ch pitch text jf_nx=0S80,0P40»
+-- (едет с нотой, видна в колонке); перед нотой — CC 102 (клавиша) и CC 103..108 (значения), их
+-- строит E.nx_rebuild по меткам. E.slx_track(track) и E.nx_sb_ratio(track, pitch, rows, lpb) ставит main
+E.NX = { ['0S'] = 103, ['0P'] = 104, ['0M'] = 105, SF = 106, ['0B'] = 107, SB = 108 }
+E.NX_DEF = { ['0S'] = 0, ['0P'] = 128, ['0M'] = 128, SF = 128, ['0B'] = 0, SB = 0 }
+local function nx_tags(tk)
+  local out = {}
+  local _, _, _, ntx = R.MIDI_CountEvts(tk)
+  for k = 0, ntx - 1 do
+    local _, _, _, pp, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
+    local ch, pitch, list = (ty == 15) and (msg or ''):match('^NOTE (%d+) (%d+) text jf_nx=([%w,]+)')
+    if ch then out[#out + 1] = { k = k, ppq = pp, ch = tonumber(ch), pitch = tonumber(pitch), list = list } end
+  end
+  return out
+end
+function E.nx_has(tk) return tk and R.ValidatePtr(tk, 'MediaItem_Take*') and #nx_tags(tk) > 0 end
+local function nx_cc(cmd, xx, ctx2)
+  if cmd == '0S' or cmd == '0P' or cmd == '0M' then return math.min(127, xx >> 1) end
+  if cmd == 'SF' then return math.max(0, math.min(127, 64 + math.floor((xx - 128) / 2 + 0.5))) end
+  if cmd == '0B' then return xx > 0 and 127 or 0 end
+  if cmd == 'SB' then
+    local r = ctx2 and E.nx_sb_ratio and E.nx_sb_ratio(ctx2.track, ctx2.pitch, xx, ctx2.lpb)
+    if not r or r <= 0 then return nil end
+    return math.max(0, math.min(127, math.floor(64 + 16 * math.log(r, 2) + 0.5)))
+  end
+end
+function E.nx_rebuild(tk, lpb)
+  if not (tk and R.ValidatePtr(tk, 'MediaItem_Take*')) then return end
+  local _, _, ncc = R.MIDI_CountEvts(tk)
+  for i = ncc - 1, 0, -1 do
+    local _, _, _, _, chanmsg, _, m2 = R.MIDI_GetCC(tk, i)
+    if chanmsg == 0xB0 and m2 >= 102 and m2 <= 108 then R.MIDI_DeleteCC(tk, i) end
+  end
+  local tr = R.GetMediaItemTake_Track(tk)
+  for _, t in ipairs(nx_tags(tk)) do
+    local pp = math.max(0, t.ppq - 1)   -- на тик раньше ноты: CC приходят до note-on
+    R.MIDI_InsertCC(tk, false, false, pp, 0xB0, t.ch, 102, t.pitch)
+    for tok in t.list:gmatch('[^,]+') do
+      local code, hex = tok:match('^(%w%w)(%x%x)$')
+      local cc = code and E.NX[code]
+      local val = cc and nx_cc(code, tonumber(hex, 16), { track = tr, pitch = t.pitch, lpb = lpb or 4 })
+      if val then R.MIDI_InsertCC(tk, false, false, pp, 0xB0, t.ch, cc, val) end
+    end
+  end
+  R.MIDI_Sort(tk)
+end
+function E.nx_set(h, lpb, cmd, xx)
+  local i, nt = midi_note(h, lpb)
+  if not i then return false end
+  local tk = h.take
+  local toks, old = {}, nil
+  for _, t in ipairs(nx_tags(tk)) do
+    if t.ch == nt.ch and t.pitch == nt.pitch and math.abs(t.ppq - nt.sppq) <= 60 then old = t end
+  end
+  if old then for tok in old.list:gmatch('[^,]+') do if tok:sub(1, 2) ~= cmd then toks[#toks + 1] = tok end end; R.MIDI_DeleteTextSysexEvt(tk, old.k) end
+  if xx and xx ~= E.NX_DEF[cmd] then toks[#toks + 1] = ('%s%02X'):format(cmd, xx) end
+  if #toks > 0 then R.MIDI_InsertTextSysexEvt(tk, false, false, nt.sppq, 15, ('NOTE %d %d text jf_nx=%s'):format(nt.ch, nt.pitch, table.concat(toks, ','))) end
+  E.nx_rebuild(tk, lpb)
+  return true
+end
 function E.set_fx(heads, lpb, cmd, xx, off)
   if #heads == 0 then return end
   run('fx ' .. cmd, function()
@@ -1313,6 +1376,8 @@ function E.set_fx(heads, lpb, cmd, xx, off)
         if h.item then E.cmds.put(h.item, cmd, xx, E.midi_cmd_off(h, lpb, off)); E.cmds.rebuild(h, lpb, E.prev_semis(h)) end
       elseif h.kind == 'midi' and cmd == '0S' and E.kit_pad and h.item and E.kit_pad(R.GetMediaItem_Track(h.item), h.pitch) then
         E.kit_soff_set(h, lpb, xx)   -- 19 окт: нота кита — сдвиг окна пэда
+      elseif h.kind == 'midi' and E.NX[cmd] and h.item and E.slx_track and E.slx_track(R.GetMediaItem_Track(h.item)) then
+        E.nx_set(h, lpb, cmd, xx)   -- 26 окт: нота slixer — команда на эту ноту
       elseif h.kind == 'midi' then   -- 19 окт: команды item (0S, SI, SO, SL …) — только у аудио; MIDI молча не писал
         E.skip_msg = cmd .. 'xx: a MIDI note cannot take it (audio notes only' .. (cmd == '0S' and '; drumrs5k: the note picks the pad, a start offset - later in jf_slixer)' or ')')
       else
@@ -1336,7 +1401,7 @@ function E.clear_fx(heads, lpb, cmd, off)
     end)
     return
   end
-  local defaults = { ['0P'] = 128, ['0M'] = 128, SI = 0, SO = 0, SL = 1, SM = 0, ['0S'] = 0, SB = 0, SF = 128 }
+  local defaults = { ['0P'] = 128, ['0M'] = 128, SI = 0, SO = 0, SL = 1, SM = 0, ['0S'] = 0, SB = 0, SF = 128, ['0B'] = 0 }
   if defaults[cmd] then E.set_fx(heads, lpb, cmd, defaults[cmd]) end
 end
 

@@ -18123,6 +18123,27 @@ function ctx.slx_push(item)
   ctx.slx_pending = { tr = tr, fx = fx, guid = guid, item = item, stage = 'slices', t = reaper.time_precise() }
 end
 edit.ontop_fn = function() return state.fxontop end   -- 26 окт: опция plugin windows on top
+-- 26 окт: команды трекера на ноту slixer (edit.nx_*): на треке есть slixer? / во сколько растянуть срез ноты,
+-- чтобы он длился rows строк (SBxx): длина среза — из вида slixer (его ноты +1400), строка — по темпу проекта
+edit.slx_track = function(tr)
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
+  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+    local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+    if (nm or ''):lower():find('jf_slixer', 1, true) then return i end
+  end
+end
+edit.nx_sb_ratio = function(tr, pitch, rows, lpb)
+  local fx = edit.slx_track(tr)
+  local v = fx and ctx.slixer_view(tr, fx)
+  if not (v and v.frames and v.frames > 0 and v.notes and rows and rows > 0) then return nil end
+  for i = 1, v.nsl do
+    if v.notes[i] == pitch then
+      local sec = ((v.ends[i] or v.frames) - (v.starts[i] or 0)) / math.max(1, v.sr or 48000)
+      local row_sec = 60 / math.max(1, reaper.Master_GetTempo()) / math.max(1, lpb or state.lpb)
+      return sec > 0 and (rows * row_sec / sec) or nil
+    end
+  end
+end
 edit.slices_hook = function(item)
   local ok, g = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_slx', '', false)
   if ok and g ~= '' then ctx.slx_push(item) end
