@@ -3269,7 +3269,25 @@ ctx = {
   end,
   env_view = function()
     local f = L and L.flat and L.flat[vim.cur.fi]
-    if not (f and f.env and f.col) then vim.msg = 'ze: put the cursor on an envelope column'; return end
+    if not (f and f.env and f.col) then
+      -- 26 окт: не огибающая — окно инструмента трека (ещё раз — закрыть); slixer (JSFX) — тоже инструмент
+      local col = cur_col()
+      local tr = col and col.track
+      if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'ze: no track at the cursor'; return end
+      local ins = reaper.TrackFX_GetInstrument(tr)
+      if ins < 0 then
+        for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+          local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+          if (nm or ''):lower():find('slixer', 1, true) or (nm or ''):match('^VSTi') or (nm or ''):match('^AUi') or (nm or ''):match('^CLAPi') or (nm or ''):match('^VST3i') then ins = i; break end
+        end
+      end
+      if ins < 0 then vim.msg = 'ze: no instrument on ' .. (col.name or 'this track') .. ' (on an envelope column: its view)'; return end
+      local open = reaper.TrackFX_GetFloatingWindow(tr, ins) ~= nil
+      reaper.TrackFX_Show(tr, ins, open and 2 or 3)
+      local _, nm = reaper.TrackFX_GetFXName(tr, ins, '')
+      vim.msg = ('ze: %s %s (ze again - %s)'):format(nm or 'instrument', open and 'closed' or 'opened', open and 'open' or 'close')
+      return
+    end
     local k = (f.col.guid or '') .. '/' .. (f.env.name or '')
     local cur = state.envvals[k]
     local function set(m, what) return function() state.envvals[k] = m; vim.msg = (f.env.name or 'envelope') .. ': ' .. what end end
