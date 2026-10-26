@@ -1439,7 +1439,7 @@ end
 -- ── note-off: укоротить событие до строки ─────────────────────────────────
 -- 24 окт: явный OFF трекера — note-off этой ноты со скоростью отпускания OFF_REL (1): jf_tracker_choke пропускает
 -- его к one-shot пэду (обычные концы нот глушит). Правка сырого потока: MIDI_SetNote скорость отпускания не пишет
-function E.mark_off(take, ch, pitch, ppq)
+function E.mark_off(take, ch, pitch, ppq, vel)   -- 26 окт: vel — 0 снимает метку явного OFF
   local ok, buf = R.MIDI_GetAllEvts(take, '')
   if not ok then return false end
   local out, pos, at, done = {}, 1, 0, false
@@ -1450,12 +1450,36 @@ function E.mark_off(take, ch, pitch, ppq)
     pos = np; at = at + offset
     if not done and #msg == 3 and math.abs(at - ppq) <= 1 and msg:byte(2) == pitch then
       local b1 = msg:byte(1)
-      if b1 == (0x80 | ch) or (b1 == (0x90 | ch) and msg:byte(3) == 0) then msg = string.char(0x80 | ch, pitch, (model and model.OFF_REL) or 1); done = true end
+      if b1 == (0x80 | ch) or (b1 == (0x90 | ch) and msg:byte(3) == 0) then msg = string.char(0x80 | ch, pitch, vel or (model and model.OFF_REL) or 1); done = true end
     end
     out[#out + 1] = string.pack('<i4Bs4', offset, flag, msg)
   end
   if done then R.MIDI_SetAllEvts(take, table.concat(out)); R.MIDI_Sort(take) end
   return done
+end
+-- 26 окт: убрать OFF — нота звучит до начала строки end_row (следующее событие), метка явного OFF снята
+function E.unoff(heads, lpb, end_row)
+  local t = row_time(end_row, lpb, 0)
+  for _, h in ipairs(heads) do
+    if h.kind == 'audio' and h.item then
+      local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+      if t > pos + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end
+    elseif h.kind == 'midi' and h.take then
+      local ip = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+      if t > ip + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 and R.MIDI_SetItemExtents then
+        R.MIDI_SetItemExtents(h.item, R.TimeMap2_timeToQN(0, ip), R.TimeMap2_timeToQN(0, t))
+      end
+      local i, n = midi_note(h, lpb)
+      if i then
+        local ppq = R.MIDI_GetPPQPosFromProjTime(h.take, t)
+        if ppq > n.sppq + 1 then
+          R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, ppq, n.ch, n.pitch, n.vel, false)
+          R.MIDI_Sort(h.take)
+          E.mark_off(h.take, n.ch, n.pitch, ppq, 0)
+        end
+      end
+    end
+  end
 end
 E.on_off = nil   -- 24 окт: main — явный OFF на пэде one-shot: пэд в режим «сам себя» (obey + choke 17)
 function E.note_off(heads, lpb, row)

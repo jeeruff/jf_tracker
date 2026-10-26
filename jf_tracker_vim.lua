@@ -3710,18 +3710,20 @@ function V.nooff(all)
   local a, b = (ctx.view_rows or ctx.region_rows)()
   local r0, r1 = a or 0, b or ((ctx.snap().last_row or 0))
   local ci = F[V.cur.fi] and F[V.cur.fi].ci
+  local sf0, sf1
+  if V.mode == 'visual' or V.mode == 'vline' then sf0, sf1, r0, r1 = V.visual_range() end   -- 26 окт: выделение
   local n = 0
   ctx.edit.run('remove OFFs', function()
     for fi, fl in ipairs(F) do
-      if (all or fl.ci == ci) and not fl.env then
+      if ((sf0 and fi >= sf0 and fi <= sf1) or (not sf0 and (all or fl.ci == ci))) and not fl.env then
         for _, sub in ipairs(subs_of(fl)) do
           for r = r0, r1 do
             local c = sub[r]
             if c and c.kind == 'off' and c.of then
               local nxt
               for r2 = r + 1, r + 4096 do local c2 = sub[r2]; if c2 and (c2.kind == 'audio' or c2.kind == 'midi') then nxt = r2; break end end
-              local last = nxt and (nxt - 1) or (ctx.region_end_row and ctx.region_end_row(r)) or (r + 16)
-              ctx.edit.note_off({ c.of }, lpb(), last + (ctx.edit.OFF_END and 0 or 1))
+              local stop = nxt or ((ctx.region_end_row and ctx.region_end_row(r) or (r + 15)) + 1)
+              ctx.edit.unoff({ c.of }, lpb(), stop)   -- 26 окт: до начала следующего события, без метки OFF
               n = n + 1
             end
           end
@@ -3730,7 +3732,8 @@ function V.nooff(all)
     end
   end)
   ctx.model.invalidate()
-  V.msg = ('nooff: %d OFF(s) removed %s in the %s'):format(n, all and 'on all tracks' or 'on the track', ctx.view_cur and ctx.view_cur() or 'pattern')
+  if sf0 then V.mode = 'normal' end
+  V.msg = ('nooff: %d OFF(s) removed %s'):format(n, sf0 and 'in the selection' or ((all and 'on all tracks' or 'on the track') .. ' in the ' .. (ctx.view_cur and ctx.view_cur() or 'pattern')))
 end
 -- 17 окт: умное выделение (как Paketti): v в VISUAL по кругу — колонка в доле → колонка в такте → такт (все
 -- треки) → половина паттерна (региона курсора) → весь паттерн → снова колонка в доле. Отсчёт — от клетки, где начали
