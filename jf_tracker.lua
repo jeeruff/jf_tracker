@@ -23866,34 +23866,46 @@ local function frame()
         SG.moved = true
       end
       if not SG.none then
+        -- 26 окт: курсор у края экрана — назад к точке старта (JS_Mouse_SetPosition), скачок копится в SG.ox / oy:
+        -- выбор и значение идут дальше, пока есть трекпад
+        if SG.wp then SG.ox, SG.oy = (SG.ox or 0) + SG.wp[1] - gfx.mouse_x, (SG.oy or 0) + SG.wp[2] - gfx.mouse_y; SG.wp = nil end
+        SG.mx, SG.my = gfx.mouse_x + (SG.ox or 0), gfx.mouse_y + (SG.oy or 0)
+        if reaper.JS_Mouse_SetPosition then
+          local sx, sy = reaper.GetMousePosition()
+          local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, sx, sy, sx, sy, true)
+          t, b = math.min(t, b), math.max(t, b)
+          local function edge(x, y) return x < l + 24 or x > r - 24 or y < t + 24 or y > b - 24 end
+          if not SG.sp then SG.sp = edge(sx, sy) and { (l + r) // 2, (t + b) // 2 } or { sx, sy } end
+          if edge(sx, sy) then SG.wp = { gfx.mouse_x, gfx.mouse_y }; reaper.JS_Mouse_SetPosition(SG.sp[1], SG.sp[2]) end
+        end
         local n = #SG.list
         local vert = SG.ori == 'v'
         local k = SG.sel or SG.k0 or 1
         if SG.ori ~= 'xy' and not sl_pan then
           -- от точки нажатия: шаг выбора — доля окна на слайдер (весь трекпад — все n), старт — ближайший
-          local pos, pos0, span = vert and gfx.mouse_x or gfx.mouse_y, vert and SG.px0 or SG.py0, vert and gfx.w or gfx.h
+          local pos, pos0, span = vert and SG.mx or SG.my, vert and SG.px0 or SG.py0, vert and gfx.w or gfx.h
           local stepx = math.max(L.rh * 2, span / math.max(1, n) / 2)
           k = math.max(1, math.min(n, (SG.k0 or 1) + math.floor((pos - pos0) / stepx + 0.5)))
         end
-        if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
+        if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
         local cur = SG.list[k]
         local ts = tgts(cur)
         -- 16 окт: Ctrl+Cmd+Option на фейдере — пан его канала, вбок (значение сразу, без порога)
         if sl_pan and cur.trk and ts[1] and ts[1].kind == 'trk' then
           ts = { trk(tcol(cur), 'pan') }
-          if not SG.pan then SG.pan, SG.x0, SG.y0 = true, gfx.mouse_x, gfx.mouse_y end
+          if not SG.pan then SG.pan, SG.x0, SG.y0 = true, SG.mx, SG.my end
           SG.live = true
-        elseif SG.pan then SG.pan = nil; SG.ax, SG.ay, SG.live = gfx.mouse_x, gfx.mouse_y, false end
+        elseif SG.pan then SG.pan = nil; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
         if not SG.live then
-          local ax, ay = math.abs(gfx.mouse_x - SG.ax), math.abs(gfx.mouse_y - SG.ay)
+          local ax, ay = math.abs(SG.mx - SG.ax), math.abs(SG.my - SG.ay)
           local along, across = vert and ay or ax, vert and ax or ay      -- по оси значения / по оси выбора
           if SG.ori == 'xy' then along, across = math.max(ax, ay), 0 end
-          if along > 10 and along > across then SG.live = true; SG.x0, SG.y0 = gfx.mouse_x, gfx.mouse_y end
-          if across > 2 * L.rh and along <= 10 then SG.ax, SG.ay = gfx.mouse_x, gfx.mouse_y end
+          if along > 10 and along > across then SG.live = true; SG.x0, SG.y0 = SG.mx, SG.my end
+          if across > 2 * L.rh and along <= 10 then SG.ax, SG.ay = SG.mx, SG.my end
         end
         if SG.live then
-          local dx, dy = gfx.mouse_x - SG.x0, SG.y0 - gfx.mouse_y        -- вверх — больше
-          SG.x0, SG.y0 = gfx.mouse_x, gfx.mouse_y
+          local dx, dy = SG.mx - SG.x0, SG.y0 - SG.my        -- вверх — больше
+          SG.x0, SG.y0 = SG.mx, SG.my
           if SG.ori == 'xy' then if dx ~= 0 and ts[1] then nudge(ts[1], dx) end; if dy ~= 0 and ts[2] then nudge(ts[2], dy) end
           elseif vert and not SG.pan then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end   -- 16 окт: пан — вбок и у фейдеров
           elseif dx ~= 0 and ts[1] then nudge(ts[1], dx) end

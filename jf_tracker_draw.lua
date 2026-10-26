@@ -9755,7 +9755,8 @@ function D.frame(L, snap, rows, state, info)
               set((hot or psel) and U.AMBER or U.CYAN); gfx.rect(wx0, py + 4, math.max(1, math.floor(math.max(0, math.min(1, v.n)) * ww + 0.5)), L.rh - 8, 1)
               if hot then hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))), onwidget = mx >= wx0 - 2 } end
               hint('dspparam', hx, py, hw, L.rh, { fx = k, param = pi })
-              if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, own = f.name, pn = p.name, x = wx0, y = py, w = ww, h = L.rh } end
+              local mlb = p.mlabel and (mi .. ' ' .. p.mlabel) or p.name   -- 26 окт: SLIDER — подпись макроса из плагина, как в DSP
+              if D.slr then D.slr[#D.slr + 1] = { g = 'dspmacro:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = mlb, own = f.name, pn = mlb, x = wx0, y = py, w = ww, h = L.rh } end
               mybot = py + L.rh
             end
           end
