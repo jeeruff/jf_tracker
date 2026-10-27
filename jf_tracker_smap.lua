@@ -108,7 +108,7 @@ function SM.step(G)
       local b = all[j]
       local dx, dy = a.x - b.x, a.y - b.y
       local d2 = dx * dx + dy * dy + 1e-6
-      local f = k2 / d2 * ((a.hub or b.hub) and 2 or 1)
+      local f = k2 / d2 * ((a.hub and b.hub) and (2 - 1.5 * (G.grav or 0.5)) or 1)   -- 27 окт: gravity — хабы друг от друга слабее
       a.dx, a.dy = a.dx + dx * f, a.dy + dy * f
       b.dx, b.dy = b.dx - dx * f, b.dy - dy * f
     end
@@ -122,7 +122,8 @@ function SM.step(G)
     h.dx, h.dy = h.dx + dx / d * f * d * 0.2, h.dy + dy / d * f * d * 0.2
   end
   for _, a in ipairs(all) do
-    a.dx, a.dy = a.dx - a.x * 0.05, a.dy - a.y * 0.05
+    local gc = 0.02 + 0.5 * (G.grav or 0.5) ^ 2   -- 27 окт: gravity — тяга к центру (группы не разлетаются)
+    a.dx, a.dy = a.dx - a.x * gc, a.dy - a.y * gc
     local d = math.sqrt(a.dx * a.dx + a.dy * a.dy) + 1e-9
     local s = math.min(d, G.temp) / d
     a.x, a.y = a.x + a.dx * s, a.y + a.dy * s
@@ -139,10 +140,15 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
   U.set(U.LINE); gfx.rect(x, y, w, h, 0)
   if #G.nodes == 0 then U.text(x + L.pad, y + 2, fit('map: no sound files here', w - 2 * L.pad), U.DIM); return nil end
-  local sc = 0.46 * math.min(w, h) * (V.zoom or 1)
+  -- 27 окт: вписать в прямоугольник по фактическому размаху узлов (раскладка расползается); зум и сдвиг — поверх
+  local x0, x1, y0, y1 = math.huge, -math.huge, math.huge, -math.huge
+  for _, a in ipairs(G.all) do x0, x1, y0, y1 = math.min(x0, a.x), math.max(x1, a.x), math.min(y0, a.y), math.max(y1, a.y) end
+  local ox, oy = (x0 + x1) / 2, (y0 + y1) / 2
+  local sc = math.min(0.44 * w / math.max(0.05, (x1 - x0) / 2), 0.44 * h / math.max(0.05, (y1 - y0) / 2)) * (V.zoom or 1)
   local cx, cy = x + w / 2 + (V.px or 0), y + h / 2 + (V.py or 0)
-  local function X(n) return cx + n.x * sc end
-  local function Y(n) return cy + n.y * sc end
+  local function X(n) return cx + (n.x - ox) * sc end
+  local function Y(n) return cy + (n.y - oy) * sc end
+  local function inr(px, py) return px >= x and px < x + w and py >= y and py < y + h end
   local PAL = { U.AMBER, U.CYAN, U.GREEN, U.RED, U.YELLOW, U.PINK or U.RED }
   local function col(hb)
     local i = HUE[hb.name] or (#hb.name % 6 + 1)
@@ -151,14 +157,15 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local inside = mx >= x and mx < x + w and my >= y and my < y + h
   local hv, hd
-  local rmax = math.max(3, math.min(10, sc * 0.035))
+  local rmax = math.max(3, math.min(10, sc * 0.035)) * (0.4 + 1.6 * (V.dim or 0.5))   -- 27 окт: dimension (пока — размер точек; после анализа — сколько спектра покрывает звук)
   -- рёбра файл—хаб
-  for _, n in ipairs(G.nodes) do
-    U.set(U.mix(col(n.h), U.BG, 0.75)); gfx.line(X(n), Y(n), X(n.h), Y(n.h), 1)
+  for _, n in ipairs(G.nodes) do   -- за рамку не рисовать: линия — только если оба конца внутри
+    local ax, ay, bx, by = X(n), Y(n), X(n.h), Y(n.h)
+    if inr(ax, ay) and inr(bx, by) then U.set(U.mix(col(n.h), U.BG, 0.75)); gfx.line(ax, ay, bx, by, 1) end
   end
   for _, n in ipairs(G.nodes) do
     local nx, ny, r = X(n), Y(n), math.max(2, n.r * rmax)
-    if nx > x - r and nx < x + w + r and ny > y - r and ny < y + h + r then
+    if nx >= x + r and nx < x + w - r and ny >= y + r and ny < y + h - r then
       local on = playing == n.path
       U.set(on and U.AMBER or U.mix(col(n.h), U.TEXT, 0.25)); gfx.circle(nx, ny, r, 1, 1)
       if inside then
@@ -170,10 +177,13 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   for _, hb in ipairs(G.hubs) do
     local nx, ny = X(hb), Y(hb)
     local r = math.max(4, math.min(14, rmax * (1 + math.sqrt(hb.n) * 0.25)))
-    U.set(col(hb)); gfx.circle(nx, ny, r, 0, 1); gfx.circle(nx, ny, r - 1, 0, 1)
-    local lab = hb.name .. ' ' .. hb.n
-    U.text(nx + r + 2, ny - L.rh / 2, lab, col(hb))
-    if inside and (mx - nx) ^ 2 + (my - ny) ^ 2 <= (r + 3) ^ 2 then hv = { hub = hb } end
+    if nx >= x + r and nx < x + w - r and ny >= y + r and ny < y + h - r then
+      U.set(col(hb)); gfx.circle(nx, ny, r, 0, 1); gfx.circle(nx, ny, r - 1, 0, 1)
+      local lab = hb.name .. ' ' .. hb.n
+      local room = x + w - (nx + r + 2) - 2
+      if room > U.measure('mm') and ny - L.rh / 2 >= y then U.text(nx + r + 2, ny - L.rh / 2, fit(lab, room), col(hb)) end
+      if inside and (mx - nx) ^ 2 + (my - ny) ^ 2 <= (r + 3) ^ 2 then hv = { hub = hb } end
+    end
   end
   if hv and hv.node then
     local n = hv.node
@@ -188,6 +198,21 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   end
   local info = ('map: %d files, %d groups%s'):format(#G.nodes, #G.hubs, #G.nodes >= SM.MAX and (' (first ' .. SM.MAX .. ')') or '')
   U.text(x + L.pad, y + 2, fit(info, w - 2 * L.pad), U.GREY)
+  -- 27 окт: ползунки справа сверху — gravity (тяга к центру), dimension (размер; после анализа — покрытие спектра)
+  local sw = math.min(L.cw * 10, math.floor(w * 0.25))
+  local lw = U.measure('dimension ')
+  if w > lw + sw + 2 * L.pad + U.measure('map: 300 files') then
+    for k, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
+      local sy = y + 2 + (k - 1) * L.rh
+      local sx = x + w - sw - L.pad
+      local v = V[sl[2]] or 0.5
+      local hot = mx >= sx - lw and mx < sx + sw and my >= sy and my < sy + L.rh
+      U.text(sx - lw, sy, sl[1], hot and U.AMBER or U.GREY)
+      U.set(U.DIM); gfx.rect(sx, sy + math.floor(L.rh / 2) - 1, sw, 2, 1)
+      U.set(hot and U.AMBER or U.TEXT); gfx.rect(sx, sy + 3, math.max(1, math.floor(sw * v + 0.5)), L.rh - 6, 1)
+      if hot then hv = { slider = sl[2], x = sx, w = sw } end
+    end
+  end
   return hv
 end
 

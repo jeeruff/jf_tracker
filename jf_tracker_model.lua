@@ -1154,6 +1154,8 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     fpath = (function() local s = R.GetMediaItemTake_Source(take); return s and R.GetMediaSourceFileName and R.GetMediaSourceFileName(s, '') or '' end)(),
     gkey = gkey,
   }
+  -- 27 окт: папка lib, заданная явно (загрузка lib в папку): P_EXT:jf_libdir
+  do local _, ld = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_libdir', '', false); if ld and ld ~= '' then pool[at].libdir = ld end end
   -- 19 окт: слоёный инструмент ¥ — его слои (метка P_EXT:jf_layers); каждый слой знает свой item в LIB
   do
     local _, lt = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layers', '', false)

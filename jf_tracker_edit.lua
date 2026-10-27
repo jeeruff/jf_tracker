@@ -5049,7 +5049,7 @@ function E.kit_items(text)
 end
 -- набор → lib трека track (за =LIB, после последнего item); число сэмплов
 -- replace (11 окт, пресет lib): сначала прежние сэмплы lib трека долой — один undo
-function E.kit_load(path, track, replace, name)
+function E.kit_load(path, track, replace, name, folder)
   local f = io.open(path, 'r'); if not f then return 0 end
   local text = f:read('*a'); f:close()
   local chunks = E.kit_items(text)
@@ -5060,7 +5060,9 @@ function E.kit_load(path, track, replace, name)
     for _, ch in ipairs(chunks) do                 -- 8 окт: каждый сэмпл — свой лейн трека LIB
       local tr, lane = E.lib_slot()
       local it = R.AddMediaItemToTrack(tr)
-      if R.SetItemStateChunk(it, set_chunk_pos(ch, 0), false) then E.lib_mark(it, track, lane); n = n + 1
+      if R.SetItemStateChunk(it, set_chunk_pos(ch, 0), false) then
+        E.lib_mark(it, track, lane); n = n + 1
+        if folder then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_libdir', folder, true) end   -- 27 окт: в папку lib
       else R.DeleteTrackMediaItem(tr, it) end
     end
   end)

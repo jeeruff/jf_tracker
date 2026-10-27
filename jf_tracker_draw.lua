@@ -4305,17 +4305,26 @@ local function lib_folders(rows, pool)
     local cnt, first = {}, {}
     for k, r in ipairs(seg) do
       local e = r.i and pool[r.i]
-      r.cat = e and D.lib_cat(e.name) or nil
+      r.cat = e and (e.libdir or D.lib_cat(e.name)) or nil   -- 27 окт: явная папка (загрузка в папку) главнее слов имени
+      r.explicit = e and e.libdir and true or nil
       if r.cat then cnt[r.cat] = (cnt[r.cat] or 0) + 1; first[r.cat] = first[r.cat] or k end
     end
     local done = {}
     for k, r in ipairs(seg) do
       local c = r.cat
-      if c and cnt[c] >= 3 then
+      if c and (cnt[c] >= 3 or r.explicit) then
         if not done[c] then
           done[c] = true
-          out[#out + 1] = { hdr = ('/%s  %d'):format(c, cnt[c]), folder = c }
-          for _, r2 in ipairs(seg) do if r2.cat == c then out[#out + 1] = r2 end end
+          -- 27 окт: свёрнутая (h / щелчок по заголовку) — только заголовок «>kicks 5», сэмплы скрыты (j k их пропускают)
+          local folded = D.LIBF and D.LIBF[c]
+          local mem = {}
+          for _, r2 in ipairs(seg) do if r2.cat == c then mem[#mem + 1] = r2.i end end
+          out[#out + 1] = { hdr = ((folded and '>' or '/') .. '%s  %d'):format(c, cnt[c]), folder = c, members = mem }
+          for _, r2 in ipairs(seg) do
+            if r2.cat == c then
+              if folded then D.lib_hidden[r2.i] = true else out[#out + 1] = r2 end
+            end
+          end
         end
       else out[#out + 1] = r end
     end
@@ -4330,7 +4339,10 @@ end
 local pool_rows0 = D.pool_rows
 function D.pool_rows(pool, sort, col, cols)
   local rows = pool_rows0(pool, sort, col, cols)
+  D.lib_hidden = {}
+  D.lib_folder_of = {}
   if D.lib_folders_on then rows = lib_folders(rows, pool) end
+  for _, r in ipairs(rows) do if r.folder then for _, i in ipairs(r.members or {}) do D.lib_folder_of[i] = r.folder end end end
   local seps = D.lib_seps
   if seps and next(seps) then
     local out = {}
@@ -6145,7 +6157,16 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 26 окт: значок типа — в заголовке раздела, не в каждой строке
       local glyph = ({ audio = '@ ', instruments = '# ', midi = D.mu() .. ' ', automation = '~ ' })[row.hdr] or ''
       local tw = ms(glyph .. row.hdr)
-      text(ix + 6, y + 1, fit(glyph .. row.hdr, w - 12), U.TEXT)
+      local hcol = U.TEXT
+      if row.folder then   -- 27 окт: заголовок папки lib — щелчок сворачивает / разворачивает; курсор в свёрнутой — подсветка
+        local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+        local here = false
+        if D.LIBF and D.LIBF[row.folder] then for _, i in ipairs(row.members or {}) do if i == inst then here = true end end end
+        if here then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1); hcol = U.AMBER
+        elseif hot then set(U.tint(U.AMBER, 0.15)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+        if hot then hover.libdirh = row.folder end
+      end
+      text(ix + 6, y + 1, fit(glyph .. row.hdr, w - 12), hcol)
       -- разделитель: длинная линия после имени
       set(U.LINE); gfx.rect(ix + 6 + tw + L.pad, y + math.floor(L.rh / 2), w - 8 - tw - 2 * L.pad, 1, 1)
     elseif row.auto then

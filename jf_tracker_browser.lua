@@ -309,11 +309,19 @@ local function draw_col(U, L, list, x, y, w, h, hi_name, tag, mx, my)
 end
 
 -- ── 27 окт: КАРТА папки (jf_tracker_smap): граф пересобирается при смене папки; вид (зум, сдвиг) — общий ──
-B.mapV = { zoom = 1, px = 0, py = 0 }
+B.mapV = { zoom = 1, px = 0, py = 0, grav = 0.5, dim = 0.5 }
 local function map_draw(U, L, x, y, w, h)
   if not B.SM then return nil end
   local G = B.mapG
-  if not G or G.root ~= B.path then G = B.SM.build(B.path, list_dir); B.mapG = G; B.mapV = { zoom = 1, px = 0, py = 0 } end
+  if not G or G.root ~= B.path then G = B.SM.build(B.path, list_dir); B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0 end
+  G.grav = B.mapV.grav
+  local sl = B.map_sl   -- 27 окт: протяжка ползунка gravity / dimension
+  if sl then
+    if gfx.mouse_cap & 1 == 1 then
+      local v = math.max(0, math.min(1, (gfx.mouse_x - sl.x) / math.max(1, sl.w)))
+      if B.mapV[sl.which] ~= v then B.mapV[sl.which] = v; if sl.which == 'grav' then G.temp = math.max(G.temp, 0.06) end end
+    else B.map_sl = nil end
+  end
   local playing
   if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end
   local hv = B.SM.draw(U, L, G, x, y, w, h, B.mapV, playing, ctx.fit)
@@ -327,7 +335,7 @@ local function map_draw(U, L, x, y, w, h)
     if gfx.mouse_cap & 1 == 1 then B.mapV.px, B.mapV.py = pan.px + mx - pan.mx, pan.py + my - pan.my else B.map_pan = nil end
   end
   B.map_hv = hv
-  if hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
+  if hv and hv.slider then return 'mapsl' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
   return nil
 end
 
@@ -886,6 +894,7 @@ function B.click(what)
       end
       if ctx.msg then ctx.msg(('map: %s - %d file(s) marked (Space - play them in a row, Enter - into the lib, u - unmark)'):format(hb.name, nn)) end
     end
+  elseif what == 'mapsl' then local s0 = B.map_hv; if s0 then B.map_sl = { which = s0.slider, x = s0.x, w = s0.w } end
   elseif what == 'mapbg' then B.map_pan = { mx = gfx.mouse_x, my = gfx.mouse_y, px = B.mapV.px, py = B.mapV.py }
   elseif what:match('^rec%d+$') then   -- 27 окт: отмеченный файл (плеер большого браузера) — играть
     local pth = (B.mk_list or {})[tonumber(what:sub(4))]

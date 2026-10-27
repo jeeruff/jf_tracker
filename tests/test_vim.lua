@@ -902,13 +902,14 @@ keysin('l'); eq('pan: l -> pan', V.cur.sub, 'pan')
 keysin('h'); eq('pan: h -> vol', V.cur.sub, nil); eq('  vol field', V.cur.field, 2)
 keysin('l'); keysin('i'); keysin('40'); eq('pan: 40 typed in INSERT', last(), 'pan:kick:64'); V.key(27)
 L.flat[1].G = nil
--- Shift+Opt+H / L — playrate инструмента, курсор стоит (не переход по трекам)
+-- 27 окт: Shift+Opt+H / L — колонки трека курсора уже / шире (как z, / z.), курсор стоит
 reset(); alt_down, shift_down = true, true
-V.key(172); eq('Shift+Opt+L: playrate +1', last(), 'rate:1'); eq('Shift+Opt+L: cursor stays', V.cur.fi, 1)
-V.key(729); eq('Shift+Opt+H: playrate -1', last(), 'rate:-1')
+V.key(172); eq('Shift+Opt+L: wider', last(), 'w:1:cur'); eq('Shift+Opt+L: cursor stays', V.cur.fi, 1)
+V.key(729); eq('Shift+Opt+H: narrower', last(), 'w:-1:cur')
 alt_down, shift_down = false, false
-reset(); keysin('3'); alt_down, shift_down = true, true; V.key(172); alt_down, shift_down = false, false
-eq('3 Shift+Opt+L: playrate +3', last(), 'rate:3')
+reset(); local nc0 = #calls; keysin('3'); alt_down, shift_down = true, true; V.key(172); alt_down, shift_down = false, false
+local nw = 0; for k = nc0 + 1, #calls do if calls[k] == 'w:1:cur' then nw = nw + 1 end end
+eq('3 Shift+Opt+L: three steps', nw, 3)
 -- колонка cmd мастера: Enter — правка в строке :, ! — действие, x — удалить, :mcmd — ставит
 reset()
 L.flat[#L.flat + 1] = { ci = 3, col = { name = 'master', lanes = {} }, ml = { kind = 'cmd', name = 'cmd', ev = { [2] = { text = '!40044', n = 1 } }, rows = { 2 } }, sub = {}, x = 0, w = 10 }

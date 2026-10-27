@@ -10945,11 +10945,22 @@ ctx = {
     vim.open_hydra({ title = 'lib order', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
-  kit_save = function(name)
+  -- 27 окт: папки lib — свернуть / развернуть (h l внутри папки, щелчок по заголовку); fold = nil — переключить
+  lib_fold = function(name, fold)
+    draw.LIBF = draw.LIBF or {}
+    if fold == nil then fold = not draw.LIBF[name] end
+    draw.LIBF[name] = fold or nil
+    vim.msg = ('lib folder %s %s (h - fold, l - unfold, :libsave name - this folder only, load a lib into it - the lib menu)'):format(name, fold and 'folded' or 'open')
+  end,
+  lib_folder_cur = function() return draw.lib_folder_of and vim.inst and draw.lib_folder_of[vim.inst] or nil end,
+  lib_hidden = function(i) return draw.lib_hidden and draw.lib_hidden[i] or false end,
+  kit_save = function(name, folder)
     name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
     if name == '' then vim.msg = 'libsave: a name please'; return end
     local col = cur_col(); local items = {}
-    for _, e in ipairs(col and col.pool or {}) do if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then items[#items + 1] = e.item end end
+    for i, e in ipairs(col and col.pool or {}) do
+      if not e.parent and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and (not folder or (draw.lib_folder_of and draw.lib_folder_of[i] == folder)) then items[#items + 1] = e.item end   -- 27 окт: папка — только её сэмплы
+    end
     if #items == 0 then vim.msg = 'libsave: the lib is empty'; return end
     local path, n = edit.kit_save(items, name)
     if path and col then edit.lib_preset_name(col.track, name) end
@@ -10957,11 +10968,20 @@ ctx = {
     if B.mode == 'libs' then B.set_all(B.read_kits()) end
   end,
   -- 11 окт: пресет lib — заменяет всю lib трека (прежние сэмплы lib долой, ноты в паттернах остаются); Cmd+Z назад
-  kit_load = function(path, name)
+  kit_load = function(path, name, folder)
     local col = cur_col(); if not col then vim.msg = 'lib preset: no track under the cursor'; return end
-    local n = edit.kit_load(path, col.track, true, name)
+    local n = edit.kit_load(path, col.track, not folder, (not folder) and name or nil, folder)
     model.invalidate()
+    if folder then vim.msg = ('lib %s: %d sample(s) added into the folder %s (Cmd+Z - back)'):format(name or '', n, folder); return end
     vim.msg = ('lib preset %s: %d sample(s) - the lib of %s replaced (Cmd+Z - back)'):format(name or '', n, col.name or '')
+  end,
+  -- 27 окт: lib в папку — выбор сохранённой lib; её сэмплы добавляются с меткой папки
+  kit_into_folder = function(folder)
+    local list = edit.lib_presets()
+    if #list == 0 then vim.msg = 'no saved libs yet - :libsave name'; return end
+    local items = {}
+    for _, e in ipairs(list) do items[#items + 1] = { label = e.name, data = e } end
+    vim.open_picker('load a lib into the folder ' .. folder, items, function(it) ctx.kit_load(it.data.path, it.data.name, folder) end)
   end,
   lib_presets = function() return edit.lib_presets() end,
   libp_step = function(d)
@@ -17950,6 +17970,12 @@ function ctx.context_items(hover)
     local skey = e and e.gkey
     if not skey and col then for k = #(col.pool or {}), 1, -1 do local q = col.pool[k]; if q and not q.parent then skey = q.gkey; break end end end
     if skey then add('Insert separator below … (pattern)', function() ctx.lib_sep_pick(skey) end, '-') end
+    -- 27 окт: папка под курсором — сохранить её одну как lib / загрузить lib в неё
+    local lf = state.libfolders and ctx.lib_folder_cur()
+    if lf then
+      add('Folder ' .. lf .. ': save it as the lib "' .. lf .. '"', function() ctx.kit_save(lf, lf) end, 'w')
+      add('Folder ' .. lf .. ': load a lib into it …', function() ctx.kit_into_folder(lf) end, 'o')
+    end
     add((state.libfolders and '!' or '') .. 'Folders: kicks, snares, hats … (3+ alike)', function() state.libfolders = not state.libfolders; vim.msg = 'lib folders ' .. (state.libfolders and 'on' or 'off') end, 'f')
     add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end, 'r')
   elseif hover.header_env then
@@ -25665,6 +25691,9 @@ local function frame()
       local hl = ctx.sl_layer_hot
       if dbl and click.zone == 'sllayer' then ctx.layer_menu(hl.root, hl.k) else ctx.layer_listen(hl.root.layers[hl.k]) end
       click = { t = now2, zone = 'sllayer' }
+    elseif hover.libdirh then   -- 27 окт: заголовок папки lib — свернуть / развернуть
+      ctx.set_focus('inst'); ctx.lib_fold(hover.libdirh)
+      click = { t = now2, zone = 'libdirh' }
     elseif hover.libfold then   -- 19 окт: + / - у инструмента — папка lib
       draw.LIBO = draw.LIBO or {}; draw.LIBO[hover.libfold] = (not draw.LIBO[hover.libfold]) or nil; ctx.set_focus('inst')
       click = { t = now2, zone = 'libfold' }

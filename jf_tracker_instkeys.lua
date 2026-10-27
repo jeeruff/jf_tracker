@@ -93,8 +93,14 @@ function IK.key(c, cur, n, nslots, ninst)
   end
   if ch == 'd' or ch == 'y' then IK.pending = ch; ctx.msg(ch .. '...'); return true end
   if (ch == 'j' or c == DOWN) and cur >= nslots and ctx.auto_select then ctx.auto_select()
-  elseif ch == 'j' or c == DOWN then ctx.inst_select(math.min(math.max(1, nslots), cur + 1))
-  elseif ch == 'k' or c == UP then ctx.inst_select(math.max(1, cur - 1))
+  elseif ch == 'j' or c == DOWN then   -- 27 окт: свёрнутые папки — мимо
+    local i = cur + 1
+    while i < nslots and ctx.lib_hidden and ctx.lib_hidden(i) do i = i + 1 end
+    ctx.inst_select(math.min(math.max(1, nslots), i))
+  elseif ch == 'k' or c == UP then
+    local i = cur - 1
+    while i > 1 and ctx.lib_hidden and ctx.lib_hidden(i) do i = i - 1 end
+    ctx.inst_select(math.max(1, i))
   elseif ch == 'J' or ch == 'K' then ctx.lib_step(ch == 'J' and 1 or -1)   -- исходник ниже / выше (3 окт)
   elseif ch == 'g' then ctx.inst_select(1)
   elseif ch == 'G' then if ctx.midi_select then ctx.midi_select() elseif ctx.auto_select then ctx.auto_select() else ctx.inst_select(math.max(1, n)) end   -- G — в самый низ: midi (10 окт)
@@ -107,6 +113,8 @@ function IK.key(c, cur, n, nslots, ninst)
   elseif ch == ' ' then ctx.inst_listen()
   elseif ch == 'a' then ctx.inst_listen_toggle()
   elseif ch == '/' then ctx.inst_find()
+  elseif (ch == 'h' or c == LEFT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(cur)) then ctx.lib_fold(ctx.lib_folder_cur(), true)   -- 27 окт: в папке — свернуть
+  elseif (ch == 'l' or c == RIGHT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and ctx.lib_hidden and ctx.lib_hidden(cur) then ctx.lib_fold(ctx.lib_folder_cur(), false)   -- развернуть
   elseif ch == 'h' or c == LEFT then ctx.inst_track(-1)
   elseif ch == 'l' or c == RIGHT then ctx.inst_track(1)
   else return false end
