@@ -2041,3 +2041,4 @@
 - options > theme: theme tweak — hue / saturation / brightness / contrast / shadows / accents, reset tweak
 - \ S — скринсеты: загрузить (1 2 3 …) / s сохранить
 - фокус карты: : / поиск / INSERT — vim (карта забирала буквы команд и Esc)
+- screensets keep the look (look, вкл): загрузка скринсета не меняет тему, шрифт, твик темы, цвета панелей

@@ -1238,8 +1238,12 @@ ctx = {
     local sets = ctx.ss_read()
     local t = sets[name or '']
     if not t then vim.msg = 'no screenset ' .. tostring(name); return end
+    -- 27 окт: опция screensets keep the look (по умолчанию вкл) — тема, шрифт, подстройка темы, цвета панелей не меняются
+    local KEEP = { theme = true, ttf = true, ttfcustom = true, ttfpx = true, fontscale = true, fontspace = true, panecol = true, shadehue = true, modefont = true }
+    local keep = reaper.GetExtState(EXT, 'sskeeplook') ~= '0'
     for _, it in ipairs(ctx.option_items()) do
       local v = t['o_' .. (it.key or '')]
+      if keep and it.key and (KEEP[it.key] or it.key:match('^tw_')) then v = nil end
       if v ~= nil and it.set and it.get and it.get() ~= v then pcall(it.set, v) end
     end
     for _, k in ipairs(ctx.SS_LAYOUT) do if t[k] ~= nil then state[k] = t[k] end end
@@ -13050,6 +13054,7 @@ ctx = {
       -- то, что есть ячейками главного модуля (follow, lock, fixed, step, LPB, fx, wave, x-fade, meters, hints, caps, bitmap), здесь не дублируется (3 окт);
       -- сайдбар-браузер — тоже: его сворачивает кнопка > у края трекера (и :side)
       { sep = true, title = 'theme' },
+      { key = 'sskeeplook', label = 'screensets keep the look', kind = 'toggle', desc = 'on (default): loading a screenset keeps your theme, font, theme tweak and pane colours - only the layout and the other options change; off - a screenset brings its own look', get = function() return reaper.GetExtState(EXT, 'sskeeplook') ~= '0' end, set = function(v) reaper.SetExtState(EXT, 'sskeeplook', v and '1' or '0', true) end },
       { key = 'theme', label = 'theme', kind = 'cycle', values = draw.themes.LIST, desc = 'palette; reaper = colours of the REAPER theme, mono = grey but the cursor; my themes - from Data/jf_tracker_themes', get = function() return state.theme or 'reaper' end, set = function(v) ctx.apply_theme(v) end, pick = function() OPT.set_tab('theme') end },
       { label = 'make a theme from the current colours', kind = 'action', value = 'template', desc = 'writes Data/jf_tracker_themes/my-theme.txt: twelve colours as key = #rrggbb - edit them in any text editor', fn = function() ctx.theme_template() end },
       { label = 'reload my themes', kind = 'action', value = 'reload', desc = 'read Data/jf_tracker_themes again; a changed theme is applied at once', fn = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); vim.msg = ('my themes: %d'):format(n); ctx.options() end },
@@ -13239,7 +13244,7 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
+      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
