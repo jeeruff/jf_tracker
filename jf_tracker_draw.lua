@@ -12036,6 +12036,8 @@ function D.popup(L, p, anchor)
   end
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad + gw)
   local h = (nrow + 1) * L.rh + 2 * L.pad
+  -- 27 окт: заголовок влезает целиком (меню не уже своей подписи)
+  if p.title and p.title ~= '' and p.kind ~= 'prompt' then w = math.min(W - 2 * L.pad, math.max(w, ms(p.title) + 2 * L.pad + 2)) end
   local x, y = L.pad, sy - h - 2
   if anchor and anchor.box then
     -- 6 окт: всплывашка в заданный прямоугольник (действия REAPER на всю матрицу)

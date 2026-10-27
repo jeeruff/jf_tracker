@@ -18548,7 +18548,7 @@ function ctx.slx_do(h)
         if it.src == 'p' then setp(it.name, k2 - 1) else ctx.slx_cmd(it.code, k2 - 1) end
       end }
     end
-    vim.open_hydra({ title = 'slixer: ' .. (it.name or it.lab), items = items })
+    vim.open_hydra({ title = 'slixer: ' .. (it.name or it.lab):lower(), items = items })   -- 27 окт: no caps
     state.popup_at = { kind = 'xy', x = h.x or gfx.mouse_x, y = (h.y or gfx.mouse_y) + (h.h or 12) + 1 }
     return
   end
