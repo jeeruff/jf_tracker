@@ -386,6 +386,15 @@ do
     B.SM.SIZE_MAX = g('sizes') or B.SM.SIZE_MAX; B.SM.EDGES_MAX = g('edges') or B.SM.EDGES_MAX; B.SM.NEB_MAX = g('stars') or B.SM.NEB_MAX
   end
 end
+-- 27 окт (6): файл под мышью на карте (точка, строка истории, отсек корабля) — для меню файла (ПКМ)
+function B.map_file_of(id)
+  if id == 'mapnode' then local n = B.map_hv and B.map_hv.node; return n and n.path end
+  local i = id:match('^maphist(%d+)$')
+  if i then local e = B.map_hist[tonumber(i)]; return e and e.path end
+  i = id:match('^mapship(%d+)$')
+  if i then local o = (B.sel_order or {})[tonumber(i)]; return o and o.full end
+  return nil
+end
 -- 27 окт (5): история карты — что проиграно из неё (новое первым); шаг — номер прослушивания (точки гаснут по нему)
 B.map_hist, B.map_step = {}, 0
 function B.map_play(path, name)

@@ -429,6 +429,7 @@ function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, i
   U.text(bx + L.pad, by, 'galaxy', hot and U.AMBER or U.TEXT)
   if hot then hv = { back = true } end
   U.text(bx + bw + L.pad, by, fit(title, w - bw - 3 * L.pad), c)
+  SM.hist_path(U, G, V, function(nd) if nd.h == hb then return pos(nd) end end, col)
   for _, e in ipairs(V.hist or {}) do
     local nd = G.bypath and G.bypath[e.path]
     local age = nd and nd.h == hb and SM.fresh(V, nd)
@@ -446,6 +447,26 @@ function SM.fresh(V, n)
   local age = (V.step or 0) - e.step
   if age > SM.DARK + SM.RECOVER then return nil end
   return age
+end
+-- линия по последним прослушанным (до DARK + RECOVER шагов): xy(nd) → экранные x, y или nil (точки не видно)
+function SM.hist_path(U, G, V, xy, col)
+  local hist = V.hist or {}
+  local win = SM.DARK + SM.RECOVER
+  local px, py
+  for i, e in ipairs(hist) do
+    local age = (V.step or 0) - e.step
+    if age > win then break end
+    local nd = G.bypath and G.bypath[e.path]
+    local x, y
+    if nd then x, y = xy(nd) end
+    if x and px then
+      local t = math.min(1, age / math.max(1, win))
+      U.set(i == 2 and U.AMBER or U.mix(U.AMBER, U.BG, 0.35 + 0.55 * t))
+      gfx.line(px, py, x, y, 1)
+      if i == 2 then gfx.line(px + 1, py, x + 1, y, 1) end
+    end
+    if x then px, py = x, y end
+  end
 end
 -- цвет точки по свежести: c — обычный цвет группы
 function SM.fresh_col(U, c, age)
@@ -561,6 +582,8 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       end
     end
   end
+  -- 27 окт (6): путь прослушанного — линия от точки к точке (новый отрезок ярче, старые бледнеют)
+  SM.hist_path(U, G, V, function(nd) if nd.star then return X(nd.star.x), Y(nd.star.y) end end, col)
   -- 27 окт (5): прослушанные — по свежести (только что — ярко, потом тёмные 10 шагов, потом светлеют); поверх буфера
   for _, e in ipairs(V.hist or {}) do
     local nd = G.bypath and G.bypath[e.path]

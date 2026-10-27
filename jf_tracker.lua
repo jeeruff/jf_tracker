@@ -17721,6 +17721,7 @@ function ctx.ctx_page(hover)
   if type(hover.visor) == 'table' then return nil end   -- 11 окт: у визора своё меню (context_items)
   if hover.btn and hover.btn.what == 'arm' then return nil end   -- 11 окт: меню записи — только своё
   if hover.only then return nil end
+  if type(hover.browser) == 'string' and B.map_file_of and B.map_file_of(hover.browser) then return 'browser' end   -- 27 окт: файл на карте — меню файла
   if hover.hdrfx or hover.hdrparam or hover.hdrinst then return 'dsp' end   -- 25 окт: эффект в шапке трека — меню DSP (было lib)
   if hover.pool then return 'inst' elseif hover.dsp then return 'dsp' elseif type(hover.matrix) == 'table' and hover.matrix.inside then return 'matrix'   -- 22 окт: hover.matrix почти всегда {} (истина) — над DSP было меню матрицы   -- 10 окт: lib первым (matrix={} в hover почти всегда — в lib вылезало меню матрицы)
   elseif type(hover.fxb) == 'table' then return 'fxb'
@@ -18239,7 +18240,8 @@ function ctx.context_items(hover)
   elseif ctx.ctx_page and ctx.ctx_page(hover) == 'browser' then
     -- 24 окт: браузер — что сделать с файлом под курсором (отмеченными): было общее меню вида
     local e = type(hover.browser) == 'number' and B.entries[hover.browser] or B.entries[B.cur]
-    local file = e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) and B.full(e) or nil
+    local file = (type(hover.browser) == 'string' and B.map_file_of and B.map_file_of(hover.browser))
+      or (e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) and B.full(e)) or nil   -- 27 окт: и файл карты (точка, история, корабль)
     if file then
       local nm = file:match('[^/]+$') or file
       add('Into the lib - its own instrument (Enter)', function() ctx.add_to_depot(file) end, 'l')
@@ -18770,7 +18772,16 @@ function ctx.key_repeat(c, from_q)
   if d <= 0 or not reaper.JS_VKeys_GetState then ctx.krep = nil; return c end
   local now = reaper.time_precise()
   local R = ctx.krep
-  local function held(r) local st = reaper.JS_VKeys_GetState(r.t0 - 0.5); return st and st:byte(r.vk) ~= 0 end
+  -- 27 окт (2): «держат» — нажата по состоянию, либо с начала нажатия не было отпускания (состояние на кадр мигало —
+  -- повтор вставал после ~16 шагов); остановка пишется в журнал debug
+  local function held(r)
+    local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
+    if st and st:byte(r.vk) ~= 0 then return true end
+    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(r.t0 - 0.02)
+    local rel = (not up) or up:byte(r.vk) ~= 0
+    if rel and ctx.dlog then pcall(ctx.dlog, ('keyrep stop c=%d vk=%d after %.2fs (state up, keyup seen)'):format(r.c, r.vk, now - r.t0)) end
+    return not rel
+  end
   if c > 0 and not from_q then
     if R and R.c == c and held(R) then return 0 end   -- системный повтор — свой ниже
     local vk = (c >= 97 and c <= 122) and (c - 32) or ((c >= 65 and c <= 90) or (c >= 48 and c <= 57)) and c or (c >= 1 and c <= 26) and (c + 64) or ctx.KR_ARROW[c]
