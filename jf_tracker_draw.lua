@@ -9694,9 +9694,10 @@ function D.frame(L, snap, rows, state, info)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       -- 24 окт: выбранный — янтарь в 2 px, остальные — рамка тише (выбранный модуль терялся среди рамок рэка)
       set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.mix(U.LINE, U.TEXT, 0.35)) or U.DIM))); D.mod_box(bx, by, bw, bh, false)
-      if is_sel and not ins_here then set(U.AMBER); D.mod_box(bx + 1, by + 1, bw - 2, bh - 2, false)
-      elseif f.enabled and info.dsp_learn ~= k and not ins_here then D.mod_box(bx + 1, by + 1, bw - 2, bh - 2, false) end   -- 2 px и у остальных
-      if info.dsp_learn == k or ins_here then D.mod_box(bx + 1, by + 1, bw - 2, bh - 2, false) end     -- learn: двойная голубая рамка
+      -- 27 окт: второй пиксель рамки — снаружи (в зазоре между модулями): внутри он ложился под кнопки шапки
+      if is_sel and not ins_here then set(U.AMBER); D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false)
+      elseif f.enabled and info.dsp_learn ~= k and not ins_here then D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false) end   -- 2 px и у остальных
+      if info.dsp_learn == k or ins_here then D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false) end     -- learn: двойная голубая рамка
       if vtw > 0 then
         local tx0, ty = bx + bw - vtw, by + L.rh + 2
         set(U.LINE); gfx.rect(tx0, by + L.rh + 1, 1, bh - L.rh - 3, 1)
@@ -9857,15 +9858,15 @@ function D.frame(L, snap, rows, state, info)
       if f.inner and not f.inner.wrap then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end   -- 24 окт: в рэке — без второй рамки (слипалась)
       if tw > 0 then
         for _, b in ipairs(bxs) do
-          local kx = b[3]
+          local kx = b[3] - 1   -- 27 окт: на пиксель внутрь — не ложиться на рамку модуля (2 px)
           local kb = b[4] or kb   -- 24 окт: [] шире буквы
-          local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
+          local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 2 and my < by + L.rh
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt) or (b[2] == 'gui' and gui_on)
           -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
           -- 20 окт: мигает ярко — сплошной янтарь и тёмная буква / обычный «горит» (было: тусклая подложка гасла — не видно)
           local flash = b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0
-          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (flash and U.AMBER or (lit and U.tint(U.AMBER, 0.25) or U.BG))); gfx.rect(kx, by + 1, kb, L.rh - 1, 1)
-          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, by + 1, kb, L.rh - 1, 0)
+          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (flash and U.AMBER or (lit and U.tint(U.AMBER, 0.25) or U.BG))); gfx.rect(kx, by + 2, kb, L.rh - 2, 1)
+          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, by + 2, kb, L.rh - 2, 0)
           local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (flash and U.BG or (lit and U.AMBER or U.TEXT))
           if b[2] == 'delta' then
             -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»; слот 5 — только её (20 окт: kcast 8, тема 9)
@@ -9877,7 +9878,7 @@ function D.frame(L, snap, rows, state, info)
             gfx.setfont(D.font_id or 1)
           else text(kx + L.pad, by + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
-          hint('dspbtn', kx, by + 1, kb, L.rh - 1, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
+          hint('dspbtn', kx, by + 2, kb, L.rh - 2, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
       end
       if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
