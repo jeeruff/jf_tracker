@@ -68,6 +68,18 @@ function SM.build(root, list_dir)
     end
   end
   walk(root, nil, 0)
+  return SM.finish(G)
+end
+-- 27 окт: граф из готового списка (вкладка proj): files { path, name, sub } — sub — запасная группа (трек)
+function SM.from_files(key, files)
+  local G = { root = key, nodes = {}, hubs = {}, edges = {}, t = 0, temp = 0.12 }
+  for _, f in ipairs(files) do
+    if #G.nodes >= SM.MAX then break end
+    G.nodes[#G.nodes + 1] = { path = f.path, name = f.name, size = file_size(f.path), cat = SM.category(f.name, f.sub) }
+  end
+  return SM.finish(G)
+end
+function SM.finish(G)
   local hubi = {}
   for _, n in ipairs(G.nodes) do
     local h = hubi[n.cat]

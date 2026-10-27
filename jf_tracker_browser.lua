@@ -310,10 +310,14 @@ end
 
 -- ── 27 окт: КАРТА папки (jf_tracker_smap): граф пересобирается при смене папки; вид (зум, сдвиг) — общий ──
 B.mapV = { zoom = 1, px = 0, py = 0, grav = 0.5, dim = 0.5 }
-local function map_draw(U, L, x, y, w, h)
+local function map_draw(U, L, x, y, w, h, files, key)
   if not B.SM then return nil end
   local G = B.mapG
-  if not G or G.root ~= B.path then G = B.SM.build(B.path, list_dir); B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0 end
+  key = key or B.path
+  if not G or G.root ~= key then
+    G = files and B.SM.from_files(key, files) or B.SM.build(B.path, list_dir)   -- 27 окт: files — готовый список (proj)
+    B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
+  end
   G.grav = B.mapV.grav
   local sl = B.map_sl   -- 27 окт: протяжка ползунка gravity / dimension
   if sl then
@@ -894,6 +898,7 @@ function B.click(what)
       end
       if ctx.msg then ctx.msg(('map: %s - %d file(s) marked (Space - play them in a row, Enter - into the lib, u - unmark)'):format(hb.name, nn)) end
     end
+  elseif what == 'projmap' then B.proj_map = not B.proj_map; if ctx.msg then ctx.msg(B.proj_map and 'proj: the sources of the project as a map (list - back)' or 'proj: list') end
   elseif what == 'mapsl' then local s0 = B.map_hv; if s0 then B.map_sl = { which = s0.slider, x = s0.x, w = s0.w } end
   elseif what == 'mapbg' then B.map_pan = { mx = gfx.mouse_x, my = gfx.mouse_y, px = B.mapV.px, py = B.mapV.py }
   elseif what:match('^rec%d+$') then   -- 27 окт: отмеченный файл (плеер большого браузера) — играть
@@ -1436,6 +1441,7 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
+  elseif B.mode == 'map' then where = 'map: ' .. B.path   -- 27 окт: карта папки браузера
   elseif B.mode == 'recent' then where = ('recently played: %d  (m - mark, Space - the marked ones in a row)'):format(#B.all)   -- 27 окт
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
@@ -1445,7 +1451,8 @@ function B.draw(U, L, x, y, w, h)
   end
   if B.mode ~= 'files' then
     local tx0 = x + L.pad + 2
-    if not (B.pmpane and B.mode == 'pm') then tx0 = btn(tx0, y, 'find', 'find', B.filtering or B.filter ~= '') end   -- 11 окт: find — первым в строке
+    if not (B.pmpane and B.mode == 'pm') and B.mode ~= 'map' then tx0 = btn(tx0, y, 'find', 'find', B.filtering or B.filter ~= '') end   -- 11 окт: find — первым в строке
+    if B.mode == 'proj' then tx0 = btn(tx0, y, B.proj_map and 'list' or 'map', 'projmap', false) end   -- 27 окт: источники проекта картой / списком
     -- pm (6 окт): кнопки вида / сортировки / DAW / big перед текстом
     if B.mode == 'pm' and not B.pmproj and not B.pm_folders and B.pm_mod() then
       local bx = tx0
@@ -1460,9 +1467,16 @@ function B.draw(U, L, x, y, w, h)
     if tx0 < x + w - 4 * L.cw then U.text(tx0, y + 1, ctx.fit(where, x + w - L.pad - tx0), (B.filtering and U.AMBER or U.GREY)) end
     y = y + L.rh; h = h - L.rh
   end
-  -- 27 окт: вкладка map — карта текущей папки на всё место списка
+  -- 27 окт: вкладка map — карта текущей папки на всё место списка; proj с кнопкой map — карта источников проекта
   if B.mode == 'map' then
     local hv = map_draw(U, L, x + 1, y, w - 2, h)
+    if hv then hover = hv end
+    return hover
+  end
+  if B.mode == 'proj' and B.proj_map then
+    local fs = {}
+    for _, e in ipairs(B.entries) do if e.path and not e.dir then fs[#fs + 1] = { path = e.path, name = e.name, sub = e.track } end end
+    local hv = map_draw(U, L, x + 1, y, w - 2, h, fs, 'proj:' .. #fs .. ':' .. (fs[1] and fs[1].path or ''))
     if hv then hover = hv end
     return hover
   end
