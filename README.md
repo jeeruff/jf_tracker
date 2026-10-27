@@ -164,6 +164,8 @@ jf_tracker is source-available under the [PolyForm Shield License 1.0.0](LICENSE
 - do not use it to make a product that competes with jf_tracker - paid or free
   (a fork sold or given away as another tracker); ask the author for other terms.
 
-Author and the ideas behind it: [NOTICE](NOTICE). It comes with no warranty.
+Author and the ideas behind it: [NOTICE](NOTICE). It comes with no warranty, and the
+author is not liable for any damage. Modules, macros and other add-ons by other people
+are their authors' responsibility - install them at your own risk.
 
 Support: <https://ko-fi.com/jeeruff>. Music: <https://jeeruff.bandcamp.com>.

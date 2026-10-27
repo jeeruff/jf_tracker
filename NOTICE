@@ -42,6 +42,19 @@ Original ideas of the author
 - A sample map in the browser: the folder as a graph or a "nebula" of floating
   points grouped into sectors.
 
+No liability
+------------
+
+jf_tracker comes as is, without any warranty; the author is not liable for any
+damage it causes (LICENSE, "No Liability").
+
+Modules, macros (.jfm), presets and other add-ons made by other people are
+their authors' work and their authors' responsibility, even when they are
+listed or hosted next to jf_tracker. The author of jf_tracker does not write,
+check in full or guarantee them and is not liable for any harm they do -
+malicious code, data loss, broken projects or anything else. Install add-ons
+from people you trust, at your own risk.
+
 Borrowed ideas and code (not the author's own)
 ----------------------------------------------
 
