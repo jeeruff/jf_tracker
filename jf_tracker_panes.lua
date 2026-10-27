@@ -927,7 +927,7 @@ end
 
 -- ── пресеты (tmux next-layout) ────────────────────────────────────────────
 local function all_tabs() local t = leaf(table.unpack(PN.TABS)); return t end
-PN.LAYOUTS = { 'main-left', 'main-right', 'wide', 'stack', 'tracker' }
+PN.LAYOUTS = { 'main-left', 'main-right', 'wide', 'widetracker', 'stack', 'tracker' }
 local BUILD = {
   ['main-left'] = PN.DEFAULT,
   ['main-right'] = function()
@@ -942,6 +942,16 @@ local BUILD = {
       node('h', { 0.2, 0.55, 0.25 }, leaf('matrix'), all_tabs(), leaf('inst')),
       leaf('tracker'),
       node('h', { 0.2, 0.15, 0.4, 0.25 }, leaf('ctrl'), leaf('fxb'), leaf('dsp'), leaf('browser'))), hidden = {} })
+  end,
+  -- 27 окт: трекер во всю ширину сверху, под ним микшер во всю ширину; снизу три стека вкладок — слева модули песни,
+  -- в центре dsp и его соседи, справа lib и browser (баг «трекер уехал наверх» стал раскладкой)
+  widetracker = function()
+    return PN.normalize({ v = 1, root = node('v', { 0.5, 0.14, 0.36 },
+      leaf('tracker'), leaf('mixer'),
+      node('h', { 0.18, 0.64, 0.18 },
+        leaf('matrix', 'patterns', 'ctrl', 'notes', 'visor', 'renderer', 'harm', 'humanizer', 'reform'),
+        leaf('dsp', 'automation', 'sample', 'macros', 'midi', 'nmod', 'retro', 'sprops'),
+        leaf('inst', 'tracks', 'slices', 'browser', 'clipboard', 'fxb', 'help', 'undotree'))), hidden = {} })
   end,
   stack = function()
     local st = leaf('matrix', 'inst', 'browser', 'ctrl', 'dsp', 'fxb', 'notes', 'slices', table.unpack(PN.TABS))
