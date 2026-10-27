@@ -4378,7 +4378,8 @@ function D.pool_rows(pool, sort, col, cols)
   D.lib_nav = {}
   for _, r in ipairs(rows) do
     if r.folder then D.lib_nav[#D.lib_nav + 1] = { folder = r.folder }
-    elseif r.i and not r.sub then D.lib_nav[#D.lib_nav + 1] = { i = r.i } end
+    elseif r.i and r.sub then D.lib_nav[#D.lib_nav + 1] = { i = r.i, kind = r.sub, k = r.k }   -- 27 окт: слайсы / слои открытой папки — тоже остановки
+    elseif r.i then D.lib_nav[#D.lib_nav + 1] = { i = r.i } end
   end
   local seps = D.lib_seps
   if seps and next(seps) then
@@ -10990,9 +10991,15 @@ function D.frame(L, snap, rows, state, info)
         local aim_y = wy
         local wave_y
         if atop then aim_y = wy + ovh + 1; wave_y = aim_y + zr * L.rh + 1 end
-        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr, wave_y)
+        -- 27 окт: опция scroll under the sample — обзор (скролл) под волной: [прицел] волна обзор (без новых локалей: D.slx_ovy)
+        D.slx_ovy = nil
+        if info.slx_ovbelow and info.slx_ovbelow() then
+          if atop then aim_y = wy; wave_y = wy + zr * L.rh + 1 else wave_y = wy end
+          D.slx_ovy = wave_y + wh + 1
+        end
+        local hw = D.SX.draw_wave(U, L, v, x0, D.slx_ovy or wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr, wave_y)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
-        local sy = (wave_y or (wy + ovh + 1)) + wh + 1   -- строка статуса сразу под волной
+        local sy = D.slx_ovy and (D.slx_ovy + ovh + 1) or ((wave_y or (wy + ovh + 1)) + wh + 1)   -- строка статуса сразу под волной (или под обзором)
         -- 26 окт: MIDI · ARP — в самом низу модуля, под группами параметров (как в окне плагина)
         local lay2 = {}
         if (G.nb2 or 0) > 0 then

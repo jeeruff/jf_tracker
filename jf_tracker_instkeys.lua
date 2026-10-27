@@ -62,15 +62,20 @@ local function nav_step(cur, d)
   local nav = ctx.lib_nav and ctx.lib_nav()
   if not nav or #nav == 0 then return nil end
   local hdr = ctx.lib_hdr and ctx.lib_hdr()
+  local sub = ctx.lib_sub_cur and ctx.lib_sub_cur()
   local p
-  for k, s in ipairs(nav) do if (hdr and s.folder == hdr) or (not hdr and s.i == cur) then p = k; break end end
+  for k, s in ipairs(nav) do
+    if (hdr and s.folder == hdr) or (not hdr and sub and s.kind and s.i == cur and s.kind == sub.kind and s.k == sub.k)
+       or (not hdr and not sub and not s.kind and not s.folder and s.i == cur) then p = k; break end
+  end
   if not p then return nil end
   local s = nav[p + d]
   if not s then return false end
   if s.folder then
     ctx.lib_hdr(s.folder)
     ctx.msg(('folder %s: l - open, h - fold, Enter - toggle'):format(s.folder))
-  else ctx.inst_select(s.i) end
+  elseif s.kind then ctx.inst_select(s.i); ctx.lib_sub_go(s.i, { kind = s.kind, k = s.k })   -- 27 окт: слайс / слой — как щелчок по нему
+  else ctx.inst_select(s.i); if ctx.lib_sub_go then ctx.lib_sub_go(s.i, nil) end end
   return true
 end
 function IK.key(c, cur, n, nslots, ninst)

@@ -348,7 +348,8 @@ local state = {
   hdrmeter = reaper.GetExtState(EXT, 'hdrmeter') ~= '0',
   kitsize = ({ s = 's', m = 'm', l = 'l' })[reaper.GetExtState(EXT, 'kitsize')] or 'l',
   bsmode = reaper.GetExtState(EXT, 'bsmode') == 'track' and 'track' or 'pattern',
-  envmark = reaper.GetExtState(EXT, 'envmark') ~= '0',   -- 27 окт: «~» на строках с автоматизацией (по умолчанию вкл)
+  envmark = reaper.GetExtState(EXT, 'envmark') ~= '0',
+  slx_ovbelow = reaper.GetExtState(EXT, 'mod_slixer_ovbelow') == '1' or nil,   -- 27 окт: скролл slixer под сэмплом   -- 27 окт: «~» на строках с автоматизацией (по умолчанию вкл)
   foldfast = reaper.GetExtState(EXT, 'foldfast') == '1',   -- 19 окт: fold быстрых нот (кнопка fd)   -- 19 окт: BS / Ins — в паттерне (Renoise) / по дорожке   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   libtabs = reaper.GetExtState(EXT, 'libtabs') == '1' and reaper.GetExtState(EXT, 'libtabs_off25') == '1',   -- 25 окт: lib — одним списком с папками разделов (вкладки — опцией)
@@ -6632,7 +6633,7 @@ ctx = {
     vim.open_hydra({ title = 'add ' .. nf .. ' to', items = {
       { key = 'l', label = 'the lib - each file its own instrument (= Enter)', fn = function() for _, f in ipairs(files) do ctx.add_to_depot(f) end; done(); vim.msg = #files .. ' file(s) into the lib' end },
       { key = 'd', label = 'drumrs5k - a pad per file, a key each (the rack on the DSP track, or a new one)', fn = function() ctx.drum_add_files(files); done() end },
-      { key = 'x', label = 'sliXer - jf_slixer on the DSP track slices it and plays on its own (the first file)', fn = function() ctx.to_slixer(files[1]); done() end },   -- 25 окт
+      { key = 'x', label = 'New sliXer - a new track with its own jf_slixer for the first file (the slixers you have stay)', fn = function() ctx.to_slixer(files[1], nil, nil, true); done() end },   -- 25 окт; 27 окт: новый, не чужой
       { key = 'y', label = 'layers (¥) of the selected lib instrument - they sound together with it on one note', fn = function() ctx.layer_add_files(files); done() end },   -- 19 окт
       { key = 's', label = 'sampler - one RS5K per file on the DSP track, played by pitch', fn = function()
         local col = dsp_target() or cur_col(); if not col then return end
@@ -10998,7 +10999,10 @@ ctx = {
       return { key = 'mod_' .. mod .. '_' .. key, label = label, kind = 'num', min = min, max = max, step = step, fmt = fmt, desc = desc,
                get = get, set = function(v) set(v); reaper.SetExtState(EXT, 'mod_' .. mod .. '_' .. key, tostring(v), true) end }
     end
-    local out = { { sep = true, title = 'map', group = 'modules' } }
+    local out = { { sep = true, title = 'slixer', group = 'modules' } }
+    out[#out + 1] = { key = 'mod_slixer_ovbelow', label = 'scroll under the sample', kind = 'toggle', desc = 'DSP, slixer: the overview strip (the scroll of the zoomed wave) under the sample instead of over it',
+      get = function() return state.slx_ovbelow == true end, set = function(v) state.slx_ovbelow = v or nil; reaper.SetExtState(EXT, 'mod_slixer_ovbelow', v and '1' or '0', true) end }
+    out[#out + 1] = { sep = true, title = 'map', group = 'modules' }
     out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
       get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
@@ -18277,7 +18281,7 @@ function ctx.context_items(hover)
         edit.drop(f.col.track, f.col.fixed and lane.idx or nil, state.lpb, vim.cur.row, file)
         model.invalidate(); vim.msg = nm .. ' -> an item on ' .. (f.col.name or 'track') .. ' at row ' .. vim.cur.row
       end, 'i')
-      add('To sliXer - jf_slixer on the DSP track slices and plays it', function() ctx.to_slixer(file) end, 'x')   -- 25 окт
+      add('New sliXer with it - a new track with its own jf_slixer (the slixers you have stay as they are)', function() ctx.to_slixer(file, nil, nil, true) end, 'x')   -- 27 окт: было — в первый slixer трека (затирал его сэмпл)
       add('Show in Finder', function() if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(file) else vim.msg = 'Finder: needs SWS' end end, 'f')   -- 25 окт
       add('Open in Media Explorer (drag it from there into any plugin)', function() reaper.OpenMediaExplorer(file, false) end, 'e')   -- 25 окт
       add('More: layers, sampler list, slices of the instrument … (a)', function() ctx.browser_send_menu() end, 'a')
@@ -18459,12 +18463,26 @@ function ctx.slx_open_slicer(f)
   end
   vim.msg = 'slixer: its sample is not in the lib of ' .. (col.name or 'this track')
 end
-function ctx.to_slixer(path, col, item)
+-- fresh (27 окт): новый трек со своим slixer (после трека курсора) — уже стоящие экземпляры не трогаются
+function ctx.to_slixer(path, col, item, fresh)
   col = col or dsp_target() or cur_col()
-  if not (col and col.track and path and path ~= '') then vim.msg = 'slixer: no file / no track'; return end
+  if not (path and path ~= '') then vim.msg = 'slixer: no file'; return end
+  if fresh then
+    local at = reaper.CountTracks(0)
+    if col and col.track then at = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')) end
+    local ntr
+    edit.run('new slixer track', function()
+      reaper.InsertTrackAtIndex(at, true)
+      ntr = reaper.GetTrack(0, at)
+      reaper.GetSetMediaTrackInfo_String(ntr, 'P_NAME', ((path:match('[^/]+$') or 'slixer'):gsub('%.%w+$', '')), true)
+    end)
+    model.invalidate()
+    col = { track = ntr, name = (path:match('[^/]+$') or 'slixer') }
+  end
+  if not (col and col.track) then vim.msg = 'slixer: no track'; return end
   local tr = col.track
   local fx
-  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+  for i = 0, (fresh and -1 or reaper.TrackFX_GetCount(tr) - 1) do
     local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
     local _, on = reaper.TrackFX_GetNamedConfigParm(tr, i, 'original_name')
     if ((nm or '') .. ' ' .. (on or '')):lower():find('jf_slixer', 1, true) then fx = i; break end
@@ -18882,6 +18900,14 @@ function ctx.slx_vdrag_tick()
   local fr = math.max(0, math.min(1, (gfx.mouse_x - h.trk.x) / math.max(1, h.trk.w)))
   reaper.TrackFX_SetParam(tr, fi, pi, lo + fr * (hi - lo))
   state.status = ('slixer: %s %.2f'):format(h.it.lab, lo + fr * (hi - lo))
+  -- 27 окт: sens — detect заново прямо во время протяжки (не чаще раза в 0.15 с), а не только по отпусканию
+  if h.it.name == 'Transient sensitivity' and fr ~= D0.last_fr then
+    local now = reaper.time_precise()
+    if now - (D0.det_t or 0) >= 0.15 then
+      D0.det_t, D0.last_fr = now, fr
+      pcall(ctx.slx_do, { it = { what = 'detect' }, f = f })
+    end
+  end
 end
 function ctx.slx_wheel(h, d)   -- колесо: число на кнопке val — шаг; над волной — зум к мыши
   if h.it and h.it.kind == 'val' then
@@ -22081,7 +22107,8 @@ local function frame()
     slx_slot_peaks = function(path, n) return ctx.slx_slot_peaks(path, n) end,
     slx_aim = function(a, n, np) return ctx.slx_aim_peaks(a, n, np) end,
     slx_spam = function() return state.sliceaudition end,
-    slx_aimtop = function() return state.zoomtop ~= false end,   -- 26 окт: прицел пульта slixer над волной   -- 26 окт: прицел — сэмплы окна у границы
+    slx_aimtop = function() return state.zoomtop ~= false end,
+    slx_ovbelow = function() return state.slx_ovbelow == true end,   -- 27 окт: обзор (скролл) slixer под волной   -- 26 окт: прицел пульта slixer над волной   -- 26 окт: прицел — сэмплы окна у границы
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)
       -- jf_rec в DSP (4 окт): буфер трека DSP; открыта вкладка rec — её же
       -- данные (иначе две ширины слоя пиков спорят в gmem)
@@ -28537,6 +28564,8 @@ local function frame()
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       -- док session в фокусе (7 окт): клип-мод — клавиатура запускает клипы;
       -- : и / команды — в vim, Esc / Tab — в трекер
+      -- 27 окт: открыта выпадашка / пикер — клавиша ей, в любом модуле (DSP, lib … забирали цифры KEYS нотами)
+      if vim.hydra or vim.picker then return vim.key(c) end
       if state.focus == 'session' and state.clipsview and snap and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         if c == 27 then ctx.set_focus('tracker'); vim.msg = 'focus: TRACKER'; return end
         if c == (':'):byte() then return vim.key(c) end
@@ -31978,11 +32007,17 @@ ctx.lib_kids = function(e)
   for sk = 1, #(e and e.slices or {}) do t[#t + 1] = { kind = 's', k = sk } end
   return t
 end
+ctx.lib_sub_cur = function() return draw.LIBSUB end
 ctx.lib_sub_go = function(i, kid)
   draw.LIBSUB = kid and { i = i, kind = kid.kind, k = kid.k } or nil
   if not kid then return end
   local root = cur_col() and (cur_col().pool or {})[i]
   if not root then return end
+  -- 27 окт: сэмпл связан со slixer (P_EXT:jf_slx) — срез выбирается и в нём, как родной
+  if kid.kind == 's' and root.item and reaper.ValidatePtr(root.item, 'MediaItem*') then
+    local _, sg = reaper.GetSetMediaItemInfo_String(root.item, 'P_EXT:jf_slx', '', false)
+    if sg ~= '' then ctx.slx_cmd(1, kid.k - 1) end
+  end
   if kid.kind == 's' then ctx.ssel = { item = root.item, k = 0 }; ctx.slice_step(kid.k); vim.msg = ('S%02X of %s - key %s plays it'):format(kid.k, root.name or '', ctx.slice_key(kid.k) or '?')
   else local l = root.layers[kid.k]; local src = l and model.layer_src and model.layer_src[l.guid]; vim.msg = ('L%d of %s: %s - Space listen, Enter its menu, x remove'):format(kid.k, root.name or '', src and src.name or '?') end
 end
@@ -31997,6 +32032,8 @@ ctx.lib_tree_key = function(c)
     local kids = ctx.lib_kids(e)
     local at = 1
     for n, kd in ipairs(kids) do if kd.kind == cs.kind and kd.k == cs.k then at = n end end
+    -- 27 окт: j k по детям — общий обход lib (строки экрана: дальше — следующий сэмпл / папка, без тупика на последнем срезе)
+    if (ch == 'j' or c == keys.down or ch == 'k' or c == keys.up) and draw.lib_nav then return false end
     if ch == 'j' or c == keys.down then if kids[at + 1] then ctx.lib_sub_go(vim.inst, kids[at + 1]) end; return true end
     if ch == 'k' or c == keys.up then if at > 1 then ctx.lib_sub_go(vim.inst, kids[at - 1]) else draw.LIBSUB = nil end; return true end
     if ch == 'h' or c == keys.left or c == 27 then draw.LIBSUB = nil; vim.msg = (e and e.name or '') .. ' (h - close the folder)'; return true end
