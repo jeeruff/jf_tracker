@@ -324,13 +324,87 @@ function SM.neb_build(G)
   for _, hb in ipairs(G.hubs) do for j, st in ipairs(hb.stars) do st.n = hb.list[j] end end
   G.gal = true
 end
+-- 27 окт (2): вид СИСТЕМЫ — сектор (группа / папка) на весь вид: все её файлы диском, подписи без наложений;
+-- кнопка galaxy / Esc — назад к галактике
+function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  local top = y + L.rh + 4
+  local gw, gh = w - 8, y + h - top - 4
+  local zoom = V.zoom or 1
+  local cx, cy = x + w / 2 + (V.px or 0), top + gh / 2 + (V.py or 0)
+  local rad = math.min(gw, gh) / 2 * 0.92 * zoom
+  local c = col(hb)
+  local n = hb.n
+  local function pos(nd)
+    local rr = math.sqrt((nd.k - 0.5) / n) * rad
+    local a = nd.k * 2.39996
+    return cx + rr * math.cos(a), cy + rr * math.sin(a)
+  end
+  local rdot = math.max(1.5, math.min(5, rad / math.sqrt(n) * 0.35)) * (0.4 + 1.6 * (V.dim or 0.5))
+  local function paint()
+    U.set(U.mix(c, U.BG, 0.85)); gfx.circle(cx - x, cy - y, rad, 0, 1)
+    U.set(U.mix(c, U.TEXT, 0.25))
+    for _, nd in ipairs(hb.list) do
+      local px, py = pos(nd)
+      local r = math.max(1, nd.r * rdot)
+      px, py = px - x, py - y
+      if px >= 0 and px < w and py >= 0 and py < h then if r < 1.5 then gfx.rect(px, py, 2, 2, 1) else gfx.circle(px, py, r, 1, 1) end end
+    end
+  end
+  SM.buffered(G, ('sys|%s|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d'):format(hb.name, x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver), x, y, w, h, U, paint)
+  -- подписи файлов: ближе к центру — первыми, без наложений
+  local placed = {}
+  local function free(ax, ay, aw, ah)
+    for _, q in ipairs(placed) do if ax < q[1] + q[3] and q[1] < ax + aw and ay < q[2] + q[4] and q[2] < ay + ah then return false end end
+    return true
+  end
+  local hv, hd
+  local budget = 400
+  for _, nd in ipairs(hb.list) do
+    local px, py = pos(nd)
+    if px >= x and px < x + w and py >= top and py < y + h then
+      if inside then
+        local d = (mx - px) ^ 2 + (my - py) ^ 2
+        if d <= 64 and (not hd or d < hd) then hv, hd = { node = nd, px = px, py = py, r = 3 }, d end
+      end
+      if budget > 0 then
+        local lab = (nd.name:gsub('%.[%w]+$', ''))
+        local lw = math.min(U.measure(lab), L.cw * 14)
+        local lx, ly = px + 4, py - L.rh / 2
+        if lx + lw < x + w - 2 and ly >= top and ly + L.rh < y + h and free(lx - 6, ly, lw + 6, L.rh) then
+          placed[#placed + 1] = { lx - 6, ly, lw + 6, L.rh }
+          U.text(lx, ly, fit(lab, lw), U.mix(c, U.TEXT, 0.4))
+          budget = budget - 1
+        end
+      end
+    end
+  end
+  -- заголовок системы и кнопка назад
+  local title = ('%s SYSTEM  %d BODIES'):format((hb.name:gsub('^/', '')):upper(), n)
+  local bx, by = x + L.pad, top
+  local bw = U.measure('galaxy') + 2 * L.pad
+  local hot = inside and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+  U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh - 1, 1)
+  U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh - 1, 0)
+  U.text(bx + L.pad, by, 'galaxy', hot and U.AMBER or U.TEXT)
+  if hot then hv = { back = true } end
+  U.text(bx + bw + L.pad, by, fit(title, w - bw - 3 * L.pad), c)
+  local pn = playing and G.bypath and G.bypath[playing]
+  if pn and pn.h == hb then local px, py = pos(pn); U.set(U.AMBER); gfx.circle(px, py, 4, 1, 1) end
+  if hv and hv.node then U.set(U.TEXT); gfx.circle(hv.px, hv.py, 5, 0, 1) end
+  return hv
+end
 function SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  if V.sys then
+    for _, hb in ipairs(G.hubs) do if hb.name == V.sys then return SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, inside) end end
+    V.sys = nil
+  end
   SM.neb_build(G)
   local top = y + L.rh + 4
   local gw, gh = w - 8, y + h - top - 4
   local zoom = V.zoom or 1
   local cx, cy = x + w / 2 + (V.px or 0), top + gh / 2 + (V.py or 0)
-  local sx, sy = gw / 2.1 * zoom, gh / 1.7 * zoom
+  local s1 = math.min(gw / 2.1, gh / 1.7) * zoom   -- одинаковый масштаб по осям: галактика не вытягивается в узкой панели
+  local sx, sy = s1, s1
   local function X(v) return cx + v * sx end
   local function Y(v) return cy + v * sy end
   local rmax = math.max(0.8, math.min(3, math.min(sx, sy) * 0.006)) * (0.4 + 1.6 * (V.dim or 0.5))

@@ -309,7 +309,7 @@ local function draw_col(U, L, list, x, y, w, h, hi_name, tag, mx, my)
 end
 
 -- ── 27 окт: КАРТА папки (jf_tracker_smap): граф пересобирается при смене папки; вид (зум, сдвиг) — общий ──
-B.mapV = { zoom = 1, px = 0, py = 0, grav = 0.5, dim = 0.5 }
+B.mapV = { zoom = 1, px = 0, py = 0, grav = 0.5, dim = 0.5, style = R.GetExtState and R.GetExtState('jf_tracker', 'mapstyle') ~= '' and R.GetExtState('jf_tracker', 'mapstyle') or 'graph' }   -- 27 окт: вид помнится
 -- 27 окт: подвкладки карты — что раскладывать: files (папка браузера), db (база / все базы), proj (источники проекта), pm (проекты jf_pm)
 B.map_src = 'files'
 B.MAP_SRCS = { 'files', 'db', 'proj', 'pm' }
@@ -373,6 +373,7 @@ function B.map_random()
   local G = B.mapG
   if not G or G.building or #G.nodes == 0 then return end
   local hb = B.map_hv and B.map_hv.hub or (B.map_hv and B.map_hv.node and B.map_hv.node.h)
+  if not hb and B.mapV.sys and B.mapV.style == 'nebula' then for _, h0 in ipairs(G.hubs) do if h0.name == B.mapV.sys then hb = h0 end end end   -- в системе — из неё
   local list = hb and hb.list or G.nodes
   local n = list[math.random(#list)]
   if not n then return end
@@ -395,8 +396,9 @@ function B.map_key(c)
     for k, v in ipairs(B.MAP_SRCS) do if v == B.map_src then i = k end end
     B.map_src = B.MAP_SRCS[i % #B.MAP_SRCS + 1]; B.mapG = nil
     if ctx.msg then ctx.msg('map: ' .. B.map_src) end
-  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'graph' })[B.mapV.style or 'graph'] or 'graph'; if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
+  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
   elseif ch == 'r' then B.map_random()
+  elseif c == 27 and B.mapV.sys then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif ch == '+' or ch == '=' then B.mapV.zoom = math.min(8, (B.mapV.zoom or 1) * 1.25)
   elseif ch == '-' then B.mapV.zoom = math.max(0.3, (B.mapV.zoom or 1) / 1.25)
   elseif ch == '0' then B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
@@ -471,7 +473,7 @@ map_draw_inner = function(U, L, x, y, w, h)
     if gfx.mouse_cap & 1 == 1 then B.mapV.px, B.mapV.py = pan.px + mx - pan.mx, pan.py + my - pan.my else B.map_pan = nil end
   end
   B.map_hv = hv
-  if hv and hv.slider then return 'mapsl' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
+  if hv and hv.slider then return 'mapsl' elseif hv and hv.back then return 'mapback' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
   return nil
 end
 
@@ -1022,9 +1024,13 @@ function B.click(what)
     local n = B.map_hv and B.map_hv.node
     if n and (n.path or ''):lower():match('%.rpp$') then if ctx.msg then ctx.msg('map: project ' .. n.name .. '  (' .. n.cat .. ') - open it in the pm tab') end   -- 27 окт: проект не слушается
     elseif n then B.pl = nil; ctx.preview_file(n.path); if ctx.msg then ctx.msg('map: ' .. n.name .. '  (' .. n.cat .. ')') end end
-  elseif what == 'mapstyle' then B.mapV.style = (B.map_hv and B.map_hv.style) or 'graph'; if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view  (v - next view, r - a random sample)') end
+  elseif what == 'mapstyle' then B.mapV.style = (B.map_hv and B.map_hv.style) or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view  (v - next view, r - a random sample)') end
   elseif what == 'maprandom' then B.map_random()
   elseif what:match('^mapdir%d+$') then B.map_dcur = tonumber(what:sub(7)); B.map_enter()
+  elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
+  elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
+    B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
+    if ctx.msg then ctx.msg(('map: %s system - %d file(s); galaxy / Esc - back, r - random from it'):format(B.map_hv.hub.name, B.map_hv.hub.n)) end
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) then   -- 27 окт (2): клик — приблизить группу; Shift+клик — отметить её файлы
     local hb = B.map_hv and B.map_hv.hub
     if hb then B.mapV.zoom = math.min(8, (B.mapV.zoom or 1) * 2.5); if ctx.msg then ctx.msg(('map: %s - %d file(s); Shift+click marks them, wheel / drag - zoom / move'):format(hb.name, hb.n)) end end

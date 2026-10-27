@@ -5572,8 +5572,9 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
       local ext = D.rack_ext or 0
       if D.round_rack and ext >= 4 then   -- 26 окт: rounded racks — обводка целиком по зазорам
         if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
-        local yb = boxy + bh0 + 2 + math.min(ext - 3, 2 * math.max(0, 2 - d))
-        rrect2(st.x - math.min(3, L.pad - 1), boxy - 2, x + pw - 1 + math.min(3, L.pad - 1), yb + 1, 6)
+        -- 27 окт: зазор сверху и снизу одинаковый (1 px; был 0 сверху и 2 снизу — «конфуз»), вложенные — ниже на свой уровень
+        local yb = boxy + bh0 + 1 + math.min(ext - 3, 2 * math.max(0, 2 - d))
+        rrect2(st.x - math.min(3, L.pad - 1), boxy - 3, x + pw - 1 + math.min(3, L.pad - 1), yb + 1, 6)
       else
       gfx.rect(st.x, boxy - 2, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px в зазоре над модулями (boxy - 4 наезжал на шапку DSP: зазор 3 px)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
@@ -9645,12 +9646,17 @@ function D.frame(L, snap, rows, state, info)
       blocks[#blocks + 1] = { x = bx, w = bw, y = by, h = bh, k = k, cont = f.container, bands = f.bands, inner = f.inner }
       if is_sel and not D.dsp_sel_rect then D.dsp_sel_rect = { x = bx + L.pad, y = by, w = bw, h = L.rh, mod = true } end   -- без параметра — под шапкой модуля
       local in_rng = (info.dsp_range and k >= info.dsp_range[1] and k <= info.dsp_range[2]) or (info.dsp_marks and info.dsp_marks[k])
-      set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, by, bw, bh, 1)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
+      -- 27 окт: rounded racks — и модули со скруглёнными углами; край модуля — 2 px и контрастнее линий внутри (иерархия границ)
+      local RR = D.round_rack and 4 or nil
+      local function box(xx, yy, ww, hh, fill) if RR then rrect(xx, yy, ww, hh, fill, RR) else gfx.rect(xx, yy, ww, hh, fill and 1 or 0) end end
+      set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); box(bx, by, bw, bh, true)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       -- 24 окт: выбранный — янтарь в 2 px, остальные — рамка тише (выбранный модуль терялся среди рамок рэка)
-      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.tint(U.LINE, 0.7)) or U.DIM))); gfx.rect(bx, by, bw, bh, 0)
-      if is_sel and not ins_here then set(U.AMBER); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end
-      if info.dsp_learn == k or ins_here then gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end     -- learn: двойная голубая рамка
+      local edge = U.mix(U.LINE, U.TEXT, 0.35)
+      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or edge) or U.DIM))); box(bx, by, bw, bh, false)
+      if is_sel and not ins_here then set(U.AMBER); box(bx + 1, by + 1, bw - 2, bh - 2, false)
+      elseif f.enabled and info.dsp_learn ~= k and not ins_here then box(bx + 1, by + 1, bw - 2, bh - 2, false) end   -- 2 px и у остальных
+      if info.dsp_learn == k or ins_here then box(bx + 1, by + 1, bw - 2, bh - 2, false) end     -- learn: двойная голубая рамка
       if vtw > 0 then
         local tx0, ty = bx + bw - vtw, by + L.rh + 2
         set(U.LINE); gfx.rect(tx0, by + L.rh + 1, 1, bh - L.rh - 3, 1)
