@@ -6253,6 +6253,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local e = pool[i]
       local rgb = e.rgb or (e.tracks and trgb[e.tracks[1]]) or (col and col.rgb) or U.GREY
       local sel = i == inst or (cur and cur.parent == e)   -- выбран слайс — горит исходник
+      if D.lib_marks and D.lib_marks[i] then set(U.tint(U.AMBER, 0.22)); gfx.rect(ix + 1, y, w - 2, L.rh, 1); set(U.AMBER); gfx.rect(ix + 1, y, 2, L.rh, 1) end   -- 27 окт: отмечен (m)
       local rr = info.inst_range                -- диапазон v (2 окт)
       local inr = rr and i >= rr[1] and i <= rr[2] and not sel
       local here = col and e.track_set and e.track_set[col.name]

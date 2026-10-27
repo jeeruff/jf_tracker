@@ -26,6 +26,14 @@ IK.init({
   midi_select = function() MIDI = true; AUTO = false; log[#log + 1] = 'midi' end,
 })
 local function k(s) local r; for ch in s:gmatch('.') do r = IK.key(ch:byte(), cur, 3, 8) end; return r end
+-- 27 окт: отметки как в lf
+cur = 1; k('m'); eq('m marks and moves down', cur, 2); eq('m marked 1', IK.marks[1], true)
+k('m'); eq('two marked', IK.nmarks(), 2)
+local n0 = #log; k('x'); eq('x cuts marked (from the end)', log[n0 + 1], 'cut:2-2'); eq('then 1', log[n0 + 2], 'cut:1-1'); eq('marks cleared', IK.nmarks(), 0)
+cur = 1; k('m'); k('u'); eq('u unmarks', IK.nmarks(), 0)
+eq('u without marks passes on (undo)', IK.key(('u'):byte(), cur, 3, 8), false)
+cur = 1; k('m'); k('m'); n0 = #log; k('dd'); eq('dd cuts marked', log[n0 + 1], 'cut:2-2'); eq('dd marks cleared', IK.nmarks(), 0)
+cur = 2
 
 k('dd'); eq('dd cuts current', last(), 'cut:2-2')
 k('yy'); eq('yy yanks', last(), 'yank:2-2')

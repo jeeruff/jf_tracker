@@ -46,6 +46,17 @@ function IK.clip(r0, r1, n, nslots, ninst)
   if (ninst or 0) > 0 and r0 >= p0 then return math.min(r1, nslots) end
   return math.min(r1, n)
 end
+-- 27 окт: отметки, как в lf: m — отметить и вниз, u — снять все (нет отметок — u дальше, это undo); dd / x / yy —
+-- по отмеченным (с конца — номера не съезжают); r — переименовать
+IK.marks = {}
+function IK.nmarks() local k = 0; for _ in pairs(IK.marks) do k = k + 1 end; return k end
+function IK.clear_marks() for k in pairs(IK.marks) do IK.marks[k] = nil end end   -- на месте: отрисовка держит ссылку на таблицу
+local function marked_desc()
+  local l = {}
+  for i in pairs(IK.marks) do l[#l + 1] = i end
+  table.sort(l, function(a, b) return a > b end)
+  return l
+end
 function IK.key(c, cur, n, nslots, ninst)
   local ch = c < 256 and string.char(c) or ''
   if IK.pending then
@@ -54,7 +65,9 @@ function IK.key(c, cur, n, nslots, ninst)
     if c == 27 then return true end
     local r0, r1 = IK.range(cur)
     r1 = IK.clip(r0, r1, n, nslots, ninst)
-    if op == 'd' and ch == 'd' then if r0 <= r1 then ctx.inst_cut(r0, r1) end; IK.anchor = nil
+    if op == 'd' and ch == 'd' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); IK.anchor = nil
+    elseif op == 'y' and ch == 'y' and IK.nmarks() > 0 and ctx.inst_yank_list then local l = marked_desc(); table.sort(l); ctx.inst_yank_list(l); IK.anchor = nil
+    elseif op == 'd' and ch == 'd' then if r0 <= r1 then ctx.inst_cut(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and ch == 'y' then if r0 <= r1 then ctx.inst_yank(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and (ch == 'p' or ch == 'P') then
       if r0 <= r1 then ctx.inst_yank(r0, r1, true); ctx.inst_put(ch == 'P') end
@@ -63,6 +76,15 @@ function IK.key(c, cur, n, nslots, ninst)
     return true
   end
   -- 24 окт: x — удалить инструмент под курсором (или диапазон v), как dd (просьба: x ничего не делал)
+  if ch == 'm' then   -- 27 окт: отметить / снять и вниз (lf)
+    if cur <= n then IK.marks[cur] = (not IK.marks[cur]) or nil end
+    ctx.inst_select(math.min(math.max(1, nslots), cur + 1))
+    ctx.msg(('%d marked - dd / x cut them, yy yank, u unmark'):format(IK.nmarks()))
+    return true
+  end
+  if ch == 'u' and IK.nmarks() > 0 then IK.clear_marks(); ctx.msg('lib: unmarked'); return true end
+  if ch == 'r' and ctx.rename_inst then ctx.rename_inst(); return true end
+  if ch == 'x' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); return true end
   if ch == 'x' then
     local r0, r1 = IK.range(cur)
     r1 = IK.clip(r0, r1, n, nslots, ninst)

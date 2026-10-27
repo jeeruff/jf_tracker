@@ -12811,6 +12811,20 @@ ctx = {
     state.inst_reg = reg
     if not quiet then vim.msg = ('yank %d instrument(s): %s - p / P puts a copy into the track library'):format(#reg, reg[1].name) end
   end,
+  -- 27 окт: yy по отметкам lib (lf m): несоседние — одним регистром
+  inst_yank_list = function(list)
+    local col = cur_col(); local pool = col and col.pool or {}
+    local reg = {}
+    for _, i in ipairs(list) do
+      local e = pool[i]
+      local sn = e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*') and edit.inst_snapshot(e.item)
+      if sn then reg[#reg + 1] = sn end
+    end
+    if #reg == 0 then vim.msg = 'nothing to yank'; return end
+    state.inst_reg = reg
+    vim.msg = ('yank %d marked instrument(s) - p / P puts copies'):format(#reg)
+  end,
+  rename_inst = function() ctx.rename_inst_prompt() end,
   inst_cut = function(i0, i1)
     local col = cur_col(); local pool = col and col.pool or {}
     -- 25 окт: номера после сэмплов — плагины-инструменты: dd убирает плагин с его трека (u — назад), как любой инструмент lib
@@ -15719,7 +15733,7 @@ ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font 
 vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
-IK.init(ctx)
+IK.init(ctx); draw.lib_marks = IK.marks   -- 27 окт: отметки lib (m) — подсветка строк
 MM.hint = function(...) return draw.hint(...) end
 MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
@@ -31775,6 +31789,10 @@ ctx.lib_tree_key = function(c)
   end
   if not e then return false end
   local kids = ctx.lib_kids(e)
+  -- 27 окт: папки lib (опция lib folders): l — развернуть свёрнутую под курсором, h — свернуть (слоёв / срезов не открыто)
+  local lfo = state.libfolders and ctx.lib_folder_cur()
+  if lfo and (ch == 'l' or c == keys.right) and ctx.lib_hidden(vim.inst) then ctx.lib_fold(lfo, false); return true end
+  if lfo and (ch == 'h' or c == keys.left) and not draw.LIBO[e.gkey or ''] and not ctx.lib_hidden(vim.inst) then ctx.lib_fold(lfo, true); return true end
   if ch == 'l' or c == keys.right then
     if #kids == 0 then vim.msg = (e.name or '') .. ': no layers or slices inside (L - a layer, s - slice it)'; return true end
     if not draw.LIBO[e.gkey or ''] then draw.LIBO[e.gkey or ''] = true else ctx.lib_sub_go(vim.inst, kids[1]) end
