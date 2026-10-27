@@ -97,4 +97,12 @@ do
   for _, p in ipairs(pts) do if math.abs(p[1]) > 1 or math.abs(p[2]) > 1 then ok = false end end
   eq('chladni: inside the plate', ok, true)
 end
+-- 27 окт (10): дерево папок
+do
+  local T = SM.tree_build(G)
+  eq('tree: weight = all files', T.n, #G.nodes)
+  local kicks
+  for _, c in ipairs(T.kids) do if c.name == 'kicks' then kicks = c end end
+  eq('tree: subfolder branch', kicks and kicks.n, 2)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

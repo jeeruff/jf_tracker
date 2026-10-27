@@ -798,10 +798,151 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
   return hv
 end
 
+
+-- ── 27 окт (10): вид TREE — дерево папок: ствол слева, ветви — папки (глубже 5 — в предка), листья-точки — файлы
+-- на веточке своей папки; классы (db / proj / pm без папок) — ветви по группе
+SM.TREE_DEPTH = 5
+function SM.tree_build(G)
+  if G.tree then return G.tree end
+  local root
+  for _, n in ipairs(G.nodes) do
+    local d = n.dir or ''
+    if not root or #d < #root then root = d end
+  end
+  root = root or ''
+  local T = { name = '/', kids = {}, files = {}, n = 0, depth = 0 }
+  local by = { [''] = T }
+  local function node(rel)
+    if by[rel] then return by[rel] end
+    local parent, nm = rel:match('^(.*)/([^/]+)$')
+    if not parent then parent, nm = '', rel end
+    local pn = node(parent)
+    local t = { name = nm, kids = {}, files = {}, n = 0, depth = pn.depth + 1, parent = pn }
+    pn.kids[#pn.kids + 1] = t
+    by[rel] = t
+    return t
+  end
+  for _, n in ipairs(G.nodes) do
+    local rel
+    if n.dir then
+      rel = (n.dir:sub(1, #root) == root) and n.dir:sub(#root + 2) or n.dir
+      local parts, k = {}, 0
+      for p in rel:gmatch('[^/]+') do k = k + 1; if k <= SM.TREE_DEPTH then parts[#parts + 1] = p end end
+      rel = table.concat(parts, '/')
+    else rel = (n.cat or 'other'):gsub('^/', '') end
+    local t = node(rel)
+    t.files[#t.files + 1] = n
+    n.tnode, n.ti = t, #t.files   -- 27 окт: для сыгранных — без обхода всех файлов
+  end
+  local function weigh(t) local w = #t.files; for _, c in ipairs(t.kids) do w = w + weigh(c) end; t.n = w; table.sort(t.kids, function(a, b) return a.n > b.n end); return w end
+  weigh(T)
+  G.tree = T
+  return T
+end
+function SM.draw_tree(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  local T = SM.tree_build(G)
+  local top = y + L.rh + 4
+  local zoom = V.zoom or 1
+  local H = (y + h - top - 4) * zoom
+  if not T.maxd then local m = 0; local function md(t) if t.depth > m then m = t.depth end; for _, c in ipairs(t.kids) do md(c) end end; md(T); T.maxd = m end
+  local dx = math.max(L.cw * 6, (w - L.cw * 18) / math.max(1, T.maxd + 1)) * math.min(2, zoom)
+  local ox, oy = x + L.pad + (V.px or 0), top + (V.py or 0)
+  -- 27 окт: раскладка — только когда меняется вид (было каждый кадр: 6700 папок + 188 тыс. файлов = 38 мс)
+  local lkey = ('%d|%d|%d|%d|%.3f|%.1f|%.1f'):format(x, y, w, h, zoom, V.px or 0, V.py or 0)
+  local lay = T.lay
+  if T.lkey ~= lkey then
+    lay = {}
+    local function place(t, y0, y1)
+      t.ty0, t.ty1 = y0, y1
+      t.tx, t.ty = ox + t.depth * dx, (y0 + y1) / 2
+      lay[#lay + 1] = t
+      local acc = y0 + (y1 - y0) * #t.files / math.max(1, t.n)   -- свои листья — сверху полосы
+      for _, c in ipairs(t.kids) do
+        local hh = (y1 - y0) * c.n / math.max(1, t.n)
+        place(c, acc, acc + hh); acc = acc + hh
+      end
+    end
+    place(T, oy, oy + H)
+    -- подписи: только ветви с полосой хотя бы в строку, крупные первыми
+    local order = {}
+    for _, t in ipairs(lay) do if t.depth > 0 and t.ty1 - t.ty0 >= L.rh * 0.8 and t.ty >= top + L.rh and t.ty < y + h then order[#order + 1] = t end end
+    table.sort(order, function(a, b) return a.n > b.n end)
+    T.lay, T.lkey, T.order = lay, lkey, order
+  end
+  local function hubcol(t) local n = t.files[1]; if not n then for _, c in ipairs(t.kids) do if c.files[1] then n = c.files[1]; break end end end; return n and col(n.h) or U.GREY end
+  -- листья: веточка вправо от узла, точки на ней (не длиннее 0.8 шага; больше — рядами в своей полосе)
+  local function leafpos(t, i)
+    local cnt = #t.files
+    local per = math.max(1, math.floor(dx * 0.8 / 4))
+    local row, k = (i - 1) // per, (i - 1) % per
+    local rows = math.max(1, math.ceil(cnt / per))
+    local band = (#t.kids == 0) and 1 or (#t.files / math.max(1, t.n))
+    return t.tx + 6 + k * 4, t.ty0 + (t.ty1 - t.ty0) * band * ((row + 0.5) / rows)
+  end
+  local function paint()
+    for _, t in ipairs(lay) do
+      if t.ty1 >= top and t.ty0 <= y + h then
+        local c = hubcol(t)
+        if t.parent then   -- ветвь уголком: от родителя вправо, вниз / вверх, к узлу
+          local px, py = t.parent.tx, t.parent.ty
+          local mxx = px + dx * 0.5
+          U.set(U.mix(c, U.BG, 0.45))
+          gfx.line(px - x, py - y, mxx - x, py - y, 1); gfx.line(mxx - x, py - y, mxx - x, t.ty - y, 1); gfx.line(mxx - x, t.ty - y, t.tx - x, t.ty - y, 1)
+        end
+        if #t.files > 0 and t.ty1 - t.ty0 >= 1 then
+          U.set(U.mix(c, U.TEXT, 0.2))
+          for i = 1, #t.files do
+            local lx, ly = leafpos(t, i)
+            if ly >= top and ly < y + h then gfx.rect(lx - x, ly - y, 2, 2, 1) end
+          end
+        end
+      end
+    end
+  end
+  SM.buffered(G, ('tree|%d|%d|%d|%d|%.3f|%.1f|%.1f|%d'):format(x, y, w, h, zoom, V.px or 0, V.py or 0, G.ver), x, y, w, h, U, paint)
+  local hv, hd
+  local placed = {}
+  for _, t in ipairs(T.order) do
+    do
+      local lab = SM.short(t.name, math.max(3, math.floor(dx / math.max(1, L.cw)) - 1)) .. ((t.ty1 - t.ty0 > 2 * L.rh) and (' ' .. t.n) or '')
+      local lw = U.measure(lab)
+      local lx, ly = t.tx - lw - 2, t.ty - L.rh
+      local free = t.ty1 - t.ty0 >= L.rh * 0.8 and lx > x
+      if free then for _, q in ipairs(placed) do if lx < q[1] + q[3] and q[1] < lx + lw and ly < q[2] + L.rh and q[2] < ly + L.rh then free = false; break end end end
+      if free then
+        placed[#placed + 1] = { lx, ly, lw }
+        U.set(hubcol(t)); gfx.rect(lx - 1, ly, lw + 2, L.rh, 1); U.text(lx, ly, lab, U.BG)   -- инверсно, как у групп
+      end
+    end
+  end
+  -- наведение: ветвь под мышью — двоичный поиск нет смысла, но только листья ветвей, чья полоса под мышью
+  if inside then
+    for _, t in ipairs(lay) do
+      if my >= t.ty0 and my < t.ty1 and mx >= t.tx and mx < t.tx + dx and #t.files > 0 then
+        for i = 1, #t.files do
+          local lx, ly = leafpos(t, i)
+          local d = (mx - lx) ^ 2 + (my - ly) ^ 2
+          if d < 30 and (not hd or d < hd) then hv, hd = { node = t.files[i], px = lx, py = ly, r = 2 }, d end
+        end
+      end
+    end
+  end
+  -- сыгранные — по свежести, как в других видах (только файлы истории)
+  local pos = {}
+  for _, e in ipairs(V.hist or {}) do
+    local n = G.bypath and G.bypath[e.path]
+    if n and n.tnode then local lx, ly = leafpos(n.tnode, n.ti); pos[n] = { lx, ly } end
+  end
+  SM.hist_path(U, G, V, function(nd) local p0 = pos[nd]; if p0 then return p0[1], p0[2] end end, col)
+  for n, p0 in pairs(pos) do local age = SM.fresh(V, n); if age then U.set(SM.fresh_col(U, col(n.h), age)); gfx.circle(p0[1], p0[2], age == 0 and 3 or 2, 1, 1) end end
+  if hv and hv.node then U.set(U.TEXT); gfx.circle(hv.px, hv.py, 4, 0, 1) end
+  return hv
+end
+
 -- точки в свой буфер: перерисовка, только когда меняется ключ вида; иначе — копия буфера
 function SM.buffered(G, key, x, y, w, h, U, paint)
   w, h = math.max(1, math.floor(w)), math.max(1, math.floor(h))
-  if G.bkey ~= key or SM.bowner ~= G then
+  if G.bkey ~= key or SM.bowner ~= G then SM.repaints = (SM.repaints or 0) + 1; SM.last_bkey = key
     local d0 = gfx.dest
     gfx.setimgdim(SM.IMG, -1, -1); gfx.setimgdim(SM.IMG, w, h)
     gfx.dest = SM.IMG
@@ -842,6 +983,8 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local hv, hd
   if V.style == 'nebula' then
     hv = SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  elseif V.style == 'tree' then
+    hv = SM.draw_tree(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'cards' then
     hv = SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   else
@@ -972,7 +1115,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
     local bw = 0
-    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'ξ' }) do   -- ξ — случайная величина: случайный сэмпл
+    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'tree', 'ξ' }) do   -- ξ — случайная величина: случайный сэмпл
       local tw = U.measure(nm) + 2 * L.pad
       local on = nm == cur
       local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh

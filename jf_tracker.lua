@@ -11024,7 +11024,7 @@ ctx = {
     out[#out + 1] = { key = 'mod_slixer_ovbelow', label = 'scroll under the sample', kind = 'toggle', desc = 'DSP, slixer: the overview strip (the scroll of the zoomed wave) under the sample instead of over it',
       get = function() return state.slx_ovbelow == true end, set = function(v) state.slx_ovbelow = v or nil; reaper.SetExtState(EXT, 'mod_slixer_ovbelow', v and '1' or '0', true) end }
     out[#out + 1] = { sep = true, title = 'map', group = 'modules' }
-    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
+    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula', 'tree' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
       get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
     out[#out + 1] = { key = 'mod_map_ship', label = 'marked as a ship', kind = 'toggle', desc = 'the marked files also as a little FTL-style ship in the corner of the map (a room per class); off - only the marked list on the right',
@@ -18910,6 +18910,7 @@ function ctx.key_repeat(c, from_q)
     if st and st:byte(r.vk) ~= 0 then r.upn = 0; return true end
     r.upn = (r.upn or 0) + 1
     if r.upn >= 3 and ctx.dlog then pcall(ctx.dlog, ('keyrep stop c=%d vk=%d after %.2fs'):format(r.c, r.vk, now - r.t0)) end
+    if r.upn >= 3 and ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', ('stop c=%d vk=%d after %.2fs n=%d'):format(r.c, r.vk, now - r.t0, r.n or 0), false) end
     return r.upn < 3
   end
   if c > 0 and not from_q then
@@ -18928,7 +18929,9 @@ function ctx.key_repeat(c, from_q)
       local step = 1 / math.max(1, state.krrate or 30)
       R.nxt = R.nxt + step
       if now - R.nxt > 0.1 then R.nxt = now + step end
-      while now >= R.nxt and #ctx.keyq < 4 do ctx.keyq[#ctx.keyq + 1] = R.c; R.nxt = R.nxt + step end   -- быстрее кадров — в очередь
+      while now >= R.nxt and #ctx.keyq < 4 do ctx.keyq[#ctx.keyq + 1] = R.c; R.nxt = R.nxt + step; R.n = (R.n or 0) + 1 end   -- быстрее кадров — в очередь
+      R.n = (R.n or 0) + 1
+      if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', ('run c=%d n=%d t=%.2fs'):format(R.c, R.n, now - R.t0), false) end
       return R.c
     end
   end

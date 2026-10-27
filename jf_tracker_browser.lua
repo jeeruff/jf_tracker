@@ -581,7 +581,7 @@ function B.map_key(c)
     for k, v in ipairs(B.MAP_SRCS) do if v == B.map_src then i = k end end
     B.map_src = B.MAP_SRCS[i % #B.MAP_SRCS + 1]; B.mapG = nil
     if ctx.msg then ctx.msg('map: ' .. B.map_src) end
-  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
+  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'tree', tree = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
   elseif ch == 'r' then B.map_random()
   elseif c == 27 and B.mapV.sys then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif (ch == '+' or ch == '=') and B.mapV.style == 'cards' then B.SM.cardz = math.min(6, (B.SM.cardz or 1.5) * 1.25)   -- 27 окт (8): размер карточек
@@ -848,14 +848,20 @@ map_draw_inner = function(U, L, x, y, w, h)
     else
       -- 27 окт (2): папка — из индекса на диске сразу; фоном — тихая проверка изменений (подмена, только если другое)
       G = B.SM.load_cache(key, B.map_cache_file(key))
-      if G then G.bg = B.SM.sig_build(B.mp(), list_dir) else G = B.SM.build(B.mp(), list_dir) end
+      -- 27 окт (10): проверка изменений — не чаще раза в сутки на папку (обход 6700 папок по кадрам — десятки секунд CPU)
+      local ck = 'mapchk_' .. key:gsub('[^%w]', '_')
+      local last = tonumber(R.GetExtState('jf_tracker', ck)) or 0
+      if G then
+        if os.time() - last > 86400 then G.bg = B.SM.sig_build(B.mp(), list_dir); R.SetExtState('jf_tracker', ck, tostring(os.time()), true) end
+      else G = B.SM.build(B.mp(), list_dir); R.SetExtState('jf_tracker', ck, tostring(os.time()), true) end
       G.root = key
     end
     B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   end
+  if ctx.prof_ext then R.SetExtState('jf_dbg', 'mapst', ('b=%s rd=%s n=%d dirs=%d st=%d bg=%s key=%s'):format(tostring(G.building), tostring(G.rd ~= nil), #G.nodes, G.ndirs or 0, G.stack and #G.stack or -1, tostring(G.bg ~= nil), tostring(G.root)) .. (' rp=%d k=%s'):format(B.SM.repaints or 0, tostring(B.SM.last_bkey)), false) end
   if not G.building and B.SM.AN then B.an_tick(G) end   -- 27 окт (9): этап 2 — анализ по кусочку
   if G.bg and not G.building then   -- 27 окт (9): проверка — после чтения индекса
-    if B.SM.sig_scan(G.bg, 0.002) then
+    if B.SM.sig_scan(G.bg, 0) then   -- 0 — одна папка за кадр
       local S = G.bg
       G.bg = nil
       local n0, h0 = B.SM.sig_of(G)
