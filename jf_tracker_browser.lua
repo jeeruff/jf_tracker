@@ -1290,6 +1290,10 @@ function B.click(what)
     local o = (B.sel_order or {})[tonumber(what:sub(6))]
     if o and B.map_dbl('m:' .. (o.full or '')) then B.map_mark(o.full, o.e and o.e.name, true)
     elseif o and o.full then B.map_play(o.full, o.e and o.e.name) end
+  elseif what == 'pvslx' then   -- 27 окт: плеер — новый трек со slixer и этим файлом
+    if B.pv_cur then ctx.to_slixer(B.pv_cur, nil, nil, true) elseif ctx.msg then ctx.msg('slixer: play or select a file first') end
+  elseif what == 'pvdrum' then   -- 27 окт: плеер — пэд drumrs5k (есть рэк на треке — в свободную ноту, нет — новый рэк)
+    if B.pv_cur and ctx.drum_add_files then ctx.drum_add_files({ B.pv_cur }) elseif ctx.msg then ctx.msg('drumrs5k: play or select a file first') end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
     B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
@@ -1749,7 +1753,8 @@ function B.player_block(U, L, x, y, w, h, btn, opts)
     -- play / keys — на строке плеера (5 окт): автопрослушивание и клавиатура
     -- с высотой выбранного файла
     local px0 = x0
-    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'cell', 'drum', B.drum } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end   -- 24 окт: подпись cell (файл — в выбранную ячейку / пэд)
+    B.pv_cur = path   -- 27 окт: файл плеера (звучит / выбран) — для slixer / drumrs5k
+    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'cell', 'drum', B.drum }, { 'slixer', 'pvslx', false }, { 'drumrs5k', 'pvdrum', false } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end   -- 27 окт: + новый slixer, drumrs5k   -- 24 окт: подпись cell (файл — в выбранную ячейку / пэд)
     local lx0 = px0 + L.pad
     local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
     local sx0, sw = lx0 + lw, math.max(8, x0 + ww - lx0 - lw - vw)
