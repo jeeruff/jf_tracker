@@ -104,6 +104,9 @@ function IK.key(c, cur, n, nslots, ninst)
   end
   if ch == 'u' and IK.nmarks() > 0 then IK.clear_marks(); ctx.msg('lib: unmarked'); return true end
   if ch == 'r' and ctx.rename_inst then ctx.rename_inst(); return true end
+  -- 27 окт (5): ξ — R случайный сэмпл по имени папки / инструмента, [ ] — назад / вперёд по выпавшим
+  if ch == 'R' and ctx.lib_random then ctx.lib_random(); return true end
+  if (ch == '[' or ch == ']') and ctx.lib_random then ctx.lib_random(ch == '[' and -1 or 1); return true end
   if ch == 'x' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); return true end
   if ch == 'x' then
     local r0, r1 = IK.range(cur)

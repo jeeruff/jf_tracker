@@ -378,6 +378,26 @@ function B.map_enter(i)
   if B.map_src ~= 'files' then B.map_src = 'files' end
 end
 -- 27 окт (2): случайный сэмпл — найти то, до чего списком не дойдёшь: в секторе / группе под мышью, иначе из всех; сразу слушать
+-- 27 окт (5): опции модуля map (вкладка modules) — из ExtState при загрузке
+do
+  local function g(k) local v = tonumber(R.GetExtState and R.GetExtState('jf_tracker', 'mod_map_' .. k) or ''); return v end
+  if B.SM then
+    B.SM.DARK = g('dark') or B.SM.DARK; B.SM.RECOVER = g('recover') or B.SM.RECOVER
+    B.SM.SIZE_MAX = g('sizes') or B.SM.SIZE_MAX; B.SM.EDGES_MAX = g('edges') or B.SM.EDGES_MAX; B.SM.NEB_MAX = g('stars') or B.SM.NEB_MAX
+  end
+end
+-- 27 окт (5): история карты — что проиграно из неё (новое первым); шаг — номер прослушивания (точки гаснут по нему)
+B.map_hist, B.map_step = {}, 0
+function B.map_play(path, name)
+  if not path then return end
+  B.map_step = B.map_step + 1
+  for i = #B.map_hist, 1, -1 do if B.map_hist[i].path == path then table.remove(B.map_hist, i) end end
+  table.insert(B.map_hist, 1, { path = path, name = name or path:match('[^/]+$') or path, step = B.map_step })
+  while #B.map_hist > 200 do B.map_hist[#B.map_hist] = nil end
+  B.mapV.hist, B.mapV.step = B.map_hist, B.map_step
+  B.pl = nil
+  ctx.preview_file(path)
+end
 B.map_last_hub = nil
 function B.map_random()
   local G = B.mapG
@@ -387,8 +407,7 @@ function B.map_random()
   local list = hb and hb.list or G.nodes
   local n = list[math.random(#list)]
   if not n then return end
-  B.pl = nil
-  ctx.preview_file(n.path)
+  B.map_play(n.path, n.name)
   if ctx.msg then ctx.msg(('random%s: %s  (r - another one; Shift+click the group - mark it)'):format(hb and (' in ' .. hb.name) or '', n.name)) end
 end
 -- клавиши панели map: j k — папки мини-lf, l / Enter — войти, h — выше, t — следующий источник, v — graph / nebula
@@ -439,51 +458,94 @@ function B.map_pane(U, L, x, y, w, h)
   local hv = B.map_draw_fn(U, L, x + 1, top, w - 2, y + h - top - 1)
   return hover or hv
 end
--- 27 окт (4): отмеченные файлы — корабль (как в FTL) справа снизу карты: точки внутри — отмеченные; клик — слушать
+-- 27 окт (5): отмеченные файлы — корабль в духе FTL справа снизу карты: отсеки — классы (kick, snare, pads, fx …),
+-- в отсеке — имена файлов; двери между отсеками, двигатели слева, нос справа; lib — отмеченные в lib, save — и сохранить набором
 function B.map_ship(U, L, x, y, w, h)
   local list = B.sel_order or {}
-  local cw = L.cw
-  local sw, sh = math.min(w - 8, cw * 22), math.min(h - 8, L.rh * 5)
-  if sw < cw * 10 or sh < L.rh * 3 then return nil end
-  local sx, sy = x + w - sw - 6, y + h - sh - 6
+  local cw, rh = L.cw, L.rh
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  -- корпус: капсула с носом справа, двигатели слева, рубка сверху
-  local hx0, hx1 = sx + cw * 2, sx + sw - cw * 3
-  local hy0, hy1 = sy + L.rh, sy + sh - L.rh * 0.6
-  U.set(U.PANEL); gfx.rect(hx0, hy0, hx1 - hx0, hy1 - hy0, 1)
-  U.set(U.mix(U.LINE, U.TEXT, 0.35))
-  gfx.rect(hx0, hy0, hx1 - hx0, 2, 1); gfx.rect(hx0, hy1 - 2, hx1 - hx0, 2, 1); gfx.rect(hx0, hy0, 2, hy1 - hy0, 1)
-  local my0 = math.floor((hy0 + hy1) / 2)
-  gfx.line(hx1, hy0, sx + sw - 1, my0); gfx.line(hx1, hy1 - 1, sx + sw - 1, my0)   -- нос
-  gfx.line(hx1, hy0 + 1, sx + sw - 2, my0); gfx.line(hx1, hy1 - 2, sx + sw - 2, my0)
-  for k = 0, 1 do   -- двигатели
-    local ey = hy0 + 3 + k * math.floor((hy1 - hy0) / 2)
-    gfx.rect(sx, ey, cw * 2, math.floor((hy1 - hy0) / 2) - 6, 0)
-    U.set(U.AMBER); gfx.rect(sx - 3, ey + 2, 3, math.max(2, math.floor((hy1 - hy0) / 2) - 10), 1); U.set(U.mix(U.LINE, U.TEXT, 0.35))
+  -- отсеки по классам
+  local rooms, by = {}, {}
+  for i, o in ipairs(list) do
+    local nm = (o.e and o.e.name) or (o.full or ''):match('[^/]+$') or '?'
+    local parent = (o.full or ''):match('([^/]+)/[^/]+$')
+    local cat = B.SM and B.SM.category(nm, parent) or 'other'
+    cat = cat:gsub('^/', '')
+    local r = by[cat]
+    if not r then r = { name = cat, files = {} }; by[cat] = r; rooms[#rooms + 1] = r end
+    r.files[#r.files + 1] = { i = i, name = nm:gsub('%.[%w]+$', ''), full = o.full }
   end
-  gfx.rect(hx0 + cw * 4, sy + 2, cw * 6, L.rh - 2, 0)   -- рубка
-  U.text(hx0 + cw * 4 + 3, sy + 2, ctx.fit(('%d marked'):format(#list), cw * 6 - 4), #list > 0 and U.AMBER or U.GREY)
-  -- отсеки: точки — отмеченные файлы (сеткой внутри корпуса), лишние — «+N»
-  local ix0, iy0, iw, ih = hx0 + 6, hy0 + 6, hx1 - hx0 - 10, hy1 - hy0 - 12
-  local step = 9
-  local cols = math.max(1, math.floor(iw / step))
-  local rows = math.max(1, math.floor(ih / step))
-  local cap = cols * rows
+  table.sort(rooms, function(a, b) return #a.files > #b.files end)
+  local RW = cw * 12                                   -- ширина отсека
+  local LINES = 4                                       -- имён в отсеке, дальше «+N»
+  local RH = rh * (LINES + 1) + 4
+  local nr = math.max(1, #rooms)
+  local per = math.ceil(nr / 2)                         -- две палубы: верхняя и нижняя
+  local bodyw = per * (RW + 3) + 6
+  local SW = bodyw + cw * 6                             -- + двигатели и нос
+  local SH = (nr > 1 and 2 or 1) * (RH + 3) + rh + 8
+  if SW > w - 8 or SH > h - 8 then
+    -- не влезает — сжать: меньше имён в отсеке
+    LINES = math.max(1, math.floor(((h - 8 - rh - 8) / ((nr > 1) and 2 or 1) - 4) / rh) - 1)
+    RH = rh * (LINES + 1) + 4
+    SH = (nr > 1 and 2 or 1) * (RH + 3) + rh + 8
+    if SW > w - 8 or SH > h - 8 or LINES < 1 then return nil end
+  end
+  local sx, sy = x + w - SW - 6, y + h - SH - 6
+  local edge = U.mix(U.LINE, U.TEXT, 0.45)
+  local hull = U.mix(U.PANEL, U.LINE, 0.35)
+  local bx0, by0 = sx + cw * 3, sy + rh + 4             -- корпус с отсеками
+  local bx1, by1 = bx0 + bodyw, sy + SH
+  -- двигатели (слева, свечение янтарём) и нос (справа)
+  for k = 0, 1 do
+    local ey = by0 + 4 + k * (by1 - by0 - rh * 2 - 8)
+    U.set(hull); gfx.rect(sx + cw, ey, cw * 2, rh * 2, 1)
+    U.set(edge); gfx.rect(sx + cw, ey, cw * 2, rh * 2, 0)
+    U.set(U.AMBER); gfx.rect(sx + cw - 4, ey + 3, 4, rh * 2 - 6, 1)
+  end
+  U.set(hull); gfx.rect(bx0, by0, bodyw, by1 - by0, 1)
+  local midy = math.floor((by0 + by1) / 2)
+  for t = 0, 2 do U.set(t == 0 and edge or hull); gfx.line(bx1 + t, by0 + 6 + t, bx1 + cw * 2 - t, midy); gfx.line(bx1 + t, by1 - 6 - t, bx1 + cw * 2 - t, midy) end
+  U.set(edge); gfx.rect(bx0, by0, bodyw, by1 - by0, 0); gfx.rect(bx0 + 1, by0 + 1, bodyw - 2, by1 - by0 - 2, 0)
+  -- рубка сверху: счёт и кнопки
   local hv
+  local tx = bx0 + 4
+  local function btn(lab, id)
+    local tw = U.measure(lab) + 2 * L.pad
+    local hot = mx >= tx and mx < tx + tw and my >= sy and my < sy + rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(tx, sy, tw, rh, 1)
+    U.set(hot and U.AMBER or edge); gfx.rect(tx, sy, tw, rh, 0)
+    U.text(tx + L.pad, sy, lab, hot and U.AMBER or U.TEXT)
+    if hot then hv = id end
+    tx = tx + tw + 2
+  end
+  U.text(tx, sy, ('%d marked'):format(#list), #list > 0 and U.AMBER or U.GREY); tx = tx + U.measure('000 marked') + 4
+  if #list > 0 then btn('lib', 'mapshiplib'); btn('save', 'mapshipsave') end
+  if #list == 0 then U.text(bx0 + 6, by0 + 6, ctx.fit('m in the browser marks files', bodyw - 12), U.DIM); return hv end
+  -- отсеки: две палубы, двери (янтарные чёрточки) между соседями
   local playing
   if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end
-  for i, o in ipairs(list) do
-    if i > cap then
-      U.text(hx1 - cw * 4, hy1 - L.rh - 2, ('+%d'):format(#list - cap + 1), U.GREY)
-      break
+  for k, r in ipairs(rooms) do
+    local col_i, row_i = (k - 1) % per, (k - 1) // per
+    local rx = bx0 + 4 + col_i * (RW + 3)
+    local ry = by0 + 4 + row_i * (RH + 3)
+    U.set(U.BG); gfx.rect(rx, ry, RW, RH, 1)
+    U.set(edge); gfx.rect(rx, ry, RW, RH, 0)
+    if col_i > 0 then U.set(U.AMBER); gfx.rect(rx - 3, ry + math.floor(RH / 2) - 4, 3, 8, 1) end   -- дверь к соседу слева
+    if row_i > 0 then U.set(U.AMBER); gfx.rect(rx + math.floor(RW / 2) - 4, ry - 3, 8, 3, 1) end   -- дверь вверх
+    U.text(rx + 3, ry + 1, ctx.fit(r.name:upper() .. ' ' .. #r.files, RW - 6), U.GREY)
+    for j = 1, math.min(#r.files, LINES) do
+      local f = r.files[j]
+      local fy = ry + 1 + j * rh
+      local hot = mx >= rx and mx < rx + RW and my >= fy and my < fy + rh
+      local last = j == LINES and #r.files > LINES
+      if last then U.text(rx + 3, fy, ('+%d'):format(#r.files - LINES + 1), U.GREY)
+      else
+        if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(rx + 1, fy, RW - 2, rh, 1); hv = 'mapship' .. f.i end
+        U.text(rx + 3, fy, ctx.fit(f.name, RW - 6), (playing == f.full) and U.AMBER or (hot and U.TEXT or U.CYAN))
+      end
     end
-    local c, r = (i - 1) % cols, (i - 1) // cols
-    local px, py = ix0 + c * step + 3, iy0 + r * step + 3
-    local hot = mx >= px - 4 and mx < px + 5 and my >= py - 4 and my < py + 5
-    U.set((playing == o.full) and U.AMBER or (hot and U.TEXT or U.CYAN)); gfx.circle(px, py, 2.5, 1, 1)
-    if hot then hv = 'mapship' .. i end
   end
-  if #list == 0 then U.text(ix0, iy0, ctx.fit('m in the browser marks files', iw), U.DIM) end
   return hv
 end
 local map_draw_inner
@@ -546,7 +608,7 @@ map_draw_inner = function(U, L, x, y, w, h)
     if gfx.mouse_cap & 1 == 1 then B.mapV.px, B.mapV.py = pan.px + mx - pan.mx, pan.py + my - pan.my else B.map_pan = nil end
   end
   B.map_hv = hv
-  if hv and hv.slider then return 'mapsl' elseif hv and hv.back then return 'mapback' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
+  if hv and hv.hist then return 'maphist' .. hv.hist elseif hv and hv.slider then return 'mapsl' elseif hv and hv.back then return 'mapback' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
   return nil
 end
 
@@ -1096,13 +1158,18 @@ function B.click(what)
   elseif what == 'mapnode' then   -- 27 окт: узел карты — слушать
     local n = B.map_hv and B.map_hv.node
     if n and (n.path or ''):lower():match('%.rpp$') then if ctx.msg then ctx.msg('map: project ' .. n.name .. '  (' .. n.cat .. ') - open it in the pm tab') end   -- 27 окт: проект не слушается
-    elseif n then B.pl = nil; ctx.preview_file(n.path); if ctx.msg then ctx.msg('map: ' .. n.name .. '  (' .. n.cat .. ')') end end
+    elseif n then B.map_play(n.path, n.name); if ctx.msg then ctx.msg('map: ' .. n.name .. '  (' .. n.cat .. ')') end end
   elseif what == 'mapstyle' then B.mapV.style = (B.map_hv and B.map_hv.style) or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view  (v - next view, r - a random sample)') end
   elseif what == 'maprandom' then B.map_random()
   elseif what:match('^mapdir%d+$') then B.map_dcur = tonumber(what:sub(7)); B.map_enter()
+  elseif what == 'mapshiplib' then B.enter_marked()
+  elseif what == 'mapshipsave' then if ctx.marked_to_lib_save then ctx.marked_to_lib_save() end
   elseif what:match('^mapship%d+$') then   -- 27 окт (4): отмеченный файл в корабле — слушать
     local o = (B.sel_order or {})[tonumber(what:sub(8))]
-    if o and o.full then B.pl = nil; ctx.preview_file(o.full); if ctx.msg then ctx.msg('marked: ' .. (o.e and o.e.name or o.full) .. '  (Space in the browser - all of them in a row)') end end
+    if o and o.full then B.map_play(o.full, o.e and o.e.name); if ctx.msg then ctx.msg('marked: ' .. (o.e and o.e.name or o.full) .. '  (Space in the browser - all of them in a row)') end end
+  elseif what:match('^maphist%d+$') then   -- 27 окт (5): строка истории — ещё раз
+    local e = B.map_hist[tonumber(what:sub(8))]
+    if e then B.map_play(e.path, e.name); if ctx.msg then ctx.msg('history: ' .. e.name) end end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
     B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0

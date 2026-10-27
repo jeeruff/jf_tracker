@@ -1209,6 +1209,19 @@ local function rrect(x, y, w, h, fill, r)
   end
 end
 D.rrect = rrect
+-- 27 окт (5): кнопки ‹ ξ › у правого края выбранной строки lib (поверх волны): ξ — случайный сэмпл по имени папки, ‹ › — по выпавшим
+function D.lib_xi_btns(L, right, y, mx, my, hover)
+  local bw = gfx.measurestr('W') + 6
+  local x0 = right - 3 * (bw + 1)
+  for k, b in ipairs({ { '<', 'prev' }, { 'ξ', 'rand' }, { '>', 'next' } }) do
+    local bx = x0 + (k - 1) * (bw + 1)
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(bx, y + 1, bw, L.rh - 2, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(bx, y + 1, bw, L.rh - 2, 0)
+    text(bx + math.floor((bw - gfx.measurestr(b[1])) / 2), y + 1, b[1], hot and U.AMBER or U.TEXT)
+    if hot then hover.libxi = b[2]; hover.pool = nil end
+  end
+end
 -- 27 окт: рамка / заливка модуля DSP: rounded racks — скруглённая, иначе прямоугольник
 function D.mod_box(x, y, w, h, fill) if D.round_rack then rrect(x, y, w, h, fill, 4) else gfx.rect(x, y, w, h, fill and 1 or 0) end end
 -- 19 окт: хоткеи параметров сэмплера пэда (режим пэдов: буква — прыжок к параметру; буквы свободны в режиме пэдов)
@@ -6405,6 +6418,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- зоны (9 окт): ~ — огибающие take (вкладка automation), волна — вкладка item
       if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = (ntenv > 0 and mx >= tx0 and mx < wx) or nil, wave = (mx >= wx and npix > 8) or nil } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
+      if sel and not child then D.lib_xi_btns(L, ix + w - 4, y, mx, my, hover) end   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
       if drag and my >= y and my < y + L.rh then
         if my < y + L.rh / 2 then D.lib_drop, drop_y = { before = i }, y
         else

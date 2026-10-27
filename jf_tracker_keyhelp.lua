@@ -443,7 +443,8 @@ KH.PAGES = {
   inst = { title = 'lib', e = {
     { k = 'c', d = 'convert: l slices to the lib, s slice to drumrs5k (a pad per slice), w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track); in the lib and the item tab ! slices at transients instead' },
-    { k = 'j k', d = 'instrument down / up' },
+    { k = 'j k', d = 'instrument down / up (and onto the name of a lib folder: h / l / Enter - fold / open)' },
+    { k = 'R [ ]', t = {}, d = 'ξ - a random sample for the selected instrument: like the name of its lib folder (kick), else the first word of its name, from the map index (open the map pane once on your samples); [ ] - back / forward through what came up (back from the first - the original sound); also the < ξ > buttons on the row' },
     { k = 'm u r (lf)', t = {}, d = 'as in lf: m - mark the instrument and go down (amber), u - unmark all (no marks - u is undo), dd / x - cut the marked, yy - yank them, r - rename' },
     { k = 'h l (folders)', t = {}, d = 'lib folders (option lib folders): the cursor in a folder - h folds it (only >kicks 5 is left, j k skip it), l opens it; a click on the folder row - the same; the lib menu: save this folder as a lib, load a lib into the folder (its samples join the folder whatever their names)' },
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
@@ -503,6 +504,15 @@ KH.PAGES = {
     { k = 'b', d = 'big: the cards over the whole window (:pm big); Esc or b - back' },
     { k = '/', d = 'filter the cards: name, #tags, bpm, key, [status], daw (ableton, flstudio ...)' },
     { k = 'r', d = 'reload the jf_pm index' },
+  } },
+  map = { title = 'map - the sample map', e = {
+    { k = 'j k l h Enter', d = 'the mini lf on the left: folders of the browser folder (the map shows what the browser has open)' },
+    { k = 'v', d = 'next view: graph (rings of groups) > cards (a grid of sectors) > nebula (one galaxy, groups as rectangular sectors; a click on a sector - its system, galaxy / Esc - back)' },
+    { k = 'r', t = {}, d = 'ξ - a random file: from the group under the mouse, else from all; plays at once' },
+    { k = 't', d = 'the next source: files / db / proj / pm' },
+    { k = '+ - 0', d = 'zoom in / out / reset (also the wheel; drag - move)' },
+    { k = 'history', t = {}, d = 'nebula: the files played from the map on the right, newest on top (a click plays again); the dot just played is bright, then dark for 10 plays, then brightens back (options > modules > map)' },
+    { k = 'ship', t = {}, d = 'the marked files (m in the browser) as a ship in the corner: a room per class; lib - into the lib, save - into the lib and save it as a set (:libsave)' },
   } },
   browser = { title = 'browser', e = {
     { k = ': ↑ ↓  Ctrl+R', d = 'command line history: up / down - commands starting with what you typed (Ctrl+P / Ctrl+N too), Ctrl+R - fzf over the history' },
@@ -892,7 +902,7 @@ KH.BARS = {
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
-           { 'Space', 'listen' }, { '/', 'find' } },
+           { 'Space', 'listen' }, { '/', 'find' }, { 'R', 'ξ random' }, { '[ ]', 'ξ back / fwd' } },
   session = { { 'c', 'clipkb' }, { 'click > x', 'launch / stop' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
   clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
                { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
@@ -927,7 +937,7 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

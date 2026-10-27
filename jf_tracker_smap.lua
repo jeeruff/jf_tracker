@@ -362,7 +362,7 @@ function SM.neb_build(G)
   table.sort(hubs, function(a, b) return a.m > b.m end)
   part(stars, hubs, -1.05, -0.85, 1.05, 0.85)
   -- звезда — файл группы (первые по порядку): по ней наведение и клик
-  for _, hb in ipairs(G.hubs) do for j, st in ipairs(hb.stars) do st.n = hb.list[j] end end
+  for _, hb in ipairs(G.hubs) do for j, st in ipairs(hb.stars) do st.n = hb.list[j]; if st.n then st.n.star = st end end end
   G.gal = true
 end
 -- 27 окт (2): вид СИСТЕМЫ — сектор (группа / папка) на весь вид: все её файлы диском, подписи без наложений;
@@ -429,12 +429,65 @@ function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, i
   U.text(bx + L.pad, by, 'galaxy', hot and U.AMBER or U.TEXT)
   if hot then hv = { back = true } end
   U.text(bx + bw + L.pad, by, fit(title, w - bw - 3 * L.pad), c)
-  local pn = playing and G.bypath and G.bypath[playing]
-  if pn and pn.h == hb then local px, py = pos(pn); U.set(U.AMBER); gfx.circle(px, py, 4, 1, 1) end
+  for _, e in ipairs(V.hist or {}) do
+    local nd = G.bypath and G.bypath[e.path]
+    local age = nd and nd.h == hb and SM.fresh(V, nd)
+    if age and V.hist_by[e.path] == e then local px, py = pos(nd); U.set(SM.fresh_col(U, c, age)); gfx.circle(px, py, age == 0 and 4 or 3, 1, 1) end
+  end
   if hv and hv.node then U.set(U.TEXT); gfx.circle(hv.px, hv.py, 5, 0, 1) end
   return hv
 end
+-- 27 окт (5): свежесть прослушивания: 0 — только что (ярко), 1..10 — сразу тёмная, 11..20 — светлеет к обычной
+SM.DARK, SM.RECOVER = 10, 10
+function SM.fresh(V, n)
+  if not (V.hist and n) then return nil end
+  local e = V.hist_by and V.hist_by[n.path]
+  if not e then return nil end
+  local age = (V.step or 0) - e.step
+  if age > SM.DARK + SM.RECOVER then return nil end
+  return age
+end
+-- цвет точки по свежести: c — обычный цвет группы
+function SM.fresh_col(U, c, age)
+  if age == 0 then return U.AMBER end
+  local dark = U.mix(c, U.BG, 0.82)
+  if age <= SM.DARK then return dark end
+  return U.mix(dark, U.mix(c, U.TEXT, 0.35), (age - SM.DARK) / SM.RECOVER)
+end
+-- панель истории справа: проигранные файлы, новое сверху, цвет — свежесть; → hover { hist = i }
+function SM.hist_panel(U, L, V, x, y, w, h, fit, mx, my, inside)
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(x, y, 1, h, 1)
+  U.text(x + L.pad, y + 1, fit('HISTORY', w - 2 * L.pad), U.GREY)
+  local hv
+  local n = math.floor((h - L.rh - 2) / L.rh)
+  for i = 1, math.min(n, #(V.hist or {})) do
+    local e = V.hist[i]
+    local ry = y + L.rh + 2 + (i - 1) * L.rh
+    local age = (V.step or 0) - e.step
+    local hot = inside and mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, ry, w - 1, L.rh, 1); hv = { hist = i } end
+    local c = age == 0 and U.AMBER or (age <= SM.DARK and U.mix(U.TEXT, U.BG, 0.55) or U.GREY)
+    U.text(x + L.pad, ry, fit((e.name:gsub('%.[%w]+$', '')), w - 2 * L.pad), hot and U.TEXT or c)
+  end
+  if not V.hist or #V.hist == 0 then U.text(x + L.pad, y + L.rh + 2, fit('played files land here', w - 2 * L.pad), U.DIM) end
+  return hv
+end
 function SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  -- справа — история прослушанного; галактика — левее
+  V.hist_by = {}
+  for _, e in ipairs(V.hist or {}) do if not V.hist_by[e.path] then V.hist_by[e.path] = e end end
+  local hw = (w >= L.cw * 44) and math.min(L.cw * 20, math.floor(w * 0.3)) or 0
+  local hhv
+  if hw > 0 then
+    hhv = SM.hist_panel(U, L, V, x + w - hw, y + L.rh + 3, hw, h - L.rh - 3, fit, mx, my, inside)
+    w = w - hw
+    inside = inside and mx < x + w
+  end
+  local r = SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  return hhv or r
+end
+function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   if V.sys then
     for _, hb in ipairs(G.hubs) do if hb.name == V.sys then return SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, inside) end end
     V.sys = nil
@@ -508,10 +561,13 @@ function SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insid
       end
     end
   end
-  -- что звучит — подсветка звезды
-  local pn = playing and G.bypath and G.bypath[playing]
-  if pn and pn.h.stars then
-    for _, st in ipairs(pn.h.stars) do if st.n == pn then U.set(U.AMBER); gfx.circle(X(st.x), Y(st.y), 3, 1, 1) end end
+  -- 27 окт (5): прослушанные — по свежести (только что — ярко, потом тёмные 10 шагов, потом светлеют); поверх буфера
+  for _, e in ipairs(V.hist or {}) do
+    local nd = G.bypath and G.bypath[e.path]
+    local age = SM.fresh(V, nd)
+    if age and nd.star and V.hist_by[e.path] == e then
+      U.set(SM.fresh_col(U, col(nd.h), age)); gfx.circle(X(nd.star.x), Y(nd.star.y), age == 0 and 3.5 or 2, 1, 1)
+    end
   end
   if hv and hv.node then U.set(U.TEXT); gfx.circle(hv.px, hv.py, 4, 0, 1) end
   return hv
@@ -645,7 +701,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local sw = math.min(L.cw * 10, math.floor(w * 0.25))
   local lw = U.measure('dimension ')
   local right = x + w   -- левый край ползунков: подпись слева до него, не налезает
-  if w > lw + sw + 2 * L.pad + U.measure('graph cards nebula random ') + U.measure('300 files') then
+  if w > lw + sw + 2 * L.pad + U.measure('graph cards nebula ξ ') + U.measure('300 files') then
     right = x + w - sw - L.pad - lw - L.pad
     for k, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
       local sy = y + 2 + (k - 1) * L.rh
@@ -666,14 +722,14 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
     local bw = 0
-    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'random' }) do
+    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'ξ' }) do   -- ξ — случайная величина: случайный сэмпл
       local tw = U.measure(nm) + 2 * L.pad
       local on = nm == cur
       local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, tw, L.rh - 1, 1)
       U.set((hot or on) and U.AMBER or U.LINE); gfx.rect(bx, by, tw, L.rh - 1, 0)
       U.text(bx + L.pad, by, nm, (hot or on) and U.AMBER or U.TEXT)
-      if hot then hv = nm == 'random' and { random = true } or { style = nm } end
+      if hot then hv = nm == 'ξ' and { random = true } or { style = nm } end
       bx = bx + tw + 2
     end
     bx = bx - bw

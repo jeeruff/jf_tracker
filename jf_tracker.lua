@@ -1561,6 +1561,8 @@ ctx = {
     return 0, (snap and snap.last_row or 0)
   end,
   -- браузер: * / :mkdir — новая папка в текущей
+  -- 27 окт (5): корабль карты — отмеченные в lib, затем имя набора (:libsave)
+  marked_to_lib_save = function() local n = B.enter_marked(); vim.open_prompt('libsave ', ''); vim.msg = ('%d file(s) went into the lib - a name for the set (:libsave)'):format(n) end,
   browser_mkdir_prompt = function()
     if B.mode ~= 'files' then vim.msg = 'mkdir: only in files'; return end
     vim.open_prompt('mkdir ', '')
@@ -10985,6 +10987,68 @@ ctx = {
   end,
   lib_folder_cur = function() return draw.lib_folder_of and vim.inst and draw.lib_folder_of[vim.inst] or nil end,
   lib_hidden = function(i) return draw.lib_hidden and draw.lib_hidden[i] or false end,
+  -- 27 окт (5): ξ — случайный сэмпл инструменту lib: слово — имя папки lib (kick), иначе первое слово имени; кандидаты —
+  -- файлы индекса карты (панель map) того же класса или со словом в имени. d = -1 / 1 — назад / вперёд по уже выпавшим
+  -- (самый первый шаг назад — исходный звук)
+  lib_rand = {},
+  -- 27 окт (5): опции модулей (вкладка modules): раздел на модуль; значения — ExtState jf_tracker/mod_<модуль>_<ключ>
+  module_items = function()
+    local SM = B.SM
+    local function num(mod, key, label, min, max, step, fmt, desc, get, set)
+      return { key = 'mod_' .. mod .. '_' .. key, label = label, kind = 'num', min = min, max = max, step = step, fmt = fmt, desc = desc,
+               get = get, set = function(v) set(v); reaper.SetExtState(EXT, 'mod_' .. mod .. '_' .. key, tostring(v), true) end }
+    end
+    local out = { { sep = true, title = 'map', group = 'modules' } }
+    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
+      desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
+      get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
+    out[#out + 1] = num('map', 'dark', 'played: dark for', 0, 50, 1, '%d plays', 'a dot just played is bright; when another one plays it goes dark for this many plays, then brightens back',
+      function() return SM.DARK end, function(v) SM.DARK = v end)
+    out[#out + 1] = num('map', 'recover', 'played: brightens over', 1, 50, 1, '%d plays', 'after the dark plays, how many plays it takes the dot to get its normal brightness back',
+      function() return SM.RECOVER end, function(v) SM.RECOVER = v end)
+    out[#out + 1] = num('map', 'sizes', 'file sizes up to', 0, 200000, 5000, '%d files', 'dots get their size from the file size while the folder has no more files than this (opening every file of a huge folder is slow, worse on a network drive)',
+      function() return SM.SIZE_MAX end, function(v) SM.SIZE_MAX = v end)
+    out[#out + 1] = num('map', 'edges', 'graph lines up to', 0, 50000, 1000, '%d files', 'graph view: the lines file - group are drawn while there are no more files than this (more - a solid fill)',
+      function() return SM.EDGES_MAX end, function(v) SM.EDGES_MAX = v end)
+    out[#out + 1] = num('map', 'stars', 'nebula stars', 1000, 100000, 1000, '%d', 'nebula: how many files are drawn as stars at most (every group gets its share, at least one)',
+      function() return SM.NEB_MAX end, function(v) SM.NEB_MAX = v; if B.mapG then B.mapG.gal = nil end end)
+    return out
+  end,
+  lib_random = function(d)
+    local col = cur_col(); local e = col and col.pool[vim.inst]
+    if e and e.parent then e = e.parent end
+    if not (e and e.item and reaper.ValidatePtr(e.item, 'MediaItem*')) then vim.msg = 'ξ: select a sample in the lib'; return end
+    local _, gid = reaper.GetSetMediaItemInfo_String(e.item, 'GUID', '', false)
+    local H = ctx.lib_rand[gid] or { list = {}, i = 0 }
+    ctx.lib_rand[gid] = H
+    if d then
+      local ni = math.max(0, math.min(#H.list, H.i + d))
+      if ni == H.i then vim.msg = d < 0 and 'ξ: the original sound already' or 'ξ: no newer pick - R rolls a new one'; return end
+      H.i = ni
+      local path = H.list[ni]
+      local n = edit.swap_source(e.item, path)   -- nil — исходный звук
+      model.invalidate()
+      vim.msg = ('ξ %d/%d: %s (%d note(s); [ ] - back / forward, R - another)'):format(ni, #H.list, path and path:match('[^/]+$') or 'the original', n)
+      if path then ctx.preview_file(path) end
+      return
+    end
+    local G = B.mapG
+    if not G or G.building or #G.nodes == 0 then vim.msg = 'ξ: open the map pane once on your samples folder - its index is where ξ picks from'; return end
+    local word = (draw.lib_folder_of and draw.lib_folder_of[vim.inst]) or ((e.name or ''):lower():match('%a+') or '')
+    word = word:lower():gsub('^/', '')
+    local cands = {}
+    for _, n in ipairs(G.nodes) do
+      if n.cat == word or n.name:lower():find(word, 1, true) then cands[#cands + 1] = n end
+    end
+    if #cands == 0 then vim.msg = ('ξ: nothing like "%s" in the map index (%s)'):format(word, G.root); return end
+    local n = cands[math.random(#cands)]
+    while #H.list > H.i do H.list[#H.list] = nil end   -- выбор после шага назад — новая ветка
+    H.list[#H.list + 1] = n.path; H.i = #H.list
+    local k = edit.swap_source(e.item, n.path)
+    model.invalidate()
+    ctx.preview_file(n.path)
+    vim.msg = ('ξ %s: %s - %d of %d like it (%d note(s); [ ] - back / forward, R - another)'):format(word, n.name, #H.list, #cands, k)
+  end,
   kit_save = function(name, folder)
     name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
     if name == '' then vim.msg = 'libsave: a name please'; return end
@@ -13198,6 +13262,8 @@ ctx = {
       click = function() return ctx.theme_tab.click() end }
     items[#items + 1] = { gap = true, sep = true }
     for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
+    -- 27 окт (5): вкладка modules — у каждого модуля свой раздел со своими опциями (ctx.module_items)
+    for _, it in ipairs(ctx.module_items()) do items[#items + 1] = it end
     items[#items + 1] = { sep = true, title = 'hotkeys', group = 'hotkeys' }
     for _, pg in ipairs(KH.ORDER) do
       local page = KH.PAGES[pg]
@@ -25840,6 +25906,8 @@ local function frame()
       local hl = ctx.sl_layer_hot
       if dbl and click.zone == 'sllayer' then ctx.layer_menu(hl.root, hl.k) else ctx.layer_listen(hl.root.layers[hl.k]) end
       click = { t = now2, zone = 'sllayer' }
+    elseif hover.libxi then   -- 27 окт (5): ‹ ξ › выбранного сэмпла lib
+      ctx.set_focus('inst'); ctx.lib_random(hover.libxi == 'prev' and -1 or (hover.libxi == 'next' and 1 or nil))
     elseif hover.libdirh then   -- 27 окт: заголовок папки lib — свернуть / развернуть
       ctx.set_focus('inst'); ctx.lib_fold(hover.libdirh)
       click = { t = now2, zone = 'libdirh' }
