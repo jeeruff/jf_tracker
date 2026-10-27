@@ -463,6 +463,7 @@ function D.layout(snap, state, nregions)
   -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
   -- 27 окт: вместо колонки +N справа — знак «+» перед нотой (как папка в lf); место только у лейнов со сложенным (L.foldG)
   L.fold_on = state.foldfast and true or false; L.x_fold = nil; L.w_fold = ms('+')
+  L.envmark = state.envmark and true or false   -- 27 окт: «~» строк с автоматизацией — в той же колонке
   L.sub_w = x
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
@@ -507,18 +508,23 @@ function D.layout(snap, state, nregions)
   end
   -- 27 окт: лейн со сложенными нотами — узкая колонка «+» перед нотой, поля от ноты правее на её ширину; кэш на раскладку
   L.GFc = setmetatable({}, { __mode = 'k' })
-  function L.foldG(G)
+  -- 27 окт (2): в лейне и сложенные ноты, и автоматизация — строка низкая: колонка в два знака «+~»; высокая — «~» под «+»
+  L.fold2_tall = L.rh >= 2 * L.th
+  L.GFc2 = setmetatable({}, { __mode = 'k' })
+  function L.foldG(G, both)
     G = G or L
-    local k = L.GFc[G]
+    local wide = both and not L.fold2_tall
+    local cache = wide and L.GFc2 or L.GFc
+    local k = cache[G]
     if k then return k end
-    local s0, d = G.x_note, L.w_fold + L.pad
+    local s0, d = G.x_note, (wide and ms('+~') or L.w_fold) + L.pad
     local function sh(v) if v and v >= s0 then return v + d end return v end
     local fx2 = {}
     for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
     k = setmetatable({ x_fold = s0, x_note = s0 + d, x_inst = G.x_inst and sh(G.x_inst) or G.x_inst, x_slc = G.x_slc and sh(G.x_slc) or G.x_slc,
       x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del),
-      x_tfx = G.x_tfx and sh(G.x_tfx) or G.x_tfx, sub_w = G.sub_w + d }, { __index = G })
-    L.GFc[G] = k
+      x_tfx = G.x_tfx and sh(G.x_tfx) or G.x_tfx, sub_w = G.sub_w + d, fold_wide = wide or nil }, { __index = G })
+    cache[G] = k
     return k
   end
   -- 21 окт: чистый MIDI-трек (ни аудио в лейне, ни сэмплов в lib, не кит) — без колонки волны: поля левее на её ширину
@@ -929,7 +935,11 @@ function D.layout(snap, state, nregions)
             if pref ~= nil then show = pref end
             if not show then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
           end
-          if L.fold_on and lane.has_fold and not narrow then G = L.foldG(G) end   -- 27 окт: «+» перед нотой
+          do   -- 27 окт: «+» / «~» перед нотой
+            local fo = L.fold_on and lane.has_fold
+            local em = L.envmark and li == 1 and si == 1 and col.env_rows
+            if not narrow and (fo or em) then G = L.foldG(G, fo and em) end
+          end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -8697,6 +8707,14 @@ function D.frame(L, snap, rows, state, info)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else
               cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv)
+              -- 27 окт: в строке есть автоматизация трека — «~» в колонке слева от ноты (сложенные ноты «+» важнее)
+              -- «+» уже нарисован: «~» рядом (колонка в два знака) или под ним (высокая строка); без «+» — на его месте
+              local G2 = f.G or L
+              if f.si == 1 and f.li == 1 and G2.x_fold and c.col.env_rows and c.col.env_rows[r.row] then
+                if not (cell and cell.fold) then text(x + G2.x_fold, ty, '~', D.ENVMARK or U.AMBER)
+                elseif G2.fold_wide then text(x + G2.x_fold + ms('+'), ty, '~', D.ENVMARK or U.AMBER)
+                elseif L.fold2_tall then text(x + G2.x_fold, ty + L.th, '~', D.ENVMARK or U.AMBER) end
+              end
               -- 20 окт: метка-прыжок и на каждой ноте (её поле ноты)
               if cell and (cell.kind == 'audio' or cell.kind == 'midi') then hint('note', x + ((f.G or L).x_note or 0), y, math.max(ms('aa'), (f.G or L).w_note or 0), L.rh, { fi = fi, row = r.row }) end
               local kw = kwmap and kwmap[fi] and kwmap[fi][r.row]

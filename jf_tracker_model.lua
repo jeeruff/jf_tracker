@@ -208,6 +208,28 @@ end
 -- 19 окт: fold (опция) — быстрая MIDI-нота в строку, которой нет свободной подколонки, не плодит лейн: ложится
 -- в ячейку строки списком cell.fold (рисуется линией в своё время внутри строки); зумом (LPB) — своей строкой
 M.FOLD = false
+-- 27 окт: опция envmark — строки, где у трека есть автоматизация (точка любой огибающей или automation item): «~» слева от ноты
+M.ENVMARK = false
+M.ENVMARK_MAX = 20000   -- точек на огибающую не больше (большие проекты)
+function M.env_rows(tr, lpb)
+  local rows, any = {}, false
+  for i = 0, R.CountTrackEnvelopes(tr) - 1 do
+    local env = R.GetTrackEnvelope(tr, i)
+    for k = 0, math.min(R.CountEnvelopePoints(env), M.ENVMARK_MAX) - 1 do
+      local _, t = R.GetEnvelopePoint(env, k)
+      rows[M.row_of_qn(R.TimeMap2_timeToQN(0, t), lpb)] = true; any = true
+    end
+    for k = 0, (R.CountAutomationItems and R.CountAutomationItems(env) or 0) - 1 do
+      local pos = R.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false)
+      local len = R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false)
+      local r0 = M.row_of_qn(R.TimeMap2_timeToQN(0, pos), lpb)
+      local r1 = math.min(r0 + 4096, M.row_of_qn(R.TimeMap2_timeToQN(0, pos + len) - 1e-6, lpb))
+      for r = r0, r1 do rows[r] = true end
+      any = true
+    end
+  end
+  return any and rows or nil
+end
 -- 20 окт: take FX у ноты — значок fx рядом с нотой; лейн с такими нотами получает под него место (lane.has_tfx)
 M.tfx_memo = {}
 local function place(lane, r0, r1, head, cont, tail, e1)
@@ -731,6 +753,7 @@ function M.build(lpb)
       -- части пересборки — в M.bprof (пульс hb: что дорого на большом проекте)
       local t0 = R.time_precise()
       col.envs = M.track_envs(tr, lpb)
+      col.env_rows = M.ENVMARK and M.env_rows(tr, lpb) or nil   -- 27 окт: «~» на строках с автоматизацией
       col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
       local t1 = R.time_precise()
       col.pool = M.track_pool(tr, depot_tr, nil, snap.end_pos, snap.zone, col.guid, #snap.cols == 0)

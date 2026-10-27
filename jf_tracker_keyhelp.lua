@@ -151,7 +151,7 @@ KH.PAGES = {
     { k = 'css csm csl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
-    { k = '- +  Opt+Shift+J K', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel); Opt+Shift+J - LPB up (opens rows), Opt+Shift+K - down (folds them), no Shift for + on a German layout; a + before a note - more notes folded into that row, LPB + shows them - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
+    { k = '- +  Opt+Shift+J K', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel); Opt+Shift+J - LPB up (opens rows), Opt+Shift+K - down (folds them), no Shift for + on a German layout; a + before a note - more notes folded into that row, LPB + shows them; a ~ - the track has automation on that row (option mark automation rows) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
     { k = 'z. z,  Opt+Shift+L H', d = 'the cursor track wider / narrower (its own width): its columns open / close one step at a time; a count - N steps (3 Opt+Shift+L)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
     { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r edit the text (:vis / :mcmd), Enter - visor: pick with previews, x delete; w b e - next / previous marker', t = {} },
