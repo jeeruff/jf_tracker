@@ -863,7 +863,7 @@ function V.lines()
                 'bandcamp  https://jeeruff.bandcamp.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
   out[#out + 1] = ''
-  out[#out + 1] = 'Business Source License 1.1 (see LICENSE, NOTICE): free to use, not for resale. No warranty.'
+  out[#out + 1] = 'PolyForm Shield 1.0.0 (see LICENSE, NOTICE): free to use, no competing products. No warranty.'
   out[#out + 1] = ''
   for _, l in ipairs(V.THANKS) do out[#out + 1] = l end
   out[#out + 1] = ''

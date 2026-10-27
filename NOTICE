@@ -1,6 +1,9 @@
 jf_tracker
 Copyright (c) 2026 jeeruff. All rights reserved, except as granted in LICENSE
-(Business Source License 1.1).
+(PolyForm Shield License 1.0.0).
+
+Required Notice: Copyright (c) 2026 jeeruff (https://github.com/jeeruff). jf_tracker - a tracker for REAPER.
+Licensor Line of Business: jf_tracker - a tracker, sampler and music sequencing tool for REAPER and other music software (https://github.com/jeeruff)
 
 Author: jeeruff (https://github.com/jeeruff). Developed since 2026-10-02; the
 git history of this repository records the work commit by commit.
@@ -9,8 +12,13 @@ Code was written with an AI assistant under the author's direction. The design,
 the ideas below, their selection and arrangement, and every decision on what the
 tool does and how it feels are the author's.
 
-The name "jf_tracker" refers to this original work. Derivative works must use a
-different name (see LICENSE, Additional Use Grant).
+In short (the LICENSE text decides): use it for anything, including making and
+selling music; change it; share it for free with LICENSE and NOTICE. Do not use
+it to provide a product that competes with jf_tracker - paid or free. For other
+arrangements, ask the author.
+
+The name "jf_tracker" refers to this original work; changed copies must not be
+presented as the original.
 
 
 Original ideas of the author

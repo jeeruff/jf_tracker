@@ -128,14 +128,12 @@ The DSP module texts use descriptions from Chris Johnson's
 
 ## License
 
-jf_tracker is source-available under the [Business Source License 1.1](LICENSE):
+jf_tracker is source-available under the [PolyForm Shield License 1.0.0](LICENSE):
 
-- use it for anything, including music you sell; change it for yourself;
+- use it for anything, including music you sell; change it;
 - share it and your changes for free, with `LICENSE` and `NOTICE` kept;
-- do not sell it, its forks or a paid bundle / service with it, and do not
-  publish a fork under the name jf_tracker - ask the author for a license;
-- four years after each version comes out, that version becomes
-  GPL-3.0-or-later.
+- do not use it to make a product that competes with jf_tracker - paid or free
+  (a fork sold or given away as another tracker); ask the author for other terms.
 
 Author and the ideas behind it: [NOTICE](NOTICE). It comes with no warranty.
 
