@@ -850,6 +850,9 @@ function B.click(what)
   elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
     B.mark(tonumber(what:sub(3)), m.alt and 'clear' or (m.shift and 'set' or nil))   -- 20 окт: Opt+клик — очистить (было Cmd)
+  elseif what:match('^rec%d+$') then   -- 27 окт: только что прослушанный (плеер большого браузера) — играть ещё раз
+    local pth = B.recent_load()[tonumber(what:sub(4))]
+    if pth then B.pl = nil; ctx.preview_file(pth) end
   elseif what:match('^pcol%d+$') then   -- 27 окт: колонка родителя — туда (папка) / к файлу в ней
     local e = B.pcol and B.pcol.list[tonumber(what:sub(5))]
     if e then
@@ -1214,7 +1217,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — не вкладкой, а в плеере (большой браузер)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -1246,6 +1249,9 @@ function B.draw(U, L, x, y, w, h)
     if w >= L.cw * 90 then wh = math.max(wh, math.min(8 * L.rh, math.floor(h * 0.12))) end   -- 27 окт: браузер развёрнут — плеер выше
     local wy = sy - wh - 2
     local x0, ww = x + L.pad + 2, w - 2 * L.pad - 4
+    -- 27 окт: большой браузер — справа от волны плеера только что прослушанные (щелчок — играть, играющий — янтарём)
+    local rx, rw
+    if w >= L.cw * 90 then rw = math.floor(ww * 0.3); rx = x0 + ww - rw; ww = ww - rw - L.pad end
     local pos, len, ppath
     if ctx.preview_pos then pos, len, ppath = ctx.preview_pos() end      -- (a and f() отрезал бы хвост значений)
     local path = ppath or B.preview_path(B.entries[B.cur])
@@ -1268,6 +1274,22 @@ function B.draw(U, L, x, y, w, h)
     end
     if mx >= x0 and mx < x0 + ww and my >= wy and my < wy + wh and path then
       hover = 'pvwave'; B.pv_frac = (mx - x0) / ww; B.pv_path = path
+    end
+    if rx then
+      U.set(U.BG); gfx.rect(rx, wy, rw, wh, 1)
+      U.set(U.LINE); gfx.rect(rx, wy, rw, wh, 0)
+      local rc = B.recent_load()
+      local nr = math.max(1, math.floor((wh - 2) / L.rh))
+      if #rc == 0 then U.text(rx + L.pad, wy + 1, ctx.fit('recent: nothing heard yet', rw - 2 * L.pad), U.DIM) end
+      for i = 1, math.min(nr, #rc) do
+        local ry = wy + 1 + (i - 1) * L.rh
+        local pth = rc[i]
+        local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
+        local on = ppath == pth
+        if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(rx + 1, ry, rw - 2, L.rh, 1) end
+        U.text(rx + L.pad, ry, ctx.fit(pth:match('([^/]+)$') or pth, rw - 2 * L.pad), on and U.AMBER or (hot and U.TEXT or U.GREY))
+        if hot then hover = 'rec' .. i end
+      end
     end
     -- слайдер громкости: подпись | дорожка | dB
     local vol = ctx.preview_vol and ctx.preview_vol() or 1
