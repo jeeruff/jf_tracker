@@ -9549,7 +9549,13 @@ function D.frame(L, snap, rows, state, info)
       if ncol == 1 and bx + bw1 + extra > room and room - bx - extra - L.pad >= L.cw * 10 then bw1 = room - bx - extra - L.pad end
       local bw = bw1 * ncol
       -- 26 окт: пульт slixer — во всю ширину DSP: кнопки в меньше рядов, волне и прицелу больше высоты
-      if f.view == 'slixer' and D.SX and not f.container then bw = math.max(bw, cx1 - cx0 - 2 * L.pad) end
+      -- 27 окт: не во всю ширину, а по самому длинному ряду кнопок (просьба: «широковато, поуже»)
+      if f.view == 'slixer' and D.SX and not f.container then
+        local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
+        local rows, low = D.SX.items(v0, function(name) return info.slx_param and info.slx_param(f.i, name) end)
+        local nat = math.max(D.SX.natural_w(rows, ms, L.pad), D.SX.natural_w({ (function() local fl = {}; for _, r in ipairs(low or {}) do for _, it in ipairs(r) do fl[#fl + 1] = it end end; return fl end)() }, ms, L.pad)) + 2 * L.pad + 2
+        bw = math.max(bw, math.min(cx1 - cx0 - 2 * L.pad, nat))
+      end
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
       if f.kit and D.DR then
         local kk = tostring(info.pool_col and info.pool_col.guid or '') .. ':' .. tostring(f.fguid or f.i)

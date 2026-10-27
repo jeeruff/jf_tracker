@@ -102,6 +102,16 @@ function SX.layout(rows, x0, y0, w, rh, ms, pad)
   return out, nrow
 end
 
+-- 27 окт: естественная ширина пульта — самый длинный ряд кнопок (каждый ряд в одну строку)
+function SX.natural_w(rows, ms, pad)
+  local mw = 0
+  for _, row in ipairs(rows or {}) do
+    local x = 0
+    for _, it in ipairs(row) do x = x + (it.kind == 'zone' and (ms(it.lab) + 2 * pad) or (bw_of(it, ms, pad) + 2)) end
+    mw = math.max(mw, x)
+  end
+  return mw
+end
 -- рисование кнопок; hover → { it = …, x, y, w }
 function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
   local hv

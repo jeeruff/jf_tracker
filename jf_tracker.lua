@@ -18304,6 +18304,27 @@ function ctx.slx_drag_tick()
   local nf = d.fine and (d.fine.base + (gfx.mouse_x - d.fine.mx0) / math.max(1, d.fine.ww) * d.fine.span) or (w.f0 + (gfx.mouse_x - w.x) / w.w * w.fn)
   d.frame = math.max(lo, math.min(hi, nf))
   state.status = ('slixer: slice %d starts at %.3fs - release to keep'):format(d.edge, d.frame / math.max(1, v.sr or 48000))
+  -- 27 окт: spam — пока тянешь (и в прицеле), край звучит сам: кусок 0.12 с от него, перезапуск раз в 0.12 с
+  -- при сдвиге (roll как на SP-404 и в слайсере lib); звук — айтем lib, связанный со slixer
+  if gfx.mouse_cap & 1 == 1 and state.sliceaudition then
+    local now = reaper.time_precise()
+    if math.abs(d.frame - (d.roll_f or v.starts[d.edge])) >= 1 and now - (d.roll_t or 0) >= 0.12 then
+      d.roll_t, d.roll_f = now, d.frame
+      local t = dsp_target()
+      local tr = t and t.col and t.col.track
+      local item = tr and ctx.slx_item_of(reaper.TrackFX_GetFXGUID(tr, d.f.fx or d.f.i))
+      local tk = item and reaper.GetActiveTake(item)
+      if tk then
+        local sr = math.max(1, v.sr or 48000)
+        local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+        local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+        local nxt = (v.starts[d.edge + 1] or v.frames) / sr
+        local a = (d.frame / sr - offs) / rate
+        local b = (math.min(nxt, d.frame / sr + 0.12) - offs) / rate
+        if b > a and a >= 0 then ctx.preview_slice(tr, { item = item, take = tk, offs = offs, rate = rate }, a, b) end
+      end
+    end
+  end
   if gfx.mouse_cap & 1 == 1 then return end
   draw.slx_drag = nil
   if math.abs(d.frame - v.starts[d.edge]) < 1 then return end   -- щелчок без сдвига — ничего не менять
@@ -23125,7 +23146,7 @@ local function frame()
     local e = hover.btn.send
     state.status = ('%s %s %s - click: routing menu, Opt+click: remove this %s'):format(hover.btn.col.name or 'track', e.dir or '>', e.name or '', e.hw and 'output' or (e.recv and 'receive' or 'send'))
   elseif hover.slx then local it = hover.slx.it; state.status = 'slixer: ' .. (it.name or it.lab) .. (it.key and ('  (' .. it.key .. ' in the plugin window)') or '') .. (it.kind == 'menu' and ' - click: list' or it.kind == 'val' and ' - wheel: change' or it.src == 'press' and ' - opens the plugin window' or '')
-  elseif hover.slxaim and hover.slxaim.a.spam then state.status = 'spam: a moved slice edge plays its slice by itself (the tracker slicer shares it)'
+  elseif hover.slxaim and hover.slxaim.a.spam then state.status = 'spam: while you drag a slice edge (also in the sniper zoom) a short roll plays from it; let go - its slice plays (the tracker slicer shares it)'
   elseif hover.slxaim then state.status = 'slixer aim - the edge up close: drag - fine move, wheel - wider / closer'
   elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
   elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: cut it in the tracker slicer, drop a file: new sample'
