@@ -18977,20 +18977,24 @@ function ctx.key_repeat(c, from_q)
   -- повтор вставал после ~16 шагов); остановка пишется в журнал debug
   -- 27 окт (3): нажата по состоянию; мигнуло «отпущена» на кадр — терпим 2 кадра подряд, на 3-й — стоп
   -- (ждать события отпускания нельзя: Enter = код 13 стоял на vk «M», его отпускания не бывает — Enter x47)
-  -- 27 окт (4): держат — состояние нажато, ИЛИ системный повтор этой клавиши был недавно (0.15 с), ИЛИ «отпущена»
-  -- длится меньше 0.2 с (было: 3 кадра — на медленных кадрах и с реальной клавиатурой глохло у конца списка)
+  -- 27 окт (5): ОТПУСКАНИЕ — событием (JS_VKeys_GetUp после последнего нажатия / системного повтора): стоп сразу, без
+  -- окна (окно 0.2 с давало гост-повтор после короткого тапа). Без события отпускания держим, даже если состояние
+  -- мигнуло «отпущена»; страховка от потерянного отпускания — «отпущена» 0.5 с и ни одного системного повтора
   local function held(r)
-    local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
-    if st and st:byte(r.vk) ~= 0 then r.up_t = nil; return true end
-    if r.evt and now - r.evt < 0.15 then r.up_t = nil; return true end
-    r.up_t = r.up_t or now
-    local ok = now - r.up_t < 0.2
-    if not ok then
-      local why = ('stop c=%d vk=%d after %.2fs n=%d (state up %.2fs, last os repeat %s)'):format(r.c, r.vk, now - r.t0, r.n or 0, now - r.up_t, r.evt and ('%.2fs ago'):format(now - r.evt) or 'never')
-      if ctx.dlog then pcall(ctx.dlog, 'keyrep ' .. why) end
-      if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', why, false) end
+    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp((r.evt or r.t0) - 0.005)
+    local why
+    if up and up:byte(r.vk) ~= 0 then why = 'key up'
+    else
+      local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
+      if st and st:byte(r.vk) ~= 0 then r.up_t = nil; return true end
+      r.up_t = r.up_t or now
+      if now - r.up_t < 0.5 or (r.evt and now - r.evt < 0.5) then return true end
+      why = 'state up 0.5s, no os repeat'
     end
-    return ok
+    local msg = ('stop c=%d vk=%d after %.2fs n=%d (%s)'):format(r.c, r.vk, now - r.t0, r.n or 0, why)
+    if ctx.dlog then pcall(ctx.dlog, 'keyrep ' .. msg) end
+    if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', msg, false) end
+    return false
   end
   if c > 0 and not from_q then
     if R and R.c == c then
