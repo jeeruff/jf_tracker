@@ -335,7 +335,7 @@ local state = {
   krdelay = tonumber(reaper.GetExtState(EXT, 'krdelay')) or 250, krrate = tonumber(reaper.GetExtState(EXT, 'krrate')) or 30,   -- 27 окт: свой автоповтор зажатой клавиши (0 — системный)
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
-  hardedges = reaper.GetExtState(EXT, 'hardedges') == '1',   -- 27 окт: по умолчанию выкл — нота, что длиннее паттерна, звучит в следующий (BS не режет её по линии паттерна)
+  hardedges = reaper.GetExtState(EXT, 'hardedges2') == '1',   -- 27 окт (ключ hardedges2: старое сохранённое «вкл» сброшено один раз): по умолчанию выкл — нота, что длиннее паттерна, звучит в следующий (BS не режет её по линии паттерна)
   escstop = reaper.GetExtState(EXT, 'escstop') ~= '0',   -- 17 окт: по умолчанию вкл, стоп на месте плейхеда
   escmode = reaper.GetExtState(EXT, 'escmode') == 'vim' and 'vim' or 'renoise',
   patcode = reaper.GetExtState(EXT, 'patcode') == 'dec' and 'dec' or 'hex',   -- 12 окт: вид кодов паттернов (AF / A15)
@@ -772,7 +772,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -12385,7 +12385,7 @@ ctx = {
     if not (e and e.item) then vim.msg = 'transpose: pick a sample in the lib'; return end
     ctx.sp_adjust(e, 'st', d)
     local p = reaper.ValidatePtr(e.take, 'MediaItem_Take*') and reaper.GetMediaItemTakeInfo_Value(e.take, 'D_PITCH') or 0
-    vim.msg = ('%s: transpose %+d st  (Shift+Opt+J / K)'):format(e.name or 'instrument', math.floor(p + 0.5))
+    vim.msg = ('%s: transpose %+d st'):format(e.name or 'instrument', math.floor(p + 0.5))
   end,
   -- 11 окт: Shift+Opt+H / L — playrate выбранного инструмента −/+ 0.01 (счётчик — на N)
   inst_rate = function(d)
@@ -12999,7 +12999,7 @@ ctx = {
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
-      { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - an o in a narrow column at the side of the cell (O - several) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
+      { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - a + before the note (as a folder in lf) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
       { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows); 21 Oct: the view decides - project view (zp) moves notes across patterns up to =END, pattern view keeps it in the pattern (pushed out - deleted); track - across patterns always. pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =END (the pattern library after =END stays), the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
       flag('hdrmeter', 'header meter', 'a thin meter under v in the track header (armed audio - the input level; MIDI on the track input - a yellow flash); the yellow MIDI bar on the track itself stays'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
@@ -18626,6 +18626,67 @@ function ctx.slx_param(fxi, name)
   return v, pi, lo, hi, tr
 end
 -- 25 окт: кнопка пульта slixer (jf_tracker_slxpanel.lua): параметр, команда экземпляру, клавиша окна, трекер
+-- 27 окт: GUI ПЛАГИНА ПОВЕРХ БЛОКА DSP: родное окно плагина без рамки ставится ровно на прямоугольник модуля и ездит
+-- с ним (прокрутка, раскладка); блок ушёл с экрана / DSP скрыт — окно закрыто, вернулся — открыто. Только позиция окна
+-- (JS_Window_SetPosition / SetStyle), без сообщений окнам. Кнопка gui в шапке модуля
+function ctx.fxgui_toggle(f)
+  if not (f and f.fguid) then return end
+  draw.fxgui = draw.fxgui or {}
+  local on = not draw.fxgui[f.fguid]
+  draw.fxgui[f.fguid] = on or nil
+  if not on then
+    local t = dsp_target()
+    if t and t.col and t.col.track then reaper.TrackFX_Show(t.col.track, f.fx or f.i, 2) end
+    ctx.fxgui_open = ctx.fxgui_open or {}; ctx.fxgui_open[f.fguid] = nil
+  end
+  vim.msg = on and ('gui: the window of %s sits over its block (gui again - back to the tracker view)'):format(f.name or 'the fx') or 'gui: tracker view'
+end
+function ctx.fxgui_cmd()
+  local t = dsp_target()
+  local f = t and (t.fx or {})[dsp_sel.fx]
+  if not f then vim.msg = 'gui: select an fx in DSP first'; return end
+  ctx.fxgui_toggle(f)
+end
+function ctx.fxgui_tick()
+  if not (draw.fxgui and next(draw.fxgui) and reaper.JS_Window_SetPosition) then return end
+  local t = dsp_target()
+  local tr = t and not t.take and t.col and t.col.track
+  ctx.fxgui_open = ctx.fxgui_open or {}
+  local O = ctx.fxgui_open
+  for guid in pairs(draw.fxgui) do
+    local r = draw.fxgui_rect and draw.fxgui_rect[guid]
+    local show = tr and r and r.vis and state.dsp ~= false and r.w > 40 and r.h > 40
+    local o = O[guid]
+    if show then
+      if reaper.TrackFX_GetFXGUID(tr, r.fi) ~= guid then show = false end
+    end
+    if show then
+      local hwnd = reaper.TrackFX_GetFloatingWindow(tr, r.fi)
+      if not hwnd then
+        reaper.TrackFX_Show(tr, r.fi, 3); hwnd = reaper.TrackFX_GetFloatingWindow(tr, r.fi)
+        if ctx.hwnd_self == nil then ctx.hwnd_self = reaper.JS_Window_Find('jf_tracker', true) or false end
+        if ctx.hwnd_self and reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(ctx.hwnd_self) end   -- клавиатура — трекеру
+        o = nil
+      end
+      if hwnd then
+        local sx0, sy0 = gfx.clienttoscreen(r.x, r.y)
+        local sx1, sy1 = gfx.clienttoscreen(r.x + r.w, r.y + r.h)
+        local key = ('%d %d %d %d'):format(sx0, sy0, sx1, sy1)
+        if not o or o.hwnd ~= hwnd then
+          if reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'POPUP') end
+          o = { hwnd = hwnd }; O[guid] = o
+        end
+        if o.key ~= key then
+          reaper.JS_Window_SetPosition(hwnd, math.min(sx0, sx1), math.min(sy0, sy1), math.abs(sx1 - sx0), math.abs(sy1 - sy0))
+          o.key = key
+        end
+      end
+    elseif o then
+      if tr and r and reaper.TrackFX_GetFXGUID(tr, r.fi) == guid then reaper.TrackFX_Show(tr, r.fi, 2) end
+      O[guid] = nil
+    end
+  end
+end
 -- 27 окт: АВТОПОВТОР ЗАЖАТОЙ КЛАВИШИ — свой: пауза state.krdelay мс, потом state.krrate раз в секунду. Системные повторы
 -- той же клавиши, пока она физически держится (JS_VKeys_GetState), гасятся. Только клавиши с понятным кодом (буквы, цифры,
 -- стрелки, Ctrl+буква); ноты в INSERT / на клавиатуре — системный повтор (по нему длина ноты удержанием). krdelay 0 — как было
@@ -23202,7 +23263,7 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
-  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - an o at the side of the cell (O - several), no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
+  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - a + before the note, no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
@@ -25437,7 +25498,8 @@ local function frame()
       -- кнопки блока: O окно, B bypass, x удалить
       ctx.set_focus('dsp')
       dsp_sel.fx = hover.dspbtn.fx
-      if hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
+      if hover.dspbtn.what == 'gui' then ctx.fxgui_toggle(hover.dspbtn.f)   -- 27 окт
+      elseif hover.dspbtn.what == 'open' then ctx.dsp_show(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bypass' then ctx.dsp_bypass(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'delta' then ctx.dsp_delta(hover.dspbtn.fx)
       elseif hover.dspbtn.what == 'bands' then ctx.dsp_bands(hover.dspbtn.fx)   -- 23 окт: ÷ — в полосы
@@ -26418,6 +26480,7 @@ local function frame()
   end
   if draw.slx_drag or ctx.slx_spam then ctx.slx_drag_tick() end
   if ctx.slx_vdrag then ctx.slx_vdrag_tick() end
+  ctx.fxgui_tick()   -- 27 окт: окна плагинов поверх своих блоков DSP (gui)
   if gfx.mouse_cap & 16 == 16 or ctx.slx_vk then ctx.slx_optkeys() end   -- 27 окт: Opt+буква — кнопки пульта slixer в DSP   -- 26 окт: граница среза slixer за мышью
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then

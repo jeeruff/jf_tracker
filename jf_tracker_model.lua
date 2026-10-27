@@ -2058,7 +2058,7 @@ function build_one(tr, fx, out)
       end
       local e = { i = fx, name = renamed or lay.title or short, enabled = A.GetEnabled(tr, fx), np = np, params = params, cols = lay.cols or 1, rs5k = lay.rs5k,
                   groups = lay.groups, rows = lay.rows,                -- 9 окт: колонка = группа с заголовком
-                  heads = next(heads) and heads or nil, colw = lay.colw }   -- 13 окт: секции потоком, ширина колонки (знаков)
+                  heads = next(heads) and heads or nil, colw = lay.colw, headcol = lay.headcol }   -- 13 окт: секции потоком, ширина колонки (знаков); 27 окт: цвет заголовков
       e.np = np_all
       if lay_pages then e.pages, e.page = lay_pages, lay_page end   -- 16 окт: вкладки модуля
       -- живой вид модуля (гранулятор): какой и какой параметр тянется по нему

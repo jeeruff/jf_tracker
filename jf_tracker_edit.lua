@@ -4516,30 +4516,35 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
             local p0, p1 = P(t0), P(t1)
             local dp = p1 - p0
+            -- 27 окт: keepend — что за концом паттерна (следующий паттерн), на месте; нота, что уходит за конец, держит свой конец
+            local plim = (keepend and fin > limit + EPS) and P(limit) or math.huge
             local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
             for k = nn - 1, 0, -1 do
               local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
-              if a0 >= p0 - 1 and a0 < p1 - 1 then R.MIDI_DeleteNote(tk, k)
+              if a0 >= plim - 1 then   -- в следующем паттерне — на месте
+              elseif a0 >= p0 - 1 and a0 < p1 - 1 then R.MIDI_DeleteNote(tk, k)
               else
                 local b0 = a0 >= p1 - 1 and a0 - dp or a0
-                local b1 = (a1 <= p0) and a1 or ((a1 >= p1) and a1 - dp or p0)
+                local b1 = (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and a1 - dp or p0))
                 if b0 ~= a0 or b1 ~= a1 then R.MIDI_SetNote(tk, k, sel, mu, b0, math.max(b0 + 1, b1), ch, pi, ve, true) end
               end
             end
             for k = ncc - 1, 0, -1 do
               local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
-              if a0 >= p0 and a0 < p1 then R.MIDI_DeleteCC(tk, k)
+              if a0 >= plim then   -- следующий паттерн
+              elseif a0 >= p0 and a0 < p1 then R.MIDI_DeleteCC(tk, k)
               elseif a0 >= p1 then R.MIDI_SetCC(tk, k, sel, mu, a0 - dp, cm, ch, m1, m2, true) end
             end
             for k = ntx - 1, 0, -1 do
               local _, sel, mu, a0, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
-              if a0 >= p0 and a0 < p1 then R.MIDI_DeleteTextSysexEvt(tk, k)
+              if a0 >= plim then
+              elseif a0 >= p0 and a0 < p1 then R.MIDI_DeleteTextSysexEvt(tk, k)
               elseif a0 >= p1 then R.MIDI_SetTextSysexEvt(tk, k, sel, mu, a0 - dp, ty, msg, true) end
             end
             R.MIDI_Sort(tk)
             if pos >= t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos) end
             local nfin = (fin >= t1) and (fin - dt) or t0
-            if keepend and fin >= limit - EPS then nfin = math.min(fin, limit) end   -- 19 окт: до конца паттерна — длина та же, пустые строки в конце
+            if keepend and fin >= limit - EPS then nfin = fin end   -- 19 окт: до конца паттерна — длина та же, пустые строки в конце; 27 окт: длиннее паттерна — не режется по его линии
             if nfin <= math.max(pos, t0) + EPS and pos >= t0 - EPS then R.DeleteTrackMediaItem(tr, it)
             else R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(EPS, nfin - pos)); drop_empty_midi(it) end
           elseif pos < t0 - EPS and fin > t1 + EPS then

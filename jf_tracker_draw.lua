@@ -461,7 +461,8 @@ function D.layout(snap, state, nregions)
   L.x_del = x
   x = L.x_del + L.w_del + L.pad
   -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
-  if state.foldfast then L.x_fold = x; L.w_fold = ms('OOO'); x = x + L.w_fold + 2 * L.pad else L.x_fold = nil end   -- 19 окт: мини-таймлайн строки (отступ от соседа)
+  -- 27 окт: вместо колонки +N справа — знак «+» перед нотой (как папка в lf); место только у лейнов со сложенным (L.foldG)
+  L.fold_on = state.foldfast and true or false; L.x_fold = nil; L.w_fold = ms('+')
   L.sub_w = x
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
@@ -504,16 +505,20 @@ function D.layout(snap, state, nregions)
     L.GTc[G] = k
     return k
   end
-  -- 20 окт: лейн без сложенных нот — без колонки fold (место не резервируется); кэш на раскладку
+  -- 27 окт: лейн со сложенными нотами — узкая колонка «+» перед нотой, поля от ноты правее на её ширину; кэш на раскладку
   L.GFc = setmetatable({}, { __mode = 'k' })
-  function L.nofoldG(G)
+  function L.foldG(G)
     G = G or L
-    if not (G.x_fold and G.sub_w and G.x_fold < G.sub_w) then return G end
     local k = L.GFc[G]
-    if not k then
-      k = setmetatable({ x_fold = false, sub_w = G.sub_w - (L.w_fold + 2 * L.pad) }, { __index = G })
-      L.GFc[G] = k
-    end
+    if k then return k end
+    local s0, d = G.x_note, L.w_fold + L.pad
+    local function sh(v) if v and v >= s0 then return v + d end return v end
+    local fx2 = {}
+    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
+    k = setmetatable({ x_fold = s0, x_note = s0 + d, x_inst = G.x_inst and sh(G.x_inst) or G.x_inst, x_slc = G.x_slc and sh(G.x_slc) or G.x_slc,
+      x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del),
+      x_tfx = G.x_tfx and sh(G.x_tfx) or G.x_tfx, sub_w = G.sub_w + d }, { __index = G })
+    L.GFc[G] = k
     return k
   end
   -- 21 окт: чистый MIDI-трек (ни аудио в лейне, ни сэмплов в lib, не кит) — без колонки волны: поля левее на её ширину
@@ -556,11 +561,7 @@ function D.layout(snap, state, nregions)
   L.MAXFX = 4
   L.MAXLVL = 3 + L.MAXFX + 3
   L.GL = { [1] = L.GC }
-  -- 19 окт: fold — и на уровнях ширины своя колонка справа (иначе +N ложился на delay от L.x_fold)
-  local function fold_tail(t, xx)
-    if L.x_fold then t.x_fold = xx; xx = xx + L.w_fold + 2 * L.pad else t.x_fold = false end
-    t.sub_w = xx
-  end
+  local function fold_tail(t, xx) t.x_fold = false; t.sub_w = xx end
   L.GL[2] = { narrow = true, nfx = 0, x_fx = {}, x_del = L.x_vol + L.w_vol + L.pad, nfields = 2 }
   fold_tail(L.GL[2], L.x_vol + L.w_vol + L.pad)
   setmetatable(L.GL[2], { __index = L })
@@ -919,7 +920,6 @@ function D.layout(snap, state, nregions)
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
-          if L.x_fold and not lane.has_fold and not narrow then G = L.nofoldG(G) end
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
           -- 21 окт: волна — только когда есть что показать (аудио в лейне или кит с сэмплами); tw — выбор трека (D.wave_pref:
           -- true / false / nil = авто). Пул lib общий на все треки — по нему не судить (так колонка не уходила никогда)
@@ -929,6 +929,7 @@ function D.layout(snap, state, nregions)
             if pref ~= nil then show = pref end
             if not show then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
           end
+          if L.fold_on and lane.has_fold and not narrow then G = L.foldG(G) end   -- 27 окт: «+» перед нотой
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
@@ -2322,16 +2323,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
     set(U.GREEN); gfx.rect(bx, y + 1, bw, L.rh - 2, 0)
     text(bx + 2, ty, 'fx', U.GREEN)
   end
-  if cell and cell.fold then
-    -- 19 окт (3): мини-таймлайн строки (как ratchet на Hapax / Elektron): колонка — строка по горизонтали,
-    -- чёрточка на месте каждой ноты (delay), высота — velocity; видимая — ярко, сложенные — светлее, команда — голубая точка
-    local tw = L.w_fold or ms('OOO')
-    local sx = (L.x_fold and L.sub_w and L.x_fold < L.sub_w) and (x + L.x_fold) or (x + (L.sub_w or (L.x_note + L.w_note + tw + 2)) - tw - 1)   -- узкая подколонка — у правого края
-    -- 19 окт (5): гребёнка не читалась — в колонке число сложенных нот: +1 +2 … (голубым, шрифт трекера)
-    local cnt = '+' .. #cell.fold
-    text(sx + math.max(0, math.floor((tw - ms(cnt)) / 2)), ty, cnt, U.CYAN)
-    -- 20 окт: яркая линия между строк (нижний край строки, не по тексту) — «тут сложено больше»; zu раскрывает
-    set(U.CYAN); gfx.rect(x + 1, y + L.rh - 1, math.max(1, (L.sub_w or tw) - 2), 1, 1)
+  if cell and cell.fold and L.x_fold then
+    -- 27 окт: в строке сложены ещё ноты — «+» перед нотой (как папка в lf), раскрыть — zu или LPB (- + / Opt+Shift+J K)
+    text(x + L.x_fold, ty, '+', U.CYAN)
     -- гребёнка (мини-таймлайн строки) — выключена:
     -- -- 19 окт (4): заметнее — подложка колонки, чёрточки в 2 px: сложенные — янтарём, видимая — белым
     -- local top, bh = y + 1, L.rh - 2
@@ -9503,6 +9497,7 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_vx = {}                                -- место блока в цепочке (от её начала) — подтянуть выбранный
     D.cst, D.info = {}, info
     D.rack_plus = {}
+    D.fxgui_rect = {}   -- 27 окт: блоки с окном плагина поверх (gui) — заново каждый кадр
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     for k, f in ipairs(fxs) do
@@ -9664,6 +9659,17 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { '÷', 'bands', bxs[#bxs][3] - kb - 2 }
         tw = tw - kb - 2
       end
+      -- 27 окт: gui — родное окно плагина поверх этого блока (ездит с ним; блок ушёл с экрана — окно закрыто)
+      if not f.container and tw > L.cw * 10 + ms('gui') + 2 * L.pad then
+        local gw = ms('gui') + 2 * L.pad
+        bxs[#bxs + 1] = { 'gui', 'gui', bxs[#bxs][3] - gw - 2, gw }
+        tw = tw - gw - 2
+      end
+      local gui_on = D.fxgui and f.fguid and D.fxgui[f.fguid]
+      if gui_on then
+        D.fxgui_rect = D.fxgui_rect or {}
+        D.fxgui_rect[f.fguid] = { x = bx + 1, y = by + L.rh + 1, w = bw - 2, h = bh - L.rh - 2, fi = f.fx or f.i, vis = bx >= cx0 and bx + bw <= cx1 }
+      end
       -- 24 окт: [] — пустой контейнер внутрь этого (вложенность любая)
       if f.container and not f.kit and not f.bands and not f.inner and #bxs > 2 and tw > L.cw * 8 + kb then
         local cwb = ms('[]') + 2 * L.pad
@@ -9760,7 +9766,7 @@ function D.frame(L, snap, rows, state, info)
           local kx = b[3]
           local kb = b[4] or kb   -- 24 окт: [] шире буквы
           local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 1 and my < by + L.rh
-          local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt)
+          local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt) or (b[2] == 'gui' and gui_on)
           -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
           -- 20 окт: мигает ярко — сплошной янтарь и тёмная буква / обычный «горит» (было: тусклая подложка гасла — не видно)
           local flash = b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0
@@ -11222,7 +11228,8 @@ function D.frame(L, snap, rows, state, info)
           if hp[1] < ncol and nfit >= 2 then
             local hx = bx + hp[1] * bw1 + L.pad
             set(U.LINE); gfx.rect(hx, hy + L.rh - 2, pw, 1, 1)
-            text(hx, hy, fit(f.heads[pi], pw), U.AMBER)
+            local hc = f.headcol and ({ red = U.RED, orange = U.AMBER, yellow = U.YELLOW, cyan = U.CYAN, green = U.GREEN })[f.headcol[f.heads[pi]] or ''] or U.AMBER   -- 27 окт: цвет секции (Cosmos)
+            text(hx, hy, fit(f.heads[pi], pw), hc)
           end
         end
       end

@@ -151,7 +151,7 @@ KH.PAGES = {
     { k = 'css csm csl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
     { k = 'zC', d = 'fold track into a one-letter strip' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
-    { k = '- +', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
+    { k = '- +  Opt+Shift+J K', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel; Opt+Shift+J K - the same without Shift for + on a German layout); a + before a note - more notes folded into that row, LPB + shows them - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
     { k = 'z. z,  Opt+Shift+L H', d = 'the cursor track wider / narrower (its own width): its columns open / close one step at a time; a count - N steps (3 Opt+Shift+L)' },
     { k = ':reg', d = 'view only the region of the cursor / whole track (all | reg above the region name)' },
     { k = 'visor / cmd: dd yy p c', d = 'master columns visor and cmd: dd cut, yy copy, p put on the cursor row (move = dd j p), c / r edit the text (:vis / :mcmd), Enter - visor: pick with previews, x delete; w b e - next / previous marker', t = {} },
@@ -599,6 +599,7 @@ KH.PAGES = {
     { k = 'yy p P', d = 'copy fx, paste after / before (any track)', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'cc', d = 'pack fx (v: range) into a new container', t = { 'cc', 'c' } },
     { k = 'cn', d = 'an empty container after the selected module (empty chain: at the end); it says what goes in: drop an fx or another container into it, [] in a container header - an empty container inside it, and so on' },
+    { k = 'gui  :gui', t = {}, d = 'the gui button in the fx head (or :gui): the native window of the plugin sits right over its DSP block, frameless, and follows it; the block off the screen - the window closes; again - back to the tracker view' },
     { k = 'r', d = 'replace the selected fx: a fzf list right here (the focus stays in DSP), the new one takes its place, on / off kept, the old one removed - one undo' },
     { k = 'rclick', d = 'container: unpack, add fx inside, presets, all serial / parallel, rename (:fxname); on a plugin inside: bypass, window, serial / parallel, move out, remove' },
     { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame; left half - serial, right half - parallel); the edges of a block - before / after it' },

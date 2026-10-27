@@ -726,7 +726,7 @@ alt_down = false
 reset()
 ctrl_down, alt_down = true, true; V.key(10); eq('Ctrl+Opt+J repeats on the track', last(), 'repeat:track')
 V.key(1685026670); eq('Ctrl+Opt+Down too', last(), 'repeat:track')
-ctrl_down, shift_down = false, true; V.key(8710); eq('Shift+Opt+J transposes the instrument down', last(), 'transpose:-1')   -- 10 окт: было repeat all (теперь :repeat all)
+ctrl_down, shift_down = false, true; do local n0 = #lpb_calls; V.key(8710); eq('Shift+Opt+J = LPB down, as -', lpb_calls[n0 + 1], -1) end   -- 27 окт: было транспоз инструмента
 alt_down, shift_down = false, false
 -- слайс = нота (4 окт): обычная MIDI-клавиатура, C-4 = слайс 1
 reset()

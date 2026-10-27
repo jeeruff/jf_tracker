@@ -12,6 +12,37 @@ local DM = {}
 
 DM.modules = {
   {
+    -- 27 окт: GFX G Cosmos (Garden FX, пад-синт JSFX) — секции как на его панели: LFO / DCO / LAYER, VCF, FILTER ENV,
+    -- AMP ENV, CHORUS · DELAY, OUT; цвет заголовков — полосами панели (красный / оранжевый / жёлтый)
+    match = 'gfx g cosmos',
+    title = 'Cosmos',
+    cols = 4, rows = 6,
+    headcol = { LFO = 'red', DCO = 'red', LAYER = 'red', VCF = 'orange', ['FILTER ENV'] = 'orange',
+                ['AMP ENV'] = 'yellow', ['CHORUS · DELAY'] = 'yellow', OUT = 'yellow' },
+    pages = {
+      { name = 'main', groups = { 'LFO', 'DCO', 'LAYER', 'VCF' }, params = {
+        { 'lfo rate', 'rate' }, { 'lfo delay', 'delay' }, { 'lfo shape', 'shape' },
+        { 'lfo to pitch', 'pitch' }, { 'lfo sync', 'sync' }, { 'lfo note', 'note' },
+        { 'saw', 'saw' }, { 'pulse (', 'pulse' }, { 'pulse width', 'pw' },
+        { 'pwm by lfo', 'pwm' }, { 'sub', 'sub' }, { 'noise', 'noise' },
+        { 'layer level', 'level' }, { 'layer detune', 'detune' }, { 'layer octave', 'octave' },
+        { 'hpf', 'hpf' }, { 'drift', 'drift' }, { 'velocity', 'velocity' },
+        { 'cutoff (hz)', 'cutoff' }, { 'resonance', 'reso' }, { 'filter env amount', 'env' },
+        { 'lfo to cutoff', 'lfo' }, { 'key track', 'key' }, { 'volume', 'volume' },
+      } },
+      { name = 'env', groups = { 'FILTER ENV', 'AMP ENV', 'CHORUS · DELAY', 'OUT' }, params = {
+        { 'filter attack', 'attack' }, { 'filter decay', 'decay' }, { 'filter sustain', 'sustain' },
+        { 'filter release', 'release' }, { 'patch', 'patch' }, { 'midi channel', 'channel' },
+        { 'amp attack', 'attack' }, { 'amp decay', 'decay' }, { 'amp sustain', 'sustain' },
+        { 'amp release', 'release' }, { 'stereo width', 'width' }, { 'mono below', 'mono' },
+        { 'chorus', 'chorus' }, { 'delay time', 'time' }, { 'delay feedback', 'feedback' },
+        { 'delay tone', 'tone' }, { 'delay mix', 'mix' }, { 'delay sync', 'sync' },
+        { 'band sat', 'sat' }, { 'bias', 'bias' }, { 'sat low band', 'low' },
+        { 'sat high band', 'high' }, { 'ceiling', 'ceiling' }, { 'delay note', 'd note' },
+      } },
+    },
+  },
+  {
     -- 16 окт: Surge XT (сцена A) — главное на первой странице, остальное вкладками (pages);
     -- параметров 2858, ищем только в первых 700 (scan: глобальные + сцена A). Патчи — строка < пресет >
     match = 'surge xt',
