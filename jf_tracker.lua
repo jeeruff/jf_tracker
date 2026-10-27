@@ -18246,6 +18246,7 @@ function ctx.context_items(hover)
       or (e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) and B.full(e)) or nil   -- 27 окт: и файл карты (точка, история, корабль)
     if file then
       local nm = file:match('[^/]+$') or file
+      if hover.browser == 'maphub' then vim.msg = 'group: the last played file of it - ' .. nm end   -- 27 окт (7): меню карточки
       add('Into the lib - its own instrument (Enter)', function() ctx.add_to_depot(file) end, 'l')
       add('Into a sampler - the whole file in one RS5K on the DSP track', function()
         local col = dsp_target() or cur_col(); if not col then return end
@@ -27603,6 +27604,13 @@ local function frame()
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
+  -- 27 окт (7): Esc — выход из zz любой панели (кроме трекера: там Esc — INSERT), если Esc не нужен открытому меню / вводу
+  if c == 27 and state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or vim.mode == 'cmd' or vim.mode == 'search' or (OPT and OPT.active) or B.filtering)
+     and not (state.focus == 'map' and B.mapV and B.mapV.sys) then
+    local zid = state.panes.zoom
+    ctx.pane_do(function() return draw.panes.zoom(state.panes, zid) end, zid .. ' back in its pane (Esc)')
+    c = 0
+  end
   -- 19 окт: g — префикс во всех модулях (как в Vim): gt / gT — меню модулей / вкладок проектов, gg — наверх
   -- (своя g модуля), g + другое — модулю обе клавиши, как раньше (у матрицы, слайсера g — свой префикс).
   -- Отложенные клавиши идут через ctx.keyq (их второй раз не перехватываем). Модули с набором текста — без этого

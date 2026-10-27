@@ -63,7 +63,7 @@ KH.PAGES = {
   } },
   pane = { title = 'panes (tmux / zellij)', e = {
     { k = '\\ (in a module)', d = 'quick menu of the module in focus (its main actions, letters); in it \\ - the main menu' },
-    { k = 'zz', d = 'in any module (lib, browser, fx list, item, macros ...): the module on the whole window, again - back; in the tracker - the tracker alone; dsp zz - dsp big', t = { 'z' } },
+    { k = 'zz', d = 'in any module (lib, browser, fx list, item, macros ...): the module on the whole window, again or Esc - back; in the tracker (Esc there is INSERT) - the tracker alone; dsp zz - dsp big', t = { 'z' } },
     { k = '⌘h ⌘j ⌘k ⌘l', d = 'focus the pane on the left / below / above / on the right (like dwm), from any pane' },
     { k = '⌘⇧h ⌘⇧j ⌘⇧k ⌘⇧l', d = 'move the pane there (out of its stack if it is a tab)' },
     { k = '⌥Tab', d = 'next pane in the tree order (Shift - back)' },

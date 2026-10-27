@@ -390,8 +390,17 @@ end
 -- 27 окт (6): файл под мышью на карте (точка, строка истории, отсек корабля) — для меню файла (ПКМ)
 function B.map_file_of(id)
   if id == 'mapnode' then local n = B.map_hv and B.map_hv.node; return n and n.path end
+  if id == 'maphub' then   -- 27 окт (7): карточка / группа — её последний сыгранный файл (нет — первый)
+    local hb = B.map_hv and B.map_hv.hub
+    if not hb then return nil end
+    local G = B.mapG
+    for _, e in ipairs(B.map_hist) do local n = G and G.bypath and G.bypath[e.path]; if n and n.h == hb then return e.path end end
+    return hb.list and hb.list[1] and hb.list[1].path
+  end
   local i = id:match('^maphist(%d+)$')
   if i then local e = B.map_hist[tonumber(i)]; return e and e.path end
+  i = id:match('^rec(%d+)$')   -- 27 окт (7): отмеченные в широком плеере браузера — то же меню файла
+  if i then return (B.mk_list or {})[tonumber(i)] end
   i = id:match('^mapmk(%d+)$')
   if i then local o = (B.sel_order or {})[tonumber(i)]; return o and o.full end
   i = id:match('^mapship(%d+)$')
@@ -467,8 +476,20 @@ function B.map_pane(U, L, x, y, w, h)
   if B.nmarked() > 0 then where = where .. ('  (%d marked)'):format(B.nmarked()) end
   if bx < x + w - 4 * L.cw then U.text(bx, by + 1, ctx.fit(where, x + w - L.pad - bx), U.GREY) end
   local top = y + L.rh + 4
-  local hv = B.map_draw_fn(U, L, x + 1, top, w - 2, y + h - top - 1)
-  return hover or hv
+  -- 27 окт (7): снизу — плеер браузера с его кнопками (одна функция B.player_block)
+  local function btn(bx0, by0, label, what, on)
+    local bw = U.measure(label) + 2 * L.pad
+    local hot = mx >= bx0 and mx < bx0 + bw and my >= by0 and my < by0 + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx0, by0, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx0, by0, bw, L.rh, 0)
+    U.text(bx0 + L.pad, by0 + 1, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+    if hot then hover = what end
+    return bx0 + bw + L.pad
+  end
+  local mh = y + h - top - 1
+  local ph, phv = B.player_block(U, L, x, top, w, mh, btn, { buttons = true, marked = false })
+  local hv = B.map_draw_fn(U, L, x + 1, top, w - 2, ph)
+  return hover or phv or hv
 end
 -- 27 окт (5): отмеченные файлы — корабль в духе FTL справа снизу карты: отсеки — классы (kick, snare, pads, fx …),
 -- в отсеке — имена файлов; двери между отсеками, двигатели слева, нос справа; lib — отмеченные в lib, save — и сохранить набором
@@ -1649,45 +1670,14 @@ function B.draw_marks(btn, bx, by, U)
   return bx
 end
 
-function B.draw(U, L, x, y, w, h)
-  if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
-  B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу
-  B.hear_tick()   -- 27 окт: прозвучавшее — в recent   -- 19 окт: поиск после паузы набора
-  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
+-- 27 окт (7): плеер браузера — мини-волна, play / keys / cell, громкость, кнопки wave track sync …; одна функция
+-- для браузера и панели map (тот же плеер, те же кнопки). btn(bx, by, label, what, on) рисует кнопку (hover — у вызывающего)
+-- → h без плеера, hover плеера
+function B.player_block(U, L, x, y, w, h, btn, opts)
+  opts = opts or {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
-  -- кнопки текстом: сверху — куда идти (files db pm proj), снизу — вид
-  -- (wave auto <> x). Шапка и подвал по одной строке.
-  local function btn(bx, by, label, what, on, tc)
-    local bw = U.measure(label) + 2 * L.pad
-    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
-    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
-    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or (tc or U.GREY)))
-    if hot then hover = what end
-    if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
-    return bx + bw + L.pad
-  end
-  local wrap_marks = false
-  do
-    local bx = x + L.pad + 2
-    -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
-    -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
-      if bx + U.measure(t) + 2 * L.pad > x + w then break end
-      bx = btn(bx, y, t, t, B.mode == t)
-    end
-    if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
-      B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
-      return hover
-    end
-    B.fx_hover = nil
-    -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
-    local mw = B.NMARKS * (U.measure('5') + 3 * L.pad)
-    if B.pmpane and B.mode == 'pm' then               -- 9 окт: панель pm — без закладок папок браузера
-    elseif bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
-  end
-  if not (B.pmpane and B.mode == 'pm') then         -- 9 окт: панель pm — без файловых кнопок (find wave track sync …)
+  if opts.buttons then         -- 9 окт: панель pm — без файловых кнопок (find wave track sync …)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'wave', 'wave', B.wave },   -- 11 окт: find — слева от стрелок < > (на виду), здесь не дублируется
@@ -1707,7 +1697,7 @@ function B.draw(U, L, x, y, w, h)
     local x0, ww = x + L.pad + 2, w - 2 * L.pad - 4
     -- 27 окт: большой браузер — справа от волны плеера отмеченные файлы (m; щелчок — играть, играющий — янтарём; Space — по очереди)
     local rx, rw
-    if w >= L.cw * 90 then rw = math.floor(ww * 0.3); rx = x0 + ww - rw; ww = ww - rw - L.pad end
+    if opts.marked ~= false and w >= L.cw * 90 then rw = math.floor(ww * 0.3); rx = x0 + ww - rw; ww = ww - rw - L.pad end
     local pos, len, ppath
     if ctx.preview_pos then pos, len, ppath = ctx.preview_pos() end      -- (a and f() отрезал бы хвост значений)
     local path = ppath or B.preview_path(B.entries[B.cur])
@@ -1776,6 +1766,51 @@ function B.draw(U, L, x, y, w, h)
       else B.vol_drag = false end
     end
     h = h - wh - L.rh - 6
+  end
+  return h, hover
+end
+function B.draw(U, L, x, y, w, h)
+  if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
+  B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу
+  B.hear_tick()   -- 27 окт: прозвучавшее — в recent   -- 19 окт: поиск после паузы набора
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hover
+  -- кнопки текстом: сверху — куда идти (files db pm proj), снизу — вид
+  -- (wave auto <> x). Шапка и подвал по одной строке.
+  local function btn(bx, by, label, what, on, tc)
+    local bw = U.measure(label) + 2 * L.pad
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, by, bw, L.rh, 1)
+    U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+    U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or (tc or U.GREY)))
+    if hot then hover = what end
+    if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
+    return bx + bw + L.pad
+  end
+  local wrap_marks = false
+  do
+    local bx = x + L.pad + 2
+    -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
+    -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
+      if bx + U.measure(t) + 2 * L.pad > x + w then break end
+      bx = btn(bx, y, t, t, B.mode == t)
+    end
+    if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
+      B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
+      return hover
+    end
+    B.fx_hover = nil
+    -- закладки 1..5 справа в том же ряду; не влезают — во второй ряд
+    local mw = B.NMARKS * (U.measure('5') + 3 * L.pad)
+    if B.pmpane and B.mode == 'pm' then               -- 9 окт: панель pm — без закладок папок браузера
+    elseif bx + mw <= x + w then B.draw_marks(btn, x + w - mw - L.pad, y, U) else wrap_marks = true end
+  end
+  do   -- 27 окт (7): плеер — B.player_block (его же зовёт панель map)
+    local hv
+    h, hv = B.player_block(U, L, x, y, w, h, btn, { buttons = not (B.pmpane and B.mode == 'pm') })
+    if hv then hover = hv end
   end
   y = y + L.rh + 2; h = h - L.rh - 2
   -- управляющая строка (2 окт): < > * [1..5] и полный путь, клик по папке — туда
