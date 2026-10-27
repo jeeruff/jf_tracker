@@ -17347,6 +17347,11 @@ function region_actions(rg)
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
     { 'resync copies: this pattern to its repeats', key = 'r', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },   -- 21 окт: r (s — секции)
+    -- 27 окт: команды панели patterns — для паттернов выделенных слотов (блок), иначе этого
+    { 'glue: the selected slots in a row - one pattern', key = 'g', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_glue() end },
+    { 'knife: split ... (half / 3 / 4 / bars / at the cursor)', key = 'k', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_split_menu() end },
+    { 'edit the name (every place)', key = 'e', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_rename() end },
+    { 'wipe from the song (every place, the time closes)', key = 'w', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_remove() end },
     -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
     { 'half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
     { 'x2: double the length', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
@@ -30429,8 +30434,25 @@ end
 -- 27 окт: ПАНЕЛЬ PATTERNS — несколько паттернов (Shift+стрелки, Shift+щелчок, v) и команды над ними: ряд кнопок над
 -- кубиками, m / правая кнопка — меню. Выбор — по именам (кубики перерисовываются каждый кадр); пусто — паттерн курсора
 MX.pl_multi = MX.pl_multi or {}
+-- список паттернов, как у кубиков (и когда панель скрыта — команды из меню матрицы)
+ctx.pat_list = function()
+  local list = {}
+  for _, p in ipairs(model.patterns(regions)) do if not p.name:match('^=') and not (p.src and p.src.session) then list[#list + 1] = p end end
+  return list
+end
+-- 27 окт: из матрицы — паттерны выделенных слотов (блок), иначе слота rg
+ctx.pat_from_matrix = function(rg)
+  MX.pl_multi = {}
+  if MX.anchor then
+    local r0, r1 = MX.block()
+    for i = r0, r1 do local sl = seq[i]; if sl and not sl.gap then MX.pl_multi[sl.name] = true end end
+  end
+  if rg then MX.pl_multi[rg.name] = true end
+  ctx.pat_rows = ctx.pat_list()
+  for i, p in ipairs(ctx.pat_rows) do if rg and p.name == rg.name then MX.pl_sel = i end end
+end
 ctx.pat_selected = function()
-  local list, out = ctx.pat_rows or {}, {}
+  local list, out = ctx.pat_rows or ctx.pat_list(), {}
   for _, p in ipairs(list) do if MX.pl_multi[p.name] then out[#out + 1] = p end end
   if #out == 0 and list[MX.pl_sel or 1] then out[1] = list[MX.pl_sel or 1] end
   return out
