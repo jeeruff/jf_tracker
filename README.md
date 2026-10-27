@@ -128,7 +128,15 @@ The DSP module texts use descriptions from Chris Johnson's
 
 ## License
 
-jf_tracker is free software under the [GNU General Public License v3](LICENSE).
-It comes with no warranty.
+jf_tracker is source-available under the [Business Source License 1.1](LICENSE):
+
+- use it for anything, including music you sell; change it for yourself;
+- share unmodified copies for free, with `LICENSE` and `NOTICE`;
+- do not sell it, its forks or a paid bundle / service with it, and do not
+  publish a fork under the name jf_tracker - ask the author for a license;
+- four years after each version comes out, that version becomes
+  GPL-3.0-or-later.
+
+Author and the ideas behind it: [NOTICE](NOTICE). It comes with no warranty.
 
 Support: <https://ko-fi.com/jeeruff>. Music: <https://jeeruff.bandcamp.com>.

@@ -863,7 +863,7 @@ function V.lines()
                 'bandcamp  https://jeeruff.bandcamp.com', '', ('jf_tracker %s  (%s)'):format(V.VERSION, V.DATE), '' }
   for _, l in ipairs(V.INTRO) do out[#out + 1] = l end
   out[#out + 1] = ''
-  out[#out + 1] = 'Free software, GNU GPL v3 (see LICENSE). No warranty.'
+  out[#out + 1] = 'Business Source License 1.1 (see LICENSE, NOTICE): free to use, not for resale. No warranty.'
   out[#out + 1] = ''
   for _, l in ipairs(V.THANKS) do out[#out + 1] = l end
   out[#out + 1] = ''

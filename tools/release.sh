@@ -31,7 +31,7 @@ mkdir -p "$ITCH"
 rm -f "$ITCH"/jf_tracker-*.zip
 ( cd "$REL" && git archive --format=zip --prefix=jf_tracker/ -o "$ITCH/jf_tracker-$V.zip" "$TAG" )
 cat > "$ITCH/READ ME FIRST.txt" <<EOF
-jf_tracker $V - a tracker view of REAPER with Vim keys. Free, GNU GPL v3.
+jf_tracker $V - a tracker view of REAPER with Vim keys. Free to use, Business Source License 1.1 (not for resale).
 
 INSTALL WITH REAPACK (recommended, updates included)
 1. REAPER: Extensions - ReaPack - Import repositories, paste:

@@ -1,0 +1,42 @@
+jf_tracker
+Copyright (c) 2026 jeeruff. All rights reserved, except as granted in LICENSE
+(Business Source License 1.1).
+
+Author: jeeruff (https://github.com/jeeruff). Developed since 2026-10-02; the
+git history of this repository records the work commit by commit.
+
+Code was written with an AI assistant under the author's direction. The design,
+the ideas below, their selection and arrangement, and every decision on what the
+tool does and how it feels are the author's.
+
+The name "jf_tracker" refers to this original work. Derivative works must use a
+different name (see LICENSE, Additional Use Grant).
+
+
+Original ideas of the author
+----------------------------
+
+- A tracker as a live view of REAPER's own timeline: rows are time, columns are
+  tracks, every note, item and envelope stays native REAPER data.
+- Vim grammar for music editing: modes, operators and motions over notes,
+  fields, patterns and modules; a which-key menu for every prefix.
+- Patterns as REAPER regions with codes (A1, B2 ...): linked repeats, a pattern
+  matrix as the song view, a cube grid of all patterns with glue / split.
+- Panes like tmux inside one REAPER script window, every module a pane.
+- slixer: a transient slicer / pad sampler JSFX driven 1:1 from the tracker's
+  DSP panel - quick slots, a sniper zoom of the slice edge with "spam" roll.
+- CONTROL mode: Option+Cmd turns the trackpad into zones over the nearest bank
+  of sliders (faders, XY, pan) - no clicking on tiny controls.
+- Harmonizer in the tracker: chords from notes and from sound, a chord lane on
+  the master as markers, sample pitch as take markers so typing a note
+  transposes the sample, negative harmony and neo-Riemannian moves as buttons.
+- Microtones in tracker cells (72-EDO marks like C-4^) sent to synths.
+- A sample map in the browser: the folder as a graph or a "nebula" of floating
+  points grouped into sectors.
+- Gestures (REFORM), humanizer, bouncer and renderer as tracker modules.
+
+Third-party material
+--------------------
+
+The fonts in fonts/ belong to their authors and keep their own licenses
+(fonts/licenses/). They are not part of the Licensed Work.
