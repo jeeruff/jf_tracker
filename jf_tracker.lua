@@ -5370,10 +5370,10 @@ ctx = {
   end,
   ml_clear = function(tk, ml, p0, p1)
     local _, _, ccn, txn = reaper.MIDI_CountEvts(tk)
-    if ml.kind == 'cc' or ml.kind == 'pc' then
+    if ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'pb' then   -- 27 окт: и pitch bend
       for k = ccn - 1, 0, -1 do
         local _, _, _, ppq, cm, _, m2 = reaper.MIDI_GetCC(tk, k)
-        if ppq >= p0 and ppq < p1 and ((ml.kind == 'cc' and cm == 0xB0 and m2 == ml.num) or (ml.kind == 'pc' and cm == 0xC0)) then reaper.MIDI_DeleteCC(tk, k) end
+        if ppq >= p0 and ppq < p1 and ((ml.kind == 'cc' and cm == 0xB0 and m2 == ml.num) or (ml.kind == 'pc' and cm == 0xC0) or (ml.kind == 'pb' and cm == 0xE0)) then reaper.MIDI_DeleteCC(tk, k) end
       end
     else
       for k = txn - 1, 0, -1 do
@@ -5392,11 +5392,46 @@ ctx = {
       local p0, p1 = reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1)
       ctx.ml_clear(tk, ml, p0, p1)
       if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
+      elseif ml.kind == 'pb' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xE0, 0, 0, v)   -- 27 окт: PB — старший байт (было: писался program change)
       else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
       reaper.MIDI_Sort(tk)
     end)
     model.invalidate()
     vim.msg = ('%s %02X at %04d'):format(ml.name, v, row)
+  end,
+  -- 27 окт: Ctrl+A / Ctrl+X на лейне (CC / PB / PC) и огибающей: есть значение в строке — ±d; пусто — сначала
+  -- то же, что выше (что сейчас звучит), следующее нажатие уже меняет. → true, если колонка такая
+  nudge_lane = function(fi, row, d)
+    local f = L and L.flat and L.flat[fi]
+    if not f then return false end
+    if f.ml and f.col and f.col.track then
+      local ml = f.ml
+      local ev = ml.ev and ml.ev[row]
+      local v
+      if ev then v = (ev.v or 0) + d
+      else
+        for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then v = ml.ev[ml.rows[k]].v; break end end
+        v = v or 0
+      end
+      ctx.ml_set(f, row, math.max(0, math.min(127, math.floor(v + 0.5))))
+      if not ev then vim.msg = ('%s %02X at %04d - the value above (again - change it)'):format(ml.name or 'lane', math.floor(v + 0.5), row) end
+      return true
+    end
+    if f.env and f.env.env then
+      local e = f.env
+      local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+      local span = (e.max or 1) - (e.min or 0)
+      local function norm(raw) return span > 0 and math.max(0, math.min(1, (raw - (e.min or 0)) / span)) or 0 end
+      local pts = edit.env_points(e, t0, t1)
+      local v
+      if pts[1] then v = norm(pts[1].v) + d / 255
+      else local _, raw = reaper.Envelope_Evaluate(e.env, t0, 0, 0); v = norm(raw or 0) end
+      ctx.env_set(e, row, math.max(0, math.min(1, v)))
+      model.invalidate()
+      vim.msg = ('%s %d%% at %04d%s'):format(e.name or 'envelope', math.floor(math.max(0, math.min(1, v)) * 100 + 0.5), row, pts[1] and '' or ' - the value it had (again - change it)')
+      return true
+    end
+    return false
   end,
   -- 11 окт: колонка cmd мастера — маркер проекта в строке row: текст ставит / меняет,
   -- пустой удаляет. «!<номер или _имя действия>» REAPER исполняет при проигрывании

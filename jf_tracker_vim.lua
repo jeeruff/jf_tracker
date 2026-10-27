@@ -3220,8 +3220,11 @@ function V.key_impl(c)
     if ctx.track_toggle then ctx.track_toggle(ch == 'M' and 'mute' or 'solo') end
   elseif ch == 's' then
     apply('s', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
-  elseif c == ctrl('a') then apply('+', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
-  elseif c == ctrl('x') then apply('-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
+  elseif c == ctrl('a') or c == ctrl('x') then   -- 27 окт: лейн / огибающая — пусто: значение сверху, дальше ±; иначе ноты
+    if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n)) then
+      apply(c == ctrl('a') and '+' or '-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
+    end
+    finish_edit()
   elseif ch == 'p' or ch == 'P' then
     local reg = V.regs['"']
     if reg and reg.kind == 'field' then   -- 19 окт: значения поля (yc / y в поле) — в ноты строк
