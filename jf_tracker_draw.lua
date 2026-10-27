@@ -9756,6 +9756,7 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { 'gui', 'gui', bxs[#bxs][3] - gw - 2, gw }
         tw = tw - gw - 2
       end
+      if D.fxgui and next(D.fxgui) and not f.fguid and info.fx_guid then f.fguid = info.fx_guid(f) end   -- 27 окт: обычный эффект — GUID для окна
       local gui_on = D.fxgui and f.fguid and D.fxgui[f.fguid]
       if gui_on then
         D.fxgui_rect = D.fxgui_rect or {}

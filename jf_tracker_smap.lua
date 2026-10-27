@@ -468,7 +468,7 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
   for _, hb in ipairs(G.hubs) do
     local i = hb.cell - 1
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
-    if qy0 + ch < top0 or qy0 + L.rh > y + h then goto next_card end
+    if qy0 + ch < top0 or qy0 + ch > y + h + 2 then goto next_card end   -- 27 окт: только целые карточки (подпись нижней лезла на плеер)
     local c = col(hb)
     -- граница сектора: уголки и пунктир по краям — тускло
     local bx0, by0, bx1, by1 = math.floor(qx0 + 3), math.floor(qy0 + 3), math.floor(qx0 + cw - 4), math.floor(qy0 + ch - 4)

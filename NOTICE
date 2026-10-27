@@ -62,7 +62,8 @@ Borrowed ideas and code (not the author's own)
   https://github.com/JoepVanlier/Hackey-Trackey - jf_tracker has its own code;
   its user key file follows Hackey-Trackey's userkeys.lua.
 - Parts of jf_tracker are based on Paketti for Renoise by Esa Ruoho (Lackluster),
-  used with his permission: https://github.com/esaruoho/paketti
+  used with his permission (any use; support him: https://www.patreon.com/esaruoho):
+  https://github.com/esaruoho/paketti
 - The reform pane follows the idea of Reform for Renoise (https://www.aqu.surf/reform);
   an own implementation, no code copied.
 - The dsp big routing view follows the idea of Sexan's ParaNormal FX Router for

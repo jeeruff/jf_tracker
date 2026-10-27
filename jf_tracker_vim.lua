@@ -1998,6 +1998,11 @@ function V.key_impl(c)
   end
   -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора;
   -- все треки — :repeat all (Shift+Opt+J с 10 окт — транспоз)
+  -- 27 окт: Ctrl+Opt+H / L — playrate выбранного инструмента медленнее / быстрее (счётчик — N шагов)
+  if mods.alt and mods.ctrl and not mods.cmd and not mods.shift and (hk == 'h' or hk == 'l' or c == LEFT or c == RIGHT) and V.mode ~= 'cmd' and V.mode ~= 'search' then
+    if ctx.inst_rate then ctx.inst_rate(((hk == 'l' or c == RIGHT) and 1 or -1) * n) end
+    V.count = nil; return
+  end
   if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
     if ctx.repeat_pattern then ctx.repeat_pattern(false) end
     V.count = nil; return

@@ -12481,7 +12481,7 @@ ctx = {
     if not (e and e.item) then vim.msg = 'transpose: pick a sample in the lib'; return end
     ctx.sp_adjust(e, 'st', d)
     local p = reaper.ValidatePtr(e.take, 'MediaItem_Take*') and reaper.GetMediaItemTakeInfo_Value(e.take, 'D_PITCH') or 0
-    vim.msg = ('%s: transpose %+d st'):format(e.name or 'instrument', math.floor(p + 0.5))
+    vim.msg = ('%s: transpose %+d st  (Ctrl+Cmd+F1 / F2, Shift - octave)'):format(e.name or 'instrument', math.floor(p + 0.5))
   end,
   -- 11 окт: Shift+Opt+H / L — playrate выбранного инструмента −/+ 0.01 (счётчик — на N)
   inst_rate = function(d)
@@ -18833,7 +18833,9 @@ end
 -- с ним (прокрутка, раскладка); блок ушёл с экрана / DSP скрыт — окно закрыто, вернулся — открыто. Только позиция окна
 -- (JS_Window_SetPosition / SetStyle), без сообщений окнам. Кнопка gui в шапке модуля
 function ctx.fxgui_toggle(f)
-  if not (f and f.fguid) then return end
+  -- 27 окт: GUID есть в модели только у контейнеров — у обычных эффектов берётся из REAPER (иначе :gui молча выходил)
+  if f and not f.fguid then local t = dsp_target(); if t and t.col and t.col.track then f.fguid = reaper.TrackFX_GetFXGUID(t.col.track, f.fx or f.i) end end
+  if not (f and f.fguid) then vim.msg = 'gui: no such fx'; return end
   draw.fxgui = draw.fxgui or {}
   local on = not draw.fxgui[f.fguid]
   draw.fxgui[f.fguid] = on or nil
@@ -22701,6 +22703,7 @@ local function frame()
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
     map_draw = function(Lx, x, y, w, h) return B.map_pane(U, Lx, x, y, w, h) end,
+    fx_guid = function(f) local t = dsp_target(); return t and t.col and t.col.track and reaper.TrackFX_GetFXGUID(t.col.track, f.fx or f.i) or nil end,
     gr_of = function(col) ctx.gr_tick(); return col and col.guid and ctx.gr_trk[col.guid] end,   -- 27 окт: gain reduction трека
     gr_fx = function(f) ctx.gr_tick(); local t = dsp_target(); return t and t.col and f and ctx.gr_one[tostring(t.col.track) .. ':' .. tostring(f.i)] end,   -- 27 окт: карта сэмплов — своя панель
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
@@ -28103,6 +28106,11 @@ local function frame()
   do
     local TK = { [26161] = -1, [26162] = 1, [6697265] = -12, [6697266] = 12 }
     local m = ctx.mods()
+    -- 27 окт: Ctrl+Cmd+F1 / F2 — транспоз выбранного инструмента lib −1 / +1 полутон (было Shift+Opt+J / K)
+    if (c == 26161 or c == 26162) and m.cmd and m.ctrl and not m.alt and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if ctx.inst_transpose then ctx.inst_transpose(TK[c] * (m.shift and 12 or 1)) end
+      c = 0
+    end
     -- 16 окт: Cmd+F1 / F2 — микротон 1/6 тона (v / ^) у выделения или ноты строки
     if (c == 26161 or c == 26162) and m.cmd and not m.alt and not m.ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       if vim.transpose_scope(m.shift and 'track' or 'sel', TK[c], true) then model.invalidate() end

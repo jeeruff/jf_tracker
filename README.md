@@ -49,6 +49,20 @@ will keep doing. If it makes you as happy as it makes me, buy me a coffee:
     verb, convolution impulse spectrogram);
   - Airwindows categories and descriptions;
   - user-editable modules with an XY-pad learn.
+- jf_slixer: a transient slicer / pad sampler driven 1:1 from the DSP panel —
+  quick-load slots, a sniper zoom of the slice edge with "spam" roll, live
+  re-detect while you move the sensitivity.
+- A sample map pane: every sound file of the browser folder (no limit, read
+  once into an index) as groups — a graph, Chladni-figure cards, or a nebula
+  galaxy with sectors; `ξ` plays a random sound, the played path and history
+  stay, marked files become a lib folder or a kit. Rough loudness /
+  brightness analysis from REAPER's peaks orders the groups dark to bright.
+- `ξ` in the lib: a random sample like the name of its folder, back / forward
+  through what came up.
+- A harmonizer: chords from notes and sound, a chord lane on the master,
+  negative harmony and neo-Riemannian moves, microtones in cells.
+- Gain reduction of compressors / limiters in track headers, the mixer and DSP.
+- CONTROL mode: the trackpad over the nearest bank of sliders.
 - A macro view, step listen, a keycaster, floating project notes with
   Markdown and todo boxes, screensets and themes.
 - An interactive tour (`:tutorial`). `?` shows the keys of the focused module,
