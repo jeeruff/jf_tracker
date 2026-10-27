@@ -14193,6 +14193,36 @@ ctx = {
     if g then reselect_item = g; vim.msg = '+ slice ' .. (path:match('[^/]+$') or path) .. ' -> ' .. (e.name or 'instrument') .. ' (glued into one sample)'
     else vim.msg = 'could not add the slice' end
   end,
+  -- 27 окт (8): файлы в lib сразу папкой (Opt+Enter): выбор папки из тех, что в lib, или новая (:libdir имя)
+  files_to_folder = function(files)
+    files = files or {}
+    if #files == 0 then vim.msg = 'lib folder: no files'; return end
+    ctx.ftf_pending = files
+    local seen, items = {}, {}
+    for _, nm in pairs(draw.lib_folder_of or {}) do if not seen[nm] then seen[nm] = true; items[#items + 1] = { label = nm, data = nm } end end
+    table.sort(items, function(a, b) return a.label < b.label end)
+    table.insert(items, 1, { label = '+ new folder ... (type its name)', data = false })
+    vim.open_picker(('%d file(s) into a lib folder'):format(#files), items, function(it)
+      if it.data then ctx.files_to_folder_named(it.data) else vim.open_prompt('libdir ', '') end
+    end)
+  end,
+  files_to_folder_named = function(name)
+    name = (name or ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('^/', '')
+    local files = ctx.ftf_pending or {}
+    ctx.ftf_pending = nil
+    if name == '' or #files == 0 then vim.msg = 'lib folder: a name and files please'; return end
+    local c = cur_col()
+    local n = 0
+    edit.run('files into the lib folder ' .. name, function()
+      for _, pth in ipairs(files) do
+        local it = edit.depot_add(pth, c and c.track)
+        if it then reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_libdir', name, true); n = n + 1 end
+      end
+    end)
+    state.libfolders = true; draw.lib_folders_on = true
+    model.invalidate()
+    vim.msg = ('%d file(s) into the lib folder %s of %s'):format(n, name, c and c.name or 'the track')
+  end,
   add_to_depot = function(path)
     if IMP.kind(path) then ctx.import_sliced(path); return end
     local c = cur_col()

@@ -480,6 +480,17 @@ end
 -- клавиши панели map: j k — папки мини-lf, l / Enter — войти, h — выше, t — следующий источник, v — graph / nebula
 function B.map_key(c)
   local ch = c < 256 and string.char(c) or ''
+  -- 27 окт (8): marked (строка под мышью / последняя щёлкнутая): x / dd — снять, Enter — в lib, Opt+Enter — в папку lib
+  local mi = B.mk_target()
+  local mo = mi and (B.sel_order or {})[mi]
+  if mo then
+    if ch == 'x' or (ch == 'd' and B.mk_d) then B.mk_d = nil; B.map_mark(mo.full, mo.e and mo.e.name, true); return true end
+    if ch == 'd' then B.mk_d = true; if ctx.msg then ctx.msg('d - d again: unmark ' .. ((mo.e and mo.e.name) or '')) end; return true end
+    B.mk_d = nil
+    if c == 13 and ctx.mods and ctx.mods().alt and ctx.files_to_folder then local p = mo.full; B.map_mark(p, nil, true); ctx.files_to_folder({ p }); return true end
+    if c == 13 then B.mk_to_lib(mi); return true end
+  end
+  if ch == 'j' or ch == 'k' or ch == 'h' or ch == 'l' or c == 1685026670 or c == 30064 then B.mk_active = nil end   -- мини-lf снова главный
   local n = #B.map_dirs()
   if ch == 'j' or c == 1685026670 then B.map_dcur = math.min(n, B.map_dcur + 1)
   elseif ch == 'k' or c == 30064 then B.map_dcur = math.max(1, B.map_dcur - 1)
@@ -535,7 +546,8 @@ function B.map_pane(U, L, x, y, w, h)
   local mh = y + h - top - 1
   local ph, phv = B.player_block(U, L, x, top, w, mh, btn, { buttons = true, marked = false })
   local hv = B.map_draw_fn(U, L, x + 1, top, w - 2, ph)
-  return hover or phv or hv
+  B.map_hv_id = hover or phv or hv   -- 27 окт (8): под мышью — для клавиш marked (x / dd / Enter)
+  return B.map_hv_id
 end
 -- 27 окт (5): отмеченные файлы — корабль в духе FTL справа снизу карты: отсеки — классы (kick, snare, pads, fx …),
 -- в отсеке — имена файлов; двери между отсеками, двигатели слева, нос справа; lib — отмеченные в lib, save — и сохранить набором
@@ -706,6 +718,19 @@ function B.map_side(U, L, x, y, w, h)
   end
   if #list == 0 then U.text(x + L.pad, y2 + L.rh + 4, ctx.fit('double click a file to keep it here', w - 2 * L.pad), U.DIM) end
   return hv
+end
+-- 27 окт (8): marked: файл в lib (и снять отметку); в папку lib — Opt+Enter
+function B.mk_to_lib(i)
+  local o = (B.sel_order or {})[i]
+  if not (o and o.full) then return end
+  if ctx.add_to_depot then ctx.add_to_depot(o.full) end
+  B.map_mark(o.full, o.e and o.e.name, true)
+end
+-- строка marked под мышью, иначе последняя щёлкнутая
+function B.mk_target()
+  local id = B.map_hv_id
+  local i = id and id:match('^mapmk(%d+)$')
+  return tonumber(i) or (B.mk_active and B.mk_cur) or nil
 end
 -- двойной щелчок по тому же id за 0.35 с
 function B.map_dbl(id)
@@ -1336,7 +1361,8 @@ function B.click(what)
     elseif e then B.map_play(e.path, e.name); if ctx.msg then ctx.msg('history: ' .. e.name .. '  (double click - into marked)') end end
   elseif what:match('^mapmk%d+$') then   -- 27 окт (7): marked: клик — слушать, двойной — снять отметку
     local o = (B.sel_order or {})[tonumber(what:sub(6))]
-    if o and B.map_dbl('m:' .. (o.full or '')) then B.map_mark(o.full, o.e and o.e.name, true)
+    B.mk_cur = tonumber(what:sub(6)); B.mk_active = true
+    if o and B.map_dbl('m:' .. (o.full or '')) then B.mk_to_lib(B.mk_cur)   -- 27 окт (8): двойной — в lib (снять — x / dd)
     elseif o and o.full then B.map_play(o.full, o.e and o.e.name) end
   elseif what == 'pvslx' then   -- 27 окт: плеер — новый трек со slixer и этим файлом
     if B.pv_cur then ctx.to_slixer(B.pv_cur, nil, nil, true) elseif ctx.msg then ctx.msg('slixer: play or select a file first') end
@@ -1699,6 +1725,13 @@ function B.key(c)
       else local e = B.entries[B.cur]; if e and not e.dir and not e.pm and not e.db and not e.kit then fs[1] = B.full(e) end end
       return #fs > 0 and ctx.drum_browser_enter(fs)
     end)() then
+  elseif c == 13 and ctx.mods and ctx.mods().alt and ctx.files_to_folder then   -- 27 окт (8): Opt+Enter — в lib папкой (отмеченные, иначе файл курсора)
+    local fs = {}
+    for _, o in ipairs(B.sel_order) do if o.full then fs[#fs + 1] = o.full end end
+    local e = B.entries[B.cur]
+    if #fs == 0 and e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) then fs[1] = B.full(e) end
+    if #fs > 0 then B.sel, B.sel_order = {}, {} end
+    ctx.files_to_folder(fs)
   elseif c == 13 and #B.sel_order > 0 then B.enter_marked()
   elseif c == 13 or ch == 'l' then B.enter()
   elseif c == 8 or ch == '-' or ch == 'h' then B.up()
