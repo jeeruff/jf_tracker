@@ -18977,16 +18977,29 @@ function ctx.key_repeat(c, from_q)
   -- повтор вставал после ~16 шагов); остановка пишется в журнал debug
   -- 27 окт (3): нажата по состоянию; мигнуло «отпущена» на кадр — терпим 2 кадра подряд, на 3-й — стоп
   -- (ждать события отпускания нельзя: Enter = код 13 стоял на vk «M», его отпускания не бывает — Enter x47)
+  -- 27 окт (4): держат — состояние нажато, ИЛИ системный повтор этой клавиши был недавно (0.15 с), ИЛИ «отпущена»
+  -- длится меньше 0.2 с (было: 3 кадра — на медленных кадрах и с реальной клавиатурой глохло у конца списка)
   local function held(r)
     local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
-    if st and st:byte(r.vk) ~= 0 then r.upn = 0; return true end
-    r.upn = (r.upn or 0) + 1
-    if r.upn >= 3 and ctx.dlog then pcall(ctx.dlog, ('keyrep stop c=%d vk=%d after %.2fs'):format(r.c, r.vk, now - r.t0)) end
-    if r.upn >= 3 and ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', ('stop c=%d vk=%d after %.2fs n=%d'):format(r.c, r.vk, now - r.t0, r.n or 0), false) end
-    return r.upn < 3
+    if st and st:byte(r.vk) ~= 0 then r.up_t = nil; return true end
+    if r.evt and now - r.evt < 0.15 then r.up_t = nil; return true end
+    r.up_t = r.up_t or now
+    local ok = now - r.up_t < 0.2
+    if not ok then
+      local why = ('stop c=%d vk=%d after %.2fs n=%d (state up %.2fs, last os repeat %s)'):format(r.c, r.vk, now - r.t0, r.n or 0, now - r.up_t, r.evt and ('%.2fs ago'):format(now - r.evt) or 'never')
+      if ctx.dlog then pcall(ctx.dlog, 'keyrep ' .. why) end
+      if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', why, false) end
+    end
+    return ok
   end
   if c > 0 and not from_q then
-    if R and R.c == c and held(R) then return 0 end   -- системный повтор — свой ниже
+    if R and R.c == c then
+      -- отпускание было после прошлого события этой клавиши — новое нажатие (jjj быстро), иначе системный повтор
+      local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp((R.evt or R.t0) - 0.01)
+      if not (up and up:byte(R.vk) ~= 0) then R.evt = now; c = 0 end   -- повтор — поглощён (и знак, что держат); свой шаг — ниже
+    end
+  end
+  if c > 0 and not from_q then
     -- Enter / Tab / Backspace — свои vk (13 9 8), не Ctrl+M / I / H; Esc — без повтора
     local vk = (c >= 97 and c <= 122) and (c - 32) or ((c >= 65 and c <= 90) or (c >= 48 and c <= 57)) and c
       or ((c == 13 or c == 9 or c == 8) and c) or (c >= 1 and c <= 26) and (c + 64) or ctx.KR_ARROW[c]
