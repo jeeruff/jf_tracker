@@ -10892,15 +10892,18 @@ function D.frame(L, snap, rows, state, info)
         local ovh = L.rh - 3
         -- 26 окт: прицел (снайперский зум края, как в слайсере) — под волной, ~40 % высоты при 6+ строках
         local zr = G.wr >= 6 and math.floor(G.wr * 0.42) or 0
+        if zr > 0 then zr = zr + 1 end   -- 27 окт: прицел на строку выше, волна на строку ниже
         local wh = (G.wr - zr) * L.rh - (zr > 0 and 2 or 0)
         local dr = D.slx_drag and D.slx_drag.fi == f.i and D.slx_drag or nil
         -- 26 окт: опция aim zoom on top (общая со слайсером) — прицел над волной
         local atop = zr > 0 and info.slx_aimtop and info.slx_aimtop()
+        -- 27 окт: сверху вниз — обзор (скролл), прицел, волна
         local aim_y = wy
-        if atop then wy = wy + zr * L.rh + 1 end
-        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr)
+        local wave_y
+        if atop then aim_y = wy + ovh + 1; wave_y = aim_y + zr * L.rh + 1 end
+        local hw = D.SX.draw_wave(U, L, v, x0, wy, w0, ovh, wh, text, ms, set, mx, my, zst, drag or dr, dr, wave_y)
         if hw then hover.slxwave = { fx = k, f = f, w = hw } end
-        local sy = wy + ovh + 1 + wh + 1   -- строка статуса сразу под волной
+        local sy = (wave_y or (wy + ovh + 1)) + wh + 1   -- строка статуса сразу под волной
         -- 26 окт: MIDI · ARP — в самом низу модуля, под группами параметров (как в окне плагина)
         local lay2 = {}
         if (G.nb2 or 0) > 0 then

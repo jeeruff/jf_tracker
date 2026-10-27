@@ -850,8 +850,8 @@ function B.click(what)
   elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
     B.mark(tonumber(what:sub(3)), m.alt and 'clear' or (m.shift and 'set' or nil))   -- 20 окт: Opt+клик — очистить (было Cmd)
-  elseif what:match('^rec%d+$') then   -- 27 окт: только что прослушанный (плеер большого браузера) — играть ещё раз
-    local pth = B.recent_load()[tonumber(what:sub(4))]
+  elseif what:match('^rec%d+$') then   -- 27 окт: отмеченный файл (плеер большого браузера) — играть
+    local pth = (B.mk_list or {})[tonumber(what:sub(4))]
     if pth then B.pl = nil; ctx.preview_file(pth) end
   elseif what:match('^pcol%d+$') then   -- 27 окт: колонка родителя — туда (папка) / к файлу в ней
     local e = B.pcol and B.pcol.list[tonumber(what:sub(5))]
@@ -1047,7 +1047,23 @@ function B.preview()
   if B.pl then B.pl = nil; if ctx.preview_stop then ctx.preview_stop() end; if ctx.msg then ctx.msg('playlist: stopped') end; return end
   if #B.sel_order > 1 then B.pl_start(); return end   -- 27 окт: отмеченные — плейлистом
   local pth = B.preview_path(B.entries[B.cur])
-  if pth then ctx.preview_file(pth); B.add_recent(pth) end
+  if pth then ctx.preview_file(pth) end
+end
+-- 27 окт: что прозвучало — в recent: больше 0.5 с или включалось 2+ раза (любой путь: Space, auto, щелчок, плейлист)
+B.plays = {}
+function B.hear_tick()
+  if not ctx.preview_pos then return end
+  local pos, len, path = ctx.preview_pos()
+  local H = B.hear or {}
+  B.hear = H
+  if not (pos and path) then H.path = nil; return end
+  if path ~= H.path or pos < (H.pos or 0) - 0.1 then   -- новый запуск
+    H.path, H.done = path, false
+    B.plays[path] = (B.plays[path] or 0) + 1
+    if B.plays[path] >= 2 then B.add_recent(path); H.done = true end
+  end
+  H.pos = pos
+  if not H.done and (pos >= 0.5 or (len and len > 0 and len < 0.5 and pos >= len - 0.05)) then B.add_recent(path); H.done = true end
 end
 -- 27 окт: НЕДАВНИЕ — последние 50 прослушанных файлов (вкладка recent), Data/jf_tracker_recent.txt
 B.RECENT_MAX = 50
@@ -1091,7 +1107,7 @@ function B.pl_next()
   pl.i = pl.i + 1
   if pl.i > #pl.list then B.pl = nil; if ctx.msg then ctx.msg('playlist: done') end; return end
   local pth = pl.list[pl.i]
-  ctx.preview_file(pth); B.add_recent(pth)
+  ctx.preview_file(pth)
   pl.t0 = R.time_precise and R.time_precise() or os.clock()
   if ctx.msg then ctx.msg(('playlist %d / %d: %s (Space - stop)'):format(pl.i, #pl.list, pth:match('([^/]+)$') or pth)) end
 end
@@ -1196,7 +1212,8 @@ end
 
 function B.draw(U, L, x, y, w, h)
   if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
-  B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу   -- 19 окт: поиск после паузы набора
+  B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу
+  B.hear_tick()   -- 27 окт: прозвучавшее — в recent   -- 19 окт: поиск после паузы набора
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
@@ -1217,7 +1234,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — не вкладкой, а в плеере (большой браузер)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -1249,7 +1266,7 @@ function B.draw(U, L, x, y, w, h)
     if w >= L.cw * 90 then wh = math.max(wh, math.min(8 * L.rh, math.floor(h * 0.12))) end   -- 27 окт: браузер развёрнут — плеер выше
     local wy = sy - wh - 2
     local x0, ww = x + L.pad + 2, w - 2 * L.pad - 4
-    -- 27 окт: большой браузер — справа от волны плеера только что прослушанные (щелчок — играть, играющий — янтарём)
+    -- 27 окт: большой браузер — справа от волны плеера отмеченные файлы (m; щелчок — играть, играющий — янтарём; Space — по очереди)
     local rx, rw
     if w >= L.cw * 90 then rw = math.floor(ww * 0.3); rx = x0 + ww - rw; ww = ww - rw - L.pad end
     local pos, len, ppath
@@ -1278,17 +1295,21 @@ function B.draw(U, L, x, y, w, h)
     if rx then
       U.set(U.BG); gfx.rect(rx, wy, rw, wh, 1)
       U.set(U.LINE); gfx.rect(rx, wy, rw, wh, 0)
-      local rc = B.recent_load()
+      local rc = {}
+      for _, o in ipairs(B.sel_order) do if o.full then rc[#rc + 1] = o.full end end
+      B.mk_list = rc
       local nr = math.max(1, math.floor((wh - 2) / L.rh))
-      if #rc == 0 then U.text(rx + L.pad, wy + 1, ctx.fit('recent: nothing heard yet', rw - 2 * L.pad), U.DIM) end
-      for i = 1, math.min(nr, #rc) do
+      if #rc == 0 then U.text(rx + L.pad, wy + 1, ctx.fit('marked: none - m marks files, Space plays them in a row', rw - 2 * L.pad), U.DIM) end
+      local first = 0
+      if B.pl and B.pl.i > nr then first = B.pl.i - nr end
+      for i = 1, math.min(nr, #rc - first) do
         local ry = wy + 1 + (i - 1) * L.rh
-        local pth = rc[i]
+        local pth = rc[first + i]
         local hot = mx >= rx and mx < rx + rw and my >= ry and my < ry + L.rh
         local on = ppath == pth
         if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(rx + 1, ry, rw - 2, L.rh, 1) end
         U.text(rx + L.pad, ry, ctx.fit(pth:match('([^/]+)$') or pth, rw - 2 * L.pad), on and U.AMBER or (hot and U.TEXT or U.GREY))
-        if hot then hover = 'rec' .. i end
+        if hot then hover = 'rec' .. (first + i) end
       end
     end
     -- слайдер громкости: подпись | дорожка | dB

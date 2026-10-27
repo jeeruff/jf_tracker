@@ -29,30 +29,30 @@ function SX.items(v, P)
   local rows = {
     {
       -- 26 окт: подписи SLICE нет — и так ясно (кнопки нарезки первые)
-      { kind = 'act', lab = 'detect', key = 'd', what = 'detect' },
-      { kind = 'menu', lab = ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 't', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' } },
-      { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1 },
-      { kind = 'act', lab = 'classify', key = 'c', src = 'press' },
-      { kind = 'tog', lab = 'auto', key = 'a', on = v and v.auto, src = 'op', code = 4 },
-      { kind = 'act', lab = 'clear', key = 'x', src = 'op', code = 3 },
-      { kind = 'act', lab = 'gate', key = 'g', src = 'press' },
-      { kind = 'tog', lab = 'q: trans', key = 'r', on = (pv('Q by transients') or 0) > 0.5, src = 'p', name = 'Q by transients' },
-      { kind = 'act', lab = 'undo', key = 'z', src = 'press' },
-      { kind = 'act', lab = 'midi', key = 'e', src = 'press' },
-      { kind = 'act', lab = 'names', key = 'n', src = 'press' },
+      { kind = 'act', lab = 'detect', key = 'd', what = 'detect', tip = 'find transients and cut there; moving sens re-runs it' },
+      { kind = 'menu', lab = ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 't', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' }, tip = 'slicing mode: transients (sens), equal parts, or pitch changes' },
+      { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1, slider = true, raw = pv('Transient sensitivity') or 0.5, tip = 'transient sensitivity: more - more slices (detect re-runs when you let go)' },
+      { kind = 'act', lab = 'classify', key = 'c', src = 'press', tip = 'guess each slice: kick / snare / hat / perc / crash / ride / voice / fx, and route to class buses' },
+      { kind = 'tog', lab = 'auto', key = 'a', on = v and v.auto, src = 'op', code = 4, tip = 'slice automatically after loading' },
+      { kind = 'act', lab = 'clear', key = 'x', src = 'op', code = 3, tip = 'remove every slice marker (the audio stays)' },
+      { kind = 'act', lab = 'gate', key = 'g', src = 'press', tip = 'gate: mute the quiet slices (below the threshold)' },
+      { kind = 'tog', lab = 'q: trans', key = 'r', on = (pv('Q by transients') or 0) > 0.5, src = 'p', name = 'Q by transients', tip = 'q: trans - incoming notes snap to the transients of the sample' },
+      { kind = 'act', lab = 'undo', key = 'z', src = 'press', tip = 'undo the last slicing change' },
+      { kind = 'act', lab = 'midi', key = 'e', src = 'press', tip = 'write the slice timing as a MIDI item on this track at the edit cursor' },
+      { kind = 'act', lab = 'names', key = 'n', src = 'press', tip = 'write MIDI note names onto this track - the piano roll shows what each key does' },
       -- 26 окт: группы SYNC нет — sync (луп в темпе) здесь, к сэмплу; q — в MIDI, thru — в ARP
-      { kind = 'menu', lab = 'sync: ' .. SY[sy + 1], key = 's', on = sy > 0, src = 'op', code = 6, items = SY },
+      { kind = 'menu', lab = 'sync: ' .. SY[sy + 1], key = 's', on = sy > 0, src = 'op', code = 6, items = SY, tip = 'fit the loop to whole beats at project tempo: pitch - repitch, str - granular stretch' },
     },
   }
   -- 26 окт: MIDI · ARP — под волной, как в окне плагина (SX.items отдаёт их вторым списком)
   local low = {
     {
       { kind = 'zone', lab = 'MIDI' },
-      { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN },
-      { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM },
-      { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity' },
-      { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16 },
-      { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 24) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127 },
+      { kind = 'menu', lab = 'q: ' .. QN[math.floor(qg + 0.5) + 1], key = 'q', on = qg > 0.5, src = 'p', name = 'Input quantize', items = QN, tip = 'quantize incoming notes to the grid' },
+      { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM, tip = 'note layout: chromatic, piano (white keys), or by class' },
+      { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity', tip = 'vel: ignore incoming velocity (fixed level)' },
+      { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16, tip = 'MIDI channel it listens to (omni - all)' },
+      { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 24) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'the note of slice 1' },
     },
     {
       { kind = 'zone', lab = 'ARP' },
@@ -79,6 +79,7 @@ local function bw_of(it, ms, pad)
   local w = ms(it.lab) + 2 * pad
   if it.key and not key_at(it) then w = w + ms(it.key) + 3 end
   if it.kind == 'val' then w = w + ms(' ' .. (it.val or '')) end
+  if it.slider then w = w + ms('WWWWW') + pad end   -- 27 окт: дорожка слайдера между подписью и числом
   if it.kind == 'menu' then w = w + 7 end
   return w
 end
@@ -138,13 +139,23 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
         if on then set(U.BG); gfx.rect(px, y + h - 3, ms(it.lab:sub(ki, ki)), 1, 1) end
       end
       tx = tx + ms(it.lab)
+      local trk
+      if it.slider then   -- 27 окт: слайдер, как в трекере: тонкая дорожка, заливка до значения
+        local tw2 = ms('WWWWW')
+        local sx0 = tx + L.pad
+        local fr = math.max(0, math.min(1, ((it.raw or 0) - (it.lo or 0)) / math.max(1e-9, (it.hi or 1) - (it.lo or 0))))
+        set(U.DIM); gfx.rect(sx0, y + math.floor(h / 2) - 1, tw2, 2, 1)
+        set(hot and U.AMBER or U.TEXT); gfx.rect(sx0, y + 3, math.max(1, math.floor(tw2 * fr + 0.5)), h - 6, 1)
+        trk = { x = sx0, w = tw2 }
+        tx = sx0 + tw2
+      end
       if it.kind == 'val' then text(tx, ty, ' ' .. (it.val or ''), on and U.BG or U.CYAN); tx = tx + ms(' ' .. (it.val or '')) end
       if it.key and not ki then text(tx + 3, ty, it.key, on and U.BG or U.AMBER); tx = tx + 3 + ms(it.key) end
       if it.kind == 'menu' then
         set(tc); local ax, ay = x + w - 7, y + math.floor(h / 2) - 1
         gfx.triangle(ax, ay, ax + 4, ay, ax + 2, ay + 3)
       end
-      if hot then hv = { it = it, x = x, y = y, w = w, h = h } end
+      if hot then hv = { it = it, x = x, y = y, w = w, h = h, trk = trk } end
     end
   end
   return hv
@@ -153,11 +164,11 @@ end
 -- волна как слайсер трекера: полоса-обзор + основная; zst = { f0, fn } (окно зума в кадрах, на модуль)
 -- 26 окт: пэдов нет — срез на волне сам интерактивный: под мышью светлее, у границы — ручка
 -- (hv.edge = номер среза, чью начальную границу тянуть); dr = { edge, frame } — граница в протяжке
-function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, drag, dr)
+function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, drag, dr, wave_y)
   local hv
   local fr = v and v.frames or 0
   set(U.mix(U.BG, U.PANEL, 0.5)); gfx.rect(x, y, w, ovh, 1)
-  local wy = y + ovh + 1
+  local wy = wave_y or (y + ovh + 1)   -- 27 окт: волна может стоять ниже (между обзором и ней — прицел)
   set(U.PANEL); gfx.rect(x, wy, w, wh, 1)
   if not (fr and fr > 0) then return nil end
   local pk = v.peaks
@@ -250,8 +261,8 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
   end
   set(U.GREEN)
   for _, p in ipairs(v.voices or {}) do local px = xof(p); if px >= x and px < x + w then gfx.rect(px, wy, 1, wh, 1) end end
-  if not drag and mx >= x and mx < x + w and my >= y and my < wy + wh then
-    hv = { over = my < wy and 'overview' or 'wave', slice = hs, edge = he, frame = fpos, fr = fr, f0 = f0, fn = fn, x = x, w = w }
+  if not drag and mx >= x and mx < x + w and ((my >= y and my < y + ovh) or (my >= wy and my < wy + wh)) then
+    hv = { over = my < y + ovh and 'overview' or 'wave', slice = hs, edge = he, frame = fpos, fr = fr, f0 = f0, fn = fn, x = x, w = w }
   end
   return hv
 end
