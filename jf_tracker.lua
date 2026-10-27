@@ -11631,7 +11631,7 @@ ctx = {
       if hot then hover.hdrparam = { track = tr, fx = fx, param = pi, x = x + 1, w = w2 - 2, name = pn, col = col, k = e.k } end
       if draw.csel_on(col and col.guid, fx, pi) then draw.csel_frame(x + 1, y, w2 - 2, L.rh) end
       ctx.hint('hdrparam', x, y, w2, L.rh, { col = col, k = e.k })
-      if draw.slr then draw.slr[#draw.slr + 1] = { g = 'hdr:' .. tostring(col.guid), col = col, fx = fx, p = pi, name = pn, x = x + 1, y = y, w = w2 - 2, h = L.rh } end   -- 14 окт: SLIDER
+      if draw.slr then draw.slr[#draw.slr + 1] = { g = 'hdr:' .. tostring(col.guid), col = col, fx = fx, p = pi, name = pn, x = x + 1, y = y, w = w2 - 2, h = L.rh } end   -- 14 окт: CONTROL
     end
     local function chip(e, x, y, w2, lab)
       local hot = mx >= x and mx < x + w2 and my >= y and my < y + L.rh
@@ -12853,7 +12853,7 @@ ctx = {
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
       { key = 'ssbars', label = 'session bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone the clips loop in (new zone only - delete the region to rebuild); clips of 1 / 2 / 4 / 8 bars loop seamlessly in 8', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
-      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Opt+Cmd (SLIDER, + Ctrl - pan), Ctrl+Opt+Cmd over selected notes (REFORM gestures). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
+      { key = 'cmsens', label = 'fader speed (experimental)', kind = 'num', min = 10, max = 200, step = 5, fmt = '%d %%', desc = 'EXPERIMENTAL - the whole mouse-with-modifiers family: Ctrl (fade), Ctrl+Option (tracks), Opt+Cmd (CONTROL, + Ctrl - pan), Ctrl+Opt+Cmd over selected notes (REFORM gestures). This sets how far a value moves per pixel; lower - calmer, Shift - finer still', get = function() return state.cmsens or 50 end, set = function(v) state.cmsens = v end },
       { key = 'curlead', label = 'cursor lead', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d ms', desc = 'draw the playing cursor ahead by this; raise it if it trails the sound', get = function() return state.curlead or 15 end, set = function(v) state.curlead = v end },
       { key = 'tlruler', label = 'timeline ruler', kind = 'cycle', values = { 'off', 'beats', 'time', 'both' }, desc = 'REAPER ruler left of the row numbers: bar.beat, time or both', get = function() return state.tlruler or 'off' end, set = function(v) state.tlruler = v end },
       { sep = true, title = 'layout' },
@@ -21450,13 +21450,13 @@ local function frame()
       else gfx.mouse_y = my - L.rh end
     end
   end
-  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для SLIDER (Opt+Cmd с 26 окт)
+  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для CONTROL (Opt+Cmd с 26 окт)
   draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
   ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
-    status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: SLIDER → FADE (fademode), SLIDER — жест по параметрам
+    status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: CONTROL → FADE (fademode), CONTROL — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
     hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, win_focus = ctx.win_focus, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
@@ -23636,7 +23636,7 @@ local function frame()
   -- клик — умолчание, колесо — шаг 1 %
   -- 19 окт: Ctrl+Cmd над рэком drumrs5k — тачпад = 16 пэдов: окно делится на 4 × 4, зона под пальцем — пэд нижних
   -- 4 рядов видимой сетки (как пэды MPC: низ-лево — первый); громкость — по высоте в зоне (верх — громко). Нажал над
-  -- рэком — захват, дальше всё окно — пэды, пока держишь; силу нажатия gfx не даёт. SLIDER при этом не берётся
+  -- рэком — захват, дальше всё окно — пэды, пока держишь; силу нажатия gfx не даёт. CONTROL при этом не берётся
   do
     local mm = ctx.mods()
     local hk = nil
@@ -23764,7 +23764,7 @@ local function frame()
     -- жест «треки» (Control+Option): окно по ширине — все треки зонами; вбок —
     -- выбор трека (фейдер в фокусе клавиатуры), вертикально — его громкость
     -- 11 окт: Ctrl+Option — сначала просто модификаторы; режим слайдеров — только когда мышь пошла (> 6 px)
-    -- 14 окт: SLIDER (держать Ctrl+Cmd): группа слайдеров у мыши (рамкой, как поле control surface в
+    -- 14 окт: CONTROL (держать Ctrl+Cmd): группа слайдеров у мыши (рамкой, как поле control surface в
     -- Ableton). Сколько их и как лежат: горизонтальные (шапка трека, колонка DSP) — высота окна делится
     -- на полосы, вверх-вниз выбор, вбок значение; вертикальные (фейдеры микшера) — ширина на столбцы,
     -- вбок выбор, вверх-вниз значение; XY-пэд — обе оси сразу. Значение — относительно, после заметного
@@ -23816,8 +23816,8 @@ local function frame()
       ctx.im = nil
     end
     local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
-    local sl_raw = (gfx.mouse_cap & 52 == 20 or sl_pan)   -- 26 окт: SLIDER — Opt+Cmd (было Ctrl+Cmd), + Ctrl — пан
-    sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не SLIDER
+    local sl_raw = (gfx.mouse_cap & 52 == 20 or sl_pan)   -- 26 окт: CONTROL — Opt+Cmd (было Ctrl+Cmd), + Ctrl — пан
+    sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не CONTROL
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local SG = ctx.sl
@@ -23844,7 +23844,7 @@ local function frame()
           end
           if b2 then best = b2 end
         end
-        -- 22 окт: модуль с макросами — SLIDER первым берёт его фейдеры макросов (главные ручки плагина)
+        -- 22 окт: модуль с макросами — CONTROL первым берёт его фейдеры макросов (главные ручки плагина)
         local mk = best and best.dsp and (best.g or ''):match('^dsp:(%d+):')
         if mk then
           local b3, d3
@@ -23963,7 +23963,7 @@ local function frame()
           U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
           local fx_, fy_ = ts[1] and frac(ts[1]) or 0.5, ts[2] and frac(ts[2]) or 0.5
           gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4, 1, 1)
-          state.status = ('-- SLIDER XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
+          state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
           local mapw = vert and gfx.w or math.min(math.floor(gfx.w / 4), L.cw * 26)
           local maph = vert and math.min(math.floor(gfx.h / 4), 8 * L.rh) or gfx.h
@@ -24016,15 +24016,15 @@ local function frame()
           U.set(U.AMBER); gfx.rect(dx0, dy0, dw, 1, 1)
           U.text(dx0 + L.pad, dy0 + 1, ctx.fit(desc, dw - 2 * L.pad), U.AMBER)
           U.text(dx0 + L.pad, dy0 + 1 + L.rh, ctx.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
-          state.status = ('-- SLIDER --  %s  %d / %d  %s   (%s, Shift fine; let Opt+Cmd go - done)'):format(cur.name or '?', k, n,
+          state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Opt+Cmd go - done)'):format(cur.name or '?', k, n,
             ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
       else
-        state.status = '-- SLIDER --  no sliders on the screen'
+        state.status = '-- CONTROL --  no sliders on the screen'
       end
       U.click, U.rclick = false, false
     elseif ctx.sl then
-      if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: slider'); model.invalidate() end
+      if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
     end
     local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS, 21 окт: REFORM (Ctrl+Opt+Cmd) — не жест треков
@@ -27327,7 +27327,7 @@ local function frame()
   end
   -- 17 окт: Ctrl+Cmd+Space — игра x0.5; Opt+Cmd+Space — listen step вкл / выкл (строка курсора на треке курсора),
   -- Shift+Cmd+Space — listen line (строка, все треки); x2 — кнопкой под play (было Opt+Cmd+Space)
-  -- 21 окт: x0.5 — Shift+Ctrl+Space (Ctrl+Cmd — режим SLIDER, Space с ним не доходил)
+  -- 21 окт: x0.5 — Shift+Ctrl+Space (Ctrl+Cmd — режим CONTROL, Space с ним не доходил)
   if (c == 32 or c == 160) and ctx.mods().ctrl and ctx.mods().shift and not ctx.mods().cmd and not ctx.mods().alt and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     ctx.half_play(0.5); c = 0
   end
@@ -27707,7 +27707,7 @@ local function frame()
   end
   if c_raw > 0 then
     ctx.keylog = ctx.keylog or {}
-    table.insert(ctx.keylog, ('%s %d>%d %s/%s%s cap%d inj%s row%d fi%d%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or ''), gfx.mouse_cap, tostring(inject_cap), vim.cur.row, vim.cur.fi, state.kslider and ' SLIDER' or ''))   -- 5 окт: моды и курсор для разбора «hjkl не работает»
+    table.insert(ctx.keylog, ('%s %d>%d %s/%s%s cap%d inj%s row%d fi%d%s'):format(os.date('%H:%M:%S'), c_raw, c, vim.mode, state.focus, (state.focus == 'top' and (':' .. tostring(state.toptab)) or ''), gfx.mouse_cap, tostring(inject_cap), vim.cur.row, vim.cur.fi, state.kslider and ' CONTROL' or ''))   -- 5 окт: моды и курсор для разбора «hjkl не работает»
     if #ctx.keylog > 24 then table.remove(ctx.keylog, 1) end
     reaper.SetExtState(EXT, 'keylog', table.concat(ctx.keylog, ' | '), false)
   end
