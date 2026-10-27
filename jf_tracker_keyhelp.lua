@@ -125,6 +125,7 @@ KH.PAGES = {
     { k = 'C-A-j', d = 'repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track; on the first row of a pattern - the previous pattern into this one; :repeat all - all tracks (Paketti)' },
     { k = 'S-A-j S-A-k', d = 'transpose the instrument selected in the lib -1 / +1 semitone (a count - by N)' },
     { k = ':mcmd', d = 'master column cmd = project markers on rows: Enter - edit the command of the row, ! - a REAPER action (marker !<id> - REAPER runs it when playback passes), BS / Del / x - delete; :mcmd <text> sets it, :mcmd alone deletes' },
+    { k = 'dw (automation)', d = 'on an envelope, a MIDI lane (CC / PB / PC) or a command field: delete the event of the cursor row (none - the next one below); 3dw - three in a row; the cursor stays, dw again - the next one' },
     { k = 'dC', d = 'clear the cursor field (vol / delay / a command) in the whole track: every subcolumn, every region; the notes stay' },
     { k = 'z1', d = 'lock the track of the cursor to one note lane (mono: a new note cuts the sounding one, overlaps trimmed); again - free (also in the track menu)' },
     { k = '- +', t = {}, d = 'over the note field of a track: how many note subcolumns at least' },

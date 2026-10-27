@@ -800,7 +800,7 @@ local function relayout()
   state.piano_strip = state.piano_show or nil
   draw.sroslash = state.sroslash and true or false   -- 16 окт: /// по умолчанию; выкл — буквы s r o
   draw.micro = (state.micro or model.seen_micro) and true or nil; draw.micro_tag = model.micro_tag   -- 16 окт: микротоны — шире колонка нот
-  local f_old = state.autozoom and L and L.flat[vim.cur.fi] or nil   -- 20 окт: поле курсора до новой раскладки
+  local f_old = L and L.flat[vim.cur.fi] or nil   -- 20 окт: поле курсора до новой раскладки (27 окт: всегда — LPB, раскрытые ноты, лейны)
   L = draw.layout(snap, state, #regions)
   -- 20 окт: autozoom — общая ширина треков сама: самая широкая, при которой влезают все треки,
   -- но не уже ноты и волны (уровень 1); ручной уровень (Cmd+колесо) — после выключения
@@ -819,17 +819,6 @@ local function relayout()
         if not (L.cols_cut or L.hs_cut) then break end
       end
     end
-    -- курсор — на том же треке / лейне / подколонке (номера полей сдвинулись с шириной)
-    if f0 and f0.col then
-      local best
-      for i, g in ipairs(L.flat) do
-        if g.col == f0.col then
-          best = best or i
-          if g.li == f0.li and g.si == f0.si and g.env == f0.env and g.ml == f0.ml then best = i; break end
-        end
-      end
-      if best then vim.cur.fi = best end
-    end
   end
   -- PT-mode (3 окт): масштаб — самый крупный, при котором 4 канала влезают
   -- (x4 → x3 → x2 → x1); заново при смене ширины окна
@@ -840,6 +829,20 @@ local function relayout()
       state.fontscale = state.fontscale - 1; draw.set_font(state); L = draw.layout(snap, state, #regions)
     end
     state.pt_fit = false
+  end
+  -- курсор — на том же треке / лейне / подколонке / огибающей: номера полей сдвигаются, когда у соседа появилась
+  -- подколонка (LPB +, раскрытые ноты), колонка «+ ~» или трек шире (27 окт: всегда, было — только autozoom)
+  if f_old and f_old.col and L.flat[vim.cur.fi] ~= f_old then
+    local function same_col(a, b) return a == b or (a.track ~= nil and a.track == b.track) end
+    local function tag(x) return x and (x.name or x.key or x.idx) end
+    local best
+    for i, g in ipairs(L.flat) do
+      if g.col and same_col(g.col, f_old.col) then
+        best = best or i
+        if g.li == f_old.li and g.si == f_old.si and tag(g.env) == tag(f_old.env) and tag(g.ml) == tag(f_old.ml) and (g.env ~= nil) == (f_old.env ~= nil) and (g.ml ~= nil) == (f_old.ml ~= nil) then best = i; break end
+      end
+    end
+    if best then vim.cur.fi = best end
   end
 end
 local function cur_col() local f = L and L.flat[vim.cur.fi]; return f and f.col end

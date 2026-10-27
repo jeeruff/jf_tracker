@@ -2945,6 +2945,35 @@ function V.key_impl(c)
         end
         V.count = nil; finish_move(); return
       end
+      -- 27 окт: dw на огибающей, MIDI-лейне (CC / PB / PC, cmd мастера) или в колонке команды — событие курсора (нет — следующее
+      -- ниже); 3dw — три события подряд; курсор на месте: снова dw — следующее
+      if p == 'd' and c == ('w'):byte() then
+        local f, fld = flat()[V.cur.fi], V.cur.field or 1
+        local kind = f and ((f.env and 'env') or (f.ml and f.ml.ev and 'ml') or ((not f.narrow) and fld >= 4 and 'fx'))
+        if kind then
+          local n, row = math.max(1, V.count or 1), V.cur.row
+          local rows, hs = {}, {}
+          if kind == 'env' then
+            for _, r in ipairs((ctx.env_point_rows and ctx.env_point_rows(f.env)) or {}) do if r >= row then rows[#rows + 1] = r end end
+          elseif kind == 'ml' then
+            for r in pairs(f.ml.ev) do if type(r) == 'number' and r >= row then rows[#rows + 1] = r end end
+          else
+            for _, h in ipairs(V.heads_in(V.cur.fi, V.cur.fi, row, math.max(row, ctx.snap().last_row or 0) + 1)) do
+              if V.field_get(h, fld) ~= nil then rows[#rows + 1] = h.row0 or row; hs[#hs + 1] = h end
+            end
+          end
+          table.sort(rows)
+          while #rows > n do rows[#rows] = nil end
+          if #rows == 0 then V.msg = 'dw: no event here or below'; V.count = nil; finish_move(); return end
+          ctx.edit.run('dw ' .. kind, function()
+            if kind == 'env' then apply('d', V.cur.fi, V.cur.fi, rows[1], rows[#rows])
+            elseif kind == 'ml' then for _, r in ipairs(rows) do ctx.ml_del(f, r) end
+            else for _, h in ipairs(hs) do if (h.row0 or row) <= rows[#rows] then V.field_set(h, fld, nil) end end end
+          end)
+          V.msg = ('dw: %d event(s) deleted (%04d%s)'):format(#rows, rows[1], #rows > 1 and ('..%04d'):format(rows[#rows]) or '')
+          V.count = nil; finish_edit(); return
+        end
+      end
       -- 21 окт: опция treat OFF as event — dw изнутри ноты / на её OFF: удалить этот OFF (нота до следующего события / конца паттерна)
       if p == 'd' and c == ('w'):byte() and ctx.state.offevent then
         local f = flat()[V.cur.fi]

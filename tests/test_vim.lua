@@ -663,7 +663,7 @@ keysin('dd'); eq('dd on an envelope deletes its row points (10 окт: трек 
 V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')
 V.cur.row = 15; keysin('p'); eq('p on env → paste points', last(), 'envpaste:Vol@15:1')
 V.cur = { fi = 1, row = 18, field = 1 }; keysin('p'); eq('env register on note column → message, no paste', last(), 'envpaste:Vol@15:1')
-V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → range to 2nd point (exclusive)', last(), 'envdelr:Vol@0-8')
+V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → the next 2 points from the cursor (27 окт: dw = event under / below the cursor)', last(), 'envdelr:Vol@3-9')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw from empty env row → next point', last(), 'envdelr:Vol@9-9')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('db'); eq('db from empty env row → back to previous point', last(), 'envdelr:Vol@3-5')
 V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W skips envelope points (items only)', V.cur.fi * 100 + V.cur.row, 117)

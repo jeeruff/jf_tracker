@@ -755,6 +755,11 @@ function M.build(lpb)
       col.envs = M.track_envs(tr, lpb)
       col.env_rows = M.ENVMARK and M.env_rows(tr, lpb) or nil   -- 27 окт: «~» на строках с автоматизацией
       col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
+      if M.ENVMARK then   -- 27 окт (2): CC / pitch bend в MIDI-лейнах — тоже автоматизация
+        for _, ml in ipairs(col.mlanes or {}) do
+          if ml.kind ~= 'tx' then for r in pairs(ml.ev or {}) do if type(r) == 'number' then col.env_rows = col.env_rows or {}; col.env_rows[r] = true end end end   -- текст / нотация — не автоматизация
+        end
+      end
       local t1 = R.time_precise()
       col.pool = M.track_pool(tr, depot_tr, nil, snap.end_pos, snap.zone, col.guid, #snap.cols == 0)
       local t2 = R.time_precise()
