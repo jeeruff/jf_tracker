@@ -1207,14 +1207,14 @@ end
 D.rrect = rrect
 -- 27 окт (5): кнопки ‹ ξ › у правого края выбранной строки lib (поверх волны): ξ — случайный сэмпл по имени папки, ‹ › — по выпавшим
 function D.lib_xi_btns(L, right, y, mx, my, hover)
-  local bw = gfx.measurestr('W') + 6
+  local bw = ms('W') + 6   -- 27 окт: ширины — шрифтом трекера (ms), не системным: ξ стоял неровно
   local x0 = right - 3 * (bw + 1)
   for k, b in ipairs({ { '<', 'prev' }, { 'ξ', 'rand' }, { '>', 'next' } }) do
     local bx = x0 + (k - 1) * (bw + 1)
     local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
     set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(bx, y + 1, bw, L.rh - 2, 1)
     set(hot and U.AMBER or U.LINE); gfx.rect(bx, y + 1, bw, L.rh - 2, 0)
-    text(bx + math.floor((bw - gfx.measurestr(b[1])) / 2), y + 1, b[1], hot and U.AMBER or U.TEXT)
+    text(bx + math.floor((bw - ms(b[1])) / 2), y + 1, b[1], hot and U.AMBER or U.TEXT)
     if hot then hover.libxi = b[2]; hover.pool = nil end
   end
 end
@@ -6291,7 +6291,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local i = row.i
       local e = pool[i]
       local rgb = e.rgb or (e.tracks and trgb[e.tracks[1]]) or (col and col.rgb) or U.GREY
-      local sel = i == inst or (cur and cur.parent == e)   -- выбран слайс — горит исходник
+      local sel = (i == inst or (cur and cur.parent == e)) and not D.lib_hdr   -- выбран слайс — горит исходник; 27 окт: курсор на имени папки — строка не горит (было двойное выделение)
       if D.lib_marks and D.lib_marks[i] then set(U.tint(U.AMBER, 0.22)); gfx.rect(ix + 1, y, w - 2, L.rh, 1); set(U.AMBER); gfx.rect(ix + 1, y, 2, L.rh, 1) end   -- 27 окт: отмечен (m)
       local rr = info.inst_range                -- диапазон v (2 окт)
       local inr = rr and i >= rr[1] and i <= rr[2] and not sel

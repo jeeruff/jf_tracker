@@ -106,6 +106,16 @@ function IK.key(c, cur, n, nslots, ninst)
   if ch == 'r' and ctx.rename_inst then ctx.rename_inst(); return true end
   -- 27 окт (5): ξ — R случайный сэмпл по имени папки / инструмента, [ ] — назад / вперёд по выпавшим
   if ch == 'R' and ctx.lib_random then ctx.lib_random(); return true end
+  -- 27 окт (7): Opt+Shift+H / L — ξ назад / вперёд (за концом выпавших — новый случайный)
+  do
+    local m = ctx.mods and ctx.mods() or {}
+    if m.alt and m.shift and not m.cmd and not m.ctrl and ctx.lib_random then
+      local left = c == 211 or c == 72 or c == 104 or c == 729 or c == LEFT
+      local right = c == 210 or c == 76 or c == 108 or c == 172 or c == RIGHT
+      if left then ctx.lib_random(-1); return true end
+      if right then if not ctx.lib_random(1) then ctx.lib_random() end; return true end
+    end
+  end
   if (ch == '[' or ch == ']') and ctx.lib_random then ctx.lib_random(ch == '[' and -1 or 1); return true end
   if ch == 'x' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); return true end
   if ch == 'x' then

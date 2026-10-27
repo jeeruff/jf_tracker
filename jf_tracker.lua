@@ -11025,14 +11025,14 @@ ctx = {
     ctx.lib_rand[gid] = H
     if d then
       local ni = math.max(0, math.min(#H.list, H.i + d))
-      if ni == H.i then vim.msg = d < 0 and 'ξ: the original sound already' or 'ξ: no newer pick - R rolls a new one'; return end
+      if ni == H.i then vim.msg = d < 0 and 'ξ: the original sound already' or 'ξ: no newer pick - R rolls a new one'; return false end
       H.i = ni
       local path = H.list[ni]
       local n = edit.swap_source(e.item, path)   -- nil — исходный звук
       model.invalidate()
       vim.msg = ('ξ %d/%d: %s (%d note(s); [ ] - back / forward, R - another)'):format(ni, #H.list, path and path:match('[^/]+$') or 'the original', n)
       if path then ctx.preview_file(path) end
-      return
+      return true
     end
     local G = B.mapG
     if not G or G.building or #G.nodes == 0 then vim.msg = 'ξ: open the map pane once on your samples folder - its index is where ξ picks from'; return end
