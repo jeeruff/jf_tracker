@@ -1984,10 +1984,10 @@ function V.key_impl(c)
   end
   local hk = HJKL[c]
   if hk and V.mod_note(c) then hk = nil end   -- 17 окт: renoise h j l — ноты (Ctrl / Option + нота)
-  -- 27 окт: Shift+Opt+J / K — LPB −1 / +1, как - и + (на немецкой раскладке + только с Shift); было транспоз инструмента
+  -- 27 окт: Shift+Opt+J / K — LPB +1 / −1 (J раскрывает строки, K собирает), как + и - (на немецкой раскладке + только с Shift); было транспоз инструмента
   if mods.alt and mods.shift and not mods.ctrl and not mods.cmd and (hk == 'j' or hk == 'k' or c == DOWN or c == UP) and V.mode ~= 'cmd' and V.mode ~= 'search' then
-    for _ = 1, n do ctx.set_lpb(nil, (hk == 'k' or c == UP) and 1 or -1) end
-    V.msg = 'LPB ' .. ctx.state.lpb .. '  (Shift+Opt+J / K = - +)'
+    for _ = 1, n do ctx.set_lpb(nil, (hk == 'k' or c == UP) and -1 or 1) end
+    V.msg = 'LPB ' .. ctx.state.lpb .. '  (Shift+Opt+J opens rows / K folds them)'
     V.count = nil; return
   end
   -- 27 окт: Shift+Opt+H / L — колонки трека курсора уже / шире по шагу, как z, / z. (счётчик — N шагов); было playrate инструмента
