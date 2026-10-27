@@ -18901,17 +18901,21 @@ function ctx.key_repeat(c, from_q)
   local R = ctx.krep
   -- 27 окт (2): «держат» — нажата по состоянию, либо с начала нажатия не было отпускания (состояние на кадр мигало —
   -- повтор вставал после ~16 шагов); остановка пишется в журнал debug
+  -- 27 окт (3): нажата по состоянию; мигнуло «отпущена» на кадр — терпим 2 кадра подряд, на 3-й — стоп
+  -- (ждать события отпускания нельзя: Enter = код 13 стоял на vk «M», его отпускания не бывает — Enter x47)
   local function held(r)
     local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
-    if st and st:byte(r.vk) ~= 0 then return true end
-    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(r.t0 - 0.02)
-    local rel = (not up) or up:byte(r.vk) ~= 0
-    if rel and ctx.dlog then pcall(ctx.dlog, ('keyrep stop c=%d vk=%d after %.2fs (state up, keyup seen)'):format(r.c, r.vk, now - r.t0)) end
-    return not rel
+    if st and st:byte(r.vk) ~= 0 then r.upn = 0; return true end
+    r.upn = (r.upn or 0) + 1
+    if r.upn >= 3 and ctx.dlog then pcall(ctx.dlog, ('keyrep stop c=%d vk=%d after %.2fs'):format(r.c, r.vk, now - r.t0)) end
+    return r.upn < 3
   end
   if c > 0 and not from_q then
     if R and R.c == c and held(R) then return 0 end   -- системный повтор — свой ниже
-    local vk = (c >= 97 and c <= 122) and (c - 32) or ((c >= 65 and c <= 90) or (c >= 48 and c <= 57)) and c or (c >= 1 and c <= 26) and (c + 64) or ctx.KR_ARROW[c]
+    -- Enter / Tab / Backspace — свои vk (13 9 8), не Ctrl+M / I / H; Esc — без повтора
+    local vk = (c >= 97 and c <= 122) and (c - 32) or ((c >= 65 and c <= 90) or (c >= 48 and c <= 57)) and c
+      or ((c == 13 or c == 9 or c == 8) and c) or (c >= 1 and c <= 26) and (c + 64) or ctx.KR_ARROW[c]
+    if c == 27 then vk = nil end
     local note = keys.piano[c] and (vim.mode == 'insert' or vim.piano)
     if vk and not note then ctx.krep = { c = c, vk = vk, t0 = now, nxt = now + d / 1000 } else ctx.krep = nil end
     return c
