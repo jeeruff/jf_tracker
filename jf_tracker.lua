@@ -18507,6 +18507,33 @@ function ctx.slx_param(fxi, name)
   return v, pi, lo, hi, tr
 end
 -- 25 окт: кнопка пульта slixer (jf_tracker_slxpanel.lua): параметр, команда экземпляру, клавиша окна, трекер
+-- 27 окт: в DSP буквы кнопок пульта slixer — Opt+буква (голые буквы — у самого DSP: d удалить fx …). Opt+E N U I на
+-- macOS — мёртвые клавиши (символ не приходит), поэтому физическая клавиша читается раз в кадр (JS_VKeys_GetState),
+-- только пока Opt зажат и в фокусе модуль slixer; Opt+J K — по-прежнему пресет
+function ctx.slx_optkeys()
+  if not (reaper.JS_VKeys_GetState and state.focus == 'dsp' and ctx.win_focus and gfx.mouse_cap & 16 == 16 and gfx.mouse_cap & 44 == 0) then ctx.slx_vk = nil; return end
+  local t = dsp_target()
+  local fxs = t and t.fx or {}
+  local f = fxs[dsp_sel.fx]
+  if not (f and f.view == 'slixer' and t.col and t.col.track) then return end
+  local st = reaper.JS_VKeys_GetState(0)
+  local prev = ctx.slx_vk or st
+  ctx.slx_vk = st
+  for vk = 65, 90 do
+    if st:byte(vk) ~= 0 and prev:byte(vk) == 0 and vk ~= 74 and vk ~= 75 then   -- J K — пресет
+      local ch = string.char(vk + 32)
+      local v = ctx.slixer_view(t.col.track, f.i)
+      local rows, low = draw.SX.items(v, function(name) return (ctx.slx_param(f.i, name)) end)
+      for _, grp in ipairs({ rows or {}, low or {} }) do
+        for _, row in ipairs(grp) do
+          for _, it in ipairs(row) do
+            if it.key == ch then ctx.slx_do({ it = it, f = f }); vim.msg = 'slixer: Opt+' .. ch:upper() .. ' - ' .. (it.lab or ''); return end
+          end
+        end
+      end
+    end
+  end
+end
 function ctx.slx_do(h)
   local it, f = h and h.it, h and h.f
   if not (it and f) then return end
@@ -26210,7 +26237,8 @@ local function frame()
       state.status = d.f.name .. ': ' .. ({ a = 'attack', ds = 'decay / sustain', r = 'release' })[d.part or 'a'] .. ' - drag, Shift: fine'
     else ctx.adsr_d = nil end
   end
-  if draw.slx_drag or ctx.slx_spam then ctx.slx_drag_tick() end   -- 26 окт: граница среза slixer за мышью
+  if draw.slx_drag or ctx.slx_spam then ctx.slx_drag_tick() end
+  if gfx.mouse_cap & 16 == 16 or ctx.slx_vk then ctx.slx_optkeys() end   -- 27 окт: Opt+буква — кнопки пульта slixer в DSP   -- 26 окт: граница среза slixer за мышью
   if dspwave_drag then
     if gfx.mouse_cap & 1 == 1 then
       local d = dspwave_drag
@@ -28512,6 +28540,7 @@ local function frame()
         do
           local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
           local OPTP = { [8710] = 'next', [730] = 'prev', [729] = 'prevdir', [172] = 'nextdir' }
+          if OPTP[cp] and not DK.pending and f and f.view == 'slixer' and cp ~= 8710 and cp ~= 730 then return end   -- 27 окт: у slixer Opt+H L — его кнопки (thru …), папок пресетов нет
           if OPTP[cp] and not DK.pending and f then ctx.dsp_preset(dsp_sel.fx, OPTP[cp]); return end
         end
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())

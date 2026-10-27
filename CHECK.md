@@ -1946,3 +1946,6 @@
 - опции: отдел control mode — fader speed, control overlay (карта трекпада и плашка), control font x2
 - mono мастера включён — мигает розовым
 - окно slixer как пульт DSP: слоты наверху одной строкой, sync за names, сведения о сэмпле под волной
+- DSP slixer: кнопки пульта — Opt+буква (Opt+D detect, Opt+X clear …); голые буквы — DSP; Opt+J K — пресет
+- временный трек загрузки slixer (демон) назван jf_slixer load, скрыт, трекер его не показывает (после перезапуска демона)
+- окно slixer: подпись quickload: перед слотами

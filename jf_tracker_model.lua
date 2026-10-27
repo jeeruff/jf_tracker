@@ -622,7 +622,7 @@ function M.build(lpb)
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
-    if not M.is_lib_name(name) then
+    if not M.is_lib_name(name) and name ~= 'jf_slixer load' then   -- 27 окт: временный трек загрузки slixer (демон) — не колонка
       local freemode = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE')
       local fixed = freemode == 2
       local color = R.GetTrackColor(tr)
