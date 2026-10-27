@@ -409,6 +409,51 @@ function B.map_file_of(id)
 end
 -- 27 окт (5): история карты — что проиграно из неё (новое первым); шаг — номер прослушивания (точки гаснут по нему)
 B.map_hist, B.map_step = {}, 0
+-- 27 окт (8): history и marked — на диске (Data/jf_tracker_maphist.txt, jf_tracker_marked.txt), переживают рестарт
+local function hist_file() return R.GetResourcePath() .. '/Data/jf_tracker_maphist.txt' end
+local function marked_file() return R.GetResourcePath() .. '/Data/jf_tracker_marked.txt' end
+function B.map_hist_save()
+  local f = io.open(hist_file(), 'w'); if not f then return end
+  f:write(tostring(B.map_step), '\n')
+  for _, e in ipairs(B.map_hist) do f:write(e.step, '\t', e.path, '\t', e.name or '', '\n') end
+  f:close()
+end
+function B.marked_save()
+  local f = io.open(marked_file(), 'w'); if not f then return end
+  for _, o in ipairs(B.sel_order or {}) do if o.full then f:write(o.full, '\t', (o.e and o.e.name) or '', '\n') end end
+  f:close()
+  B.marked_sig = #(B.sel_order or {}) .. ':' .. tostring((B.sel_order or {})[#(B.sel_order or {})] and B.sel_order[#B.sel_order].full)
+end
+-- отметки поменялись (m в браузере, двойной клик, lib / save, clear) — на диск; зовут браузер и карта каждый кадр (дёшево)
+function B.marked_tick()
+  local list = B.sel_order or {}
+  local sig = #list .. ':' .. tostring(list[#list] and list[#list].full)
+  if sig ~= B.marked_sig then B.marked_save() end
+end
+function B.hist_load()
+  local f = io.open(hist_file(), 'r')
+  if f then
+    B.map_step = tonumber(f:read('*l') or '') or 0
+    for line in f:lines() do
+      local st, pth, nm = line:match('^(%d+)\t([^\t]*)\t(.*)$')
+      if pth and pth ~= '' then B.map_hist[#B.map_hist + 1] = { step = tonumber(st), path = pth, name = nm ~= '' and nm or pth:match('[^/]+$') } end
+    end
+    f:close()
+  end
+  B.mapV.hist, B.mapV.step = B.map_hist, B.map_step
+  f = io.open(marked_file(), 'r')
+  if f then
+    for line in f:lines() do
+      local pth, nm = line:match('^([^\t]+)\t?(.*)$')
+      if pth and not B.sel[pth] then
+        B.sel[pth] = true
+        B.sel_order[#B.sel_order + 1] = { key = pth, e = { name = nm ~= '' and nm or pth:match('[^/]+$'), path = pth }, full = pth }
+      end
+    end
+    f:close()
+  end
+  B.marked_sig = #B.sel_order .. ':' .. tostring(B.sel_order[#B.sel_order] and B.sel_order[#B.sel_order].full)
+end
 function B.map_play(path, name)
   if not path then return end
   B.map_step = B.map_step + 1
@@ -416,6 +461,7 @@ function B.map_play(path, name)
   table.insert(B.map_hist, 1, { path = path, name = name or path:match('[^/]+$') or path, step = B.map_step })
   while #B.map_hist > 200 do B.map_hist[#B.map_hist] = nil end
   B.mapV.hist, B.mapV.step = B.map_hist, B.map_step
+  B.map_hist_save()
   B.pl = nil
   ctx.preview_file(path)
 end
@@ -629,12 +675,13 @@ function B.map_side(U, L, x, y, w, h)
   -- marked
   local y2 = y + h1
   local list = B.sel_order or {}
+  B.marked_tick()
   U.set(U.PANEL); gfx.rect(x, y2, w, h - h1, 1)
   U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(x, y2, w, 1, 1); gfx.rect(x, y2, 1, h - h1, 1)
   local tx = x + L.pad
   U.text(tx, y2 + 2, ('marked %d'):format(#list), #list > 0 and U.AMBER or U.GREY); tx = tx + U.measure('marked 000') + 4
   if #list > 0 then
-    for _, b in ipairs({ { 'lib', 'mapshiplib' }, { 'save', 'mapshipsave' } }) do
+    for _, b in ipairs({ { 'lib', 'mapshiplib' }, { 'save', 'mapshipsave' }, { 'clear', 'mapmkclear' } }) do
       local bw = U.measure(b[1]) + 2 * L.pad
       if tx + bw <= x + w - 2 then
         local hot = mx >= tx and mx < tx + bw and my >= y2 + 2 and my < y2 + 2 + L.rh
@@ -1278,6 +1325,7 @@ function B.click(what)
   elseif what == 'maprandom' then B.map_random()
   elseif what:match('^mapdir%d+$') then B.map_dcur = tonumber(what:sub(7)); B.map_enter()
   elseif what == 'mapshiplib' then B.enter_marked()
+  elseif what == 'mapmkclear' then B.sel, B.sel_order = {}, {}; if ctx.msg then ctx.msg('marked: cleared') end
   elseif what == 'mapshipsave' then if ctx.marked_to_lib_save then ctx.marked_to_lib_save() end
   elseif what:match('^mapship%d+$') then   -- 27 окт (4): отмеченный файл в корабле — слушать
     local o = (B.sel_order or {})[tonumber(what:sub(8))]
@@ -1775,6 +1823,7 @@ function B.player_block(U, L, x, y, w, h, btn, opts)
   return h, hover
 end
 function B.draw(U, L, x, y, w, h)
+  B.marked_tick()   -- 27 окт (8): отметки — на диск, пока не очищены / не сохранены
   if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
   B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу
   B.hear_tick()   -- 27 окт: прозвучавшее — в recent   -- 19 окт: поиск после паузы набора
@@ -2043,4 +2092,5 @@ function B.draw_drag(U, L)
   U.text(x + L.pad, y + 1, label, U.BG, U.AMBER)
 end
 
+pcall(B.hist_load)   -- 27 окт (8): history и marked с прошлого раза
 return B

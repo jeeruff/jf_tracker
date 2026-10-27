@@ -2018,3 +2018,4 @@
 - sens в DSP slixer: detect перезапускается прямо во время протяжки (раз в 0.15 с)
 - lib: j k идут и по слайсам / слоям открытого сэмпла; сэмпл со slixer — выбранный срез выбирается и в slixer (заказ 1, проверить номер среза)
 - плеер (браузер / карта): кнопки slixer (новый трек со slixer) и drumrs5k (пэд: есть рэк — в свободную ноту, нет — новый рэк)
+- history и marked карты переживают рестарт (Data/jf_tracker_maphist.txt, jf_tracker_marked.txt); marked — пока не clear / lib / save; кнопка clear в marked
