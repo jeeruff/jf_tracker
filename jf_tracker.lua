@@ -18397,19 +18397,8 @@ function ctx.slx_drag_tick()
     local now = reaper.time_precise()
     if math.abs(d.frame - (d.roll_f or v.starts[d.edge])) >= 1 and now - (d.roll_t or 0) >= 0.12 then
       d.roll_t, d.roll_f = now, d.frame
-      local t = dsp_target()
-      local tr = t and t.col and t.col.track
-      local item = tr and ctx.slx_item_of(reaper.TrackFX_GetFXGUID(tr, d.f.fx or d.f.i))
-      local tk = item and reaper.GetActiveTake(item)
-      if tk then
-        local sr = math.max(1, v.sr or 48000)
-        local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
-        local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
-        local nxt = (v.starts[d.edge + 1] or v.frames) / sr
-        local a = (d.frame / sr - offs) / rate
-        local b = (math.min(nxt, d.frame / sr + 0.12) - offs) / rate
-        if b > a and a >= 0 then ctx.preview_slice(tr, { item = item, take = tk, offs = offs, rate = rate }, a, b) end
-      end
+      -- 27 окт: как в окне плагина — граница сдвигается в самом slixer и срез звучит им (с его fx); айтем lib не нужен
+      ctx.slx_cmd(12, d.edge - 1, d.frame, 1)
     end
   end
   if gfx.mouse_cap & 1 == 1 then return end
@@ -18419,11 +18408,11 @@ function ctx.slx_drag_tick()
   local sr = math.max(1, v.sr or 48000)
   local secs = {}
   for i = 1, v.nsl do secs[i] = (i == d.edge and d.frame or v.starts[i]) / sr end
-  ctx.slx_apply_secs(d.f, secs, v.nsl)
+  ctx.slx_apply_secs(d.f, secs, v.nsl, d.edge, d.frame)
 end
 -- 27 окт: новые начала срезов (секунды файла): есть связанный айтем lib с той же нарезкой (n_old срезов) — правится
 -- он (уйдёт в slixer хуком), иначе заказом прямо в slixer
-function ctx.slx_apply_secs(f, secs, n_old)
+function ctx.slx_apply_secs(f, secs, n_old, edge, frame)
   local t = dsp_target()
   local col = t and t.col
   local item = col and col.track and ctx.slx_item_of(reaper.TrackFX_GetFXGUID(col.track, f.fx or f.i))
@@ -18434,6 +18423,7 @@ function ctx.slx_apply_secs(f, secs, n_old)
     local ts = {}
     for i = 1, #secs do ts[i] = math.max(0, (secs[i] - offs) / rate) end
     edit.set_slices(item, ts)
+  elseif edge then ctx.slx_cmd(12, edge - 1, frame, 0)   -- 27 окт: одна граница — заказом 12 (вся нарезка заново сбросила бы настройки срезов)
   else ctx.slx_send_starts(secs) end
 end
 -- 27 окт: двойной щелчок по волне пульта — срез здесь; по границе — убрать её (как в слайсере lib)
@@ -18528,9 +18518,10 @@ function ctx.slx_pending_tick()
   end
 end
 -- 25 окт: команда экземпляру, показанному в DSP (владелец вида): см. jf_slixer.jsfx TRKV+6100
-function ctx.slx_cmd(code, arg)
+function ctx.slx_cmd(code, arg, a2, a3)
   with_ns('jf_slixer', function()
     local B = 200000
+    reaper.gmem_write(B + 6103, a2 or 0); reaper.gmem_write(B + 6104, a3 or 0)   -- 27 окт: второй / третий аргумент (заказ 12)
     reaper.gmem_write(B + 6101, code); reaper.gmem_write(B + 6102, arg or 0)
     reaper.gmem_write(B + 6100, (math.floor(reaper.gmem_read(B + 6100)) % 16000000) + 1)
   end)

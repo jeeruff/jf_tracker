@@ -33,7 +33,17 @@ Original ideas of the author
 - Microtones in tracker cells (72-EDO marks like C-4^) sent to synths.
 - A sample map in the browser: the folder as a graph or a "nebula" of floating
   points grouped into sectors.
-- Gestures (REFORM), humanizer, bouncer and renderer as tracker modules.
+
+Borrowed ideas and code (not the author's own)
+----------------------------------------------
+
+- Parts of jf_tracker are based on Paketti for Renoise by Esa Ruoho (Lackluster),
+  used with his permission: https://github.com/esaruoho/paketti
+- The reform pane follows the idea of Reform for Renoise (https://www.aqu.surf/reform);
+  an own implementation, no code copied.
+- The dsp big routing view follows the idea of Sexan's ParaNormal FX Router for
+  REAPER; an own implementation, no code copied.
+- The Orca field is an own implementation of Orca by Hundred Rabbits (MIT).
 
 Third-party material
 --------------------
