@@ -308,6 +308,29 @@ local function draw_col(U, L, list, x, y, w, h, hi_name, tag, mx, my)
   return hv
 end
 
+-- ── 27 окт: КАРТА папки (jf_tracker_smap): граф пересобирается при смене папки; вид (зум, сдвиг) — общий ──
+B.mapV = { zoom = 1, px = 0, py = 0 }
+local function map_draw(U, L, x, y, w, h)
+  if not B.SM then return nil end
+  local G = B.mapG
+  if not G or G.root ~= B.path then G = B.SM.build(B.path, list_dir); B.mapG = G; B.mapV = { zoom = 1, px = 0, py = 0 } end
+  local playing
+  if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end
+  local hv = B.SM.draw(U, L, G, x, y, w, h, B.mapV, playing, ctx.fit)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local inside = mx >= x and mx < x + w and my >= y and my < y + h
+  if inside and gfx.mouse_wheel ~= 0 then   -- колесо — зум к центру
+    B.mapV.zoom = math.max(0.3, math.min(8, B.mapV.zoom * (gfx.mouse_wheel > 0 and 1.15 or 1 / 1.15))); gfx.mouse_wheel = 0
+  end
+  local pan = B.map_pan
+  if pan then
+    if gfx.mouse_cap & 1 == 1 then B.mapV.px, B.mapV.py = pan.px + mx - pan.mx, pan.py + my - pan.my else B.map_pan = nil end
+  end
+  B.map_hv = hv
+  if hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
+  return nil
+end
+
 -- ── поиск прямо в списке (fzf-синтаксис, 2 окт) ─────────────────────────
 -- Контекст: в папке (files) — рекурсивно от ТЕКУЩЕЙ папки (индекс на папку,
 -- строится при первом символе, до 20000 строк); в открытой базе — по базе;
@@ -801,6 +824,7 @@ end
 B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
+  if m == 'map' then B.mode = 'map'; B.filter = ''; B.filtering = false; return end   -- 27 окт: карта папки (B.path не меняется)
   if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
@@ -815,7 +839,7 @@ function B.click(what)
   if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'map' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'drum' then B.drum = not B.drum; if ctx.drum_audition_toggle then ctx.drum_audition_toggle(B.drum) end
@@ -850,6 +874,19 @@ function B.click(what)
   elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
     B.mark(tonumber(what:sub(3)), m.alt and 'clear' or (m.shift and 'set' or nil))   -- 20 окт: Opt+клик — очистить (было Cmd)
+  elseif what == 'mapnode' then   -- 27 окт: узел карты — слушать
+    local n = B.map_hv and B.map_hv.node
+    if n then B.pl = nil; ctx.preview_file(n.path); if ctx.msg then ctx.msg('map: ' .. n.name .. '  (' .. n.cat .. ')') end end
+  elseif what == 'maphub' then   -- 27 окт: категория — её файлы в отметки (Space — плейлистом, Enter — в lib)
+    local hb = B.map_hv and B.map_hv.hub
+    if hb and B.mapG then
+      local nn = 0
+      for _, n in ipairs(B.mapG.nodes) do
+        if n.h == hb and not B.sel[n.path] then B.sel[n.path] = true; B.sel_order[#B.sel_order + 1] = { key = n.path, e = { name = n.name, path = n.path }, full = n.path }; nn = nn + 1 end
+      end
+      if ctx.msg then ctx.msg(('map: %s - %d file(s) marked (Space - play them in a row, Enter - into the lib, u - unmark)'):format(hb.name, nn)) end
+    end
+  elseif what == 'mapbg' then B.map_pan = { mx = gfx.mouse_x, my = gfx.mouse_y, px = B.mapV.px, py = B.mapV.py }
   elseif what:match('^rec%d+$') then   -- 27 окт: отмеченный файл (плеер большого браузера) — играть
     local pth = (B.mk_list or {})[tonumber(what:sub(4))]
     if pth then B.pl = nil; ctx.preview_file(pth) end
@@ -1234,7 +1271,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'map', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'map', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'map', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'map', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -1414,6 +1451,12 @@ function B.draw(U, L, x, y, w, h)
     if tx0 < x + w - 4 * L.cw then U.text(tx0, y + 1, ctx.fit(where, x + w - L.pad - tx0), (B.filtering and U.AMBER or U.GREY)) end
     y = y + L.rh; h = h - L.rh
   end
+  -- 27 окт: вкладка map — карта текущей папки на всё место списка
+  if B.mode == 'map' then
+    local hv = map_draw(U, L, x + 1, y, w - 2, h)
+    if hv then hover = hv end
+    return hover
+  end
   -- pm-сетка карточек (6 окт): вместо строк списка
   if B.mode == 'pm' and B.grid and not B.pmproj and not B.pm_folders and B.pm_mod() then
     local PM = B.pm_mod()
@@ -1497,6 +1540,11 @@ function B.draw(U, L, x, y, w, h)
   if cols then
     local e = B.entries[B.cur]
     B.ncol = nil
+    -- 27 окт: нижняя половина третьей колонки — карта текущей папки
+    local mh = math.floor(h * 0.5)
+    local mhv = map_draw(U, L, pv_x, y + h - mh, pv_w, mh)
+    if mhv then hover = mhv end
+    h = h - mh - 2
     if e and e.dir then
       local p = B.full(e)
       B.ncol = { path = p, list = list_dir(p) }

@@ -66,6 +66,7 @@ local MX = dofile(DIR .. '/jf_tracker_matrix.lua')
 local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
 local B = dofile(DIR .. '/jf_tracker_browser.lua')
+B.SM = dofile(DIR .. '/jf_tracker_smap.lua')   -- 27 окт: карта сэмплов папки (граф, как в Obsidian)
 local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
@@ -15270,7 +15271,7 @@ ctx.inner_tab_cycle = function(dir)
   end
   local f = state.focus
   if f == 'browser' and B.mode ~= 'fx' then
-    local L0 = B.pmpane and { 'files', 'recent', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent
+    local L0 = B.pmpane and { 'files', 'recent', 'map', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'map', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent, map
     local m = nxt(L0, B.mode)
     B.click(m); vim.msg = 'browser: ' .. m .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
