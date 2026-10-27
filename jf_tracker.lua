@@ -18703,7 +18703,7 @@ end
 -- 26 окт: :pitch — высота сэмпла → take-маркеры (PLAN_HARM этап 1): аудио-айтем в строке курсора, иначе
 -- сэмпл lib под курсором lib; на каждый срез (или весь сэмпл) — нота «A3» (+центы) или аккорд «Am».
 -- Свои маркеры — своего цвета (повтор их заменяет). Без процессов: YIN / хрома (jf_tracker_theory)
-ctx.PITCH_MK_COLOR = reaper.ColorToNative(230, 150, 60) | 0x1000000
+ctx.PITCH_MK_COLOR = model.pitch_mk_color()   -- 27 окт: один цвет с моделью (нота = высота из маркера)
 function ctx.pitch_target()
   local col = cur_col()
   if col and col.track and state.focus == 'tracker' then
@@ -18769,7 +18769,7 @@ function ctx.pitch_mark()
   model.invalidate()
   local names = {}
   for i = 1, math.min(8, #res) do names[#names + 1] = res[i].name end
-  vim.msg = ('pitch: %d marker(s) - %s%s (take markers of the sample; u - undo)'):format(#res, table.concat(names, ' '), #res > 8 and ' ...' or '')
+  vim.msg = ('pitch: %d marker(s) - %s%s (take markers of the sample: the note shows how it sounds, type another note - the sample plays it; u - undo)'):format(#res, table.concat(names, ' '), #res > 8 and ' ...' or '')
 end
 -- 26 окт: ТРАНСПОЗИТОР в паре с harmonizer (V.transpose_smart, :tr): аккорд строки, подгон к нему, JI, слушать
 -- аккорд строки t: колонка аккордов мастера (маркер ch:), иначе nil

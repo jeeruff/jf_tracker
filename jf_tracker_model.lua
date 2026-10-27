@@ -320,6 +320,33 @@ function M.src_period(src)
   return R.GetMediaSourceLength(M.online_src(src) or src) or 0
 end
 
+-- 27 окт: высота сэмпла из take-маркера :pitch (свой цвет): «A3», «C#4-12» (центы) или аккорд «Am» (корень в
+-- 4-й октаве); маркер — тот, что на начале проигрываемого куска (или первый внутри него). → MIDI-высота с центами
+function M.pitch_mk_color() M.PITCH_MK_COLOR = M.PITCH_MK_COLOR or (R.ColorToNative(230, 150, 60) | 0x1000000); return M.PITCH_MK_COLOR end
+local PCS = { C = 0, D = 2, E = 4, F = 5, G = 7, A = 9, B = 11 }
+function M.marker_root(take, offs, rate, len)
+  local n = R.GetNumTakeMarkers and R.GetNumTakeMarkers(take) or 0
+  if type(n) ~= 'number' or n == 0 then return nil end
+  M.pitch_mk_color()
+  local best, bp, first, fp
+  for i = 0, n - 1 do
+    local sp, nm, col = R.GetTakeMarker(take, i)
+    if col == M.PITCH_MK_COLOR and nm then
+      if sp <= offs + 0.005 and (not bp or sp > bp) then best, bp = nm, sp end
+      if sp > offs and sp < offs + len * rate and (not fp or sp < fp) then first, fp = nm, sp end
+    end
+  end
+  local nm = best or first
+  if not nm then return nil end
+  local l, acc, rest = nm:match('^([A-G])([#b]?)(.*)$')
+  if not l then return nil end
+  local pc = PCS[l] + (acc == '#' and 1 or (acc == 'b' and -1 or 0))
+  local oct, cents = rest:match('^(%-?%d+)([%+%-]%d+)$')
+  if not oct then oct = rest:match('^(%-?%d+)$') end
+  if oct then return pc + (tonumber(oct) + 1) * 12 + (tonumber(cents) or 0) / 100 end
+  return pc % 12 + 60                                   -- аккорд: корень
+end
+
 local function place_audio(lane, lpb, it, take, qn0, qn1)
   local r0, d0 = M.row_of_qn(qn0, lpb)
   local r1, d1 = M.row_of_qn(qn1, lpb)
@@ -355,6 +382,15 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
   head.fx, head.rowfx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
+  -- 27 окт: у сэмпла есть маркер высоты (:pitch) — нота = как звучит (маркер + транспоз), не транспоз от C-4
+  local mroot = take and M.marker_root(take, head.offs, rate > 0 and rate or 1, head.len)
+  if mroot then
+    local abs = mroot + semis
+    head.mroot, head.semis = mroot, abs - M.BASE_NOTE
+    head.note = M.note_name(math.floor(abs + 0.5))
+    head.micro = M.micro_of_cents((abs - math.floor(abs + 0.5)) * 100)
+    head.frac = false
+  end
   if head.micro then M.seen_micro = true end
   do local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); head.slice = tonumber(sk) end   -- 11 окт: номер слайса — поле в ячейке
   do local _, gh = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_ghost', '', false); head.ghost = (gh ~= nil and gh ~= '') or nil end   -- 15 окт: ghost-слайс playthru + q (рисуется бледно)
@@ -867,7 +903,7 @@ function M.build(lpb)
     for _, lane in ipairs(col.lanes) do
       for _, sub in ipairs(lane.subs) do
         for _, cell in pairs(sub) do
-          if cell.kind == 'audio' and cell.item then
+          if cell.kind == 'audio' and cell.item and not cell.mroot then   -- 27 окт: с маркером высоты — без базы
             local i = snap.inst_of[cell.item]
             local base = i and all[i] and snap.inst_semis[i] or 0
             if base ~= 0 then

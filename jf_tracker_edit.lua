@@ -642,7 +642,7 @@ function E.transpose(heads, lpb, semis, map, label)
       if map then   -- сдвиг этой ноты: от её высоты
         local p0
         if h.kind == 'midi' then local _, n = midi_note(h, lpb); p0 = n and n.pitch
-        elseif h.kind == 'audio' and h.take then p0 = 60 + audio_semis(h) end
+        elseif h.kind == 'audio' and h.take then p0 = (h.mroot or 60) + audio_semis(h) end   -- 27 окт: от маркера высоты
         semis = p0 and (map(p0, h) - p0) or 0   -- 26 окт: и сама нота (к аккорду её строки)
       end
       if semis == 0 then goto next_head end
@@ -778,7 +778,10 @@ function E.set_pitch(heads, lpb, pitch)
   run('pitch', function()
     for _, h in ipairs(heads) do
       local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
-      if h.kind == 'audio' and h.take and tonumber(slk) then
+      if h.kind == 'audio' and h.take and h.mroot then
+        -- 27 окт: у сэмпла маркер высоты (:pitch) — звучит набранной нотой: транспоз = нота − определённая
+        audio_set_semis(h, pitch - h.mroot)
+      elseif h.kind == 'audio' and h.take and tonumber(slk) then
         -- слайс (4 окт, вечер): нота — его высота (слайс — Sxx)
         E.slice_pitch(h.item, pitch - model.BASE_NOTE)
       elseif h.kind == 'audio' and h.take then
