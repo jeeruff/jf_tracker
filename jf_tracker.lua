@@ -17173,6 +17173,7 @@ local function hint_go(t)
   elseif t.kind == 'mx' then ctx.set_focus('matrix'); MX.goto_cell(seq, snap, d.ri, d.ci)
   elseif t.kind == 'patcube' then   -- 19 окт: f + код паттерна (a1, bc …) — к нему в трекер; серого ещё нет
     if d.i then MX.pl_sel = d.i; ctx.patlist_do('go', d.i) else vim.msg = d.fixed:upper() .. ': no such pattern yet (n in the matrix names a bar)' end
+  elseif t.kind == 'patbtn' then ctx.set_focus('patterns'); ctx.pat_btn(d.b)   -- 27 окт: ряд команд patterns
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
   elseif t.kind == 'mxbtn' then
@@ -23033,7 +23034,8 @@ local function frame()
     local pn = hover.matrix.palname
     local nt = ctx.pat_note(pn.name)
     state.status = pn.name .. (nt ~= '' and (' - ' .. nt) or '') .. '  |  hold: listen to the pattern, dblclick: its note (:pnote text)'
-  elseif hover.matrix and hover.matrix.patrow and ctx.pat_status then state.status = ctx.pat_status .. '  (click - listen, double - go there)'   -- 19 окт: сетка patterns
+  elseif hover.matrix and hover.matrix.patbtn then state.status = ({ menu = 'patterns menu (m, rclick on a pattern): listen, go, glue, split, copy, rename, note, chain, remove, select', glue = 'glue (J): the selected patterns become one where they play right after each other in the song', split = 'split (s): in half / 3 / 4 / bars / at the tracker cursor - in every place of the song', copy = 'copy: a free duplicate after the first place of the pattern', name = 'rename (r): every place of the pattern' })[hover.matrix.patbtn] or ''
+  elseif hover.matrix and hover.matrix.patrow and ctx.pat_status then state.status = ctx.pat_status .. '  (click - listen, double - go there, Shift+click - select, rclick - menu)'   -- 19 окт: сетка patterns
   elseif hover.matrix and hover.matrix.palcell then state.status = hover.matrix.palcell.p.name .. '-' .. hover.matrix.palcell.ci .. ': hold - listen to this track of the pattern (solo)'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
   elseif hover.matrix and hover.matrix.btn == 'se' then state.status = 's/e on: the matrix goes from =START to =END; off: the whole project as the REAPER timeline (library regions after =END too, 16 free bars at the end) - only the view, the markers stay'
@@ -25042,8 +25044,14 @@ local function frame()
         MX.sk_sel = {}; ctx.sketch_save(); vim.msg = ('sketch: %d removed'):format(#ks)
       end
       click = { t = now2, zone = 'sketchbtn' }
+    elseif hover.matrix and hover.matrix.patbtn then   -- 27 окт: ряд команд панели patterns
+      ctx.set_focus('patterns'); ctx.pat_btn(hover.matrix.patbtn)
+      click = { t = now2, zone = 'patbtn' }
+    elseif hover.matrix and hover.matrix.patrow and gfx.mouse_cap & 8 == 8 then   -- 27 окт: Shift+щелчок — в выбор / из выбора
+      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow; ctx.pat_mark(hover.matrix.patrow)
+      click = { t = now2, zone = 'patmark' }
     elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
-      ctx.set_focus('matrix'); MX.pl_sel = hover.matrix.patrow
+      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow   -- 27 окт: фокус — панель patterns (её клавиши: J s m v)
       if dbl and click.zone == 'patrow' then local p = (ctx.pat_rows or {})[hover.matrix.patrow]; if p then ctx.chain_add(p.name) end   -- 19 окт: двойной — в цепь
       else ctx.patlist_do('listen') end
       click = { t = now2, zone = 'patrow' }
@@ -26237,6 +26245,10 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and hover.matrix and hover.matrix.patrow then   -- 27 окт: меню паттернов — ПКМ (вне выбора — только этот)
+    local p = (ctx.pat_rows or {})[hover.matrix.patrow]
+    if p and not MX.pl_multi[p.name] then MX.pl_multi = {} end
+    MX.pl_sel = hover.matrix.patrow; ctx.set_focus('patterns'); ctx.pat_menu(); U.rclick = false
   elseif U.rclick and hover.matrix and hover.matrix.secloop then ctx.sec_menu(hover.matrix.secloop); U.rclick = false   -- 18 окт: меню секции — ПКМ
   elseif U.rclick and hover.tlist then local c2 = snap and snap.cols[hover.tlist.ci]; if c2 then ctx.track_menu(c2) end   -- 11 окт: tracks — меню трека (скрыть — столбец T)
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
@@ -28162,6 +28174,9 @@ local function frame()
         local ch = c < 256 and string.char(c) or ''
         -- 19 окт: список: j k — выбор, g G — края, Space — слушать, Enter — к паттерну в трекере, n — заметка
         if MX.ch_focus then ctx.chain_kb(c); return end
+        if ctx.mods().shift and (c == 1818584692 or c == 1919379572 or c == 30064 or c == 1685026670) then
+          ctx.pat_extend(c == 1818584692 and -1 or (c == 1919379572 and 1 or 0), c == 30064 and -1 or (c == 1685026670 and 1 or 0)); return
+        end
         if c == 9 or ((ch == 'j' or c == 1685026670) and not ctx.patgrid_move(0, 1)) then
           MX.ch_focus = true; vim.msg = 'chain: h l w b move, x dw delete, dd clear, y p P, Enter - to it, Space - play from it, C - type, k / Esc - back'; return
         end
@@ -28174,6 +28189,13 @@ local function frame()
         if ch == ' ' then ctx.patlist_do('listen'); return end
         if c == 13 then ctx.patlist_do('go'); return end
         if ch == 'n' then ctx.patlist_do('note'); return end
+        -- 27 окт: выбор нескольких и команды: Shift+стрелки — расширить, v — отметить, Esc — снять; J glue, s split, r имя, m меню
+        if ch == 'v' then ctx.pat_mark(MX.pl_sel); return end
+        if c == 27 and ctx.pat_nsel() > 0 then ctx.pat_select('none'); return end
+        if ch == 'J' then ctx.pat_glue(); return end
+        if ch == 's' then ctx.pat_split_menu(); return end
+        if ch == 'r' then ctx.pat_rename(); return end
+        if ch == 'm' then ctx.pat_menu(); return end
         if ch == 'C' then ctx.pl_edit(); return end   -- 19 окт вечер: chain — набрать (как в матрице)
         return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
@@ -30195,6 +30217,24 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   ctx.pat_rows = list
   -- 19 окт: плотно — сетка всех кодов: ряд — буква A, B, C …, колонки — варианты 1, 2 … (hex) сколько влезает;
   -- паттерна ещё нет — серый кубик с кодом; без кода — последним рядом
+  -- 27 окт: ряд команд над кубиками: menu glue split copy name, справа — сколько выбрано
+  do
+    local bx = x
+    for _, b in ipairs({ 'menu', 'glue', 'split', 'copy', 'name' }) do
+      local bw = U.measure(b) + 2 * Lx.pad
+      if bx + bw > x + w then break end
+      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
+      U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
+      U.text(bx + Lx.pad, y, b, hot and U.AMBER or U.TEXT)
+      if hot then hv.patbtn = b end
+      if ctx.hint then ctx.hint('patbtn', bx, y, bw, Lx.rh - 1, { b = b }) end
+      bx = bx + bw + 2
+    end
+    local n = ctx.pat_nsel()
+    if n > 0 and bx + U.measure(' 99 sel') < x + w then U.text(bx + Lx.pad, y, n .. ' sel', U.CYAN) end
+    y = y + Lx.rh + 2; h = h - Lx.rh - 2
+  end
   local cw = U.measure('W00') + 2 * Lx.pad
   local ch = Lx.rh + 2
   local per = math.max(1, math.floor(w / cw))
@@ -30230,10 +30270,11 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
       goto pcell_next
     end
     local on = cl.i == MX.pl_sel
+    local marked = MX.pl_multi[p.name]   -- 27 окт: в выборе — заливка голубым
     local n = uses[p.name] or 0
     local playing = play_name == p.name
     local hot = mx >= cx and mx < cx + cw - 1 and my >= cy and my < cy + ch - 1
-    U.set(playing and U.tint(U.GREEN, 0.35) or (n > 0 and U.tint(U.CYAN, 0.18) or U.PANEL)); gfx.rect(cx, cy, cw - 1, ch - 1, 1)
+    U.set(playing and U.tint(U.GREEN, 0.35) or (marked and U.tint(U.CYAN, 0.45) or (n > 0 and U.tint(U.CYAN, 0.18) or U.PANEL))); gfx.rect(cx, cy, cw - 1, ch - 1, 1)
     U.set(on and U.AMBER or (hot and U.TEXT or U.mix(U.LINE, U.PANEL, 0.3))); gfx.rect(cx, cy, cw - 1, ch - 1, 0)
     local code = model.SEC.code_of(p.name) and (p.name:match('^(%S+)') or p.name) or p.name
     U.text(cx + Lx.pad, cy + 1, ctx.fit(code, cw - 2 * Lx.pad), on and U.AMBER or (playing and U.GREEN or (n > 0 and U.TEXT or U.DIM)))
@@ -30384,6 +30425,212 @@ ctx.patlist_do = function(what, i)
     vim.cur.row = r0; ctx.set_focus('tracker'); vim.ensure_visible()
     vim.msg = 'pattern ' .. p.name .. ' at row ' .. r0
   elseif what == 'note' then ctx.pat_note_prompt(p.name) end
+end
+-- 27 окт: ПАНЕЛЬ PATTERNS — несколько паттернов (Shift+стрелки, Shift+щелчок, v) и команды над ними: ряд кнопок над
+-- кубиками, m / правая кнопка — меню. Выбор — по именам (кубики перерисовываются каждый кадр); пусто — паттерн курсора
+MX.pl_multi = MX.pl_multi or {}
+ctx.pat_selected = function()
+  local list, out = ctx.pat_rows or {}, {}
+  for _, p in ipairs(list) do if MX.pl_multi[p.name] then out[#out + 1] = p end end
+  if #out == 0 and list[MX.pl_sel or 1] then out[1] = list[MX.pl_sel or 1] end
+  return out
+end
+ctx.pat_nsel = function() local n = 0; for _ in pairs(MX.pl_multi) do n = n + 1 end; return n end
+ctx.pat_mark = function(i, on)
+  local p = (ctx.pat_rows or {})[i]
+  if not p then return end
+  if on == nil then on = not MX.pl_multi[p.name] end
+  MX.pl_multi[p.name] = on or nil
+  vim.msg = ('patterns: %d selected - J glue, s split, m menu, Esc - none'):format(ctx.pat_nsel())
+end
+ctx.pat_extend = function(dc, dr)   -- Shift+стрелка: текущий и следующий — в выбор
+  ctx.pat_mark(MX.pl_sel, true)
+  if ctx.patgrid_move(dc, dr) then ctx.pat_mark(MX.pl_sel, true) end
+end
+-- все регионы паттерна (и вне песни)
+ctx.pat_occ = function(name)
+  local out = {}
+  for _, rg in ipairs(regions) do if not rg.gap and rg.name == name then out[#out + 1] = rg end end
+  table.sort(out, function(a, b) return a.pos < b.pos end)
+  return out
+end
+-- glue: выбранные паттерны, что в песне стоят подряд (A1 A2), — один паттерн; одинаковые цепочки — один код
+ctx.pat_glue = function()
+  local sel = ctx.pat_selected()
+  if #sel < 2 then vim.msg = 'glue: select two or more patterns (Shift+arrows, Shift+click, v)'; return end
+  local set = {}
+  for _, p in ipairs(sel) do set[p.name] = true end
+  local runs, cur = {}, nil
+  for _, rg in ipairs(seq) do
+    if not rg.gap and set[rg.name] and cur and math.abs(cur[#cur].rgnend - rg.pos) < 1e-6 then cur[#cur + 1] = rg
+    else
+      if cur and #cur >= 2 then runs[#runs + 1] = cur end
+      cur = (not rg.gap and set[rg.name]) and { rg } or nil
+    end
+  end
+  if cur and #cur >= 2 then runs[#runs + 1] = cur end
+  if #runs == 0 then vim.msg = 'glue: the selected patterns never play one right after another in the song'; return end
+  local names, fake = {}, {}
+  for _, rg in ipairs(regions) do fake[#fake + 1] = { name = rg.name } end
+  for _, run in ipairs(runs) do
+    local sig = {}
+    for _, rg in ipairs(run) do sig[#sig + 1] = rg.name:match('^(%S+)') or rg.name end
+    run.key = table.concat(sig, '+')
+    if not names[run.key] then names[run.key] = model.SEC.next_family(fake); fake[#fake + 1] = { name = names[run.key] } end
+  end
+  ctx.slot_op('glue patterns', function()
+    for _, run in ipairs(runs) do for _, rg in ipairs(run) do reaper.DeleteProjectMarker(0, rg.idx, true) end end
+    for _, run in ipairs(runs) do reaper.AddProjectMarker2(0, true, run[1].pos, run[#run].rgnend, names[run.key], -1, run[1].color or 0) end
+  end)
+  MX.pl_multi = {}
+  ctx.mx_refresh()
+  local t = {}
+  for k, nm in pairs(names) do t[#t + 1] = k .. ' = ' .. nm end
+  table.sort(t)
+  vim.msg = ('glue: %d place(s) in the song - %s (u - undo)'):format(#runs, table.concat(t, ', '))
+end
+-- split: каждый выбранный паттерн — на части (доли длины по его первому месту) во всех местах; первая часть — то же
+-- имя, остальные — следующие варианты буквы (A1 → A1 + A5 …); айтемы режутся на границах частей
+ctx.pat_split = function(how)
+  local sel = ctx.pat_selected()
+  if #sel == 0 then vim.msg = 'split: no pattern'; return end
+  local plan, fake = {}, {}
+  for _, rg in ipairs(regions) do fake[#fake + 1] = { name = rg.name } end
+  for _, p in ipairs(sel) do
+    local occ = ctx.pat_occ(p.name)
+    local r0 = occ[1]
+    if r0 then
+      local len = r0.rgnend - r0.pos
+      local fr = {}
+      if how == 'bars' then
+        local _, m0 = reaper.TimeMap2_timeToBeats(0, r0.pos + 1e-6)
+        local m = math.floor(m0) + 1
+        while true do
+          local t = reaper.TimeMap2_beatsToTime(0, 0, m)
+          if t >= r0.rgnend - 1e-6 then break end
+          if t > r0.pos + 1e-6 then fr[#fr + 1] = (t - r0.pos) / len end
+          m = m + 1
+        end
+      elseif how == 'cursor' then
+        local t = edit.row_time(vim.cur.row, state.lpb, 0)
+        for _, rg in ipairs(occ) do if t > rg.pos + 1e-6 and t < rg.rgnend - 1e-6 then fr[1] = (t - rg.pos) / (rg.rgnend - rg.pos) end end
+      else
+        local n = tonumber(how) or 2
+        for k = 1, n - 1 do fr[#fr + 1] = k / n end
+      end
+      if #fr > 0 then
+        local nm = { p.name }
+        for k = 2, #fr + 1 do
+          local v = model.SEC.code_of(p.name) and model.SEC.next_variant(fake, p.name) or (p.name .. ' ' .. k)
+          nm[k] = v; fake[#fake + 1] = { name = v }
+        end
+        plan[#plan + 1] = { occ = occ, fr = fr, names = nm }
+      end
+    end
+  end
+  if #plan == 0 then vim.msg = how == 'cursor' and 'split: the tracker cursor is not inside the selected pattern' or 'split: nothing to cut (shorter than a bar?)'; return end
+  ctx.slot_op('split pattern', function()
+    for _, pl in ipairs(plan) do
+      for _, rg in ipairs(pl.occ) do
+        local len = rg.rgnend - rg.pos
+        local cuts = {}
+        for k, f in ipairs(pl.fr) do cuts[k] = rg.pos + f * len end
+        for ti = 0, reaper.CountTracks(0) - 1 do
+          local tr = reaper.GetTrack(0, ti)
+          for _, t in ipairs(cuts) do
+            for ii = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+              local it = reaper.GetTrackMediaItem(tr, ii)
+              local a = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+              local b = a + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+              if a < t - 1e-6 and b > t + 1e-6 and b > rg.pos and a < rg.rgnend then reaper.SplitMediaItem(it, t) end
+            end
+          end
+        end
+        reaper.SetProjectMarker3(0, rg.idx, true, rg.pos, cuts[1], rg.name, rg.color or 0)
+        for k = 2, #cuts + 1 do reaper.AddProjectMarker2(0, true, cuts[k - 1], cuts[k] or rg.rgnend, pl.names[k], -1, rg.color or 0) end
+      end
+    end
+  end)
+  MX.pl_multi = {}
+  ctx.mx_refresh()
+  local t = {}
+  for _, pl in ipairs(plan) do t[#t + 1] = table.concat(pl.names, ' ') end
+  vim.msg = ('split: %s (every place in the song; u - undo)'):format(table.concat(t, ' | '))
+end
+ctx.pat_split_menu = function()
+  local items = {
+    { label = 'in half', v = '2' }, { label = 'into 3', v = '3' }, { label = 'into 4', v = '4' },
+    { label = 'into bars', v = 'bars' }, { label = 'at the tracker cursor', v = 'cursor' },
+  }
+  ctx.smart_at = { x = gfx.mouse_x + 4, y = gfx.mouse_y, top = gfx.mouse_y }
+  ctx.smart_open({ title = 'split', items = items, cols = 1, sel = 1, on_pick = function(it) ctx.pat_split(it.v) end })
+end
+ctx.pat_rename = function()
+  local p = ctx.pat_selected()[1]
+  if not p then return end
+  ctx.name_pick('region', 'pattern name', p.name, function(nm)
+    nm = (nm or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    if nm == '' or nm == p.name then return end
+    local occ = ctx.pat_occ(p.name)
+    edit.run('rename pattern ' .. p.name, function() for _, rg in ipairs(occ) do reaper.SetProjectMarker3(0, rg.idx, true, rg.pos, rg.rgnend, nm, rg.color or 0) end end)
+    MX.pl_multi = {}
+    ctx.mx_refresh()
+    vim.msg = ('pattern %s is %s now (%d place(s))'):format(p.name, nm, #occ)
+  end)
+end
+ctx.pat_copy = function()   -- свободная копия (как yp в матрице) — за первым местом паттерна в песне
+  local p = ctx.pat_selected()[1]
+  if not p then return end
+  for i, rg in ipairs(seq) do if not rg.gap and rg.name == p.name then MX.cur.ri = i; ctx.slot_new('clone'); return end end
+  vim.msg = 'copy: ' .. p.name .. ' is not in the song'
+end
+ctx.pat_remove = function()   -- из песни: все места выбранных, время закрывается (как dd по слотам)
+  local sel = ctx.pat_selected()
+  local occ = {}
+  for _, p in ipairs(sel) do for _, rg in ipairs(seq) do if not rg.gap and rg.name == p.name then occ[#occ + 1] = rg end end end
+  if #occ == 0 then vim.msg = 'remove: not in the song'; return end
+  table.sort(occ, function(a, b) return a.pos > b.pos end)
+  ctx.slot_op('remove patterns from the song', function() for _, rg in ipairs(occ) do alias.delete_slot(rg) end end)
+  MX.pl_multi = {}
+  ctx.mx_refresh()
+  vim.msg = ('removed %d place(s) from the song - the time closed (u - undo)'):format(#occ)
+end
+ctx.pat_select = function(what)
+  MX.pl_multi = {}
+  if what == 'none' then vim.msg = 'patterns: none selected'; return end
+  local uses = {}
+  for _, rg in ipairs(seq) do if not rg.gap then uses[rg.name] = true end end
+  for _, p in ipairs(ctx.pat_rows or {}) do
+    if what == 'all' or (what == 'used' and uses[p.name]) or (what == 'unused' and not uses[p.name]) then MX.pl_multi[p.name] = true end
+  end
+  vim.msg = ('patterns: %d selected'):format(ctx.pat_nsel())
+end
+ctx.pat_menu = function()
+  local sel = ctx.pat_selected()
+  local nm = #sel == 1 and sel[1].name or (#sel .. ' patterns')
+  local items = {
+    { label = 'listen (Space)', v = 'listen' }, { label = 'go there (Enter)', v = 'go' },
+    { label = 'glue: one pattern where they play in a row (J)', v = 'glue' }, { label = 'split ... (s)', v = 'split' },
+    { label = 'copy: a free duplicate after it', v = 'copy' }, { label = 'rename (r)', v = 'name' }, { label = 'note (n)', v = 'note' },
+    { label = 'into the chain (a)', v = 'chain' }, { label = 'remove from the song (the time closes)', v = 'remove' },
+    { label = 'select all', v = 'all' }, { label = 'select the ones in the song', v = 'used' }, { label = 'select the unused', v = 'unused' }, { label = 'select none (Esc)', v = 'none' },
+  }
+  ctx.smart_at = { x = gfx.mouse_x + 4, y = gfx.mouse_y, top = gfx.mouse_y }
+  ctx.smart_open({ title = 'patterns: ' .. nm, items = items, cols = 1, sel = 1, on_pick = function(it)
+    local v = it.v
+    if v == 'listen' or v == 'go' or v == 'note' then ctx.patlist_do(v)
+    elseif v == 'glue' then ctx.pat_glue()
+    elseif v == 'split' then ctx.pat_split_menu()
+    elseif v == 'copy' then ctx.pat_copy()
+    elseif v == 'name' then ctx.pat_rename()
+    elseif v == 'chain' then ctx.chain_put('end')
+    elseif v == 'remove' then ctx.pat_remove()
+    else ctx.pat_select(v) end
+  end })
+end
+ctx.pat_btn = function(b)
+  if b == 'menu' then ctx.pat_menu() elseif b == 'glue' then ctx.pat_glue() elseif b == 'split' then ctx.pat_split_menu()
+  elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename() end
 end
 -- 19 окт: sketchpad матрицы — эскизы X1 X2 …: набранные в clipkb клетки (трек ← паттерн) копятся эскизом, а не сразу в песню.
 -- Эскизы — строкой над слотами: щелчок — звучит, Shift+щелчок — в последовательность (несколько — подряд, лупом),
