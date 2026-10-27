@@ -40,9 +40,40 @@ do
   local f = os.tmpname()
   eq('cache saved', SM.save_cache(G, f), true)
   local G2 = SM.load_cache('/s', f)
+  while G2 and not SM.scan(G2, 1) do end   -- 27 окт (9): чтение индекса — по кадрам
   eq('cache nodes', G2 and #G2.nodes, #G.nodes)
   eq('cache same', G2 and SM.same_files(G, G2), true)
   eq('cache other root', SM.load_cache('/other', f), nil)
   os.remove(f)
+end
+-- 27 окт (9): короткие подписи, типы файлов, формы карточек, свежесть, лёгкая проверка изменений
+eq('short keeps short', SM.short('/kicks', 10), 'kicks')
+eq('short drops noise', SM.short('Bluezone Corporation - Dark Cinematic Textures & Sounds Samples Pack 2', 20), 'Bluezone Corporation')
+eq('short never empty', SM.short('/1234567890123', 3) ~= '', true)
+eq('type midi', SM.ext_type('groove.mid'), 'midi')
+eq('type rex', SM.ext_type('Amen.RX2'), 'rex')
+eq('type tpl', SM.ext_type('Bass.RTrackTemplate'), 'tpl')
+eq('type sample', SM.ext_type('kick.WAV'), 'samples')
+eq('cat of midi is its type', SM.cat_of('beat.mid'), 'midi')
+eq('cat of wav by name', SM.cat_of('Kick_01.wav'), 'kick')
+do
+  local hb = G.hubs[1]
+  local sh = SM.card_shape(hb)
+  eq('card shape lobes 2..6', sh.lobes >= 2 and sh.lobes <= 6, true)
+  eq('card shape stable', SM.card_shape(hb).lobes, sh.lobes)
+end
+do
+  local V = { step = 30, hist = { { path = 'a', step = 30 }, { path = 'b', step = 25 }, { path = 'c', step = 5 } } }
+  V.hist_by = { a = V.hist[1], b = V.hist[2], c = V.hist[3] }
+  eq('fresh: just played', SM.fresh(V, { path = 'a' }), 0)
+  eq('fresh: dark', SM.fresh(V, { path = 'b' }), 5)
+  eq('fresh: back to normal', SM.fresh(V, { path = 'c' }), nil)
+end
+do
+  local S = SM.sig_build('/s', function(p) return tree[p] or {} end)
+  while not SM.sig_scan(S, 1) do end
+  local n, h = SM.sig_of(G)
+  eq('sig: same count', S.n, n)
+  eq('sig: same hash', S.h, h)
 end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

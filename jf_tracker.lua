@@ -10992,6 +10992,27 @@ ctx = {
   -- файлы индекса карты (панель map) того же класса или со словом в имени. d = -1 / 1 — назад / вперёд по уже выпавшим
   -- (самый первый шаг назад — исходный звук)
   lib_rand = {},
+  -- 27 окт: gain reduction — опрос 15 раз в секунду: каждый эффект верхнего уровня всех треков (GainReduction_dB)
+  gr_trk = {}, gr_one = {}, gr_t = 0,
+  gr_tick = function()
+    local now = reaper.time_precise()
+    if now - ctx.gr_t < 1 / 15 then return end
+    ctx.gr_t = now
+    local trk, one = {}, {}
+    for _, col in ipairs((snap and snap.cols) or {}) do
+      local tr = col.track
+      if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+        local mx = 0
+        for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+          local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, i, 'GainReduction_dB')
+          local g = ok and tonumber(v)
+          if g and math.abs(g) > 0.05 then g = math.abs(g); one[tostring(tr) .. ':' .. i] = g; mx = math.max(mx, g) end
+        end
+        if mx > 0 then trk[col.guid] = mx end
+      end
+    end
+    ctx.gr_trk, ctx.gr_one = trk, one
+  end,
   -- 27 окт (5): опции модулей (вкладка modules): раздел на модуль; значения — ExtState jf_tracker/mod_<модуль>_<ключ>
   module_items = function()
     local SM = B.SM
@@ -13801,8 +13822,17 @@ ctx = {
       nm = nm or 'patches'
       return { name = nm, idx = 0, cnt = #ctx.surge_list(), none = false }
     end
-    local idx, cnt = A.GetPresetIndex(t.track, f.i)
+    -- 27 окт (9): GetPresetIndex у JSFX с пресетами — ~6.6 мс на вызов (REAPER читает файл пресетов): каждый кадр
+    -- это и было 7 мс DSP (17-30 fps). Индекс / число — раз в 2 с на эффект, имя (дёшево) — каждый кадр
+    local pk = tostring(t.track) .. ':' .. tostring(f.fguid or f.i)
+    local pc = ctx.preset_cache[pk]
+    local now = reaper.time_precise()
     local ok, nm = A.GetPreset(t.track, f.i, '')
+    if not pc or now - pc.t > 2 or pc.nm ~= nm then
+      local i0, c0 = A.GetPresetIndex(t.track, f.i)
+      pc = { t = now, idx = i0, cnt = c0, nm = nm }; ctx.preset_cache[pk] = pc
+    end
+    local idx, cnt = pc.idx, pc.cnt
     local has = (cnt or 0) > 0 or (ok and nm ~= '')
     return { name = (ok and nm ~= '') and nm or 'no preset', idx = idx, cnt = cnt, none = not has }
   end,
@@ -21413,7 +21443,9 @@ local function frame()
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.panes_ui and state.khelp then state.khelp = false end   -- 18 окт: старая справка на месте DSP при панелях — никогда
   if (state.khelp or ctx.help_pane_on()) and state.focus ~= 'dsp' and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
-  draw.prof_on = state.debug or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
+  -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
+  if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
+  draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
   draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
   U.begin_frame()
@@ -22664,7 +22696,9 @@ local function frame()
     nmod_draw = function(Lx, x, y, w, h) ctx.NMUI.draw(Lx, x, y, w, h, ctx.nmod_list(), state.focus == 'nmod') end,   -- 12 окт
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
-    map_draw = function(Lx, x, y, w, h) return B.map_pane(U, Lx, x, y, w, h) end,   -- 27 окт: карта сэмплов — своя панель
+    map_draw = function(Lx, x, y, w, h) return B.map_pane(U, Lx, x, y, w, h) end,
+    gr_of = function(col) ctx.gr_tick(); return col and col.guid and ctx.gr_trk[col.guid] end,   -- 27 окт: gain reduction трека
+    gr_fx = function(f) ctx.gr_tick(); local t = dsp_target(); return t and t.col and f and ctx.gr_one[tostring(t.col.track) .. ':' .. tostring(f.i)] end,   -- 27 окт: карта сэмплов — своя панель
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
       -- 15 окт: браузера на экране нет — модуль сразу у pm (без щелчка по заглушке)
       if B.mode ~= 'pm' and state.panes and not draw.panes.visible(state.panes, 'browser') then B.mode = 'pm' end
@@ -29128,6 +29162,15 @@ local function frame()
   end
   inject_cap = nil
   draw.pmark(nil)                                  -- jftop: конец кадра, ожидание defer не считается
+  if ctx.prof_ext and reaper.time_precise() - (ctx.jftop_extt or 0) > 2 then
+    ctx.jftop_extt = reaper.time_precise()
+    local list = {}
+    for k, p in pairs(draw.prof) do list[#list + 1] = { k, p.ema, p.max, p.kb or 0 } end
+    table.sort(list, function(a, b) return a[2] > b[2] end)
+    local parts = {}
+    for i = 1, math.min(10, #list) do parts[#parts + 1] = ('%s %.2f/%.1f/%.0fKB'):format(list[i][1], list[i][2], list[i][3], list[i][4]) end
+    reaper.SetExtState('jf_dbg', 'top', table.concat(parts, ' | ') .. (' || lua %dKB'):format(math.floor(collectgarbage('count'))), false)
+  end
   if state.debug and ctx.dlog and reaper.time_precise() - (ctx.jftop_logt or 0) > 5 then
     -- debug: раз в 5 с — сводка jftop в лог (средние мс за кадр, по убыванию)
     ctx.jftop_logt = reaper.time_precise()

@@ -1218,6 +1218,26 @@ function D.lib_xi_btns(L, right, y, mx, my, hover)
     if hot then hover.libxi = b[2]; hover.pool = nil end
   end
 end
+-- 27 окт: gain reduction (GainReduction_dB компрессоров / лимитеров: ReaComp, ReaXcomp, ReaLimit, плагины с этим полем)
+-- шапка трека: красная полоса справа налево по полосе метра (шкала 0..24 dB) и число
+function D.gr_hdr(L, x, y, w, gr)
+  if not gr or gr < 0.1 then return end
+  local fw = math.max(1, math.floor(w * math.min(1, gr / 24) + 0.5))
+  set(U.RED); gfx.rect(x + w - fw, y - 1, fw, 3, 1)
+end
+-- микшер: столбик сверху вниз от 0 dB у правого края коробки фейдера (та же шкала, что фейдер)
+function D.gr_mix(x, ypos, gr)
+  if not gr or gr < 0.1 then return end
+  local y0, y1 = ypos(0), ypos(-math.min(60, gr))
+  set(U.RED); gfx.rect(x, y0, 3, math.max(1, y1 - y0), 1)
+end
+-- DSP: «-4.2» красным за именем модуля
+function D.gr_tag(L, x, y, gr)
+  if not gr or gr < 0.1 then return end
+  local s = ('-%.1f'):format(gr)
+  set(U.RED); gfx.rect(x, y + 1, ms(s) + 2 * L.pad, L.rh - 1, 1)
+  text(x + L.pad, y + 1, s, U.BG)
+end
 -- 27 окт: рамка / заливка модуля DSP: rounded racks — скруглённая, иначе прямоугольник
 function D.mod_box(x, y, w, h, fill) if D.round_rack then rrect(x, y, w, h, fill, 4) else gfx.rect(x, y, w, h, fill and 1 or 0) end end
 -- 19 окт: хоткеи параметров сэмплера пэда (режим пэдов: буква — прыжок к параметру; буквы свободны в режиме пэдов)
@@ -7795,6 +7815,7 @@ function D.frame(L, snap, rows, state, info)
             if not hover.mixmode and mx >= c.x and mx < c.x + c.w and my >= D.lufs_row_y and my < D.lufs_row_y + L.rh then hover.mixpk = col.track end   -- щелчок — сброс
           end
         end
+        if info.gr_of then D.gr_mix(bx0 + bw0 - 3, ypos, info.gr_of(col)) end   -- 27 окт: подавление — столбик от 0 dB
         -- ручка: 11 окт — просто риска «__» во всю коробку (была колпачком в рамке)
         local hy2 = ypos(db)
         local hc = U.readable((hot or kon) and U.AMBER or U.TEXT, dark, 4)
@@ -7856,6 +7877,7 @@ function D.frame(L, snap, rows, state, info)
           local fw = math.floor(mw0 * (math.min(12, pdb) + 60) / 72 + 0.5)
           set(pdb > 0 and U.RED or (pdb > -6 and U.AMBER or U.GREEN)); gfx.rect(mx0, my0, fw, 2, 1)
         end
+        if info.gr_of then D.gr_hdr(L, mx0, my0, mw0, info.gr_of(col)) end   -- 27 окт: подавление компрессора трека
         local age = info.midi_in_age and info.midi_in_age(col)
         if age and age < 0.3 then
           local yl = U.YELLOW or U.AMBER
@@ -9422,6 +9444,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + mw + L.pad
     end
     -- блок трека — первый слева, закреплён (не перетаскивается с FX)
+    D.pmark('dsp: track strip')
     if info.pool_col and info.trk_io and info.dsptrack then
       -- 22 окт: опция slim DSP track header — узкой вертикальной колонкой; по умолчанию — строками (L.cw * 19), под ними XY-пресеты
       local used = info.dsptrackslim and D.track_block_v(L, info, info.pool_col, bx, boxy, boxh, hover, rawset_col)
@@ -9559,6 +9582,7 @@ function D.frame(L, snap, rows, state, info)
     D.fxgui_rect = {}   -- 27 окт: блоки с окном плагина поверх (gui) — заново каждый кадр
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
+    D.pmark('dsp: layout')
     for k, f in ipairs(fxs) do
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
       do
@@ -9628,9 +9652,12 @@ function D.frame(L, snap, rows, state, info)
       local bw = bw1 * ncol
       -- 26 окт: пульт slixer — во всю ширину DSP: кнопки в меньше рядов, волне и прицелу больше высоты
       -- 27 окт: не во всю ширину, а по самому длинному ряду кнопок (просьба: «широковато, поуже»)
+      D.pmark('dsp: slx head')
       if f.view == 'slixer' and D.SX and not f.container then
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
+        D.pmark('dsp: slx items')
         local rows, low = D.SX.items(v0, function(name) return info.slx_param and info.slx_param(f.i, name) end)
+        D.pmark('dsp: slx natw')
         local nat = math.max(D.SX.natural_w(rows, ms, L.pad), D.SX.natural_w({ (function() local fl = {}; for _, r in ipairs(low or {}) do for _, it in ipairs(r) do fl[#fl + 1] = it end end; return fl end)() }, ms, L.pad)) + 2 * L.pad + 2
         bw = math.max(bw, math.min(cx1 - cx0 - 2 * L.pad, nat))
       end
@@ -9648,7 +9675,9 @@ function D.frame(L, snap, rows, state, info)
       -- 22 окт: макросы (Macro 1..8) — колонка MACRO слева в модуле: горизонтальные слайдеры; щелчок по заголовку —
       -- свернуть в узкую полосу с вертикальной подписью (info.macfold по имени плагина)
       -- 24 окт: слева — колонка вертикальных вкладок macro / xy, каждая раскрывает свою панель справа от себя
+      D.pmark('dsp: macw')
       local mw, vt, mpw, xpw = D.mac_w(L, info, f)
+      D.pmark('dsp: frame0')
       local macfold = mpw == 0
       bw = bw + mw
       if wrap_next(bw) then by = boxy end   -- 23 окт: следующий ряд
@@ -9772,6 +9801,7 @@ function D.frame(L, snap, rows, state, info)
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      if info.gr_fx then D.gr_tag(L, bx + L.pad + ms(nmtxt) + L.pad + (iol and (iow + L.pad) or 0), by, info.gr_fx(f)) end   -- 27 окт: подавление этого эффекта
       if iol then
         local ix0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
         local ihot = not drag and mx >= ix0 and mx < ix0 + iow and my >= by + 1 and my < by + L.rh
@@ -9790,6 +9820,7 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 27 окт: slixer — 8 слотов быстрой загрузки плитками в свободном месте шапки: мини-волна, имя поверх;
       -- щелчок — загрузить (заказ 10), пустой — номер тускло
+      D.pmark('dsp: slx slots')
       if f.view == 'slixer' and info.slx_slots and tw > 0 then
         local sx0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + 2 * L.pad + (iol and (iow + L.pad) or 0) + ((info.dspleft and ptw > 0) and (ptw + L.pad) or 0)
         local sx1 = math.huge
@@ -9947,6 +9978,7 @@ function D.frame(L, snap, rows, state, info)
       -- не влезает по высоте — прежняя колонка слева
       local wtop, wtop_wh = 0, 0
       f.slx_geo = nil
+      D.pmark('dsp: slx frame')
       if f.view == 'slixer' and D.SX and not f.container then
         -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна (пэдов нет, 26 окт); параметры — под ними
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
@@ -10969,7 +11001,9 @@ function D.frame(L, snap, rows, state, info)
           hover.dspview = { fx = k, f = f, x = wx, w = ww }
         end
       end
+      D.pmark('dsp: modules')
       if f.view == 'slixer' and f.slx_geo then
+        D.pmark('dsp: slixer')
         -- 25 окт: пульт 1 в 1 с окном плагина (jf_tracker_slxpanel.lua)
         local G = f.slx_geo
         local v = G.v

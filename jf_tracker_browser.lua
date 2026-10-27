@@ -816,17 +816,21 @@ map_draw_inner = function(U, L, x, y, w, h)
     else
       -- 27 окт (2): папка — из индекса на диске сразу; фоном — тихая проверка изменений (подмена, только если другое)
       G = B.SM.load_cache(key, B.map_cache_file(key))
-      if G then G.bg = B.SM.build(B.mp(), list_dir) else G = B.SM.build(B.mp(), list_dir) end
+      if G then G.bg = B.SM.sig_build(B.mp(), list_dir) else G = B.SM.build(B.mp(), list_dir) end
       G.root = key
     end
     B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   end
-  if G.bg then
-    if B.SM.scan(G.bg, 0.002) then
-      local nw = G.bg
+  if G.bg and not G.building then   -- 27 окт (9): проверка — после чтения индекса
+    if B.SM.sig_scan(G.bg, 0.002) then
+      local S = G.bg
       G.bg = nil
-      nw.root = key
-      if not B.SM.same_files(G, nw) then B.mapG = nw; G = nw; B.SM.save_cache(nw, B.map_cache_file(key)); if ctx.msg then ctx.msg(('map: the folder changed - %d files now'):format(#nw.nodes)) end end
+      local n0, h0 = B.SM.sig_of(G)
+      if S.n ~= n0 or S.h ~= h0 then   -- поменялось — полный пересбор (с индикатором), потом в индекс
+        local nw = B.SM.build(B.mp(), list_dir); nw.root = key
+        B.mapG = nw; G = nw
+        if ctx.msg then ctx.msg(('map: the folder changed (%d -> %d files) - reading it again'):format(n0, S.n)) end
+      end
     end
   elseif not files and not G.building and not G.cached and not G.saved then
     G.saved = true; B.SM.save_cache(G, B.map_cache_file(key))   -- первый скан — в индекс

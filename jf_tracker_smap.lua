@@ -66,7 +66,16 @@ end
 -- короткое имя по месту: главные слова (без версий, «samples», «pack» …), не длиннее maxch
 local NOISE = { samples = true, sample = true, pack = true, library = true, kit = true, wav = true, the = true, vol = true, free = true,
   multiformat = true, kontakt = true, sounds = true, sound = true, collection = true, complete = true, ['and'] = true, of = true, ['for'] = true }
+SM.short_memo = setmetatable({}, { __mode = 'k' })
 function SM.short(name, maxch)
+  -- 27 окт (9): кэш по имени и длине — подписи 150 групп каждый кадр сорили строками
+  local m = SM.short_memo[name]
+  if not m then m = {}; SM.short_memo[name] = m end
+  local r = m[maxch]
+  if not r then r = SM.short0(name, maxch); m[maxch] = r end
+  return r
+end
+function SM.short0(name, maxch)
   local base = (name:gsub('^[/!_%s]+', ''))
   if #base <= maxch then return base end
   local out = ''
@@ -97,6 +106,7 @@ end
 -- обход дерева в пределах бюджета времени; → true, когда готово (тогда же SM.finish)
 function SM.scan(G, budget)
   if not G.building then return true end
+  if G.rd then return SM.read_tick(G, budget * 3) end
   local t0 = now()
   local st = G.stack
   while #st > 0 do
@@ -134,18 +144,51 @@ function SM.load_cache(root, file)
   if not f then return nil end
   local head = f:read('*l') or ''
   if head ~= 'JFMAP1\t' .. root then f:close(); return nil end
-  local G = { root = root, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0, cached = true }
-  local dir, sub
-  for line in f:lines() do
+  -- 27 окт (9): чтение по кадрам (SM.scan) — 190 тыс. строк разом замораживали окно на 4 с
+  return { root = root, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0, cached = true, building = true, rd = f, ndirs = 0 }
+end
+function SM.read_tick(G, budget)
+  local t0 = now()
+  local f, k = G.rd, 0
+  while true do
+    local line = f:read('*l')
+    if not line then f:close(); G.rd = nil; G.building = false; SM.finish(G); return true end
     if line:sub(1, 2) == 'D\t' then
       local d, sb = line:match('^D\t([^\t]*)\t(.*)$')
-      dir = d; sub = (sb ~= '' and sb) or nil
-    elseif dir and #G.nodes < SM.LIMIT then
-      G.nodes[#G.nodes + 1] = { path = (dir == '/' and '' or dir) .. '/' .. line, name = line, cat = SM.cat_of(line, sub), dir = dir, sub = sub }
+      G.rdir = d; G.rsub = (sb ~= '' and sb) or nil; G.ndirs = G.ndirs + 1
+    elseif G.rdir and #G.nodes < SM.LIMIT then
+      local dir = G.rdir
+      G.nodes[#G.nodes + 1] = { path = (dir == '/' and '' or dir) .. '/' .. line, name = line, cat = SM.cat_of(line, G.rsub), dir = dir, sub = G.rsub }
     end
+    k = k + 1
+    if k % 256 == 0 and now() - t0 > budget then return false end
   end
-  f:close()
-  return SM.finish(G)
+end
+-- 27 окт (9): лёгкая проверка изменений — обход дерева без узлов (только число и сумма путей): полный пересбор
+-- 190 тыс. файлов каждый запуск сорил сотнями КБ за кадр и давал пики (17 fps). → true, когда готово (G.sig_n, G.sig_h)
+function SM.sig_build(root, list_dir)
+  return { stack = { root }, list_dir = list_dir, n = 0, h = 0, building = true }
+end
+function SM.sig_scan(S, budget)
+  if not S.building then return true end
+  local t0 = now()
+  local st = S.stack
+  while #st > 0 do
+    local path = table.remove(st)
+    for _, e in ipairs(S.list_dir(path, true)) do
+      local p = (path == '/' and '' or path) .. '/' .. e.name
+      if e.dir then st[#st + 1] = p
+      else S.n = S.n + 1; S.h = (S.h + #p * 31 + p:byte(-1)) % 2147483647 end
+    end
+    if now() - t0 > budget then return false end
+  end
+  S.building = false
+  return true
+end
+function SM.sig_of(G)
+  local h = 0
+  for _, n in ipairs(G.nodes) do h = (h + #n.path * 31 + n.path:byte(-1)) % 2147483647 end
+  return #G.nodes, h
 end
 -- одинаковы ли два набора файлов (проверка изменений): число и сумма путей
 function SM.same_files(a, b)
@@ -194,7 +237,7 @@ function SM.finish(G)
   G.szi = #G.nodes <= SM.SIZE_MAX and 1 or nil   -- 27 окт: больше — без размеров (открывать каждый файл на сетевом диске — минуты)
   G.ver = (G.ver or 0) + 1
   -- 27 окт (2): хабов немного — раскладка сразу до покоя (точки потом не перерисовываются каждый кадр)
-  for _ = 1, 800 do if not SM.step(G) then break end end
+  for _ = 1, 150 do if not SM.step(G) then break end end   -- 27 окт (9): было 800 (151 группа — 9 млн пар, ~1 с замирания); дальше — по кадрам
   return G
 end
 -- размеры файлов по кусочкам: радиус точки — доля наибольшего; → true, когда все
@@ -273,6 +316,23 @@ function SM.neb_layout(G, x, y, w, h, L)
   SM.cards_scroll = math.max(0, math.min(maxs, SM.cards_scroll or 0))
   return cols, rows, top - SM.cards_scroll, cw, ch, top
 end
+function SM.card_shape(hb)
+  local hsh = 0
+  for i = 1, #hb.name do hsh = (hsh * 31 + hb.name:byte(i)) % 1000003 end
+  local mn, mxs, subs = math.huge, 0, {}
+  for _, n in ipairs(hb.list) do
+    local sz = n.size or 0
+    mn, mxs = math.min(mn, sz), math.max(mxs, sz)
+    if n.sub then subs[n.sub] = true end
+  end
+  local ns = 0; for _ in pairs(subs) do ns = ns + 1 end
+  local var = (mxs > 0 and mn < math.huge) and math.min(1, math.log(1 + mxs / math.max(1, mn)) / 6) or 0.3
+  local el = math.min(0.45, math.log(1 + hb.n) / 25)
+  local rot = (ns * 0.7 + (hsh % 7) * 0.45)
+  hb.shape = { lobes = 2 + hsh % 5, depth = 0.08 + 0.32 * var, phase = (hsh % 628) / 100,
+               ax = 1 + el, ay = 1 - el * 0.8, c = math.cos(rot), s = math.sin(rot) }
+  return hb.shape
+end
 function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   local cols, rows, top, cw, ch, top0 = SM.neb_layout(G, x, y, w, h, L)
   local hv, hd
@@ -284,7 +344,12 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
     local rr = math.sqrt((n.k - 0.5) / hb.n) * spread
     local a = n.k * 2.39996
-    local qx, qy = rr * math.cos(a), rr * math.sin(a)
+    -- 27 окт (9): у каждой карточки своя форма по содержимому: лепестки — от имени, их глубина — от разброса
+    -- размеров файлов, вытянутость — от числа файлов (облако), поворот — от подпапок
+    local S = hb.shape or SM.card_shape(hb)
+    local edge = 1 + S.depth * math.sin(S.lobes * a + S.phase)
+    local qx, qy = rr * edge * math.cos(a) * S.ax, rr * edge * math.sin(a) * S.ay
+    qx, qy = qx * S.c - qy * S.s, qx * S.s + qy * S.c
     return qx0 + cw / 2 + qx * (cw / 2 - 10), qy0 + ch / 2 + 6 + qy * (ch / 2 - 18)
   end
   -- точки — в буфер, пока вид тот же
