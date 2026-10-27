@@ -52,6 +52,34 @@ function SM.category(name, sub)
   return sub and ('/' .. sub) or 'other'
 end
 
+-- 27 окт (8): типы файлов карты: сэмплы, MIDI, REX, automation items, шаблоны треков; не-сэмплы — своей группой по типу
+SM.TYPES = { 'samples', 'midi', 'rex', 'auto', 'tpl' }
+SM.EXT_TYPE = { wav = 'samples', aif = 'samples', aiff = 'samples', flac = 'samples', mp3 = 'samples', ogg = 'samples', m4a = 'samples',
+  wv = 'samples', caf = 'samples', opus = 'samples', w64 = 'samples',
+  mid = 'midi', midi = 'midi', rx2 = 'rex', rex = 'rex', rcy = 'rex', reaperautoitem = 'auto', rtracktemplate = 'tpl' }
+function SM.ext_type(name) local e = name:match('%.([%w]+)$'); return e and SM.EXT_TYPE[e:lower()] end
+function SM.cat_of(name, sub)
+  local t = SM.ext_type(name)
+  if t and t ~= 'samples' then return t end
+  return SM.category(name, sub)
+end
+-- короткое имя по месту: главные слова (без версий, «samples», «pack» …), не длиннее maxch
+local NOISE = { samples = true, sample = true, pack = true, library = true, kit = true, wav = true, the = true, vol = true, free = true,
+  multiformat = true, kontakt = true, sounds = true, sound = true, collection = true, complete = true, ['and'] = true, of = true, ['for'] = true }
+function SM.short(name, maxch)
+  local base = (name:gsub('^[/!_%s]+', ''))
+  if #base <= maxch then return base end
+  local out = ''
+  for w in base:gmatch('[^%s%-_%.%(%)%[%]&,|]+') do
+    if not NOISE[w:lower()] and not w:match('^%d+$') and not w:match('^v%d') then
+      local nxt = out == '' and w or (out .. ' ' .. w)
+      if #nxt > maxch then break end
+      out = nxt
+    end
+  end
+  if out == '' then out = base:sub(1, math.max(1, maxch)) end
+  return out
+end
 local function file_size(path)
   local f = io.open(path, 'rb')
   if not f then return 0 end
@@ -78,7 +106,7 @@ function SM.scan(G, budget)
     for _, e in ipairs(G.list_dir(path, true)) do
       local p = (path == '/' and '' or path) .. '/' .. e.name
       if e.dir then st[#st + 1] = { p, sub or e.name }
-      elseif #G.nodes < SM.LIMIT then G.nodes[#G.nodes + 1] = { path = p, name = e.name, cat = SM.category(e.name, sub), dir = path, sub = sub } end
+      elseif #G.nodes < SM.LIMIT then G.nodes[#G.nodes + 1] = { path = p, name = e.name, cat = SM.cat_of(e.name, sub), dir = path, sub = sub } end
     end
     if now() - t0 > budget then return false end
   end
@@ -113,7 +141,7 @@ function SM.load_cache(root, file)
       local d, sb = line:match('^D\t([^\t]*)\t(.*)$')
       dir = d; sub = (sb ~= '' and sb) or nil
     elseif dir and #G.nodes < SM.LIMIT then
-      G.nodes[#G.nodes + 1] = { path = (dir == '/' and '' or dir) .. '/' .. line, name = line, cat = SM.category(line, sub), dir = dir, sub = sub }
+      G.nodes[#G.nodes + 1] = { path = (dir == '/' and '' or dir) .. '/' .. line, name = line, cat = SM.cat_of(line, sub), dir = dir, sub = sub }
     end
   end
   f:close()
@@ -132,7 +160,7 @@ function SM.from_files(key, files)
   local G = { root = key, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0 }
   for _, f in ipairs(files) do
     if #G.nodes >= SM.LIMIT then break end
-    G.nodes[#G.nodes + 1] = { path = f.path, name = f.name, cat = SM.category(f.name, f.sub) }
+    G.nodes[#G.nodes + 1] = { path = f.path, name = f.name, cat = SM.cat_of(f.name, f.sub) }
   end
   return SM.finish(G)
 end
@@ -234,13 +262,19 @@ function SM.neb_layout(G, x, y, w, h, L)
     table.sort(G.hubs, function(a, b) return a.n > b.n end)
     for i, hb in ipairs(G.hubs) do hb.cell = i end
   end
-  local cols = math.max(1, math.ceil(math.sqrt(nh * w / math.max(1, h))))
-  local rows = math.max(1, math.ceil(nh / cols))
+  -- 27 окт (8): карточка не меньше cardz × 10 знаков (+ / - / колесо — размер), лишние ряды — прокруткой (Shift+колесо, j k)
   local top = y + L.rh + 4
-  return cols, rows, top, w / cols, (y + h - top) / rows
+  local minw = L.cw * 10 * (SM.cardz or 1.5)
+  local cols = math.max(1, math.min(nh, math.floor(w / minw)))
+  local rows = math.max(1, math.ceil(nh / cols))
+  local cw = w / cols
+  local ch = math.max(L.rh * 4, cw * 0.75)
+  local maxs = math.max(0, rows * ch - (y + h - top))
+  SM.cards_scroll = math.max(0, math.min(maxs, SM.cards_scroll or 0))
+  return cols, rows, top - SM.cards_scroll, cw, ch, top
 end
 function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  local cols, rows, top, cw, ch = SM.neb_layout(G, x, y, w, h, L)
+  local cols, rows, top, cw, ch, top0 = SM.neb_layout(G, x, y, w, h, L)
   local hv, hd
   local rmax = math.max(2, math.min(7, math.min(cw, ch) * 0.03)) * (0.4 + 1.6 * (V.dim or 0.5))
   local spread = 0.95 - 0.45 * (V.grav or 0.5)
@@ -266,10 +300,11 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     end
     gfx.a = 1
   end
-  SM.buffered(G, ('cards|%d|%d|%d|%d|%.3f|%.3f|%d'):format(x, y, w, h, V.dim or 0.5, V.grav or 0.5, G.ver), x, y, w, h, U, function() dots(x, y) end)
+  SM.buffered(G, ('cards|%d|%d|%d|%d|%.3f|%.3f|%d|%.1f|%d'):format(x, y, w, h, V.dim or 0.5, V.grav or 0.5, G.ver, cw, SM.cards_scroll), x, y, w, h, U, function() dots(x, y) end)
   for _, hb in ipairs(G.hubs) do
     local i = hb.cell - 1
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
+    if qy0 + ch < top0 or qy0 + L.rh > y + h then goto next_card end
     local c = col(hb)
     -- граница сектора: уголки и пунктир по краям — тускло
     local bx0, by0, bx1, by1 = math.floor(qx0 + 3), math.floor(qy0 + 3), math.floor(qx0 + cw - 4), math.floor(qy0 + ch - 4)
@@ -294,9 +329,10 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
         if d <= (r + 3) ^ 2 and (not hd or d < hd) then hv, hd = { node = n, px = px, py = py, r = r }, d end
       end
     end
+    ::next_card::
   end
   local pn = playing and G.bypath and G.bypath[playing]
-  if pn then local px, py = pos(pn); U.set(U.AMBER); gfx.circle(px, py, math.max(2, pn.r * rmax) + 1, 1, 1) end
+  if pn then local px, py = pos(pn); if py >= top0 and py < y + h then U.set(U.AMBER); gfx.circle(px, py, math.max(2, pn.r * rmax) + 1, 1, 1) end end
   return hv
 end
 
@@ -479,15 +515,27 @@ end
 function SM.hist_panel(U, L, V, x, y, w, h, fit, mx, my, inside)
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(x, y, 1, h, 1)
-  U.text(x + L.pad, y + 1, fit('history', w - 2 * L.pad), U.GREY)
+  U.text(x + L.pad, y + 1, fit('history', w - 2 * L.pad), V.zone == 'hist' and U.AMBER or U.GREY)
   local hv
+  do   -- 27 окт (8): print — впечатать проигранное в трекер
+    local bw = U.measure('print') + 2 * L.pad
+    local bx = x + w - bw - 2
+    if bx > x + U.measure('history ') and #(V.hist or {}) > 0 then
+      local hot = inside and mx >= bx and mx < bx + bw and my >= y + 1 and my < y + 1 + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y + 1, bw, L.rh - 1, 1)
+      U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y + 1, bw, L.rh - 1, 0)
+      U.text(bx + L.pad, y + 1, 'print', hot and U.AMBER or U.TEXT)
+      if hot then hv = { hprint = true } end
+    end
+  end
   local n = math.floor((h - L.rh - 2) / L.rh)
   for i = 1, math.min(n, #(V.hist or {})) do
     local e = V.hist[i]
     local ry = y + L.rh + 2 + (i - 1) * L.rh
     local age = (V.step or 0) - e.step
     local hot = inside and mx >= x and mx < x + w and my >= ry and my < ry + L.rh
-    if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, ry, w - 1, L.rh, 1); hv = { hist = i } end
+    if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, ry, w - 1, L.rh, 1); hv = { hist = i }
+    elseif V.zone == 'hist' and V.hcur == i then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(x + 1, ry, w - 1, L.rh, 1) end
     local c = age == 0 and U.AMBER or (age <= SM.DARK and U.mix(U.TEXT, U.BG, 0.55) or U.GREY)
     U.text(x + L.pad, ry, fit((e.name:gsub('%.[%w]+$', '')), w - 2 * L.pad), hot and U.TEXT or c)
   end
@@ -554,7 +602,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
         U.set(U.mix(c, U.BG, hot and 0.25 or 0.65))
         gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
         gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
-        local lab = ('%s SECTOR %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
+        local lab = ('%s %d'):format(SM.short(hb.name, math.max(3, math.floor((cx1 - cx0 - 6) / math.max(1, U.measure('M'))) - 5)):upper(), hb.n)
         local lw = math.min(U.measure(lab), cx1 - cx0 - 6)
         if lw > U.measure('MM') and cy1 - cy0 > L.rh + 2 and (hot or free(cx0 + 3, cy0 + 2, lw, L.rh)) then
           placed[#placed + 1] = { cx0 + 3, cy0 + 2, lw, L.rh }
@@ -655,6 +703,11 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
             if px >= 0 and px < w and py >= 0 and py < h then gfx.line(px, py, hx, hy, 1) end
           end
         end
+        -- 27 окт (8): точки гуще 3 px — группа одним залитым диском (узоры муара не мешают читать)
+        if SM.U * sc < 3 then
+          U.set(U.mix(c, U.BG, 0.35)); gfx.circle(hx, hy, math.max(1.5, hb.R * sc), 1, 1)
+          goto next_hub
+        end
         U.set(U.mix(c, U.TEXT, 0.25))
         for _, n in ipairs(hb.list) do
           local px, py = hx + n.ox * sc, hy + n.oy * sc
@@ -663,6 +716,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
             if r < 1.5 then gfx.rect(px, py, r < 0.9 and 1 or 2, r < 0.9 and 1 or 2, 1) else gfx.circle(px, py, r, 1, 1) end
           end
         end
+        ::next_hub::
       end
     end
     SM.buffered(G, ('g|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d|%.4f'):format(x, y, w, h, sc, cx, cy, V.dim or 0.5, G.ver, G.temp > 0.002 and G.temp or 0), x, y, w, h, U, paint)
@@ -680,14 +734,17 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
       if nx >= x + r and nx < x + w - r and ny >= y + r and ny < y + h - r then
         U.set(col(hb)); gfx.circle(nx, ny, r, 0, 1); gfx.circle(nx, ny, r - 1, 0, 1)
         local hot = inside and (mx - nx) ^ 2 + (my - ny) ^ 2 <= (r + 3) ^ 2
-        local lab = hb.name .. ' ' .. hb.n
+        -- 27 окт (8): подпись по масштабу: диск мелкий — без подписи, дальше — короче (главные слова), ближе — полностью
+        local rpx = hb.R * sc
+        local maxch = math.floor(math.max(0, math.min(60, rpx * 2.2 / math.max(1, L.cw))))
+        local lab = (hot or maxch >= 4) and (SM.short(hb.name, hot and 60 or maxch) .. ((hot or rpx > 40) and (' ' .. hb.n) or '')) or nil
         local lx, ly = nx + r + 2, ny - L.rh / 2
         local room = x + w - lx - 2
-        local lw = math.min(room, U.measure(lab))
-        if room > U.measure('mm') and ly >= y + L.rh and (hot or free(lx, ly, lw, L.rh)) then
+        local lw = lab and math.min(room, U.measure(lab)) or 0
+        if lab and room > U.measure('mm') and ly >= y + L.rh and (hot or free(lx, ly, lw, L.rh)) then
           placed[#placed + 1] = { lx, ly, lw, L.rh }
-          if hot then U.set(U.PANEL); gfx.rect(lx - 1, ly, lw + 2, L.rh, 1) end
-          U.text(lx, ly, fit(lab, room), col(hb))
+          U.set(col(hb)); gfx.rect(lx - 1, ly, lw + 2, L.rh, 1)   -- 27 окт (8): инверсно — цвет группы подложкой, буквы фоном
+          U.text(lx, ly, fit(lab, room), U.BG)
         end
         if hot then hv = { hub = hb } end
       end
@@ -712,15 +769,27 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     U.set(U.PANEL); gfx.rect(tx, ty, tw, L.rh, 1); U.set(U.AMBER); gfx.rect(tx, ty, tw, L.rh, 0)
     U.text(tx + L.pad, ty, fit(lab, tw), U.TEXT)
   end
-  -- 27 окт: ползунки справа сверху — gravity (тяга к центру), dimension (размер; после анализа — покрытие спектра)
+  -- 27 окт (8): настройки слева снизу — типы файлов (samples midi rex auto tpl) и ползунки gravity / dimension
   local sw = math.min(L.cw * 10, math.floor(w * 0.25))
   local lw = U.measure('dimension ')
-  local right = x + w   -- левый край ползунков: подпись слева до него, не налезает
-  if w > lw + sw + 2 * L.pad + U.measure('graph cards nebula ξ ') + U.measure('300 files') then
-    right = x + w - sw - L.pad - lw - L.pad
+  local right = x + w
+  local base = y + h - 3 * L.rh - 4
+  if w > lw + sw + 2 * L.pad and h > 8 * L.rh then
+    local tx = x + L.pad
+    U.set(U.BG); gfx.rect(x + 1, base - 1, math.max(lw + sw + L.pad, U.measure('samples midi rex auto tpl ') + 12 * L.pad), 3 * L.rh + 3, 1)
+    for _, t in ipairs(SM.TYPES) do
+      local on = V.types and V.types[t]
+      local tw = U.measure(t) + 2 * L.pad
+      local hot = mx >= tx and mx < tx + tw and my >= base and my < base + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx, base, tw, L.rh - 1, 1)
+      U.set(on and U.AMBER or U.LINE); gfx.rect(tx, base, tw, L.rh - 1, 0)
+      U.text(tx + L.pad, base, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      if hot then hv = { mtype = t } end
+      tx = tx + tw + 2
+    end
     for k, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
-      local sy = y + 2 + (k - 1) * L.rh
-      local sx = x + w - sw - L.pad
+      local sy = base + k * L.rh + 1
+      local sx = x + L.pad + lw
       local v = V[sl[2]] or 0.5
       local hot = mx >= sx - lw and mx < sx + sw and my >= sy and my < sy + L.rh
       U.set(U.BG); gfx.rect(sx - lw, sy, lw + sw, L.rh, 1)

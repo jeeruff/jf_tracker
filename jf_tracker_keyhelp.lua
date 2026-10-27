@@ -512,6 +512,10 @@ KH.PAGES = {
     { k = 't', d = 'the next source: files / db / proj / pm' },
     { k = '+ - 0', d = 'zoom in / out / reset (also the wheel; drag - move)' },
     { k = 'history', t = {}, d = 'the right panel, top: the files played from the map, newest on top (a click plays again); the dot just played is bright, then dark for 10 plays, then brightens back - a line joins them (options > modules > map)' },
+    { k = 'drag', t = {}, d = 'hold the mouse on a dot and move: every file the mouse passes plays and lands in the history (a path)' },
+    { k = 'print p', t = {}, d = 'history: the last played files into the tracker - each on its own new track / one after another / all at once on the cursor track' },
+    { k = 'Cmd+h j k l', t = {}, d = 'inside the map pane: mini lf / map / history / marked first (j k there play the row, Enter - mark / into the lib), past the edge - the next pane' },
+    { k = 'samples midi rex auto tpl', t = {}, d = 'bottom left: which kinds of files the map lays out; far out the labels get shorter (main words), dense groups become one disk; cards: + - size, wheel scrolls' },
     { k = 'marked', t = {}, d = 'the right panel, bottom: the marked files (m in the browser); a double click on a file of the map or the history marks it; on a marked one (under the mouse / clicked): double click or Enter - into the lib, Opt+Enter - into a lib folder, x / dd - unmark, clear - all; lib - into the lib, save - into the lib and save it as a set (:libsave); the ship in the corner - an option (modules > map)' },
   } },
   browser = { title = 'browser', e = {

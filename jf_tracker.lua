@@ -14194,6 +14194,52 @@ ctx = {
     else vim.msg = 'could not add the slice' end
   end,
   -- 27 окт (8): файлы в lib сразу папкой (Opt+Enter): выбор папки из тех, что в lib, или новая (:libdir имя)
+  -- 27 окт (8): history карты → в трекер: tracks — каждый файл на свой новый трек (строка курсора), seq — один трек
+  -- подряд (каждый со своей длиной), stack — один трек, все на строке курсора (подколонки)
+  map_print_menu = function()
+    local hist = B.map_hist or {}
+    if #hist == 0 then vim.msg = 'print: play something from the map first'; return end
+    local n = math.min(#hist, 16)
+    vim.open_hydra({ title = ('print the last %d played'):format(n), items = {
+      { key = 't', label = 'tracks - each on its own new track', fn = function() ctx.map_print('tracks', n) end },
+      { key = 's', label = 'sequence - one after another on the cursor track', fn = function() ctx.map_print('seq', n) end },
+      { key = 'a', label = 'at once - all at the cursor row of the cursor track', fn = function() ctx.map_print('stack', n) end } } })
+  end,
+  map_print = function(mode, n)
+    local hist = B.map_hist or {}
+    local files = {}
+    for i = math.min(n, #hist), 1, -1 do files[#files + 1] = hist[i].path end   -- в порядке прослушивания
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local col = f and f.col
+    if not (col and col.track) then vim.msg = 'print: put the tracker cursor on a track'; return end
+    local row0 = vim.cur.row
+    edit.run('print the map history', function()
+      if mode == 'tracks' then
+        local at = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER'))
+        for k, pth in ipairs(files) do
+          reaper.InsertTrackAtIndex(at + k - 1, true)
+          local tr = reaper.GetTrack(0, at + k - 1)
+          reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', ((pth:match('[^/]+$') or ''):gsub('%.%w+$', '')), true)
+          edit.drop(tr, nil, state.lpb, row0, pth)
+        end
+      else
+        local row = row0
+        for _, pth in ipairs(files) do
+          edit.drop(col.track, nil, state.lpb, row, pth)
+          if mode == 'seq' then
+            local src = reaper.PCM_Source_CreateFromFile(pth)
+            local len = src and reaper.GetMediaSourceLength(src) or 0
+            if src then reaper.PCM_Source_Destroy(src) end
+            local t0 = edit.row_time(row, state.lpb, 0)
+            local q1 = reaper.TimeMap2_timeToQN(0, t0 + len)
+            row = math.max(row + 1, math.ceil(q1 * state.lpb - 1e-6))
+          end
+        end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('print: %d file(s) %s'):format(#files, mode == 'tracks' and 'on new tracks' or (mode == 'seq' and 'one after another' or 'at once') .. ' on ' .. (col.name or 'the track'))
+  end,
   files_to_folder = function(files)
     files = files or {}
     if #files == 0 then vim.msg = 'lib folder: no files'; return end
@@ -27987,6 +28033,7 @@ local function frame()
       if DIR[ch] then
         local id = ctx.pane_cur()
         if m.shift then ctx.pane_move(id, DIR[ch])
+        elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
         c = 0
       end
