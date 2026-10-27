@@ -383,6 +383,7 @@ do
   local function g(k) local v = tonumber(R.GetExtState and R.GetExtState('jf_tracker', 'mod_map_' .. k) or ''); return v end
   if B.SM then
     B.SM.DARK = g('dark') or B.SM.DARK; B.SM.RECOVER = g('recover') or B.SM.RECOVER
+    B.map_ship_on = g('ship') == 1   -- корабль — опцией (по умолчанию нет)
     B.SM.SIZE_MAX = g('sizes') or B.SM.SIZE_MAX; B.SM.EDGES_MAX = g('edges') or B.SM.EDGES_MAX; B.SM.NEB_MAX = g('stars') or B.SM.NEB_MAX
   end
 end
@@ -391,6 +392,8 @@ function B.map_file_of(id)
   if id == 'mapnode' then local n = B.map_hv and B.map_hv.node; return n and n.path end
   local i = id:match('^maphist(%d+)$')
   if i then local e = B.map_hist[tonumber(i)]; return e and e.path end
+  i = id:match('^mapmk(%d+)$')
+  if i then local o = (B.sel_order or {})[tonumber(i)]; return o and o.full end
   i = id:match('^mapship(%d+)$')
   if i then local o = (B.sel_order or {})[tonumber(i)]; return o and o.full end
   return nil
@@ -574,19 +577,86 @@ end
 local map_draw_inner
 local function map_draw(U, L, x, y, w, h)
   if not B.SM then return nil end
+  local hv0
   if B.map_src == 'files' and w >= L.cw * 40 then
     local dw = math.min(math.floor(w * 0.25), L.cw * 26)
     local dirs = B.map_dirs()
     B.map_dcur = math.max(1, math.min(#dirs, B.map_dcur))
     U.set(U.PANEL); gfx.rect(x, y, dw, h, 1)
-    local hv0 = draw_col(U, L, dirs, x, y + 1, dw - 2, h - 2, dirs[B.map_dcur] and dirs[B.map_dcur].name, 'mapdir', gfx.mouse_x, gfx.mouse_y)
+    hv0 = draw_col(U, L, dirs, x, y + 1, dw - 2, h - 2, dirs[B.map_dcur] and dirs[B.map_dcur].name, 'mapdir', gfx.mouse_x, gfx.mouse_y)
     U.set(U.LINE); gfx.rect(x + dw - 1, y, 1, h, 1)
     x, w = x + dw, w - dw
-    if hv0 then map_draw_inner(U, L, x, y, w, h); B.map_ship(U, L, x, y, w, h); return hv0 end
+  end
+  -- 27 окт (7): справа — history (сверху) и marked (снизу), во всех видах; корабль — опцией (modules > map)
+  local sv
+  if w >= L.cw * 44 then
+    local sw = math.min(L.cw * 22, math.floor(w * 0.3))
+    sv = B.map_side(U, L, x + w - sw, y, sw, h)
+    w = w - sw
   end
   local hv = map_draw_inner(U, L, x, y, w, h)
-  local sh = B.map_ship(U, L, x, y, w, h)
-  return sh or hv
+  local sh = B.map_ship_on and B.map_ship(U, L, x, y, w, h)
+  return hv0 or sv or sh or hv
+end
+-- правая панель карты: history (что сыграно с карты) и marked (отмеченные; двойной клик по файлу на карте / в истории — сюда)
+function B.map_side(U, L, x, y, w, h)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local inside = mx >= x and mx < x + w and my >= y and my < y + h
+  local h1 = math.floor(h / 2)
+  local hv = B.SM.hist_panel(U, L, B.mapV, x, y, w, h1, ctx.fit, mx, my, inside)
+  if hv then hv = 'maphist' .. hv.hist end
+  -- marked
+  local y2 = y + h1
+  local list = B.sel_order or {}
+  U.set(U.PANEL); gfx.rect(x, y2, w, h - h1, 1)
+  U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(x, y2, w, 1, 1); gfx.rect(x, y2, 1, h - h1, 1)
+  local tx = x + L.pad
+  U.text(tx, y2 + 2, ('marked %d'):format(#list), #list > 0 and U.AMBER or U.GREY); tx = tx + U.measure('marked 000') + 4
+  if #list > 0 then
+    for _, b in ipairs({ { 'lib', 'mapshiplib' }, { 'save', 'mapshipsave' } }) do
+      local bw = U.measure(b[1]) + 2 * L.pad
+      if tx + bw <= x + w - 2 then
+        local hot = mx >= tx and mx < tx + bw and my >= y2 + 2 and my < y2 + 2 + L.rh
+        U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(tx, y2 + 2, bw, L.rh - 1, 1)
+        U.set(hot and U.AMBER or U.LINE); gfx.rect(tx, y2 + 2, bw, L.rh - 1, 0)
+        U.text(tx + L.pad, y2 + 2, b[1], hot and U.AMBER or U.TEXT)
+        if hot then hv = b[2] end
+        tx = tx + bw + 2
+      end
+    end
+  end
+  local playing
+  if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end
+  local n = math.floor((h - h1 - L.rh - 4) / L.rh)
+  for i = 1, math.min(n, #list) do
+    local o = list[i]
+    local ry = y2 + L.rh + 4 + (i - 1) * L.rh
+    local hot = inside and my >= ry and my < ry + L.rh
+    if hot then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x + 1, ry, w - 1, L.rh, 1); hv = 'mapmk' .. i end
+    local nm = ((o.e and o.e.name) or (o.full or ''):match('[^/]+$') or ''):gsub('%.[%w]+$', '')
+    U.text(x + L.pad, ry, ctx.fit(nm, w - 2 * L.pad), (playing == o.full) and U.AMBER or (hot and U.TEXT or U.CYAN))
+  end
+  if #list == 0 then U.text(x + L.pad, y2 + L.rh + 4, ctx.fit('double click a file to keep it here', w - 2 * L.pad), U.DIM) end
+  return hv
+end
+-- двойной щелчок по тому же id за 0.35 с
+function B.map_dbl(id)
+  local now = R.time_precise()
+  local d = B.map_lc and B.map_lc.id == id and now - B.map_lc.t < 0.35
+  B.map_lc = { id = id, t = now }
+  return d
+end
+-- отметить / снять файл (тот же список, что m в браузере)
+function B.map_mark(path, name, off)
+  if not path then return end
+  if off then
+    B.sel[path] = nil
+    for i, o in ipairs(B.sel_order) do if o.key == path or o.full == path then table.remove(B.sel_order, i); break end end
+  elseif not B.sel[path] then
+    B.sel[path] = true
+    B.sel_order[#B.sel_order + 1] = { key = path, e = { name = name or path:match('[^/]+$'), path = path }, full = path }
+  end
+  if ctx.msg then ctx.msg(('%s %s - marked: %d (lib / save in the marked list)'):format(off and 'unmarked' or 'marked', name or path:match('[^/]+$') or '', #B.sel_order)) end
 end
 B.map_draw_fn = map_draw
 map_draw_inner = function(U, L, x, y, w, h)
@@ -1181,6 +1251,7 @@ function B.click(what)
   elseif what == 'mapnode' then   -- 27 окт: узел карты — слушать
     local n = B.map_hv and B.map_hv.node
     if n and (n.path or ''):lower():match('%.rpp$') then if ctx.msg then ctx.msg('map: project ' .. n.name .. '  (' .. n.cat .. ') - open it in the pm tab') end   -- 27 окт: проект не слушается
+    elseif n and B.map_dbl('n:' .. n.path) then B.map_mark(n.path, n.name)   -- 27 окт (7): двойной — в marked
     elseif n then B.map_play(n.path, n.name); if ctx.msg then ctx.msg('map: ' .. n.name .. '  (' .. n.cat .. ')') end end
   elseif what == 'mapstyle' then B.mapV.style = (B.map_hv and B.map_hv.style) or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view  (v - next view, r - a random sample)') end
   elseif what == 'maprandom' then B.map_random()
@@ -1192,7 +1263,12 @@ function B.click(what)
     if o and o.full then B.map_play(o.full, o.e and o.e.name); if ctx.msg then ctx.msg('marked: ' .. (o.e and o.e.name or o.full) .. '  (Space in the browser - all of them in a row)') end end
   elseif what:match('^maphist%d+$') then   -- 27 окт (5): строка истории — ещё раз
     local e = B.map_hist[tonumber(what:sub(8))]
-    if e then B.map_play(e.path, e.name); if ctx.msg then ctx.msg('history: ' .. e.name) end end
+    if e and B.map_dbl('n:' .. e.path) then B.map_mark(e.path, e.name)
+    elseif e then B.map_play(e.path, e.name); if ctx.msg then ctx.msg('history: ' .. e.name .. '  (double click - into marked)') end end
+  elseif what:match('^mapmk%d+$') then   -- 27 окт (7): marked: клик — слушать, двойной — снять отметку
+    local o = (B.sel_order or {})[tonumber(what:sub(6))]
+    if o and B.map_dbl('m:' .. (o.full or '')) then B.map_mark(o.full, o.e and o.e.name, true)
+    elseif o and o.full then B.map_play(o.full, o.e and o.e.name) end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
     B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0

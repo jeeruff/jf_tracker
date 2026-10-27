@@ -11002,6 +11002,8 @@ ctx = {
     out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
       get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
+    out[#out + 1] = { key = 'mod_map_ship', label = 'marked as a ship', kind = 'toggle', desc = 'the marked files also as a little FTL-style ship in the corner of the map (a room per class); off - only the marked list on the right',
+      get = function() return B.map_ship_on or false end, set = function(v) B.map_ship_on = v or nil; reaper.SetExtState(EXT, 'mod_map_ship', v and '1' or '0', true) end }
     out[#out + 1] = num('map', 'dark', 'played: dark for', 0, 50, 1, '%d plays', 'a dot just played is bright; when another one plays it goes dark for this many plays, then brightens back',
       function() return SM.DARK end, function(v) SM.DARK = v end)
     out[#out + 1] = num('map', 'recover', 'played: brightens over', 1, 50, 1, '%d plays', 'after the dark plays, how many plays it takes the dot to get its normal brightness back',

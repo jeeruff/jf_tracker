@@ -479,7 +479,7 @@ end
 function SM.hist_panel(U, L, V, x, y, w, h, fit, mx, my, inside)
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(x, y, 1, h, 1)
-  U.text(x + L.pad, y + 1, fit('HISTORY', w - 2 * L.pad), U.GREY)
+  U.text(x + L.pad, y + 1, fit('history', w - 2 * L.pad), U.GREY)
   local hv
   local n = math.floor((h - L.rh - 2) / L.rh)
   for i = 1, math.min(n, #(V.hist or {})) do
@@ -495,18 +495,8 @@ function SM.hist_panel(U, L, V, x, y, w, h, fit, mx, my, inside)
   return hv
 end
 function SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  -- справа — история прослушанного; галактика — левее
-  V.hist_by = {}
-  for _, e in ipairs(V.hist or {}) do if not V.hist_by[e.path] then V.hist_by[e.path] = e end end
-  local hw = (w >= L.cw * 44) and math.min(L.cw * 20, math.floor(w * 0.3)) or 0
-  local hhv
-  if hw > 0 then
-    hhv = SM.hist_panel(U, L, V, x + w - hw, y + L.rh + 3, hw, h - L.rh - 3, fit, mx, my, inside)
-    w = w - hw
-    inside = inside and mx < x + w
-  end
-  local r = SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  return hhv or r
+  -- 27 окт (7): панель history / marked — у браузера справа от карты во всех видах (B.map_side)
+  return SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
 end
 function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   if V.sys then
@@ -617,6 +607,8 @@ end
 local HUE = { kick = 1, snare = 2, hat = 3, clap = 4, tom = 5, cymbal = 6, perc = 7, bass = 8, loop = 9, fx = 10, vox = 11, synth = 12 }
 SM.EDGES_MAX = 4000                            -- рёбра файл—хаб — пока файлов не больше (иначе сплошная заливка)
 function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
+  V.hist_by = {}
+  for _, e in ipairs(V.hist or {}) do if not V.hist_by[e.path] then V.hist_by[e.path] = e end end
   if G.building then SM.scan(G, SM.SCAN_S) end
   if not G.building then SM.size_tick(G, SM.SCAN_S) end
   G.grav = V.grav

@@ -511,8 +511,8 @@ KH.PAGES = {
     { k = 'r', t = {}, d = 'ξ - a random file: from the group under the mouse, else from all; plays at once' },
     { k = 't', d = 'the next source: files / db / proj / pm' },
     { k = '+ - 0', d = 'zoom in / out / reset (also the wheel; drag - move)' },
-    { k = 'history', t = {}, d = 'nebula: the files played from the map on the right, newest on top (a click plays again); the dot just played is bright, then dark for 10 plays, then brightens back (options > modules > map)' },
-    { k = 'ship', t = {}, d = 'the marked files (m in the browser) as a ship in the corner: a room per class; lib - into the lib, save - into the lib and save it as a set (:libsave)' },
+    { k = 'history', t = {}, d = 'the right panel, top: the files played from the map, newest on top (a click plays again); the dot just played is bright, then dark for 10 plays, then brightens back - a line joins them (options > modules > map)' },
+    { k = 'marked', t = {}, d = 'the right panel, bottom: the marked files (m in the browser); a double click on a file of the map or the history marks it, on a marked one - unmarks; lib - into the lib, save - into the lib and save it as a set (:libsave); the ship in the corner - an option (modules > map)' },
   } },
   browser = { title = 'browser', e = {
     { k = ': ↑ ↓  Ctrl+R', d = 'command line history: up / down - commands starting with what you typed (Ctrl+P / Ctrl+N too), Ctrl+R - fzf over the history' },
