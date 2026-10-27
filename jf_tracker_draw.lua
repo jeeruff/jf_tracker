@@ -5492,12 +5492,16 @@ function D.lane_close(L, f, bx, boxy, bh0)
   bracket(L, st.x, bx - L.pad - 1, boxy, bh0, f.inner.depth or 1)
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
+  -- 27 окт: rounded racks — перед рэком свой зазор под рамку (как за полем «+» у закрытия); первый в цепочке
+  -- без него резался по краю окна цепочки
+  if f.wrap and D.round_rack and (D.rack_ext or 0) >= 4 then bx = bx + math.min(3, L.pad - 1) + 1 end
   if f.wrap then D.cst[f] = { x = bx, y = boxy, k = k } end
   if f.inner and f.inner.lane and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
   local inn = f.inner
   if inn and inn.wrap and D.cst[inn.parent] and D.cst[inn.parent].y == boxy then
     set(rack_col(inn.depth or 1)); gfx.rect(bx - L.pad, boxy, L.pad, bh0, 1)   -- щель перед эффектом — цветом рэка
   end
+  return bx
 end
 -- 24 окт (вечер): конец рэка — без колонки out: рэк закрывается рамкой, за ним — поле «+» (щелчок — эффект в
 -- конец контейнера, fzf; бросок эффекта на него — туда же); рамка и скобка — до конца поля
@@ -9478,7 +9482,7 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     for k, f in ipairs(fxs) do
-      D.rack_open(L, f, k, bx, boxy, bh0)
+      bx = D.rack_open(L, f, k, bx, boxy, bh0)
       do
       -- 22 окт: модуль сложен (zf / zF) — узкая полоса во всю высоту: кнопки x B сверху, имя вертикально (щелчок — развернуть)
       if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
