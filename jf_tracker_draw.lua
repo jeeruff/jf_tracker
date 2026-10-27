@@ -7233,9 +7233,11 @@ function D.frame(L, snap, rows, state, info)
         if bx + mw <= c.x + c.w - 1 then
           local on = D.mmono.on
           local hot = mx >= bx and mx < bx + mw and my >= by and my < by + bhh + 2
-          set(hot and D.CURROW or (on and U.tint(U.AMBER, 0.3) or U.PANEL)); gfx.rect(bx, by, mw, bhh, 1)
-          set(hot and U.AMBER or (on and U.AMBER or U.DIM)); gfx.rect(bx, by, mw, bhh, 0)
-          text(bx + 3, by + math.floor((bhh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0), 'mono', (hot or on) and U.AMBER or BTXT)
+          -- 27 окт: mono включён — мигает розовым (раз в полсекунды: яркая заливка / бледная), не забыть, что слушаешь моно
+          local blink = on and math.floor(now * 2) % 2 == 0
+          set(hot and D.CURROW or (on and U.tint(U.PINK, blink and 0.75 or 0.25) or U.PANEL)); gfx.rect(bx, by, mw, bhh, 1)
+          set(hot and U.AMBER or (on and U.PINK or U.DIM)); gfx.rect(bx, by, mw, bhh, 0)
+          text(bx + 3, by + math.floor((bhh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0), 'mono', hot and U.AMBER or (on and (blink and U.BG or U.PINK) or BTXT))
           if hot then hover.mmono = true end
           hint('mmono', bx, by, mw, bhh + 2, true)
         end

@@ -239,6 +239,7 @@ local state = {
   phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
   bigcur = flag('bigcur', false),                 -- cursor zoom: строка курсора лупой ×2 (8 окт; 15 окт — и без fixed)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
+  ctlmap = flag('ctlmap', true), ctlx2 = flag('ctlx2', false),   -- 27 окт: CONTROL — оверлей (карта трекпада, плашка), шрифт x2
   roundrack = flag('roundrack', false),          -- 26 окт: скруглённые скобки рэков DSP
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
   pianokeys = flag('pianokeys', false),          -- клавиатура транспорта и без hints (быстрая опция keys, 8 окт)
@@ -763,7 +764,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'roundrack', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -881,7 +882,8 @@ local function toggle_dock(apply_title)
     -- главного окна REAPER, иначе шапка трекера уезжает под шторку
     local _, ml, mt, mr, mb = reaper.JS_Window_GetRect(reaper.GetMainHwnd())
     if mt and mb and mt > mb and mb <= t + 1 and ml <= l and mr >= r then b = math.min(b, mt) end   -- только если REAPER сам во весь экран
-    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t)
+    -- 27 окт: без рамки — на 1 px выше рабочей области: иначе под строкой меню оставалась щель, пока окно не в фокусе
+    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t + (on and 1 or 0))
   end
   local docked = gfx.dock(-1) & 1 == 1
   if apply_title then                              -- опция title / старт: только рамка плавающего окна
@@ -12985,6 +12987,8 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
+      flag('ctlmap', 'control overlay', 'CONTROL (Opt+Cmd+mouse): the trackpad map (strips of the bank, an XY square) and the box with the name and value over the window; off - only the frame of the bank and the status line'),
+      flag('ctlx2', 'control font x2', 'CONTROL: the overlay text (names, value) twice as big - readable from afar'),
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
       { key = 'bigname', label = 'big trackname', kind = 'cycle', values = { 'off', '1.5', '2' }, desc = 'the track name in its header bigger: x1.5 / x2 (the header grows by it)', get = function() return state.bigname or 'off' end, set = function(v) state.bigname = v; reaper.SetExtState(EXT, 'bigname', v, true); relayout() end },
       flag('anpatch', 'track autoname by patch', 'the track takes the name of the patch / preset of its instrument (Surge XT patch, REAPER preset); a name you typed yourself is kept'),
@@ -13038,7 +13042,8 @@ ctx = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor' } },
       { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'cmsens', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'offdim', 'envwide' } },
+      { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
+      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'session', { 'mxlaunch', 'ssbsync', 'ssbars' } },
@@ -24101,16 +24106,27 @@ local function frame()
         U.set(U.AMBER); gfx.rect(cur.x - 1, cur.y - 1, cur.w + 2, cur.h + 2, 0)
         U.set(U.TEXT); gfx.rect(cur.x - 2, cur.y - 2, cur.w + 4, cur.h + 4, 0)
         -- карта трекпада: горизонтальные — полосы справа, вертикальные — столбцы снизу, XY — квадрат
+        -- 27 окт: опции control overlay (карта и плашка) и control font x2 (текст оверлея вдвое крупнее)
+        local OZ = { z = state.ctlx2 and 2 or 1 }
+        OZ.rh = L.rh * OZ.z
+        OZ.ms = function(t) return OZ.z == 2 and draw.big_measure(t, 2) or U.measure(t) end
+        OZ.tx = function(x, y, t, col) if OZ.z == 2 then draw.big_text(x, y, t, col, 2) else U.text(x, y, t, col) end end
+        OZ.fit = function(t, w) if OZ.z == 1 then return ctx.fit(t, w) end; t = t or ''; while t ~= '' and OZ.ms(t) > w do t = t:sub(1, -2) end; return t end
         if SG.ori == 'xy' then
-          local sd = math.min(math.floor(gfx.h / 3), L.cw * 24)
+          local sd = math.min(math.floor(gfx.h / 3), L.cw * 24 * OZ.z)
           local qx, qy = gfx.w - sd - 4, 4
-          U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
           local fx_, fy_ = ts[1] and frac(ts[1]) or 0.5, ts[2] and frac(ts[2]) or 0.5
-          gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4, 1, 1)
+          if state.ctlmap ~= false then
+            U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
+            gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4 * OZ.z, 1, 1)
+            OZ.tx(qx + L.pad, qy + 2, OZ.fit(cur.name or '', sd - 2 * L.pad), U.AMBER)
+          end
           state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
-          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / 4), L.cw * 26)
-          local maph = vert and math.min(math.floor(gfx.h / 4), 8 * L.rh) or gfx.h
+          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / (OZ.z == 2 and 2.5 or 4)), L.cw * 26 * OZ.z)
+          local maph = vert and math.min(math.floor(gfx.h / (OZ.z == 2 and 2.5 or 4)), 8 * OZ.rh) or gfx.h
+          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Ctrl: pan' or ''))
+          if state.ctlmap ~= false then
           local mx0, my0 = gfx.w - mapw, gfx.h - maph
           U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
           -- 24 окт: общий хозяин (трек / эффект) — заголовком сверху, у слайдеров — только параметр (имя трека съедало его)
@@ -24118,9 +24134,9 @@ local function frame()
           for _, r in ipairs(SG.list) do if r.own ~= own then own = nil; break end end
           local function lab(r) return (own and r.pn) or r.name or '' end
           if own and not vert then
-            U.text(mx0 + L.pad, my0 + 2, ctx.fit(own, mapw - 2 * L.pad), U.TEXT)
-            U.set(U.LINE); gfx.rect(mx0 + L.pad, my0 + L.rh + 2, mapw - 2 * L.pad, 1, 1)
-            my0, maph = my0 + L.rh + 4, maph - L.rh - 4
+            OZ.tx(mx0 + L.pad, my0 + 2, OZ.fit(own, mapw - 2 * L.pad), U.TEXT)
+            U.set(U.LINE); gfx.rect(mx0 + L.pad, my0 + OZ.rh + 2, mapw - 2 * L.pad, 1, 1)
+            my0, maph = my0 + OZ.rh + 4, maph - OZ.rh - 4
           end
           U.set(U.AMBER); if vert then gfx.rect(mx0, my0, mapw, 1, 1) else gfx.rect(mx0, my0, 1, maph, 1) end
           local step = (vert and mapw or maph) / n
@@ -24133,16 +24149,16 @@ local function frame()
               local bx = mx0 + a0
               if on then U.set(U.AMBER, 0.30); gfx.rect(bx, my0 + 1, a1 - a0, maph - 1, 1) end
               U.set(U.LINE); gfx.rect(bx + a1 - a0 - 1, my0 + 1, 1, maph - 1, 1)
-              local bh = math.floor((maph - L.rh - 6) * fr + 0.5)
+              local bh = math.floor((maph - OZ.rh - 6) * fr + 0.5)
               U.set(on and U.AMBER or U.CYAN, 0.7); gfx.rect(bx + 2, my0 + maph - 2 - bh, math.max(1, a1 - a0 - 5), bh, 1)
-              if a1 - a0 >= U.measure('mm') then U.text(bx + 2, my0 + 2, ctx.fit(lab(r), a1 - a0 - 4), on and U.AMBER or U.GREY) end
+              if a1 - a0 >= OZ.ms('mm') then OZ.tx(bx + 2, my0 + 2, OZ.fit(lab(r), a1 - a0 - 4), on and U.AMBER or U.GREY) end
             else
               local by0, by1 = my0 + a0, my0 + a1
               if on then U.set(U.AMBER, 0.30); gfx.rect(mx0 + 1, by0, mapw - 1, by1 - by0, 1) end
               U.set(U.LINE); gfx.rect(mx0 + 1, by1 - 1, mapw - 1, 1, 1)
               local cy = by0 + math.floor((by1 - by0) / 2)
-              if by1 - by0 >= L.rh + 4 then
-                U.text(mx0 + L.pad, cy - L.rh, ctx.fit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY)
+              if by1 - by0 >= OZ.rh + 4 then
+                OZ.tx(mx0 + L.pad, cy - OZ.rh, OZ.fit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY)
                 U.set(U.DIM); gfx.rect(mx0 + L.pad, cy + 2, mapw - 2 * L.pad, 2, 1)
                 U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, cy + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), 2, 1)
               else
@@ -24152,14 +24168,14 @@ local function frame()
           end
           -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
           local desc = ('%s  %s'):format(own and (own .. ': ' .. (cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
-          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Ctrl: pan' or ''))
-          local dy0 = vert and (my0 - 2 * L.rh - 2) or (gfx.h - 2 * L.rh - 2)
-          local dw = vert and mapw or math.max(mapw, math.min(gfx.w, U.measure(desc) + 2 * L.pad))
+          local dy0 = vert and (my0 - 2 * OZ.rh - 2) or (gfx.h - 2 * OZ.rh - 2)
+          local dw = vert and mapw or math.max(mapw, math.min(gfx.w, OZ.ms(desc) + 2 * L.pad))
           local dx0 = gfx.w - dw
-          U.set(U.BG, 0.94); gfx.rect(dx0, dy0, dw, 2 * L.rh + 2, 1)
+          U.set(U.BG, 0.94); gfx.rect(dx0, dy0, dw, 2 * OZ.rh + 2, 1)
           U.set(U.AMBER); gfx.rect(dx0, dy0, dw, 1, 1)
-          U.text(dx0 + L.pad, dy0 + 1, ctx.fit(desc, dw - 2 * L.pad), U.AMBER)
-          U.text(dx0 + L.pad, dy0 + 1 + L.rh, ctx.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
+          OZ.tx(dx0 + L.pad, dy0 + 1, OZ.fit(desc, dw - 2 * L.pad), U.AMBER)
+          OZ.tx(dx0 + L.pad, dy0 + 1 + OZ.rh, OZ.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
+          end
           state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Opt+Cmd go - done)'):format(cur.name or '?', k, n,
             ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
