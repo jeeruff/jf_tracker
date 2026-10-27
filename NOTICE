@@ -56,6 +56,9 @@ Borrowed ideas and code (not the author's own)
   REAPER; an own implementation, no code copied.
 - The Orca field is an own implementation of Orca by Hundred Rabbits (MIT).
 
+Many interface ideas come from other tools and their authors (ideas only, own
+code): see "Ideas from other tools" in README.md and SOURCES.md.
+
 Third-party material
 --------------------
 

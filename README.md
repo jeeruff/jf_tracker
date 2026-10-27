@@ -128,6 +128,30 @@ for REAPER - an own implementation, no code copied.
 The reform pane (time scale / curve / shift / redistribute and value ranges of the selected notes)
 follows the idea of [Reform](https://www.aqu.surf/reform) for Renoise - an own implementation, no code copied.
 
+### Ideas from other tools
+
+Ideas only - jf_tracker has its own code for all of them. Respect to their authors:
+
+- trackers - rows, hex, the note-vol-fx cell, F1 / F2 octaves, Esc as edit - ProTracker, FastTracker, Impulse Tracker, [Renoise](https://www.renoise.com), [Furnace](https://github.com/tildearrow/furnace), [Dirtywave M8](https://dirtywave.com)
+- modes, operators and motions - [Vim](https://www.vim.org) (Bram Moolenaar)
+- a menu of what a prefix key does next - [which-key.nvim](https://github.com/folke/which-key.nvim) (folke)
+- marked files and folder columns in the browser, lib marks - [lf](https://github.com/gokcehan/lf) (gokcehan), ranger, Midnight Commander
+- fuzzy search syntax - [fzf](https://github.com/junegunn/fzf) (Junegunn Choi)
+- jumps to the most used folder (:z) - [zoxide](https://github.com/ajeetdsouza/zoxide) (Ajeet D'Souza)
+- quick marks to jump back - [harpoon](https://github.com/ThePrimeagen/harpoon) (ThePrimeagen)
+- panes, splits and the pane mode - [tmux](https://github.com/tmux/tmux), [zellij](https://zellij.dev)
+- the pattern grid of codes A1 B2 ... - Polyend Tracker, Elektron sequencers
+- clips, scenes and launching - Ableton Live (Session View), Bitwig Studio
+- note keys that play patterns (patternkb), pads - Akai MPC
+- spam: a moved slice edge rolls - Roland SP-404
+- the sniper zoom of a slice edge - Xfer Nerve (Steve Duda)
+- dense parameter groups of the slixer panel - Madrona Labs Aalto and Kaivo
+- ring knobs - Nagra / Kudelski recorders
+- the sample map as a graph - [Obsidian](https://obsidian.md) graph view; sample browsing by sound - Sononym
+- the monome grid and arc pages - [monome](https://monome.org)
+- negative harmony; P / R / L chord moves - Ernst Levy (negative harmony, popularised by Jacob Collier); Hugo Riemann and the neo-Riemannian theory
+- music notation glyphs - SMuFL / Bravura (Steinberg); the score export uses [LilyPond](https://lilypond.org)
+
 The DSP module texts use descriptions from Chris Johnson's
 [Airwindopedia](https://www.airwindows.com/) when it is installed.
 
