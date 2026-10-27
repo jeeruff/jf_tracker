@@ -599,6 +599,7 @@ KH.PAGES = {
     { k = 'yy p P', d = 'copy fx, paste after / before (any track)', t = { 'yy', 'y', 'p', 'P' } },
     { k = 'cc', d = 'pack fx (v: range) into a new container', t = { 'cc', 'c' } },
     { k = 'cn', d = 'an empty container after the selected module (empty chain: at the end); it says what goes in: drop an fx or another container into it, [] in a container header - an empty container inside it, and so on' },
+    { k = 'r', d = 'replace the selected fx: a fzf list right here (the focus stays in DSP), the new one takes its place, on / off kept, the old one removed - one undo' },
     { k = 'rclick', d = 'container: unpack, add fx inside, presets, all serial / parallel, rename (:fxname); on a plugin inside: bypass, window, serial / parallel, move out, remove' },
     { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame; left half - serial, right half - parallel); the edges of a block - before / after it' },
     { k = 'aa', d = 'automate or show the envelope of the selected parameter: none - it is made; then the tracker cursor goes to its column', t = { 'aa', 'a' } },

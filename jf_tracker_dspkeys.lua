@@ -169,6 +169,8 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
   end
+  -- 27 окт: r — заменить выбранный эффект (fzf-список на месте, без перехода в панель fx)
+  if ch == 'r' and not DK.pending and ctx.fx_replace then ctx.fx_replace(sel.fx); return true end
   -- 21 окт: счётчик: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 3w; 22 окт: только когда клавиатура не играет
   -- (KEYS — цифры ноты); значение числом — в INSERT параметра (i)
   if ch:match('^%d$') and not DK.digits_play then

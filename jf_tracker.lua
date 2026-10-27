@@ -4155,6 +4155,31 @@ ctx = {
       vim.msg = '+ ' .. it.label
     end)
   end,
+  -- 27 окт: r в DSP — заменить выбранный эффект: fzf-список всплывашкой (фокус остаётся в DSP); новый встаёт на место
+  -- старого, вкл / выкл переносится, старый удаляется — одной отменой. Внутри контейнера — пока нет (адрес не номер)
+  fx_replace = function(k)
+    local col = dsp_target(); if not col then return end
+    local f = (col.fx or {})[k]
+    if not f then vim.msg = 'replace: no fx selected'; return end
+    local tr, tk = col.track, col.take
+    local idx = f.fx or f.i
+    if f.inner or idx >= 0x1000000 then vim.msg = 'replace: an fx inside a container - not yet (rclick: remove, then a in the container)'; return end
+    vim.open_picker('replace ' .. (f.name or 'fx') .. ' with', ctx.fx_list(), function(it)
+      local ok = false
+      edit.run('replace fx ' .. (f.name or ''), function()
+        local en = tk and reaper.TakeFX_GetEnabled(tk, idx) or (not tk and reaper.TrackFX_GetEnabled(tr, idx))
+        local ni
+        if tk then ni = reaper.TakeFX_AddByName(tk, it.data, -1000 - idx) else ni = reaper.TrackFX_AddByName(tr, it.data, false, -1000 - idx) end
+        if ni and ni >= 0 then
+          if tk then reaper.TakeFX_Delete(tk, idx + 1); reaper.TakeFX_SetEnabled(tk, idx, en)
+          else reaper.TrackFX_Delete(tr, idx + 1); reaper.TrackFX_SetEnabled(tr, idx, en) end
+          ok = true
+        end
+      end)
+      model.invalidate()
+      vim.msg = ok and ('replaced: %s -> %s (u - undo)'):format(f.name or '?', it.label) or ('replace: cannot add ' .. it.label)
+    end)
+  end,
   -- / в DSP (7 окт): поиск по уже добавленным эффектам и их параметрам;
   -- Enter — фокус на найденном (эффект или параметр)
   dsp_find = function()
@@ -24287,7 +24312,7 @@ local function frame()
           end
           state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
-          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / (OZ.z == 2 and 2.5 or 4)), L.cw * 26 * OZ.z)
+          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / (OZ.z == 2 and 2.5 or 3.5)), L.cw * 34 * OZ.z)   -- 27 окт: шире — имена вдвое крупнее
           local maph = vert and math.min(math.floor(gfx.h / (OZ.z == 2 and 2.5 or 4)), 8 * OZ.rh) or gfx.h
           local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Ctrl: pan' or ''))
           if state.ctlmap ~= false then
@@ -24296,7 +24321,14 @@ local function frame()
           -- 24 окт: общий хозяин (трек / эффект) — заголовком сверху, у слайдеров — только параметр (имя трека съедало его)
           local own = SG.list[1] and SG.list[1].own
           for _, r in ipairs(SG.list) do if r.own ~= own then own = nil; break end end
-          local function lab(r) return (own and r.pn) or r.name or '' end
+          -- 27 окт: имена полностью (v p w у фейдеров трека — volume pan width), вдвое крупнее; полоски толще
+          local FULL = { v = 'volume', p = 'pan', w = 'width', vol = 'volume', L = 'pan L', R = 'pan R' }
+          local function lab(r) local t = (own and r.pn) or r.name or ''; return FULL[t] or t end
+          local NZ = OZ.z * 2
+          local function nms(t) return draw.big_measure(t, NZ) end
+          local function nfit(t, w) t = t or ''; while t ~= '' and nms(t) > w do t = t:sub(1, -2) end; return t end
+          local NRH = L.rh * NZ
+          local BH = math.max(4, math.floor(L.rh * 0.6))
           if own and not vert then
             OZ.tx(mx0 + L.pad, my0 + 2, OZ.fit(own, mapw - 2 * L.pad), U.TEXT)
             U.set(U.LINE); gfx.rect(mx0 + L.pad, my0 + OZ.rh + 2, mapw - 2 * L.pad, 1, 1)
@@ -24315,23 +24347,28 @@ local function frame()
               U.set(U.LINE); gfx.rect(bx + a1 - a0 - 1, my0 + 1, 1, maph - 1, 1)
               local bh = math.floor((maph - OZ.rh - 6) * fr + 0.5)
               U.set(on and U.AMBER or U.CYAN, 0.7); gfx.rect(bx + 2, my0 + maph - 2 - bh, math.max(1, a1 - a0 - 5), bh, 1)
-              if a1 - a0 >= OZ.ms('mm') then OZ.tx(bx + 2, my0 + 2, OZ.fit(lab(r), a1 - a0 - 4), on and U.AMBER or U.GREY) end
+              if a1 - a0 >= nms('mm') then draw.big_text(bx + 2, my0 + 2, nfit(lab(r), a1 - a0 - 4), on and U.AMBER or U.GREY, NZ) end
             else
               local by0, by1 = my0 + a0, my0 + a1
               if on then U.set(U.AMBER, 0.30); gfx.rect(mx0 + 1, by0, mapw - 1, by1 - by0, 1) end
               U.set(U.LINE); gfx.rect(mx0 + 1, by1 - 1, mapw - 1, 1, 1)
               local cy = by0 + math.floor((by1 - by0) / 2)
-              if by1 - by0 >= OZ.rh + 4 then
+              if by1 - by0 >= NRH + BH + 6 then
+                local ty = cy - math.floor((NRH + BH + 4) / 2)
+                draw.big_text(mx0 + L.pad, ty, nfit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY, NZ)
+                U.set(U.DIM); gfx.rect(mx0 + L.pad, ty + NRH + 2, mapw - 2 * L.pad, BH, 1)
+                U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, ty + NRH + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), BH, 1)
+              elseif by1 - by0 >= OZ.rh + BH + 4 then   -- тесно — обычный размер имени
                 OZ.tx(mx0 + L.pad, cy - OZ.rh, OZ.fit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY)
-                U.set(U.DIM); gfx.rect(mx0 + L.pad, cy + 2, mapw - 2 * L.pad, 2, 1)
-                U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, cy + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), 2, 1)
+                U.set(U.DIM); gfx.rect(mx0 + L.pad, cy + 2, mapw - 2 * L.pad, BH, 1)
+                U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, cy + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), BH, 1)
               else
                 U.set(on and U.AMBER or U.CYAN, 0.6); gfx.rect(mx0 + 1, by0 + 1, math.max(1, math.floor((mapw - 2) * fr + 0.5)), math.max(1, by1 - by0 - 2), 1)
               end
             end
           end
           -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
-          local desc = ('%s  %s'):format(own and (own .. ': ' .. (cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
+          local desc = ('%s  %s'):format(own and (own .. ': ' .. (FULL[cur.pn or ''] or cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
           local dy0 = vert and (my0 - 2 * OZ.rh - 2) or (gfx.h - 2 * OZ.rh - 2)
           local dw = vert and mapw or math.max(mapw, math.min(gfx.w, OZ.ms(desc) + 2 * L.pad))
           local dx0 = gfx.w - dw
