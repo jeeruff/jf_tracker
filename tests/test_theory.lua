@@ -53,4 +53,21 @@ local z = {}; for i = 1, 2048 do z[i] = 0 end
 eq('silence', TH.yin(z, 2048, sr), nil)
 local r3 = TH.sample_root(synth(261.63 * 2 ^ (14 / 1200), 2048, sr), 2048)
 eq('cents +14 near C4', r3 and (r3.pitch == 60 and math.abs(r3.cents - 14) <= 2), true)
+-- 27 окт: кандидаты, негативная гармония, P L R, тритоновая замена
+local cc = TH.chord_candidates(TH.note_chroma({ { pitch = 57 }, { pitch = 60 }, { pitch = 64 }, { pitch = 67 } }), 4)
+eq('cand Am7 first', cc[1] and cc[1].sym, 'Am7')
+local has6 = false; for _, e in ipairs(cc) do if e.sym == 'C6' or e.sym == 'C' then has6 = true end end
+eq('cand C / C6 among', has6, true)
+eq('neg C4 -> G3', TH.negative(60, 0), 55)
+eq('neg E4 -> Eb4', TH.negative(64, 0), 63)
+eq('neg twice = same', TH.negative(TH.negative(71, 0), 0), 71)
+eq('neg C in C = Cm', TH.negative_sym('C', 0), 'Cm')
+eq('neg G7 in C = Dm7b5 / Fm6', ({ Dm7b5 = true, Fm6 = true })[TH.negative_sym('G7', 0)], true)
+eq('neg F in C = Gm', TH.negative_sym('F', 0), 'Gm')
+local tf = {}; for _, e in ipairs(TH.transforms('C', 0)) do tf[e.lab] = e.sym end
+eq('P C', tf.P, 'Cm'); eq('R C', tf.R, 'Am'); eq('L C', tf.L, 'Em')
+local tm = {}; for _, e in ipairs(TH.transforms('Am', 0)) do tm[e.lab] = e.sym end
+eq('R Am', tm.R, 'C'); eq('L Am', tm.L, 'F')
+local td = {}; for _, e in ipairs(TH.transforms('G7', 0)) do td[e.lab] = e.sym end
+eq('tt G7', td.tt, 'C#7')
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

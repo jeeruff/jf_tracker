@@ -346,4 +346,89 @@ function TH.second_voice(p, interval, root, id)
   return TH.step(p, n, root, id)
 end
 
+-- ── 27 окт: кандидаты и преобразования аккорда (панель harmonizer) ────────
+-- хрома из нот: вес высоты — её длина (или 1); бас — чуть весомее (корень чаще внизу)
+function TH.note_chroma(notes)
+  local ch, tot, lo = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 0, nil
+  for _, n in ipairs(notes) do if not lo or n.pitch < lo then lo = n.pitch end end
+  for _, n in ipairs(notes) do
+    local w = (n.w or 1) * (n.pitch == lo and 1.25 or 1)
+    local k = math.floor(n.pitch + 0.5) % 12 + 1
+    ch[k] = ch[k] + w; tot = tot + w
+  end
+  if tot <= 0 then return nil end
+  for i = 1, 12 do ch[i] = ch[i] / tot end
+  return ch
+end
+TH.CAND_Q = { '', 'm', '7', 'maj7', 'm7', 'sus4', 'sus2', 'dim', 'aug', '6', 'm6', 'm7b5', 'dim7', '9', 'add9' }
+-- n лучших аккордов по хроме (оценка best_chord, звучащее мимо аккорда — штраф): { { sym, w } }, w лучшего = 1
+function TH.chord_candidates(chroma, n, quals)
+  local all = {}
+  for root = 0, 11 do
+    for _, q in ipairs(quals or TH.CAND_Q) do
+      local c = CH.parse(CH.NAMES[root + 1] .. q)
+      if c then
+        local s, set = 0.15 * chroma[root + 1], {}
+        for _, iv in ipairs(c.ints) do local k = (root + iv) % 12; if not set[k] then set[k] = true; s = s + chroma[k + 1] end end
+        local out = 0
+        for k = 0, 11 do if not set[k] then out = out + chroma[k + 1] end end
+        all[#all + 1] = { sym = CH.NAMES[root + 1] .. q, s = (s - 0.5 * out) / math.sqrt(#c.ints) }
+      end
+    end
+  end
+  table.sort(all, function(a, b) return a.s > b.s end)
+  local res = {}
+  for i = 1, math.min(n or 4, #all) do
+    if all[i].s <= 0 then break end
+    res[#res + 1] = { sym = all[i].sym, w = all[i].s / all[1].s }
+  end
+  return res
+end
+-- имя набора классов высот без /баса, если можно (бас перебирается)
+function TH.name_pcs(pcs)
+  for _, b in ipairs(pcs) do
+    local ps = { 48 + b }
+    for _, c in ipairs(pcs) do if c ~= b then ps[#ps + 1] = 60 + c end end
+    local nm = CH.name(ps)
+    if nm and not nm:find('[/?]') then return nm end
+  end
+  local ps = {}
+  for _, c in ipairs(pcs) do ps[#ps + 1] = 60 + c end
+  return CH.name(ps)
+end
+-- НЕГАТИВНАЯ ГАРМОНИЯ (Э. Леви, популяризация — Дж. Кольер): зеркало вокруг оси между терциями лада
+-- (в C — между Eb и E): p' = 2·root + 7 − p; октава — ближайшая к исходной (регистр не прыгает)
+function TH.negative(p, root)
+  local s = 2 * root + 7
+  local k = math.floor((2 * p - s) / 12 + 0.5)
+  return s - p + 12 * k
+end
+function TH.negative_sym(sym, root)
+  local c = CH.parse(sym)
+  if not c then return nil end
+  local pcs, seen = {}, {}
+  for _, iv in ipairs(c.ints) do local k = (2 * root + 7 - c.root - iv) % 12; if not seen[k] then seen[k] = true; pcs[#pcs + 1] = k end end
+  return TH.name_pcs(pcs)
+end
+-- преобразования аккорда: negative (по ладу), нео-римановские P L R (трезвучия), тритоновая замена (доминанты)
+-- → { { lab, sym, why } }
+function TH.transforms(sym, root)
+  local c = CH.parse(sym)
+  if not c then return {} end
+  local N = CH.NAMES
+  local out = {}
+  local neg = TH.negative_sym(sym, root)
+  if neg then out[#out + 1] = { lab = 'neg', sym = neg, why = 'negative harmony: mirrored around the axis of the key' } end
+  if c.suffix == '' or c.suffix == 'm' then
+    local maj = c.suffix == ''
+    out[#out + 1] = { lab = 'P', sym = N[c.root + 1] .. (maj and 'm' or ''), why = 'parallel: the third moves a semitone' }
+    out[#out + 1] = { lab = 'R', sym = maj and (N[(c.root + 9) % 12 + 1] .. 'm') or N[(c.root + 3) % 12 + 1], why = 'relative: the fifth (major) / root (minor) moves a tone' }
+    out[#out + 1] = { lab = 'L', sym = maj and (N[(c.root + 4) % 12 + 1] .. 'm') or N[(c.root + 8) % 12 + 1], why = 'leading-tone exchange: the root (major) / fifth (minor) moves a semitone' }
+  end
+  if c.suffix:match('^7') or c.suffix:match('^9') or c.suffix:match('^13') then
+    out[#out + 1] = { lab = 'tt', sym = N[(c.root + 6) % 12 + 1] .. c.suffix, why = 'tritone substitution: the same tritone, the root a tritone away' }
+  end
+  return out
+end
+
 return TH

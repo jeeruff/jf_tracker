@@ -318,15 +318,61 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
   -- 26 окт: аккорды трека в паттерне — колонкой сбоку от стана и таба (под кнопками места не занимают)
   local ay = y + 3 * (rh + 2) + 2
   local ty = ay - rh - 4
+  -- 27 окт: ХРОМА и КАНДИДАТЫ под ступенями: 12 столбиков (C … B) того, что звучит (выделение, строка всех
+  -- треков, chord lane, иначе звук трека); справа is — кандидаты (щелчок — в колонку аккордов мастера),
+  -- try — neg (ноты зеркалом, n), P R L (нео-риманово), tt (тритоновая замена) — щелчок пишет аккорд в строку
+  local hb = 0
+  local narrow = gx1 + 2 * L.cw + 10 * L.cw > x + w
+  local bx1 = narrow and (x + w) or gx1
+  if info.chroma and ay + 3 * rh <= y + h then
+    hb = 3 * rh + 4
+    local bw = math.max(U.measure('C#') + 2, L.cw * 2)
+    local bh = 2 * rh - 2
+    local mxv = 0
+    for i = 1, 12 do mxv = math.max(mxv, info.chroma[i]) end
+    local P = info.cands and info.cands[1] and CH.parse(info.cands[1].sym)
+    local inch = {}
+    if P then for _, iv in ipairs(P.ints) do inch[(P.root + iv) % 12] = true end end
+    for i = 0, 11 do
+      local cx0 = x + i * bw
+      local v = mxv > 0 and info.chroma[i + 1] / mxv or 0
+      local hh = math.floor(v * bh + 0.5)
+      U.set(U.tint(U.LINE, 0.5)); gfx.rect(cx0, ay, bw - 2, bh, 0)
+      U.set(inch[i] and U.CYAN or U.GREY); if hh > 0 then gfx.rect(cx0, ay + bh - hh, bw - 2, hh, 1) end
+      local nm = HM.pc_name(i)
+      U.text(cx0 + math.floor((bw - 2 - U.measure(nm)) / 2), ay + bh + 1, nm, P and i == P.root and U.AMBER or (inch[i] and U.TEXT or U.DIM))
+    end
+    local qx0 = x + 12 * bw + L.cw
+    local qx = qx0
+    U.text(qx, ay, 'is', U.GREY); qx = qx + U.measure('is ') + L.pad
+    for _, c in ipairs(info.cands or {}) do
+      local lab = HM.spell(c.sym) .. (' %d'):format(math.floor(c.w * 100 + 0.5))
+      local bw2 = bw_of(lab)
+      if qx + bw2 > bx1 then break end
+      qx = btn(qx, ay, bw2, lab, c.sym == (info.here and info.here:gsub('/.*$', '')), { kind = 'cand', sym = c.sym, why = 'what sounds - ' .. (info.src or '') .. ', weight ' .. math.floor(c.w * 100 + 0.5) .. ' %; click - into the chord column of the master' })
+    end
+    qx = qx0
+    local ty2 = ay + rh + 2
+    U.text(qx, ty2, 'try', U.GREY); qx = qx + U.measure('try ') + L.pad
+    for _, t in ipairs(info.trans or {}) do
+      local lab = t.lab .. ' ' .. HM.spell(t.sym)
+      local bw2 = bw_of(lab)
+      if qx + bw2 > bx1 then break end
+      local data = t.lab == 'neg' and { kind = 'neg', why = t.why .. ' (n): the notes themselves are mirrored, the octave kept' } or { kind = 'xf', sym = t.sym, why = t.why .. '; click - this chord on the row' }
+      qx = btn(qx, ty2, bw2, lab, false, data, t.lab == 'neg' and U.AMBER or nil)
+    end
+    local why = hv and hv.why or (info.src and ('source: ' .. info.src .. (info.base and (' - ' .. HM.spell(info.base)) or '')))
+    if why then U.text(qx0, ay + 2 * rh + 3, fit(why, bx1 - qx0), U.DIM) end
+  end
   -- справа: стан и таб
-  local show = (hv and hv.kind == 'deg') and HM.degree(hv.k, hv.seventh) or HM.spell(info.here)
+  local show = (hv and (hv.kind == 'deg')) and HM.degree(hv.k, hv.seventh) or ((hv and (hv.kind == 'cand' or hv.kind == 'xf')) and HM.spell(hv.sym)) or HM.spell(info.here)
   local px = gx1 + 2 * L.cw
   local py = y + rh + 2
   -- 26 окт: справа не влезает (узкая панель) — стан и таб под списком аккордов, во всю ширину
-  if px + 10 * L.cw > x + w then px, py = x, ty + rh + 4 end
+  if narrow then px, py = x, ty + rh + 4 + hb end
   if (HM.show_staff or HM.show_tab) and px + 10 * L.cw <= x + w and py + 3 * rh <= y + h then
     if show and CH.parse((show:gsub('%?$', ''))) then
-      U.text(px, py, show, (hv and hv.kind == 'deg') and U.AMBER or U.TEXT)
+      U.text(px, py, show, (hv and (hv.kind == 'deg' or hv.kind == 'cand' or hv.kind == 'xf')) and U.AMBER or U.TEXT)
       local qx = px
       local ph = y + h - py - rh
       if HM.show_staff then qx = qx + HM.staff(L, qx, py + rh, ph, show) + 2 * L.cw end
@@ -367,7 +413,10 @@ function HM.click(d, pitches)
   elseif d.kind == 'staff' then HM.show_staff = not HM.show_staff; return true
   elseif d.kind == 'tab' then HM.show_tab = not HM.show_tab; return true
   elseif d.kind == 'ji' then HM.ji = not HM.ji; return true
-  elseif d.kind == 'deg' then return { write = HM.degree(d.k, d.seventh) } end
+  elseif d.kind == 'deg' then return { write = HM.degree(d.k, d.seventh) }
+  elseif d.kind == 'cand' then return { mark = d.sym }   -- 27 окт
+  elseif d.kind == 'xf' then return { write = d.sym }
+  elseif d.kind == 'neg' then return { neg = true } end
 end
 
 function HM.key(c, pitches)
@@ -387,6 +436,7 @@ function HM.key(c, pitches)
   if ch == 'j' then return HM.click({ kind = 'ji' }) end
   if ch == 'o' then return HM.click({ kind = 'kmark' }) end
   if ch == 'i' then return HM.click({ kind = 'ksnap' }) end
+  if ch == 'n' then return { neg = true } end   -- 27 окт: негативная гармония (:neg)
   return nil
 end
 

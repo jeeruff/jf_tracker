@@ -11521,6 +11521,17 @@ ctx = {
     elseif inf.lane then here = select(2, ctx.chord_heads(col, vim.cur.row))
     else here = pitches_of(vim.heads_in(1, #L.flat, vim.cur.row, vim.cur.row)) end
     inf.here = chord_of(here)
+    -- 27 окт: хрома (12 столбиков) и кандидаты аккорда; нот нет — звук трека курсора (строка / выделение)
+    local TH = MMX.TH
+    local nps = {}
+    for _, p in ipairs(here) do nps[#nps + 1] = { pitch = p } end
+    if inf.here then inf.chroma, inf.src = TH.note_chroma(nps), (vim.mode == 'visual' or vim.mode == 'vline') and 'selection' or (inf.lane and 'chord lane' or 'row') end
+    if not inf.chroma and #here == 0 then inf.chroma = ctx.harm_audio_chroma(col); if inf.chroma then inf.src = 'sound' end end
+    if inf.chroma then
+      inf.cands = TH.chord_candidates(inf.chroma, 4)
+      local base = inf.here or (inf.cands[1] and inf.cands[1].sym)
+      if base then inf.trans = TH.transforms((base:gsub('/.*$', '')), MMX.HM.root); inf.base = base end
+    end
     if not inf.lane then return inf end   -- список аккордов строк — только у трека-лейна аккордов
     local rows = {}
     for _, lane in ipairs(col.lanes or {}) do
@@ -11545,6 +11556,11 @@ ctx = {
   harm_do = function(r)
     if r == 'leave' then ctx.set_focus('tracker'); return end
     if type(r) == 'table' then
+      if r.mark then   -- 27 окт: кандидат → колонка аккордов мастера на строке курсора
+        if not state.chordlane then state.chordlane = true; relayout() end
+        ctx.chd_set(vim.cur.row, r.mark); return
+      end
+      if r.neg then ctx.negative_cmd(); return end   -- 27 окт: негативная гармония нот
       if r.tr then vim.transpose_smart(); return end   -- 26 окт: транспозитор из harmonizer
       if r.write then ctx.chord_cmd(r.write) elseif r.lane then ctx.chord_cmd('')
       elseif r.keyauto then ctx.key_cmd('') elseif r.key then ctx.key_cmd(r.key) end   -- 21 окт
@@ -18640,6 +18656,54 @@ ctx.harm_span = function()
   else local a, b = ctx.region_rows(); r0, r1 = a, b end
   if not r0 then return nil end
   return edit.row_time(r0, state.lpb, 0), edit.row_time(r1, state.lpb, 0)
+end
+-- 27 окт: хрома звука трека курсора (аудио-айтемы до FX): выделение, иначе доля от строки курсора; кеш —
+-- по треку, отрезку и изменению проекта (панель зовёт каждый кадр)
+ctx.harm_audio_chroma = function(col)
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return nil end
+  local t0, t1
+  if vim.mode == 'visual' or vim.mode == 'vline' then t0, t1 = ctx.harm_span() end
+  if not t0 then t0, t1 = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + state.lpb, state.lpb, 0) end
+  local key = ('%s %.4f %.4f %d'):format(tostring(col.track), t0, t1, reaper.GetProjectStateChangeCount(0))
+  local hc = ctx.harm_ac
+  if hc and hc.key == key then return hc.ch end
+  local ch
+  local has = false
+  for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+    local it = reaper.GetTrackMediaItem(col.track, i)
+    local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local tk = reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) and p < t1 and p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > t0 then has = true; break end
+  end
+  if has then
+    local TH = MMX.TH
+    local N = math.min(8000, math.floor((t1 - t0) * TH.SR))
+    if N > 256 then
+      local acc = reaper.CreateTrackAudioAccessor(col.track)
+      local buf = reaper.new_array(N * 2)
+      reaper.GetAudioAccessorSamples(acc, TH.SR, 2, t0, N, buf)
+      reaper.DestroyAudioAccessor(acc)
+      local t, mono = buf.table(1, N * 2), {}
+      for k = 1, N do mono[k] = 0.5 * ((t[2 * k - 1] or 0) + (t[2 * k] or 0)) end
+      ch = TH.window_chroma(mono, N)
+    end
+  end
+  ctx.harm_ac = { key = key, ch = ch }
+  return ch
+end
+-- 27 окт: :neg — НЕГАТИВНАЯ ГАРМОНИЯ: ноты выделения (иначе строки курсора по всем трекам) — зеркало вокруг оси
+-- лада (в C между Eb и E: C↔G, E↔Eb, F↔D); октава — ближайшая (регистр на месте); ещё раз — обратно
+ctx.negative_cmd = function()
+  local heads
+  if vim.mode == 'visual' or vim.mode == 'vline' then local f0, f1, r0, r1 = vim.visual_range(); heads = vim.heads_in(f0, f1, r0, r1)
+  else heads = vim.heads_in(1, #L.flat, vim.cur.row, vim.cur.row) end
+  local hs = {}
+  for _, h in ipairs(heads) do if h.kind == 'midi' or h.kind == 'audio' then hs[#hs + 1] = h end end
+  if #hs == 0 then vim.msg = 'negative: no notes (select them, or put the cursor on a row with notes)'; return end
+  local root = MMX.HM.root or 0
+  edit.transpose_map(hs, state.lpb, function(p) return MMX.TH.negative(p, root) end, 'negative harmony')
+  model.invalidate()
+  vim.msg = ('negative harmony: %d note(s) mirrored around the axis of %s (%s <-> %s); again - back'):format(#hs, MMX.HM.key_name(), MMX.HM.pc_name(root), MMX.HM.pc_name(root + 7))
 end
 -- :harmonize [beat|half] — мелодия трека курсора → аккорд лада на каждый такт (долю / полтакта) → колонка chord мастера
 ctx.harmonize_cmd = function(arg)
