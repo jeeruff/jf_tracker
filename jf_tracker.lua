@@ -18428,6 +18428,55 @@ function ctx.slx_cmd(code, arg)
     reaper.gmem_write(B + 6100, (math.floor(reaper.gmem_read(B + 6100)) % 16000000) + 1)
   end)
 end
+-- 27 окт: 8 слотов быстрой загрузки slixer (владелец вида пишет пути в TRKV+7000..): { path, name, pk } × 8;
+-- пики (24 столбика) трекер берёт из файла сам — один раз на путь (кеш), так что и 15 экземпляров не тяжелы
+ctx.slx_qpk = {}
+function ctx.slx_slots()
+  local ver = 0
+  with_ns('jf_slixer', function() ver = reaper.gmem_read(200000 + 7000) end)
+  local Q = ctx.slx_q
+  if Q and Q.ver == ver then return Q.list end
+  local list = {}
+  with_ns('jf_slixer', function()
+    for i = 0, 7 do
+      local b = 200000 + 7001 + i * 258
+      local n = math.max(0, math.min(256, math.floor(reaper.gmem_read(b))))
+      local cs = {}
+      for k = 1, n do cs[k] = string.char(math.max(1, math.min(255, math.floor(reaper.gmem_read(b + k))))) end
+      local path = table.concat(cs)
+      list[i + 1] = { path = path, name = path ~= '' and ((path:match('[^/\\]+$') or path):gsub('%.[%w]+$', '')) or nil }
+    end
+  end)
+  ctx.slx_q = { ver = ver, list = list }
+  return list
+end
+function ctx.slx_slot_peaks(path, n)
+  if not path or path == '' then return nil end
+  local c = ctx.slx_qpk[path]
+  if c and (c.pk or (c.t and reaper.time_precise() - c.t < 2)) then return c.pk end
+  ctx.slx_qpk[path] = { t = reaper.time_precise() }
+  local src = reaper.PCM_Source_CreateFromFile(path)
+  if not src then return nil end
+  local len = reaper.GetMediaSourceLength(src)
+  local nch = math.max(1, reaper.GetMediaSourceNumChannels(src))
+  local pk
+  if len and len > 0 then
+    local buf = reaper.new_array(n * nch * 2)
+    local ret = reaper.PCM_Source_GetPeaks(src, n / len, 0, nch, n, 0, buf)
+    if ret and (ret & 0xfffff) > 0 then
+      local t = buf.table()
+      pk = {}
+      for i = 1, n do
+        local mx, mn = 0, 0
+        for ch = 1, nch do mx = math.max(mx, t[(i - 1) * nch + ch] or 0); mn = math.min(mn, t[n * nch + (i - 1) * nch + ch] or 0) end
+        pk[i] = math.min(1, math.max(mx, -mn))
+      end
+    end
+  end
+  reaper.PCM_Source_Destroy(src)
+  ctx.slx_qpk[path].pk = pk
+  return pk
+end
 -- 25 окт: параметр slixer по имени (номера сдвигаются от версии к версии): значение (как в слайдере) и индекс
 ctx.slx_pi = {}
 function ctx.slx_param(fxi, name)
@@ -21679,6 +21728,8 @@ local function frame()
     adsr_drag = function() return ctx.adsr_d end,
     -- живой вид модуля DSP: гранулятор — gmem jf_grgrain (GB = 20000), раз в кадр
     slx_param = function(fxi, name) return ctx.slx_param(fxi, name) end,   -- 25 окт: пульт slixer — параметр по имени
+    slx_slots = function() return ctx.slx_slots() end,   -- 27 окт: слоты быстрой загрузки — плитки в шапке модуля
+    slx_slot_peaks = function(path, n) return ctx.slx_slot_peaks(path, n) end,
     slx_aim = function(a, n, np) return ctx.slx_aim_peaks(a, n, np) end,
     slx_spam = function() return state.sliceaudition end,
     slx_aimtop = function() return state.zoomtop ~= false end,   -- 26 окт: прицел пульта slixer над волной   -- 26 окт: прицел — сэмплы окна у границы
@@ -22909,6 +22960,7 @@ local function frame()
   elseif hover.dspxy then state.status = hover.dspxy.f.name .. ': XY pad - drag to move the vector (X and Y together)'
   elseif hover.dspadsr then state.status = 'ADSR - drag the nearest handle: A sideways, D sideways + S up / down, R sideways; Shift: fine'
   elseif hover.dspwave then state.status = (hover.dspwave.f.file and ((hover.dspwave.f.file:match('[^/]+$') or '') .. ' - drag: nearest handle (start / end) - drop a browser file: new sample') or 'RS5K: drop a sample file from the browser here')
+  elseif hover.dspbtn and hover.dspbtn.what == 'qslot' then state.status = 'slixer quick slot ' .. (hover.dspbtn.slot + 1) .. ': ' .. (hover.dspbtn.path ~= '' and (hover.dspbtn.path .. ' - click loads it') or 'empty - Shift+click a slot in the slixer window stores the current sample')
   elseif hover.dspbtn and hover.dspbtn.what == 'linkrow' then
     local l = hover.dspbtn.link
     state.status = ('%s: %s follows %s: %s  %+d %%  (click - amount / unlink)'):format(l.tname or '?', l.tpname or '?', l.sname or '?', l.spname or '?', math.floor(l.sc * 100 + 0.5))
@@ -25162,6 +25214,9 @@ local function frame()
       elseif hover.dspbtn.what == 'pins' then ctx.pins_open(hover.dspbtn.fx)   -- 24 окт: «2 in 2/6 out» — матрица пинов
       elseif hover.dspbtn.what == 'cnew' then ctx.dsp_container_new(hover.dspbtn.fx, true)   -- 24 окт: [] — контейнер внутрь
       elseif hover.dspbtn.what == 'lastp' then ctx.dsp_lastparam_menu(hover.dspbtn.fx)
+      elseif hover.dspbtn.what == 'qslot' then   -- 27 окт: слот быстрой загрузки slixer
+        if hover.dspbtn.path ~= '' then ctx.slx_cmd(10, hover.dspbtn.slot); vim.msg = 'slixer: slot ' .. (hover.dspbtn.slot + 1) .. ' - ' .. (hover.dspbtn.name or '') .. ' loads'
+        else vim.msg = 'slixer: slot ' .. (hover.dspbtn.slot + 1) .. ' is empty - store a sample in it in the slixer window (Shift+click a slot)' end
       elseif hover.dspbtn.what == 'pprev' then ctx.dsp_preset(hover.dspbtn.fx, 'prev')
       elseif hover.dspbtn.what == 'pnext' then ctx.dsp_preset(hover.dspbtn.fx, 'next')
       elseif hover.dspbtn.what == 'vmode' then

@@ -9696,6 +9696,40 @@ function D.frame(L, snap, rows, state, info)
         local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
         if pre_at then pre_at(x) end
       end
+      -- 27 окт: slixer — 8 слотов быстрой загрузки плитками в свободном месте шапки: мини-волна, имя поверх;
+      -- щелчок — загрузить (заказ 10), пустой — номер тускло
+      if f.view == 'slixer' and info.slx_slots and tw > 0 then
+        local sx0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + 2 * L.pad + (iol and (iow + L.pad) or 0) + ((info.dspleft and ptw > 0) and (ptw + L.pad) or 0)
+        local sx1 = math.huge
+        for _, bb in ipairs(bxs) do sx1 = math.min(sx1, bb[3]) end
+        if ptw > 0 and not info.dspleft then sx1 = bx + 2 * L.pad + tw end
+        sx1 = sx1 - 2 * L.pad
+        local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
+        if qw >= L.cw * 3 then
+          local sl = info.slx_slots() or {}
+          for i = 0, 7 do
+            local e = sl[i + 1] or {}
+            local qx, qy, qh = sx0 + i * (qw + 2), by + 1, L.rh - 1
+            local full = e.path and e.path ~= ''
+            local hot = not drag and mx >= qx and mx < qx + qw and my >= qy and my < qy + qh
+            set(hot and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(qx, qy, qw, qh, 1)
+            local pk = full and info.slx_slot_peaks and info.slx_slot_peaks(e.path, 24)
+            if pk then
+              set(U.tint(U.CYAN, hot and 0.45 or 0.3))
+              local n = math.min(#pk, qw - 2)
+              for c = 0, n - 1 do
+                local v = pk[math.floor(c * #pk / n) + 1] or 0
+                local hh = math.max(1, math.floor(v * (qh - 2) + 0.5))
+                gfx.rect(qx + 1 + math.floor(c * (qw - 2) / n), qy + math.floor((qh - hh) / 2), math.max(1, math.floor((qw - 2) / n)), hh, 1)
+              end
+            end
+            set(hot and U.AMBER or U.LINE); gfx.rect(qx, qy, qw, qh, 0)
+            text(qx + 2, qy, fit(full and e.name or tostring(i + 1), qw - 4), hot and U.AMBER or (full and U.TEXT or U.DIM))
+            if hot then hover.dspbtn = { fx = k, f = f, what = 'qslot', slot = i, path = e.path or '', name = e.name }; on_btn = true end
+            hint('dspbtn', qx, qy, qw, qh, { fx = k, what = 'qslot', slot = i })
+          end
+        end
+      end
       if f.inner and not f.inner.wrap then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end   -- 24 окт: в рэке — без второй рамки (слипалась)
       if tw > 0 then
         for _, b in ipairs(bxs) do
