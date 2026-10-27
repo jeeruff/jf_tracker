@@ -412,6 +412,7 @@ function B.an_tick(G)
   end
 end
 -- 27 окт (8): типы файлов карты (по умолчанию — сэмплы)
+if B.mapV.style == 'tree' then B.mapV.style = 'graph' end   -- 27 окт: вид tree скрыт
 B.mapV.types = {}
 do
   local ts = R.GetExtState and R.GetExtState('jf_tracker', 'maptypes') or ''
@@ -581,7 +582,7 @@ function B.map_key(c)
     for k, v in ipairs(B.MAP_SRCS) do if v == B.map_src then i = k end end
     B.map_src = B.MAP_SRCS[i % #B.MAP_SRCS + 1]; B.mapG = nil
     if ctx.msg then ctx.msg('map: ' .. B.map_src) end
-  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'tree', tree = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
+  elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
   elseif ch == 'r' then B.map_random()
   elseif c == 27 and B.mapV.sys then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif (ch == '+' or ch == '=') and B.mapV.style == 'cards' then B.SM.cardz = math.min(6, (B.SM.cardz or 1.5) * 1.25)   -- 27 окт (8): размер карточек

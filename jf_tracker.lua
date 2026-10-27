@@ -11024,7 +11024,7 @@ ctx = {
     out[#out + 1] = { key = 'mod_slixer_ovbelow', label = 'scroll under the sample', kind = 'toggle', desc = 'DSP, slixer: the overview strip (the scroll of the zoomed wave) under the sample instead of over it',
       get = function() return state.slx_ovbelow == true end, set = function(v) state.slx_ovbelow = v or nil; reaper.SetExtState(EXT, 'mod_slixer_ovbelow', v and '1' or '0', true) end }
     out[#out + 1] = { sep = true, title = 'map', group = 'modules' }
-    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula', 'tree' },
+    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
       get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
     out[#out + 1] = { key = 'mod_map_ship', label = 'marked as a ship', kind = 'toggle', desc = 'the marked files also as a little FTL-style ship in the corner of the map (a room per class); off - only the marked list on the right',
@@ -13288,6 +13288,17 @@ ctx = {
       key = function(c) return ctx.theme_tab.key(c) end,
       click = function() return ctx.theme_tab.click() end }
     items[#items + 1] = { gap = true, sep = true }
+    -- 27 окт: твик темы (вкладка theme): ползунки поверх любой темы
+    items[#items + 1] = { sep = true, title = 'theme tweak', group = 'theme' }
+    for _, d in ipairs({ { 'hue', 'hue', -180, 180, 5, '%+d°' }, { 'sat', 'saturation', 0, 200, 5, '%d %%' }, { 'bri', 'brightness', -50, 50, 2, '%+d' },
+                         { 'con', 'contrast', 50, 160, 5, '%d %%' }, { 'sha', 'shadows', -60, 60, 5, '%+d' }, { 'acc', 'accents', 0, 200, 5, '%d %%' } }) do
+      items[#items + 1] = { key = 'tw_' .. d[1], label = d[2], kind = 'num', min = d[3], max = d[4], step = d[5], fmt = d[6],
+        desc = 'theme tweak over any theme: ' .. d[2] .. ' (all of them back - reset tweak)',
+        get = function() return ctx.TW[d[1]] end,
+        set = function(v) ctx.TW[d[1]] = v; reaper.SetExtState(EXT, 'tw_' .. d[1], tostring(v), true); ctx.apply_theme(state.theme) end }
+    end
+    items[#items + 1] = { label = 'reset tweak', kind = 'action', value = 'reset', desc = 'hue 0, saturation 100, brightness 0, contrast 100, shadows 0, accents 100',
+      fn = function() ctx.TW = { hue = 0, sat = 100, bri = 0, con = 100, sha = 0, acc = 100 }; for k, v in pairs(ctx.TW) do reaper.SetExtState(EXT, 'tw_' .. k, tostring(v), true) end; ctx.apply_theme(state.theme); vim.msg = 'theme tweak reset' end }
     for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
     -- 27 окт (5): вкладка modules — у каждого модуля свой раздел со своими опциями (ctx.module_items)
     for _, it in ipairs(ctx.module_items()) do items[#items + 1] = it end
@@ -15829,6 +15840,49 @@ end
 -- тема трекера (3 окт): родная палитра заново (jf_looper_ui — свежая копия),
 -- поверх — тема из jf_tracker_themes; draw пересчитывает свои цвета, кэши
 -- картинок текста и цветов сброшены. reaper — родная палитра как есть
+-- 27 окт: ТВИК ТЕМЫ — поверх выбранной: поворот оттенка, насыщенность, яркость, контраст, подъём теней, сила акцентов
+-- (AMBER CYAN GREEN RED YELLOW PINK). Значения — ExtState tw_*; все цвета палитры U (таблицы r g b 0..1)
+ctx.TW = { hue = 0, sat = 100, bri = 0, con = 100, sha = 0, acc = 100 }
+for k in pairs(ctx.TW) do local v = tonumber(reaper.GetExtState(EXT, 'tw_' .. k)); if v then ctx.TW[k] = v end end
+function ctx.tw_hsv(r, g, b)
+  local mx, mn = math.max(r, g, b), math.min(r, g, b)
+  local d = mx - mn
+  local h = 0
+  if d > 1e-6 then
+    if mx == r then h = ((g - b) / d) % 6 elseif mx == g then h = (b - r) / d + 2 else h = (r - g) / d + 4 end
+    h = h / 6
+  end
+  return h, mx > 0 and d / mx or 0, mx
+end
+function ctx.tw_rgb(h, s0, v)
+  local i = math.floor(h * 6) % 6
+  local f = h * 6 - math.floor(h * 6)
+  local p, q, t = v * (1 - s0), v * (1 - f * s0), v * (1 - (1 - f) * s0)
+  if i == 0 then return v, t, p elseif i == 1 then return q, v, p elseif i == 2 then return p, v, t
+  elseif i == 3 then return p, q, v elseif i == 4 then return t, p, v end
+  return v, p, q
+end
+function ctx.theme_tweak(P)
+  local T = ctx.TW
+  if T.hue == 0 and T.sat == 100 and T.bri == 0 and T.con == 100 and T.sha == 0 and T.acc == 100 then return end
+  local ACC = { AMBER = true, CYAN = true, GREEN = true, RED = true, YELLOW = true, PINK = true }
+  for k, c in pairs(P) do
+    if type(c) == 'table' and type(c[1]) == 'number' and type(c[3]) == 'number' and #c <= 4 and k:match('^%u') then
+      local h, sv, v = ctx.tw_hsv(c[1], c[2], c[3])
+      h = (h + T.hue / 360) % 1
+      local sm = T.sat / 100 * (ACC[k] and T.acc / 100 or 1)
+      sv = math.max(0, math.min(1, sv * sm))
+      local r, g, b = ctx.tw_rgb(h, sv, v)
+      local function adj(x)
+        x = (x - 0.5) * (T.con / 100) + 0.5 + T.bri / 100            -- контраст вокруг середины, яркость
+        if x < 0.5 then x = x + (0.5 - x) * (T.sha / 100) end          -- тени: подъём (+) / углубление (-) тёмных
+        if ACC[k] then x = x * (0.6 + 0.4 * T.acc / 100) end            -- акценты тусклее / ярче
+        return math.max(0, math.min(1, x))
+      end
+      P[k] = { adj(r), adj(g), adj(b), c[4] }
+    end
+  end
+end
 function ctx.apply_theme(name)
   local ok, fresh = pcall(dofile, DIR .. '/jf_tracker_ui.lua')
   if not ok or type(fresh) ~= 'table' then return false end
@@ -15836,6 +15890,7 @@ function ctx.apply_theme(name)
   if not draw.themes.valid(name) then name = 'reaper' end
   state.theme = name
   draw.themes.apply(U, name)
+  ctx.theme_tweak(U)   -- 27 окт: твик темы поверх любой (hue / saturation / brightness / contrast / shadows / accents)
   draw.init(U, model.peaks, MX)
   if draw.reset_colours then draw.reset_colours() end
   draw.set_font(state)                          -- сброс кэша картинок текста (цвета в ключе)
@@ -28765,6 +28820,8 @@ local function frame()
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
       elseif state.focus == 'map' then   -- 27 окт: панель map — j k h l Enter, t источник, v вид
+        -- 27 окт (2): командная строка, поиск и INSERT — vim (карта забирала буквы «:debug» и Esc)
+        if vim.mode == 'cmd' or vim.mode == 'search' or vim.mode == 'insert' then return vim.key(c) end
         if not B.map_key(c) then return vim.key(c) end
       elseif state.focus == 'nmod' then
         -- 12 окт: note mod — j k строка, a добавить, Enter кривая, r rate, l loop, d удалить
