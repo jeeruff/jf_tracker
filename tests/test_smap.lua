@@ -76,4 +76,15 @@ do
   eq('sig: same count', S.n, n)
   eq('sig: same hash', S.h, h)
 end
+-- 27 окт (9): этап 2 — анализ по пикам
+do
+  local pk = { n = 4, max = { 0.5, 0.5, 0.5, 0.5 }, min = { -0.5, -0.5, -0.5, -0.5 }, spec = { 1000, 1000, 1000, 1000 } }
+  local a = SM.an_from_peaks(pk)
+  eq('an: loudness 0..1', a.l > 0 and a.l <= 1, true)
+  eq('an: 1 kHz mid-bright', a.b > 0.4 and a.b < 0.7, true)
+  local hb = G.hubs[1]
+  SM.AN[hb.list[1].path] = { l = 0.5, b = 0.9 }
+  SM.an_resort(G, hb)
+  eq('an: bright goes outward (last)', hb.list[#hb.list].path == next(SM.AN) or #hb.list == 1, true)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

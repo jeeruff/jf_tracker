@@ -380,6 +380,37 @@ function B.map_enter(i)
   if B.map_src ~= 'files' then B.map_src = 'files' end
 end
 -- 27 окт (2): случайный сэмпл — найти то, до чего списком не дойдёшь: в секторе / группе под мышью, иначе из всех; сразу слушать
+-- 27 окт (9): этап 2 — анализ: очередь (что слушали + группа под мышью), по 2 файла за кадр, пики строятся в фоне
+local function an_file() return R.GetResourcePath() .. '/Data/jf_tracker_mapan.txt' end
+B.an_q, B.an_qs, B.an_t = {}, {}, 0
+function B.an_push(path) if path and not B.SM.AN[path] and not B.an_qs[path] then B.an_qs[path] = true; B.an_q[#B.an_q + 1] = path end end
+function B.an_tick(G)
+  if not B.an_loaded then B.an_loaded = true; pcall(B.SM.an_load, an_file()) end
+  local hb = B.map_hv and (B.map_hv.hub or (B.map_hv.node and B.map_hv.node.h))
+  if hb and hb ~= B.an_hub then
+    B.an_hub = hb
+    for i = 1, math.min(#hb.list, 400) do B.an_push(hb.list[i].path) end
+  end
+  local done = 0
+  local i = 1
+  while i <= #B.an_q and done < 2 and i <= 6 do
+    local pth = B.an_q[i]
+    local pk = ctx.file_peaks and ctx.file_peaks(pth, 32, 0, 1, true)
+    if pk then
+      local a = B.SM.an_from_peaks(pk)
+      if a then B.SM.AN[pth] = a; B.SM.an_dirty = true; B.SM.an_n = (B.SM.an_n or 0) + 1 end
+      table.remove(B.an_q, i); B.an_qs[pth] = nil; done = done + 1
+      local n = G and G.bypath and G.bypath[pth]
+      if n then n.h.an_new = (n.h.an_new or 0) + 1 end
+    else i = i + 1 end
+  end
+  local now = R.time_precise()
+  if now - B.an_t > 1.5 then   -- раз в 1.5 с: перестроить группы с новыми данными, сохранить
+    B.an_t = now
+    for _, h in ipairs((G and G.hubs) or {}) do if (h.an_new or 0) > 0 then h.an_new = 0; B.SM.an_resort(G, h) end end
+    B.SM.an_save(an_file())
+  end
+end
 -- 27 окт (8): типы файлов карты (по умолчанию — сэмплы)
 B.mapV.types = {}
 do
@@ -465,6 +496,7 @@ function B.hist_load()
 end
 function B.map_play(path, name, keep)
   if not path then return end
+  if B.an_push then B.an_push(path) end   -- 27 окт (9): сыгранное — в анализ
   B.map_step = B.map_step + 1
   local kept = false
   if keep then   -- 27 окт (8): ещё раз из истории — строка на месте (не прыгает наверх), только свежесть
@@ -821,6 +853,7 @@ map_draw_inner = function(U, L, x, y, w, h)
     end
     B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   end
+  if not G.building and B.SM.AN then B.an_tick(G) end   -- 27 окт (9): этап 2 — анализ по кусочку
   if G.bg and not G.building then   -- 27 окт (9): проверка — после чтения индекса
     if B.SM.sig_scan(G.bg, 0.002) then
       local S = G.bg

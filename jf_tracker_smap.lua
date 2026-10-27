@@ -164,6 +164,47 @@ function SM.read_tick(G, budget)
     if k % 256 == 0 and now() - t0 > budget then return false end
   end
 end
+-- 27 окт (9): ЭТАП 2 — грубый анализ звука (пики REAPER + спектральный слой 's', без внешних программ):
+-- l — громкость (средний пик 0..1), b — яркость (средняя частота спектра в лог-шкале 50 Гц..16 кГц, 0..1).
+-- SM.AN[path] = { l, b } — общий для всех папок, на диске Data/jf_tracker_mapan.txt; считаются файлы, которые
+-- слушали, и группа под мышью (не все 190 тыс. — пики строятся файлами на диск)
+SM.AN, SM.an_dirty = {}, false
+function SM.an_from_peaks(pk)
+  if not (pk and pk.n and pk.n > 0) then return nil end
+  local sl, sb, nb = 0, 0, 0
+  for i = 1, pk.n do
+    local a = math.max(math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0))
+    sl = sl + a
+    local sv = pk.spec and pk.spec[i]
+    if sv and sv > 0 and a > 0.01 then
+      local f = math.floor(sv) % 32768
+      if f > 20 then sb = sb + math.max(0, math.min(1, math.log(f / 50, 2) / math.log(16000 / 50, 2))); nb = nb + 1 end
+    end
+  end
+  return { l = math.min(1, sl / pk.n * 1.6), b = nb > 0 and sb / nb or 0.5 }
+end
+function SM.an_load(file)
+  local f = io.open(file, 'r'); if not f then return end
+  for line in f:lines() do
+    local pth, l, b = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)$')
+    if pth then SM.AN[pth] = { l = tonumber(l), b = tonumber(b) }; SM.an_n = (SM.an_n or 0) + 1 end
+  end
+  f:close()
+end
+function SM.an_save(file)
+  if not SM.an_dirty then return end
+  local f = io.open(file .. '.tmp', 'w'); if not f then return end
+  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\n') end
+  f:close(); os.remove(file); os.rename(file .. '.tmp', file)
+  SM.an_dirty = false
+end
+-- группа: после анализа — спираль по яркости (тёмные к центру, яркие наружу): похожие звуки рядом
+function SM.an_resort(G, hb)
+  local function key(n) local a = SM.AN[n.path]; return a and a.b or 2 end
+  table.sort(hb.list, function(p, q) return key(p) < key(q) end)
+  for k, n in ipairs(hb.list) do n.k = k; local a, rr = k * 2.39996, SM.U * math.sqrt(k + SM.K0); n.ox, n.oy = rr * math.cos(a), rr * math.sin(a) end
+  G.ver = G.ver + 1
+end
 -- 27 окт (9): лёгкая проверка изменений — обход дерева без узлов (только число и сумма путей): полный пересбор
 -- 190 тыс. файлов каждый запуск сорил сотнями КБ за кадр и давал пики (17 fps). → true, когда готово (G.sig_n, G.sig_h)
 function SM.sig_build(root, list_dir)
@@ -776,7 +817,9 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
         U.set(U.mix(c, U.TEXT, 0.25))
         for _, n in ipairs(hb.list) do
           local px, py = hx + n.ox * sc, hy + n.oy * sc
-          local r = n.r * rmax
+          local an = SM.AN[n.path]
+          -- этап 2: проанализирован — размер по громкости, dimension раздувает яркие (покрытие спектра)
+          local r = an and (0.3 + 0.7 * an.l) * (1 + (V.dim or 0.5) * 1.5 * an.b) * rmax * 0.7 or n.r * rmax
           if px >= -r and px < w + r and py >= -r and py < h + r then
             if r < 1.5 then gfx.rect(px, py, r < 0.9 and 1 or 2, r < 0.9 and 1 or 2, 1) else gfx.circle(px, py, r, 1, 1) end
           end
@@ -866,7 +909,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   end
   -- 27 окт: кнопка вида: graph / nebula (два положения) и счёт; текст — до ползунков
   do
-    local info = ('%d files, %d groups%s'):format(#G.nodes, #G.hubs, G.szi and ' - sizes...' or '')
+    local info = ('%d files, %d groups%s%s'):format(#G.nodes, #G.hubs, G.szi and ' - sizes...' or '', (SM.an_n or 0) > 0 and ('  ~%d heard' ):format(SM.an_n) or '')
     -- 27 окт (2): вид — три вкладки (не кнопка с тремя положениями); random — случайный сэмпл (сектор под мышью / все)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
