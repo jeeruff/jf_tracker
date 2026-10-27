@@ -87,4 +87,14 @@ do
   SM.an_resort(G, hb)
   eq('an: bright goes outward (last)', hb.list[#hb.list].path == next(SM.AN) or #hb.list == 1, true)
 end
+-- 27 окт (10): фигура Хладни — точки на узловых линиях
+do
+  local hb = G.hubs[1]
+  hb.chl = nil
+  local pts = SM.chladni(hb)
+  eq('chladni: has nodal points', #pts > 50, true)
+  local ok = true
+  for _, p in ipairs(pts) do if math.abs(p[1]) > 1 or math.abs(p[2]) > 1 then ok = false end end
+  eq('chladni: inside the plate', ok, true)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

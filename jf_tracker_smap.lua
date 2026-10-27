@@ -202,6 +202,7 @@ end
 function SM.an_resort(G, hb)
   local function key(n) local a = SM.AN[n.path]; return a and a.b or 2 end
   table.sort(hb.list, function(p, q) return key(p) < key(q) end)
+  hb.chl = nil   -- 27 окт (10): яркость поменялась — фигура Хладни заново (третья мода)
   for k, n in ipairs(hb.list) do n.k = k; local a, rr = k * 2.39996, SM.U * math.sqrt(k + SM.K0); n.ox, n.oy = rr * math.cos(a), rr * math.sin(a) end
   G.ver = G.ver + 1
 end
@@ -357,7 +358,58 @@ function SM.neb_layout(G, x, y, w, h, L)
   SM.cards_scroll = math.max(0, math.min(maxs, SM.cards_scroll or 0))
   return cols, rows, top - SM.cards_scroll, cw, ch, top
 end
+-- 27 окт (10): ФИГУРА ХЛАДНИ квадратной пластины: f(x,y) = Σ a_i · (cos(n_i πx) cos(m_i πy) − cos(m_i πx) cos(n_i πy)),
+-- x, y ∈ [-1, 1]; узловые линии f = 0 — там песок (точки). 2-3 моды: (n1, m1) — от имени, (n2, m2) — от числа файлов
+-- и разброса размеров, третья — от яркости (если группа проанализирована). Точки линии — пересечения знака на сетке 96×96
+function SM.chladni_modes(hb)
+  local sh = SM.card_shape(hb)
+  local hsh = sh.hsh
+  local n1 = 1 + hsh % 5; local m1 = n1 + 1 + (hsh // 5) % 3
+  local n2 = 1 + math.floor(math.log(1 + hb.n) / math.log(3)) % 6; local m2 = n2 + 2
+  local modes = { { n1, m1, 1 }, { n2, m2, 0.3 + sh.depth * 1.5 } }
+  local sb, nb = 0, 0
+  for i = 1, math.min(#hb.list, 200) do local a = SM.AN[hb.list[i].path]; if a then sb = sb + a.b; nb = nb + 1 end end
+  if nb > 0 then local n3 = 2 + math.floor(sb / nb * 6); modes[3] = { n3, n3 + 3, 0.5 } end
+  return modes
+end
+function SM.chladni(hb)
+  local modes = SM.chladni_modes(hb)
+  local N = 96
+  local pi = math.pi
+  local function f(x, y)
+    local v = 0
+    for _, m in ipairs(modes) do
+      v = v + m[3] * (math.cos(m[1] * pi * x) * math.cos(m[2] * pi * y) - math.cos(m[2] * pi * x) * math.cos(m[1] * pi * y))
+    end
+    return v
+  end
+  local row, prev = {}, nil
+  local pts = {}
+  for j = 0, N do
+    local y = -1 + 2 * j / N
+    row = {}
+    for i = 0, N do
+      local x = -1 + 2 * i / N
+      local v = f(x, y)
+      row[i] = v
+      if (i > 0 and (row[i - 1] < 0) ~= (v < 0)) or (prev and (prev[i] < 0) ~= (v < 0)) then pts[#pts + 1] = { x, y } end
+    end
+    prev = row
+  end
+  -- порядок обхода — вперемешку (детерминированно), чтобы малая группа покрывала всю фигуру, а не угол
+  local step = 7919 % math.max(1, #pts)
+  if step == 0 then step = 1 end
+  local out, used, j = {}, {}, 1
+  for _ = 1, #pts do
+    while used[j] do j = j % #pts + 1 end
+    used[j] = true; out[#out + 1] = pts[j]
+    j = (j + step - 1) % #pts + 1
+  end
+  hb.chl = out
+  return out
+end
 function SM.card_shape(hb)
+  if hb.shape then return hb.shape end
   local hsh = 0
   for i = 1, #hb.name do hsh = (hsh * 31 + hb.name:byte(i)) % 1000003 end
   local mn, mxs, subs = math.huge, 0, {}
@@ -370,7 +422,7 @@ function SM.card_shape(hb)
   local var = (mxs > 0 and mn < math.huge) and math.min(1, math.log(1 + mxs / math.max(1, mn)) / 6) or 0.3
   local el = math.min(0.45, math.log(1 + hb.n) / 25)
   local rot = (ns * 0.7 + (hsh % 7) * 0.45)
-  hb.shape = { lobes = 2 + hsh % 5, depth = 0.08 + 0.32 * var, phase = (hsh % 628) / 100,
+  hb.shape = { hsh = hsh, lobes = 2 + hsh % 5, depth = 0.08 + 0.32 * var, phase = (hsh % 628) / 100,
                ax = 1 + el, ay = 1 - el * 0.8, c = math.cos(rot), s = math.sin(rot) }
   return hb.shape
 end
@@ -383,14 +435,18 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     local hb = n.h
     local i = hb.cell - 1
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
-    local rr = math.sqrt((n.k - 0.5) / hb.n) * spread
-    local a = n.k * 2.39996
-    -- 27 окт (9): у каждой карточки своя форма по содержимому: лепестки — от имени, их глубина — от разброса
-    -- размеров файлов, вытянутость — от числа файлов (облако), поворот — от подпапок
-    local S = hb.shape or SM.card_shape(hb)
-    local edge = 1 + S.depth * math.sin(S.lobes * a + S.phase)
-    local qx, qy = rr * edge * math.cos(a) * S.ax, rr * edge * math.sin(a) * S.ay
-    qx, qy = qx * S.c - qy * S.s, qx * S.s + qy * S.c
+    -- 27 окт (10): фигура Хладни — точки на узловых линиях пластины (SM.chladni), моды — из содержимого группы
+    local pts = hb.chl or SM.chladni(hb)
+    local np = #pts
+    local qx, qy
+    if np > 0 then
+      local j = (hb.n <= np) and (math.floor((n.k - 1) * np / hb.n) + 1) or ((n.k - 1) % np + 1)
+      local pt = pts[j]
+      qx, qy = pt[1] * spread, pt[2] * spread   -- больше файлов, чем точек линии, — на тех же точках (линии остаются линиями)
+    else
+      local rr, a = math.sqrt((n.k - 0.5) / hb.n) * spread, n.k * 2.39996
+      qx, qy = rr * math.cos(a), rr * math.sin(a)
+    end
     return qx0 + cw / 2 + qx * (cw / 2 - 10), qy0 + ch / 2 + 6 + qy * (ch / 2 - 18)
   end
   -- точки — в буфер, пока вид тот же
@@ -398,9 +454,11 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     for _, hb in ipairs(G.hubs) do
       local c = col(hb)
       U.set(U.mix(c, U.TEXT, 0.15), 0.85)
+      -- 27 окт (10): точки не толще шага сетки фигуры — иначе узловые линии сливаются в сплошной прямоугольник
+      local rcap = math.max(1, cw / 220)
       for _, n in ipairs(hb.list) do
         local px, py = pos(n)
-        local r = n.r * rmax
+        local r = math.min(n.r * rmax, rcap)
         if r < 1.5 then gfx.rect(px - ox, py - oy, 2, 2, 1) else gfx.circle(px - ox, py - oy, r, 1, 1) end
       end
     end
