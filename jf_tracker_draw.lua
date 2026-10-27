@@ -5793,7 +5793,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
   if mode == 'MAIN' then mode = 'VIPER' end   -- 22 окт: MAIN → VIPER mode
-  local reap0 = mode:match('^REAPER') ~= nil                -- 16 окт: до обрезки по месту (REAP… тоже REAPER)
+  local reap0 = D.reap_glitch and mode:match('^REAPER') ~= nil   -- 16 окт: до обрезки по месту (REAP… тоже REAPER); 27 окт: полосатый — только с reaper glitch, иначе шрифтом режима
   -- 15 окт: цвет режима (D.MODE_COL), как у рамки поля; модуль в фокусе (LIB, UNDO…) — янтарный
   local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal', KEYS = 'normal' }
   local mk = MK[mode:match('^[%u%-]+') or '']

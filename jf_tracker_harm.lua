@@ -333,7 +333,7 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
       if HM.show_tab and qx + U.measure('e 10') + 4 * L.pad <= x + w and 6 * rh <= y + h - py - rh then qx = qx + HM.tab(L, qx, py + rh, show) + 2 * L.cw end
       HM.chord_column(L, qx, py, x + w - qx, y + h - py, info)
     else
-      U.text(px, py, fit('hover a chord, or put the cursor on one', x + w - px), U.DIM)
+      U.text(px, py, fit('select notes, or a row with several notes', x + w - px), U.DIM)
       HM.chord_column(L, px, py + rh, x + w - px, y + h - py - rh, info)
     end
   end

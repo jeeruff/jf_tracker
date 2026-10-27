@@ -11507,8 +11507,21 @@ ctx = {
     local col = cur_col()
     local inf = { col_name = col and col.name, lane = col and state.folds[col.guid] == 'chord', list = {}, keymark = state.keymark, keysnap = state.keysnap }
     if not col then return inf end
-    local _, here = ctx.chord_heads(col, vim.cur.row)
-    inf.here = #here > 0 and MMX.CH.name(here) or nil
+    -- 27 окт: аккорд — только из нескольких разных нот: выделение (v / V), строка курсора по всем трекам или
+    -- трек-лейн аккордов; одна нота аккордом не считается
+    local function chord_of(ps)
+      local pcs, n = {}, 0
+      for _, p in ipairs(ps) do if not pcs[p % 12] then pcs[p % 12] = true; n = n + 1 end end
+      return n >= 2 and MMX.CH.name(ps) or nil
+    end
+    local function pitches_of(hs) local o = {}; for _, c in ipairs(hs) do if c.kind == 'midi' and c.pitch then o[#o + 1] = c.pitch end end; return o end
+    local here
+    if vim.mode == 'visual' or vim.mode == 'vline' then
+      local f0, f1, r0, r1 = vim.visual_range(); here = pitches_of(vim.heads_in(f0, f1, r0, r1))
+    elseif inf.lane then here = select(2, ctx.chord_heads(col, vim.cur.row))
+    else here = pitches_of(vim.heads_in(1, #L.flat, vim.cur.row, vim.cur.row)) end
+    inf.here = chord_of(here)
+    if not inf.lane then return inf end   -- список аккордов строк — только у трека-лейна аккордов
     local rows = {}
     for _, lane in ipairs(col.lanes or {}) do
       for _, sub in ipairs(lane.subs or {}) do
@@ -11524,7 +11537,8 @@ ctx = {
     for i, r in ipairs(list) do
       if i > 48 then break end
       local _, ps = ctx.chord_heads(col, r)
-      inf.list[#inf.list + 1] = { row = r, name = MMX.CH.name(ps) or '?', cur = r == vim.cur.row }
+      local nm = chord_of(ps)
+      if nm then inf.list[#inf.list + 1] = { row = r, name = nm, cur = r == vim.cur.row } end
     end
     return inf
   end,
@@ -12860,7 +12874,7 @@ ctx = {
       flag('tlrp', 'tracks: tcp / mcp', 'the tracks module shows the REAPER columns tcp / mcp (track visible in the arrange view / the mixer)'),
       flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
-      { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines - impossible to miss that the keys go elsewhere', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
+      { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines, the mode word REAPER is torn white-on-black - impossible to miss that the keys go elsewhere. Off - REAPER is written in the mode font like NORMAL', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
       { key = 'ptmode', label = 'pt-mode', kind = 'toggle', desc = 'ProTracker view: 4 channels, scopes on top, only notes / sample / volume / one command, LPB 4, big bitmap font; the matrix, lib, browser and DSP hidden. Off - the layout comes back as it was (also :pt, :pt new makes CH1..CH4)', get = function() return state.ptmode and true or false end, set = function(v) if (v and true or false) ~= (state.ptmode and true or false) then ctx.pt_toggle() end end },   -- 26 окт: PT-mode — и в опциях / быстрых
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
@@ -20770,7 +20784,7 @@ local function frame()
     end
     ctx.mix_vis_prev = PNm.visible(state.panes, 'mixer') and state.mixer
   end
-  draw.round_rack = state.roundrack or nil   -- 26 окт: опция rounded racks
+  draw.round_rack = state.roundrack or nil; draw.reap_glitch = state.glitch or nil   -- 26 окт: опция rounded racks
   if model.OFF_END ~= (state.offend or false) then model.OFF_END, edit.OFF_END = state.offend or false, state.offend or false; model.invalidate() end   -- OFF в конце строки (опция, 8 окт)
   if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
   theme_check()
