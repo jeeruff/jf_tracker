@@ -347,9 +347,9 @@ function B.map_cache_file(root)
   R.RecursiveCreateDirectory(dir, 0)
   return dir .. '/' .. root:gsub('[^%w%-_.]', '_') .. '.txt'
 end
--- 27 окт (3): у панели map своя папка (B.map_path), браузер её не двигает и она не двигает браузер
+-- 27 окт (4): карта показывает папку, открытую в браузере (пользователь); мини-lf карты ходит по ней же
 B.map_dcur = 1
-function B.mp() if not B.map_path then B.map_path = B.path end; return B.map_path end
+function B.mp() return B.path end
 function B.map_dirs()
   local out = {}
   local mp = B.mp()
@@ -359,9 +359,13 @@ function B.map_dirs()
 end
 function B.map_cd(path)
   if not path or path == '' or path == B.mp() then return end
-  B.zadd(B.zload(), path, os.time()); B.zsave()
-  local from = B.map_path
-  B.map_path = path
+  local from = B.path
+  if B.mode == 'files' then B.go(path)          -- история, zoxide, список браузера
+  else   -- браузер на другой вкладке (db, pm …) — её список не трогаем, только папка
+    B.zadd(B.zload(), path, os.time()); B.zsave()
+    B.back[#B.back + 1] = B.path; B.fwd = {}
+    B.path = path
+  end
   B.map_dcur = 1
   for i, e in ipairs(B.map_dirs()) do if (path .. '/' .. e.name) == from then B.map_dcur = i end end   -- выше — курсор на папке, откуда пришли
   B.mapG = nil
@@ -435,6 +439,53 @@ function B.map_pane(U, L, x, y, w, h)
   local hv = B.map_draw_fn(U, L, x + 1, top, w - 2, y + h - top - 1)
   return hover or hv
 end
+-- 27 окт (4): отмеченные файлы — корабль (как в FTL) справа снизу карты: точки внутри — отмеченные; клик — слушать
+function B.map_ship(U, L, x, y, w, h)
+  local list = B.sel_order or {}
+  local cw = L.cw
+  local sw, sh = math.min(w - 8, cw * 22), math.min(h - 8, L.rh * 5)
+  if sw < cw * 10 or sh < L.rh * 3 then return nil end
+  local sx, sy = x + w - sw - 6, y + h - sh - 6
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  -- корпус: капсула с носом справа, двигатели слева, рубка сверху
+  local hx0, hx1 = sx + cw * 2, sx + sw - cw * 3
+  local hy0, hy1 = sy + L.rh, sy + sh - L.rh * 0.6
+  U.set(U.PANEL); gfx.rect(hx0, hy0, hx1 - hx0, hy1 - hy0, 1)
+  U.set(U.mix(U.LINE, U.TEXT, 0.35))
+  gfx.rect(hx0, hy0, hx1 - hx0, 2, 1); gfx.rect(hx0, hy1 - 2, hx1 - hx0, 2, 1); gfx.rect(hx0, hy0, 2, hy1 - hy0, 1)
+  local my0 = math.floor((hy0 + hy1) / 2)
+  gfx.line(hx1, hy0, sx + sw - 1, my0); gfx.line(hx1, hy1 - 1, sx + sw - 1, my0)   -- нос
+  gfx.line(hx1, hy0 + 1, sx + sw - 2, my0); gfx.line(hx1, hy1 - 2, sx + sw - 2, my0)
+  for k = 0, 1 do   -- двигатели
+    local ey = hy0 + 3 + k * math.floor((hy1 - hy0) / 2)
+    gfx.rect(sx, ey, cw * 2, math.floor((hy1 - hy0) / 2) - 6, 0)
+    U.set(U.AMBER); gfx.rect(sx - 3, ey + 2, 3, math.max(2, math.floor((hy1 - hy0) / 2) - 10), 1); U.set(U.mix(U.LINE, U.TEXT, 0.35))
+  end
+  gfx.rect(hx0 + cw * 4, sy + 2, cw * 6, L.rh - 2, 0)   -- рубка
+  U.text(hx0 + cw * 4 + 3, sy + 2, ctx.fit(('%d marked'):format(#list), cw * 6 - 4), #list > 0 and U.AMBER or U.GREY)
+  -- отсеки: точки — отмеченные файлы (сеткой внутри корпуса), лишние — «+N»
+  local ix0, iy0, iw, ih = hx0 + 6, hy0 + 6, hx1 - hx0 - 10, hy1 - hy0 - 12
+  local step = 9
+  local cols = math.max(1, math.floor(iw / step))
+  local rows = math.max(1, math.floor(ih / step))
+  local cap = cols * rows
+  local hv
+  local playing
+  if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end
+  for i, o in ipairs(list) do
+    if i > cap then
+      U.text(hx1 - cw * 4, hy1 - L.rh - 2, ('+%d'):format(#list - cap + 1), U.GREY)
+      break
+    end
+    local c, r = (i - 1) % cols, (i - 1) // cols
+    local px, py = ix0 + c * step + 3, iy0 + r * step + 3
+    local hot = mx >= px - 4 and mx < px + 5 and my >= py - 4 and my < py + 5
+    U.set((playing == o.full) and U.AMBER or (hot and U.TEXT or U.CYAN)); gfx.circle(px, py, 2.5, 1, 1)
+    if hot then hv = 'mapship' .. i end
+  end
+  if #list == 0 then U.text(ix0, iy0, ctx.fit('m in the browser marks files', iw), U.DIM) end
+  return hv
+end
 local map_draw_inner
 local function map_draw(U, L, x, y, w, h)
   if not B.SM then return nil end
@@ -446,9 +497,11 @@ local function map_draw(U, L, x, y, w, h)
     local hv0 = draw_col(U, L, dirs, x, y + 1, dw - 2, h - 2, dirs[B.map_dcur] and dirs[B.map_dcur].name, 'mapdir', gfx.mouse_x, gfx.mouse_y)
     U.set(U.LINE); gfx.rect(x + dw - 1, y, 1, h, 1)
     x, w = x + dw, w - dw
-    if hv0 then map_draw_inner(U, L, x, y, w, h); return hv0 end
+    if hv0 then map_draw_inner(U, L, x, y, w, h); B.map_ship(U, L, x, y, w, h); return hv0 end
   end
-  return map_draw_inner(U, L, x, y, w, h)
+  local hv = map_draw_inner(U, L, x, y, w, h)
+  local sh = B.map_ship(U, L, x, y, w, h)
+  return sh or hv
 end
 B.map_draw_fn = map_draw
 map_draw_inner = function(U, L, x, y, w, h)
@@ -1047,6 +1100,9 @@ function B.click(what)
   elseif what == 'mapstyle' then B.mapV.style = (B.map_hv and B.map_hv.style) or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view  (v - next view, r - a random sample)') end
   elseif what == 'maprandom' then B.map_random()
   elseif what:match('^mapdir%d+$') then B.map_dcur = tonumber(what:sub(7)); B.map_enter()
+  elseif what:match('^mapship%d+$') then   -- 27 окт (4): отмеченный файл в корабле — слушать
+    local o = (B.sel_order or {})[tonumber(what:sub(8))]
+    if o and o.full then B.pl = nil; ctx.preview_file(o.full); if ctx.msg then ctx.msg('marked: ' .. (o.e and o.e.name or o.full) .. '  (Space in the browser - all of them in a row)') end end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
     B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
