@@ -908,6 +908,22 @@ function D.layout(snap, state, nregions)
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
     local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini' or fs == 'chord', chord = fs == 'chord', compact = fs == true, hidden = hidden }
+    -- 27 окт (2): «~» — только автоматизация, которой сейчас не видно колонкой (огибающие / MIDI-лейны этого трека)
+    if L.envmark and col.env_rows then
+      local seen = {}
+      local se = state.trackenvs and state.trackenvs[col.guid]
+      if se == nil then se = state.envs end
+      if c.compact then se = true end
+      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then se = false end   -- уровни ширины: огибающие — только у широкого
+      if state.ptmode then se = false end
+      if se then for _, e in ipairs(col.envs or {}) do seen['e:' .. (e.name or '')] = true end end
+      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode then
+        for _, ml in ipairs(col.mlanes or {}) do seen['m:' .. tostring(ml.key)] = true end
+      end
+      local rows, any = {}, false
+      for _, m in ipairs(col.env_rows) do if not seen[m.key] then for r in pairs(m.rows) do rows[r] = true; any = true end end end
+      c.marks = any and rows or nil
+    end
     local lx = (c.x or 0) + 1
     if c.folded then
       local fw = c.chord and L.chord_w or L.fold_w    -- 8 окт: лейн аккордов — шире полоски
@@ -937,7 +953,7 @@ function D.layout(snap, state, nregions)
           end
           do   -- 27 окт: «+» / «~» перед нотой
             local fo = L.fold_on and lane.has_fold
-            local em = L.envmark and li == 1 and si == 1 and col.env_rows
+            local em = L.envmark and li == 1 and si == 1 and c.marks
             if not narrow and (fo or em) then G = L.foldG(G, fo and em) end
           end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
@@ -4347,6 +4363,12 @@ function D.pool_rows(pool, sort, col, cols)
   D.lib_folder_of = {}
   if D.lib_folders_on then rows = lib_folders(rows, pool) end
   for _, r in ipairs(rows) do if r.folder then for _, i in ipairs(r.members or {}) do D.lib_folder_of[i] = r.folder end end end
+  -- 27 окт: остановки курсора в порядке строк на экране: сэмплы и заголовки папок (j k встают и на имя папки)
+  D.lib_nav = {}
+  for _, r in ipairs(rows) do
+    if r.folder then D.lib_nav[#D.lib_nav + 1] = { folder = r.folder }
+    elseif r.i and not r.sub then D.lib_nav[#D.lib_nav + 1] = { i = r.i } end
+  end
   local seps = D.lib_seps
   if seps and next(seps) then
     local out = {}
@@ -6166,6 +6188,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
         local here = false
         if D.LIBF and D.LIBF[row.folder] then for _, i in ipairs(row.members or {}) do if i == inst then here = true end end end
+        if D.lib_hdr == row.folder then here = true end   -- 27 окт: курсор на самом имени папки (j k)
         if here then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1); hcol = U.AMBER
         elseif hot then set(U.tint(U.AMBER, 0.15)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
         if hot then hover.libdirh = row.folder end
@@ -6284,8 +6307,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 10 окт: « /N» нарезанного всегда видно — режется имя, а не число слайсов; (muted) — не у lib
       local nkids = child and 0 or (#(e.layers or {}) + #(e.slices or {}))   -- 19 окт: папка (как lf): + закрыта, - открыта
       -- 26 окт: число слайсов — сразу после + / - («01+ 16$ amenbro»), не в конце строки
-      local pre = ('%02d%s '):format(e.num or i, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or '     ')
-      if nkids > 0 and mx >= ix + 6 + ms('00') and mx < ix + 6 + ms('00+') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
+      -- 27 окт: отмечен (m) — «*» между номером и именем, как в lf
+      local mk = (D.lib_marks and D.lib_marks[i]) and '*' or ' '
+      local pre = ('%02d%s%s '):format(e.num or i, mk, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or '     ')
+      if nkids > 0 and mx >= ix + 6 + ms('00 ') and mx < ix + 6 + ms('00 +') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
       local suf = ''   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
@@ -6692,6 +6717,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         end
       elseif id == 'tracks' then
         D.track_list(L, state, snap, info, hover, ct.x + 1, ct.y + 2, ct.w - 2, ct.h - 4, foc == 'tracks')   -- 11 окт: Track Manager
+      elseif id == 'map' and info.map_draw then
+        hover.browser = info.map_draw(L, ct.x, ct.y, ct.w, ct.h)          -- 27 окт: карта сэмплов — своя панель
       elseif id == 'pm' and info.pm_draw then
         hover.browser = info.pm_draw(L, ct.x, ct.y, ct.w, ct.h)          -- 9 окт: проекты — своя панель
       elseif id == 'browser' and info.browser_draw then
@@ -8710,7 +8737,7 @@ function D.frame(L, snap, rows, state, info)
               -- 27 окт: в строке есть автоматизация трека — «~» в колонке слева от ноты (сложенные ноты «+» важнее)
               -- «+» уже нарисован: «~» рядом (колонка в два знака) или под ним (высокая строка); без «+» — на его месте
               local G2 = f.G or L
-              if f.si == 1 and f.li == 1 and G2.x_fold and c.col.env_rows and c.col.env_rows[r.row] then
+              if f.si == 1 and f.li == 1 and G2.x_fold and c.marks and c.marks[r.row] then
                 if not (cell and cell.fold) then text(x + G2.x_fold, ty, '~', D.ENVMARK or U.AMBER)
                 elseif G2.fold_wide then text(x + G2.x_fold + ms('+'), ty, '~', D.ENVMARK or U.AMBER)
                 elseif L.fold2_tall then text(x + G2.x_fold, ty + L.th, '~', D.ENVMARK or U.AMBER) end

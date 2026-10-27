@@ -428,6 +428,7 @@ state.panes = (function()
     if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
     if reaper.GetExtState(EXT, 'clip_tab') ~= '1' then draw.panes.keep_in(m, 'clipboard', 'inst'); reaper.SetExtState(EXT, 'clip_tab', '1', true) end   -- 13 окт: clipboard — вкладкой у lib
     if reaper.GetExtState(EXT, 'ut_tab2') ~= '1' and draw.panes.keep_in(m, 'undotree', 'browser') then reaper.SetExtState(EXT, 'ut_tab2', '1', true) end   -- 15 окт: undo — вкладкой у браузера (один раз; браузер спрятан — когда появится)
+    if reaper.GetExtState(EXT, 'map_tab') ~= '1' and draw.panes.keep_in(m, 'map', 'browser') then reaper.SetExtState(EXT, 'map_tab', '1', true) end   -- 27 окт: map — вкладкой у браузера (один раз)
     if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
     if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
     -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
@@ -12777,7 +12778,9 @@ ctx = {
   end,
   -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
   -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
-  inst_select = function(n) pool_select(n) end,
+  inst_select = function(n) draw.lib_hdr = nil; pool_select(n) end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
+  lib_nav = function() return draw.lib_nav end,
+  lib_hdr = function(name) if name ~= nil then draw.lib_hdr = name or nil end; return draw.lib_hdr end,
   inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
   inst_preview = function(...) return PV.inst_preview(...) end,
   -- нота с удержанием (3 окт, Cmd+нота в INSERT / слое пианино): звук сразу,
@@ -15342,7 +15345,7 @@ ctx.inner_tab_cycle = function(dir)
   end
   local f = state.focus
   if f == 'browser' and B.mode ~= 'fx' then
-    local L0 = B.pmpane and { 'files', 'recent', 'map', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'map', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent, map
+    local L0 = B.pmpane and { 'files', 'recent', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent (map — своя панель)
     local m = nxt(L0, B.mode)
     B.click(m); vim.msg = 'browser: ' .. m .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
@@ -22478,6 +22481,7 @@ local function frame()
     nmod_draw = function(Lx, x, y, w, h) ctx.NMUI.draw(Lx, x, y, w, h, ctx.nmod_list(), state.focus == 'nmod') end,   -- 12 окт
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
+    map_draw = function(Lx, x, y, w, h) return B.map_pane(U, Lx, x, y, w, h) end,   -- 27 окт: карта сэмплов — своя панель
     pm_draw = state.panes_ui and function(Lx, x, y, w, h)
       -- 15 окт: браузера на экране нет — модуль сразу у pm (без щелчка по заглушке)
       if B.mode ~= 'pm' and state.panes and not draw.panes.visible(state.panes, 'browser') then B.mode = 'pm' end
@@ -28516,6 +28520,8 @@ local function frame()
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         if not B.key(c) then return vim.key(c) end
+      elseif state.focus == 'map' then   -- 27 окт: панель map — j k h l Enter, t источник, v вид
+        if not B.map_key(c) then return vim.key(c) end
       elseif state.focus == 'nmod' then
         -- 12 окт: note mod — j k строка, a добавить, Enter кривая, r rate, l loop, d удалить
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end

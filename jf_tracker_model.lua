@@ -211,10 +211,14 @@ M.FOLD = false
 -- 27 окт: опция envmark — строки, где у трека есть автоматизация (точка любой огибающей или automation item): «~» слева от ноты
 M.ENVMARK = false
 M.ENVMARK_MAX = 20000   -- точек на огибающую не больше (большие проекты)
+-- 27 окт (2): по источникам — { { key = 'e:<имя огибающей>' | 'm:<ключ лейна>', rows = { [row] = true } } }: вид метит
+-- только то, чего сейчас не видно колонкой
 function M.env_rows(tr, lpb)
-  local rows, any = {}, false
+  local out = {}
   for i = 0, R.CountTrackEnvelopes(tr) - 1 do
     local env = R.GetTrackEnvelope(tr, i)
+    local _, name = R.GetEnvelopeName(env, '')
+    local rows, any = {}, false
     for k = 0, math.min(R.CountEnvelopePoints(env), M.ENVMARK_MAX) - 1 do
       local _, t = R.GetEnvelopePoint(env, k)
       rows[M.row_of_qn(R.TimeMap2_timeToQN(0, t), lpb)] = true; any = true
@@ -227,8 +231,9 @@ function M.env_rows(tr, lpb)
       for r = r0, r1 do rows[r] = true end
       any = true
     end
+    if any then out[#out + 1] = { key = 'e:' .. (name or ''), rows = rows } end
   end
-  return any and rows or nil
+  return #out > 0 and out or nil
 end
 -- 20 окт: take FX у ноты — значок fx рядом с нотой; лейн с такими нотами получает под него место (lane.has_tfx)
 M.tfx_memo = {}
@@ -757,7 +762,12 @@ function M.build(lpb)
       col.mlanes = M.track_midilanes(tr, lpb, col.guid)   -- MIDI-лейны: CC / PC / артикуляции / SysEx (6 окт)
       if M.ENVMARK then   -- 27 окт (2): CC / pitch bend в MIDI-лейнах — тоже автоматизация
         for _, ml in ipairs(col.mlanes or {}) do
-          if ml.kind ~= 'tx' then for r in pairs(ml.ev or {}) do if type(r) == 'number' then col.env_rows = col.env_rows or {}; col.env_rows[r] = true end end end   -- текст / нотация — не автоматизация
+          if ml.kind ~= 'tx' and next(ml.ev or {}) then   -- текст / нотация — не автоматизация
+            local rows = {}
+            for r in pairs(ml.ev) do if type(r) == 'number' then rows[r] = true end end
+            col.env_rows = col.env_rows or {}
+            col.env_rows[#col.env_rows + 1] = { key = 'm:' .. tostring(ml.key), rows = rows }
+          end
         end
       end
       local t1 = R.time_precise()

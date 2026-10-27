@@ -29,6 +29,7 @@ PN.PANELS = {
   { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт вечер: снова своя панель — кубики + chain (из матрицы убраны)   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
+  { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
   { id = 'slices',     label = 'slices',     key = 's', hint = 'inst',    side = 'top', avail = 'merged' },   -- 19 окт: слайсы (и слои) — папкой в lib (как lf); панель выключена — вернуть: avail = 'slices_on'

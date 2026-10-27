@@ -3528,6 +3528,9 @@ function V.hydra_fix(h)
 end
 function V.open_hydra(h)
   V.hydra = V.hydra_fix(h); V.hydra_stack = {}
+  -- 27 окт: открыто щелчком (кнопка мыши нажата) и место не задано — меню у мыши, не у курсора трекера
+  local st = ctx.state
+  if st and not st.popup_at and gfx and (gfx.mouse_cap or 0) & 3 ~= 0 then st.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
 end
 
 function V.hydra_key(c)

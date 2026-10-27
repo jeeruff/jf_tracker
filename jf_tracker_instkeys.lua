@@ -57,8 +57,28 @@ local function marked_desc()
   table.sort(l, function(a, b) return a > b end)
   return l
 end
+-- 27 окт: курсор на имени папки lib (IK.hdr): j k по строкам экрана встают и на заголовок; h / l / Enter — свернуть / открыть
+local function nav_step(cur, d)
+  local nav = ctx.lib_nav and ctx.lib_nav()
+  if not nav or #nav == 0 then return nil end
+  local hdr = ctx.lib_hdr and ctx.lib_hdr()
+  local p
+  for k, s in ipairs(nav) do if (hdr and s.folder == hdr) or (not hdr and s.i == cur) then p = k; break end end
+  if not p then return nil end
+  local s = nav[p + d]
+  if not s then return false end
+  if s.folder then
+    ctx.lib_hdr(s.folder)
+    ctx.msg(('folder %s: l - open, h - fold, Enter - toggle'):format(s.folder))
+  else ctx.inst_select(s.i) end
+  return true
+end
 function IK.key(c, cur, n, nslots, ninst)
   local ch = c < 256 and string.char(c) or ''
+  local hdr = ctx.lib_hdr and ctx.lib_hdr()
+  if hdr and (ch == 'h' or c == LEFT) then ctx.lib_fold(hdr, true); return true end
+  if hdr and (ch == 'l' or c == RIGHT) then ctx.lib_fold(hdr, false); return true end
+  if hdr and c == 13 then ctx.lib_fold(hdr); return true end
   if IK.pending then
     local op = IK.pending
     IK.pending = nil
@@ -115,6 +135,8 @@ function IK.key(c, cur, n, nslots, ninst)
   end
   if ch == 'd' or ch == 'y' then IK.pending = ch; ctx.msg(ch .. '...'); return true end
   if (ch == 'j' or c == DOWN) and cur >= nslots and ctx.auto_select then ctx.auto_select()
+  elseif (ch == 'j' or c == DOWN) and nav_step(cur, 1) == true then   -- 27 окт: по строкам экрана, с именами папок
+  elseif (ch == 'k' or c == UP) and nav_step(cur, -1) == true then
   elseif ch == 'j' or c == DOWN then   -- 27 окт: свёрнутые папки — мимо
     local i = cur + 1
     while i < nslots and ctx.lib_hidden and ctx.lib_hidden(i) do i = i + 1 end
@@ -135,7 +157,7 @@ function IK.key(c, cur, n, nslots, ninst)
   elseif ch == ' ' then ctx.inst_listen()
   elseif ch == 'a' then ctx.inst_listen_toggle()
   elseif ch == '/' then ctx.inst_find()
-  elseif (ch == 'h' or c == LEFT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(cur)) then ctx.lib_fold(ctx.lib_folder_cur(), true)   -- 27 окт: в папке — свернуть
+  elseif (ch == 'h' or c == LEFT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(cur)) then local fo = ctx.lib_folder_cur(); ctx.lib_fold(fo, true); if ctx.lib_hdr then ctx.lib_hdr(fo) end   -- 27 окт: в папке — свернуть, курсор на её имя
   elseif (ch == 'l' or c == RIGHT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and ctx.lib_hidden and ctx.lib_hidden(cur) then ctx.lib_fold(ctx.lib_folder_cur(), false)   -- развернуть
   elseif ch == 'h' or c == LEFT then ctx.inst_track(-1)
   elseif ch == 'l' or c == RIGHT then ctx.inst_track(1)
