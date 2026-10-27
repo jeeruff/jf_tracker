@@ -112,6 +112,11 @@ Parts of jf_tracker are based on his [Paketti](https://github.com/esaruoho/paket
 for Renoise and are used with his permission. Support his work:
 <https://www.patreon.com/esaruoho>.
 
+The first tracker inside REAPER was [Hackey-Trackey](https://github.com/JoepVanlier/Hackey-Trackey)
+by Joep Vanlier (MIT) - it showed that a tracker can live on REAPER's own timeline. jf_tracker
+follows that idea with its own code; the user key file (`jf_tracker_keys.lua`) works like its
+`userkeys.lua`.
+
 Also thanks to my brother **beast**, who showed me trackers and the demoscene in the first place.
 
 The Orca field is an own implementation of [Orca](https://github.com/hundredrabbits/Orca)
