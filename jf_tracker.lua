@@ -11024,7 +11024,7 @@ ctx = {
     out[#out + 1] = { key = 'mod_slixer_ovbelow', label = 'scroll under the sample', kind = 'toggle', desc = 'DSP, slixer: the overview strip (the scroll of the zoomed wave) under the sample instead of over it',
       get = function() return state.slx_ovbelow == true end, set = function(v) state.slx_ovbelow = v or nil; reaper.SetExtState(EXT, 'mod_slixer_ovbelow', v and '1' or '0', true) end }
     out[#out + 1] = { sep = true, title = 'map', group = 'modules' }
-    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula' },
+    out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula', 'sand' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
       get = function() return B.mapV.style or 'graph' end, set = function(v) B.mapV.style = v; B.mapV.sys = nil; reaper.SetExtState(EXT, 'mapstyle', v, true) end }
     out[#out + 1] = { key = 'mod_map_ship', label = 'marked as a ship', kind = 'toggle', desc = 'the marked files also as a little FTL-style ship in the corner of the map (a room per class); off - only the marked list on the right',
@@ -14281,6 +14281,7 @@ ctx = {
     model.invalidate()
     vim.msg = ('print: %d file(s) %s'):format(#files, mode == 'tracks' and 'on new tracks' or (mode == 'seq' and 'one after another' or 'at once') .. ' on ' .. (col.name or 'the track'))
   end,
+  file_len_of = function(path) return model.file_len(path) end,   -- 27 окт: длина файла (карта, вид sand)
   files_to_folder = function(files)
     files = files or {}
     if #files == 0 then vim.msg = 'lib folder: no files'; return end
@@ -15238,6 +15239,17 @@ ctx = {
         } } end },
       { key = 'd', label = (((state.panes_ui and L and L.pn) and draw.panes.visible(state.panes, 'dsp')) or (not (state.panes_ui and L and L.pn) and state.dsp)) and 'hide DSP (:dsp)' or 'show DSP (:dsp)', fn = function() ctrl_action('q_dsp', 0) end },   -- панели: лист DSP
       { key = 'o', label = 'options (quick toggles)', sub = function() return ctx.options_hydra() end },
+      -- 27 окт: S — скринсеты: загрузить (цифры / буквы), сохранить текущий вид
+      { key = 'S', label = 'screensets …', sub = function()
+          local sets, order = ctx.ss_read()
+          local items = {}
+          local keysq = '1234567890abcdefghijklmnopqrtuvwxyz'
+          for i, nm in ipairs(order) do
+            if i <= #keysq then items[#items + 1] = { key = keysq:sub(i, i), label = 'load ' .. nm, fn = function() ctx.ss_load(nm) end } end
+          end
+          items[#items + 1] = { key = 's', label = 'save the current view as …', fn = function() vim.open_prompt('ssave ', '') end }
+          return { title = 'screensets', items = items }
+        end },
       -- \P — проект (2 окт): s сохранить (как :w), S сохранить как…
       { key = ':', label = 'command line', fn = function() vim.mode = 'cmd'; vim.cmdline = '' end },
       { key = '/', label = 'search', fn = function() vim.mode = 'search'; vim.searchline = '' end },

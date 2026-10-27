@@ -105,4 +105,17 @@ do
   for _, c in ipairs(T.kids) do if c.name == 'kicks' then kicks = c end end
   eq('tree: subfolder branch', kicks and kicks.n, 2)
 end
+-- 27 окт (10): песок — низкий крупнее и темнее, короткий мельче и ярче
+do
+  SM.AN['/low'] = { l = 0.5, b = 0.05, d = 3 }
+  SM.AN['/high'] = { l = 0.5, b = 0.95, d = 3 }
+  SM.AN['/short'] = { l = 0.5, b = 0.05, d = 0.05 }
+  local sl, _, dl = SM.sand_grain({ path = '/low' })
+  local sh, _, dh = SM.sand_grain({ path = '/high' })
+  local ss, _, ds = SM.sand_grain({ path = '/short' })
+  eq('sand: low bigger', sl > sh, true)
+  eq('sand: low darker', dl > dh, true)
+  eq('sand: short smaller', ss < sl, true)
+  eq('sand: short brighter', ds < dl, true)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

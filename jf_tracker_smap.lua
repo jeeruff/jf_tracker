@@ -186,15 +186,15 @@ end
 function SM.an_load(file)
   local f = io.open(file, 'r'); if not f then return end
   for line in f:lines() do
-    local pth, l, b = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)$')
-    if pth then SM.AN[pth] = { l = tonumber(l), b = tonumber(b) }; SM.an_n = (SM.an_n or 0) + 1 end
+    local pth, l, b, d = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)\t?([%d%.]*)$')
+    if pth then SM.AN[pth] = { l = tonumber(l), b = tonumber(b), d = tonumber(d) }; SM.an_n = (SM.an_n or 0) + 1 end
   end
   f:close()
 end
 function SM.an_save(file)
   if not SM.an_dirty then return end
   local f = io.open(file .. '.tmp', 'w'); if not f then return end
-  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\n') end
+  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', '\n') end
   f:close(); os.remove(file); os.rename(file .. '.tmp', file)
   SM.an_dirty = false
 end
@@ -447,10 +447,32 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
       local rr, a = math.sqrt((n.k - 0.5) / hb.n) * spread, n.k * 2.39996
       qx, qy = rr * math.cos(a), rr * math.sin(a)
     end
-    return qx0 + cw / 2 + qx * (cw / 2 - 10), qy0 + ch / 2 + 6 + qy * (ch / 2 - 18)
+    local m = math.max(5, math.floor(math.min(cw - 8, ch - 6) * 0.08)) + 6
+    return qx0 + cw / 2 + qx * (cw / 2 - 4 - m), qy0 + ch / 2 + qy * (ch / 2 - 3 - m - L.rh)
   end
   -- точки — в буфер, пока вид тот же
+  -- 27 окт (10): игральная карта: светлая карта со скруглёнными углами, рубашка — рамка с фигурой Хладни внутри
+  local function card(ox, oy, hb)
+    local i = hb.cell - 1
+    local qx0, qy0 = x + (i % cols) * cw - ox, top + math.floor(i / cols) * ch - oy
+    local c = col(hb)
+    local bx0, by0, bw, bh = math.floor(qx0 + 4), math.floor(qy0 + 3), math.floor(cw - 8), math.floor(ch - 6)
+    local face = U.mix(U.PANEL, U.TEXT, 0.06)
+    U.set(face)
+    gfx.rect(bx0 + 3, by0, bw - 6, bh, 1); gfx.rect(bx0, by0 + 3, bw, bh - 6, 1)
+    gfx.rect(bx0 + 1, by0 + 1, bw - 2, bh - 2, 1)
+    U.set(U.mix(c, U.BG, 0.3))
+    gfx.line(bx0 + 3, by0, bx0 + bw - 4, by0); gfx.line(bx0 + 3, by0 + bh - 1, bx0 + bw - 4, by0 + bh - 1)
+    gfx.line(bx0, by0 + 3, bx0, by0 + bh - 4); gfx.line(bx0 + bw - 1, by0 + 3, bx0 + bw - 1, by0 + bh - 4)
+    gfx.line(bx0, by0 + 3, bx0 + 3, by0); gfx.line(bx0 + bw - 4, by0, bx0 + bw - 1, by0 + 3)
+    gfx.line(bx0, by0 + bh - 4, bx0 + 3, by0 + bh - 1); gfx.line(bx0 + bw - 4, by0 + bh - 1, bx0 + bw - 1, by0 + bh - 4)
+    -- рамка рубашки (двойная тонкая), внутри — фигура
+    local m = math.max(5, math.floor(math.min(bw, bh) * 0.08))
+    U.set(U.mix(c, face, 0.45)); gfx.rect(bx0 + m, by0 + m + L.rh, bw - 2 * m, bh - 2 * m - 2 * L.rh, 0)
+    U.set(U.mix(c, face, 0.7)); gfx.rect(bx0 + m + 2, by0 + m + L.rh + 2, bw - 2 * m - 4, bh - 2 * m - 2 * L.rh - 4, 0)
+  end
   local function dots(ox, oy)
+    for _, hb in ipairs(G.hubs) do card(ox, oy, hb) end
     for _, hb in ipairs(G.hubs) do
       local c = col(hb)
       U.set(U.mix(c, U.TEXT, 0.15), 0.85)
@@ -470,19 +492,12 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
     if qy0 + ch < top0 or qy0 + ch > y + h + 2 then goto next_card end   -- 27 окт: только целые карточки (подпись нижней лезла на плеер)
     local c = col(hb)
-    -- граница сектора: уголки и пунктир по краям — тускло
-    local bx0, by0, bx1, by1 = math.floor(qx0 + 3), math.floor(qy0 + 3), math.floor(qx0 + cw - 4), math.floor(qy0 + ch - 4)
-    U.set(U.mix(c, U.BG, 0.8))
-    for px = bx0 + 10, bx1 - 10, 6 do gfx.rect(px, by0, 2, 1, 1); gfx.rect(px, by1, 2, 1, 1) end
-    for py = by0 + 10, by1 - 10, 6 do gfx.rect(bx0, py, 1, 2, 1); gfx.rect(bx1, py, 1, 2, 1) end
-    U.set(U.mix(c, U.BG, 0.35))
-    for _, cn in ipairs({ { bx0, by0, 1, 1 }, { bx1, by0, -1, 1 }, { bx0, by1, 1, -1 }, { bx1, by1, -1, -1 } }) do
-      gfx.rect(math.min(cn[1], cn[1] + cn[3] * 8), cn[2], 9, 1, 1); gfx.rect(cn[1], math.min(cn[2], cn[2] + cn[4] * 8), 1, 9, 1)
-    end
-    local lab = ('NEB-%02d // %s'):format(hb.cell, (hb.name:gsub('^/', '')):upper())
-    U.text(bx0 + 6, by0 + 3, fit(lab, bx1 - bx0 - 12), c)
-    local sub = ('%s SECTOR  %d BODIES  MASS %s'):format(GREEK[(hb.cell - 1) % #GREEK + 1], hb.n, mb(hb.mass or 0))
-    if by1 - by0 > 3 * L.rh then U.text(bx0 + 6, by1 - L.rh - 2, fit(sub, bx1 - bx0 - 12), U.mix(c, U.BG, 0.45)) end
+    -- 27 окт (10): индексы игральной карты — имя группы слева сверху, число файлов справа снизу (цвет группы)
+    local bx0, by0, bx1, by1 = math.floor(qx0 + 4), math.floor(qy0 + 3), math.floor(qx0 + cw - 4), math.floor(qy0 + ch - 3)
+    local room = bx1 - bx0 - 8
+    U.text(bx0 + 4, by0 + 2, fit(SM.short(hb.name, math.max(3, math.floor(room / math.max(1, U.measure('M'))))):upper(), room), c)
+    local cnt = tostring(hb.n)
+    U.text(bx1 - 4 - U.measure(cnt), by1 - L.rh - 1, cnt, U.mix(c, U.BG, 0.2))
     if inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by0 + L.rh + 3 then hv = { hub = hb } end
     -- ближайшая точка — только в секторе под мышью
     if inside and not hv and mx >= qx0 and mx < qx0 + cw and my >= qy0 and my < qy0 + ch then
@@ -939,6 +954,88 @@ function SM.draw_tree(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   return hv
 end
 
+
+-- ── 27 окт (10): вид SAND — каждый файл песчинка: ниже частота — крупнее и темнее, короче — мельче и ярче
+-- (этап 2: SM.AN b — яркость, d — длина; не проанализирован — средняя тусклая). Кучки — места групп из раскладки
+-- графа, радиус по логарифму числа файлов (папка киков не размером с солнце), песчинки — спиралью по яркости
+function SM.sand_grain(n)
+  local a = SM.AN[n.path]
+  if not a then return 1.2, nil, 0.75 end
+  local low = 1 - (a.b or 0.5)                                   -- 1 — низ, 0 — верх
+  local short = a.d and math.max(0, math.min(1, 1 - math.log(1 + a.d) / math.log(1 + 8))) or 0.5   -- 1 — короткий
+  local size = 0.8 + 3.2 * low * (1 - 0.6 * short)                -- низкие крупнее, короткие мельче
+  local dark = 0.15 + 0.55 * low - 0.35 * short                   -- низкие темнее, короткие ярче
+  return size, a, math.max(0, math.min(0.85, dark))
+end
+function SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  local top = y + L.rh + 4
+  local hs = G.hubs
+  local x0, x1, y0, y1 = math.huge, -math.huge, math.huge, -math.huge
+  for _, hb in ipairs(hs) do x0, x1, y0, y1 = math.min(x0, hb.x), math.max(x1, hb.x), math.min(y0, hb.y), math.max(y1, hb.y) end
+  local ox, oy = (x0 + x1) / 2, (y0 + y1) / 2
+  local sc = math.min(0.42 * w / math.max(0.05, (x1 - x0) / 2), 0.42 * (y + h - top) / math.max(0.05, (y1 - y0) / 2)) * (V.zoom or 1)
+  local cx, cy = x + w / 2 + (V.px or 0), top + (y + h - top) / 2 + (V.py or 0)
+  local base = math.max(6, math.min(w, h) * 0.018) * (V.zoom or 1)
+  local function R(hb) return base * (1 + math.log(hb.n, 10)) end   -- 1 файл — base, 10 — 2·base, 10 000 — 5·base
+  local function HX(hb) return cx + (hb.x - ox) * sc end
+  local function HY(hb) return cy + (hb.y - oy) * sc end
+  local function gpos(hb, n)
+    local k = n.k
+    local rr = math.sqrt((k - 0.5) / hb.n) * R(hb)
+    local a = k * 2.39996
+    return HX(hb) + rr * math.cos(a), HY(hb) + rr * math.sin(a)
+  end
+  local function paint()
+    for _, hb in ipairs(hs) do
+      local c = col(hb)
+      for _, n in ipairs(hb.list) do
+        local px, py = gpos(hb, n)
+        if px >= x and px < x + w and py >= top and py < y + h then
+          local sz, _, dark = SM.sand_grain(n)
+          U.set(U.mix(U.mix(c, U.TEXT, 0.3), U.BG, dark))
+          if sz < 1.5 then gfx.rect(px - x, py - y, 1, 1, 1) else gfx.circle(px - x, py - y, sz * 0.5, 1, 1) end
+        end
+      end
+    end
+  end
+  SM.buffered(G, ('sand|%d|%d|%d|%d|%.4f|%.1f|%.1f|%d|%d'):format(x, y, w, h, sc, cx, cy, G.ver, SM.an_n or 0), x, y, w, h, U, paint)
+  -- подписи кучек (крупные первыми, без наложений), наведение — ближайшая песчинка в кучке под мышью
+  local hv, hd
+  local placed = {}
+  G.lab_order = G.lab_order or (function() local t = {}; for i, hb in ipairs(hs) do t[i] = hb end; table.sort(t, function(a, b) return a.n > b.n end); return t end)()
+  for _, hb in ipairs(G.lab_order) do
+    local nx, ny, r = HX(hb), HY(hb), R(hb)
+    if r > 10 and nx >= x and nx < x + w and ny - r - L.rh >= top and ny < y + h then
+      local lab = SM.short(hb.name, math.max(3, math.floor(r * 2 / math.max(1, L.cw)))) .. ' ' .. hb.n
+      local lw = U.measure(lab)
+      local lx, ly = nx - lw / 2, ny - r - L.rh - 1
+      local free = true
+      for _, q in ipairs(placed) do if lx < q[1] + q[3] and q[1] < lx + lw and ly < q[2] + L.rh and q[2] < ly + L.rh then free = false; break end end
+      if free then placed[#placed + 1] = { lx, ly, lw }; U.set(col(hb)); gfx.rect(lx - 1, ly, lw + 2, L.rh, 1); U.text(lx, ly, lab, U.BG) end
+    end
+    if inside and not hv and (mx - nx) ^ 2 + (my - ny) ^ 2 <= (r + 4) ^ 2 then
+      for _, n in ipairs(hb.list) do
+        local px, py = gpos(hb, n)
+        local d = (mx - px) ^ 2 + (my - py) ^ 2
+        if d < 25 and (not hd or d < hd) then hv, hd = { node = n, px = px, py = py, r = 2 }, d end
+      end
+      if not hv then hv = { hub = hb } end
+    end
+  end
+  SM.hist_path(U, G, V, function(nd) return gpos(nd.h, nd) end, col)
+  for _, e in ipairs(V.hist or {}) do
+    local nd = G.bypath and G.bypath[e.path]
+    local age = SM.fresh(V, nd)
+    if age and V.hist_by[e.path] == e then local px, py = gpos(nd.h, nd); U.set(SM.fresh_col(U, col(nd.h), age)); gfx.circle(px, py, age == 0 and 3 or 2, 1, 1) end
+  end
+  if hv and hv.node then
+    U.set(U.TEXT); gfx.circle(hv.px, hv.py, 4, 0, 1)
+    local a = SM.AN[hv.node.path]
+    if a then hv.info = ('loud %.0f%%  bright %.0f%%%s'):format(a.l * 100, a.b * 100, a.d and ('  %.2fs'):format(a.d) or '') end
+  end
+  return hv
+end
+
 -- точки в свой буфер: перерисовка, только когда меняется ключ вида; иначе — копия буфера
 function SM.buffered(G, key, x, y, w, h, U, paint)
   w, h = math.max(1, math.floor(w)), math.max(1, math.floor(h))
@@ -983,6 +1080,8 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local hv, hd
   if V.style == 'nebula' then
     hv = SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
+  elseif V.style == 'sand' then
+    hv = SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'tree' and SM.TREE_ON then   -- 27 окт: скрыт; SM.TREE_ON = true — вернуть
     hv = SM.draw_tree(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'cards' then
@@ -1115,7 +1214,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
     local bw = 0
-    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'ξ' }) do   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
+    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'sand', 'ξ' }) do   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
       local tw = U.measure(nm) + 2 * L.pad
       local on = nm == cur
       local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh
