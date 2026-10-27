@@ -11573,11 +11573,14 @@ ctx = {
       return n >= 2 and MMX.CH.name(ps) or nil
     end
     local function pitches_of(hs) local o = {}; for _, c in ipairs(hs) do if c.kind == 'midi' and c.pitch then o[#o + 1] = c.pitch end end; return o end
-    local here
+    -- 27 окт: микротоны нот (72-EDO, шаг 1/6 полутона) — куда тяготеет нота: линия в её столбике хромы
+    local function micro_of(hs) local o = {}; for _, c in ipairs(hs) do if c.kind == 'midi' and c.pitch and c.micro and c.micro ~= 0 then o[#o + 1] = { pc = c.pitch % 12, off = c.micro / 6 } end end; return o end
+    local here, hs0
     if vim.mode == 'visual' or vim.mode == 'vline' then
-      local f0, f1, r0, r1 = vim.visual_range(); here = pitches_of(vim.heads_in(f0, f1, r0, r1))
-    elseif inf.lane then here = select(2, ctx.chord_heads(col, vim.cur.row))
-    else here = pitches_of(vim.heads_in(1, #L.flat, vim.cur.row, vim.cur.row)) end
+      local f0, f1, r0, r1 = vim.visual_range(); hs0 = vim.heads_in(f0, f1, r0, r1); here = pitches_of(hs0)
+    elseif inf.lane then hs0, here = ctx.chord_heads(col, vim.cur.row)
+    else hs0 = vim.heads_in(1, #L.flat, vim.cur.row, vim.cur.row); here = pitches_of(hs0) end
+    inf.micro = micro_of(hs0 or {})
     inf.here = chord_of(here)
     -- 27 окт: хрома (12 столбиков) и кандидаты аккорда; нот нет — звук трека курсора (строка / выделение)
     local TH = MMX.TH

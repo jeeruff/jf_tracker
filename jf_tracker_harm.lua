@@ -339,6 +339,13 @@ function HM.draw(L, x, y, w, h, focus, info, fit, hint)
       local hh = math.floor(v * bh + 0.5)
       U.set(U.tint(U.LINE, 0.5)); gfx.rect(cx0, ay, bw - 2, bh, 0)
       U.set(inch[i] and U.CYAN or U.GREY); if hh > 0 then gfx.rect(cx0, ay + bh - hh, bw - 2, hh, 1) end
+      -- 27 окт: микротон — розовая линия в столбике: середина — ровно, левее — ниже, правее — выше (край — полполутона)
+      for _, m in ipairs(info.micro or {}) do
+        if m.pc == i then
+          local mx0 = cx0 + math.floor((bw - 2) / 2 + m.off * (bw - 2) - 1)
+          U.set(U.PINK or U.RED); gfx.rect(math.max(cx0, math.min(cx0 + bw - 4, mx0)), ay, 2, bh, 1)
+        end
+      end
       local nm = HM.pc_name(i)
       U.text(cx0 + math.floor((bw - 2 - U.measure(nm)) / 2), ay + bh + 1, nm, P and i == P.root and U.AMBER or (inch[i] and U.TEXT or U.DIM))
     end
