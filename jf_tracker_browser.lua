@@ -462,6 +462,7 @@ end
 -- в отсеке — имена файлов; двери между отсеками, двигатели слева, нос справа; lib — отмеченные в lib, save — и сохранить набором
 function B.map_ship(U, L, x, y, w, h)
   local list = B.sel_order or {}
+  if #list == 0 then return nil end   -- 27 окт: нечего показать — корабля нет (пустой закрывал карту)
   local cw, rh = L.cw, L.rh
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- отсеки по классам
@@ -492,21 +493,34 @@ function B.map_ship(U, L, x, y, w, h)
     if SW > w - 8 or SH > h - 8 or LINES < 1 then return nil end
   end
   local sx, sy = x + w - SW - 6, y + h - SH - 6
-  local edge = U.mix(U.LINE, U.TEXT, 0.45)
-  local hull = U.mix(U.PANEL, U.LINE, 0.35)
+  local edge = U.mix(U.LINE, U.TEXT, 0.5)
+  local hull = U.mix(U.PANEL, U.LINE, 0.55)
   local bx0, by0 = sx + cw * 3, sy + rh + 4             -- корпус с отсеками
   local bx1, by1 = bx0 + bodyw, sy + SH
-  -- двигатели (слева, свечение янтарём) и нос (справа)
-  for k = 0, 1 do
-    local ey = by0 + 4 + k * (by1 - by0 - rh * 2 - 8)
-    U.set(hull); gfx.rect(sx + cw, ey, cw * 2, rh * 2, 1)
-    U.set(edge); gfx.rect(sx + cw, ey, cw * 2, rh * 2, 0)
-    U.set(U.AMBER); gfx.rect(sx + cw - 4, ey + 3, 4, rh * 2 - 6, 1)
-  end
-  U.set(hull); gfx.rect(bx0, by0, bodyw, by1 - by0, 1)
   local midy = math.floor((by0 + by1) / 2)
-  for t = 0, 2 do U.set(t == 0 and edge or hull); gfx.line(bx1 + t, by0 + 6 + t, bx1 + cw * 2 - t, midy); gfx.line(bx1 + t, by1 - 6 - t, bx1 + cw * 2 - t, midy) end
-  U.set(edge); gfx.rect(bx0, by0, bodyw, by1 - by0, 0); gfx.rect(bx0 + 1, by0 + 1, bodyw - 2, by1 - by0 - 2, 0)
+  -- двигатели: две гондолы сверху и снизу у кормы, сопла светятся янтарём
+  local pw, ph = cw * 4, math.max(6, math.floor((by1 - by0) * 0.28))
+  for k = 0, 1 do
+    local py = k == 0 and (by0 - math.floor(ph / 2)) or (by1 - math.ceil(ph / 2))
+    U.set(hull); gfx.rect(sx + cw, py, pw, ph, 1)
+    U.set(edge); gfx.rect(sx + cw, py, pw, ph, 0)
+    U.set(U.AMBER); gfx.rect(sx + cw - 3, py + 2, 3, ph - 4, 1)
+    U.set(U.tint(U.AMBER, 0.5)); gfx.rect(sx + cw - 6, py + 3, 3, ph - 6, 1)
+  end
+  -- корпус: срезанные углы, нос — клином вправо
+  local cut = math.min(6, math.floor((by1 - by0) / 4))
+  U.set(hull)
+  gfx.rect(bx0 + cut, by0, bodyw - cut, by1 - by0, 1); gfx.rect(bx0, by0 + cut, cut, by1 - by0 - 2 * cut, 1)
+  for t = 0, cut - 1 do gfx.rect(bx0 + cut - t, by0 + t, 1, by1 - by0 - 2 * t, 1) end
+  local nose = cw * 2
+  for t = 0, nose do
+    local hh = math.floor((by1 - by0) / 2 * (1 - t / (nose + 1)))
+    gfx.rect(bx1 + t, midy - hh, 1, 2 * hh, 1)
+  end
+  U.set(edge)
+  gfx.line(bx0 + cut, by0, bx1, by0); gfx.line(bx0 + cut, by1, bx1, by1)
+  gfx.line(bx0, by0 + cut, bx0, by1 - cut); gfx.line(bx0, by0 + cut, bx0 + cut, by0); gfx.line(bx0, by1 - cut, bx0 + cut, by1)
+  gfx.line(bx1, by0, bx1 + nose, midy); gfx.line(bx1, by1, bx1 + nose, midy)
   -- рубка сверху: счёт и кнопки
   local hv
   local tx = bx0 + 4
@@ -519,9 +533,9 @@ function B.map_ship(U, L, x, y, w, h)
     if hot then hv = id end
     tx = tx + tw + 2
   end
-  U.text(tx, sy, ('%d marked'):format(#list), #list > 0 and U.AMBER or U.GREY); tx = tx + U.measure('000 marked') + 4
-  if #list > 0 then btn('lib', 'mapshiplib'); btn('save', 'mapshipsave') end
-  if #list == 0 then U.text(bx0 + 6, by0 + 6, ctx.fit('m in the browser marks files', bodyw - 12), U.DIM); return hv end
+  U.set(U.BG); gfx.rect(tx - 2, sy, U.measure('000 marked') + 4, rh, 1)
+  U.text(tx, sy, ('%d marked'):format(#list), U.AMBER); tx = tx + U.measure('000 marked') + 4
+  btn('lib', 'mapshiplib'); btn('save', 'mapshipsave')
   -- отсеки: две палубы, двери (янтарные чёрточки) между соседями
   local playing
   if ctx.preview_pos then local _, _, p = ctx.preview_pos(); playing = p end

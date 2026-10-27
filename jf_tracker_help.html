@@ -357,6 +357,21 @@ first and last pattern after every edit. Old names keep working as patterns. Cod
 <tr><td><kbd>^H</kbd> <kbd>^J</kbd> <kbd>^K</kbd> <kbd>^L</kbd></td><td>move the matrix cursor straight from the tracker</td></tr>
 </table>
 
+<h2 id="smap">Sample map</h2>
+<p>A pane of its own (a tab next to the browser, <kbd>Ctrl</kbd>+<kbd>W</kbd> <kbd>w</kbd>): every sound file of the folder open in
+the browser as dots in groups — by the words of the name (kick, snare, hat, loop, fx, vox …), else by subfolder. No limit on the
+number of files: the folder is read a little every frame the first time, then kept as an index on disk
+(<code>Data/jf_tracker_mapcache</code>) and checked for changes quietly. The mini lf on the left walks the folders
+(<kbd>j</kbd> <kbd>k</kbd>, <kbd>l</kbd> / <kbd>Enter</kbd>, <kbd>h</kbd>); <code>files db proj pm</code> on top pick what the map lays out.</p>
+<p>Views (<kbd>v</kbd>): <code>graph</code> — rings of groups with their files around; <code>cards</code> — a grid of sectors;
+<code>nebula</code> — one galaxy of every file, groups as rectangular sectors over the cloud; a click on a sector shows its
+system — all its files with names (<code>galaxy</code> / <kbd>Esc</kbd> — back). On the right of the nebula — the history of what
+you played from the map; the dot just played is bright, then dark for 10 plays, then it brightens back (options → modules → map).
+<code>ξ</code> or <kbd>r</kbd> plays a random file — from the group under the mouse, else from all: find a sound you would never
+reach scrolling lists.</p>
+<p>The marked files (<kbd>m</kbd> in the browser) are a ship in the corner of the map: a room per class with the file names;
+<code>lib</code> puts them into the lib, <code>save</code> also saves them as a set (<code>:libsave</code>).</p>
+
 <h2 id="lib">Lib and slices</h2>
 <p>The lib is the sounds of the cursor track: every distinct audio source its items use, plus the track library (items
 after the <code>=LIB</code> marker at the end of the project). A note is a linked copy of its sound, so an edit in the
@@ -366,6 +381,11 @@ onto the track at the cursor.</p>
   <img src="help/slices.png" alt="the slices list">
   <figcaption>The slices list: the key of each slice on the left (<kbd>`</kbd> — the whole sample, <kbd>1</kbd> <kbd>f1</kbd> <kbd>2</kbd> …), its name and length.</figcaption>
 </figure>
+<p><b>ξ — a random sample.</b> <kbd>R</kbd> (or <code>ξ</code> on the selected row) gives the selected sound a random file like the name
+of its lib folder (<code>kick</code>), else like the first word of its name, from the map index — every note of it plays the new file.
+<kbd>[</kbd> <kbd>]</kbd> (or <code>&lt;</code> <code>&gt;</code>) step back / forward through what came up; back from the first — the original
+sound. <kbd>j</kbd> <kbd>k</kbd> also stop on the name of a lib folder: <kbd>h</kbd> / <kbd>l</kbd> / <kbd>Enter</kbd> fold / open it;
+marked sounds show <code>*</code> after the number.</p>
 <p>The slices module lists the slices of the selected sound: <kbd>j</kbd> <kbd>k</kbd> select, the selected slice is what
 the item tab edits.</p>
 <p><b>Pad groups in drumrs5k.</b> <code>g</code> — a group: a hit on one pad plays every pad of the group (a layer right in

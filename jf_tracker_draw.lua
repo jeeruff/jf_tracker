@@ -517,13 +517,9 @@ function D.layout(snap, state, nregions)
     local cache = wide and L.GFc2 or L.GFc
     local k = cache[G]
     if k then return k end
-    local s0, d = G.x_note, (wide and ms('+~') or L.w_fold) + L.pad
-    local function sh(v) if v and v >= s0 then return v + d end return v end
-    local fx2 = {}
-    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
-    k = setmetatable({ x_fold = s0, x_note = s0 + d, x_inst = G.x_inst and sh(G.x_inst) or G.x_inst, x_slc = G.x_slc and sh(G.x_slc) or G.x_slc,
-      x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del),
-      x_tfx = G.x_tfx and sh(G.x_tfx) or G.x_tfx, sub_w = G.sub_w + d, fold_wide = wide or nil }, { __index = G })
+    -- 27 окт (6): колонка «+ ~» — справа у подколонки (сложенное раскладывается вправо), поля не сдвигаются
+    local d = (wide and ms('+~') or L.w_fold) + L.pad
+    k = setmetatable({ x_fold = G.sub_w - L.pad + 1, sub_w = G.sub_w + d, fold_wide = wide or nil }, { __index = G })
     cache[G] = k
     return k
   end
