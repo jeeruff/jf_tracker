@@ -257,6 +257,57 @@ function B.refresh()
   B.set_all(out)
 end
 
+-- ── 27 окт: КОЛОНКИ как в lf (Miller columns): широкий браузер в режиме files — родитель | папка | превью ──
+-- список папки для соседних колонок (те же фильтры, что B.refresh), кеш 2 с; до 3000 строк
+local LDC = {}
+local function join(dir, name) return (dir == '/' and '' or dir) .. '/' .. name end
+local function list_dir(path)
+  local now = R.time_precise and R.time_precise() or os.clock()
+  local c = LDC[path]
+  if c and now - c.t < 2 then return c.list end
+  local out, files, i = {}, {}, 0
+  while #out < 3000 do
+    local d = R.EnumerateSubdirectories(path, i)
+    if not d then break end
+    if shown(d) then out[#out + 1] = { name = d, dir = true } end
+    i = i + 1
+  end
+  table.sort(out, function(a, b) return a.name:lower() < b.name:lower() end)
+  i = 0
+  while #files < 3000 do
+    local f = R.EnumerateFiles(path, i)
+    if not f then break end
+    if shown(f) and wanted(f) then files[#files + 1] = { name = f } end
+    i = i + 1
+  end
+  table.sort(files, function(a, b) return a.name:lower() < b.name:lower() end)
+  for _, f in ipairs(files) do out[#out + 1] = f end
+  LDC[path] = { t = now, list = out }
+  return out
+end
+B.list_dir = list_dir
+-- колонка-список: hi — имя подсвеченной (текущая папка в родителе); → hover 'tagN'
+local function draw_col(U, L, list, x, y, w, h, hi_name, tag, mx, my)
+  local nvis = math.floor(h / L.rh)
+  local hi
+  if hi_name then for i, e in ipairs(list) do if e.name == hi_name then hi = i; break end end end
+  local first = hi and math.max(0, math.min(hi - math.floor(nvis / 2), #list - nvis)) or 0
+  local hv
+  for i = 1, nvis do
+    local idx = first + i
+    local e = list[idx]
+    if not e then break end
+    local ry = y + (i - 1) * L.rh
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if idx == hi then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(x, ry, w, L.rh, 1)
+    elseif hot then U.set(U.tint(U.AMBER, 0.12)); gfx.rect(x, ry, w, L.rh, 1) end
+    U.text(x + L.pad, ry + 1, ctx.fit((e.dir and '/' or ' ') .. e.name, w - 2 * L.pad), idx == hi and U.AMBER or (hot and U.TEXT or (e.dir and U.CYAN or U.GREY)))
+    if hot then hv = tag .. idx end
+  end
+  if #list == 0 then U.text(x + L.pad, y + 1, 'empty', U.DIM) end
+  return hv
+end
+
 -- ── поиск прямо в списке (fzf-синтаксис, 2 окт) ─────────────────────────
 -- Контекст: в папке (files) — рекурсивно от ТЕКУЩЕЙ папки (индекс на папку,
 -- строится при первом символе, до 20000 строк); в открытой базе — по базе;
@@ -750,12 +801,12 @@ end
 B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
   B.pm_scroll.v = 0
   if m == 'presets' then B.prdir = nil end
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) else B.set_all(B.read_pm()) end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) elseif m == 'recent' then B.recent_list() else B.set_all(B.read_pm()) end
 end
 
 -- кнопки шапки: files | db | size | hide
@@ -764,7 +815,7 @@ function B.click(what)
   if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'fx' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'drum' then B.drum = not B.drum; if ctx.drum_audition_toggle then ctx.drum_audition_toggle(B.drum) end
@@ -799,6 +850,19 @@ function B.click(what)
   elseif what:match('^bm%d+$') then
     local m = ctx.mods and ctx.mods() or {}
     B.mark(tonumber(what:sub(3)), m.alt and 'clear' or (m.shift and 'set' or nil))   -- 20 окт: Opt+клик — очистить (было Cmd)
+  elseif what:match('^pcol%d+$') then   -- 27 окт: колонка родителя — туда (папка) / к файлу в ней
+    local e = B.pcol and B.pcol.list[tonumber(what:sub(5))]
+    if e then
+      if e.dir then B.go(join(B.pcol.path, e.name))
+      else B.go(B.pcol.path); for i, x in ipairs(B.entries) do if x.name == e.name then B.cur = i; break end end end
+    end
+  elseif what:match('^ncol%d+$') then   -- 27 окт: колонка превью — внутрь папки под курсором
+    local e = B.ncol and B.ncol.list[tonumber(what:sub(5))]
+    if e then
+      local name = e.name
+      if e.dir then B.go(join(B.ncol.path, name))
+      else B.go(B.ncol.path); for i, x in ipairs(B.entries) do if x.name == name then B.cur = i; break end end end
+    end
   elseif what:match('^crumb%d+$') then
     local c = B.crumbs[tonumber(what:match('%d+'))]
     if c then B.go(c.path) end
@@ -945,8 +1009,11 @@ function B.up()
   end
   -- выше корня :browse тоже можно (полный путь в строке пути, 2 окт)
   if B.path == '/' then return end
-  local parent = B.path:match('(.*)/[^/]+$')
-  if parent then B.go(parent ~= '' and parent or '/') end
+  local parent, child = B.path:match('(.*)/([^/]+)$')
+  if parent then
+    B.go(parent ~= '' and parent or '/')
+    for i, e in ipairs(B.entries) do if e.dir and e.name == child then B.cur = i; break end end   -- 27 окт: как в lf — курсор на папке, из которой вышли
+  end
 end
 
 -- строка описания для статус-бара
@@ -974,8 +1041,65 @@ function B.describe(idx)
 end
 
 function B.preview()
+  if B.pl then B.pl = nil; if ctx.preview_stop then ctx.preview_stop() end; if ctx.msg then ctx.msg('playlist: stopped') end; return end
+  if #B.sel_order > 1 then B.pl_start(); return end   -- 27 окт: отмеченные — плейлистом
   local pth = B.preview_path(B.entries[B.cur])
-  if pth then ctx.preview_file(pth) end
+  if pth then ctx.preview_file(pth); B.add_recent(pth) end
+end
+-- 27 окт: НЕДАВНИЕ — последние 50 прослушанных файлов (вкладка recent), Data/jf_tracker_recent.txt
+B.RECENT_MAX = 50
+local function rfile() return R.GetResourcePath and (R.GetResourcePath() .. '/Data/jf_tracker_recent.txt') or nil end
+function B.recent_load()
+  if B.recent then return B.recent end
+  B.recent = {}
+  local f = rfile() and io.open(rfile(), 'r')
+  if f then for line in f:lines() do if line ~= '' then B.recent[#B.recent + 1] = line end end; f:close() end
+  return B.recent
+end
+function B.add_recent(path)
+  if not path or path == '' then return end
+  local rc = B.recent_load()
+  for i = #rc, 1, -1 do if rc[i] == path then table.remove(rc, i) end end
+  table.insert(rc, 1, path)
+  while #rc > B.RECENT_MAX do table.remove(rc) end
+  local fn = rfile()
+  local f = fn and io.open(fn, 'w')
+  if f then f:write(table.concat(rc, '\n'), '\n'); f:close() end
+  if B.mode == 'recent' and not B.pl then B.recent_list() end
+end
+function B.recent_list()
+  local out = {}
+  for _, pth in ipairs(B.recent_load()) do
+    out[#out + 1] = { name = pth:match('([^/]+)$') or pth, path = pth, meta = (pth:match('(.*)/[^/]+$') or ''):match('([^/]+)$') }
+  end
+  B.set_all(out)
+end
+-- 27 окт: ПЛЕЙЛИСТ — отмеченные файлы (m) по очереди, в порядке отметки: Space — играть / стоп; конец файла — следующий
+function B.pl_start()
+  local list = {}
+  for _, o in ipairs(B.sel_order) do if o.full and B.preview_path(o.e) then list[#list + 1] = o.full end end
+  if #list == 0 then return end
+  B.pl = { list = list, i = 0 }
+  B.pl_next()
+end
+function B.pl_next()
+  local pl = B.pl
+  if not pl then return end
+  pl.i = pl.i + 1
+  if pl.i > #pl.list then B.pl = nil; if ctx.msg then ctx.msg('playlist: done') end; return end
+  local pth = pl.list[pl.i]
+  ctx.preview_file(pth); B.add_recent(pth)
+  pl.t0 = R.time_precise and R.time_precise() or os.clock()
+  if ctx.msg then ctx.msg(('playlist %d / %d: %s (Space - stop)'):format(pl.i, #pl.list, pth:match('([^/]+)$') or pth)) end
+end
+function B.pl_tick()
+  local pl = B.pl
+  if not (pl and ctx.preview_pos) then return end
+  local now = R.time_precise and R.time_precise() or os.clock()
+  if now - (pl.t0 or 0) < 0.4 then return end              -- превью ещё стартует
+  local pos, len, path = ctx.preview_pos()
+  if pos and path ~= pl.list[pl.i] then B.pl = nil; return end   -- играет другое (щелчок, auto) — плейлист уступает
+  if not pos or (len and len > 0 and pos >= len - 0.03) then B.pl_next() end
 end
 
 function B.refilter_soon() if R.time_precise then B.filter_due = R.time_precise() + 0.25 else B.set_all(B.all) end end
@@ -1068,7 +1192,8 @@ function B.draw_marks(btn, bx, by, U)
 end
 
 function B.draw(U, L, x, y, w, h)
-  if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end   -- 19 окт: поиск после паузы набора
+  if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
+  B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу   -- 19 окт: поиск после паузы набора
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
@@ -1089,7 +1214,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' })) do
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t, t, B.mode == t)
     end
@@ -1118,6 +1243,7 @@ function B.draw(U, L, x, y, w, h)
   do
     local sy = y + h - L.rh - 2                     -- строка слайдера
     local wh = 2 * L.rh                             -- высота мини-волны
+    if w >= L.cw * 90 then wh = math.max(wh, math.min(8 * L.rh, math.floor(h * 0.12))) end   -- 27 окт: браузер развёрнут — плеер выше
     local wy = sy - wh - 2
     local x0, ww = x + L.pad + 2, w - 2 * L.pad - 4
     local pos, len, ppath
@@ -1221,6 +1347,7 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
+  elseif B.mode == 'recent' then where = ('recently played: %d  (m - mark, Space - the marked ones in a row)'):format(#B.all)   -- 27 окт
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
   if B.filter ~= '' or B.filtering then
@@ -1251,6 +1378,23 @@ function B.draw(U, L, x, y, w, h)
     B.grid_cols = cols
     if hv then hover = hv end
     return hover
+  end
+  -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
+  local cols = B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90
+  local pv_x, pv_w
+  if cols then
+    local pw, cw0 = math.floor(w * 0.22), math.floor(w * 0.36)
+    B.pcol = nil
+    if B.path ~= '/' then
+      local parent = B.path:match('(.*)/[^/]+$') or ''
+      if parent == '' then parent = '/' end
+      B.pcol = { path = parent, list = list_dir(parent) }
+      local hv = draw_col(U, L, B.pcol.list, x + 1, y, pw - 3, h, B.path:match('([^/]+)$'), 'pcol', mx, my)
+      if hv then hover = hv end
+    end
+    U.set(U.LINE); gfx.rect(x + pw - 1, y, 1, h, 1); gfx.rect(x + pw + cw0 - 1, y, 1, h, 1)
+    pv_x, pv_w = x + pw + cw0 + 1, w - pw - cw0 - 3
+    x, w = x + pw, cw0 - 1
   end
   local nvis = math.floor(h / L.rh)
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
@@ -1306,6 +1450,41 @@ function B.draw(U, L, x, y, w, h)
     if ctx.hint then ctx.hint('browser', x + 2, ry, w - 4, L.rh, idx) end
   end
   if ctx.vbar then ctx.vbar('browser', vb[1], vb[2], 2, vb[3] * L.rh, B.scroll, vb[3], #B.entries) end
+  -- 27 окт: третья колонка — что под курсором: папка — её содержимое (щелчок — туда), файл — крупная волна и сведения
+  if cols then
+    local e = B.entries[B.cur]
+    B.ncol = nil
+    if e and e.dir then
+      local p = B.full(e)
+      B.ncol = { path = p, list = list_dir(p) }
+      local hv = draw_col(U, L, B.ncol.list, pv_x, y, pv_w, h, nil, 'ncol', mx, my)
+      if hv then hover = hv end
+    elseif e then
+      local path = B.preview_path(e)
+      local wx, ww = pv_x + L.pad, pv_w - 2 * L.pad
+      local wh = math.max(2 * L.rh, math.min(h - 4 * L.rh, 12 * L.rh))
+      U.text(wx, y + 1, ctx.fit(e.name or '', ww), U.TEXT)
+      local wy = y + L.rh + 4
+      U.set(U.BG); gfx.rect(wx, wy, ww, wh, 1)
+      U.set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
+      local pk = path and ww > 8 and ctx.file_peaks and ctx.file_peaks(path, ww)
+      local cy, hh = wy + math.floor(wh / 2), math.floor(wh / 2) - 2
+      U.set(U.readable(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 4.0))
+      if pk and pk.n > 0 then
+        for px = 0, ww - 1 do
+          local i = math.floor(px / ww * pk.n) + 1
+          local a, b = pk.min[i] or 0, pk.max[i] or 0
+          if b - a < 0.02 then a, b = -0.01, 0.01 end
+          gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
+        end
+      else gfx.line(wx, cy, wx + ww - 1, cy) end
+      local len = path and file_len({ path = path })
+      local ext = (e.name or ''):match('%.([%w]+)$')
+      local info = (len and ('%.2f s'):format(len) or '') .. (ext and ('   ' .. ext:lower()) or '')
+      U.text(wx, wy + wh + 4, ctx.fit(info, ww), U.GREY)
+      U.text(wx, wy + wh + 4 + L.rh, ctx.fit('Enter - into the lib, Space - listen', ww), U.DIM)
+    end
+  end
   -- закладка под мышью (5 окт): точный путь всплывашкой под кнопкой, по ширине
   -- сайдбара (длинный — с начала обрезан …); статус-бар путём не засоряем
   local bi = type(hover) == 'string' and tonumber(hover:match('^bm(%d+)$'))

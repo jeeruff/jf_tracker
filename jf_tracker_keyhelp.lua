@@ -503,6 +503,8 @@ KH.PAGES = {
   } },
   browser = { title = 'browser', e = {
     { k = ': ↑ ↓  Ctrl+R', d = 'command line history: up / down - commands starting with what you typed (Ctrl+P / Ctrl+N too), Ctrl+R - fzf over the history' },
+    { k = 'browser columns', t = {}, d = 'a wide browser (zoomed) in files shows columns like lf: the parent folder (yours lit - click goes there) | the folder | what is under the cursor (a folder - its files, click goes in; a file - a big wave, length, type); h - up, the cursor lands on the folder you left; the player gets taller' },
+    { k = 'recent / playlist', t = {}, d = 'browser tab recent - the last 50 files you listened to (newest on top); m marks files (any folders, recent too), Space with 2+ marked - they play one after another in the order marked, Space again - stop; playing something else stops the playlist' },
     { k = ':z words  :zi', d = 'zoxide: jump to the most used / recent folder matching the words (last word - in the folder name); :zi - pick from the visited folders' },
     { k = 'j k g G', d = 'move / first / last' },
     { k = 'l Enter', d = 'open folder / insert file' },

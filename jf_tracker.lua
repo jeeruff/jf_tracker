@@ -15235,7 +15235,7 @@ ctx.inner_tab_cycle = function(dir)
   end
   local f = state.focus
   if f == 'browser' and B.mode ~= 'fx' then
-    local L0 = B.pmpane and { 'files', 'db', 'proj', 'libs', 'presets' } or { 'files', 'db', 'pm', 'proj', 'libs', 'presets' }
+    local L0 = B.pmpane and { 'files', 'recent', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent
     local m = nxt(L0, B.mode)
     B.click(m); vim.msg = 'browser: ' .. m .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
