@@ -3138,7 +3138,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
       if b[4] == 'arm' then
         local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
-        if aa then text(cx - math.floor(ms('a') / 2), cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)
+        if aa then text(cx - math.floor(ms('a') / 2) + 1, cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)   -- 27 окт: +1 px — у ширины буквы справа пустой столбец, центр по чернилам
         else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
       else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or rc) end
     else
@@ -7219,7 +7219,7 @@ function D.frame(L, snap, rows, state, info)
             local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
             -- 15 окт: строчная a (без заглавных), по центру круга — не по прямоугольнику кнопки (съезжала)
             local al = b.cap and 'A' or 'a'   -- 16 окт: в микшере — A, как в REAPER (просьба; в шапке строчная)
-            if aa then text(cx - math.floor(ms(al) / 2) + (b.cap and 1 or 0), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0) + (b.cap and 1 or 0), al, on and U.TEXT or rc)   -- заглавная — на px ниже и правее (центр круга)
+            if aa then text(cx - math.floor(ms(al) / 2) + 1, cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0) + (b.cap and 1 or 0), al, on and U.TEXT or rc)   -- заглавная — на px ниже и правее (центр круга)
             else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
           else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or (L.rh - 2)) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or BTXT) end
           local key = b[4] == 'phase' and 'trkio' or 'btn'

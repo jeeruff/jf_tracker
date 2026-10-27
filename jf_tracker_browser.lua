@@ -341,6 +341,12 @@ local function map_source()
   return B.mp(), nil
 end
 -- 27 окт (2): мини-lf слева от карты (источник files): .. и подпапки текущей папки; клик / l / Enter — войти, h — выше
+-- 27 окт (2): индекс карты на диске: Data/jf_tracker_mapcache/<папка>.txt
+function B.map_cache_file(root)
+  local dir = R.GetResourcePath() .. '/Data/jf_tracker_mapcache'
+  R.RecursiveCreateDirectory(dir, 0)
+  return dir .. '/' .. root:gsub('[^%w%-_.]', '_') .. '.txt'
+end
 -- 27 окт (3): у панели map своя папка (B.map_path), браузер её не двигает и она не двигает браузер
 B.map_dcur = 1
 function B.mp() if not B.map_path then B.map_path = B.path end; return B.map_path end
@@ -449,8 +455,22 @@ map_draw_inner = function(U, L, x, y, w, h)
   local G = B.mapG
   local key, files = map_source()
   if not G or G.root ~= key then
-    G = files and B.SM.from_files(key, files()) or B.SM.build(B.path, list_dir)   -- 27 окт: files — готовый список (db / proj / pm)
+    if files then G = B.SM.from_files(key, files())   -- 27 окт: files — готовый список (db / proj / pm)
+    else
+      -- 27 окт (2): папка — из индекса на диске сразу; фоном — тихая проверка изменений (подмена, только если другое)
+      G = B.SM.load_cache(key, B.map_cache_file(key))
+      if G then G.bg = B.SM.build(key, list_dir) else G = B.SM.build(key, list_dir) end
+    end
     B.mapG = G; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
+  end
+  if G.bg then
+    if B.SM.scan(G.bg, 0.002) then
+      local nw = G.bg
+      G.bg = nil
+      if not B.SM.same_files(G, nw) then B.mapG = nw; G = nw; B.SM.save_cache(nw, B.map_cache_file(key)); if ctx.msg then ctx.msg(('map: the folder changed - %d files now'):format(#nw.nodes)) end end
+    end
+  elseif not files and not G.building and not G.cached and not G.saved then
+    G.saved = true; B.SM.save_cache(G, B.map_cache_file(key))   -- первый скан — в индекс
   end
   G.grav = B.mapV.grav
   local sl = B.map_sl   -- 27 окт: протяжка ползунка gravity / dimension
@@ -1695,11 +1715,7 @@ function B.draw(U, L, x, y, w, h)
   if cols then
     local e = B.entries[B.cur]
     B.ncol = nil
-    -- 27 окт: нижняя половина третьей колонки — карта текущей папки
-    local mh = math.floor(h * 0.5)
-    local mhv = map_draw(U, L, pv_x, y + h - mh, pv_w, mh)
-    if mhv then hover = mhv end
-    h = h - mh - 2
+    -- 27 окт (3): карты в третьей колонке больше нет — у неё своя панель map (одно место на инструмент)
     if e and e.dir then
       local p = B.full(e)
       B.ncol = { path = p, list = list_dir(p) }

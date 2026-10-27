@@ -78,13 +78,54 @@ function SM.scan(G, budget)
     for _, e in ipairs(G.list_dir(path, true)) do
       local p = (path == '/' and '' or path) .. '/' .. e.name
       if e.dir then st[#st + 1] = { p, sub or e.name }
-      elseif #G.nodes < SM.LIMIT then G.nodes[#G.nodes + 1] = { path = p, name = e.name, cat = SM.category(e.name, sub) } end
+      elseif #G.nodes < SM.LIMIT then G.nodes[#G.nodes + 1] = { path = p, name = e.name, cat = SM.category(e.name, sub), dir = path, sub = sub } end
     end
     if now() - t0 > budget then return false end
   end
   G.building, G.stack, G.list_dir = false, nil, nil
   SM.finish(G)
   return true
+end
+-- 27 окт (2): индекс на диске — один раз просканировали, дальше карта сразу из него; фоновая проверка ищет изменения.
+-- Формат: строка «D\t<папка>\t<sub>», за ней «<имя файла>» по строке
+function SM.save_cache(G, file)
+  local f = io.open(file .. '.tmp', 'w')
+  if not f then return false end
+  f:write('JFMAP1\t', G.root, '\n')
+  local last
+  for _, n in ipairs(G.nodes) do
+    if n.dir ~= last then f:write('D\t', n.dir or '', '\t', n.sub or '', '\n'); last = n.dir end
+    f:write(n.name, '\n')
+  end
+  f:close()
+  os.remove(file); os.rename(file .. '.tmp', file)
+  return true
+end
+function SM.load_cache(root, file)
+  local f = io.open(file, 'r')
+  if not f then return nil end
+  local head = f:read('*l') or ''
+  if head ~= 'JFMAP1\t' .. root then f:close(); return nil end
+  local G = { root = root, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0, cached = true }
+  local dir, sub
+  for line in f:lines() do
+    if line:sub(1, 2) == 'D\t' then
+      local d, sb = line:match('^D\t([^\t]*)\t(.*)$')
+      dir = d; sub = (sb ~= '' and sb) or nil
+    elseif dir and #G.nodes < SM.LIMIT then
+      G.nodes[#G.nodes + 1] = { path = (dir == '/' and '' or dir) .. '/' .. line, name = line, cat = SM.category(line, sub), dir = dir, sub = sub }
+    end
+  end
+  f:close()
+  return SM.finish(G)
+end
+-- одинаковы ли два набора файлов (проверка изменений): число и сумма путей
+function SM.same_files(a, b)
+  if #a.nodes ~= #b.nodes then return false end
+  local sa, sb = 0, 0
+  for _, n in ipairs(a.nodes) do sa = (sa + #n.path * 31 + n.path:byte(-1)) % 2147483647 end
+  for _, n in ipairs(b.nodes) do sb = (sb + #n.path * 31 + n.path:byte(-1)) % 2147483647 end
+  return sa == sb
 end
 -- 27 окт: граф из готового списка (db / proj / pm): files { path, name, sub } — sub — запасная группа
 function SM.from_files(key, files)

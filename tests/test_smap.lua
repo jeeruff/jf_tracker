@@ -35,4 +35,14 @@ eq('big: sizes done', GB.szi, nil)
 local k = 0
 while SM.step(GB) and k < 2000 do k = k + 1 end
 eq('big: cools', k < 2000, true)
+-- 27 окт: индекс на диске — туда и обратно, тот же набор
+do
+  local f = os.tmpname()
+  eq('cache saved', SM.save_cache(G, f), true)
+  local G2 = SM.load_cache('/s', f)
+  eq('cache nodes', G2 and #G2.nodes, #G.nodes)
+  eq('cache same', G2 and SM.same_files(G, G2), true)
+  eq('cache other root', SM.load_cache('/other', f), nil)
+  os.remove(f)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
