@@ -5473,6 +5473,18 @@ local function bracket(L, x0, x1, boxy, bh0, d)
     gfx.arc(x1 - R, cy, R - t, 0.5 * math.pi, math.pi, 1)
   end
 end
+-- 26 окт: опция rounded racks — рэк обведён целиком (2 px, радиус до 6) по зазорам вокруг него: слева / справа в щели
+-- между модулями, сверху в зазоре под шапкой, снизу на месте скобки; углы — дугой
+local function rrect2(x0, y0, x1, y1, R)
+  R = math.max(2, math.min(R, (x1 - x0) // 2, (y1 - y0) // 2))
+  gfx.rect(x0 + R, y0, x1 - x0 + 1 - 2 * R, 2, 1); gfx.rect(x0 + R, y1 - 1, x1 - x0 + 1 - 2 * R, 2, 1)
+  gfx.rect(x0, y0 + R, 2, y1 - y0 + 1 - 2 * R, 1); gfx.rect(x1 - 1, y0 + R, 2, y1 - y0 + 1 - 2 * R, 1)
+  for t = 0, 1 do
+    local r = R - t
+    gfx.arc(x0 + R, y0 + R, r, -0.5 * math.pi, 0, 1); gfx.arc(x1 - R, y0 + R, r, 0, 0.5 * math.pi, 1)
+    gfx.arc(x1 - R, y1 - R, r, 0.5 * math.pi, math.pi, 1); gfx.arc(x0 + R, y1 - R, r, math.pi, 1.5 * math.pi, 1)
+  end
+end
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
@@ -5515,9 +5527,16 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     end
     if same then
       set(fr)
+      local ext = D.rack_ext or 0
+      if D.round_rack and ext >= 4 then   -- 26 окт: rounded racks — обводка целиком по зазорам
+        if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
+        local yb = boxy + bh0 + 2 + math.min(ext - 3, 2 * math.max(0, 2 - d))
+        rrect2(st.x - math.min(3, L.pad - 1), boxy - 2, x + pw - 1 + math.min(3, L.pad - 1), yb + 1, 6)
+      else
       gfx.rect(st.x, boxy - 2, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px в зазоре над модулями (boxy - 4 наезжал на шапку DSP: зазор 3 px)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
       bracket(L, st.x, x + pw - 1, boxy, bh0, d)
+      end
     end
     bx = x + pw + L.pad
   end
