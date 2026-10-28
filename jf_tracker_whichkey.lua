@@ -60,6 +60,14 @@ function WK.get(p, op)
   end
   local t = T[p]
   if not t then return nil end
+  if not t.sorted then   -- 28 окт: пункты — по алфавиту описаний (номера 1..9 — тоже по описанию)
+    t.sorted = true
+    table.sort(t.items, function(a, b)
+      local ka, kb = (a[2] or ''):gsub('^[^%w]+', ''):lower(), (b[2] or ''):gsub('^[^%w]+', ''):lower()
+      if ka ~= kb then return ka < kb end
+      return a[1] < b[1]
+    end)
+  end
   if p == 'd' or p == 'y' or p == 'c' then
     local items = {}
     for _, e in ipairs(t.items) do items[#items + 1] = e end
