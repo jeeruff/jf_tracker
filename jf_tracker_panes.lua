@@ -62,6 +62,7 @@ PN.PANELS = {
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
   { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true },   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
+  { id = 'hints',      label = 'hints',      key = 'I', hint = 'hints',   side = 'top' },   -- 28 окт: что делает модуль под мышью / в фокусе (\\ h)
   { id = 'garden',     label = 'orca',       key = 'O', hint = 'orca',    side = 'top', tab = true, avail = 'dev' },
 }
 PN.BY, PN.TABS, PN.BYKEY = {}, {}, {}
@@ -974,6 +975,55 @@ end
 function PN.next_preset(cur_name)
   for i, n in ipairs(PN.LAYOUTS) do if n == cur_name then return PN.LAYOUTS[i % #PN.LAYOUTS + 1] end end
   return PN.LAYOUTS[1]
+end
+
+
+-- 28 окт: описание модуля для панели hints (\ h): что это, как с ним работать — коротко. Модуль может отдать живое
+-- описание сам: ctx.about_fn[id] = function() return 'текст' end (API модулей; иначе — строка отсюда)
+PN.ABOUT = {
+  tracker = 'The song as rows and columns over real REAPER items: note, instrument, volume, delay and command fields per track, envelope and MIDI lanes beside them. NORMAL moves and edits with Vim keys (h j k l, w b, d y p, counts), INSERT types notes from the keyboard, VISUAL selects a block. Every edit is one REAPER undo step.',
+  patterns = 'The pattern codes of the song as a grid of cubes: a letter is a family (A, B, C ...), a number its variant (A1, A2 ...). Bright - in the song, grey - not made yet, green - playing, xN - how many times it repeats. Click or Enter jumps there; Shift / v selects several to glue, split, copy, rename or remove. The chain row under the grid is the song order as text, edited with Vim keys (h l w b, x dw dd, y p P), Space plays it, C types it.',
+  matrix = 'The song as slots: one row per pattern (region), columns are the tracks. Shows =START and =END, sections on the left, the length and signature of each pattern; a free bar after the song makes a new pattern. Wheel on =START / =END moves them a bar (what is after =END moves along). Enter on a cell lists the patterns that sound on that track.',
+  browser = 'Files on disk with preview: folders on the left (like lf), the list in the middle, the wave on the right. j k move, l / Enter go in or put the file into the lib, h back, / search, m marks files for a playlist or a lib folder. Tabs: files, zoxide (your most used folders + what you heard), db, pm projects, proj sources, libs, presets.',
+  map = 'Every sound file of the browser folder as a map: graph, cards or a galaxy, grouped by name and ordered dark to bright. Click or Space plays, double click marks, x random. Filters bottom left (no quiet, no long, no loops ...), history and marked files on the right; marked files go to the lib or a lib folder.',
+  inst = 'The lib: the instruments of the cursor track (samples, synths, slices, kits). The number is what the instrument field of a note means; Enter / click selects it for typing, the slicer and properties follow. Audio, instruments, automation and MIDI clips are separate groups.',
+  ctrl = 'The main module: quick on / off of the tracker parts (dsp, browser, matrix, envelopes, scopes, wave, meters ...), help, notes, tutorial, options and screensets. Each button shows its key in the status line.',
+  slices = 'The slices of the selected sample: a row per slice with its key, start and length; the wave above with the slice edges. Click hears a slice, keys play them in order (1 F1 2 ...).',
+  sprops = 'Properties of the selected item / instrument: pitch, rate, volume, pan, fades, stretch, beatsync, take FX. J K row, H L value, R resets.',
+  nmod = 'Note mod: per-note modulation curves of the cursor instrument (pitch, volume, filter ...), drawn once and replayed by every note.',
+  mixer = 'Faders under the tracker, one per track: volume, pan, mute / solo / arm, sends; the master on the right. Drag or wheel a fader, double click resets.',
+  tracks = 'Every REAPER track in a list, like the Track Manager: show / hide in the tracker, mute, solo, arm, colour, folders.',
+  clipboard = 'The yank history: everything copied with y / yy. Pick an older entry to paste it with p.',
+  undotree = 'The undo history as a tree: every edit a node, branches when you undo and do something else. Enter goes back to that state.',
+  perf = 'Where the time goes: each part of the frame in ms (rows, headers, DSP, panes ...), the garbage made per frame. For finding slow spots.',
+  actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
+  reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
+  humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',
+  renderer = 'The bouncer: render notes or a pattern of an instrument to audio and put it back as a sample in the lib.',
+  help = 'The keys of the module you came from, as a list: the last used ones on top, the pressed key lights up. \\ ? opens the whole help.',
+  hints = 'This pane: what the module under the mouse (or in focus) is and how to use it.',
+  notes = 'Text notes of the project, kept in the project file.',
+  fxb = 'All installed effects and instruments: a tree of groups (favourites, recent, types, categories, developers) and the list. / searches plugins and their presets, Enter adds to the cursor track, drag onto DSP inserts there (upper half serial, lower parallel), * favourite, x excludes from the search.',
+  pm = 'Project cards of jf_pm: your REAPER projects with status, tempo and date; open one or take tracks / regions from it.',
+  dsp = 'The FX chain of the cursor track as blocks: meters in / out, gain compensation, delta solo per effect, presets, pictures for the stock plugins. Containers are racks between [ ], parallel branches have a colour line. h l block, j k parameter, + - value, dd delete, cc pack into a container, c= c| parallel / serial, zf fold.',
+  retro = 'The retro sampler: what you played recently is kept; take the last seconds as a sample after the fact.',
+  sample = 'The item tab: the wave of the item under the cursor with slices, start / end, zoom and the edge aim; s slices it, the slice keys play.',
+  automation = 'Automation of the cursor track over time: envelopes as curves, points and automation items; draw, move and shape them.',
+  modulation = 'Modulation of FX parameters: LFOs and links of the cursor track, shown with their curves.',
+  midi = 'MIDI of the cursor track: CC, pitch bend and program changes as lanes.',
+  harm = 'The harmonizer: the key of the song, its chords by degree (click writes one), what chord sounds now, staff and tab views, progressions and just intonation.',
+  clips = 'Session clips like Ableton: the matrix as scenes x tracks; launch a clip or a scene on the quantize boundary into the =SESSION loop zone.',
+  macros = 'Macros: recorded (q), saved and built-in; play one at the cursor, give it a key, edit its body.',
+  scopes = 'Scopes of the tracks: oscilloscope, spectrum or spectrogram per track (JSFX bridge).',
+  master = 'The master track: its chain, meters and loudness.',
+  video = 'Video of the project in a tab.',
+  visor = 'ReaVisor shaders driven by the tracker.',
+  grid = 'monome grid / arc: the grid as tracks, the arc rings follow the DSP.',
+}
+function PN.about(id, ctx)
+  local fn = ctx and ctx.about_fn and ctx.about_fn[id]
+  if fn then local ok, t = pcall(fn); if ok and t then return t end end
+  return PN.ABOUT[id]
 end
 
 return PN

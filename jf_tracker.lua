@@ -3337,7 +3337,7 @@ ctx = {
     if state.panes_ui and state.panes then
       state.khelp = false
       if state.focus == 'help' then ctx.set_focus(ctx.pn_prev and ctx.pn_prev ~= 'help' and ctx.pn_prev or 'tracker'); vim.msg = 'help: back'
-      else ctx.pane_cmd('help show'); vim.msg = 'help pane: keys of the module you came from; \\ K again - back' end
+      else ctx.pane_cmd('help show'); vim.msg = 'help pane: keys of the module you came from; again - back' end
       return
     end
     state.khelp = not state.khelp
@@ -17372,6 +17372,47 @@ ctx.play_note_item = function(it)
   ctx.mx_cell_preview(reaper.GetMediaItem_Track(it), p0, p0 + len, 'note')
 end
 ctx.help_pane_on = function() return L and L.pn and L.pn.by_panel and L.pn.by_panel.help ~= nil end
+-- 28 окт: панель hints — что за модуль под мышью (вне модулей — в фокусе) и как с ним работать (draw.panes.about)
+ctx.about_fn = ctx.about_fn or {}
+-- 28 окт: \\ h / кнопка hints — панель hints вкладкой к main (ctrl); уже видна — фокус на ней, ещё раз — спрятать
+ctx.hints_open = function()
+  local PN, m = draw.panes, state.panes
+  if not m then vim.msg = 'hints: panes are off (option panes)'; return end
+  if PN.visible(m, 'hints') then
+    if state.focus == 'hints' then ctx.pane_do(function() return PN.hide(m, 'hints') end, 'hints hidden') else ctx.pane_focus('hints') end
+    return
+  end
+  if not ctx.pane_do(function() return PN.stack(m, 'hints', 'ctrl') end, 'hints: next to main') then
+    ctx.pane_do(function() return PN.show(m, 'hints') end, 'hints shown')
+  end
+  vim.msg = 'hints: point at a module - what it is and how to use it (\\ h again - focus / hide)'
+end
+ctx.hints_draw = function(Lx, x, y, w, h, foc, hv)
+  local PN = draw.panes
+  local id
+  local lay = draw.pn_lay
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  for pid, r in pairs(lay and lay.rects or {}) do
+    if pid ~= 'hints' and mx >= r.x and mx < r.x + r.w and my >= r.y and my < r.y + r.h then id = pid; break end
+  end
+  id = id or (state.focus ~= 'hints' and state.focus) or ctx.pn_prev or 'tracker'
+  if id == 'top' then id = state.toptab or 'sample' end
+  local p = PN.BY[id]
+  local title = (p and p.label or id):upper()
+  U.text(x, y, draw.fit(title, w), U.AMBER)
+  local txt = PN.about(id, ctx) or 'no description yet'
+  local ty = y + Lx.rh + 4
+  local line = ''
+  local function flush() if line ~= '' then U.text(x, ty, line, U.TEXT); ty = ty + Lx.rh; line = '' end end
+  for word in txt:gmatch('%S+') do
+    if ty + Lx.rh > y + h then break end
+    local try = line == '' and word or (line .. ' ' .. word)
+    if draw.measure(try) > w and line ~= '' then flush(); line = word else line = try end
+  end
+  if ty + Lx.rh <= y + h then flush() end
+  ty = ty + 4
+  if ty + Lx.rh <= y + h then U.text(x, ty, draw.fit('\\ - its menu   help pane - its keys   \\ ? - the whole help', w), U.GREY) end
+end
 ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
   if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, HELP) end
   local DOC = ctx.DOC
@@ -17965,9 +18006,9 @@ function view_actions()
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
-    { 'Help', key = 'h', fn = function() ctx.help_big() end },
+    { 'Help (the whole help inside the tracker)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
+    { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
-    { (state.khelp and '!' or '') .. 'Help panel of the focused module', key = 'K', fn = function() ctx.toggle_help() end },
   }
 end
 
@@ -20859,9 +20900,9 @@ function ctrl_action(name, delta)
   elseif name == 'q_preview' then if delta == 0 then state.preview = not state.preview end
   elseif name == 'q_endstop' then if delta == 0 then state.endstop = not state.endstop end
   elseif name == 'q_captions' then if delta == 0 then state.captions = not state.captions; relayout() end
-  elseif name == 'help' then if delta == 0 then ctx.toggle_help() end
+  elseif name == 'help' then if delta == 0 then ctx.help_big() end   -- 28 окт: help — вся справка внутри трекера
   elseif name == 'notes' then if delta == 0 then ctx.notes_toggle() end
-  elseif name == 'hints' then if delta == 0 then state.hints = not state.hints; vim.msg = 'module hints ' .. (state.hints and 'on' or 'off') end
+  elseif name == 'hints' then if delta == 0 then ctx.hints_open() end   -- 28 окт: hints — панель описаний (строка подсказок — в опциях)
   elseif name == 'play' then
     if delta == 0 then edit.play_stop()
     else
@@ -22654,6 +22695,7 @@ local function frame()
     ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
     act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
+    hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,   -- 28 окт: панель hints
     slice_key = function(k) return ctx.slice_key(k) end, slice_note = function(k) return ctx.slice_note(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -23874,8 +23916,8 @@ local function frame()
   elseif type(hover.khelp) == 'table' then state.status = hover.khelp.e.k .. '  -  ' .. hover.khelp.e.d .. (hover.khelp.tag and ('   [' .. hover.khelp.tag .. ']') or '')
   elseif hover.ctrl == 'notes' then state.status = 'notes: project notes / notes of the item under the cursor - the editor opens in the main module'
   elseif type(hover.notes) == 'string' then state.status = hover.notes == 'text' and 'notes - type (markdown: # heading, - [ ] todo, - list, > quote, `code`, **bold**); Esc / Tab: leave (saved)' or (hover.notes == 'drag' and 'notes: drag the header to move the window' or hover.notes == 'resize' and 'notes: drag the corner to resize' or hover.notes:match('^zoom') and 'notes text size' or hover.notes:match('^todo:') and 'todo - click: done / open' or ('show ' .. hover.notes .. ' notes'))
-  elseif hover.ctrl == 'hints' then state.status = 'module hints: one line of the main keys under every module; ? opens the full help'
-  elseif hover.ctrl == 'help' then state.status = 'help panel: keys of the focused module at the bottom (the help button - the whole help); pressed keys light up'
+  elseif hover.ctrl == 'hints' then state.status = 'hints: a pane next to main - what the module under the mouse does (\\ h); the line of keys under modules - options, module hints'
+  elseif hover.ctrl == 'help' then state.status = 'help: the whole help inside the tracker (\\ ?): sections, j k, / search, o - in the browser'
   elseif hover.ctrl == 'options' then state.status = 'all tracker options in one window (:options, \\o)'
   elseif hover.ctrl == 'about' then state.status = 'about: version and changes (:about)'
   elseif hover.ctrl == 'caps' then state.status = 'column captions: a row under the track header naming the fields - wv nt vl fx dl'
