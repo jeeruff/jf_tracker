@@ -590,10 +590,13 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if playing then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(0, y, W, rh, 1) end
     if queued then U.set(U.tint(U.CYAN, 0.30)); gfx.rect(0, y, W, rh, 1) end
     -- плейхед внутри слота (детальный зум): тонкая линия по времени
+    -- 28 окт: цветом курсора REAPER (тема: col_cursor, зелёный), 2 px; в однострочном слоте — ничего (лишняя риска)
     if playing and rh > L.rh then
       local fy = y + math.floor((info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0) * rh)
-      U.set(U.AMBER); gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 1, 1)
-    elseif playing then
+      local pc = reaper.GetThemeColor('col_cursor', 0)   -- зелёный курсор темы (как на снимке пользователя)
+      if pc and pc >= 0 then local r, g, b = reaper.ColorFromNative(pc); gfx.set(r / 255, g / 255, b / 255, 1) else U.set(U.GREEN) end
+      gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 2, 1)
+    elseif false then
       -- 8 окт: строка в одну высоту — плейхед по горизонтали: полоса прогресса
       -- снизу и риска на месте (по клеткам паттерна, слева направо)
       local frac = (info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0)

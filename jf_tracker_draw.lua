@@ -6745,6 +6745,41 @@ function D.pane_col(id, mode, hue)
   D.PCOL[id] = c
   return c
 end
+-- 28 окт: кэш панелей — «спокойная» панель (lib, браузер, справка …) рисуется в общий буфер 1022 размером с окно, только
+-- когда что-то поменялось; в прочих кадрах её прямоугольник копируется из буфера. Перерисовка: эпоха main (ввод, правка,
+-- снимок, фокус, раскладка, курсор), мышь над панелью (и кадр после ухода), фокус на ней, раз в 0.5 с (фоновые
+-- обновления), воспроизведение — у панелей с плейхедом, хинты-прыжки. Трекер, микшер, DSP, вкладки с волной — всегда
+D.PC_OK = { inst = true, browser = true, map = true, help = true, hints = true, notes = true, clipboard = true, undotree = true,
+  actions = true, harm = true, reform = true, humanizer = true, renderer = true, console = true, tracks = true, patterns = true,
+  matrix = true, fxb = true, sprops = true, nmod = true, macros = true, pm = true }
+D.PC_PLAY = { matrix = true, patterns = true, browser = true, map = true, inst = true }   -- плейхед / превью
+D.pc_st = {}
+function D.pc_hit(id, c, info, inside, foc)
+  if not (D.pc_on and D.PC_OK[id] and not c.min) then return false end
+  if D.pc_w ~= gfx.w or D.pc_h ~= gfx.h then gfx.setimgdim(1022, gfx.w, gfx.h); D.pc_w, D.pc_h = gfx.w, gfx.h; D.pc_st = {} end
+  local st = D.pc_st[id]
+  local now = reaper.time_precise()
+  if st and st.ep == info.pc_epoch and st.x == c.x and st.y == c.y and st.w == c.w and st.h == c.h and not inside and not st.inside
+     and not foc and now - st.t < 0.5 and not (info.playing and D.PC_PLAY[id]) and not info.hn_active then
+    gfx.blit(1022, 1, 0, c.x, c.y, c.w, c.h, c.x, c.y, c.w, c.h)
+    D.pc_hits = (D.pc_hits or 0) + 1
+    return true
+  end
+  return false
+end
+function D.pc_begin(id, c)
+  if not (D.pc_on and D.PC_OK[id] and not c.min and D.pc_w) then return nil end
+  local d0 = gfx.dest
+  gfx.dest = 1022
+  return { id = id, d0 = d0, c = c }
+end
+function D.pc_end(pc, info, inside)
+  if not pc then return end
+  local c = pc.c
+  gfx.dest = pc.d0; gfx.a = 1; gfx.mode = 0
+  gfx.blit(1022, 1, 0, c.x, c.y, c.w, c.h, c.x, c.y, c.w, c.h)
+  D.pc_st[pc.id] = { ep = info.pc_epoch, x = c.x, y = c.y, w = c.w, h = c.h, t = reaper.time_precise(), inside = inside }
+end
 function D.panes_frame(L, snap, state, info, hover, ph)
   L.pn_dsp = nil
   local PN, lay = D.panes, L.pn
@@ -6762,7 +6797,14 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
           info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
       end
+    elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
+      -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
+      local ct = c.content
+      local rk = PN.BY[id].tab and 'top' or id
+      if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
+      if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
     elseif id then
+      local pcb = D.pc_begin(id, c)
       local ct = c.content
       -- 11 окт: mixer — полоски уже нарисованы трекером (раньше оболочки): фон только под подписью
       set(U.PANEL); gfx.rect(c.x, c.y, c.w, id == 'mixer' and math.max(0, ct.y - c.y) or c.h, 1)
@@ -6945,6 +6987,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if not qb then qb = { { '\\', 'menu' } }; for _, it in ipairs(bar) do qb[#qb + 1] = it end; D.qm_bars[bar] = qb end
         D.hint_bar(hl, c.hint.x, c.hint.y, c.hint.w, qb, fon)
       end
+      D.pc_end(pcb, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h)
     end
   end
   D.pmark('panes: lines and grips')
