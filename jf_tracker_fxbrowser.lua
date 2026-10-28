@@ -20,6 +20,7 @@ local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf
 local FB = {}
 FB.list = {}           -- { label=, data= } от main
 FB.query = ''
+FB.pq_prev = ''   -- 28 окт: начало поиска — main строит индекс пресетов
 FB.cur = 1
 FB.scroll = 0
 FB.folder = 'all'
@@ -254,6 +255,29 @@ function FB.results()
     end
     res = out
   elseif #terms > 0 then table.sort(res, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.name < b.name end) end
+  -- 28 окт: поиск и по пресетам плагинов (FB.presets — индекс jf_tracker_fxpresets, строит main при первом поиске):
+  -- группа «presets» под плагинами; строка — пресет и его плагин, Enter — плагин сразу с этим пресетом
+  if #terms > 0 and FB.presets and (folder == 'all' or (tree and FB.node.k == 'all')) then
+    local pr = {}
+    for _, e in ipairs(FB.presets) do
+      local hay = (e.preset .. ' ' .. (e.fx.label or '')):lower()
+      local total, okp = 0, true
+      for _, t in ipairs(terms) do
+        local sc = score(hay, t)
+        if not sc then okp = false; break end
+        total = total + sc
+      end
+      if okp and not (next(FB.excl) and FB.excluded(e.fx)) then
+        pr[#pr + 1] = { it = { label = e.fx.label, data = e.fx.data, preset = e.preset, user = e.user }, s = total, name = e.preset:lower() }
+        if #pr >= 300 then break end
+      end
+    end
+    if #pr > 0 then
+      table.sort(pr, function(a, b) if a.s ~= b.s then return a.s > b.s end return a.name < b.name end)
+      res[#res + 1] = { hdr = ('presets %d'):format(#pr) }
+      for _, r in ipairs(pr) do res[#res + 1] = r end
+    end
+  end
   cache.q, cache.list, cache.res, cache.folder, cache.gen = FB.query, FB.list, res, fkey, FB.gen
   return res
 end
@@ -448,7 +472,8 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     local sel = idx == FB.cur
     local curc = sel and U.list_cursor(x + 1, ry, w - 3, L.rh, focused and (FB.col == 2 or not FB.tree_on))   -- 10 окт: курсор как в lib
     local name, kind = FB.short(r.it.label)
-    if FB.is_fav(r.it) then name = '* ' .. name end          -- избранное видно в любой папке
+    if r.it.preset then kind = name; name = (r.it.user and '' or '~ ') .. r.it.preset end   -- 28 окт: пресет (~ — заводской), справа — его плагин
+    if FB.is_fav(r.it) and not r.it.preset then name = '* ' .. name end          -- избранное видно в любой папке
     local exl = FB.excl['p:' .. r.it.label]
     if exl then name = 'x ' .. name end                       -- 28 окт: исключён из поиска
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0

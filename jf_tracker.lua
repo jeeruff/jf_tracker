@@ -100,6 +100,7 @@ edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спек
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
 local FB = dofile(DIR .. '/jf_tracker_fxbrowser.lua')   -- браузер эффектов слева от DSP (2 окт)
+FB.PI = dofile(DIR .. '/jf_tracker_fxpresets.lua')   -- 28 окт: индекс пресетов плагинов (поиск в fx list)
 local KH = dofile(DIR .. '/jf_tracker_keyhelp.lua')
 KH.marks_load(reaper.GetExtState('jf_tracker', 'khmarks'))   -- 18 окт: закладки справки
 KH.on_marks = function() reaper.SetExtState('jf_tracker', 'khmarks', KH.marks_str(), true) end
@@ -2728,10 +2729,10 @@ ctx = {
     end
     local col = dsp_target()
     if not (it and col) then vim.msg = 'fx: nothing selected'; return end
-    edit.fx_add(col.track, it.data, pos)
+    edit.fx_add(col.track, it.data, pos, it.preset)
     FB.push_recent(it); ctx.fxb_save()
     state.dsp = true
-    vim.msg = '+ ' .. (FB.short(it.label)) .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
+    vim.msg = '+ ' .. (FB.short(it.label)) .. (it.preset and (' [' .. it.preset .. ']') or '') .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
     -- 5 окт: фокус — туда, откуда пришли к поиску эффектов
     if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
   end,
@@ -4309,6 +4310,25 @@ ctx = {
       model.invalidate()
       vim.msg = '+ ' .. x.label .. ' (take fx of the note under the cursor)'
     end)
+  end,
+  -- 28 окт: индекс пресетов (REAPER/presets/*.ini) — один раз, при первом поиске в fx list; :fxpresets — заново
+  fx_presets_build = function()
+    local dir = reaper.GetResourcePath() .. '/presets'
+    local files = {}
+    local i = 0
+    while true do
+      local fn = reaper.EnumerateFiles(dir, i)
+      if not fn then break end
+      if fn:match('%.ini$') then
+        local fh = io.open(dir .. '/' .. fn, 'r')
+        if fh then files[#files + 1] = { name = fn, text = fh:read('a') or '' }; fh:close() end
+      end
+      i = i + 1
+      if i > 5000 then break end
+    end
+    FB.presets = FB.PI.build(files, FB.list)
+    FB.gen = FB.gen + 1
+    return #FB.presets, #files
   end,
   fx_list = function()
     local items = {}
@@ -22642,6 +22662,11 @@ local function frame()
     fxb_px = state.fxb_px,
     fxb_draw = (state.panes_ui or (state.dsp and state.fxb and not state.khelp and not state.browserleft)) and function(Lx, x, y, w, h)   -- панели: у fx list свой лист
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
+      -- 28 окт: начали поиск — индекс пресетов (первый раз и не чаще раза в минуту: свежесохранённые находятся)
+      if FB.query ~= '' and FB.pq_prev == '' and #FB.list > 0 and (not FB.presets or reaper.time_precise() - (FB.pres_t or 0) > 60) then
+        FB.pres_t = reaper.time_precise(); ctx.fx_presets_build()
+      end
+      FB.pq_prev = FB.query
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
     end or nil,
     dsp_drag = (dsp_drag and dsp_drag.active and { k = dsp_drag.fx }) or (fxb_drag and fxb_drag.active and { new = true }) or nil,

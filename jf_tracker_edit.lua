@@ -4258,9 +4258,10 @@ end
 -- окно FX после добавления (5 окт, галочка в меню DSP): false — закрыть
 -- (параметры и так в блоке DSP), true — открыть; REAPER сам может открыть
 E.open_on_add = false
-function E.fx_add(track, name, pos)
+function E.fx_add(track, name, pos, preset)
   run('fx add', function()
     local idx = add_fx(track, name, pos and (-1000 - pos) or -1)
+    if idx and idx >= 0 and preset and preset ~= '' then FA(track).SetPreset(track, idx, preset) end   -- 28 окт: из поиска по пресетам
     if idx and idx >= 0 then FA(track).Show(track, idx, E.open_on_add and 3 or 2) end
   end)
   if model then model.invalidate() end
