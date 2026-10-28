@@ -17818,6 +17818,7 @@ function view_actions()
     { 'Help (the whole help inside the tracker)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
+    { 'Quit REAPER (it asks to save a changed project)', key = 'q', fn = function() reaper.Main_OnCommand(40004, 0) end },   -- 28 окт: \\ q
   }
 end
 

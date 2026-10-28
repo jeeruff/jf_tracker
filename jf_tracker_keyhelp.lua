@@ -174,6 +174,7 @@ KH.PAGES = {
     { k = ':', d = 'command line (Tab completes)' },
     { k = '\\', d = 'the main menu of everything (v view, P project, o options ...)' },
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },
+    { k = '\\ q', t = {}, d = 'quit REAPER (as File: Quit - it asks to save a changed project)' },
     { k = '\\ k', t = {}, d = 'keyboard modes: m - notes, p - patternkb (the note keys play the patterns), c - clipkb (1qaz 2wsx ... play the matrix cells); the mode word shows it (УЗОРКЛАВЪ / ОТРЫВКЛАВЪ)' },
     { k = '\\\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
     { k = '?', d = 'any REAPER action in the tracker style (fuzzy, the recent ones on top)' },
