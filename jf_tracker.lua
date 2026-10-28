@@ -15503,6 +15503,8 @@ model.cont_view = function(tr, e)
   local v = (draw.kit_list or {})[g .. ':' .. tostring(e.fguid or e.i)]
   return (v == 'wrap' or v == 'pack' or v == 'list') and v or nil
 end
+-- 28 окт: cf — контейнер сложен целиком (шапка полоской, модули внутри не показаны); ключ — как у zf
+model.cont_folded = function(e) return state.dsp_mfold and state.dsp_mfold[tostring(e.fguid or e.i)] or false end
 model.inner_chain = function(tr, e, ki)   -- строка списка цепей пэда (ключ — как в draw.pad_chain_view)
   if not ki then return nil end   -- 24 окт: пэд не выбран — цепи нет (было: падал каждый кадр, чёрный экран)
   local g = reaper.ValidatePtr(tr, 'MediaTrack*') and reaper.GetTrackGUID(tr) or ''
@@ -15934,6 +15936,17 @@ ctx.theme_tab.init(U, {
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
   modefonts = function() return ctx.MODEFONTS end,
   -- 22 окт: zf — модуль DSP сложен в полосу (имя вертикально + x B), zF — все модули (есть развёрнутые — сложить все, иначе развернуть)
+  dsp_cfold = function(k)   -- 28 окт: cf — сложить / развернуть контейнер под курсором (или тот, в котором модуль)
+    local col = dsp_target(); local fxs = col and col.fx or {}
+    local f = fxs[k]
+    local c = f and (f.container and f or (f.inner and f.inner.parent))
+    if not (c and c.container) then vim.msg = 'cf: not in a container'; return end
+    state.dsp_mfold = state.dsp_mfold or {}
+    local key = tostring(c.fguid or c.i)
+    state.dsp_mfold[key] = (not state.dsp_mfold[key]) or nil
+    model.invalidate()
+    vim.msg = state.dsp_mfold[key] and ('cf: container %s folded (cf - unfold)'):format(c.name or '') or ('cf: container %s unfolded'):format(c.name or '')
+  end,
   dsp_mfold = function(which)
     state.dsp_mfold = state.dsp_mfold or {}
     local col = dsp_target(); local fxs = col and col.fx or {}
@@ -15947,6 +15960,7 @@ ctx.theme_tab.init(U, {
       local f = fxs[which]
       if not f then vim.msg = 'zf: no module'; return end
       state.dsp_mfold[key(f)] = (not state.dsp_mfold[key(f)]) or nil
+      if f.container then model.invalidate() end   -- 28 окт: контейнер — и его модули (cf)
       vim.msg = state.dsp_mfold[key(f)] and ('zf: %s folded (zf or a click on it - unfold)'):format(f.name) or ('zf: %s unfolded'):format(f.name)
     end
   end,

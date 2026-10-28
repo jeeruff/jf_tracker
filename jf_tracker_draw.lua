@@ -5531,7 +5531,7 @@ local function sq_bracket(x, y, h, right, L)
   local hx = right and (x + 2 - hw) or x
   gfx.rect(hx, y, hw, 2, 1); gfx.rect(hx, y + h - 2, hw, 2, 1)
 end
-local function brg(L) return math.max(4, L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
+local function brg(L) return math.max(6, 2 * L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end

@@ -1884,7 +1884,7 @@ function M.expand_inner(tr, out)
     e.cend = nil
     view[#view + 1] = e
     if e.container and e.kids and not e.kit and not e.bands then
-      if M.cont_mode(tr, e) == 'wrap' then wrap_kids(tr, e, view, 1)
+      if M.cont_mode(tr, e) == 'wrap' and not (M.cont_folded and M.cont_folded(e)) then wrap_kids(tr, e, view, 1)   -- 28 окт: cf — сложен целиком
       elseif e.wrap then   -- вид pack / list: вернуть полный список параметров
         e.wrap = nil; e.params = e.params_all or e.params
         if e.xy_own then e.xy, e.xy_x, e.xy_y = e.xy_own[1] or nil, e.xy_own[2], e.xy_own[3] end

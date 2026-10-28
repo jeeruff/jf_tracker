@@ -48,7 +48,7 @@ local T = {
   dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, 
         { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },
   dsp_y = { title = 'y - copy', items = { { 'y', 'the fx' } } },
-  dsp_c = { title = 'c - rack / container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' }, { 'v', 'view: pads / list (container: wrap / pack / list)' }, { 'b', 'into 3 / 4 / 5 bands' }, { 's', 'size of the drumrs5k pads: s m l' } } },
+  dsp_c = { title = 'c - rack / container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' }, { 'v', 'view: pads / list (container: wrap / pack / list)' }, { 'b', 'into 3 / 4 / 5 bands' }, { 'f', 'fold the container (with everything inside; again - unfold)' }, { 's', 'size of the drumrs5k pads: s m l' } } },
 }
 
 -- p — ожидающий префикс; op — оператор, если ждём g после него (dgg)
