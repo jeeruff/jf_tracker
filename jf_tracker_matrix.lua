@@ -589,14 +589,17 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local queued = MX.queued and MX.queued.idx == rg.idx and math.abs(MX.queued.pos - rg.pos) < 1e-6
     if playing then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(0, y, W, rh, 1) end
     if queued then U.set(U.tint(U.CYAN, 0.30)); gfx.rect(0, y, W, rh, 1) end
-    -- 28 окт: горизонтальной линии плейхеда в высоком слоте нет (лишняя: слот и так подсвечен)
-    if playing and rh <= L.rh then
+    -- плейхед внутри слота (детальный зум): тонкая линия по времени
+    if playing and rh > L.rh then
+      local fy = y + math.floor((info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0) * rh)
+      U.set(U.AMBER); gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 1, 1)
+    elseif playing then
       -- 8 окт: строка в одну высоту — плейхед по горизонтали: полоса прогресса
       -- снизу и риска на месте (по клеткам паттерна, слева направо)
       local frac = (info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0)
       local x0 = L.mx_label_w
       local fx = x0 + math.floor(frac * (W - x0 - 2) + 0.5)
-      U.set(U.AMBER); gfx.rect(x0, y + rh - 2, fx - x0, 2, 1); gfx.rect(fx, y + 1, 2, rh - 2, 1)
+      U.set(U.AMBER); gfx.rect(fx, y + 1, 2, rh - 2, 1)   -- 28 окт: без полосы прогресса снизу (лишняя), только риска
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
     -- 18 окт: колонка линейки — зона выделения / лупа (двойной щелчок — луп на слот, протяжка — несколько, Cmd — выборочно)
