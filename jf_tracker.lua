@@ -16578,6 +16578,16 @@ ctx.ACV.init(U, ctx, LG)
 -- отрезок холста: как у генератора (time selection → регион курсора → такт), в строках и секундах
 ctx.acv_span = function()
   local t0, t1, label = ctx.lfo_span()
+  -- 28 окт: без time selection — то, что видно в трекере (proj / sec / pat), а не регион / такт курсора
+  if label ~= 'time selection' and not ctx.ACV.proj then
+    local m = ctx.view_cur()
+    local a, b2, sc = ctx.view_rows()
+    if a and b2 and b2 >= a then
+      t0, t1 = edit.row_time(a, state.lpb, 0), edit.row_time(b2 + 1, state.lpb, 0)
+      label = m == 'project' and 'project' or (m == 'section' and ('section ' .. ((sc and sc.name) or '')) or label)
+      if m == 'project' then t1 = math.max(t1, t0 + 1) end
+    end
+  end
   if ctx.ACV.proj then t0, t1, label = 0, math.max(1, reaper.GetProjectLength(0)), 'project'   -- 15 окт: zp — весь проект
   elseif label == 'one bar' then                                  -- такт, в котором курсор (генератор берёт такт от курсора)
     local qn = reaper.TimeMap2_timeToQN(0, t0)
@@ -16591,6 +16601,14 @@ ctx.acv_span = function()
     bps = reaper.Master_GetTempo() / 60, row_of = function(t) return model.row_of_time(t, state.lpb) end,
     time = function(r) return edit.row_time(r, state.lpb, 0) end }
   if reaper.GetPlayState() & 1 == 1 then sp.play_row = model.row_of_time(reaper.GetPlayPosition(), state.lpb) end
+  -- 28 окт: сетка холста — границы паттернов и секций в отрезке (строки), такты — сам холст
+  sp.marks = {}
+  for _, rg in ipairs(regions or {}) do
+    if rg.pos and rg.pos >= t0 - 1e-6 and rg.pos < t1 - 1e-6 then sp.marks[#sp.marks + 1] = { row = model.row_of_time(rg.pos, state.lpb), kind = 'pat', name = rg.name ~= '' and rg.name or tostring(rg.idx or '') } end
+  end
+  for _, sc in ipairs(regions.sections or {}) do
+    if sc.pos >= t0 - 1e-6 and sc.pos < t1 - 1e-6 then sp.marks[#sp.marks + 1] = { row = model.row_of_time(sc.pos, state.lpb), kind = 'sec', name = sc.name or '' } end
+  end
   return sp
 end
 -- кривые холста: цель генератора (первая), огибающие трека курсора, огибающие слотов note mod
@@ -21941,7 +21959,8 @@ local function frame()
   if B.SM and B.mapG then
     B.SM.bg = true
     local G = B.mapG
-    if G.building then B.SM.scan(G, 0.001) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
+    -- обход папок — 3 мс за тик (раз в жизни папки), чтение индекса — 1 мс ×3
+    if G.building then B.SM.scan(G, G.rd and 0.001 or 0.003) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
     -- 28 окт: вид cloud — грубый анализ частот фоном: каждый 3-й тик два ещё не слышанных файла (шагом по списку,
     -- чтобы облако заполнялось равномерно); группы и облако пересобираются по мере (B.an_tick, раз в 1.5 с)
     if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then

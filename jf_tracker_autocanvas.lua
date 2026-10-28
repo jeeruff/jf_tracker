@@ -223,6 +223,17 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     local d = row - r0
     if d % g == 0 and (not dense or d % bar == 0) then U.set(U.mix(U.LINE, U.BG, (d % bar == 0) and 0.2 or 0.6)); gfx.rect(rx(row), gy, 1, gh, 1) end
   end
+  -- 28 окт: границы паттернов (ярче тактов) и секций (цветом, с именем) — сетка по горизонтали, как в трекере
+  for _, mk in ipairs(span.marks or {}) do
+    local mx0 = rx(mk.row)
+    if mk.kind == 'sec' then
+      U.set(U.CYAN); gfx.rect(mx0, gy, 2, gh, 1)
+      if mk.name ~= '' then U.text(mx0 + 3, gy + 1, ctx.fit(mk.name, math.max(0, gx + gw - mx0 - 4)), U.CYAN) end
+    else
+      U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(mx0, gy, 1, gh, 1)
+      if gw / math.max(1, #(span.marks or {})) > 30 and mk.name ~= '' then U.text(mx0 + 2, gy + gh - rh, ctx.fit(mk.name, 40), U.GREY) end
+    end
+  end
   U.set(U.mix(U.LINE, U.BG, 0.65))
   for _, f in ipairs({ 0.25, 0.5, 0.75 }) do gfx.rect(gx, vy(f), gw, 1, 1) end
   -- диапазон v
