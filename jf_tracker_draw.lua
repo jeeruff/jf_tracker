@@ -943,7 +943,7 @@ function D.layout(snap, state, nregions)
           -- true / false / nil = авто). Пул lib общий на все треки — по нему не судить (так колонка не уходила никогда)
           if not narrow then
             local pref = D.wave_pref and D.wave_pref(col)
-            local show = lane.audio_sub ~= nil or D.col_is_kit(col)
+            local show = lane.audio_sub ~= nil or D.col_is_kit(col) or (D.has_slx and D.has_slx(col))   -- 28 окт: и slixer (main)
             if pref ~= nil then show = pref end
             if not show then G = (G == L.GC) and L.GCM or L.nowaveG(G) end
           end
@@ -8740,7 +8740,7 @@ function D.frame(L, snap, rows, state, info)
           if h.c.kind == 'midi' and h.c.pitch and h.row >= r0 - 2048 then
             -- 19 окт: голова-волна — раз на снимок (h живёт, пока жив f.sub), не каждый кадр
             local ph = h.ph
-            if ph == nil then ph = info.kit_wave(f.col, h.c.pitch, h.row) or false; h.ph = ph end
+            if ph == nil then ph = info.kit_wave(f.col, h.c.pitch, h.row); if ph == 'wait' then ph = false else ph = ph or false; h.ph = ph end end   -- 28 окт: 'wait' — slixer ещё не ответил
             if ph == false then ph = nil end
             if ph then
               local e = h.row + math.ceil(ph.rows_f)

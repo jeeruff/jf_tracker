@@ -31326,6 +31326,52 @@ edit.kit_pad = function(track, pitch)
     end
   end
 end
+-- 28 окт: slixer на треке — у ноты в колонке волны кусок её слайса (нота → слайс по v.notes, пики — экспорт slixer
+-- для DSP: вся волна, срез a..b). Данные — последний ответ этого slixer (свежее 2 с — новый запрос, если DSP не
+-- держит другой slixer: обмен через gmem один на всех). 'wait' — ещё нет ответа, голова не запоминается
+ctx.slx_last = ctx.slx_last or {}
+ctx.slx_fx = function(col)
+  for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end
+end
+draw.has_slx = function(col) return ctx.slx_fx(col) ~= nil end
+ctx.slx_wave = function(col, pitch, row)
+  local sf = ctx.slx_fx(col)
+  if not sf then return nil end
+  if not pitch then return true end
+  local guid = reaper.TrackFX_GetFXGUID(col.track, sf.i)
+  if not guid then return nil end
+  local now = reaper.time_precise()
+  local v = ctx.slx_last[guid]
+  if (not v or now - v.t > 2) and (not ctx.slx.guid or ctx.slx.guid == guid) then
+    local nv = ctx.slixer_view(col.track, sf.i)
+    if nv and nv.frames and nv.frames > 0 then nv.t = now; ctx.slx_last[guid] = nv; v = nv end
+  end
+  if not (v and v.frames and v.frames > 0 and v.peaks and (v.peaks.n or 0) > 0 and (v.sr or 0) > 0) then return 'wait' end
+  local k
+  for i, nt in ipairs(v.notes or {}) do if nt == pitch then k = i; break end end
+  if not (k and v.starts[k] and v.ends[k] and v.ends[k] > v.starts[k]) then return nil end
+  local a, b = v.starts[k] / v.frames, v.ends[k] / v.frames
+  local t0 = edit.row_time(row, state.lpb, 0)
+  local rows_f = model.row_of_time(t0 + (v.ends[k] - v.starts[k]) / v.sr, state.lpb) - row
+  if rows_f <= 0 then return nil end
+  local P, memo = v.peaks, {}
+  return { rows_f = rows_f, start_f = 0, obey = true, choke = 0,
+    kpk = function(n)
+      local p = memo[n]
+      if p then return p end
+      local mx, mn = {}, {}
+      local i0, i1 = a * P.n, b * P.n
+      for q = 1, n do
+        local s0 = math.floor(i0 + (q - 1) / n * (i1 - i0)) + 1
+        local s1 = math.max(s0, math.floor(i0 + q / n * (i1 - i0)))
+        local hi, lo = 0, 0
+        for j = s0, math.min(s1, P.n) do local x1, x2 = P.max[j] or 0, P.min[j] or 0; if x1 > hi then hi = x1 end; if x2 < lo then lo = x2 end end
+        mx[q], mn[q] = hi, lo
+      end
+      p = { n = n, max = mx, min = mn }; memo[n] = p
+      return p
+    end }
+end
 ctx.kit_wave = function(col, pitch, row)
   local kc = ctx.kit_wave_c[col]
   if kc == nil then
@@ -31339,7 +31385,7 @@ ctx.kit_wave = function(col, pitch, row)
     end
     ctx.kit_wave_c[col] = kc
   end
-  if not kc then return nil end
+  if not kc then return ctx.slx_wave(col, pitch, row) end   -- 28 окт: не кит — может, slixer
   if not pitch then return true end
   local kd = kc[pitch]
   if not kd then return nil end
