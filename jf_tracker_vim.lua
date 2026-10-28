@@ -3112,7 +3112,20 @@ function V.key_impl(c)
       if e then finish_edit() else finish_move() end
       done = true
     elseif c == ctrl('a') or c == ctrl('x') then
-      apply(c == ctrl('a') and '+' or '-', f0, f1, r0, r1); V.mode = 'normal'; finish_edit(); done = true
+      -- 28 окт: выделение остаётся (жми ещё раз); лейны CC / PB и огибающие в выделении — их события тоже ±
+      local d = (c == ctrl('a') and 1 or -1) * (V.count or 1)
+      ctx.edit.run('nudge the selection', function()
+        for fi = f0, f1 do
+          local f = flat()[fi]
+          if f and f.ml and f.ml.ev and ctx.nudge_lane then
+            for r = r0, r1 do if f.ml.ev[r] then ctx.nudge_lane(fi, r, d) end end
+          elseif f and f.env and ctx.env_nudge then
+            for _, r in ipairs((ctx.env_point_rows and ctx.env_point_rows(f.env)) or {}) do if r >= r0 and r <= r1 then ctx.env_nudge(f.env, r, d / 64) end end
+          end
+        end
+        apply(c == ctrl('a') and '+' or '-', f0, f1, r0, r1)
+      end)
+      V.count = nil; finish_edit(); done = true
     elseif c == ('p'):byte() and V.regs['"'] and V.regs['"'].kind == 'field' then
       local n = V.field_paste(V.regs['"'], f0, r0); V.msg = ('field: %d value(s) put'):format(n)
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; finish_edit(); done = true
