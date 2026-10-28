@@ -21942,6 +21942,24 @@ local function frame()
     B.SM.bg = true
     local G = B.mapG
     if G.building then B.SM.scan(G, 0.001) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
+    -- 28 окт: вид cloud — грубый анализ частот фоном: каждый 3-й тик два ещё не слышанных файла (шагом по списку,
+    -- чтобы облако заполнялось равномерно); группы и облако пересобираются по мере (B.an_tick, раз в 1.5 с)
+    if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then
+      ctx.cl_tick = (ctx.cl_tick or 0) + 1
+      if #B.an_q >= 12 and ctx.cl_tick % 60 == 0 then local old = table.remove(B.an_q, 1); if old then B.an_qs[old] = nil end end   -- застрявший (пики не строятся) — вон
+      if ctx.cl_tick % 3 == 0 and #G.nodes > 0 and #B.an_q < 12 then   -- очередь не растёт, пока пики строятся
+        local N = #G.nodes
+        G.cl_ptr = G.cl_ptr or 0
+        local pushed, tries = 0, 0
+        while pushed < 2 and tries < 50 do
+          G.cl_ptr = (G.cl_ptr + 7919) % N
+          local n = G.nodes[G.cl_ptr + 1]
+          if n and not B.SM.AN[n.path] then B.an_push(n.path); pushed = pushed + 1 end
+          tries = tries + 1
+        end
+        pcall(B.an_tick, G)
+      end
+    end
   end
   if ctx.con_after then local okc, ec = pcall(ctx.con_tick); if not okc then ctx.con_after = nil; vim.msg = 'console: ' .. tostring(ec) end end   -- 28 окт
   -- 19 окт: превью pitch-команды (0U / 0D) у MIDI-ноты — изгиб по шагам, как его запишет клип; потом центр

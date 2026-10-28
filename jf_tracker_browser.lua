@@ -753,7 +753,17 @@ local function map_draw(U, L, x, y, w, h)
     local dirs = B.map_dirs()
     B.map_dcur = math.max(1, math.min(#dirs, B.map_dcur))
     U.set(U.PANEL); gfx.rect(x, y, dw, h, 1)
-    hv0 = draw_col(U, L, dirs, x, y + 1, dw - 2, h - 2, dirs[B.map_dcur] and dirs[B.map_dcur].name, 'mapdir', gfx.mouse_x, gfx.mouse_y)
+    -- 28 окт: узкая карта (справа нет колонки history) — история нижней половиной списка папок
+    local narrow = (w - dw) < L.cw * 44 and h > 12 * L.rh
+    local dh = narrow and math.floor(h / 2) or h
+    hv0 = draw_col(U, L, dirs, x, y + 1, dw - 2, dh - 2, dirs[B.map_dcur] and dirs[B.map_dcur].name, 'mapdir', gfx.mouse_x, gfx.mouse_y)
+    if narrow then
+      local mx, my = gfx.mouse_x, gfx.mouse_y
+      local hy = y + dh
+      local hh = B.SM.hist_panel(U, L, B.mapV, x, hy, dw - 1, h - dh, ctx.fit, mx, my, mx >= x and mx < x + dw and my >= hy and my < y + h)
+      if hh then hv0 = hh.hprint and 'maphprint' or ('maphist' .. hh.hist) end
+      U.set(U.LINE); gfx.rect(x, hy, dw - 1, 1, 1)
+    end
     if B.map_focus and B.mapV.zone == 'lf' then U.set(U.AMBER); gfx.rect(x, y, dw - 1, h, 0) end   -- 28 окт: часть в фокусе — рамкой
     U.set(U.LINE); gfx.rect(x + dw - 1, y, 1, h, 1)
     x, w = x + dw, w - dw
