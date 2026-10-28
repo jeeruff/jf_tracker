@@ -5625,6 +5625,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
   if (D.rack_ext or 0) < 3 then return end
   set((f.enabled and not f.poff) and lane_col(f.inner.lane or f.inner.bi) or U.DIM)   -- 28 окт: полоса ÷N — своим цветом
   gfx.rect(st.x, boxy + bh0 + 1, math.max(2, bx - L.pad - st.x), 2, 1)   -- ветка — черта под модулем, без ножек
+  if D.lane_top then gfx.rect(st.x, boxy - 3, math.max(2, bx - L.pad - st.x), 2, 1) end   -- 28 окт: опция — и над модулем
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.wrap then
@@ -5719,8 +5720,11 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     local selk = D.sel_i == kd.i
     local nhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
     set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
+    -- 28 окт: ветка — полоска её цвета слева (тот же цвет, что черта под модулем)
+    local lane = kd.entry and kd.entry.inner and kd.entry.inner.lane
+    if lane then set(kd.enabled and lane_col(lane) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1) end
     local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
-    text(x + L.pad, y, fit(glyph .. (kd.name or '?'), nw - 2 * L.pad), selk and U.TEXT or (kd.enabled and U.TEXT or U.GREY))
+    text(x + L.pad + (lane and 2 or 0), y, fit(glyph .. (kd.name or '?'), nw - 2 * L.pad - (lane and 2 or 0)), selk and U.TEXT or (kd.enabled and U.TEXT or U.GREY))
     if nhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', ki = c.ki, kid = kd } end
     if D.hint then D.hint('dspbtn', x, y, nw, L.rh - 1, { fx = k, what = 'cjump' }) end
     local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
