@@ -255,6 +255,73 @@ function C.rebuild(head, lpb, prev_semis)
       end
       R.MIDI_Sort(take)
     end
+    -- 28 окт: 0R на MIDI — нота перезапускается копиями (каждые y/16 строки, velocity ×(1 − x/16)) до конца ноты;
+    -- копии помечены в P_EXT:jf_rtg («ppq:pitch:ch;…»), исходная длина — в P_EXT:jf_rtl («ppq:pitch:end;…»),
+    -- при пересборке — сперва убрать прошлое
+    do
+      local _, gen = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', '', false)
+      local _, lens = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', false)
+      local changed = false
+      if (gen or '') ~= '' or (lens or '') ~= '' then
+        local G, Lm = {}, {}
+        for a1, b1, c1 in (gen or ''):gmatch('([%-%d%.]+):(%d+):(%d+)') do G[('%d:%d:%d'):format(math.floor(tonumber(a1) + 0.5), tonumber(b1), tonumber(c1))] = true end
+        for a1, b1, e1 in (lens or ''):gmatch('([%-%d%.]+):(%d+):([%-%d%.]+)') do Lm[('%d:%d'):format(math.floor(tonumber(a1) + 0.5), tonumber(b1))] = tonumber(e1) end
+        local _, nn = R.MIDI_CountEvts(take)
+        for k = nn - 1, 0, -1 do
+          local _, sel, mu, sp, ep, ch, pi, ve = R.MIDI_GetNote(take, k)
+          local key3 = ('%d:%d:%d'):format(math.floor(sp + 0.5), pi, ch)
+          local key2 = ('%d:%d'):format(math.floor(sp + 0.5), pi)
+          if G[key3] then R.MIDI_DeleteNote(take, k); changed = true
+          elseif Lm[key2] then R.MIDI_SetNote(take, k, sel, mu, sp, Lm[key2], ch, pi, ve, true); changed = true end
+        end
+        R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', '', true)
+        R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', true)
+      end
+      local rsegs = C.segments(list, { ['0R'] = true }, tq, len)
+      local gout, lout = {}, {}
+      if #rsegs > 0 then
+        local _, nn = R.MIDI_CountEvts(take)
+        local notes = {}
+        for k = 0, nn - 1 do
+          local _, sel, mu, sp, ep, ch, pi, ve = R.MIDI_GetNote(take, k)
+          notes[#notes + 1] = { k = k, sel = sel, mu = mu, sp = sp, ep = ep, ch = ch, pi = pi, ve = ve,
+            s = R.MIDI_GetProjTimeFromPPQPos(take, sp) - pos, e = R.MIDI_GetProjTimeFromPPQPos(take, ep) - pos }
+        end
+        for _, sg in ipairs(rsegs) do
+          local c = sg[3]
+          local every = (c.y > 0 and c.y or 4) / 16 * row_sec
+          local decay = 1 - c.x / 16
+          -- ноты, что звучат на начале отрезка (начались не позже его строки)
+          for _, nt in ipairs(notes) do
+            if nt.s <= sg[1] + row_sec / 2 and nt.e > sg[1] + 1e-4 and every > 1e-4 then
+              local stop = math.min(nt.e, sg[2])
+              local t = math.max(nt.s, sg[1]) + every
+              local j = 1
+              local first = true
+              while t < stop - 1e-4 and j <= 64 do
+                local pp = R.MIDI_GetPPQPosFromProjTime(take, pos + t)
+                local pnext = R.MIDI_GetPPQPosFromProjTime(take, pos + math.min(stop, t + every))
+                if first then   -- исходная — до первого перезапуска
+                  lout[#lout + 1] = ('%d:%d:%.3f'):format(math.floor(nt.sp + 0.5), nt.pi, nt.ep)
+                  R.MIDI_SetNote(take, nt.k, nt.sel, nt.mu, nt.sp, pp, nt.ch, nt.pi, nt.ve, true)
+                  first = false
+                end
+                local v = math.max(1, math.floor(nt.ve * decay ^ j + 0.5))
+                R.MIDI_InsertNote(take, false, nt.mu, pp, math.max(pp + 1, (t + every >= stop) and nt.ep or pnext), nt.ch, nt.pi, v, true)
+                gout[#gout + 1] = ('%d:%d:%d'):format(math.floor(pp + 0.5), nt.pi, nt.ch)
+                t = t + every; j = j + 1
+              end
+            end
+          end
+        end
+      end
+      if #gout > 0 then
+        R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', table.concat(gout, ';'), true)
+        R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', table.concat(lout, ';'), true)
+        changed = true
+      end
+      if changed then R.MIDI_Sort(take) end
+    end
     return
   end
   -- аудио: огибающие

@@ -131,7 +131,7 @@ function SM.save_cache(G, file)
   if not f then return false end
   f:write('JFMAP1\t', G.root, '\n')
   local last
-  for _, n in ipairs(G.nodes) do
+  for _, n in ipairs(G.raw or G.nodes) do
     if n.dir ~= last then f:write('D\t', n.dir or '', '\t', n.sub or '', '\n'); last = n.dir end
     f:write(n.name, '\n')
   end
@@ -229,8 +229,9 @@ function SM.sig_scan(S, budget)
 end
 function SM.sig_of(G)
   local h = 0
-  for _, n in ipairs(G.nodes) do h = (h + #n.path * 31 + n.path:byte(-1)) % 2147483647 end
-  return #G.nodes, h
+  local L0 = G.raw or G.nodes
+  for _, n in ipairs(L0) do h = (h + #n.path * 31 + n.path:byte(-1)) % 2147483647 end
+  return #L0, h
 end
 -- одинаковы ли два набора файлов (проверка изменений): число и сумма путей
 function SM.same_files(a, b)
@@ -254,7 +255,30 @@ local function place(n, k)
   local a, rr = k * 2.39996, SM.U * math.sqrt(k + SM.K0)
   n.ox, n.oy = rr * math.cos(a), rr * math.sin(a)
 end
+-- 28 окт: фильтры карты (список слева снизу): по имени — всегда, по звуку — для проанализированных (этап 2)
+SM.FILTERS = {
+  { key = 'quiet', label = 'no quiet', test = function(n, a) return a and a.l < 0.08 end },
+  { key = 'long', label = 'no long > 10s', test = function(n, a) return a and a.d and a.d > 10 end },
+  { key = 'short', label = 'no short < 0.2s', test = function(n, a) return a and a.d and a.d < 0.2 end },
+  { key = 'backup', label = 'no backup', test = function(n) local l = n.name:lower(); return l:find('backup', 1, true) or l:find('autosave', 1, true) end },
+  { key = 'ir', label = 'no IR', test = function(n) local l = (n.path or n.name):lower(); return l:find('impulse', 1, true) or l:find('/irs?/') or l:find('%f[%a]ir%f[%A]') or l:find('cab', 1, true) end },
+  { key = 'loops', label = 'no loops', test = function(n) return n.cat == 'loop' end },
+}
+SM.FON = {}
+function SM.filtered_out(n)
+  local a = SM.AN and SM.AN[n.path]
+  for _, f in ipairs(SM.FILTERS) do if SM.FON[f.key] and f.test(n, a) then return true end end
+  return false
+end
 function SM.finish(G)
+  -- 28 окт: G.raw — весь список (индекс, проверка изменений), G.nodes — после фильтров
+  G.raw = G.raw or G.nodes
+  if next(SM.FON) then
+    local keep = {}
+    for _, n in ipairs(G.raw) do if not SM.filtered_out(n) then keep[#keep + 1] = n end end
+    G.nodes = keep
+  else G.nodes = G.raw end
+  G.hubs = {}
   local hubi = {}
   G.bypath = {}
   for _, n in ipairs(G.nodes) do
@@ -634,6 +658,25 @@ function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, i
       end
     end
   end
+  -- 28 окт: справа сверху — вся галактика мелко, сектор этой системы подсвечен; щелчок — назад
+  if G.gal then
+    local mw = math.min(math.floor(w * 0.22), L.cw * 24)
+    local mh = math.floor(mw * 0.8)
+    local mx0, my0 = x + w - mw - 6, top + 2
+    U.set(U.BG); gfx.rect(mx0, my0, mw, mh, 1)
+    U.set(U.LINE); gfx.rect(mx0, my0, mw, mh, 0)
+    local function MX(v) return mx0 + (v + 1.05) / 2.1 * mw end
+    local function MY(v) return my0 + (v + 0.85) / 1.7 * mh end
+    for _, h2 in ipairs(G.hubs) do
+      local rc = h2.rect
+      if rc then
+        local on = h2 == hb
+        U.set(on and U.AMBER or U.mix(col(h2), U.BG, 0.55))
+        gfx.rect(math.floor(MX(rc[1])), math.floor(MY(rc[2])), math.max(1, math.floor(MX(rc[3]) - MX(rc[1]))), math.max(1, math.floor(MY(rc[4]) - MY(rc[2]))), on and 1 or 0)
+      end
+    end
+    if inside and mx >= mx0 and mx < mx0 + mw and my >= my0 and my < my0 + mh then hv = { back = true } end
+  end
   -- заголовок системы и кнопка назад
   local title = ('%s SYSTEM  %d BODIES'):format((hb.name:gsub('^/', '')):upper(), n)
   local bx, by = x + L.pad, top
@@ -686,9 +729,9 @@ end
 -- цвет точки по свежести: c — обычный цвет группы
 function SM.fresh_col(U, c, age)
   if age == 0 then return U.AMBER end
-  local dark = U.mix(c, U.BG, 0.82)
-  if age <= SM.DARK then return dark end
-  return U.mix(dark, U.mix(c, U.TEXT, 0.35), (age - SM.DARK) / SM.RECOVER)
+  -- 28 окт: хвост — свежие светлые, давние гаснут к обычному цвету (было: сразу тёмные, потом светлели)
+  local t = math.min(1, age / math.max(1, SM.DARK + SM.RECOVER))
+  return U.mix(U.mix(c, U.TEXT, 0.6), c, t)
 end
 -- панель истории справа: проигранные файлы, новое сверху, цвет — свежесть; → hover { hist = i }
 function SM.hist_panel(U, L, V, x, y, w, h, fit, mx, my, inside)
@@ -998,7 +1041,10 @@ function SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
       end
     end
   end
-  SM.buffered(G, ('sand|%d|%d|%d|%d|%.4f|%.1f|%.1f|%d|%d'):format(x, y, w, h, sc, cx, cy, G.ver, SM.an_n or 0), x, y, w, h, U, paint)
+  -- 28 окт: перерисовка буфера — по смене вида и раз в 2 с при новых анализах (было: каждый кадр, пока шёл анализ — 20 тыс. песчинок)
+  local now0 = R and R.time_precise and R.time_precise() or os.clock()
+  if (SM.an_n or 0) ~= (G.sand_an or 0) and now0 - (G.sand_t or 0) > 2 then G.sand_an, G.sand_t = SM.an_n or 0, now0 end
+  SM.buffered(G, ('sand|%d|%d|%d|%d|%.4f|%.1f|%.1f|%d|%d'):format(x, y, w, h, sc, cx, cy, G.ver, G.sand_an or 0), x, y, w, h, U, paint)
   -- подписи кучек (крупные первыми, без наложений), наведение — ближайшая песчинка в кучке под мышью
   local hv, hd
   local placed = {}
@@ -1194,6 +1240,22 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
       U.text(tx + L.pad, base, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
       if hot then hv = { mtype = t } end
       tx = tx + tw + 2
+    end
+    -- 28 окт: фильтры — строкой над типами
+    do
+      local fy = base - L.rh - 2
+      local fx = x + L.pad
+      for _, f in ipairs(SM.FILTERS) do
+        local on = SM.FON[f.key]
+        local tw = U.measure(f.label) + 2 * L.pad
+        if fx + tw > x + w - 4 then fy = fy - L.rh - 1; fx = x + L.pad end
+        local hot = mx >= fx and mx < fx + tw and my >= fy and my < fy + L.rh
+        U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(fx, fy, tw, L.rh - 1, 1)
+        U.set(on and U.AMBER or U.LINE); gfx.rect(fx, fy, tw, L.rh - 1, 0)
+        U.text(fx + L.pad, fy, f.label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+        if hot then hv = { mfilter = f.key } end
+        fx = fx + tw + 2
+      end
     end
     for k, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
       local sy = base + k * L.rh + 1

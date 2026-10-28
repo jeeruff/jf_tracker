@@ -491,6 +491,25 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   if not notes then
     local ok, buf = R.MIDI_GetAllEvts(take, '')
     notes = ok and M.parse_midi(buf) or {}
+    -- 28 окт: копии 0R (P_EXT:jf_rtg) не показываются, у исходной — её длина до перезапусков (P_EXT:jf_rtl)
+    do
+      local _, gen = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', '', false)
+      if gen and gen ~= '' then
+        local G, Lm = {}, {}
+        for a1, b1, c1 in gen:gmatch('([%-%d%.]+):(%d+):(%d+)') do G[('%d:%d:%d'):format(math.floor(tonumber(a1) + 0.5), tonumber(b1), tonumber(c1))] = true end
+        local _, lens = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', false)
+        for a1, b1, e1 in (lens or ''):gmatch('([%-%d%.]+):(%d+):([%-%d%.]+)') do Lm[('%d:%d'):format(math.floor(tonumber(a1) + 0.5), tonumber(b1))] = tonumber(e1) end
+        local keep = {}
+        for _, nt in ipairs(notes) do
+          if not G[('%d:%d:%d'):format(math.floor(nt.ppq + 0.5), nt.pitch, nt.ch)] then
+            local e = Lm[('%d:%d'):format(math.floor(nt.ppq + 0.5), nt.pitch)]
+            if e then nt.ppq_end = e end
+            keep[#keep + 1] = nt
+          end
+        end
+        notes = keep
+      end
+    end
     -- позиции нот — сразу в QN проекта (учитывает позицию item и offset)
     for _, nt in ipairs(notes) do
       nt.qn = R.MIDI_GetProjQNFromPPQPos(take, nt.ppq)

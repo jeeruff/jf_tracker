@@ -22744,7 +22744,7 @@ local function frame()
     nmod_draw = function(Lx, x, y, w, h) ctx.NMUI.draw(Lx, x, y, w, h, ctx.nmod_list(), state.focus == 'nmod') end,   -- 12 окт
     browser_fxb = function() return B.mode == 'fx' and B.fx_hover or nil end,
     -- 9 окт: панель pm — тот же модуль браузера в режиме pm (свой режим на время рисования)
-    map_draw = function(Lx, x, y, w, h) return B.map_pane(U, Lx, x, y, w, h) end,
+    map_draw = function(Lx, x, y, w, h) B.map_focus = state.focus == 'map'; return B.map_pane(U, Lx, x, y, w, h) end,
     fx_guid = function(f) local t = dsp_target(); return t and t.col and t.col.track and reaper.TrackFX_GetFXGUID(t.col.track, f.fx or f.i) or nil end,
     gr_of = function(col) ctx.gr_tick(); return col and col.guid and ctx.gr_trk[col.guid] end,   -- 27 окт: gain reduction трека
     gr_fx = function(f) ctx.gr_tick(); local t = dsp_target(); return t and t.col and f and ctx.gr_one[tostring(t.col.track) .. ':' .. tostring(f.i)] end,   -- 27 окт: карта сэмплов — своя панель
