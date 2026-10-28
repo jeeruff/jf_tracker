@@ -153,11 +153,11 @@ do
   a.items[3] = { pos = qn2t(5), len = qn2t(0.25), take = { name = 'hat.wav', pan = 0.5, chanmode = 2 }, loop = false }
   local b = { name = 'B', freemode = 2, nlanes = 2, lanenames = { 'one', 'two' }, items = {} }
   b.items[1] = { pos = 0, len = 0.5, lane = 1, take = { name = 'x.wav' } }
-  local depot = { name = 'DEPOT', items = { { pos = 0, len = 1, take = { name = 'd' } } } }
+  local depot = { name = 'LIB', items = { { pos = 0, len = 1, take = { name = 'd' } } } }
   tracks = { a, b, depot }
 
   local snap = M.build(4)
-  eq('cols (без DEPOT)', #snap.cols, 2)
+  eq('cols (без LIB)', #snap.cols, 2)
   local la = snap.cols[1].lanes[1]
   eq('A subs', #la.subs, 2)
   local h = la.subs[1][0]

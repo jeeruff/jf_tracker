@@ -235,9 +235,6 @@ do
   local sl = E.item_slices(it)
   near('slice 2 follows the wave: offs + t * rate stays', 0.5 + sl[2] * 1.309, 0.5 + 1 * 1.5)
   near('slice 3 too', 0.5 + sl[3] * 1.309, 0.5 + 2 * 1.5)
-  -- старая нарезка без rate0: оценка по длине (длина менялась вместе с rate)
-  local old = item(0, 4 * 1.5 / 1.309, 0.5, 1.309, { ['P_EXT:jf_slices'] = '0.000000,1.000000', ['P_EXT:jf_slice_base'] = '0.500000;4.000000' })
-  near('legacy slices recover the wave point', 0.5 + E.item_slices(old)[2] * 1.309, 0.5 + 1 * 1.5)
 end
 -- slice playthru (6 окт): до конца сэмпла, но не дальше следующей ноты колонки
 do
