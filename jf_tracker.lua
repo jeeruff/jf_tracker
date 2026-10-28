@@ -23478,7 +23478,7 @@ local function frame()
           local N = 16
           for i = 0, N - 1 do
             local t = (i + 0.5) / N
-            U.set(U.AMBER, A * ((to_end and t or (1 - t)) ^ 1.6))
+            U.set(draw.CUR_ACC or U.AMBER, A * ((to_end and t or (1 - t)) ^ 1.6))   -- 28 окт: цветом курсора
             if vert then local a0, a1 = y + math.floor(h * i / N), y + math.floor(h * (i + 1) / N); if a1 > a0 then gfx.rect(x, a0, w, a1 - a0, 1) end
             else local a0, a1 = x + math.floor(w * i / N), x + math.floor(w * (i + 1) / N); if a1 > a0 then gfx.rect(a0, y, a1 - a0, h, 1) end end
           end
