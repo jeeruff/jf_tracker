@@ -334,6 +334,7 @@ local state = {
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   krdelay = tonumber(reaper.GetExtState(EXT, 'krdelay')) or 250, krrate = tonumber(reaper.GetExtState(EXT, 'krrate')) or 30,   -- 27 окт: свой автоповтор зажатой клавиши (0 — системный)
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
+  holdroll = reaper.GetExtState(EXT, 'holdroll') == '1' or nil,   -- 28 окт: удержание ноты: hold — длина по времени (OFF), roll — курсор едет, без OFF
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
   hardedges = reaper.GetExtState(EXT, 'hardedges2') == '1',   -- 27 окт (ключ hardedges2: старое сохранённое «вкл» сброшено один раз): по умолчанию выкл — нота, что длиннее паттерна, звучит в следующий (BS не режет её по линии паттерна)
   escstop = reaper.GetExtState(EXT, 'escstop') ~= '0',   -- 17 окт: по умолчанию вкл, стоп на месте плейхеда
@@ -10633,6 +10634,7 @@ ctx = {
     swingbar = 'swing amount: drag left / right from the middle',
     velbar = 'velocity of the inserted notes 1..127: drag; { } (qwerty: c C) - step 8',
     mk1 = 'go to marker 1', mk2 = 'go to marker 2', mk3 = 'go to marker 3', mk4 = 'go to marker 4', mk5 = 'go to marker 5', mk6 = 'go to marker 6', mk7 = 'go to marker 7', mk8 = 'go to marker 8', mk9 = 'go to marker 9', mk10 = 'go to marker 10 (0)',
+    holdroll = 'held note key in INSERT: hold - the note lasts as long as you hold (an OFF where you let go); roll - the cursor rolls down while you hold, no OFF (the note rings to the next event). Opt+` switches',
     human = 'human: every inserted note a little different - timing, pitch, velocity / volume; click - 0 / 25 / 50 / 100 %',
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
     tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
@@ -18734,6 +18736,12 @@ function ctx.slx_apply_secs(f, secs, n_old, edge, frame)
   else ctx.slx_send_starts(secs) end
 end
 -- 27 окт: двойной щелчок по волне пульта — срез здесь; по границе — убрать её (как в слайсере lib)
+function ctx.holdroll_toggle()
+  state.holdroll = not state.holdroll or nil
+  reaper.SetExtState(EXT, 'holdroll', state.holdroll and '1' or '0', true)
+  vim.msg = state.holdroll and 'roll: hold a note key - the cursor rolls down, no OFF (the note rings to the next event)  (Opt+`)'
+    or 'hold: hold a note key - the note lasts as long as you hold, an OFF where you let go  (Opt+`)'
+end
 function ctx.slx_slice_edit(f, frame, del_edge)
   local v = f.slx_geo and f.slx_geo.v
   if not (v and v.starts and v.frames and v.frames > 0) then return end
@@ -20709,6 +20717,7 @@ function ctrl_action(name, delta)
     end
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
+  elseif name == 'holdroll' then ctx.holdroll_toggle()
   elseif name == 'legato' then
     edit.step_legato = not edit.step_legato; reaper.SetExtState(EXT, 'steplegato', edit.step_legato and '1' or '0', true)
     vim.msg = 'legato ' .. (edit.step_legato and 'on: an inserted note and the one before it last to the next note, not stretched (the instrument loop plays on)' or 'off')
@@ -22362,7 +22371,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
-      slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, holdroll = state.holdroll, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
@@ -28419,7 +28428,16 @@ local function frame()
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
       -- 21 окт: держат клавишу ноты в INSERT — длина вставленной MIDI-ноты по времени удержания (тап — до следующего события)
       local lm = edit.last_midi
-      if vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(now - lm.t_press) then
+      if state.holdroll and vim.mode == 'insert' and lm and now - lm.t_press < 30 and math.abs(lm.t_press - nk.t) < 0.5 then
+        -- 28 окт: roll — нота не обрезается (OFF нет, звучит до следующего события), курсор едет вниз по времени удержания
+        local rl = ctx.roll
+        if not (rl and rl.t == lm.t_press) then rl = { t = lm.t_press, row = vim.cur.row }; ctx.roll = rl end
+        local rd = edit.row_time(rl.row + 1, state.lpb, 0) - edit.row_time(rl.row, state.lpb, 0)
+        if rd > 0 then
+          local r = rl.row + math.floor((now - lm.t_press) / rd)
+          if r ~= vim.cur.row then vim.cur.row = r; if ctx.scroll_to_cursor then ctx.scroll_to_cursor() end end
+        end
+      elseif vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(now - lm.t_press) then
         ctx.hold_len = lm; reaper.UpdateArrange()
       end
     else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) } end
@@ -28490,6 +28508,10 @@ local function frame()
   end
   -- 13 окт: Ctrl+` — шаг next (на следующий объект трека) вкл / выкл, в любом режиме;
   -- note-off: ~ (Shift+`) — все треки, Ctrl+~ — весь трек (17 окт)
+  -- 28 окт: Opt+` — удержание нотной клавиши: hold (длина по времени, в конце OFF) / roll (курсор едет, OFF нет)
+  if c == 96 and ctx.mods().alt and not ctx.mods().ctrl and not ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    ctx.holdroll_toggle(); c = 0
+  end
   if c == 96 and ctx.mods().ctrl and not ctx.mods().cmd and not ctx.mods().shift and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     -- 25 окт: Ctrl+` — next ↔ auto (число — Ctrl - / +, Ctrl+0..9); Ctrl+Opt+` убран: одна функция — одна клавиша
     if vim.step_next then vim.step_next = false; vim.step_auto = true

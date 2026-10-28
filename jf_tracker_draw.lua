@@ -4515,8 +4515,9 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
+                  { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = 'hold' },   -- 28 окт: Opt+`
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
-                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
+                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 }, { '_', '', res = 'hold' },
                   { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
@@ -5522,10 +5523,13 @@ local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; retur
 D.lane_col = lane_col
 -- 28 окт: контейнер — только яркие [ ] внутри по краям: без линий над / под модулями, без ступенек и скобок
 -- (5 контейнеров = 10 линий — нечитаемо); зазор от шрифта: G = L.pad между модулями и от скобки до модуля
-local function sq_bracket(x, y, h, right)
+-- 28 окт (3): высота — как у модуля с его внешним пикселем рамки (by - 1 … by + bh), усики длиннее, от шрифта
+local function sq_bracket(x, y, h, right, L)
+  y, h = y - 1, h + 2
+  local hw = math.max(7, 2 * L.pad)
   gfx.rect(x, y, 2, h, 1)
-  local hx = right and (x - 3) or x
-  gfx.rect(hx, y, 5, 2, 1); gfx.rect(hx, y + h - 2, 5, 2, 1)
+  local hx = right and (x + 2 - hw) or x
+  gfx.rect(hx, y, hw, 2, 1); gfx.rect(hx, y + h - 2, hw, 2, 1)
 end
 local function brg(L) return math.max(4, L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
@@ -5537,7 +5541,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.wrap then
-    set((f.enabled and not f.poff) and U.AMBER or U.GREY); sq_bracket(bx, boxy, bh0, false)
+    set((f.enabled and not f.poff) and U.AMBER or U.GREY); sq_bracket(bx, boxy, bh0, false, L)
     D.cst[f] = { x = bx, y = boxy, k = k }
     bx = bx + 2 + brg(L)
   end
@@ -5567,7 +5571,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
       x = x + pw + brg(L)
     end
     if st and st.y == boxy then
-      set((c.enabled and not c.poff) and U.AMBER or U.GREY); sq_bracket(x, boxy, bh0, true)
+      set((c.enabled and not c.poff) and U.AMBER or U.GREY); sq_bracket(x, boxy, bh0, true, L)
     end
     bx = x + 2 + L.pad
   end
