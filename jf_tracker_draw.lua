@@ -5526,7 +5526,7 @@ D.lane_col = lane_col
 -- 28 окт (3): высота — как у модуля с его внешним пикселем рамки (by - 1 … by + bh), усики длиннее, от шрифта
 local function sq_bracket(x, y, h, right, L)
   y, h = y - 1, h + 2
-  local hw = math.max(7, 2 * L.pad)
+  local hw = math.max(4, L.pad + 1)   -- 28 окт (5): усики короче — от их концов до модуля видно зазор
   gfx.rect(x, y, 2, h, 1)
   local hx = right and (x + 2 - hw) or x
   gfx.rect(hx, y, hw, 2, 1); gfx.rect(hx, y + h - 2, hw, 2, 1)
