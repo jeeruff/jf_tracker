@@ -30755,6 +30755,15 @@ ctx.console_open = function()
   ctx.pane_focus('console')
   vim.msg = 'console: t1: n("c e g b") Enter - into the pattern at the cursor; Cmd+Enter - every line; Esc - back'
 end
+-- 28 окт: при запуске — скрытые копии 0R без исходной ноты (остались от прежних версий): убрать одним шагом undo
+ctx.rtg_startup = function()   -- функция, не do-блок: в главном куске предел 200 локальных
+  local okd, nd = pcall(edit.rtg_sync, true)
+  if okd and nd > 0 then
+    pcall(edit.run, '0R: remove ghost copies', function() edit.rtg_sync() end)
+    vim.msg = ('0R: %d ghost retrigger copies removed (their notes were deleted)'):format(nd)
+  end
+end
+ctx.rtg_startup()
 -- 28 окт: превью 0Rxy у MIDI-ноты — первая нота превью, затем копии каждые y/16 строки (y = 0 → 4/16), velocity
 -- ×(1 − x/16) на каждую, как их запишет jf_tracker_cmds; длина — нота (rows), не дольше 2 с
 ctx.preview_retrig = function(tr, pitch, xy, rows)

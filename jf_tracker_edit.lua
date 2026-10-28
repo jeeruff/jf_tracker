@@ -350,7 +350,8 @@ local function run(desc, fn)
   -- 13 окт: луп удержания — хвосты нот за головами (после всех правок, в том же undo)
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
-  if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: premod — за нотами трека
+  if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end
+  if ok and depth == 1 then local okr, er = pcall(E.rtg_sync); if not okr then E.rtg_err = er end end   -- 28 окт: копии 0R без исходной ноты   -- 22 окт: premod — за нотами трека
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil; E.tempo_pre = nil end
@@ -4508,6 +4509,72 @@ local function rtg_remap(it, fs, fe)
   end
   R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', table.concat(go, ';'), true)
   R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', table.concat(lo, ';'), true)
+end
+
+-- 28 окт: сироты 0R — копия звучит, только пока жива её исходная нота (та же высота / канал, начало раньше копии,
+-- исходный конец — P_EXT:jf_rtl — не раньше копии). Удалил ноту (x, dd, Backspace по ней …) — её скрытые копии
+-- оставались в клипе и звучали «призраком». После каждой правки: копии без исходной — вон, метки без нот — вон.
+-- Клип проверяется заново, только если его MIDI поменялся (хэш)
+E.rtg_hash = setmetatable({}, { __mode = 'k' })
+function E.rtg_clean(it, take, dry)   -- dry: только сосчитать
+  local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', '', false)
+  if (g or '') == '' then return 0 end
+  local _, l = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', false)
+  local G = {}
+  for a, pi, ch in g:gmatch('([%-%d%.]+):(%d+):(%d+)') do G[('%d:%d:%d'):format(math.floor(tonumber(a) + 0.5), tonumber(pi), tonumber(ch))] = true end
+  local Lm = {}
+  for a, pi, e in (l or ''):gmatch('([%-%d%.]+):(%d+):([%-%d%.]+)') do Lm[('%d:%d'):format(math.floor(tonumber(a) + 0.5), tonumber(pi))] = tonumber(e) end
+  local _, nn = R.MIDI_CountEvts(take)
+  local heads, copies = {}, {}
+  for k = 0, nn - 1 do
+    local _, _, _, sp, ep, ch, pi = R.MIDI_GetNote(take, k)
+    local key = ('%d:%d:%d'):format(math.floor(sp + 0.5), pi, ch)
+    if G[key] then copies[#copies + 1] = { k = k, sp = sp, pi = pi, ch = ch, key = key }
+    else
+      local hk = pi * 16 + ch
+      heads[hk] = heads[hk] or {}
+      local h = heads[hk]
+      h[#h + 1] = { sp = sp, e = Lm[('%d:%d'):format(math.floor(sp + 0.5), pi)] or ep }
+    end
+  end
+  local del, keep = {}, {}
+  for _, c in ipairs(copies) do
+    local alive = false
+    for _, h in ipairs(heads[c.pi * 16 + c.ch] or {}) do
+      if h.sp < c.sp - 0.5 and h.e >= c.sp - 1 then alive = true; break end
+    end
+    if alive then keep[#keep + 1] = c.key else del[#del + 1] = c.k end
+  end
+  if dry then return #del + (#keep ~= #copies and 1 or 0) end
+  table.sort(del, function(a, b) return a > b end)
+  for _, k in ipairs(del) do R.MIDI_DeleteNote(take, k) end
+  local nk = 0; for _ in pairs(G) do nk = nk + 1 end
+  if #del > 0 or #keep ~= nk then   -- и метки, чьих нот больше нет
+    R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', table.concat(keep, ';'), true)
+    if #keep == 0 then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', true) end
+  end
+  if #del > 0 then R.MIDI_Sort(take) end
+  return #del
+end
+function E.rtg_sync(dry)
+  local n = 0
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local tk = R.GetActiveTake(it)
+      if tk and R.TakeIsMIDI(tk) then
+        local _, h = R.MIDI_GetHash(tk, true, '')
+        if dry then n = n + E.rtg_clean(it, tk, true)
+        elseif E.rtg_hash[tk] ~= h then
+          n = n + E.rtg_clean(it, tk)
+          local _, h2 = R.MIDI_GetHash(tk, true, '')
+          E.rtg_hash[tk] = h2
+        end
+      end
+    end
+  end
+  return n
 end
 
 function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- keepend (19 окт): MIDI-клип до limit держит длину (паттерн Renoise)
