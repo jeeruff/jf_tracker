@@ -18967,64 +18967,14 @@ end
 -- 27 окт: АВТОПОВТОР ЗАЖАТОЙ КЛАВИШИ — свой: пауза state.krdelay мс, потом state.krrate раз в секунду. Системные повторы
 -- той же клавиши, пока она физически держится (JS_VKeys_GetState), гасятся. Только клавиши с понятным кодом (буквы, цифры,
 -- стрелки, Ctrl+буква); ноты в INSERT / на клавиатуре — системный повтор (по нему длина ноты удержанием). krdelay 0 — как было
-ctx.KR_ARROW = { [1818584692] = 37, [30064] = 38, [1919379572] = 39, [1685026670] = 40 }   -- полем ctx: у главного чанка нет свободных локалей
+ctx.KR = dofile(DIR .. '/jf_tracker_keyrep.lua')   -- 27 окт: автоповтор — модуль (тесты tests/test_keyrep.lua)
+ctx.KR_ARROW = ctx.KR.ARROW
+ctx.kr_env = { R = reaper, keyq = ctx.keyq, is_note = function(c) return keys.piano[c] and (vim.mode == 'insert' or vim.piano) end,
+  log = function(msg) if ctx.dlog then pcall(ctx.dlog, 'keyrep ' .. msg) end; if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', msg, false) end end }
 function ctx.key_repeat(c, from_q)
-  local d = state.krdelay or 250
-  if d <= 0 or not reaper.JS_VKeys_GetState then ctx.krep = nil; return c end
-  local now = reaper.time_precise()
-  local R = ctx.krep
-  -- 27 окт (2): «держат» — нажата по состоянию, либо с начала нажатия не было отпускания (состояние на кадр мигало —
-  -- повтор вставал после ~16 шагов); остановка пишется в журнал debug
-  -- 27 окт (3): нажата по состоянию; мигнуло «отпущена» на кадр — терпим 2 кадра подряд, на 3-й — стоп
-  -- (ждать события отпускания нельзя: Enter = код 13 стоял на vk «M», его отпускания не бывает — Enter x47)
-  -- 27 окт (5): ОТПУСКАНИЕ — событием (JS_VKeys_GetUp после последнего нажатия / системного повтора): стоп сразу, без
-  -- окна (окно 0.2 с давало гост-повтор после короткого тапа). Без события отпускания держим, даже если состояние
-  -- мигнуло «отпущена»; страховка от потерянного отпускания — «отпущена» 0.5 с и ни одного системного повтора
-  local function held(r)
-    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp((r.evt or r.t0) - 0.005)
-    local why
-    if up and up:byte(r.vk) ~= 0 then why = 'key up'
-    else
-      local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
-      if st and st:byte(r.vk) ~= 0 then r.up_t = nil; return true end
-      r.up_t = r.up_t or now
-      if now - r.up_t < 0.5 or (r.evt and now - r.evt < 0.5) then return true end
-      why = 'state up 0.5s, no os repeat'
-    end
-    local msg = ('stop c=%d vk=%d after %.2fs n=%d (%s)'):format(r.c, r.vk, now - r.t0, r.n or 0, why)
-    if ctx.dlog then pcall(ctx.dlog, 'keyrep ' .. msg) end
-    if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', msg, false) end
-    return false
-  end
-  if c > 0 and not from_q then
-    if R and R.c == c then
-      -- отпускание было после прошлого события этой клавиши — новое нажатие (jjj быстро), иначе системный повтор
-      local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp((R.evt or R.t0) - 0.01)
-      if not (up and up:byte(R.vk) ~= 0) then R.evt = now; c = 0 end   -- повтор — поглощён (и знак, что держат); свой шаг — ниже
-    end
-  end
-  if c > 0 and not from_q then
-    -- Enter / Tab / Backspace — свои vk (13 9 8), не Ctrl+M / I / H; Esc — без повтора
-    local vk = (c >= 97 and c <= 122) and (c - 32) or ((c >= 65 and c <= 90) or (c >= 48 and c <= 57)) and c
-      or ((c == 13 or c == 9 or c == 8) and c) or (c >= 1 and c <= 26) and (c + 64) or ctx.KR_ARROW[c]
-    if c == 27 then vk = nil end
-    local note = keys.piano[c] and (vim.mode == 'insert' or vim.piano)
-    if vk and not note then ctx.krep = { c = c, vk = vk, t0 = now, nxt = now + d / 1000 } else ctx.krep = nil end
-    return c
-  end
-  if R and c <= 0 then
-    if not held(R) then ctx.krep = nil; return c end
-    if now >= R.nxt then
-      local step = 1 / math.max(1, state.krrate or 30)
-      R.nxt = R.nxt + step
-      if now - R.nxt > 0.1 then R.nxt = now + step end
-      while now >= R.nxt and #ctx.keyq < 4 do ctx.keyq[#ctx.keyq + 1] = R.c; R.nxt = R.nxt + step; R.n = (R.n or 0) + 1 end   -- быстрее кадров — в очередь
-      R.n = (R.n or 0) + 1
-      if ctx.prof_ext then reaper.SetExtState('jf_dbg', 'krep', ('run c=%d n=%d t=%.2fs'):format(R.c, R.n, now - R.t0), false) end
-      return R.c
-    end
-  end
-  return c
+  local E = ctx.kr_env
+  E.delay, E.rate, E.keyq = state.krdelay or 250, state.krrate or 30, ctx.keyq
+  return ctx.KR.step(c, from_q, E)
 end
 -- 27 окт: в DSP буквы кнопок пульта slixer — Opt+буква (голые буквы — у самого DSP: d удалить fx …). Opt+E N U I на
 -- macOS — мёртвые клавиши (символ не приходит), поэтому физическая клавиша читается раз в кадр (JS_VKeys_GetState),
