@@ -5745,9 +5745,16 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   set(U.LINE); gfx.rect(x - 2, wy0, w + 4, math.max(2, y - wy0 + 1), 0)
   y = y + 3
   -- 25 окт: две цепи — кроссфейд одной ручкой нативно: mix второй цепи следует за mix первой с −100 % (база 1)
+  -- 28 окт: кнопка A<>B (было x-fade — путалось с кроссфейдом нот); горит, когда связь стоит; щелчок — вкл / выкл;
+  -- объяснение — в статусе при наведении
   if #chains == 2 and y + L.rh <= ymax then
-    local b1 = btn(x, 'x-fade', 'cxfade')
-    text(b1 + L.pad, y, fit('the mix of ' .. (chains[1].kd.name or '1') .. ' crossfades them', x + w - b1 - L.pad), U.DIM)
+    local c2 = chains[2].kd
+    local on = false
+    for _, l in ipairs(info.links_of and tr0_of(info) and info.links_of(tr0_of(info), f) or {}) do
+      if l.t == c2.i and l.tp == c2.wet_i then on = true end
+    end
+    local b1 = btn(x, on and 'A<>B on' or 'A<>B', 'cxfade', { on = on })
+    if on then text(b1 + L.pad, y, fit('mix of ' .. (chains[1].kd.name or '1'), x + w - b1 - L.pad), U.DIM) end
     y = y + L.rh + 2
   end
   -- связи «параметр следует за параметром» (нативный Link): строка — кто за кем и сила, справа — график зависимости

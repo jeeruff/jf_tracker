@@ -23686,7 +23686,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', cxfade = 'A<>B: crossfade the two chains with one knob - the mix of the first: 100 % only A, 0 % only B (the mix of B follows inverted, a native REAPER link); click again - off', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
@@ -26039,8 +26039,12 @@ local function frame()
         local ch = {}
         for _, kd in ipairs(f0 and f0.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then ch[#ch + 1] = kd end end
         if col and #ch == 2 and ch[1].wet_i and ch[2].wet_i then
-          if edit.param_link(col.track, f0.i, ch[2].i, ch[2].wet_i, ch[1].i, ch[1].wet_i, -1, 1) then
-            vim.msg = ('x-fade: the mix of %s crossfades %s and %s (100 %% - only %s)'):format(ch[1].name or '1', ch[1].name or '1', ch[2].name or '2', ch[1].name or '1')
+          local okl, la = reaper.TrackFX_GetNamedConfigParm(col.track, ch[2].i, ('param.%d.plink.active'):format(ch[2].wet_i))
+          if okl and la == '1' then   -- 28 окт: стоит — снять (A<>B off)
+            edit.param_unlink(col.track, ch[2].i, ch[2].wet_i)
+            vim.msg = ('A<>B off: the mixes of %s and %s are free again'):format(ch[1].name or '1', ch[2].name or '2')
+          elseif edit.param_link(col.track, f0.i, ch[2].i, ch[2].wet_i, ch[1].i, ch[1].wet_i, -1, 1) then
+            vim.msg = ('A<>B on: the mix of %s crossfades the two chains - 100 %% only %s, 0 %% only %s (click again - off)'):format(ch[1].name or '1', ch[1].name or 'A', ch[2].name or 'B')
           end
         end
       elseif hover.dspbtn.what == 'linkrow' then   -- 25 окт: строка связи — сила / снять
