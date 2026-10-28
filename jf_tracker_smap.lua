@@ -510,7 +510,7 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     end
     gfx.a = 1
   end
-  SM.buffered(G, ('cards|%d|%d|%d|%d|%.3f|%.3f|%d|%.1f|%d'):format(x, y, w, h, V.dim or 0.5, V.grav or 0.5, G.ver, cw, SM.cards_scroll), x, y, w, h, U, function() dots(x, y) end)
+  SM.buffered(G, ('cards|%d|%d|%d|%d|%.3f|%.3f|%d|%.1f|%.2f'):format(x, y, w, h, V.dim or 0.5, V.grav or 0.5, G.ver, cw, SM.cards_scroll or 0), x, y, w, h, U, function() dots(x, y) end)
   for _, hb in ipairs(G.hubs) do
     local i = hb.cell - 1
     local qx0, qy0 = x + (i % cols) * cw, top + math.floor(i / cols) * ch
