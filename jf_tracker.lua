@@ -27790,6 +27790,13 @@ local function frame()
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
+  -- 28 окт: Ctrl+- с клавиатуры не доходит до gfx.getchar (Ctrl+= доходит, логика шага верна — проверено инъекцией):
+  -- берём физическое нажатие vk 0xBD; если getchar сам прислал Ctrl+- (45 / 31) — запасной путь выключается
+  if c > 0 and (c == 45 or c == 31) and not from_q and ctx.mods().ctrl then ctx.kmin_native = true end
+  if c == 0 and not from_q and not ctx.kmin_native and ctx.win_focus and reaper.JS_VKeys_GetDown and ctx.mods().ctrl and not ctx.mods().cmd then
+    local dn = reaper.JS_VKeys_GetDown(ctx.frame_t_prev or (ctx.frame_t - 0.05))
+    if dn and dn:byte(0xBD) ~= 0 then c = 45 end
+  end
   -- 27 окт (7): Esc — выход из zz любой панели (кроме трекера: там Esc — INSERT), если Esc не нужен открытому меню / вводу
   if c == 27 and state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or vim.mode == 'cmd' or vim.mode == 'search' or (OPT and OPT.active) or B.filtering)
      and not (state.focus == 'map' and B.mapV and B.mapV.sys) then

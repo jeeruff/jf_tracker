@@ -7977,12 +7977,15 @@ function D.frame(L, snap, rows, state, info)
       local G1 = (L.flat[ln.f0] or {}).G or L
       local nx = ln.x + (ln.sx and ln.sx[1] or 0) + (G1.x_note or 0)
       local function pm(x0, kind, onhot)
+        -- 28 окт: зажат Option — ярко − + подколонок нот, Ctrl+Option — − + колонок эффектов
+        local cap = gfx.mouse_cap
+        local lit = cap & 16 ~= 0 and cap & 4 == 0 and (kind == 'fxcolbtn') == (cap & 32 ~= 0)
         for k, b in ipairs({ { '-', -1 }, { '+', 1 } }) do
           local bx = x0 + (k - 1) * (L.btn_w + 2)
           local hot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
-          set(hot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
-          set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
-          text(bx + 2, by, b[1], hot and U.AMBER or BTXT)
+          set(hot and D.CURROW or (lit and U.tint(U.AMBER, 0.35) or U.PANEL)); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
+          set(lit and U.AMBER or U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
+          text(bx + 2, by, b[1], (hot or lit) and U.AMBER or BTXT)
           if hot then onhot(b[2]) end
           hint(kind, bx, by, L.btn_w, L.rh, kind == 'lanebtn' and { col = col, lane = ln.lane, d = b[2], n = ln.nsub } or { d = b[2] })
         end
