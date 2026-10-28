@@ -4281,7 +4281,10 @@ function V.smart()
                  if h0 and h0.kind == 'midi' and h0.pitch and h0.item and ctx.preview then
                    local tr = reaper.GetMediaItem_Track(h0.item)
                    local _, nt = E.midi_note_of and E.midi_note_of(h0, lpb())
-                   if tr then ctx.preview(tr, (nt and nt.pitch) or h0.pitch, 'midi') end   -- 0S на ките мог сменить пэд
+                   local pp = (nt and nt.pitch) or h0.pitch
+                   if tr and letter == '0R' and ctx.preview_retrig then   -- 28 окт: слышно повторы, не одну ноту
+                     ctx.preview_retrig(tr, pp, it.v, nt and nt.len_rows or h0.len_rows or h0.rows)
+                   elseif tr then ctx.preview(tr, pp, 'midi') end   -- 0S на ките мог сменить пэд
                    -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — xx/16 полутона за строку
                    if (letter == '0U' or letter == '0D') and ctx.preview_bend and ctx.row_sec then
                      ctx.preview_bend(h0.ch or 0, (it.v / 16) * (letter == '0U' and 1 or -1) / ctx.row_sec(), 0.4, tr)

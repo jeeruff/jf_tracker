@@ -30590,6 +30590,34 @@ ctx.preview_bend = function(ch, slope, dur, tr)
   local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0   -- трек только что взведён — нота уйдёт через 0.15 с
   ctx.bend_q = { ch = ch, slope = slope, t0 = now + delay, t1 = now + delay + dur, range = tr and CM.bend_range(tr) or 2 }
 end
+-- 28 окт: превью 0Rxy у MIDI-ноты — первая нота превью, затем копии каждые y/16 строки (y = 0 → 4/16), velocity
+-- ×(1 − x/16) на каждую, как их запишет jf_tracker_cmds; длина — нота (rows), не дольше 2 с
+ctx.preview_retrig = function(tr, pitch, xy, rows)
+  ctx.preview(tr, pitch, 'midi')
+  local x, y = xy >> 4, xy & 15
+  local rs = ctx.row_sec()
+  local step = rs * ((y > 0 and y or 4) / 16)
+  local now = reaper.time_precise()
+  local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0
+  local dur = math.min(2, math.max(step, (rows or 4) * rs))
+  local p = math.max(0, math.min(127, math.floor(pitch)))
+  local offs = ctx.note_offs or {}
+  if offs[#offs] and offs[#offs].p == p then offs[#offs].t = now + delay + step * 0.9 end   -- первая нота не глушит копии
+  ctx.note_ons = ctx.note_ons or {}
+  local v, k = math.max(1, math.min(127, vim.vel or 100)), 1
+  while k * step < dur - 1e-6 and k < 128 do
+    v = v * (1 - x / 16)
+    if v < 1 then break end
+    local t = now + delay + k * step
+    ctx.note_ons[#ctx.note_ons + 1] = { p = p, v = math.max(1, math.floor(v + 0.5)), t = t }
+    offs[#offs + 1] = { p = p, t = t + step * 0.9 }
+    k = k + 1
+  end
+  ctx.note_offs = offs
+  local t_end = now + delay + dur + 0.3
+  if ctx.arm_tmp then ctx.arm_tmp.t = math.max(ctx.arm_tmp.t or 0, t_end) end
+  if ctx.vkb_iso then ctx.vkb_iso.t = math.max(ctx.vkb_iso.t or 0, t_end) end
+end
 -- 19 окт: undo без снимка дерева undo (промежуточные шаги reform): снимок проекта на каждое движение слайдера съедал память
 ctx.raw_undo = function()
   local ST = ctx.ut_state and ctx.ut_state()
