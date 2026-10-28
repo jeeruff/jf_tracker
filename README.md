@@ -102,7 +102,6 @@ Updates arrive through ReaPack's *Synchronize packages*. The zip is also on
    - `jf_tracker_scope` — the oscilloscope / spectrum of the scopes;
    - `jf_tracker_trig` — a note-on when a sample item starts (note mod);
    - `jf_tracker_probe` — a level meter between effects (gain staging in the router);
-   - `jf_tracker_macro` — the macro knobs of a container;
    - `jf_tracker_zone` — key / velocity / chain zones of a rack, as in Ableton;
    - `jf_tracker_choke` — pad groups and choke groups of the drum rack;
    - `jf_tracker_chordfollow` — notes of a track follow the chord lane.
