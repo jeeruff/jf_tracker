@@ -96,9 +96,16 @@ Updates arrive through ReaPack's *Synchronize packages*. The zip is also on
 
 1. Copy the `jf_tracker` folder into REAPER's `Scripts` folder. In REAPER,
    *Options → Show REAPER resource path* shows where that is.
-2. Copy `effects/jf_rec.jsfx`, `effects/jf_tracker_scope.jsfx` and
-   `effects/jf_tracker_trig.jsfx` into REAPER's `Effects` folder. They are the
-   retro sampler, the scopes and the MIDI trigger of sample notes (note mod).
+2. Copy every file of `effects/` into REAPER's `Effects` folder. The tracker
+   puts them on tracks by itself when a feature needs them:
+   - `jf_rec` — the retro sampler (what you played, caught after the fact);
+   - `jf_tracker_scope` — the oscilloscope / spectrum of the scopes;
+   - `jf_tracker_trig` — a note-on when a sample item starts (note mod);
+   - `jf_tracker_probe` — a level meter between effects (gain staging in the router);
+   - `jf_tracker_macro` — the macro knobs of a container;
+   - `jf_tracker_zone` — key / velocity / chain zones of a rack, as in Ableton;
+   - `jf_tracker_choke` — pad groups and choke groups of the drum rack;
+   - `jf_tracker_chordfollow` — notes of a track follow the chord lane.
 3. Open *Actions → Show action list → New action → Load ReaScript…* and pick
    `jf_tracker.lua`.
 

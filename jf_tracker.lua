@@ -3332,7 +3332,7 @@ ctx = {
     if state.panes_ui and state.panes then
       state.khelp = false
       if state.focus == 'help' then ctx.set_focus(ctx.pn_prev and ctx.pn_prev ~= 'help' and ctx.pn_prev or 'tracker'); vim.msg = 'help: back'
-      else ctx.pane_cmd('help show'); vim.msg = 'help pane: keys of the module you came from; F1 again - back' end
+      else ctx.pane_cmd('help show'); vim.msg = 'help pane: keys of the module you came from; \\ K again - back' end
       return
     end
     state.khelp = not state.khelp
