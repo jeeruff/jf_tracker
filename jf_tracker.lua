@@ -26487,7 +26487,7 @@ local function frame()
         reaper.SetMediaTrackInfo_Value(tr, F, v)
       end)
       -- 11 окт: протяжка по трекам, как в REAPER — то же значение на эту кнопку других треков
-      ctx.btn_paint = { what = what, v = v, done = { [hover.btn.col.guid] = true } }
+      ctx.btn_paint = { what = what, v = v, done = { [hover.btn.col.guid] = true }, y0 = gfx.mouse_y }
       click = { t = now2, zone = 'btn' }
     elseif hover.header_env then
       local ok, e = pcall(context_menu, hover)
@@ -27821,11 +27821,21 @@ local function frame()
   if ctx.btn_paint then
     local p = ctx.btn_paint
     if gfx.mouse_cap & 1 == 0 then ctx.btn_paint = nil
-    elseif hover and hover.btn and hover.btn.what == p.what and hover.btn.col and not p.done[hover.btn.col.guid] then
-      local tr = hover.btn.col.track
-      p.done[hover.btn.col.guid] = true
-      if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
-        edit.run('track ' .. p.what, function() reaper.SetMediaTrackInfo_Value(tr, ctx.TRK_BTN[p.what] or 'I_RECARM', p.v) end)
+    else
+      -- 28 окт: не обязательно попадать в кнопку — трек под мышью, если она примерно на той же высоте (±2 строки)
+      local col = hover and hover.btn and hover.btn.what == p.what and hover.btn.col
+      if not col and L and L.cols and math.abs(gfx.mouse_y - (p.y0 or gfx.mouse_y)) <= 2 * L.rh then
+        for _, c in ipairs(L.cols) do
+          if c.col and c.x and gfx.mouse_x >= c.x and gfx.mouse_x < c.x + (c.w or 0) and not c.master then col = c.col; break end
+        end
+      end
+      if col and col.guid and not p.done[col.guid] then
+        local tr = col.track
+        p.done[col.guid] = true
+        if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+          edit.run('track ' .. p.what, function() reaper.SetMediaTrackInfo_Value(tr, ctx.TRK_BTN[p.what] or 'I_RECARM', p.v) end)
+          model.invalidate()
+        end
       end
     end
   end
