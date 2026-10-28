@@ -11735,7 +11735,15 @@ function D.frame(L, snap, rows, state, info)
         local pnm, pnw = p.name or '', nw - L.pad - ((p.mk or '') ~= '' and (ms((p.mk:gsub(' ', ''))) + 2) or 0)
         if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
         text(bxc + L.pad, py, fit(pnm, pnw), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT))
-        if (p.mk or '') ~= '' then text(bxc + nw - ms((p.mk:gsub(' ', ''))), py, (p.mk:gsub(' ', '')), U.CYAN) end
+        if (p.mk or '') ~= '' then
+          text(bxc + nw - ms((p.mk:gsub(' ', ''))), py, (p.mk:gsub(' ', '')), U.CYAN)
+          -- 28 окт: метка — кнопка: щелчок / f-прыжок — панель automation с кривой и колонка огибающей в трекере
+          if not drag and mx >= bxc + nw - ms((p.mk:gsub(' ', ''))) - 1 and mx < bxc + nw + 1 and my >= py and my < py + L.rh then
+            hover.dspbtn = { fx = k, f = f, what = 'pauto', param = pi }
+            set(U.CYAN); gfx.rect(bxc + nw - ms((p.mk:gsub(' ', ''))) - 2, py, ms((p.mk:gsub(' ', ''))) + 3, L.rh, 0)
+          end
+          hint('dspbtn', bxc + nw - ms((p.mk:gsub(' ', ''))) - 1, py, ms((p.mk:gsub(' ', ''))) + 2, L.rh, { fx = k, what = 'pauto', param = pi })
+        end
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix

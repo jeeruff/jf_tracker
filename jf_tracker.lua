@@ -17588,6 +17588,7 @@ local function hint_go(t)
     elseif w == 'preset' then ctx.dsp_preset(d.fx, 'pick') elseif w == 'del' then ctx.dsp_delete(d.fx, d.fx)
     elseif w == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: midi out рэка
     elseif w == 'bands' then ctx.dsp_bands(d.fx)
+    elseif w == 'pauto' then ctx.param_auto_open(d.fx, d.param)   -- 28 окт: f-прыжок на метку ~
     elseif w == 'kview' and d.key then draw.kit_list = draw.kit_list or {}; draw.kit_list[d.key] = d.view end
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
   elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
@@ -26002,6 +26003,7 @@ local function frame()
           end
           vim.open_hydra({ title = (l.tpname or '?') .. ' follows ' .. (l.sname or '') .. ': ' .. (l.spname or ''), items = items })
         end
+      elseif hover.dspbtn.what == 'pauto' then ctx.param_auto_open(hover.dspbtn.fx, hover.dspbtn.param)   -- 28 окт: метка ~ параметра
       elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
@@ -31477,6 +31479,16 @@ ctx.chain_col_hex = function(arg)
   local h = (arg or ''):match('^#?(%x%x%x%x%x%x)$')
   if not (tg and h) then vim.msg = 'chcol rrggbb - after the chain colour picker (# item)'; return end
   ctx.chain_col_set(tg.tr, tg.key, h:lower()); vim.msg = 'chain colour #' .. h:lower()
+end
+-- 28 окт: метка ~ / ≈ параметра DSP (щелчок, f-прыжок) — огибающая: колонка в трекере (курсор на неё) и панель
+-- automation на странице curve (кривая); фокус остаётся в DSP
+ctx.param_auto_open = function(k, pi)
+  dsp_sel.fx, dsp_sel.param = k, pi
+  ctx.dsp_automate(k, pi)
+  mod_pane = 'curve'
+  local m = state.panes
+  if m and draw.panes and not draw.panes.visible(m, 'automation') then ctx.pane_do(function() return draw.panes.show(m, 'automation') end, 'automation shown') end
+  if m and draw.panes then draw.panes.set_active(m, 'automation'); state.toptab = 'automation'; ctx.relayout() end
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
