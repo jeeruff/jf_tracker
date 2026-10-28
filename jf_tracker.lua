@@ -167,15 +167,14 @@ local state = {
   preview = flag('preview', true),
   autosync = flag('autosync', true),
   pitchmodes = {},
-  font = tonumber(ext('font', 0)) or 0,         -- 0 = битмап REAPER (масштаб fontscale), N = TTF
+  font = 0,                                     -- битмап REAPER (масштаб fontscale); TTF убран 3 окт
   fontscale = tonumber(ext('fontscale', 2)) or 2,
   poolsort = tostring(ext('poolsort', 'track')),
   libtrack = reaper.GetExtState(EXT, 'libtrack') == '1',   -- 11 окт: lib по трекам (кнопка track)
   fontspace = tonumber(ext('fontspace', 2)) or 2,
-  toptab = (function() local t = ext('toptab', 'master'); if t == 'mod' then t = 'automation' elseif t == 'scope' then t = 'master' elseif t == 'clips' then t = 'sample' end; return t end)(),   -- clips вкладкой убраны (7 окт)
+  toptab = ext('toptab', 'master'),
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
-  pool = flag('pool', true),                    -- (устар.) = top
   poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (кнопка preview)
   -- режим превью инструмента (3 окт): full — до конца item / Esc, hold — пока
   -- держишь кнопку мыши на строке, sec — первая секунда
@@ -188,8 +187,6 @@ local state = {
   scopes = flag('scopes', false),               -- скопы дорожек в шапках (3 окт, вернули): JSFX-мост jf_tracker_scope на треках
   scopemode = (function() local v = reaper.GetExtState(EXT, 'scopemode'); return (v == 'spec' or v == 'sgram') and v or 'scope' end)(),
   icons = flag('icons', true),                    -- Nerd-иконки (TTF или гибрид с битмапом, :icons)
-  glyphface = (function() local v = reaper.GetExtState(EXT, 'glyphface'); return v ~= '' and v or nil end)(),
-  fontface = (function() local v = reaper.GetExtState(EXT, 'fontface'); return v ~= '' and v or 'JetBrainsMono Nerd Font Mono' end)(),
   xfade = flag('xfade', false),                   -- x-fade вставленных нот (\x, контрол xf)
   xfade_ms = tonumber(reaper.GetExtState(EXT, 'xfade_ms')) or 10,
   xfademode = reaper.GetExtState(EXT, 'xfademode') ~= '' and reaper.GetExtState(EXT, 'xfademode') or 'vol',   -- x-fade: vol (огибающая take, числа в колонке vol) | fades (5 окт)
@@ -206,7 +203,7 @@ local state = {
   wavemode = (function()
     local v = reaper.GetExtState(EXT, 'wavemode')
     if v == 'column' or v == 'note' or v == 'back' or v == 'off' then return v end
-    return reaper.GetExtState(EXT, 'wave') == 'off' and 'note' or 'column'
+    return 'column'
   end)(),
   itemcol = flag('itemcol', true),               -- заливка и кайма item его цветом (3 окт)
   itemalpha = tonumber(reaper.GetExtState(EXT, 'itemalpha')) or 5,   -- прозрачность заливки item, %
@@ -306,13 +303,12 @@ local state = {
   mfold = reaper.GetExtState(EXT, 'mfold') == '1', mfoldauto = reaper.GetExtState(EXT, 'mfoldauto') == '1',   -- 17 окт: мастер сложен / складывать сам   -- 17 окт: Shift+нота — прослушать (по умолчанию выкл)
   shadehue = tonumber(reaper.GetExtState(EXT, 'shadehue')) or 0,   -- 17 окт: оттенок shades (0 — акцент темы)   -- 17 окт: питч слайса от клавиши 1 или 6 (середина)
   panecol = ({ ['0'] = 'off', shades = 'shades' })[reaper.GetExtState(EXT, 'panecol')] or 'colours',   -- 17 окт: цвета панелей: colours — свой у каждой, shades — оттенки акцента темы, off
-  focusbeacon = flag('focusbeacon', true), dimfocus = tonumber(reaper.GetExtState(EXT, 'dimamt')) or (reaper.GetExtState(EXT, 'dimfocus') == '1' and 22 or 0),   -- 15 окт: dim unfocused — сила затемнения, % (0 = выкл; было вкл/выкл)   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
+  focusbeacon = flag('focusbeacon', true), dimfocus = tonumber(reaper.GetExtState(EXT, 'dimamt')) or 0,   -- 15 окт: dim unfocused — сила затемнения, % (0 = выкл; было вкл/выкл)   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
   ruler = flag('ruler', true), rgnames = flag('rgnames', true), mknames = flag('mknames', true), rgedges = flag('rgedges', true), rgbar = flag('rgbar', true), mxregion = flag('mxregion', true),   -- 11 окт: кнопка markers в уголке
   mxmarks = flag('mxmarks', true),              -- 10 окт: кнопка s/e — строки маркеров =START / =END в матрице
   mxfold = flag('mxfold', true),                  -- 7 окт: по умолчанию свёрнута (кнопка zoom)
   fps = (function() local v = reaper.GetExtState(EXT, 'fps'); return (v == '30' or v == '25' or v == '24') and tonumber(v) or 'max' end)(),               -- матрица свёрнута: номера, имена треков, ячейки (3 окт)
   toppos = (function() local v = reaper.GetExtState(EXT, 'toppos2'); return (v == 'top' or v == 'bottom' or v == 'clips') and v or 'mid' end)(),   -- 8 окт: по умолчанию над DSP (ключ toppos2 — сброс старого top)
-  wzoom = 0,                                                       -- 7 окт: прежний зум 0/1/2 заменён уровнями wzlevel
   wzlevel = tonumber(reaper.GetExtState(EXT, 'wzlevel')),         -- общий уровень ширины треков (Cmd + гор. колесо), nil — как у трека
   autozoom = reaper.GetExtState(EXT, 'autozoom') == '1' or nil,   -- 20 окт: ширина треков сама (кнопка autozoom)
   hdrin = reaper.GetExtState(EXT, 'hdrin') ~= '0',   -- строка входа в шапке трека (3 окт)
@@ -362,7 +358,7 @@ local state = {
   slx_ovbelow = reaper.GetExtState(EXT, 'mod_slixer_ovbelow') == '1' or nil,   -- 27 окт: скролл slixer под сэмплом   -- 27 окт: «~» на строках с автоматизацией (по умолчанию вкл)
   foldfast = reaper.GetExtState(EXT, 'foldfast') == '1',   -- 19 окт: fold быстрых нот (кнопка fd)   -- 19 окт: BS / Ins — в паттерне (Renoise) / по дорожке   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
-  libtabs = reaper.GetExtState(EXT, 'libtabs') == '1' and reaper.GetExtState(EXT, 'libtabs_off25') == '1',   -- 25 окт: lib — одним списком с папками разделов (вкладки — опцией)
+  libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',   -- 25 окт: lib — одним списком с папками разделов (вкладки — опцией)
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
@@ -414,164 +410,26 @@ local state = {
   fcollapse = {},                               -- guid папки → свёрнута
   thide = {},                                   -- 11 окт: guid → скрыт в трекере (track list, ПКМ)
 }
--- быстрая опция dB marks (9 окт): один раз — рядом с mixer в сохранённых быстрых опциях
--- 9 окт: быстрая опция jumps (линейка прыжков) — в первую колонку быстрых
-if (state.quick or '') ~= '' and not (',' .. state.quick:gsub('|', ',') .. ','):find(',jumps,', 1, true) then
-  state.quick = state.quick:gsub('q_ruler', 'q_ruler,jumps', 1)
-end
-if (state.quick or '') ~= '' and not (',' .. state.quick:gsub('|', ',') .. ','):find(',dbmarks,', 1, true) then
-  state.quick = state.quick:gsub('mixer', 'mixer,dbmarks', 1)
-end
 state.panes_ui = flag('panes_ui', true)           -- 9 окт: раскладка панелями tmux / zellij (по умолчанию; выкл — прежний вид)
--- дерево панелей (9 окт): из ExtState panes; нет — один раз из прежних
--- опций положения (пользователю ничего делать не нужно)
+state.autoadd = flag('autoadd', true)             -- 28 окт: новые модули сами встают в сохранённую раскладку (опция auto-add modules)
+-- дерево панелей (9 окт): из ExtState panes; нет — раскладка по умолчанию
 state.panes = (function()
   local s = reaper.GetExtState(EXT, 'panes')
-  -- 9 окт: миграция v2 (main — левый верх, над матрицей) — один раз поверх первой
-  if reaper.GetExtState(EXT, 'panes_mig') ~= '2' then s = ''; reaper.SetExtState(EXT, 'panes_mig', '2', true) end
   if s ~= '' then
-    local m = draw.panes.decode(s); draw.panes.add_new(m, s)   -- 13 окт: и при запуске — новые модули на свои места
-    -- 13 окт: tracks — дерево трек → инструменты → automation — встаёт туда, где lib (вкладкой рядом), один раз
-    if reaper.GetExtState(EXT, 'tl_at_lib') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_at_lib', '1', true) end
-    -- 13 окт: модуль slices спрятан — слайсы и их клавиши в дереве tracks внутри инструмента (показать: Ctrl+W s / :pane slices show)
-    -- 13 окт: lib и tracks — две вкладки одного места (lib — вся база сэмплов, tracks — дерево треков), один раз
-    -- 13 окт: модуль slices снова виден — под lib (один раз)
-    if reaper.GetExtState(EXT, 'slices_under_lib') ~= '1' then draw.panes.split(m, 'inst', 'slices', 'd', 0.4); reaper.SetExtState(EXT, 'slices_under_lib', '1', true) end
-    if reaper.GetExtState(EXT, 'clip_tab') ~= '1' then draw.panes.keep_in(m, 'clipboard', 'inst'); reaper.SetExtState(EXT, 'clip_tab', '1', true) end   -- 13 окт: clipboard — вкладкой у lib
-    if reaper.GetExtState(EXT, 'ut_tab2') ~= '1' and draw.panes.keep_in(m, 'undotree', 'browser') then reaper.SetExtState(EXT, 'ut_tab2', '1', true) end   -- 15 окт: undo — вкладкой у браузера (один раз; браузер спрятан — когда появится)
-    if reaper.GetExtState(EXT, 'map_tab') ~= '1' and draw.panes.keep_in(m, 'map', 'browser') then reaper.SetExtState(EXT, 'map_tab', '1', true) end   -- 27 окт: map — вкладкой у браузера (один раз)
-    if reaper.GetExtState(EXT, 'tl_tab2') ~= '1' then draw.panes.keep_in(m, 'tracks', 'inst'); reaper.SetExtState(EXT, 'tl_tab2', '1', true) end
-    if reaper.GetExtState(EXT, 'slices_off') ~= '1' then draw.panes.hide(m, 'slices'); reaper.SetExtState(EXT, 'slices_off', '1', true) end
-    -- 19 окт: patterns — кубики в углу матрицы: скрытая панель оставалась в дереве и делила место с матрицей (линия тянулась наоборот)
-    if reaper.GetExtState(EXT, 'pat_off') ~= '1' then draw.panes.hide(m, 'patterns'); reaper.SetExtState(EXT, 'pat_off', '1', true) end
-    -- 19 окт вечер: patterns + chain — своя панель над матрицей (один раз)
-    if reaper.GetExtState(EXT, 'rf_tab') ~= '1' and draw.panes.keep_in(m, 'reform', 'help') then reaper.SetExtState(EXT, 'rf_tab', '1', true) end   -- 19 окт: reform — вкладкой у help
-    if reaper.GetExtState(EXT, 'hum_tab') ~= '1' and draw.panes.keep_in(m, 'humanizer', 'help') then reaper.SetExtState(EXT, 'hum_tab', '1', true) end
-    if reaper.GetExtState(EXT, 'rd_tab') ~= '1' and draw.panes.keep_in(m, 'renderer', 'help') then reaper.SetExtState(EXT, 'rd_tab', '1', true) end   -- 20 окт: renderer — вкладкой у help   -- 19 окт: humanizer — вкладкой у help
-    if reaper.GetExtState(EXT, 'pat_pane2') ~= '1' then draw.panes.split(m, 'matrix', 'patterns', 'u', 0.3); reaper.SetExtState(EXT, 'pat_pane2', '1', true) end
-    if reaper.GetExtState(EXT, 'mod_merged') ~= '1' then draw.panes.hide(m, 'modulation'); reaper.SetExtState(EXT, 'mod_merged', '1', true) end   -- 18 окт: модуляция — страница automation (M), вкладки нет
+    local m = draw.panes.decode(s)
+    if state.autoadd then draw.panes.add_new(m, s) end   -- 13 окт: новые модули — на свои места
     return m
   end
-  return draw.panes.migrate({ top = state.top, toppos = state.toppos, ctrlpos = state.ctrlpos, slicespos = state.slicespos,
-    browserleft = state.browserleft, side = state.side, dsp = state.dsp, fxb = state.fxb, khelp = state.khelp,
-    notes_open = state.notes_open, mx_hidden = state.mx_hidden, toptab = state.toptab, mxfold = state.mxfold,
-    top_px = state.top_px, side_px = state.side_px, inst_px = state.inst_px, mx_px = state.mx_px,
-    mx_fold_px = state.mx_fold_px, fxb_px = state.fxb_px }, tonumber(ext('w', 900)), tonumber(ext('h', 600)))
+  return draw.panes.DEFAULT()
 end)()
 do local z = reaper.GetExtState(EXT, 'dsp_zx'); state.dsp_zx_saved = z ~= '' and z or nil end   -- 22 окт: снимок раскладки до zx — переживает перезапуск
 -- 9 окт: pm — вкладка браузера, пока выключена опция pm as a pane
 if state.panes and not state.pmpane and draw.panes.visible(state.panes, 'pm') then draw.panes.hide(state.panes, 'pm') end
--- 10 окт: props — свой модуль; один раз показать справа от вкладки item (дальше — как пользователь разложит)
-if state.panes and reaper.GetExtState(EXT, 'sprops_init') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.visible(state.panes, 'sprops') then
-    if PNm.visible(state.panes, 'sample') then PNm.split(state.panes, 'sample', 'sprops', 'r', 0.4) else PNm.show(state.panes, 'sprops') end
-  end
-  reaper.SetExtState(EXT, 'sprops_init', '1', true)
-end
 -- 11 окт: по умолчанию в стопке рядом с properties — нарезчик (вкладка item)
 if state.panes and draw.panes.visible(state.panes, 'sample') and draw.panes.visible(state.panes, 'sprops') then
   draw.panes.set_active(state.panes, 'sample'); state.toptab = 'sample'
 end
--- 12 окт: note mod — один раз вкладкой в стопку properties (активной остаётся properties)
-if state.panes and reaper.GetExtState(EXT, 'nmod_init') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.visible(state.panes, 'nmod') and PNm.visible(state.panes, 'sprops') then
-    local cur = PNm.active_of(state.panes, 'sprops')
-    if PNm.stack(state.panes, 'nmod', 'sprops') and cur then PNm.set_active(state.panes, cur) end
-  end
-  reaper.SetExtState(EXT, 'nmod_init', '1', true)
-end
--- 11 окт: микшер — свой модуль; один раз поставить его под трекер (дальше — как пользователь разложит)
-if state.panes and reaper.GetExtState(EXT, 'mixer_init') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.visible(state.panes, 'mixer') then PNm.split(state.panes, 'tracker', 'mixer', 'd', 0.28) end
-  reaper.SetExtState(EXT, 'mixer_init', '1', true)
-end
--- 9 окт (миграция 7): старый F3 раскрыл скрытые вкладки отдельными панелями —
--- вкладка своей панелью (одна в листе) снова скрыта; стек вкладок не трогаем
-if state.panes and reaper.GetExtState(EXT, 'panes_mig7') ~= '1' then
-  local PNm = draw.panes
-  for _, id in ipairs({ 'midi', 'harm', 'scopes', 'master', 'video', 'garden' }) do
-    local lf = PNm.find(state.panes, id)
-    if lf and #lf.panes == 1 then PNm.hide(state.panes, id) end
-  end
-  reaper.SetExtState(EXT, 'panes_mig7', '1', true)
-end
--- 10 окт (миграция 8): clips — панель-вкладка в стеке верхнего модуля (рядом
--- с macros / item), один раз поверх текущей раскладки
-if state.panes and reaper.GetExtState(EXT, 'panes_mig8') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.find(state.panes, 'clips') then
-    local host = (PNm.visible(state.panes, 'macros') and 'macros') or (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
-    if host then
-      local lf = PNm.find(state.panes, host)
-      local act = lf and lf.active
-      PNm.stack(state.panes, 'clips', host)
-      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
-    end
-  end
-  reaper.SetExtState(EXT, 'panes_mig8', '1', true)
-end
--- 11 окт (миграция 9): macros снова пропала из вкладок (скрыта пресетом / Ctrl+W c) — вернуть к item
-if state.panes and reaper.GetExtState(EXT, 'panes_mig9') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.visible(state.panes, 'macros') then
-    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
-    if host then
-      local lf = PNm.find(state.panes, host)
-      local act = lf and lf.active
-      PNm.stack(state.panes, 'macros', host)
-      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
-    end
-  end
-  reaper.SetExtState(EXT, 'panes_mig9', '1', true)
-end
--- 9 окт (миграция 6): macros скрыта (миграция 5 ставила её к harmonizer, а он
--- бывает скрыт) — в стек вкладок верхнего модуля, к item / automation
-if state.panes and reaper.GetExtState(EXT, 'panes_mig6') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.visible(state.panes, 'macros') then
-    local host = (PNm.visible(state.panes, 'sample') and 'sample') or (PNm.visible(state.panes, 'automation') and 'automation') or nil
-    if host then
-      local lf = PNm.find(state.panes, host)
-      local act = lf and lf.active
-      PNm.stack(state.panes, 'macros', host)
-      lf = PNm.find(state.panes, host); if lf and act then lf.active = act end
-    end
-  end
-  reaper.SetExtState(EXT, 'panes_mig6', '1', true)
-end
--- 9 окт (миграция 5): вкладка macros — в стек вкладок верхнего модуля
-if state.panes and reaper.GetExtState(EXT, 'panes_mig5') ~= '1' then
-  local PNm = draw.panes
-  if not PNm.find(state.panes, 'macros') and PNm.find(state.panes, 'harm') then
-    local act
-    local lf = PNm.find(state.panes, 'harm')
-    act = lf and lf.active
-    PNm.stack(state.panes, 'macros', 'harm')
-    lf = PNm.find(state.panes, 'harm'); if lf and act then lf.active = act end
-  end
-  reaper.SetExtState(EXT, 'panes_mig5', '1', true)
-end
--- 9 окт (миграция 4): fx и pm — отдельные панели стеком с браузером
--- (browser | pm | fx), один раз поверх текущей раскладки
-if state.panes and reaper.GetExtState(EXT, 'panes_mig4') ~= '1' then
-  local PNm = draw.panes
-  if PNm.visible(state.panes, 'browser') then
-    PNm.stack(state.panes, 'pm', 'browser')
-    PNm.stack(state.panes, 'fxb', 'browser')
-    local lf = PNm.find(state.panes, 'browser')
-    if lf then for k, id in ipairs(lf.panes) do if id == 'browser' then lf.active = k end end end
-  end
-  reaper.SetExtState(EXT, 'panes_mig4', '1', true)
-end
--- миграция 1 окт (2): пользователь выбрал битмап ×2
--- ext() отдаёт число для числовых строк: сравнивать через tostring (иначе 3 ~= '3'
--- и шрифт сбрасывался в битмап при каждом старте)
-if tostring(ext('font_v', '')) ~= '3' then state.font = 0; state.fontscale = 2 end
 if (tonumber(state.fontscale) or 2) > 3 then state.fontscale = 3 end   -- x4 — только PT-mode (3 окт)
-state.font = 0                                                         -- TTF убран (3 окт): только битмап
 state.subs_min = {}
 for k, v in tostring(ext('subsmin', '')):gmatch('([^=,]+)=(%d+)') do state.subs_min[k] = tonumber(v) end
 state.wave_os = tonumber(ext('wave_os', 1)) or 1
@@ -584,14 +442,12 @@ state.hdrfill = (function()
   local v = reaper.GetExtState(EXT, 'hdrfill')
   return (v == 'header' or v == 'full' or v == 'off') and v or 'line'
 end)()
-reaper.DeleteExtState(EXT, 'fathdr', true)
 state.pvvol = tonumber(ext('pvvol', 1)) or 1
 PV.set_vol(state.pvvol)
 vim.vel = math.max(1, math.min(127, tonumber(ext('vel', 100)) or 100))
 model.OVERSAMPLE = state.wave_os
 vim.step_auto = tostring(ext('step_auto', '0')) == '1'
 vim.step_next = tostring(ext('step_next', '0')) == '1'
-reaper.SetExtState(EXT, 'font_v', '3', true)
 -- fold: «guid» — компактный, «guid=m» — полоска (zC), ревью 2 окт
 for g in tostring(ext('folds', '')):gmatch('[^,]+') do
   local id, m = g:match('^([^=]+)=?(%a*)$')
@@ -774,23 +630,22 @@ local function save_win()
   if state.ss_big and state.ss_saved then for k, v in pairs(state.ss_saved) do state[k] = v end; state.ss_big = false end   -- session big тоже
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('font', state.font); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
+  S('lpb', state.lpb); S('fxcols', state.fxcols); S('ssbars', state.ssbars or 8); S('ss_px', state.ss_px or ''); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'pool', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'lanetop', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('wzoom', tostring(state.wzoom or 0)); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
   S('mx_px', state.mx_px and tostring(math.floor(state.mx_px)) or ''); S('fxb_px', state.fxb_px and tostring(math.floor(state.fxb_px)) or ''); S('mx_fold_px', state.mx_fold_px and tostring(math.floor(state.mx_fold_px)) or ''); S('mx_hidden', state.mx_hidden and '1' or '0')
-  S('glyphface', state.glyphface or ''); S('fontface', state.fontface or '')
   local pm = {}
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
   S('pitchmodes', table.concat(pm, ','))
@@ -1257,10 +1112,10 @@ ctx = {
       if v ~= nil and it.set and it.get and it.get() ~= v then pcall(it.set, v) end
     end
     for _, k in ipairs(ctx.SS_LAYOUT) do if t[k] ~= nil then state[k] = t[k] end end
-    if type(t.panes) == 'string' and t.panes ~= '' then   -- дерево панелей (9 окт); старые наборы его не трогают
+    if type(t.panes) == 'string' and t.panes ~= '' then   -- дерево панелей (9 окт)
       local v = state.panes.v
       state.panes = draw.panes.decode(t.panes); state.panes.v = v + 1
-      draw.panes.add_new(state.panes, t.panes)   -- 11 окт: набор старше модулей properties / mixer / … — они встают на свои места
+      if state.autoadd then draw.panes.add_new(state.panes, t.panes) end   -- набор старше новых модулей — они встают на свои места (опция)
     end
     if MX then MX.fold = false end   -- 9 окт: свёрнутой матрицы больше нет
     draw.set_font(state); model.invalidate()
@@ -1483,7 +1338,6 @@ ctx = {
   set_pitchmode = function(col, mode) state.pitchmodes[col.guid] = mode end,
   -- TTF: размер 10..32 (3 окт), 0 — битмап
   -- TTF убран (3 окт): только битмап REAPER; set_font оставлен для совместимости
-  set_font = function() state.font = 0; draw.set_font(state) end,
   -- Nerd-шрифт для текста (TTF-режим) или для глифов (гибрид); ищем по подстроке
   set_scale = function(n) state.fontscale = n; draw.set_font(state) end,
   set_space = function(n) state.fontspace = n; draw.set_font(state) end,
@@ -2302,10 +2156,6 @@ ctx = {
     for tok in (str or ''):gmatch('[^;]+') do
       local sl, nm, dt, tm = tok:match('^(%d+)|([^|]*)|([^|]*)|(.*)$')
       if sl then rows[#rows + 1] = { slot = tonumber(sl), name = nm, date = dt, time = tm } end
-    end
-    if #rows == 0 then   -- слоты, записанные кнопками 1..12 (днём 22 окт), — строками без даты
-      local _, old = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnaps')
-      for k in (old or ''):gmatch('%d+') do rows[#rows + 1] = { slot = tonumber(k), name = 'Mix ' .. k, date = '', time = '' } end
     end
     return rows
   end,
@@ -3326,7 +3176,6 @@ ctx = {
     elseif f == 'top' then
       local t = state.toptab
       if t == 'garden' then return 'orca' end                   -- Garden убран: только Orca
-      if t == 'scope' then return 'master' end
       return KH.PAGES[t] and t or 'tracker'
     elseif KH.PAGES[f] then return f   -- 17 окт: у slices / sprops / nmod / session и прочих — своя страница, не tracker
     end
@@ -4760,45 +4609,7 @@ ctx = {
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
-  quick_str = function()
-    local q = state.quick
-    if q and q == ctx.qs_ok then return q end   -- 17 окт: уже переписана — миграции ниже не гонять (звалось ~4 раза за кадр)
-    -- 7 окт: session и router — в начале средней колонки (и в своей раскладке)
-    if q and not q:find('measure', 1, true) then   -- 7 окт: measure — в конец левой колонки
-      local a, rest = q:match('^([^|]*)(|.*)$')
-      if a then q = a .. ',measure' .. rest; state.quick = q end
-    end
-    -- 13 окт: wave only / text only — к быстрым опциям (за wave), один раз
-    if q and not q:find('waveonly', 1, true) and reaper.GetExtState(EXT, 'q_wo13') ~= '1' then
-      q = q:gsub('q_wave', 'q_wave,waveonly,textonly', 1); state.quick = q; reaper.SetExtState(EXT, 'q_wo13', '1', true)
-    end
-    if q and q:find('dsp_big', 1, true) and not q:find('whichkey', 1, true) then   -- whichkey — в начало третьей колонки
-      local a, b, c3 = q:match('^([^|]*)|([^|]*)|(.*)$')
-      if a then q = a .. '|' .. b .. '|whichkey,' .. c3; state.quick = q end
-    end
-    if q and not q:find('pianokeys', 1, true) then q = q:gsub('q_hints', 'q_hints,pianokeys', 1); state.quick = q end   -- 8 окт: keys — под hints
-    if q and not q:find('title', 1, true) then local a, rest = q:match('^([^|]*)(|.*)$'); if a then q = a .. ',title' .. rest; state.quick = q end end   -- 8 окт: title — в конец левой колонки
-    if q and not q:find('autoinst', 1, true) and q:find('autofocus', 1, true) then q = q:gsub('autofocus', 'autofocus,autoinst', 1); state.quick = q end   -- 11 окт: auto instrument — под autofocus
-    if q and not q:find('armsel', 1, true) and q:find('autoinst', 1, true) then q = q:gsub('autoinst', 'autoinst,armsel', 1); state.quick = q end   -- 11 окт: rec follows selection — под ним
-    if q and not q:find('dsp_big', 1, true) then
-      q = q:gsub(',?clipsview', ''):gsub('^,', ''):gsub('|,', '|')
-      local a, b = q:match('^([^|]*)|(.*)$')
-      q = a and (a .. '|clipsview,dsp_big,' .. b) or q
-      state.quick = q
-    end
-    -- 11 окт: browser < > и mixer ^ v убраны из быстрых — положение задают панели (Ctrl+W)
-    if q then
-      local q2 = q:gsub('[^,|]+', function(x) if x == 'q_side' or x == 'mixer' then return '' end end)
-      q2 = q2:gsub(',,+', ','):gsub(',|', '|'):gsub('|,', '|'):gsub('^,', ''):gsub(',$', '')
-      if q2 ~= q then q = q2; state.quick = q end
-    end
-    -- 26 окт: pt-mode — в быстрые, один раз (в конец третьей колонки)
-    if q and not q:find('ptmode', 1, true) and reaper.GetExtState(EXT, 'q_pt26') ~= '1' then
-      q = q .. ',ptmode'; state.quick = q; reaper.SetExtState(EXT, 'q_pt26', '1', true)
-    end
-    ctx.qs_ok = q
-    return q or ctx.QUICK_DEFAULT
-  end,
+  quick_str = function() return state.quick or ctx.QUICK_DEFAULT end,
   quick_has = function(key)
     local id = ctx.QUICK_ALIAS[key] or key
     for x in ctx.quick_str():gmatch('[^,|]+') do if x == id then return true end end
@@ -12315,7 +12126,7 @@ ctx = {
   -- треков сверху; матрица, lib / браузер, DSP спрятаны, курсор в центре, метры.
   -- Повтор — всё как было (state.pt_saved)
   pt_toggle = function()
-    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'wzoom', 'captions' }
+    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions' }
     if state.ptmode then
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
       state.ptmode, state.pt_saved = false, nil
@@ -12329,7 +12140,7 @@ ctx = {
       state.fixed, state.meters, state.meterstyle, state.khelp = true, true, 'pt', false
       -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
       -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
-      state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.wzoom, state.captions = 1, 'off', 'off', false, 4, 0, false
+      state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.captions = 1, 'off', 'off', false, 4, false
       state.fontscale = 2                                    -- 6 окт: ×2 (×4 — огромно)
       state.pt_fit = true                                    -- кадр уменьшит масштаб, если 4 канала не влезли
       if not state.scopes then ctx.toggle_scopes(true) end
@@ -13228,6 +13039,7 @@ ctx = {
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
       { key = 'rollstep', label = 'step a/x (roll)', kind = 'toggle', desc = 'roll (Opt+`) on: Ctrl+A / Ctrl+X copy the event of the cursor row a step lower and change it there +1 / -1, the cursor follows - every press the next step of a ramp (volume, commands, notes, CC)', get = function() return state.rollstep or false end, set = function(v) state.rollstep = v or nil; reaper.SetExtState(EXT, 'rollstep', v and '1' or '0', true) end },
+      { key = 'autoadd', label = 'auto-add new modules', kind = 'toggle', desc = 'a module that is new in this version takes its place in your saved layout (and in screensets) by itself; off - it stays hidden until you show it (Ctrl+W, :pane name show)', get = function() return state.autoadd end, set = function(v) state.autoadd = v or false end },
       { key = 'lanetop', label = 'branch line on top too', kind = 'toggle', desc = 'DSP: the colour line of a parallel branch / a band - also above its modules (off: only under them)', get = function() return state.lanetop or false end, set = function(v) state.lanetop = v or nil; draw.lane_top = v or nil end },
       { key = 'roundrack', label = 'rounded racks', kind = 'toggle', desc = 'DSP: modules have rounded corners; off - square', get = function() return state.roundrack or false end, set = function(v) state.roundrack = v or nil; draw.round_rack = v or nil end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
@@ -13341,7 +13153,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
-      { 'panes and bars', { 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
@@ -16142,7 +15954,6 @@ FB.hint = function(...) return draw.hint(...) end   -- fx list: метки f (9 
 ctx.hint = function(...) return draw.hint(...) end   -- через draw.hint: сдвиг верхнего модуля (mid / bottom)
 ctx.env_colour = draw.env_colour
 ctx.ic = function(name, text) return draw.ic(name, text) end
-ctx.icons_on = function() return draw.icons and not draw.hybrid and (state.font or 0) > 0 end
 vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
@@ -17623,8 +17434,6 @@ end
 -- 16 окт: раскладка клавиатуры: frow (по умолчанию) — цифры белыми, F-ряд чёрными, октава [ ], громкость { };
 -- qwerty — прежняя строка q2w3e, октава z x
 do local kl = reaper.GetExtState(EXT, 'keylayout'); if kl == '' then kl = 'frow' end; keys.set_layout(kl); draw.piano_layout(kl == 'frow' and 'frow' or kl == 'renoise') end   -- 17 окт: и renoise
-if reaper.GetExtState(EXT, 'libtabs_off25') ~= '1' then state.libtabs = false; reaper.SetExtState(EXT, 'libtabs', '0', true); reaper.SetExtState(EXT, 'libtabs_off25', '1', true) end
-if reaper.GetExtState(EXT, 'hint_panes24') ~= '1' then if state.hintpos == 'tabs' then state.hintpos = 'panes' end; reaper.SetExtState(EXT, 'hint_panes24', '1', true) end   -- 24 окт: подсказки снова внизу модулей (в строке вкладок влезало только «\ menu») — один раз
 edit.step_legato = reaper.GetExtState(EXT, 'steplegato') == '1'   -- 13 окт: шаг legato
 state.modefont = (reaper.GetExtState(EXT, 'modefont') ~= '' and reaper.GetExtState(EXT, 'modefont')) or nil; draw.modefont = state.modefont   -- 13 окт
 -- 20 окт: шрифт keycast — bitmap (по умолчанию) или один из mode font; выбор — выпадашкой (options)
@@ -17644,7 +17453,6 @@ end
 MX.bpm = reaper.GetExtState(EXT, 'mxbpm') ~= '0'   -- 13 окт: колонка BPM матрицы
 MX.sig_always = reaper.GetExtState(EXT, 'mxsig') ~= '0'   -- 23 окт: колонка размера всегда (по умолчанию — вкл)
 MX.sections = reaper.GetExtState(EXT, 'mxsec') ~= '0'     -- 23 окт: полоса секций — своя опция (не от ruler)
-if reaper.GetExtState(EXT, 'keep_on13') ~= '1' then state.keepsamples = true; reaper.SetExtState(EXT, 'keepsamples', '1', true); reaper.SetExtState(EXT, 'keep_on13', '1', true) end   -- 13 окт: страховка вкл один раз (была выключена)
 -- 13 окт: луп удержания — на волне вкладки item (одно место для резки и лупа): точки, кроссфейд, кандидаты
 ctx.NMUI = dofile(DIR .. '/jf_tracker_nmodui.lua'); ctx.NMUI.init(U, ctx)   -- 12 окт: note mod
 draw.midi_inst = function(it, p) local n = ctx.midi_inst_num(it, p); return n and snap and snap.cols[1] and ctx.inst_disp(snap.cols[1], n) or n end   -- 21 окт: показ — подряд за сэмплами   -- 11 окт: номер инструмента у MIDI-нот
@@ -22617,7 +22425,7 @@ local function frame()
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
     mono = mono_read(),   -- 15 окт: панель grid всегда; чтение шины — раз в 0.25 с
     arc_info = ctx.arc_info,
-    master = (state.top and (state.toptab == 'master' or state.toptab == 'scope') and snap.master) and {
+    master = (state.top and state.toptab == 'master' and snap.master) and {
       peaks = { reaper.Track_GetPeakInfo(snap.master.track, 0), reaper.Track_GetPeakInfo(snap.master.track, 1) },
       scope_slot = snap.master.scope_slot, fx = snap.master.fx } or nil,
     retro = (state.top and state.toptab == 'retro') and retro_read(math.max(16, math.floor(gfx.w - L.ctrl_w - L.inst_w - 4 * L.pad))) or nil,
@@ -28868,14 +28676,12 @@ local function frame()
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
-    if (state.font or 0) == 0 then
-      -- шаги x1 → x1.5 → x2 → x3 (5 окт)
-      local STEPS = { 1, 1.5, 2, 3 }
-      local cur, i = tonumber(state.fontscale) or 2, 1
-      for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
-      ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
-      vim.msg = ('bitmap x%s'):format(tostring(state.fontscale):gsub('%.0$', ''))
-    else ctx.set_font(math.max(6, state.font + d)); vim.msg = 'font ' .. state.font end
+    -- шаги x1 → x1.5 → x2 → x3 (5 окт)
+    local STEPS = { 1, 1.5, 2, 3 }
+    local cur, i = tonumber(state.fontscale) or 2, 1
+    for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
+    ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
+    vim.msg = ('bitmap x%s'):format(tostring(state.fontscale):gsub('%.0$', ''))
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
@@ -30219,20 +30025,6 @@ frame = (function(inner)
   end
 end)(frame)
 
--- 11 окт: скринсеты, сохранённые до модулей (properties, mixer, visor, clips, macros), —
--- один раз переписать файл: новые модули на свои места
-if reaper.GetExtState(EXT, 'ss_mods') ~= '1' and pcall(function()
-    local sets, order = ctx.ss_read()
-    local n = 0
-    for _, nm in ipairs(order) do
-      local t = sets[nm]
-      if t and type(t.panes) == 'string' and t.panes ~= '' then
-        local m = draw.panes.decode(t.panes)
-        if draw.panes.add_new(m, t.panes) then draw.panes.pin_mixer(m); draw.panes.pin_sprops(m); t.panes = draw.panes.encode(m); n = n + 1 end
-      end
-    end
-    if n > 0 then ctx.ss_write(sets, order) end
-  end) then reaper.SetExtState(EXT, 'ss_mods', '1', true) end
 -- 11 окт: кнопка матрицы по id — щелчок и выпадашка » (кнопки, что не влезли в ширину модуля)
 ctx.mx_btn_do = function(b)
   ctx.pl_help = (b == 'plist' or tostring(b):match('^pl') ~= nil) or nil   -- 18 окт: щелчок по плейлисту — справка о нём
