@@ -972,6 +972,7 @@ do
     { k = 'A<>B', t = {}, d = 'container with two chains: the A<>B button links their mix - one fades in while the other fades out (a crossfade of the chains); lit while the link is on, click - on / off' },
     '★ links', 'c= c|', 'cc', '[] (track block)', 'cf', 'cv', 'cb', 'zr',
     { k = 'drag a module', t = {}, d = 'in CHAINS / ROUTE: drag a module onto another chain or between modules - it moves there (onto = parallel)' },
+    { k = 'chain colour', t = {}, d = 'the module menu (\\ or right click) of a module in a chain: Chain colour - a palette of squares with an index (type xx), # - your own hex (:chcol rrggbb), reset - the colour of the lane number' },
     'h l', 'w W', 'dw db', 'Z' }) }
 end
 KH.PAGES.console = { title = 'console (Strudel patterns)', e = {

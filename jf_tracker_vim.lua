@@ -1185,6 +1185,7 @@ local function run_cmd(line)
   if not cmd then return end
   local n = tonumber(arg)
   if cmd == 'q' then return 'quit'
+  elseif cmd == 'chcol' then if ctx.chain_col_hex then ctx.chain_col_hex(arg) end   -- 28 окт: свой цвет цепочки
   elseif cmd == 'console' then if ctx.console_open then ctx.console_open() end   -- 28 окт: консоль Strudel
   elseif cmd == 'reload' then ctx.reloading = true; return 'quit'   -- 15 окт: перезапуск со свежими файлами (правки без рестарта REAPER)
   elseif cmd == 'w' then ctx.edit.save(); V.msg = 'saved'

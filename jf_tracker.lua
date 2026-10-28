@@ -18407,6 +18407,10 @@ function ctx.context_items(hover)
     if f then
       add('Pack ' .. (f.name or 'the module') .. ' into a container (cc)', function() ctx.dsp_pack(dsp_sel.fx, dsp_sel.fx) end, 'p')
       add('Empty container after ' .. (f.name or 'it') .. ' (cn)', function() ctx.dsp_container_new(dsp_sel.fx) end, 'X')
+      local inr = f.inner
+      local lane = inr and inr.parent and (inr.lane or inr.bi)
+      if f.container and not lane then lane = nil end
+      if lane then add('Chain colour …', function() ctx.chain_col_pick(inr.parent, lane) end, 'C') end   -- 28 окт
     end
     add('Add FX … (fzf)', function() ctx.fx_picker() end, 'f')
     add((state.khelp and '!' or '') .. 'Help panel of the focused module', function() ctx.toggle_help() end, 'K')
@@ -31392,6 +31396,87 @@ ctx.curacc_apply = function()
   draw.CURCELL = draw.CUR_ACC or draw.U_MONO_CURSOR or draw.CURCELL
 end
 ctx.curacc_apply()
+-- 28 окт: цвет цепочки контейнера (ветки) — свой: P_EXT:jf_chcol трека «GUID контейнера|ветка=rrggbb;…»;
+-- нет своего — цвет по номеру ветки (D.lane_col). Выбор — палитра квадратиками с индексом xx, :chcol rrggbb
+ctx.CHPAL = {}
+;(function()   -- функция, не do: в главном куске предел 200 локальных
+  local function hsv(h, sat, v)
+    local k = math.floor(h * 6); local f = h * 6 - k
+    local p1, q, t = v * (1 - sat), v * (1 - f * sat), v * (1 - (1 - f) * sat)
+    local c = ({ { v, t, p1 }, { q, v, p1 }, { p1, v, t }, { p1, q, v }, { t, p1, v }, { v, p1, q } })[k % 6 + 1]
+    return ('%02x%02x%02x'):format(math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
+  end
+  for i = 0, 11 do ctx.CHPAL[#ctx.CHPAL + 1] = hsv(i / 12, 0.75, 1) end
+  for i = 0, 11 do ctx.CHPAL[#ctx.CHPAL + 1] = hsv(i / 12 + 1 / 24, 0.55, 0.7) end
+  for _, h in ipairs({ 'ff00ff', 'ffb000', '00ffff', '66ff00', 'ffffff', 'b0b0b0', '707070', '404040' }) do ctx.CHPAL[#ctx.CHPAL + 1] = h end
+end)()
+ctx.chcol_c = setmetatable({}, { __mode = 'k' })
+ctx.chcol_rgb = function(h) local r, g, b = (h or ''):match('^#?(%x%x)(%x%x)(%x%x)$'); return r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil end
+ctx.chain_col_map = function(tr)
+  local c = ctx.chcol_c[tr]
+  local now = reaper.time_precise()
+  if c and now - c.t < 1 then return c end
+  local _, s = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_chcol', '', false)
+  if not c or c.s ~= s then
+    c = { s = s, map = {}, rgb = {} }
+    for k, h in (s or ''):gmatch('([^;=]+)=(%x+)') do c.map[k] = h; c.rgb[k] = ctx.chcol_rgb(h) end
+    ctx.chcol_c[tr] = c
+  end
+  c.t = now
+  return c
+end
+ctx.chain_key = function(tr, cont, lane)
+  if not (tr and cont and cont.i and lane) then return nil end
+  cont._guid = cont._guid or reaper.TrackFX_GetFXGUID(tr, cont.i)
+  return cont._guid and (cont._guid .. '|' .. lane) or nil
+end
+draw.chain_col = function(cont, lane)
+  local t = dsp_target()
+  if not t or t.take then return nil end
+  local k = ctx.chain_key(t.track, cont, lane)
+  return k and ctx.chain_col_map(t.track).rgb[k] or nil
+end
+ctx.chain_col_set = function(tr, key, hex)
+  local c = ctx.chain_col_map(tr)
+  c.map[key] = hex
+  local parts = {}
+  for k, h in pairs(c.map) do parts[#parts + 1] = k .. '=' .. h end
+  edit.run('chain colour', function() reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_chcol', table.concat(parts, ';'), true) end)
+  ctx.chcol_c[tr] = nil
+end
+ctx.chain_col_pick = function(cont, lane)
+  local t = dsp_target()
+  if not (t and not t.take and cont and lane) then vim.msg = 'chain colour: a module of a container chain (track fx)'; return end
+  local key = ctx.chain_key(t.track, cont, lane)
+  if not key then return end
+  ctx.chcol_target = { tr = t.track, key = key }
+  local cur = ctx.chain_col_map(t.track).map[key]
+  local items, sel = {}, 1
+  for i, h in ipairs(ctx.CHPAL) do
+    local rgb, idx = ctx.chcol_rgb(h), ('%02X'):format(i - 1)
+    if h == cur then sel = i end
+    items[#items + 1] = { v = h, label = idx, t = idx, on = h == cur, draw = function(x, y, w, hh, sl)
+      local sq = hh - 2
+      gfx.set(rgb[1], rgb[2], rgb[3], 1); gfx.rect(x + 2, y + 1, sq, sq, 1)
+      U.set(sl and U.TEXT or U.GREY); gfx.x, gfx.y = x + sq + 6, y; gfx.drawstr(idx)
+    end }
+  end
+  items[#items + 1] = { v = 'hex', label = '#rrggbb', t = '#' }
+  items[#items + 1] = { v = 'reset', label = 'reset', t = 'R' }
+  local cw = draw.measure('00') + 3 * L.pad + L.rh
+  ctx.smart_open({ title = ('chain colour  chain %d  (xx - index, # - own hex)'):format(lane), items = items, cols = 8, sel = sel, cell_w = math.max(cw, draw.measure('#rrggbb') + 2 * L.pad),
+    on_pick = function(it)
+      if it.v == 'hex' then vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'chcol ' .. (cur or ''); return end
+      ctx.chain_col_set(t.track, key, it.v ~= 'reset' and it.v or nil)
+      vim.msg = it.v == 'reset' and 'chain colour: back to the lane colour' or ('chain colour #' .. it.v)
+    end })
+end
+ctx.chain_col_hex = function(arg)
+  local tg = ctx.chcol_target
+  local h = (arg or ''):match('^#?(%x%x%x%x%x%x)$')
+  if not (tg and h) then vim.msg = 'chcol rrggbb - after the chain colour picker (# item)'; return end
+  ctx.chain_col_set(tg.tr, tg.key, h:lower()); vim.msg = 'chain colour #' .. h:lower()
+end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end

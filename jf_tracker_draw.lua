@@ -5639,7 +5639,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
   if (D.rack_ext or 0) < 3 then return end
-  set((f.enabled and not f.poff) and lane_col(f.inner.lane or f.inner.bi) or U.DIM)   -- 28 окт: полоса ÷N — своим цветом
+  set((f.enabled and not f.poff) and ((D.chain_col and D.chain_col(f.inner.parent, f.inner.lane or f.inner.bi)) or lane_col(f.inner.lane or f.inner.bi)) or U.DIM)   -- 28 окт: полоса ÷N — своим цветом (или выбранным)
   gfx.rect(st.x, boxy + bh0 + 1, math.max(2, bx - L.pad - st.x), 2, 1)   -- ветка — черта под модулем, без ножек
   if D.lane_top then gfx.rect(st.x, boxy - 3, math.max(2, bx - L.pad - st.x), 2, 1) end   -- 28 окт: опция — и над модулем
 end
@@ -5738,7 +5738,7 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
     -- 28 окт: ветка — полоска её цвета слева (тот же цвет, что черта под модулем)
     local lane = kd.entry and kd.entry.inner and kd.entry.inner.lane
-    if lane then set(kd.enabled and lane_col(lane) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1) end
+    if lane then set(kd.enabled and ((D.chain_col and D.chain_col(f, lane)) or lane_col(lane)) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1) end
     local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
     text(x + L.pad + (lane and 2 or 0), y, fit(glyph .. (kd.name or '?'), nw - 2 * L.pad - (lane and 2 or 0)), selk and U.TEXT or (kd.enabled and U.TEXT or U.GREY))
     if nhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', ki = c.ki, kid = kd } end
