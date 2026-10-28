@@ -3172,7 +3172,7 @@ ctx = {
     if ctx.pl_help and MX.plist and f == 'matrix' then return 'playlist' end
     if f == 'tracker' then return vim.mode == 'insert' and 'insert' or 'tracker'
     elseif f == 'browser' and B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj then return 'pm'
-    elseif f == 'dsp' then return state.khelp and 'help' or 'dsp'
+    elseif f == 'dsp' then if state.khelp then return 'help' end; return ctx.dsp_kind() or 'dsp'
     elseif f == 'top' then
       local t = state.toptab
       if t == 'garden' then return 'orca' end                   -- Garden убран: только Orca
@@ -17179,6 +17179,13 @@ end
 ctx.help_pane_on = function() return L and L.pn and L.pn.by_panel and L.pn.by_panel.help ~= nil end
 -- 28 окт: панель hints — что за модуль под мышью (вне модулей — в фокусе) и как с ним работать (draw.panes.about)
 ctx.about_fn = ctx.about_fn or {}
+-- 28 окт: hints о DSP — и о модуле под курсором: slixer / контейнер (первая запись их страницы справки)
+ctx.about_fn.dsp = function()
+  local k = ctx.dsp_kind and ctx.dsp_kind()
+  local P = k and KH.PAGES[k]
+  if not P then return nil end
+  return draw.panes.ABOUT.dsp .. '\n\n' .. P.title .. ': ' .. P.e[1].d
+end
 -- 28 окт: \\ h / кнопка hints — панель hints вкладкой к main (ctrl); уже видна — фокус на ней, ещё раз — спрятать
 ctx.hints_open = function()
   local PN, m = draw.panes, state.panes
@@ -19037,6 +19044,15 @@ end
 -- 27 окт: в DSP буквы кнопок пульта slixer — Opt+буква (голые буквы — у самого DSP: d удалить fx …). Opt+E N U I на
 -- macOS — мёртвые клавиши (символ не приходит), поэтому физическая клавиша читается раз в кадр (JS_VKeys_GetState),
 -- только пока Opt зажат и в фокусе модуль slixer; Opt+J K — по-прежнему пресет
+-- 28 окт: модуль под курсором DSP — slixer / контейнер: своя страница справки и строка клавиш
+function ctx.dsp_kind()
+  local t = dsp_target()
+  local f = t and t.fx and t.fx[dsp_sel.fx]
+  if not f then return nil end
+  if f.view == 'slixer' then return 'slixer' end
+  if f.container then return 'container' end
+  return nil
+end
 function ctx.slx_optkeys()
   if not (reaper.JS_VKeys_GetState and state.focus == 'dsp' and ctx.win_focus and gfx.mouse_cap & 16 == 16 and gfx.mouse_cap & 44 == 0) then ctx.slx_vk = nil; return end
   local t = dsp_target()
@@ -21551,7 +21567,7 @@ local function frame()
   end
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.panes_ui and state.khelp then state.khelp = false end   -- 18 окт: старая справка на месте DSP при панелях — никогда
-  if (state.khelp or ctx.help_pane_on()) and state.focus ~= 'dsp' and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
+  if (state.khelp or ctx.help_pane_on()) and (state.focus ~= 'dsp' or state.panes_ui) and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
   -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
   if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
@@ -22486,7 +22502,7 @@ local function frame()
     end)(),
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
-    hint_bars = state.hints and function(p) return (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
+    hint_bars = state.hints and function(p) if p == 'dsp' then local k = ctx.dsp_kind(); if k then return KH.BARS['dsp_' .. k] end end; return (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or (state.toptab == 'automation' and mod_pane == 'mod' and 'modulation') or state.toptab,   -- 15 окт: холст — свои подсказки

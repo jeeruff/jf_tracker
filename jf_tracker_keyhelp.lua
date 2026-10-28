@@ -953,7 +953,31 @@ KH.BARS = {
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
 }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+-- 28 окт: курсор DSP на slixer / контейнере — своя страница справки и своя строка клавиш (записи берутся из dsp)
+do
+  local function from_dsp(ks)
+    local out, by = {}, {}
+    for _, e in ipairs(KH.PAGES.dsp.e) do by[e.k] = e end
+    for _, k in ipairs(ks) do if type(k) == 'table' then out[#out + 1] = k elseif by[k] then out[#out + 1] = by[k] end end
+    return out
+  end
+  KH.PAGES.slixer = { title = 'DSP: slixer (slicer sampler)', e = from_dsp({
+    { k = 'slixer', t = {}, d = 'the sampler of the tracker: a sample cut into slices, every slice a note (C-3 up); the module shows the wave with the slices, its buttons on top and the MIDI row below. Notes of the track play the slices; 0Sxx picks a slice, 0Rxy retriggers it' },
+    'Opt+letter (slixer)', 'slixer slots', 'ze', 'Opt+J K',
+    { k = 'drag a slice edge', t = {}, d = 'on the wave: move the edge of a slice (spam on - it rolls while you drag, let go - the slice plays); click a slice - select and hear it' },
+    'h l', 'w W', 'j k g G', '+ - ^A ^X', 'i', 'Z' }) }
+  KH.PAGES.container = { title = 'DSP: container (rack)', e = from_dsp({
+    'container', 'container XY',
+    { k = 'A<>B', t = {}, d = 'container with two chains: the A<>B button links their mix - one fades in while the other fades out (a crossfade of the chains); lit while the link is on, click - on / off' },
+    '★ links', 'c= c|', 'cc', '[] (track block)', 'cf', 'cv', 'cb', 'zr',
+    { k = 'drag a module', t = {}, d = 'in CHAINS / ROUTE: drag a module onto another chain or between modules - it moves there (onto = parallel)' },
+    'h l', 'w W', 'dw db', 'Z' }) }
+end
+KH.BARS.dsp_slixer = { { 'Opt+D', 'detect' }, { 'Opt+T', 'transient' }, { 'Opt+C', 'classify' }, { 'Opt+X', 'clear' }, { 'Opt+Z', 'undo' },
+  { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
+KH.BARS.dsp_container = { { 'h l', 'fx' }, { 'c= c|', 'parallel / serial' }, { 'cc', 'pack' }, { 'cf', 'fold' }, { 'cv', 'grid / list' },
+  { 'cb', 'bands' }, { 'zr', 'router' }, { 'P', 'pin ★' }, { 'Z', 'menu' }, { 'dd', 'delete' } }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
