@@ -23373,7 +23373,7 @@ local function frame()
       if wk.panels then   -- 16 окт: панели по алфавиту строками, буква — янтарём (из реестра: ничего не забыто)
         local list = {}
         for _, pp in ipairs(draw.panes.PANELS) do if pp.key and (pp.avail ~= 'dev' or state.dev) then list[#list + 1] = pp end end
-        table.sort(list, function(a, b) return a.label:lower() < b.label:lower() end)
+        table.sort(list, function(a, b) local ra, rb = vim.key_rank(a.key), vim.key_rank(b.key); if ra ~= rb then return ra < rb end; return a.label:lower() < b.label:lower() end)   -- 28 окт: по клавишам
         -- 16 окт (вечер): строкой на панель — «клавиша  имя» колонкой, как остальной which-key (чипы слипались:
         -- measurestr не считает пробел в конце «a »)
         for _, pp in ipairs(list) do lines[#lines + 1] = { key = pp.key, text = pp.label } end

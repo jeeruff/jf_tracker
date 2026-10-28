@@ -3566,21 +3566,25 @@ function V.hydra_fix(h)
     if it.key then used[it.key] = true end
   end
   if #dups > 0 and ctx.dlog then ctx.dlog(('menu "%s": duplicate keys %s - moved to free letters'):format(tostring(h.title), table.concat(dups, ' '))) end
-  V.menu_sort(h.items, function(it) return it.label or it[1] end, h.nosort)
+  V.menu_sort(h.items, function(it) return it.key end, h.nosort)
   return h
 end
--- 28 окт: все меню — по алфавиту названий (как панели в Ctrl+W); номера (1 2 3 …) и списки значений — как есть
-function V.menu_key(t) return ((t or ''):gsub('^!', ''):gsub('^[^%w]+', ''):lower()) end
-function V.menu_sort(items, lab, nosort)
+-- 28 окт: все меню — по алфавиту КЛАВИШ (правило пользователя): a A b B … (заглавная сразу за строчной), потом
+-- цифры, знаки; без клавиши — в конце; равные — в прежнем порядке
+function V.key_rank(k)
+  if type(k) ~= 'string' or k == '' then return 100000 end
+  local ch = k:sub(1, 1)
+  local b = ch:byte()
+  if ch:match('%a') then return ch:lower():byte() * 2 + (ch:match('%u') and 1 or 0) end
+  if ch:match('%d') then return 1000 + b end
+  return 2000 + b
+end
+function V.menu_sort(items, keyf, nosort)
   if nosort or type(items) ~= 'table' or #items < 3 then return end
-  for _, it in ipairs(items) do
-    local k = it.key or it[1]
-    if type(k) == 'string' and k:match('^%d') then return end
-  end
   local ord = {}
   for i, it in ipairs(items) do ord[it] = i end
   table.sort(items, function(a, b)
-    local ka, kb = V.menu_key(lab(a)), V.menu_key(lab(b))
+    local ka, kb = V.key_rank(keyf(a)), V.key_rank(keyf(b))
     if ka ~= kb then return ka < kb end
     return ord[a] < ord[b]
   end)

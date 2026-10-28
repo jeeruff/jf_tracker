@@ -60,12 +60,21 @@ function WK.get(p, op)
   end
   local t = T[p]
   if not t then return nil end
-  if not t.sorted then   -- 28 окт: пункты — по алфавиту описаний (номера 1..9 — тоже по описанию)
+  if not t.sorted then   -- 28 окт: пункты — по алфавиту клавиш
     t.sorted = true
+    local function rank(k)   -- 28 окт: по клавишам, как меню: a A b B …, цифры, знаки
+      local ch = (k or ''):sub(1, 1)
+      if ch == '' then return 100000 end
+      if ch:match('%a') then return ch:lower():byte() * 2 + (ch:match('%u') and 1 or 0) end
+      if ch:match('%d') then return 1000 + ch:byte() end
+      return 2000 + ch:byte()
+    end
+    local ord = {}
+    for i, e in ipairs(t.items) do ord[e] = i end
     table.sort(t.items, function(a, b)
-      local ka, kb = (a[2] or ''):gsub('^[^%w]+', ''):lower(), (b[2] or ''):gsub('^[^%w]+', ''):lower()
+      local ka, kb = rank(a[1]), rank(b[1])
       if ka ~= kb then return ka < kb end
-      return a[1] < b[1]
+      return ord[a] < ord[b]
     end)
   end
   if p == 'd' or p == 'y' or p == 'c' then
