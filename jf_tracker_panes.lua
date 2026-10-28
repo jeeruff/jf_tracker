@@ -345,7 +345,8 @@ local function place(lay, M, n, x, y, w, h)
   end
 end
 
-function PN.layout(model, W, H, M)
+function PN.layout(model, W, H, M, Y0)   -- 28 окт: Y0 — отступ сверху (окно без рамки на 1 px выше рабочей области)
+  Y0 = Y0 or 0
   local lay = { v = model.v, W = W, H = H, cells = {}, by_panel = {}, rects = {}, order = {}, grips = {}, seps = {}, nodes = {}, M = M }   -- M: минимумы для протяжки ручек
   local z = model.zoom and PN.find(model, model.zoom)
   -- 22 окт: зум нескольких листов друг под другом (zz в DSP: микшер над DSP на всё окно)
@@ -357,20 +358,20 @@ function PN.layout(model, W, H, M)
     for _, id in ipairs(model.zoomside or {}) do local l = PN.find(model, id); if l and alive(M, l) and not seen[l] then seen[l] = true; sl[#sl + 1] = l end end
     local SW = #sl > 0 and math.floor(W * (model.zoomside_w or 0.18)) or 0
     local LW = W - (SW > 0 and SW + M.sep or 0)
-    local y0, fr = 0, model.zoomfr or {}
+    local y0, fr = Y0, model.zoomfr or {}
     for i, l in ipairs(zl) do
-      local hh = i == #zl and H - y0 or math.floor((H - M.sep * (#zl - 1)) * (fr[i] or 1 / #zl))
+      local hh = i == #zl and H - y0 or math.floor((H - Y0 - M.sep * (#zl - 1)) * (fr[i] or 1 / #zl))
       place_leaf(lay, M, l, 0, y0, LW, hh); lay.nodes[l] = { x = 0, y = y0, w = LW, h = hh }
       y0 = y0 + hh + M.sep
     end
-    local sy = 0
+    local sy = Y0
     for i, l in ipairs(sl) do
-      local hh = i == #sl and H - sy or math.floor((H - M.sep * (#sl - 1)) / #sl)
+      local hh = i == #sl and H - sy or math.floor((H - Y0 - M.sep * (#sl - 1)) / #sl)
       place_leaf(lay, M, l, LW + M.sep, sy, SW, hh); lay.nodes[l] = { x = LW + M.sep, y = sy, w = SW, h = hh }
       sy = sy + hh + M.sep
     end
-  elseif z and alive(M, z) then place_leaf(lay, M, z, 0, 0, W, H); lay.nodes[z] = { x = 0, y = 0, w = W, h = H }
-  else place(lay, M, model.root, 0, 0, W, H) end
+  elseif z and alive(M, z) then place_leaf(lay, M, z, 0, Y0, W, H - Y0); lay.nodes[z] = { x = 0, y = Y0, w = W, h = H - Y0 }
+  else place(lay, M, model.root, 0, Y0, W, H - Y0) end
   -- трекер — первым в кольце (номер 1), остальные по обходу
   for i, id in ipairs(lay.order) do
     if id == 'tracker' and i > 1 then table.remove(lay.order, i); table.insert(lay.order, 1, id); break end

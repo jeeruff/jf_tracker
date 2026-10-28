@@ -408,7 +408,7 @@ function D.panes_layout(state, L, nregions, ncols)
     if a == 'merged' then return false end              -- 18 окт: modulation — страница automation
     return true
   end
-  D.pn_lay = D.panes.layout(m, gfx.w, H, M)
+  D.pn_lay = D.panes.layout(m, gfx.w, H, M, D.top_inset or 0)   -- 28 окт: без рамки — всё на 1 px ниже (верхняя линия видна)
   return D.pn_lay
 end
 
@@ -12231,10 +12231,12 @@ function D.frame(L, snap, rows, state, info)
       -- 15 окт: снова 1 px (INSERT — 2): толстая рамка закрывала края растягивания панелей
       gfx.rect(r[1], r[2], r[3], r[4], 0)
       -- рамка режима: поле строк трекера в цвете режима (D.MODE_COL); INSERT — 2 px
-      local tf = info.focus == 'tracker' and not info.mixfocus and D.trk_field
+      -- 28 окт: INSERT — красная рамка поля строк и при фокусе в другой панели (клавиши нот всё ещё пишут)
+      local insany = info.vmode == 'insert'
+      local tf = ((info.focus == 'tracker' and not info.mixfocus) or insany) and D.trk_field
       if tf then
         set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(tf[1], tf[2], tf[3], tf[4], 0)
-        if ins then gfx.rect(tf[1] + 1, tf[2] + 1, tf[3] - 2, tf[4] - 2, 0) end
+        if ins or insany then gfx.rect(tf[1] + 1, tf[2] + 1, tf[3] - 2, tf[4] - 2, 0) end
       end
       -- 15 окт: опция focus beacon — фокус перешёл в модуль: рамка вспыхивает и стягивается к нему за 0.4 с
       local now = reaper.time_precise()

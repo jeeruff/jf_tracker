@@ -21654,6 +21654,7 @@ local function frame()
     ctx.mix_vis_prev = PNm.visible(state.panes, 'mixer') and state.mixer
   end
   draw.lane_top = state.lanetop or nil   -- 28 окт: черта ветки и над модулем
+  draw.top_inset = (state.notitle and gfx.dock(-1) & 1 == 0) and 1 or 0   -- 28 окт: окно без рамки на 1 px выше — рисуем на 1 px ниже
   draw.round_rack = state.roundrack or nil; draw.reap_glitch = state.glitch or nil   -- 26 окт: опция rounded racks
   if model.OFF_END ~= (state.offend or false) then model.OFF_END, edit.OFF_END = state.offend or false, state.offend or false; model.invalidate() end   -- OFF в конце строки (опция, 8 окт)
   if not ctx.title_init then ctx.title_init = true; if state.notitle then toggle_dock(true) end end   -- старт плавающим: без заголовка
