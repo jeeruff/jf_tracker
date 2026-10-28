@@ -1639,7 +1639,9 @@ function B.enter()
   if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
   elseif e.pmfolder then B.pmfolder = e.pmfolder; B.pm = nil; B.cur = 1; B.filter = ''; B.set_all(B.read_pm())   -- папка проектов (без jf_pm)
-  elseif e.dir then B.go(B.full(e))
+  elseif e.dir then
+    if e.zdir then B.mode = 'files'; B.cur = 1; B.filter = '' end   -- 28 окт: папка zoxide — во вкладку files
+    B.go(B.full(e))
   elseif e.pm and B.grid and PMm() then if ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end   -- сетка: Enter — открыть (внутрь — Shift+Enter)
   elseif e.pm then B.pm_open(e)                         -- проект → внутрь, как папка
   elseif e.kit then if ctx.kit_load then ctx.kit_load(e.path, e.name) end   -- набор → lib трека курсора
@@ -1657,7 +1659,7 @@ end
 
 -- путь для прослушивания строки (nil — нечего слушать)
 function B.preview_path(e)
-  if not e or e.dir or e.db or e.trk or e.rgn or e.mark then return nil end
+  if not e or e.dir or e.db or e.trk or e.rgn or e.mark or e.empty then return nil end
   if (e.name or ''):lower():match('%.xrni$') or (e.name or ''):lower():match('%.sfz$') then return nil end   -- инструмент (архив / текст SFZ), не звук
   if (e.name or ''):lower():match('%.jfcurve$') then return nil end    -- кривая — не звук
   if e.other then return nil end                                      -- не звук (*.*): не слушаем
@@ -1760,8 +1762,16 @@ function B.add_recent(path)
   if f then f:write(table.concat(rc, '\n'), '\n'); f:close() end
   if B.mode == 'recent' and not B.pl then B.recent_list() end
 end
+-- 28 окт: вкладка zoxide (была recent): сверху лучшие папки zoxide (Enter — туда, во вкладку files), ниже —
+-- недавно прослушанные файлы
+B.ZTAB = 15
 function B.recent_list()
   local out = {}
+  for i, z in ipairs(B.zlist()) do
+    if i > B.ZTAB then break end
+    out[#out + 1] = { name = (z.path:match('([^/]+)/?$') or z.path) .. '/', path = z.path, dir = true, zdir = true, meta = (z.path:match('(.*)/[^/]+/?$') or ''):match('([^/]+)$') }
+  end
+  if #out > 0 then out[#out + 1] = { name = '-- played --', empty = true } end
   for _, pth in ipairs(B.recent_load()) do
     out[#out + 1] = { name = pth:match('([^/]+)$') or pth, path = pth, meta = (pth:match('(.*)/[^/]+$') or ''):match('([^/]+)$') }
   end
@@ -1811,6 +1821,16 @@ function B.key(c)
     else return false end
     return true
   end
+  -- 28 окт: z — меню вида браузера: zi — папки zoxide (fzf), zz — на всё окно, zm — свернуть панель
+  if B.zpend then
+    B.zpend = nil
+    if ch == 'i' then if ctx.browse_z then ctx.browse_z('') end
+    elseif ch == 'o' then B.set_mode('recent')
+    elseif ch == 'z' then if ctx.zz_zoom then ctx.zz_zoom() end
+    elseif ch == 'm' then if ctx.pane_min then ctx.pane_min() end end
+    return true
+  end
+  if ch == 'z' and not B.keys then B.zpend = true; return true end   -- в режиме keys z — нота
   if B.keys and ctx.browser_note and ctx.browser_note(c) then return true end   -- keys: q 2 w 3 e … — файл с высотой
   -- pm-сетка (6 окт): свои клавиши (hjkl по сетке, Enter открыть, Space слушать, p pin …)
   if B.mode == 'pm' and B.grid and not B.pmproj and not B.pm_folders and PMm() then
@@ -2018,7 +2038,7 @@ function B.draw(U, L, x, y, w, h)
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
     for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
-      bx = btn(bx, y, t, t, B.mode == t)
+      bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
     if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
       B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
@@ -2087,7 +2107,7 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
-  elseif B.mode == 'recent' then where = ('recently played: %d  (m - mark, Space - the marked ones in a row)'):format(#B.all)   -- 27 окт
+  elseif B.mode == 'recent' then where = 'zoxide: folders you go to most, then files played lately (Enter - go / to lib, m - mark, zi - all folders)'   -- 27 окт; 28 окт: zoxide
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
   if B.filter ~= '' or B.filtering then

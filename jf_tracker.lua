@@ -23217,6 +23217,7 @@ local function frame()
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
       or (SL.active and SL.pend_z and MX.WK.get('item_z'))   -- 24 окт: z во вкладке item
+      or (state.focus == 'browser' and B.zpend and MX.WK.get('browser_z'))   -- 28 окт: z в браузере
       or (state.focus == 'dsp' and state.dsp_zs and MX.WK.get('dsp_zs')) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
@@ -28811,6 +28812,8 @@ local function frame()
         if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
+        -- 28 окт: командная строка / поиск — vim (браузер забирал буквы «:reload»: l, Enter → файл в lib)
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if not B.key(c) then return vim.key(c) end
       elseif state.focus == 'map' then   -- 27 окт: панель map — j k h l Enter, t источник, v вид
         -- 27 окт (2): командная строка, поиск и INSERT — vim (карта забирала буквы «:debug» и Esc)
