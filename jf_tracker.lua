@@ -21575,7 +21575,11 @@ local function frame()
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
   draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
-  U.begin_frame()
+  -- 28 окт: простой — пропущенный кадр не заливает и не копирует экран: окно держит прошлую картинку (gfx.clear = -1);
+  -- раньше каждый тик буфер 1021 копировался на экран целиком (LICE_BlitInt — главная нагрузка)
+  gfx.clear = -1
+  ctx.kept = ctx.keep_screen
+  U.begin_frame(ctx.kept)
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   -- 8 окт: колесо и протяжка (кнопка зажата, мышь сдвинулась) — тоже ввод:
   -- прокрутка / выделение видны в этом же тике, а не в следующем
@@ -22071,7 +22075,7 @@ local function frame()
     ctx.hb_last = string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count')))
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count'))) .. (ctx.fps_idle and ' idle' or (' busy ' .. ('%.1f'):format(reaper.time_precise() - idle.active_t) .. ' ' .. tostring(ctx.idle_why)))
     reaper.SetExtState(EXT, 'hb', ctx.hb_last, false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
@@ -22122,6 +22126,8 @@ local function frame()
     local mkey = gfx.mouse_x .. ',' .. gfx.mouse_y .. ',' .. gfx.mouse_cap .. ',' .. gfx.w .. ',' .. gfx.h
     if mkey ~= idle.mkey or is_playing or changed or gfx.mouse_wheel ~= 0 or (now_t - idle.input_t) < 1.5
        or PV.playing() or vim.picker or vim.hydra or state.bpm_edit then
+      ctx.idle_why = (mkey ~= idle.mkey and 'mouse') or (is_playing and 'play') or (changed and 'project') or ((now_t - idle.input_t) < 1.5 and 'keys')
+        or (PV.playing() and 'preview') or ((vim.picker or vim.hydra) and 'menu') or 'other'
       idle.active_t, idle.mkey = now_t, mkey
     end
     idle.n = idle.n + 1
@@ -22131,12 +22137,24 @@ local function frame()
     -- каждом тике defer буфер выводится на экран; max — прямо, без буфера.
     -- Выше ~33 fps скрипт не может: defer REAPER тикает около 30 раз в секунду.
     local fps_t = tonumber(state.fps)
+    -- 28 окт: простой (1.5 с ни мыши, ни клавиш, ни правок, транспорт стоит) — 8 кадров в секунду через тот же буфер
+    -- (полный кадр ~10 мс × 33 = треть ядра впустую); любое действие — сразу полная частота
+    ctx.fps_idle = (now_t - idle.active_t > 1.5) or nil   -- и при опции fps 30 / 25 / 24
+    if ctx.fps_idle then fps_t = 8 end
     -- big fixed cursor (8 окт): кадр в буфер и при fps max — лупа копирует
     -- строку курсора из картинки, не из экрана
     ctx.bigbuf = state.bigcur or nil   -- 15 окт: cursor zoom — и без фиксированного курсора
+    -- 28 окт: частота ниже тика (fps 30 / 25 / 24, простой 8) — прямо на экран (gfx.clear = -1 держит картинку):
+    -- пропущенный кадр ничего не заливает и не копирует. Буфер 1021 — только для лупы cursor zoom (bigbuf):
+    -- копия буфера на экран каждый тик была главной нагрузкой (LICE_BlitInt)
+    ctx.direct_fps = (fps_t and not ctx.bigbuf) or nil
+    ctx.throttle = (fps_t or ctx.bigbuf) and true or nil
     if fps_t or ctx.bigbuf then
-      if fps_buf.w ~= gfx.w or fps_buf.h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); fps_buf.w, fps_buf.h = gfx.w, gfx.h; fps_buf.last = 0 end
-      gfx.dest = 1021
+      if ctx.bigbuf then
+        if fps_buf.w ~= gfx.w or fps_buf.h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); fps_buf.w, fps_buf.h = gfx.w, gfx.h; fps_buf.last = 0 end
+        gfx.dest = 1021
+      end
+      if fps_buf.w0 ~= gfx.w or fps_buf.h0 ~= gfx.h then fps_buf.w0, fps_buf.h0 = gfx.w, gfx.h; fps_buf.last = 0 end
       if not fps_t or now_t - fps_buf.last >= 1 / fps_t - 0.004 or not idle.hover then
         fps_buf.last = now_t
         -- 8 окт: буфер чистится сам — U.begin_frame стёр экран ДО gfx.dest = 1021,
@@ -22145,6 +22163,9 @@ local function frame()
       else idle_skip = true end
     end
   end
+  ctx.frame_skip = idle_skip
+  ctx.keep_screen = ctx.throttle   -- следующий кадр: begin_frame не заливает (заливка — здесь, если кадр рисуется)
+  if ctx.kept and not ctx.throttle then U.set(U.BG); gfx.rect(0, 0, gfx.w, gfx.h, 1) end   -- снова каждый тик: залить, как begin_frame
   if not idle_skip then HN.reset() end
   if ctx.frz and ctx.frz.pend then ctx.freeze_poll() end   -- 17 окт: длина freeze — с конца цикла (каждый тик, не только кадр)
   if state.rec_sess and reaper.GetPlayState() & 4 == 0 and not OPT.ask.active then ctx.rec_finish(false) end   -- запись остановили снаружи
@@ -23031,7 +23052,7 @@ local function frame()
   end
   -- 17 окт: пропущенный кадр — всё ниже в пустышку 797. Было ниже строки effects: она (и клипы, зона, макро)
   -- в пропущенных кадрах дорисовывалась в буфер прошлого кадра — поверх опций, справки, меню
-  if gfx.dest == 1021 and idle_skip then
+  if idle_skip and (gfx.dest == 1021 or ctx.direct_fps) then
     if not ctx.dummy_img then gfx.setimgdim(797, 1, 1); ctx.dummy_img = true end
     gfx.dest = 797
   end
@@ -27872,7 +27893,7 @@ local function frame()
     end
     if w > 4 and h > 4 then
       local d0 = gfx.dest
-      gfx.dest = tonumber(state.fps) and 1021 or -1
+      gfx.dest = ctx.bigbuf and 1021 or -1
       local ok, rgb = pcall(MX.PNG.grab, x, y, w, h)
       gfx.dest = d0
       -- 8 окт: как системный снимок macOS — та же папка (screencapture location
@@ -27901,7 +27922,7 @@ local function frame()
     end
   end
   draw.pmark('blit, gfx.update')
-  if tonumber(state.fps) or ctx.bigbuf then
+  if ctx.bigbuf and not ctx.frame_skip then
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
     -- 16 окт: непрозрачно и без сложения — gfx.a / gfx.mode последнего наложения (подсказка, рамка
     -- с alpha) иначе выводили весь кадр полупрозрачно на чёрный экран: окно темнело целиком

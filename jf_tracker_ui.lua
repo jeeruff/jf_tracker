@@ -243,10 +243,10 @@ function U.vbar(key, x, y, w, h, scroll, nvis, total)
   if U.vbar_impl then return U.vbar_impl(key, x, y, w, h, scroll, nvis, total) end
 end
 
-function U.begin_frame()
+function U.begin_frame(keep)   -- keep (28 окт): экран держит прошлый кадр (простой) — не заливать
   U.click  = gfx.mouse_cap & 1 == 1 and not U.mdown
   U.rclick = gfx.mouse_cap & 2 == 2 and not U.rdown
-  set(U.BG); gfx.rect(0, 0, gfx.w, gfx.h, 1)
+  if not keep then set(U.BG); gfx.rect(0, 0, gfx.w, gfx.h, 1) end
 end
 
 function U.end_frame()
