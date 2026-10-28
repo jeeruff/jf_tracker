@@ -28653,6 +28653,11 @@ local function frame()
   -- 13 окт: Ctrl+Option + / - — продолжить предыдущую команду колонки со значением ±1 (на следующий шаг)
   -- 28 окт: Opt + - / = — подколонки нот лейна курсора (как - + над полем), Ctrl+Opt + - / = — колонки эффектов трека
   -- (на поле команды Ctrl+Opt остаётся «продолжить команду ±1»); в INSERT с клавиатурой на поле ноты Opt+нота — аккорд
+  -- 28 окт: Opt+- / Opt+= на клавиатуре — «–» «≠» приходят юникодом (0x75000000 + код), не как 8211 / 8800 (работал только ±)
+  if c >= 0x75000000 and c < 0x76000000 and ctx.mods().alt then
+    local u = c - 0x75000000
+    if u == 8211 or u == 8212 or u == 8800 or u == 177 then c = u end
+  end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211 or c == 177 or c == 8212) and ctx.mods().alt and not ctx.mods().cmd
      and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31 or c == 8211 or c == 8212) and -1 or 1
@@ -28666,8 +28671,8 @@ local function frame()
       ctx.lane_subs(f.col, ln, d, n); ctx.relayout(); c = 0
     end
   end
-  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211) and ctx.mods().ctrl and ctx.mods().alt and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    vim.fx_continue((c == 45 or c == 95 or c == 31 or c == 8211) and -1 or 1); model.invalidate(); c = 0
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211 or c == 8212) and ctx.mods().ctrl and ctx.mods().alt and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    vim.fx_continue((c == 45 or c == 95 or c == 31 or c == 8211 or c == 8212) and -1 or 1); model.invalidate(); c = 0
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().ctrl and not ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.mod_note(c == 31 and 45 or c) then
     -- из next / auto — сразу на число (13 окт: раньше число менялось, а шаг оставался next)
