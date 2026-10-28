@@ -5517,118 +5517,59 @@ end
 -- 24 окт: контейнер — рэк, как в Ableton / Bitwig: слева шапка (имя, макросы, XY), в середине эффекты на подложке
 -- цвета контейнера (щели между ними залиты — видно, что это одно целое), справа — замыкание «out»; рамка сверху и снизу
 -- через все три части. Вложенный контейнер — подложка гуще (глубина). D.cst[f] — начало рэка (x, ряд, номер блока).
-local function rack_col(d) return U.tint(U.AMBER, 0.10 + 0.07 * math.min(3, d)) end
 -- 24 окт: цвет параллельной ветки (lane 1, 2, …) — скобка под её модулем / контейнером
 local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; return P[(n - 1) % #P + 1] end
 D.lane_col = lane_col
--- 24 окт: скобка — 2 px ниже рамки модулей (не слипается с ней), уровни через 2 px: внешний — ниже всех
-local function bracket(L, x0, x1, boxy, bh0, d)
-  local ext = D.rack_ext or 0
-  if ext < 4 then return end
-  local y0 = boxy + bh0 + 2
-  local yb = y0 + math.min(ext - 3, 2 * math.max(0, 2 - d))
-  -- 24 окт: концы — от самого низа модулей (была щель в 2 px — «рваный угол»); зазор только у горизонтали
-  -- 26 окт: 2 px (была 1 px — терялась); концы снаружи модулей: от их низа вниз, не поверх
-  local R = D.round_rack and math.min(4, yb - boxy - bh0) or 0   -- 26 окт: опция rounded racks — углы скобки дугой
-  if R < 2 then
-    gfx.rect(x0, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, yb - boxy - bh0 + 1, 1)
-    gfx.rect(x0, yb, x1 - x0 + 1, 2, 1)
-    return
-  end
-  local cy = yb + 1 - R                          -- центр дуг: внешний край штриха — x0 / x1 и yb + 1
-  gfx.rect(x0, boxy + bh0 + 1, 2, cy - boxy - bh0, 1); gfx.rect(x1 - 1, boxy + bh0 + 1, 2, cy - boxy - bh0, 1)
-  gfx.rect(x0 + R, yb, x1 - x0 + 1 - 2 * R, 2, 1)
-  for t = 0, 1 do
-    gfx.arc(x0 + R, cy, R - t, math.pi, 1.5 * math.pi, 1)
-    gfx.arc(x1 - R, cy, R - t, 0.5 * math.pi, math.pi, 1)
-  end
+-- 28 окт: контейнер — только яркие [ ] внутри по краям: без линий над / под модулями, без ступенек и скобок
+-- (5 контейнеров = 10 линий — нечитаемо); зазор от шрифта: G = L.pad между модулями, G/2 от скобки до модуля
+local function sq_bracket(x, y, h, right)
+  gfx.rect(x, y, 2, h, 1)
+  local hx = right and (x - 3) or x
+  gfx.rect(hx, y, 5, 2, 1); gfx.rect(hx, y + h - 2, 5, 2, 1)
 end
--- 26 окт: опция rounded racks — рэк обведён целиком (2 px, радиус до 6) по зазорам вокруг него: слева / справа в щели
--- между модулями, сверху в зазоре под шапкой, снизу на месте скобки; углы — дугой
-local function rrect2(x0, y0, x1, y1, R)
-  R = math.max(2, math.min(R, (x1 - x0) // 2, (y1 - y0) // 2))
-  gfx.rect(x0 + R, y0, x1 - x0 + 1 - 2 * R, 2, 1); gfx.rect(x0 + R, y1 - 1, x1 - x0 + 1 - 2 * R, 2, 1)
-  gfx.rect(x0, y0 + R, 2, y1 - y0 + 1 - 2 * R, 1); gfx.rect(x1 - 1, y0 + R, 2, y1 - y0 + 1 - 2 * R, 1)
-  for t = 0, 1 do
-    local r = R - t
-    gfx.arc(x0 + R, y0 + R, r, -0.5 * math.pi, 0, 1); gfx.arc(x1 - R, y0 + R, r, 0, 0.5 * math.pi, 1)
-    gfx.arc(x1 - R, y1 - R, r, 0.5 * math.pi, math.pi, 1); gfx.arc(x0 + R, y1 - R, r, math.pi, 1.5 * math.pi, 1)
-  end
-end
+local function brg(L) return math.max(2, math.floor(L.pad / 2)) end
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
-  set(f.enabled and lane_col(f.inner.lane) or U.DIM)
-  bracket(L, st.x, bx - L.pad - 1, boxy, bh0, f.inner.depth or 1)
+  if (D.rack_ext or 0) < 3 then return end
+  set((f.enabled and not f.poff) and lane_col(f.inner.lane) or U.DIM)
+  gfx.rect(st.x, boxy + bh0 + 1, math.max(2, bx - L.pad - st.x), 2, 1)   -- ветка — черта под модулем, без ножек
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
-  -- 27 окт: rounded racks — перед рэком свой зазор под рамку (как за полем «+» у закрытия); первый в цепочке
-  -- без него резался по краю окна цепочки
-  if f.wrap and D.round_rack and (D.rack_ext or 0) >= 4 then bx = bx + math.min(3, L.pad - 1) + 1 end
-  if f.wrap then D.cst[f] = { x = bx, y = boxy, k = k } end
-  if f.inner and f.inner.lane and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
-  local inn = f.inner
-  if inn and inn.wrap and D.cst[inn.parent] and D.cst[inn.parent].y == boxy then
-    set(rack_col(inn.depth or 1)); gfx.rect(bx - L.pad, boxy, L.pad, bh0, 1)   -- щель перед эффектом — цветом рэка
+  if f.wrap then
+    set((f.enabled and not f.poff) and U.AMBER or U.GREY); sq_bracket(bx, boxy, bh0, false)
+    D.cst[f] = { x = bx, y = boxy, k = k }
+    bx = bx + 2 + brg(L)
   end
+  if f.inner and f.inner.lane and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
   return bx
 end
--- 24 окт (вечер): конец рэка — без колонки out: рэк закрывается рамкой, за ним — поле «+» (щелчок — эффект в
--- конец контейнера, fzf; бросок эффекта на него — туда же); рамка и скобка — до конца поля
+-- конец рэка: ] за последним модулем; при перетаскивании перед ней — поле броска в конец контейнера:
+-- верх | — последовательно, низ = — параллельно (щелчок «+» — кнопка + в шапке контейнера)
 function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
-  local pw = math.max(L.cw * 4, ms('+') + 4 * L.pad)
+  local pw = math.max(L.cw * 3, ms('=') + 4 * L.pad)
   for _, c in ipairs(f.cend) do
     local st = D.cst[c]
-    local d = c.inner and c.inner.depth or 0
-    local x = bx - L.pad + 2
-    local same = st and st.y == boxy
-    local fr = c.enabled and U.tint(U.AMBER, 0.6) or U.DIM
-    if same then   -- правая кромка рэка — в зазоре за последним модулем (26 окт: 2 px, не на модуле)
-      set(fr); gfx.rect(x - 2, boxy, 2, bh0, 1)
-    end
-    local hot = not drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
-    local lit = drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
-    -- 28 окт: поле — тёмное; «+» только под мышью; при броске — две половины: верх | последовательно, низ = параллельно
-    set(hot and U.tint(U.AMBER, 0.2) or U.BG); gfx.rect(x, boxy, pw, bh0, 1)
-    if lit then
+    local x = bx - L.pad + brg(L)
+    if drag and st then
+      local lit = mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
       local hh = math.floor(bh0 / 2)
-      local low = my >= boxy + hh
-      set(U.tint(U.CYAN, 0.25)); gfx.rect(x, low and boxy + hh or boxy, pw, low and bh0 - hh or hh, 1)
-      set(U.CYAN); gfx.rect(x, boxy + hh, pw, 1, 1)
-      text(x + math.floor((pw - ms('|')) / 2), boxy + math.floor((hh - L.rh) / 2), '|', low and U.GREY or U.CYAN)
+      local low = lit and my >= boxy + hh
+      set(U.BG); gfx.rect(x, boxy, pw, bh0, 1)
+      if lit then set(U.tint(U.CYAN, 0.25)); gfx.rect(x, low and boxy + hh or boxy, pw, low and bh0 - hh or hh, 1) end
+      set(lit and U.CYAN or U.DIM)
+      for dy = 0, bh0 - 1, 6 do gfx.rect(x, boxy + dy, 1, math.min(3, bh0 - dy), 1); gfx.rect(x + pw - 1, boxy + dy, 1, math.min(3, bh0 - dy), 1) end
+      gfx.rect(x, boxy + hh, pw, 1, 1)
+      text(x + math.floor((pw - ms('|')) / 2), boxy + math.floor((hh - L.rh) / 2), '|', (lit and not low) and U.CYAN or U.GREY)
       text(x + math.floor((pw - ms('=')) / 2), boxy + hh + math.floor((bh0 - hh - L.rh) / 2), '=', low and U.CYAN or U.GREY)
-    end
-    set(lit and U.CYAN or U.tint(fr, 0.8))
-    for dy = 0, bh0 - 1, 6 do gfx.rect(x, boxy + dy, 1, math.min(3, bh0 - dy), 1); gfx.rect(x + pw - 1, boxy + dy, 1, math.min(3, bh0 - dy), 1) end
-    for dx = 0, pw - 1, 6 do gfx.rect(x + dx, boxy, math.min(3, pw - dx), 1, 1); gfx.rect(x + dx, boxy + bh0 - 1, math.min(3, pw - dx), 1, 1) end
-    if hot then text(x + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', U.AMBER) end
-    if st then
       D.rack_plus = D.rack_plus or {}
       D.rack_plus[#D.rack_plus + 1] = { x = x, y = boxy, w = pw, h = bh0, k = st.k }
-      if hot then hover.dspbtn = { fx = st.k, f = c, what = 'cadd' } end
-      if D.hint then D.hint('dspbtn', x, boxy, pw, bh0, { fx = st.k, what = 'cadd' }) end
+      x = x + pw + brg(L)
     end
-    if same then
-      set(fr)
-      local ext = D.rack_ext or 0
-      if D.round_rack and ext >= 4 then   -- 26 окт: rounded racks — обводка целиком по зазорам
-        if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
-        -- 27 окт: зазор сверху и снизу одинаковый (1 px; был 0 сверху и 2 снизу — «конфуз»), вложенные — ниже на свой уровень
-        local yb = boxy + bh0 + 1 + math.min(ext - 3, 2 * math.max(0, 2 - d))
-        rrect2(st.x - math.min(3, L.pad - 1), boxy - 3, x + pw - 1 + math.min(3, L.pad - 1), yb + 1, 6)
-      else
-      gfx.rect(st.x, boxy - 2, x + pw - st.x, 2, 1)   -- 26 окт: верх рэка 2 px в зазоре над модулями (boxy - 4 наезжал на шапку DSP: зазор 3 px)
-      if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
-      bracket(L, st.x, x + pw - 1, boxy, bh0, d)
-      end
-      -- 28 окт: начало и конец контейнера — яркие [ ] в зазорах слева и справа (рамка рэка тусклая — края терялись)
-      local xl, xr = st.x - math.min(3, L.pad - 1), x + pw - 2 + math.min(3, L.pad - 1)
-      local y0, y1 = boxy - 3, boxy + bh0 + 2
-      set((c.enabled and not c.poff) and U.AMBER or U.GREY)
-      gfx.rect(xl, y0, 2, y1 - y0 + 1, 1); gfx.rect(xl, y0, 5, 2, 1); gfx.rect(xl, y1 - 1, 5, 2, 1)
-      gfx.rect(xr, y0, 2, y1 - y0 + 1, 1); gfx.rect(xr - 3, y0, 5, 2, 1); gfx.rect(xr - 3, y1 - 1, 5, 2, 1)
+    if st and st.y == boxy then
+      set((c.enabled and not c.poff) and U.AMBER or U.GREY); sq_bracket(x, boxy, bh0, true)
     end
-    bx = x + pw + L.pad
+    bx = x + 2 + L.pad
   end
   return bx
 end
@@ -9486,7 +9427,7 @@ function D.frame(L, snap, rows, state, info)
     local bh0 = boxh
     -- 24 окт: есть рэки контейнеров — под модулями полоса 7 px под их скобки, полоса прокрутки — ниже неё
     D.rack_band = 0
-    for _, f in ipairs(fxs) do if f.wrap then D.rack_band = 7; break end end
+    for _, f in ipairs(fxs) do if f.inner and f.inner.lane then D.rack_band = 4; break end end   -- 28 окт: только черты веток (скобок под модулями нет)
     bh0 = bh0 - D.rack_band
     local function ncol_of(f)
       -- 19 окт: рэк drumrs5k в низкой панели — параметры пэда расходятся колонками вправо
