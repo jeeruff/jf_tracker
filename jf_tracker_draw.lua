@@ -5521,13 +5521,13 @@ end
 local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; return P[(n - 1) % #P + 1] end
 D.lane_col = lane_col
 -- 28 окт: контейнер — только яркие [ ] внутри по краям: без линий над / под модулями, без ступенек и скобок
--- (5 контейнеров = 10 линий — нечитаемо); зазор от шрифта: G = L.pad между модулями, G/2 от скобки до модуля
+-- (5 контейнеров = 10 линий — нечитаемо); зазор от шрифта: G = L.pad между модулями и от скобки до модуля
 local function sq_bracket(x, y, h, right)
   gfx.rect(x, y, 2, h, 1)
   local hx = right and (x - 3) or x
   gfx.rect(hx, y, 5, 2, 1); gfx.rect(hx, y + h - 2, 5, 2, 1)
 end
-local function brg(L) return math.max(2, math.floor(L.pad / 2)) end
+local function brg(L) return math.max(4, L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
