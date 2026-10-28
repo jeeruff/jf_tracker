@@ -303,11 +303,11 @@ function C.rebuild(head, lpb, prev_semis)
                 local pnext = R.MIDI_GetPPQPosFromProjTime(take, pos + math.min(stop, t + every))
                 if first then   -- исходная — до первого перезапуска
                   lout[#lout + 1] = ('%d:%d:%.3f'):format(math.floor(nt.sp + 0.5), nt.pi, nt.ep)
-                  R.MIDI_SetNote(take, nt.k, nt.sel, nt.mu, nt.sp, pp, nt.ch, nt.pi, nt.ve, true)
+                  R.MIDI_SetNote(take, nt.k, nt.sel, nt.mu, nt.sp, math.max(nt.sp + 1, pp - 1), nt.ch, nt.pi, nt.ve, true)   -- 28 окт: тик зазора — note-off раньше note-on (legato / mono сэмплера иначе не перезапускал)
                   first = false
                 end
                 local v = math.max(1, math.floor(nt.ve * decay ^ j + 0.5))
-                R.MIDI_InsertNote(take, false, nt.mu, pp, math.max(pp + 1, (t + every >= stop) and nt.ep or pnext), nt.ch, nt.pi, v, true)
+                R.MIDI_InsertNote(take, false, nt.mu, pp, math.max(pp + 1, (t + every >= stop) and nt.ep or (pnext - 1)), nt.ch, nt.pi, v, true)
                 gout[#gout + 1] = ('%d:%d:%d'):format(math.floor(pp + 0.5), nt.pi, nt.ch)
                 t = t + every; j = j + 1
               end

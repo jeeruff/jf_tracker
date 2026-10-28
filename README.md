@@ -140,9 +140,6 @@ follows that idea with its own code; the user key file (`jf_tracker_keys.lua`) w
 
 Also thanks to my brother **beast**, who showed me trackers and the demoscene in the first place.
 
-The Orca field is an own implementation of [Orca](https://github.com/hundredrabbits/Orca)
-by Hundred Rabbits (MIT), the esoteric livecoding language - no code copied.
-
 The dsp big routing view follows the idea of Sexan's ParaNormal FX Router
 for REAPER - an own implementation, no code copied.
 

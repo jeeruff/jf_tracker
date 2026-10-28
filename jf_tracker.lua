@@ -81,7 +81,12 @@ MMX.HM.show_staff = reaper.GetExtState('jf_tracker', 'harmstaff') ~= '0'   -- 9 
 MMX.HM.show_tab = reaper.GetExtState('jf_tracker', 'harmtab') ~= '0'
 MMX.HM.ji = reaper.GetExtState('jf_tracker', 'harmji') == '1'   -- 16 окт: натуральный строй
 MMX.PP = dofile(DIR .. '/jf_tracker_params.lua')   -- панель params вкладки modulation (3 окт); полем MMX: предел локальных
-local ORCA = dofile(DIR .. '/jf_tracker_orca.lua')       -- ядро Orca (Garden)
+-- 28 окт: Orca — только dev (в релиз не входит, см. tools/make_index.py): нет файла — пустая заглушка, поле не создаётся
+local ORCA = (function()
+  local fh = io.open(DIR .. '/jf_tracker_orca.lua', 'r')
+  if fh then fh:close(); return dofile(DIR .. '/jf_tracker_orca.lua') end
+  return setmetatable({ DOC = {} }, { __index = function() return function() return nil end end })
+end)()
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')
