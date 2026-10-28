@@ -4493,6 +4493,24 @@ local function row_shift(it, pos, lpb, nrows)
   return E.swing_time(r + nrows, lpb, it) + (pos - E.swing_time(r, lpb, it))
 end
 E.row_shift = row_shift
+-- 28 окт: копии 0R (P_EXT:jf_rtg «ppq:pitch:ch;…») и исходные длины (P_EXT:jf_rtl «ppq:pitch:end;…») — по позициям
+-- нот; Backspace / Insert строк двигают ноты внутри клипа — позиции меток двигать так же (fs — начало ноты, nil —
+-- удалена; fe — конец), иначе копии retrigger становились настоящими нотами
+local function rtg_remap(it, fs, fe)
+  local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', '', false)
+  local _, l = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', '', false)
+  if (g or '') == '' and (l or '') == '' then return end
+  local go, lo = {}, {}
+  for a, pi, ch in (g or ''):gmatch('([%-%d%.]+):(%d+):(%d+)') do
+    local b = fs(tonumber(a)); if b then go[#go + 1] = ('%d:%s:%s'):format(math.floor(b + 0.5), pi, ch) end
+  end
+  for a, pi, e in (l or ''):gmatch('([%-%d%.]+):(%d+):([%-%d%.]+)') do
+    local b = fs(tonumber(a)); if b then lo[#lo + 1] = ('%d:%s:%.3f'):format(math.floor(b + 0.5), pi, fe(tonumber(e))) end
+  end
+  R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtg', table.concat(go, ';'), true)
+  R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_rtl', table.concat(lo, ';'), true)
+end
+
 function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- keepend (19 окт): MIDI-клип до limit держит длину (паттерн Renoise)
   local dt = t1 - t0
   if dt <= 0 then return end
@@ -4530,6 +4548,8 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
                 if b0 ~= a0 or b1 ~= a1 then R.MIDI_SetNote(tk, k, sel, mu, b0, math.max(b0 + 1, b1), ch, pi, ve, true) end
               end
             end
+            rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 and a0 < p1 - 1 then return nil end; return a0 >= p1 - 1 and a0 - dp or a0 end,
+              function(a1) return (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and a1 - dp or p0)) end)
             for k = ncc - 1, 0, -1 do
               local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
               if a0 >= plim then   -- следующий паттерн
@@ -4611,6 +4631,8 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
           -- 21 окт: клип через границу паттерна — ноты, что уже за границей (следующий паттерн), не трогать, конец клипа — как был
           local nfin = fin > limit + EPS and fin or math.min(fin + dt, limit)
           local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), P(limit)
+          rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < plim - 1) and a0 + dp or nil end; return a0 end,
+            function(a1) if a1 <= p0 or a1 >= plim then return a1 end; return math.min(a1 + dp, plim) end)   -- 28 окт: метки 0R — с нотами
           local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
           for k = nn - 1, 0, -1 do
             local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
