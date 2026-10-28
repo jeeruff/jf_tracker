@@ -29480,6 +29480,9 @@ ctx.mem = function()
     if n ~= 'ctx' and n ~= 'state' then roots[#roots + 1] = { n, v } end
     i = i + 1
   end
+  -- 28 окт: и глобалы / реестр — 1.2 ГБ живого жило вне ctx
+  for k, v in pairs(_G) do if type(v) == 'table' or type(v) == 'function' then roots[#roots + 1] = { '_G.' .. tostring(k), v } end end
+  roots[#roots + 1] = { 'registry', debug.getregistry() }
   local t0 = reaper.time_precise()
   local list, nobj = MEM.census(roots)
   local rep = ('heap %s -> %s after collect, %d objects (%.0f ms): '):format(MEM.fmt(before * 1024), MEM.fmt(after * 1024), nobj, (reaper.time_precise() - t0) * 1000) .. MEM.report(list, 14)
@@ -33159,7 +33162,10 @@ ctx.mx_more = function()
   vim.open_hydra({ title = 'matrix', items = items })
   state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
-reaper.atexit(save_win)
+-- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
+-- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
+JF_TRACKER_SAVE_WIN = save_win
+if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
 -- расширения (релиз 5 окт): без SWS прослушивание молчит, без js_ReaScriptAPI нет
