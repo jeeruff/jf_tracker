@@ -3342,12 +3342,33 @@ function D.route_section(L, info, col, x, y, w, h, hover)
   local nodes = info.route_nodes and info.route_nodes(col) or {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   text(x + L.pad, y + 2, fit('ROUTE', w - 2 * L.pad), U.AMBER)
-  local y0 = y + L.rh + 4
-  if #nodes == 0 then text(x + L.pad, y0, fit('no fx', w - 2 * L.pad), U.DIM); return end
+  -- 28 окт (2): справа от заголовка — слоты цепей 1..4 (сравнение: вся цепочка FX трека), ниже — схема в окошке
+  local cs = info.chslots and info.chslots(col)
+  if cs then
+    local sbw = ms('4') + 2 * L.pad
+    local sx = x + w - L.pad - 4 * (sbw + 2)
+    if sx > x + L.pad + ms('ROUTE') + L.pad then
+      for i = 1, 4 do
+        local bx2 = sx + (i - 1) * (sbw + 2)
+        local hot = mx >= bx2 and mx < bx2 + sbw and my >= y + 2 and my < y + L.rh + 1
+        local on, cur = cs.has[i], cs.cur == i
+        set(hot and U.tint(U.AMBER, 0.35) or (cur and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.PANEL))); gfx.rect(bx2, y + 2, sbw, L.rh - 1, 1)
+        set((hot or cur) and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(bx2, y + 2, sbw, L.rh - 1, 0)
+        text(bx2 + L.pad, y + 2, tostring(i), (hot or cur) and U.AMBER or (on and U.TEXT or U.GREY))
+        if hot then hover.trkmod = { col = col, what = 'chslot', i = i } end
+      end
+    end
+  end
+  local wx, wy = x + L.pad, y + L.rh + 4
+  local ww, wh = w - 2 * L.pad, y + h - 3 - wy
+  if wh < L.rh + 4 then return end
+  set(U.BG); gfx.rect(wx, wy, ww, wh, 1)
+  set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
+  if #nodes == 0 then text(wx + L.pad, wy + 2, fit('no fx', ww - 2 * L.pad), U.DIM); return end
   if not D.RK then return end
-  local boxes, links, br = D.RK.route_layout(nodes, { x = x + L.pad, y = y0, w = w - 2 * L.pad, h = y + h - 2 - y0,
-    nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4), nh = L.rh, gx = math.max(4, L.pad + 2), bw = math.max(3, L.pad), rgap = 2 })
-  set(U.GREY)   -- 28 окт: связи ярче
+  local boxes, links, br = D.RK.route_layout(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
+    nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4), nh = L.rh, gx = math.max(6, 2 * L.pad), bw = math.max(3, L.pad), rgap = 4 })
+  set(U.GREY)
   for _, l in ipairs(links) do gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
   for _, b in ipairs(br) do
     set(U.tint(U.AMBER, 0.6)); gfx.rect(b.x, b.y, 2, b.h, 1)
@@ -3355,17 +3376,29 @@ function D.route_section(L, info, col, x, y, w, h, hover)
     gfx.rect(hx, b.y, 4, 1, 1); gfx.rect(hx, b.y + b.h - 1, 4, 1, 1)
   end
   local sel = D.dsp_selk
+  local rd = D.rdrag
+  D.rdrop = nil
   for bi, b in ipairs(boxes) do
     local n = b.n
     local hot = mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h
     local isel = sel == n.k
+    local moving = rd and rd.k == n.k
     local fillc = n.cont and U.tint(U.AMBER, 0.18) or ((n.depth or 0) > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
-    set(hot and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
-    set((hot or isel) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
-    if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 2, 1, b.h + 2, 1) end   -- = : связка столбика
-    local lb = (n.name or '?'):gsub('^%s+', ''):sub(1, 3)
-    text(b.x + math.floor((b.w - ms(lb)) / 2), b.y, lb, (hot or isel) and U.AMBER or (n.en and U.TEXT or U.GREY))
-    if hot then hover.trkmod = { col = col, what = 'rnode', k = n.k, par = n.par, name = n.name } end
+    set((hot and not rd) and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
+    set((hot or isel or moving) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
+    if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 3, 1, b.h + 3, 1) end   -- = : связка столбика
+    local lb = D.RK.abbrev(n.name)
+    text(b.x + math.floor((b.w - ms(lb)) / 2), b.y, lb, (hot or isel or moving) and U.AMBER or (n.en and U.TEXT or U.GREY))
+    -- бросок: левая половина — до, правая — после, ниже узла (до следующего ряда) — параллельно ему
+    if rd and not moving and mx >= b.x - 3 and mx < b.x + b.w + 3 and my >= b.y and my < b.y + b.h + L.rh then
+      local mode = my >= b.y + b.h and 'par' or (mx < b.x + b.w / 2 and 'before' or 'after')
+      D.rdrop = { k = n.k, mode = mode }
+      set(U.CYAN)
+      if mode == 'par' then gfx.rect(b.x, b.y + b.h + 1, b.w, 2, 1)
+      elseif mode == 'before' then gfx.rect(b.x - 3, b.y - 1, 2, b.h + 2, 1)
+      else gfx.rect(b.x + b.w + 1, b.y - 1, 2, b.h + 2, 1) end
+    end
+    if hot and not rd then hover.trkmod = { col = col, what = 'rnode', k = n.k, par = n.par, name = n.name } end
   end
 end
 

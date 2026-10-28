@@ -39,4 +39,34 @@ function RK.route_layout(nodes, o)
   return boxes, links, br, cut
 end
 
+-- 28 окт: блок <FXCHAIN … > чанка трека (слоты цепей) → текст, начало, конец (включительно); нет — nil
+function RK.fxchain(chunk)
+  local a = chunk:find('\n<FXCHAIN')
+  if not a then return nil end
+  a = a + 1
+  local depth, pos = 0, a
+  while pos <= #chunk do
+    local e = chunk:find('\n', pos, true) or #chunk
+    local t = chunk:sub(pos, e):match('^%s*(.-)%s*$')
+    if t:sub(1, 1) == '<' then depth = depth + 1 elseif t == '>' then depth = depth - 1 end
+    if depth == 0 then return chunk:sub(a, e), a, e end
+    pos = e + 1
+  end
+  return nil
+end
+
+-- 28 окт: подпись узла роутера — первые 3 согласные имени (slixer → slx, Container → Cnt, VST: ReaEQ → RQ);
+-- согласных меньше двух — начало имени как есть
+function RK.abbrev(name, n)
+  n = n or 3
+  local s = (name or '?'):gsub('^[%s|=]+', ''):gsub('^%w+i?:%s*', ''):gsub('%s*%(.*$', '')
+  local out = {}
+  for ch in s:gmatch('%a') do
+    if not ch:lower():match('[aeiouy]') then out[#out + 1] = ch end
+    if #out >= n then break end
+  end
+  if #out < 2 then return s:sub(1, n) end
+  return table.concat(out)
+end
+
 return RK

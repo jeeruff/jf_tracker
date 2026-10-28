@@ -2145,12 +2145,11 @@ ctx = {
     if h.what == 'wauto' then state.dsp_wauto = not state.dsp_wauto; return end
     if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
     if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; return end   -- 28 окт: мини-роутер
-    if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — курсор DSP на этот модуль
-      dsp_sel.fx = h.k; dsp_sel.param = 1; ctx.set_focus('dsp')
-      local f = (col and col.fx or {})[h.k]
-      vim.msg = 'route: ' .. (f and f.name or '?') .. ((h.par or 0) > 0 and ' (= parallel to the previous)' or '')
+    if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — нажал: тянуть (перенос / =), отпустил на месте — к модулю
+      ctx.rdrag = { col = col, k = h.k, x0 = gfx.mouse_x, y0 = gfx.mouse_y, name = h.name }
       return
     end
+    if h.what == 'chslot' then ctx.chslot_do(col, h.i, ctx.mods().alt and 'clear' or (ctx.mods().shift and 'save' or 'click')); return end
     local c = ctx.trk_mods(col)
     if h.what == 'row' then
       local r = c and c.rows[h.r]; if not r then return end
@@ -18834,6 +18833,80 @@ function ctx.slx_apply_secs(f, secs, n_old, edge, frame)
 end
 -- 27 окт: двойной щелчок по волне пульта — срез здесь; по границе — убрать её (как в слайсере lib)
 function ctx.roll_step() return state.holdroll and state.rollstep end
+-- 28 окт: быстрые слоты цепей (мини-роутер) — вся цепочка FX трека (блок FXCHAIN чанка: порядок, параметры, вкл)
+-- в P_EXT:jf_chslotN; пустой — запомнить, полный — вызвать (одна отмена), Shift — перезаписать, Opt — очистить
+ctx.fxchain_of = function(chunk) return draw.RK.fxchain(chunk) end   -- чистая, тест test_dsprack
+function ctx.chslot_info(col)
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return nil end
+  ctx.chs = ctx.chs or {}
+  local c = ctx.chs[col.guid]
+  if not c or c.track ~= col.track then
+    c = { track = col.track, has = {} }
+    for i = 1, 4 do local _, v = reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_chslot' .. i, '', false); c.has[i] = v ~= '' end
+    local _, cur = reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_chslotcur', '', false)
+    c.cur = tonumber(cur)
+    ctx.chs[col.guid] = c
+  end
+  return c
+end
+function ctx.chslot_do(col, i, mode)
+  local tr = col and col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+  local c = ctx.chslot_info(col)
+  local key = 'P_EXT:jf_chslot' .. i
+  if mode == 'clear' then
+    reaper.GetSetMediaTrackInfo_String(tr, key, '', true); c.has[i] = false
+    if c.cur == i then c.cur = nil end
+    vim.msg = ('chain slot %d cleared'):format(i); return
+  end
+  local ok, chunk = reaper.GetTrackStateChunk(tr, '', false)
+  if not ok then return end
+  if mode == 'save' or not c.has[i] then
+    local fc = ctx.fxchain_of(chunk) or 'EMPTY'
+    reaper.GetSetMediaTrackInfo_String(tr, key, fc, true); c.has[i] = true; c.cur = i
+    reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_chslotcur', tostring(i), true)
+    vim.msg = ('chain slot %d: the fx chain of %s saved (click - recall, Shift+click - overwrite, Opt+click - clear)'):format(i, col.name or 'track')
+    return
+  end
+  local _, saved = reaper.GetSetMediaTrackInfo_String(tr, key, '', false)
+  local cur, a, b = ctx.fxchain_of(chunk)
+  local new
+  if cur then new = chunk:sub(1, a - 1) .. (saved == 'EMPTY' and '' or saved) .. chunk:sub(b + 1)
+  elseif saved ~= 'EMPTY' then new = chunk:gsub('\n>%s*$', '\n' .. saved .. '>\n') end
+  if not new then vim.msg = ('chain slot %d: nothing to change'):format(i); return end
+  reaper.Undo_BeginBlock2(0)
+  reaper.SetTrackStateChunk(tr, new, false)
+  reaper.Undo_EndBlock2(0, 'jf_tracker: chain slot ' .. i, -1)
+  c.cur = i; reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_chslotcur', tostring(i), true)
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = ('chain slot %d recalled (u - undo; Shift+click - save over it)'):format(i)
+end
+-- 28 окт: мини-роутер — бросок узла: before / after — последовательно, par — параллельно этому (после него);
+-- только модули верхнего уровня цепочки (внутри контейнера — в DSP)
+function ctx.route_drop(col, k, to, mode)
+  local fxs = col and col.fx or {}
+  local src, dst = fxs[k], fxs[to]
+  if not (src and dst) or k == to then return end
+  if src.inner or dst.inner then vim.msg = 'route: inside a container - move it in DSP (drag the block)'; return end
+  local tr = col.track
+  local g = reaper.TrackFX_GetFXGUID(tr, src.i)
+  local si, di = src.i, dst.i
+  local target
+  if mode == 'before' then target = (si < di) and (di - 1) or di
+  else target = (si < di) and di or (di + 1) end
+  if target ~= si then edit.fx_move(tr, si, target) end
+  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+    if reaper.TrackFX_GetFXGUID(tr, i) == g then
+      local want = mode == 'par' and 1 or 0
+      local _, pv = reaper.TrackFX_GetNamedConfigParm(tr, i, 'parallel')
+      if i > 0 and (tonumber(pv) or 0) ~= want then edit.fx_parallel(tr, i, want) end
+      if i == 0 and want == 0 and (tonumber(pv) or 0) ~= 0 then edit.fx_parallel(tr, i, 0) end
+      break
+    end
+  end
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = ('route: %s %s %s'):format(src.name or '?', mode == 'par' and 'parallel to' or mode, dst.name or '?')
+end
 function ctx.holdroll_toggle()
   state.holdroll = not state.holdroll or nil
   reaper.SetExtState(EXT, 'holdroll', state.holdroll and '1' or '0', true)
@@ -22335,7 +22408,8 @@ local function frame()
     msn_tog = ctx.MSN_TOG, msn_opt = ctx.MSN_OPT,
     macfold = state.dsp_macfold, xyopen = state.dsp_xyopen,   -- 24 окт: вкладка xy   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
     trk_mods = function(col) return ctx.trk_mods(col) end,
-    route_nodes = function(col) return ctx.route_nodes(col) end,   -- 28 окт: мини-роутер   -- 22 окт: мини-панель mod · auto в блоке трека
+    route_nodes = function(col) return ctx.route_nodes(col) end,
+    chslots = function(col) return ctx.chslot_info(col) end,   -- 28 окт: слоты цепей   -- 28 окт: мини-роутер   -- 22 окт: мини-панель mod · auto в блоке трека
     modedit = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3) (modsel занято строкой вкладки modulation): редактор модуляции выбранного параметра
     modtab = function() return state.modtab or 'lfo' end,
     modsl = ctx.MODSL,
@@ -27259,6 +27333,22 @@ local function frame()
     else
       if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: mixer XY morph'); model.invalidate() end
       ctx.mixxydrag = nil
+    end
+  end
+  if ctx.rdrag then   -- 28 окт: мини-роутер — тянуть узел; отпустил на месте — курсор DSP на модуль
+    local d = ctx.rdrag
+    if gfx.mouse_cap & 1 == 1 then
+      if not d.active and (math.abs(gfx.mouse_x - d.x0) > 4 or math.abs(gfx.mouse_y - d.y0) > 4) then d.active = true end
+      draw.rdrag = d.active and d or nil
+      if d.active then state.status = 'route: drop on a box - left half before it, right half after it, below it = parallel' end
+    else
+      ctx.rdrag = nil; draw.rdrag = nil
+      local h = draw.rdrop
+      if d.active and h and h.k then ctx.route_drop(d.col, d.k, h.k, h.mode)
+      elseif not d.active then
+        dsp_sel.fx = d.k; dsp_sel.param = 1; ctx.set_focus('dsp')
+        vim.msg = 'route: ' .. (d.name or '?') .. ' (drag it: before / after / below = parallel)'
+      end
     end
   end
   if ctx.snapdrag then   -- 22 окт: морф XY-пресетов, пока кнопка нажата; отпустил — одна отмена

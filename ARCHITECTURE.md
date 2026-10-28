@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 33230 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 33320 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2929 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 6026 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_alias.lua` | 866 | алиасы паттернов (этап 6). |
@@ -123,7 +123,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 12400 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 12433 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 978 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 257 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 121 | темы трекера (3 окт). |
@@ -172,7 +172,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_autocanvas.lua` | 347 | холст автоматизации (15 окт): страница curve вкладки automation. |
 | `jf_tracker_curves.lua` | 95 | кривые для выделения на колонке огибающей (24 окт): reform для автоматизации. |
 | `jf_tracker_drumrack.lua` | 148 | drumrs5k (16 окт): контейнер RS5K видом драм-рэка. |
-| `jf_tracker_dsprack.lua` | 42 | геометрия цепочки DSP без reaper / gfx (28 окт; тест tests/test_dsprack.lua). |
+| `jf_tracker_dsprack.lua` | 72 | геометрия цепочки DSP без reaper / gfx (28 окт; тест tests/test_dsprack.lua). |
 | `jf_tracker_fxdump.lua` | 54 | снимок параметров плагина (PLAN_DSP этап 0, 22 окт): образцы для парсера. |
 | `jf_tracker_fxfloat.lua` | 47 | опция «no auto FX windows» (24 окт): окна, которые REAPER открывает сам («Auto-float newly created FX windows») при добавлении эффекта — из трекера… |
 | `jf_tracker_fxparse.lua` | 194 | парсер параметров плагина по тексту значения (PLAN_DSP этапы 1–2, 22 окт). |

@@ -53,5 +53,20 @@ for i = 1, #b do for j = i + 1, #b do
 end end
 ok(not over, 'boxes do not overlap')
 
+-- блок FXCHAIN: вложенные <...> (VST с base64, контейнер), конец — свой '>'
+local ch = '<TRACK\nNAME x\n<FXCHAIN\nSHOW 0\n<VST "VST: A" a.vst 0\nAAAA\n>\nFXID {1}\n<CONTAINER Container "" \n<JS foo ""\n0 0\n>\n>\n>\n<ITEM\nPOSITION 0\n>\n>\n'
+local fc, a, e = RK.fxchain(ch)
+ok(fc and fc:sub(1, 9) == '<FXCHAIN\n', 'fxchain starts at <FXCHAIN')
+ok(fc and fc:sub(-2) == '>\n' and not fc:find('<ITEM', 1, true), 'fxchain ends before <ITEM')
+ok(ch:sub(1, a - 1) .. fc .. ch:sub(e + 1) == ch, 'fxchain positions splice back')
+ok(RK.fxchain('<TRACK\nNAME x\n>\n') == nil, 'no fxchain - nil')
+
+-- подписи согласными
+ok(RK.abbrev('jf_slixer') == 'jfs', 'abbrev jf_slixer -> jfs')
+ok(RK.abbrev('slixer') == 'slx', 'abbrev slixer')
+ok(RK.abbrev('Container') == 'Cnt', 'abbrev Container')
+ok(RK.abbrev('VST: ReaEQ (Cockos)') == 'RQ', 'abbrev drops prefix and vendor')
+ok(RK.abbrev('Eau') == 'Eau', 'too few consonants - the name start')
+
 print(('test_dsprack: %d/%d ok'):format(n - fails, n))
 os.exit(fails == 0 and 0 or 1)
