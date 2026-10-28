@@ -2942,7 +2942,7 @@ ctx = {
     local tr = f.col.track
     local rg = (not all) and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
     local t0 = rg and rg.pos or (model.marker_pos(model.START_MARKER) or 0)
-    local t1 = rg and rg.rgnend or model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
+    local t1 = rg and rg.rgnend or model.marker_pos(model.END_MARKER) or math.huge
     local n = 0
     edit.run('clear track', function()
       for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
@@ -2963,7 +2963,7 @@ ctx = {
     local trs = {}
     if all then for _, c in ipairs(snap.cols) do if c.track and not c.master then trs[#trs + 1] = c.track end end else trs[1] = f.col.track end
     local t0 = model.marker_pos(model.START_MARKER) or 0
-    local t1 = model.marker_pos(model.END_MARKER) or (regions.lib_pos or math.huge)
+    local t1 = model.marker_pos(model.END_MARKER) or math.huge
     local rg = (all and what == 'e') and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
     if rg then t0, t1 = rg.pos, rg.rgnend end
     local ra, rb = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
@@ -4961,7 +4961,6 @@ ctx = {
       if rg.rgnend > t then t = rg.rgnend end
     end
     if s1 and t < s1 - 1e-4 then bars(t, s1) end
-    out.lib_pos = regions.lib_pos
     seq_cache.key, seq_cache.seq = key, out
     return out
   end,
@@ -4969,7 +4968,6 @@ ctx = {
   real_seq = function()
     local o = {}
     for _, r in ipairs(seq) do if not r.gap then o[#o + 1] = r end end
-    o.lib_pos = seq.lib_pos
     return o
   end,
   -- ── матрица: регионы интерактивно (1 окт) ──────────────────────────
@@ -9253,8 +9251,6 @@ ctx = {
       local rs = {}
       for i, r in ipairs(list) do rs[i] = r end
       for k = 1, count do
-        -- =LIB мог уехать на прошлой итерации — позиция с проекта, не из кэша
-        rs.lib_pos = model.lib_pos()
         local t0, t1 = alias.add_region(rs, names[k], bars or 1)
         rs[#rs + 1] = { pos = t0, rgnend = t1, name = names[k] }
       end
@@ -15333,9 +15329,8 @@ edit.after = function(desc)
     local t = edit.row_time(vim.cur.row, state.lpb, 0)
     local s0 = model.marker_pos(model.START_MARKER)
     local s1 = model.marker_pos(model.END_MARKER)
-    local lib = regions and regions.lib_pos
-    -- 17 окт: правка за =END (до библиотеки =LIB) — =END сам едет на конец этого такта, дальше — новый паттерн
-    if s1 and t >= s1 - 1e-6 and (not lib or t < lib - 1e-6) then
+    -- 17 окт: правка за =END — =END сам едет на конец этого такта, дальше — новый паттерн
+    if s1 and t >= s1 - 1e-6 then
       local qn = reaper.TimeMap2_timeToQN(0, t)
       local _, _, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
       local e = reaper.TimeMap2_QNToTime(0, qme or (qn + 4))

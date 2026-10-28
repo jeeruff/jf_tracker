@@ -26,7 +26,7 @@ if (pname and pname ~= '') or not (table.concat(names, ','):find('A drums', 1, t
     local col = snap.cols[2]
     local e = col.pool[1]
     local d = edit.depot_span(tr, e, 0.1, 0.3)
-    local lib = model.lib_pos()
+    local lib = nil
     log(('pool span → depot: item@%.2f lib=%.2f len=%.3f name=%s'):format(R.GetMediaItemInfo_Value(d, 'D_POSITION'), lib or -1, R.GetMediaItemInfo_Value(d, 'D_LENGTH'), R.GetTakeName(R.GetActiveTake(d))))
     edit.undo(); edit.undo()
     log('after undo n=' .. R.CountTrackMediaItems(tr) .. ' (was ' .. n0 .. ')')

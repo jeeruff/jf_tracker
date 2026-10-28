@@ -18,7 +18,7 @@ local M = {}
 local R = reaper
 
 M.DEPOT = 'LIB'          -- 8 окт: библиотека — заглушённый трек LIB (fixed lanes: инструмент — свой лейн с нуля); в колонках не показываем
-M.LIB_NAMES = { LIB = true, DEPOT = true }   -- DEPOT — старое имя того же трека
+M.LIB_NAMES = { LIB = true }
 function M.is_lib_name(name) return M.LIB_NAMES[name or ''] == true end
 M.BASE_NOTE = 60         -- «C-4 = оригинал»: MIDI 60 показываем как C-4
 M.MAX_UNROLL = 256       -- предел разворота зацикленного MIDI-item (повторов)
@@ -310,7 +310,6 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local fo = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN')
   if fo > 0.02 then fx[#fx + 1] = 'SO' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
   -- loop source в REAPER включён по умолчанию — показываем только ВЫКЛЮЧЕННЫЙ
-  -- 13 окт: голова ноты с лупом удержания — B_LOOPSRC снят нарочно (P_EXT:jf_sushead), не показываем
   if not slk and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'SL00' end   -- 13 окт: у слайса луп выкл — норма, не показывать
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
   if cm and cm ~= 0 then fx[#fx + 1] = 'SM' .. M.hex2(math.floor(cm)) end
@@ -644,7 +643,6 @@ function M.build(lpb)
     if M.is_lib_name(name) then depot_tr = tr end
   end
   snap.depot = depot_tr
-  snap.lib_pos = nil                       -- 8 окт: маркера =LIB больше нет
   snap.end_pos = M.marker_pos(M.END_MARKER)
   snap.zone = M.session_zone()                -- зона сессии (7 окт): её items — не библиотека
   -- мастер: для вкладки master (скоп слот 31, цепь FX)
@@ -720,8 +718,6 @@ function M.build(lpb)
           local in_zone = M.SHOW_ZONE and snap.zone and ip >= snap.zone[1] - 1e-6 and ip < snap.zone[2] - 1e-6
           if ip >= snap.end_pos - 1e-6 and not in_zone then lane = nil end
         end
-        -- 13 окт: хвост лупа удержания — часть ноты-головы, своей ячейки нет
-        if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then lane = nil end
         -- 13 окт: копии ретриггера (0Rxy, P_EXT:jf_gen) — часть своей ноты: своих ячеек и подколонок нет
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false)) ~= '' then lane = nil end
         -- 19 окт: слои ноты слоёного инструмента (¥, P_EXT:jf_lof) — часть своей ноты, как копии ретриггера
@@ -790,7 +786,7 @@ function M.build(lpb)
         end
       end
       local t1 = R.time_precise()
-      col.pool = M.track_pool(tr, depot_tr, nil, snap.end_pos, snap.zone, col.guid, #snap.cols == 0)
+      col.pool = M.track_pool(tr, depot_tr, snap.end_pos, snap.zone, col.guid, #snap.cols == 0)
       local t2 = R.time_precise()
       col.mods = M.track_mods(tr)
       local t3 = R.time_precise()
@@ -1126,7 +1122,6 @@ M.pool_key = pool_key
 local function pool_add(pool, seen, it, from_depot)
   local take = R.GetActiveTake(it)
   if not take then return end
-  if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) ~= '' then return end   -- хвост лупа удержания (13 окт)
   -- 19 окт: слой ¥ — не свой инструмент (живёт в своём корне), производный item слоя — тоже
   if select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_layerof', '', false)) ~= '' then
     local _, g = R.GetSetMediaItemInfo_String(it, 'GUID', '', false)
@@ -1245,15 +1240,10 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     local t = {}
     for v in sl:gmatch('[^,]+') do t[#t + 1] = tonumber(v) end
     -- 6 окт: привязка к волне — как E.item_slices: t · rate0 / rate текущий
-    -- (beatsync — его rate0); старая нарезка без rate0 — оценка по длине
+    -- (beatsync — его rate0)
     local _, b = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', '', false)
-    local _, l0, r0 = (b or ''):match('([^;]+);([^;]+);?([^;]*)')
-    l0, r0 = tonumber(l0), tonumber(r0)
+    local r0 = tonumber(((b or ''):match('[^;]+;[^;]+;([^;]*)')))
     local rn = tonumber(((bs or ''):match('^[^;]+;[^;]+;([^;]+)'))) or R.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
-    if not r0 and l0 and l0 > 0 then
-      local ln = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if math.abs(ln - l0) > 1e-3 then r0 = rn * ln / l0 end
-    end
     local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
     if math.abs(f - 1) > 1e-9 then for i = 1, #t do t[i] = t[i] * f end end
     pool[at].slices = t
@@ -1268,8 +1258,6 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
   do local _, pt = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_playthru', '', false); pool[at].playthru = pt == '1' end   -- 6 окт
 end
 
--- lib_pos — позиция маркера =LIB: items трека после него — его депо
--- (библиотека инструментов, помечены *). Трек DEPOT — наследие, тоже читается.
 function M.marker_pos(name)
   if not R.CountProjectMarkers then return nil end
   local n = R.CountProjectMarkers(0)
@@ -1279,22 +1267,17 @@ function M.marker_pos(name)
   end
   return nil
 end
-function M.lib_pos() return M.marker_pos(M.LIB_MARKER) end
 M.END_MARKER = '=END'
 M.START_MARKER = '=START'
 
--- Пул трека: items до маркера =END (последовательность) и после =LIB
--- (библиотека). Всё между =END и =LIB — не читается (просьба 1 окт: путаница;
--- сэмплы библиотеки реально лежат на треках за =LIB).
-function M.track_pool(tr, depot_tr, lib_pos, end_pos, zone, guid, first)
+-- Пул трека: items до маркера =END (последовательность); сэмплы библиотеки — на треке LIB (depot_tr)
+function M.track_pool(tr, depot_tr, end_pos, zone, guid, first)
   local pool, seen = {}, {}
   for i = 0, R.CountTrackMediaItems(tr) - 1 do
     local it = R.GetTrackMediaItem(tr, i)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     if zone and pos >= zone[1] - 1e-6 and pos < zone[2] - 1e-6 then goto skip_item end   -- копии клипов сессии — не инструменты
-    local in_lib = lib_pos ~= nil and pos >= lib_pos - 1e-6 and (end_pos == nil or pos >= end_pos - 1e-6)
-    local after_end = end_pos ~= nil and pos >= end_pos - 1e-6
-    if in_lib or not after_end then pool_add(pool, seen, it, in_lib) end
+    if not (end_pos ~= nil and pos >= end_pos - 1e-6) then pool_add(pool, seen, it, false) end
     ::skip_item::
   end
   if depot_tr then
@@ -2489,14 +2472,12 @@ function M.regions(lpb)
   if rcache.key == key then return rcache.list end
   local out = {}
   local markers = {}      -- маркеры для линейки трекера (2 окт): имя, строка (дробная), цвет
-  -- библиотека паттернов: всё после маркера =LIB не входит в последовательность
-  local lib_pos, end_pos, start_pos
+  local end_pos, start_pos
   local i = 0
   while true do
     local ret, isrgn, pos, _, name, idx, color = R.EnumProjectMarkers3(0, i)
     if not ret or ret == 0 then break end
     if not isrgn then
-      if name == M.LIB_MARKER then lib_pos = pos end
       if name == M.END_MARKER then end_pos = pos end
       if name == M.START_MARKER and not start_pos then start_pos = pos end
       markers[#markers + 1] = { idx = idx, name = name or '', pos = pos, row_f = R.TimeMap2_timeToQN(0, pos) * lpb, color = color }
@@ -2529,13 +2510,11 @@ function M.regions(lpb)
     out = pats
   end
   out.sections = secs
-  out.lib_pos = lib_pos
   out.end_pos, out.start_pos = end_pos, start_pos   -- для последовательности без перебора маркеров каждый кадр
   out.markers = markers
   rcache.key, rcache.list = key, out
   return out
 end
-M.LIB_MARKER = '=LIB'
 M.SESSION_REGION = '=SESSION'   -- зона сессии (6 окт): не слот, не паттерн
 M.SHOW_ZONE = false             -- трекер показывает зону (сессия играет), ставит main
 function M.session_zone()

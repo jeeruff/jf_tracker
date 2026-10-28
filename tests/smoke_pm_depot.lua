@@ -18,14 +18,14 @@ if (pname and pname ~= '') or not (table.concat(names, ','):find('A drums', 1, t
     -- депо на треке A drums после =LIB
     local tr = R.GetTrack(0, 0)
     local n0 = R.CountTrackMediaItems(tr)
-    local lib0 = model.lib_pos()
+    local lib0 = nil
     local sample = B.entries[1] and B.pm_preview(B.entries[1])
     if not sample then
       -- любой wav из песочницы: источник первого аудио-item A drums
       local tk = R.GetActiveTake(R.GetTrackMediaItem(tr, 0)); sample = R.GetMediaSourceFileName(R.GetMediaItemTake_Source(tk), '')
     end
     local it = edit.depot_add(sample, tr)
-    local lib1 = model.lib_pos()
+    local lib1 = nil
     log(('depot_add: lib before=%s after=%.2f item@%.2f n=%d→%d'):format(tostring(lib0), lib1 or -1, it and R.GetMediaItemInfo_Value(it, 'D_POSITION') or -1, n0, R.CountTrackMediaItems(tr)))
     local pool = model.track_pool(tr, nil, lib1)
     local nd = 0; for _, e in ipairs(pool) do if e.depot then nd = nd + 1 end end
@@ -34,7 +34,7 @@ if (pname and pname ~= '') or not (table.concat(names, ','):find('A drums', 1, t
     local d = edit.drop(tr, nil, 4, 48, sample)
     log(('drop: item@%.3f expect %.3f'):format(d and R.GetMediaItemInfo_Value(d, 'D_POSITION') or -1, R.TimeMap2_QNToTime(0, 12)))
     edit.undo(); edit.undo(); if not lib0 then edit.undo() end
-    log(('after undo n=%d lib=%s'):format(R.CountTrackMediaItems(tr), tostring(model.lib_pos())))
+    log(('after undo n=%d lib=%s'):format(R.CountTrackMediaItems(tr), tostring(nil)))
   end)
   if not ok then log('ERR ' .. tostring(err)) end
 end

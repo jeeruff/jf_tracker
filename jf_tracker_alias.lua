@@ -662,12 +662,6 @@ function A.add_region(regions, name, bars)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
   local blen = (qme and qms) and (qme - qms) or 4
   local t1 = R.TimeMap2_QNToTime(0, qn + blen * math.max(1, bars or 1))
-  -- библиотека — только =LIB ПОСЛЕ =END (2 окт: =LIB раньше =END — не библиотека;
-  -- раньше сдвигалось всё после такого =LIB, вся песня уезжала на каждое «+»)
-  local endp0 = model.marker_pos and model.marker_pos(model.END_MARKER)
-  local lib = regions.lib_pos
-  if lib and endp0 and lib < endp0 - EPS then lib = nil end
-  if lib and t1 > lib + EPS then A.shift_after(lib, bar_ceil(t1) - lib) end
   local i = 0
   while true do
     local ret, isrgn, pos, _, nm, _, color = R.EnumProjectMarkers3(0, i)

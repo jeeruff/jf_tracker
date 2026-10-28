@@ -151,8 +151,6 @@ end
 -- пропал файл — в lib встаёт он, а не голый файл (best[tr][fn] = chunk)
 local function census(with_chunks)
   local out, best = {}, with_chunks and {} or nil
-  local lib = model and model.lib_pos and model.lib_pos()
-  local endp = model and model.marker_pos and model.marker_pos(model.END_MARKER)
   for ti = 0, R.CountTracks(0) - 1 do
     local tr = R.GetTrack(0, ti)
     local _, name = R.GetTrackName(tr)
@@ -165,13 +163,11 @@ local function census(with_chunks)
         if tk and not R.TakeIsMIDI(tk) and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) == '' then
           local fn = root_file(R.GetMediaItemTake_Source(tk))
           if fn ~= '' then
-            local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
-            local in_lib = lib ~= nil and pos >= lib - 1e-6 and (endp == nil or pos >= endp - 1e-6)
             set = set or {}
             set[fn] = set[fn] or false
-            if not in_lib then
+            do
               set[fn] = true
-              if best and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) == '' then   -- хвост лупа — не мать
+              if best then
                 local b = best[tr] or {}; best[tr] = b
                 local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
                 if not b[fn] or len > b[fn].len then b[fn] = { it = it, len = len } end
@@ -352,7 +348,6 @@ local function run(desc, fn)
     if not ok2 then err = err2; ok = false end
   end
   -- 13 окт: луп удержания — хвосты нот за головами (после всех правок, в том же undo)
-  if ok and depth == 1 then local oku, eu = pcall(E.sus_sync); if not oku then E.sus_err = eu end end
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
   if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end   -- 22 окт: premod — за нотами трека
@@ -1040,8 +1035,7 @@ end
 -- item при rate нарезки (третье поле базы: offs;len;rate0); читаются в секундах
 -- item при ТЕКУЩЕМ rate (beatsync — его исходный rate0): t · rate0 / rate.
 -- Позиция в источнике = offs + t · rate — та же точка волны при любом rate
--- (раньше смена rate сдвигала все слайсы). Старая нарезка без rate0: rate0
--- оценивается по длине (rate менялся вместе с длиной item), иначе = текущий
+-- (раньше смена rate сдвигала все слайсы)
 local function slice_rate_now(it)
   local tk = R.GetActiveTake(it)
   local bs = E.bsync_of and E.bsync_of(it)
@@ -1063,13 +1057,6 @@ function E.item_slices(it)
   if #out > 0 then
     local rn = slice_rate_now(it)
     local r0 = base.rate0
-    if not r0 and base.len and base.len > 0 then
-      local ln = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      r0 = math.abs(ln - base.len) > 1e-3 and (rn * ln / base.len) or rn
-      -- старую базу дописать rate0 (6 окт): дальше нарезка не зависит от длины
-      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', ('%.6f;%.6f;%.6f'):format(base.offs or 0, base.len, r0), true)
-      base.rate0 = r0
-    end
     local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
     if math.abs(f - 1) > 1e-9 then
       for i = 1, #out do out[i] = out[i] * f end
@@ -2047,8 +2034,7 @@ function E.legato(track, lane_idx, t0, t1, off, fill)
   for i = 0, R.CountTrackMediaItems(track) - 1 do
     local it = R.GetTrackMediaItem(track, i)
     local tk = R.GetActiveTake(it)
-    if tk and not R.TakeIsMIDI(tk) and (lane_idx == nil or math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) == lane_idx)
-       and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_susof', '', false)) == '' then   -- хвост лупа удержания — производное, его пересоберут
+    if tk and not R.TakeIsMIDI(tk) and (lane_idx == nil or math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) == lane_idx) then
       list[#list + 1] = { it = it, tk = tk, pos = R.GetMediaItemInfo_Value(it, 'D_POSITION') }
     end
   end
@@ -2151,8 +2137,7 @@ local function finish_insert(track, lane_idx, it)
       local o = R.GetTrackMediaItem(track, i)
       local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
       local tk = R.GetActiveTake(o)
-      if o ~= it and tk and not R.TakeIsMIDI(tk) and op < p - 1e-4 and same_lane(track, o, lane_idx)
-         and select(2, R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_susof', '', false)) == '' and (not best or op > best) then best = op end
+      if o ~= it and tk and not R.TakeIsMIDI(tk) and op < p - 1e-4 and same_lane(track, o, lane_idx) and (not best or op > best) then best = op end
     end
     E.legato(track, lane_idx, best or p, p + 1e-4, false, true)
   end
@@ -4999,14 +4984,13 @@ end
 -- трек не задан — наследие: трек DEPOT (создаётся)
 -- ── наборы lib (4 окт): шаблон трека REAPER ───────────────────────────────
 -- Набор = сэмплы lib (item с нарезкой, метками, take FX) в родном формате
--- REAPER — шаблоне трека TrackTemplates/jf_kits/<имя>.RTrackTemplate: его
+-- REAPER — шаблоне трека TrackTemplates/jf_libs/<имя>.RTrackTemplate: его
 -- открывает и сам REAPER (Insert track from template). items — item сэмплов.
 -- 11 окт: это пресеты lib (вся lib трека), не kits: kit — один инструмент из нескольких звуков (набор &).
--- Новые — в TrackTemplates/jf_libs, сохранённые раньше в jf_kits тоже видны.
 function E.kit_dir() return R.GetResourcePath() .. '/TrackTemplates/jf_libs' end
 function E.lib_presets()
   local out, seen = {}, {}
-  for _, d in ipairs({ E.kit_dir(), R.GetResourcePath() .. '/TrackTemplates/jf_kits' }) do
+  for _, d in ipairs({ E.kit_dir() }) do
     local i = 0
     while true do
       local fn = R.EnumerateFiles(d, i); if not fn then break end
@@ -5334,50 +5318,6 @@ function E.set_section(item, start, len, overlap, chunk)
   R.SetItemStateChunk(item, table.concat(out, '\n'), false)
   R.UpdateItemInProject(item)
   return true
-end
-
--- секция → снова весь файл (вложенный источник), смещение take — в секундах файла
-function E.unsection(item)
-  local ok, chunk = R.GetItemStateChunk(item, '', false)
-  if not ok then return false end
-  local sb = source_block(chunk)
-  if not sb or sb.kind ~= 'SECTION' or not sb.inner then return false end
-  local tk = R.GetActiveTake(item)
-  local offs = tk and R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') or 0
-  local out = {}
-  for i = 1, sb.s - 1 do out[#out + 1] = sb.lines[i] end
-  out[#out + 1] = sb.inner
-  for i = sb.e + 1, #sb.lines do out[#out + 1] = sb.lines[i] end
-  R.SetItemStateChunk(item, table.concat(out, '\n'), false)
-  tk = R.GetActiveTake(item)
-  if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', sb.startpos + offs) end
-  return true
-end
-
--- ── луп удержания — убран (13 окт). Проекты, где он был, приводятся в прежний вид после
--- первой правки: хвосты (P_EXT:jf_susof) удаляются, головы снова играют файл, метки стираются
-local function ext(it, k) local _, v = R.GetSetMediaItemInfo_String(it, k, '', false); return v or '' end
-local function set_ext(it, k, v) R.GetSetMediaItemInfo_String(it, k, v, true) end
-function E.sus_sync()
-  local _, used = R.GetProjExtState(0, 'jf_tracker', 'sus')
-  if used ~= '1' then return end
-  for ti = 0, R.CountTracks(0) - 1 do
-    local tr = R.GetTrack(0, ti)
-    for ii = R.CountTrackMediaItems(tr) - 1, 0, -1 do
-      local it = R.GetTrackMediaItem(tr, ii)
-      if ext(it, 'P_EXT:jf_susof') ~= '' then R.DeleteTrackMediaItem(tr, it)
-      else
-        local was = ext(it, 'P_EXT:jf_sushead')
-        if was ~= '' then
-          E.unsection(it)
-          R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', tonumber(was:match('L(%d)')) or 1)
-          set_ext(it, 'P_EXT:jf_sushead', '')
-        end
-        for _, k in ipairs({ 'P_EXT:jf_loop', 'P_EXT:jf_sussig', 'P_EXT:jf_lvar' }) do if ext(it, k) ~= '' then set_ext(it, k, '') end end
-      end
-    end
-  end
-  R.SetProjExtState(0, 'jf_tracker', 'sus', '')
 end
 
 -- Луп items до конца региона rgnend; nsteps = период ровно N шагов
@@ -5763,7 +5703,7 @@ function E.layers_sync()
         local it = R.GetTrackMediaItem(tr, ii)
         local lof = ext(it, LOF)
         if lof ~= '' then derived[lof] = derived[lof] or {}; table.insert(derived[lof], it)
-        elseif ext(it, 'P_EXT:jf_gen') == '' and ext(it, 'P_EXT:jf_susof') == '' then
+        elseif ext(it, 'P_EXT:jf_gen') == '' then
           local b = iid_base(E.get_iid(it))
           if b and roots[b] then notes[#notes + 1] = { it = it, b = b, pos = R.GetMediaItemInfo_Value(it, 'D_POSITION') } end
         end
