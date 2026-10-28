@@ -15334,7 +15334,6 @@ edit.after = function(desc)
       local qn = reaper.TimeMap2_timeToQN(0, t)
       local _, _, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
       local e = reaper.TimeMap2_QNToTime(0, qme or (qn + 4))
-      if lib and e > lib then e = lib end
       local i = 0
       while true do
         local ret, isr, pos, _, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
@@ -15353,7 +15352,7 @@ edit.after = function(desc)
         if rg.pos > t + 1e-6 and (not next_pos or rg.pos < next_pos) then next_pos = rg.pos end
       end
     end
-    if not covered and (not s0 or t >= s0 - 1e-6) and (not s1 or t < s1 - 1e-6) and (not lib or t < lib - 1e-6) then
+    if not covered and (not s0 or t >= s0 - 1e-6) and (not s1 or t < s1 - 1e-6) then
       local qn = reaper.TimeMap2_timeToQN(0, t)
       local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-9)
       local t0 = reaper.TimeMap2_QNToTime(0, qms or qn)
@@ -32145,72 +32144,6 @@ ctx.palette_listen = function(p, ci, owner)
   if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then vim.msg = 'palette: the transport plays - stop it to listen'; return end   -- своя прослушка — не помеха
   ctx.mx_cell_preview(only, src.pos, src.rgnend, owner or 'palette'); ctx.pal_t = reaper.time_precise()
   vim.msg = ('palette: %s%s'):format(p.name, ci and (' on ' .. (snap.cols[ci].name or '')) or ' (all tracks)')
-end
-ctx.plist_draw = function(Lx, x, y, w)
-  local P = ctx.PL
-  ctx.pl_load()
-  local hover = {}
-  local mx, my = gfx.mouse_x, gfx.mouse_y
-  local rh, pad = Lx.rh, Lx.pad
-  local l = P.lists[P.cur]
-  local function btn(bx, by, label, id, on)
-    local bw = U.measure(label) + 2 * pad
-    if bx + bw > x + w then return bx end
-    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
-    U.set(U.LINE); gfx.rect(bx, by, bw, rh, 0)
-    U.text(bx + pad, by + 1, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
-    if hot then hover.btn = id end
-    if ctx.hint then ctx.hint('mxbtn', bx, by, bw, rh, id) end
-    return bx + bw + pad
-  end
-  -- строка 1: < имя > play write new del
-  local bx = btn(x + pad, y, '<', 'plprev')
-  local tail = { { 'play', 'plplay', ctx.PLY ~= nil }, { 'write', 'plwrite' }, { 'new', 'plnew' }, { 'del', 'pldel' } }
-  local tw = U.measure('>') + 3 * pad
-  for _, b in ipairs(tail) do tw = tw + U.measure(b[1]) + 3 * pad end
-  local nw = math.max(4 * Lx.cw, x + w - bx - tw)
-  local hot = mx >= bx and mx < bx + nw and my >= y and my < y + rh
-  U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, nw, rh, 1)
-  U.set(U.LINE); gfx.rect(bx, y, nw, rh, 0)
-  local nm = l and (('%d/%d %s'):format(P.cur, #P.lists, l.name)) or 'chain - new makes one'
-  U.text(bx + pad, y + 1, ctx.fit(nm, nw - 2 * pad), hot and U.AMBER or (l and U.CYAN or U.GREY))
-  if hot then hover.btn = 'plname' end
-  bx = btn(bx + nw + pad, y, '>', 'plnext')
-  for _, b in ipairs(tail) do bx = btn(bx, y, b[1], b[2], b[3]) end
-  -- строки текста: слова с переносом
-  local steps, toks, errs = ctx.pl_parsed()
-  local cur = ctx.PLY and ctx.PLY.segs[ctx.PLY.i]
-  local ty, tx = y + rh + 2, x + pad
-  local x1 = x + w - pad
-  local lines = 1
-  local area_y = ty
-  if not toks or #toks == 0 then
-    U.text(tx, ty + 1, ctx.fit('click - type the order: A1 A1 B1x2 C1:16 D1-8 B2+8 verse … (Tab completes)', w - 2 * pad), U.DIM)
-  else
-    local sp = Lx.cw   -- пробел битмап-шрифта измеряется в 0
-    for i, t in ipairs(toks) do
-      local tw2 = U.measure(t.text)
-      if tx + tw2 > x1 and tx > x + pad then tx = x + pad; ty = ty + rh; lines = lines + 1 end
-      if lines > 4 then break end
-      local on = cur and cur.tok == i
-      if on then U.set(U.tint(U.AMBER, 0.35)); gfx.rect(tx - 1, ty, tw2 + 2, rh, 1) end
-      U.text(tx, ty + 1, t.text, t.err and U.RED or (on and U.AMBER or U.TEXT))
-      tx = tx + tw2 + sp
-    end
-  end
-  local th = lines * rh
-  if mx >= x and mx < x + w and my >= area_y and my < area_y + th then
-    hover.btn = 'pltext'
-    U.set(U.LINE); gfx.rect(x + 1, area_y - 1, w - 2, th + 1, 0)
-  end
-  if ctx.hint then ctx.hint('mxbtn', x, area_y, w, th, 'pltext') end
-  -- итог
-  local sy = area_y + th + 1
-  local n, rows = P.summary(steps or {})
-  local st = #errs > 0 and errs[1] or (('%d step(s) · %d rows · %.1f bars'):format(n, rows, rows / math.max(1, state.lpb * 4)))
-  U.text(x + pad, sy + 1, ctx.fit(st, w - 2 * pad), #errs > 0 and U.RED or U.GREY)
-  return sy + rh + 2 - y, hover
 end
 -- 18 окт: секция в матрице — щелчок по её полосе: меню; протяжка за середину — перенос (Opt — копия, Cmd — алиас),
 -- за край — начало / конец по слотам

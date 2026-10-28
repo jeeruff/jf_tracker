@@ -380,44 +380,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ch, W - 4, 1, 1)
     hy = hy + ch + 2
   end
-  -- 18 окт: палитра — все паттерны проекта с превью по трекам (view → p)
-  if MX.palette_old and MX.palette and ctx.palette_draw then   -- 19 окт: палитра заменена кубиками в углу и clipkb в клетках (c)
-    local ph, hv = ctx.palette_draw(L, 0, hy + L.rh + 2, W - 6)
-    for k, v in pairs(hv) do hover[k] = v end
-    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
-    hy = hy + ph + 2
-  end
-  -- 19 окт: кубики всех паттернов на всю ширину (матрица ниже) и строка chain под ними
-  if MX.cubes_old and ctx.patlist_draw and not MX.fold then   -- 19 окт вечер: кубики и chain — своя панель patterns
-    local used = 1
-    for _, r in ipairs(regions) do local l = ctx.SEC and ctx.SEC.code_of(r.name or ''); if l then used = math.max(used, l:byte() - 64) end end
-    local nr = math.max(3, math.min(8, used + 2))
-    local ph = nr * (L.rh + 2)
-    U.text(L.pad, hy + L.rh + 2, 'patterns', U.GREY)   -- 19 окт: заголовок над кубиками
-    hy = hy + L.rh
-    local _, phv = ctx.patlist_draw(L, 2, hy + L.rh + 2, W - 8, ph)
-    for k, v in pairs(phv or {}) do hover[k] = v end
-    hy = hy + ph + 2
-    if ctx.chain_draw then
-      local chh, chv = ctx.chain_draw(L, 0, hy + L.rh + 2, W - 6)
-      for k, v in pairs(chv) do hover[k] = v end
-      hy = hy + chh
-    end
-  end
   -- 19 окт: sketchpad — эскизы X1 X2 … (набор clipkb Enter), строкой под кнопками
   if ctx.sketch_draw then
     local sh, shv = ctx.sketch_draw(L, 0, hy + L.rh + 2, W - 6)
     for k, v in pairs(shv) do hover[k] = v end
     if sh > 0 then hy = hy + sh end
-  end
-  -- 18 окт: playlist — блок под кнопками (порядок паттернов текстом), матрица ниже
-  MX.pl_y = nil
-  if MX.plist_old and MX.plist and ctx.plist_draw then   -- 19 окт: старый блок chain (< имя > play write new del, текст, итог) убран — строка chain под кубиками
-    local ph, hv = ctx.plist_draw(L, 0, hy + L.rh + 2, W - 6)
-    for k, v in pairs(hv) do hover[k] = v end
-    MX.pl_y = hy + L.rh + 2
-    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ph, W - 4, 1, 1)
-    hy = hy + ph + 2
   end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3

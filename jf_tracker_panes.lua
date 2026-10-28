@@ -14,7 +14,6 @@
 -- PN.move / swap / stack / unstack / split / hide / show / resize /
 -- equalize / zoom / set_active / cycle — операции tmux / zellij / dwm
 -- PN.encode / decode           → строка для ExtState и скринсетов
--- PN.migrate(old, W, H)        → дерево из прежних опций положения
 -- PN.LAYOUTS / PN.preset       → пресеты (tmux next-layout)
 -- Без reaper.* и gfx — тест tests/test_panes.lua.
 
@@ -873,58 +872,6 @@ function PN.decode(s)
   if z and z ~= '' then model.zoom = z end
   local ok, m = pcall(PN.normalize, model)
   if not ok or not m or not PN.find(m, 'tracker') then return PN.DEFAULT() end
-  return m
-end
-
--- ── миграция прежних опций положения (один раз при первом запуске) ────────
--- old: top, toppos, ctrlpos, slicespos, browserleft, side, dsp, fxb, khelp,
--- notes_open, mx_hidden, toptab, mxfold, top_px, side_px, inst_px, mx_px,
--- mx_fold_px, fxb_px; W, H — окно (px → доли)
-function PN.migrate(old, W, H)
-  old = old or {}
-  W, H = math.max(1, W or 1200), math.max(1, H or 800)
-  local m = PN.DEFAULT()
-  local root = m.root
-  local left, mid, right = root.kids[1], root.kids[2], root.kids[3]
-  local function frac(px, total, cur) if px and px > 0 then return math.max(0.05, math.min(0.6, px / total)) end return cur end
-  root.fr[1] = frac(old.mxfold and old.mx_fold_px or old.mx_px, W, root.fr[1])
-  root.fr[3] = frac(old.side_px, W, root.fr[3])
-  mid.fr[1] = frac(old.top_px, H, mid.fr[1])
-  right.fr[1] = frac(old.inst_px, H, right.fr[1])
-  root.fr[2] = math.max(0.2, 1 - root.fr[1] - root.fr[3])
-  mid.fr[2] = math.max(0.3, 1 - mid.fr[1] - mid.fr[3])
-  norm_fr(root); norm_fr(mid); norm_fr(right)   -- 9 окт: внизу — один dsp (fx — в стеке браузера)
-  -- main: по умолчанию — левый верх (прежний ctrl_alone); вкладки наверху и
-  -- main там же — рядом с вкладками; mid — под матрицей; bottom — в нижней полосе
-  local ctrlpos = old.ctrlpos or 'top'
-  if ctrlpos == 'top' and old.toppos == 'top' then
-    detach(m, 'ctrl'); mid.kids[1] = node('h', { 0.3, 0.7 }, leaf('ctrl'), mid.kids[1])
-  elseif ctrlpos == 'mid' then
-    left.kids[1], left.kids[2] = left.kids[2], left.kids[1]; left.fr[1], left.fr[2] = left.fr[2], left.fr[1]
-  elseif ctrlpos == 'bottom' then
-    detach(m, 'ctrl')
-    local mid2 = m.root.kids[2]
-    for k, kid in ipairs(mid2.kids) do
-      if is_leaf(kid) and kid.panes[1] == 'dsp' then mid2.kids[k] = node('h', { 0.25, 0.75 }, leaf('ctrl'), kid) end
-    end
-  end
-  if old.browserleft then
-    detach(m, 'browser')
-    local lk = m.root.kids[1]
-    m.root.kids[1] = node('v', { 0.6, 0.4 }, lk, leaf('browser'))
-  end
-  PN.normalize(m)
-  if old.toptab and PN.find(m, old.toptab) then PN.set_active(m, old.toptab) end
-  if old.top == false then
-    PN.hide(m, 'ctrl'); PN.hide(m, 'slices')
-    for _, id in ipairs(PN.TABS) do PN.hide(m, id) end
-  end
-  if old.dsp == false and not old.khelp then PN.hide(m, 'dsp'); PN.hide(m, 'fxb') end
-  if old.fxb == false then PN.hide(m, 'fxb') end
-  if old.side == false then PN.hide(m, 'browser') end
-  if old.mx_hidden then PN.hide(m, 'matrix') end
-  if old.notes_open then PN.stack(m, 'notes', 'fxb') end
-  m.v = 1
   return m
 end
 

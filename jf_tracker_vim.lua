@@ -1156,7 +1156,7 @@ V.COMMANDS = {
   { 'fxname', 'text', 'rename the selected fx or container in the chain (empty - its own name back)' },
   { 'zone', 'lo hi [full-lo full-hi]', 'the chain zone of a container (0..127): where the chain sounds for chain select, full in the middle, fades at the edges (click the numbers in CHAINS)' },
   { 'iname', 'text', 'rename the selected instrument in all its items (click the name in sample properties)' },
-  { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing); :garden is the old name' },
+  { 'orca', '[on|off|clear|pin|reset|size WxH|load]', 'Orca tab: Orca field (plants notes into the timeline while playing)' },
   { '!', 'text', 'REAPER actions (all, incl. scripts / custom): fzf, recent first - kept apart from tracker commands; also \\ a' },
   { 'midi', '', 'MIDI learn tab: knobs and pads of a controller drive the slicer (Enter: learn)' },
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
@@ -1242,8 +1242,7 @@ local function run_cmd(line)
   elseif cmd == 'scale' and n then local k = (math.abs(n - 1.5) < 0.01) and 1.5 or math.max(1, math.min(3, math.floor(n))); ctx.set_scale(k); V.msg = 'bitmap x' .. tostring(k):gsub('%.0$', '') .. (n > 3 and ' (x4 is kept for PT-mode)' or '')
   elseif cmd == 'space' and n then ctx.set_space(math.max(0, math.min(12, math.floor(n)))); V.msg = 'space ' .. math.floor(n)
   elseif cmd == 'tab' then
-    -- вкладка item — бывшая sample (:tab sample убран, 3 окт); orca — бывшая garden
-    if arg == 'sample' then V.msg = 'tab: item (the old sample tab)'; return end
+    -- вкладка item — внутренний id sample; orca — garden
     local a = (arg == 'automation' or arg == 'auto') and 'automation' or ((arg == 'mod' or arg == 'modulate' or arg == 'modulation') and 'modulation') or ((arg == 'item') and 'sample' or ((arg == 'orca') and 'garden' or arg))
     st.toptab = (a == 'sample' or a == 'automation' or a == 'modulation' or a == 'midi' or (a == 'grid' and st.gridtab) or a == 'retro' or (a == 'garden' and st.dev)) and a or 'master'
   elseif cmd == 'scopemode' then ctx.scopemode(arg ~= '' and arg or nil)
@@ -1257,7 +1256,6 @@ local function run_cmd(line)
   elseif cmd == 'fixed' then st.fixed = not st.fixed; V.msg = 'fixed cursor: ' .. (st.fixed and 'on' or 'off')
   elseif cmd == 'xfade' then
     if n then ctx.xfade_len(0, math.floor(n)) elseif arg == 'now' then ctx.xfade_now() elseif arg == 'off' or arg == 'on' then if (arg == 'on') ~= (st.xfade == true) then ctx.xfade_toggle() end else ctx.xfade_toggle() end
-  elseif cmd == 'icons' then V.msg = 'icons are gone - bitmap only'
   elseif cmd == 'mxzoom' then ctx.mx_zoom()
   elseif cmd == 'trim' then if ctx.mx_trim then ctx.mx_trim() end
   elseif cmd == 'quantize' or cmd == 'squant' then ctx.smart_quantize()
@@ -1267,7 +1265,7 @@ local function run_cmd(line)
   elseif cmd == 'fxname' then if ctx.fx_rename then ctx.fx_rename(arg) end
   elseif cmd == 'zone' then if ctx.zone_cmd then ctx.zone_cmd(arg) end   -- 25 окт
   elseif cmd == 'iname' then ctx.rename_inst(arg)
-  elseif cmd == 'garden' or cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
+  elseif cmd == 'orca' then ctx.garden_cmd(arg ~= '' and arg or 'show')
   elseif cmd == 'midi' then st.top = true; st.toptab = 'midi'; if ctx.set_focus then ctx.set_focus('top') end
   elseif cmd == 'start' or cmd == 'end' then if ctx.seq_marker then ctx.seq_marker(cmd, arg) end
   elseif cmd == 'loops' then if ctx.mx_loops_toggle then ctx.mx_loops_toggle() end

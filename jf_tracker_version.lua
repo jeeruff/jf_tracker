@@ -104,7 +104,7 @@ V.CHANGES = {
     'themes: solarized-dark / solarized-light, rednight / greennight, a theme tweak over any theme (hue, saturation, brightness, contrast, shadows, accents); theme tab with mini previews, 9 bundled pixel Nerd fonts and installed terminal fonts drawn in their faces; screensets keep the look (option)',
     'options: masonry columns over the whole width, search over all tabs (Enter changes the highlighted one), audio tab (device, sample rate, buffer), own key repeat (delay / rate), focus back from plugins, plugin windows on top, auto MIDI input for plugin instruments',
     'speed: frame garbage 1220 -> 184 KB per frame, a cached JSFX preset index, the browser find waits for typing and prefers substring hits, the undo tree keeps at most 24 snapshots in memory (the 1.4 GB leak is gone)',
-    'sustain loop removed (tab, :sus, bake, loop variants); old projects are cleaned on the first edit',
+    'sustain loop removed (tab, :sus, bake, loop variants)',
     'license: PolyForm Shield 1.0.0 (use, change, make and sell music, share for free; no competing products); NOTICE, SOURCES.md and credits for borrowed ideas (Hackey-Trackey, Paketti, Reform, ParaNormal)',
     'fixes: instrument previews no longer write two notes through the MIDI step recorder; previews stop on project tab change (SWS crash); matrix bar labels matched REAPER (were a bar ahead); MIDI insert rounds to the nearest tick (notes showed a row early); a failing frame no longer grows Lua memory',
   } },
