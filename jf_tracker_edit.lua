@@ -1476,6 +1476,7 @@ function E.note_off(heads, lpb, row)
   if #heads == 0 then return end
   local offs = {}
   local t = row_time(row + (E.OFF_END and 1 or 0), lpb, 0)   -- 8 окт: OFF в конце строки — нота звучит и на ней
+  local rebuild_after = {}
   run('note off', function()
     for _, h in ipairs(heads) do
       if h.kind == 'audio' then
@@ -1495,10 +1496,23 @@ function E.note_off(heads, lpb, row)
             R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, ppq, n.ch, n.pitch, n.vel, false)
             E.mark_off(h.take, n.ch, n.pitch, ppq)   -- 24 окт: явный OFF — скорость отпускания 1
             offs[#offs + 1] = { track = R.GetMediaItemTake_Track(h.take), pitch = n.pitch }
+            -- 28 окт: нота с 0R — исходный конец в P_EXT:jf_rtl; новый OFF — туда же и копии заново (иначе пересборка
+            -- возвращала старый конец, OFF не двигался)
+            local _, rtl = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_rtl', '', false)
+            local key = ('%d:%d:'):format(math.floor(n.sppq + 0.5), n.pitch)
+            if (rtl or ''):find(key, 1, true) then
+              local out = {}
+              for tok in rtl:gmatch('[^;]+') do
+                if tok:sub(1, #key) == key then out[#out + 1] = key .. ('%.3f'):format(ppq) else out[#out + 1] = tok end
+              end
+              R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_rtl', table.concat(out, ';'), true)
+              if E.cmds then rebuild_after[#rebuild_after + 1] = h end
+            end
           end
         end
       end
     end
+    for _, h in ipairs(rebuild_after) do E.cmds.rebuild(h, lpb, E.prev_semis(h)) end   -- 0R по новой длине
   end)
   if E.on_off then for _, o in ipairs(offs) do pcall(E.on_off, o.track, o.pitch) end end
 end
