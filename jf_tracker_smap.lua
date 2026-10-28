@@ -246,7 +246,7 @@ function SM.from_files(key, files)
   local G = { root = key, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0 }
   for _, f in ipairs(files) do
     if #G.nodes >= SM.LIMIT then break end
-    G.nodes[#G.nodes + 1] = { path = f.path, name = f.name, cat = SM.cat_of(f.name, f.sub) }
+    G.nodes[#G.nodes + 1] = { path = f.path, name = f.name, cat = SM.cat_of(f.name, f.sub), src = true }
   end
   return SM.finish(G)
 end
@@ -266,6 +266,8 @@ SM.FILTERS = {
 }
 SM.FON = {}
 function SM.filtered_out(n)
+  -- 28 окт: выбранные типы файлов (samples midi rex …) — фильтр списка; файлы из db / proj — без типа, не режутся
+  if SM.TYPEON and not n.src then local t = SM.ext_type(n.name or ''); if t and not SM.TYPEON[t] then return true end end
   local a = SM.AN and SM.AN[n.path]
   for _, f in ipairs(SM.FILTERS) do if SM.FON[f.key] and f.test(n, a) then return true end end
   return false
@@ -273,7 +275,7 @@ end
 function SM.finish(G)
   -- 28 окт: G.raw — весь список (индекс, проверка изменений), G.nodes — после фильтров
   G.raw = G.raw or G.nodes
-  if next(SM.FON) then
+  if next(SM.FON) or SM.TYPEON then
     local keep = {}
     for _, n in ipairs(G.raw) do if not SM.filtered_out(n) then keep[#keep + 1] = n end end
     G.nodes = keep

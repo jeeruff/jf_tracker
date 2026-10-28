@@ -82,7 +82,7 @@ local AUDIO = { wav = true, aif = true, aiff = true, flac = true, mp3 = true, og
 local function shown(name) return B.hidden or name:sub(1, 1) ~= '.' end
 local function wanted(name, map)
   local ext = name:match('%.([%w]+)$')
-  if map and B.SM then local t = B.SM.ext_type(name); return t ~= nil and B.mapV.types[t] == true end   -- 27 окт (8): карта — по типам
+  if map and B.SM then return B.SM.ext_type(name) ~= nil end   -- 28 окт: карта сканирует все свои типы, выбор типов — фильтром (без нового обхода)
   return B.all_files or (ext ~= nil and AUDIO[ext:lower()] == true)
 end
 
@@ -339,7 +339,7 @@ local function map_source()
       return out
     end
   end
-  return B.mp() .. '|' .. B.types_key(), nil
+  return B.mp(), nil   -- 28 окт: ключ — только папка: типы фильтруют готовый список (раньше каждый тип = полный обход)
 end
 function B.types_key() local t = {}; for _, k in ipairs(B.SM.TYPES) do if B.mapV.types[k] then t[#t + 1] = k end end; return table.concat(t, ',') end
 -- 27 окт (2): мини-lf слева от карты (источник files): .. и подпапки текущей папки; клик / l / Enter — войти, h — выше
@@ -852,6 +852,7 @@ B.map_draw_fn = map_draw
 map_draw_inner = function(U, L, x, y, w, h)
   local G = B.mapG
   local key, files = map_source()
+  B.SM.TYPEON = B.mapV.types
   -- 28 окт: графы папок — в памяти (до 6): ушёл из папки посреди скана и вернулся — скан продолжается, а не сначала
   B.map_graphs = B.map_graphs or {}
   if G and G.root ~= key then
@@ -1502,7 +1503,9 @@ function B.click(what)
     local t = what:sub(7)
     B.mapV.types[t] = not B.mapV.types[t] or nil
     R.SetExtState('jf_tracker', 'maptypes', B.types_key(), true)
-    B.mapG = nil
+    B.SM.TYPEON = B.mapV.types
+    local G = B.mapG
+    if G and not G.building then G.nodes = G.raw; G.neb, G.gal, G.lab_order, G.tree = nil, nil, nil, nil; B.SM.finish(G) end
     if ctx.msg then ctx.msg('map: ' .. (B.types_key() ~= '' and B.types_key() or 'nothing') .. ' (samples midi rex automation items track templates)') end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
