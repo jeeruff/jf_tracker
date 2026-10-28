@@ -18746,6 +18746,7 @@ function ctx.slx_slice_edit(f, frame, del_edge)
     table.sort(secs)
   end
   ctx.slx_apply_secs(f, secs, v.nsl)
+  if not del_edge then draw.slx_newsel = { fi = f.i, frame = frame, t = reaper.time_precise() + 3 } end   -- 28 окт: новый срез — выбранный (когда дойдёт)
   vim.msg = del_edge and ('slixer: slice %02X removed (%d left)'):format(del_edge, #secs) or ('slixer: slice added at %.3fs (%d slices; dblclick on an edge removes it)'):format(frame / sr, #secs)
 end
 -- 26 окт: прицел пульта — сэмплы окна a..a+n (кадры деки) в np точек, заказом slixer (TRKV+1590..1594, +1600..);
@@ -22263,6 +22264,7 @@ local function frame()
     slx_slot_peaks = function(path, n) return ctx.slx_slot_peaks(path, n) end,
     slx_aim = function(a, n, np) return ctx.slx_aim_peaks(a, n, np) end,
     slx_spam = function() return state.sliceaudition end,
+    slx_select = function(i) ctx.slx_cmd(1, i) end,   -- 28 окт: выбрать срез slixer (без звука)
     slx_aimtop = function() return state.zoomtop ~= false end,
     slx_ovbelow = function() return state.slx_ovbelow == true end,   -- 27 окт: обзор (скролл) slixer под волной   -- 26 окт: прицел пульта slixer над волной   -- 26 окт: прицел — сэмплы окна у границы
     dsp_view = function(kind, width)        -- width: ширина вида (rec) / индекс FX (slixer)

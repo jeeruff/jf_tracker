@@ -11057,8 +11057,23 @@ function D.frame(L, snap, rows, state, info)
         end
         if (zr > 0 or side) and v and v.frames and v.frames > 0 then
           D.slx_aim = D.slx_aim or {}
-          local edge = (dr and dr.edge) or (hw and hw.edge) or D.slx_aim[f.i]
-          if not edge or not (v.starts and v.starts[edge]) then edge = (v.sel and v.sel >= 0) and (v.sel + 1) or nil end
+          -- 28 окт: прицел — всегда выбранный срез (нажатый мидью / клавиатурой / мышью / новый), не граница под мышью
+          -- и не срез, что звучит в thru; тянется граница — она
+          local edge = (dr and dr.edge) or ((v.sel and v.sel >= 0) and (v.sel + 1)) or D.slx_aim[f.i]
+          if edge and not (v.starts and v.starts[edge]) then edge = nil end
+          local ns = D.slx_newsel   -- новый срез дошёл до slixer — выбрать его (прицел сразу на нём)
+          if ns and ns.fi == f.i and v.starts then
+            if reaper.time_precise() > ns.t then D.slx_newsel = nil
+            else
+              for i = 1, v.nsl or 0 do
+                if v.starts[i] and math.abs(v.starts[i] - ns.frame) < 64 then
+                  D.slx_newsel = nil; edge = i
+                  if v.sel ~= i - 1 and info.slx_select then info.slx_select(i - 1) end
+                  break
+                end
+              end
+            end
+          end
           if edge and v.starts[edge] then D.slx_aim[f.i] = edge end
           local sr = math.max(1, v.sr or 48000)
           local w2 = math.floor((D.slx_zwin or 0.04) * sr)
