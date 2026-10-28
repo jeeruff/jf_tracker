@@ -334,7 +334,8 @@ local state = {
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   krdelay = tonumber(reaper.GetExtState(EXT, 'krdelay')) or 250, krrate = tonumber(reaper.GetExtState(EXT, 'krrate')) or 30,   -- 27 окт: свой автоповтор зажатой клавиши (0 — системный)
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
-  holdroll = reaper.GetExtState(EXT, 'holdroll') == '1' or nil,   -- 28 окт: удержание ноты: hold — длина по времени (OFF), roll — курсор едет, без OFF
+  holdroll = reaper.GetExtState(EXT, 'holdroll') == '1' or nil,
+  rollstep = reaper.GetExtState(EXT, 'rollstep') == '1' or nil,   -- 28 окт: roll + Ctrl+A / X — копия на шаг ниже с ±1   -- 28 окт: удержание ноты: hold — длина по времени (OFF), roll — курсор едет, без OFF
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
   hardedges = reaper.GetExtState(EXT, 'hardedges2') == '1',   -- 27 окт (ключ hardedges2: старое сохранённое «вкл» сброшено один раз): по умолчанию выкл — нота, что длиннее паттерна, звучит в следующий (BS не режет её по линии паттерна)
   escstop = reaper.GetExtState(EXT, 'escstop') ~= '0',   -- 17 окт: по умолчанию вкл, стоп на месте плейхеда
@@ -13135,6 +13136,7 @@ ctx = {
       { key = 'dsp_big', label = 'router', kind = 'toggle', desc = 'the fx chain of the cursor track as a routing graph in the DSP FX panel (zr; zR - big router)', get = function() return state.dsp_big end, set = function(v) if (v and true or false) ~= (state.dsp_big and true or false) then ctx.dsp_big() end end },
       flag('measure', 'measure', 'ruler on the mouse: a click sets the start, the next click the end - size in px, chars and rows; with debug on every measure goes to the debug log and ExtState jf_tracker/measure (what is under both points). s - PNG of the measured box (or the whole window) next to the system screenshots, named like them + _jftracker; the path and the report go to the debug log and ExtState jf_tracker/shot. Right click / Esc - off'),
       { key = 'title', label = 'title bar', kind = 'toggle', desc = 'the title bar of the floating (fullscreen, F11) window; off - no frame, no title (js_ReaScriptAPI)', get = function() return not state.notitle end, set = function(v) state.notitle = not v; toggle_dock(true) end },
+      { key = 'rollstep', label = 'step a/x (roll)', kind = 'toggle', desc = 'roll (Opt+`) on: Ctrl+A / Ctrl+X copy the event of the cursor row a step lower and change it there +1 / -1, the cursor follows - every press the next step of a ramp (volume, commands, notes, CC)', get = function() return state.rollstep or false end, set = function(v) state.rollstep = v or nil; reaper.SetExtState(EXT, 'rollstep', v and '1' or '0', true) end },
       { key = 'roundrack', label = 'rounded racks', kind = 'toggle', desc = 'DSP: the bracket under a container (rack) and its lanes has rounded corners; off - square', get = function() return state.roundrack or false end, set = function(v) state.roundrack = v or nil; draw.round_rack = v or nil end },
       flag('offbar', 'note OFF as |', 'draw a note off as a bar | instead of the word OFF (quieter rows)'),
       { key = 'offend', label = 'note OFF at the row end', kind = 'toggle', desc = 'off (default, like Renoise / IT) - OFF in a row = the note stops at its start; on - the note sounds through the OFF row and stops at its end: a long chord takes one row less, the next note may start right after', get = function() return state.offend end, set = function(v) state.offend = v; model.OFF_END = v; edit.OFF_END = v; model.invalidate() end },
@@ -15930,7 +15932,7 @@ ctx.modefonts = function() return ctx.MODEFONTS end
 ctx.modefont_get = function() return state.modefont or 'off' end
 ctx.modefont_set = function(v) state.modefont = v ~= 'off' and v or nil; draw.modefont = state.modefont; reaper.SetExtState(EXT, 'modefont', state.modefont or '', true); vim.msg = 'mode font: ' .. v end
 ctx.tt = {}
-ctx.theme_tab.init(U, {
+ctx.tt_api = {
   L = function() return L end, text = draw.text, measure = draw.measure, fit = draw.fit,
   font_id = function() return draw.font_id or 0 end,
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
@@ -16029,7 +16031,11 @@ ctx.theme_tab.init(U, {
   install_fonts = function() vim.msg = ctx.fonts_install() end,
   download_fonts = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end,
   reload_themes = function() local n = ctx.load_user_themes(); ctx.apply_theme(state.theme); ctx.tt.themes = nil; vim.msg = ('my themes: %d'):format(n) end,
-})
+}
+ctx.theme_tab.init(U, ctx.tt_api)
+-- 28 окт: в эту таблицу попали и функции DSP (zf / zF, cf, аккордеон) — в главном ctx их не было (zf молчал,
+-- cf: attempt to call a nil); всё, чего нет в ctx, — туда же
+for k, v in pairs(ctx.tt_api) do if ctx[k] == nil then ctx[k] = v end end
 draw.hint = HN.add
 FB.hint = function(...) return draw.hint(...) end   -- fx list: метки f (9 окт)
 ctx.hint = function(...) return draw.hint(...) end   -- через draw.hint: сдвиг верхнего модуля (mid / bottom)
@@ -18750,6 +18756,7 @@ function ctx.slx_apply_secs(f, secs, n_old, edge, frame)
   else ctx.slx_send_starts(secs) end
 end
 -- 27 окт: двойной щелчок по волне пульта — срез здесь; по границе — убрать её (как в слайсере lib)
+function ctx.roll_step() return state.holdroll and state.rollstep end
 function ctx.holdroll_toggle()
   state.holdroll = not state.holdroll or nil
   reaper.SetExtState(EXT, 'holdroll', state.holdroll and '1' or '0', true)
@@ -28430,7 +28437,7 @@ local function frame()
     local up = nk and nk.c == c and reaper.JS_VKeys_GetUp(nk.t - (nk.dt or 0) - 0.02)
     -- 21 окт: нота уже тянется удержанием, клавиша физически нажата — повтор, даже если окно отпусканий ошиблось
     -- (короткое удержание давало вторую ноту: один повтор проходил как нажатие)
-    local st = ctx.hold_len and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(nk.t - 0.5)
+    local st = (ctx.hold_len or (state.holdroll and ctx.roll)) and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(nk.t - 0.5)   -- 28 окт: и в roll
     local still = st and st:byte(vk) ~= 0
     -- 21 окт: повтор из очереди, обработанный уже после отпускания (окно отпусканий его видит) — по темпу: та же клавиша
     -- меньше чем через 0.12 с после прошлого её события (повторы macOS идут через 30 мс; руками так не переударить)

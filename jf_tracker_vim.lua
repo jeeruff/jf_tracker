@@ -3270,6 +3270,27 @@ function V.key_impl(c)
     if ctx.track_toggle then ctx.track_toggle(ch == 'M' and 'mute' or 'solo') end
   elseif ch == 's' then
     apply('s', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row); finish_edit()
+  elseif (c == ctrl('a') or c == ctrl('x')) and ctx.roll_step and ctx.roll_step() then
+    -- 28 окт: roll + опция step a/x — событие строки курсора копией на шаг ниже, там ±1 (A выше / X ниже), курсор туда:
+    -- каждое нажатие — следующая ступень (рампа громкости, команды, ноты, CC)
+    local d = c == ctrl('a') and 1 or -1
+    local st = (type(V.step) == 'number' and V.step > 0) and V.step or 1
+    local fi, r0 = V.cur.fi, V.cur.row
+    local r1 = r0 + st
+    local f = flat()[fi]
+    if f and (f.ml or env_of(fi)) and ctx.nudge_lane then
+      V.cur.row = r1
+      ctx.nudge_lane(fi, r1, d); ctx.nudge_lane(fi, r1, d * n)   -- пусто: первое — значение сверху, второе — ±
+      finish_edit()
+    else
+      local heads = V.heads_in(fi, fi, r0, r0)
+      if #heads == 0 then V.msg = 'step a/x: nothing on the cursor row to continue'; return end
+      local reg = E.yank(heads, lpb(), r0, fi)
+      E.paste(reg, lpb(), r1, paste_targets(fi), false)
+      V.cur.row = r1
+      for _ = 1, n do apply(d > 0 and '+' or '-', fi, fi, r1, r1) end
+      finish_edit()
+    end
   elseif c == ctrl('a') or c == ctrl('x') then   -- 27 окт: лейн / огибающая — пусто: значение сверху, дальше ±; иначе ноты
     if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n)) then
       apply(c == ctrl('a') and '+' or '-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
