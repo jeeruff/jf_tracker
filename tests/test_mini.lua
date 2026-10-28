@@ -64,6 +64,20 @@ ok(vals(ev0) == 'e c' and vals(ev1) == 'c e', '.every(2, rev) on cycles 0, 2 ...
 e = M.query('n("c e").slow(2)', 0)
 ok(#e == 1 and vals(e) == 'c', '.slow(2) - half per cycle')
 
+-- паттерны-аргументы
+e = M.query('n("c e g b").cmd("0R42")', 0)
+ok(#e == 4 and e[1].cmd == '0R42' and e[4].cmd == '0R42', '.cmd constant on every note')
+e = M.query('n("c e g b").cmd("0D20 ~")', 0)
+ok(e[1].cmd == '0D20' and e[2].cmd == '0D20' and e[3].cmd == nil, '.cmd pattern: active event at the note start')
+e = M.query('s("1 3 ~ 5")', 0)
+ok(#e == 3 and e[1].slice == 1 and e[3].slice == 5 and e[3].s == 0.75, 's(...) alone gives the rhythm: ' .. #e)
+e = M.query('n("c e").s("2").vel("0.9 0.4")', 0)
+ok(e[1].slice == 2 and e[2].slice == 2 and near(e[1].vel, 0.9) and near(e[2].vel, 0.4), '.s and .vel patterns on n')
+e = M.query('n("c e").i(3)', 0)
+ok(e[1].inst == 3 and e[2].inst == 3, '.i(3) instrument')
+e = M.query('s("1 2 3 4").rev()', 0)
+ok(e[1].slice == 4, 'rev on slices')
+
 -- ошибки разбора
 ok(not pcall(M.parse, 'c [e g'), 'missing ] is an error')
 ok(not pcall(M.parse, 'c(3)'), 'bad euclid is an error')

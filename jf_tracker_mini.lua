@@ -176,9 +176,11 @@ end
 -- 'n("c e").fast(2).rev()' | '"c e" .fast 2' | 'c e g' → { mini = '…', ops = { { name, args } } }
 function M.chain(expr)
   expr = (expr or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  local fn0 = expr:match('^(%a+)%s*%(')
   local q = expr:match('^%a*%(?%s*"([^"]*)"%s*%)?') or expr:match("^%a*%(?%s*'([^']*)'%s*%)?")
   local rest
-  if q then rest = expr:gsub('^%a*%(?%s*["\'][^"\']*["\']%s*%)?', '', 1)
+  if q and fn0 and fn0 ~= 'n' and fn0 ~= 'note' then q, rest = '', '.' .. expr   -- s("1 3") первым — это аргумент, не ноты
+  elseif q then rest = expr:gsub('^%a*%(?%s*["\'][^"\']*["\']%s*%)?', '', 1)
   else
     local a = expr:find('%s*%.%a') -- голая строка до первой .функции
     q = a and expr:sub(1, a - 1) or expr
@@ -210,10 +212,15 @@ function M.query(expr, c, opts)
   local tree = M.parse(ch.mini)
   local fast, add, vel, revd = 1, 0, opts.vel or 0.8, false
   local every = {}
+  -- 28 окт: паттерны-аргументы (.s .cmd .vel .i): своя мини-нотация, нота берёт значение события, активного на её старте
+  local pats = {}
   for _, op in ipairs(ch.ops) do
     local a = op.args:gsub('^%s+', ''):gsub('%s+$', '')
     local num = tonumber((a:match('^[%-%d%.]+')))
-    if op.name == 'fast' then fast = fast * (num or 1)
+    local qs = a:match('^"([^"]*)"$') or a:match("^'([^']*)'$")
+    if op.name == 's' or op.name == 'cmd' or op.name == 'i' or ((op.name == 'vel' or op.name == 'gain') and qs and qs:find('%s')) then
+      pats[op.name == 'gain' and 'vel' or op.name] = ev(M.parse(qs or a), c)
+    elseif op.name == 'fast' then fast = fast * (num or 1)
     elseif op.name == 'slow' then fast = fast / (num or 1)
     elseif op.name == 'rev' then revd = not revd
     elseif op.name == 'add' then add = add + (num or 0)
@@ -228,12 +235,32 @@ function M.query(expr, c, opts)
   if fast ~= 1 then node = fast > 1 and { k = 'fast', n = fast, c = tree } or { k = 'slow', n = 1 / fast, c = tree } end
   local evs = ev(node, c)
   for _, ew in ipairs(every) do if c % ew.n == 0 and ew.what == 'rev' then revd = not revd end end
+  local function at(list, t)   -- событие паттерна-аргумента, активное в t
+    for _, pe in ipairs(list or {}) do if t >= pe.s - 1e-9 and t < pe.e - 1e-9 then return pe.v end end
+    return nil
+  end
   local out = {}
   for _, e in ipairs(evs) do
     local s, en = e.s, e.e
     if revd then s, en = 1 - e.e, 1 - e.s end
     local p = M.pitch(e.v, opts.base, opts.oct)
-    out[#out + 1] = { s = s, e = en, v = e.v, pitch = p and (p + add) or nil, vel = vel }
+    local o = { s = s, e = en, v = e.v, pitch = p and (p + add) or nil, vel = vel }
+    local sv = at(pats.s, s); if sv then o.slice = tonumber(sv) end
+    local cv = at(pats.cmd, s); if cv then o.cmd = cv end
+    local iv = at(pats.i, s); if iv then o.inst = tonumber(iv) end
+    local vv = at(pats.vel, s); if vv then o.vel = tonumber(vv) or o.vel end
+    out[#out + 1] = o
+  end
+  -- s("1 3 5") без n(...) — сами слайсы задают ритм
+  if #evs == 0 and pats.s then
+    for _, pe in ipairs(pats.s) do
+      local s, en = pe.s, pe.e
+      if revd then s, en = 1 - pe.e, 1 - pe.s end
+      local o = { s = s, e = en, v = pe.v, slice = tonumber(pe.v), vel = vel }
+      local cv = at(pats.cmd, s); if cv then o.cmd = cv end
+      local vv = at(pats.vel, s); if vv then o.vel = tonumber(vv) or o.vel end
+      out[#out + 1] = o
+    end
   end
   table.sort(out, function(x, y) if math.abs(x.s - y.s) > 1e-9 then return x.s < y.s end return (x.pitch or 0) < (y.pitch or 0) end)
   return out
