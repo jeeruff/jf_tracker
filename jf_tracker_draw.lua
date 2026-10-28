@@ -5531,6 +5531,11 @@ local function sq_bracket(x, y, h, right, L)
   local hx = right and (x + 2 - hw) or x
   gfx.rect(hx, y, hw, 2, 1); gfx.rect(hx, y + h - 2, hw, 2, 1)
 end
+-- 28 окт (4): цвет скобок — тёмный янтарь; ярко — только у выделенного в DSP контейнера; выключен — тускло
+local function br_col(c)
+  if not (c.enabled and not c.poff) then return U.DIM end
+  return (D.sel_i and c.i == D.sel_i) and U.AMBER or U.tint(U.AMBER, 0.45)
+end
 local function brg(L) return math.max(6, 2 * L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
@@ -5541,7 +5546,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.wrap then
-    set((f.enabled and not f.poff) and U.AMBER or U.GREY); sq_bracket(bx, boxy, bh0, false, L)
+    set(br_col(f)); sq_bracket(bx, boxy, bh0, false, L)
     D.cst[f] = { x = bx, y = boxy, k = k }
     bx = bx + 2 + brg(L)
   end
@@ -5571,7 +5576,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
       x = x + pw + brg(L)
     end
     if st and st.y == boxy then
-      set((c.enabled and not c.poff) and U.AMBER or U.GREY); sq_bracket(x, boxy, bh0, true, L)
+      set(br_col(c)); sq_bracket(x, boxy, bh0, true, L)
     end
     bx = x + 2 + L.pad
   end
