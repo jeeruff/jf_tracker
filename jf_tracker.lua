@@ -181,6 +181,7 @@ local state = {
   theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
   tlruler = (function() local v = reaper.GetExtState(EXT, 'tlruler'); return (v == 'beats' or v == 'time' or v == 'both') and v or 'off' end)(),   -- линейка у номеров (3 окт)
   curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
+  curacc = (function() local v = reaper.GetExtState(EXT, 'curacc'); return v ~= '' and v or 'ff00ff' end)(),   -- 28 окт: цвет курсора, когда фокус в другой панели
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
@@ -12970,6 +12971,7 @@ ctx = {
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
+      { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'accent of the cursor: the tracker cursor while another panel has the focus, the selected DSP parameter - hex RGB; grey - the old look', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply() end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
 -- 18 окт: выключено --       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
@@ -13152,7 +13154,7 @@ ctx = {
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'pcache', 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -21932,6 +21934,12 @@ local function frame()
     end
     ctx.note_offs = keep
   end
+  -- 28 окт: карта сэмплов строится фоном, понемногу каждый тик (не в её отрисовке — та из кэша панелей)
+  if B.SM and B.mapG then
+    B.SM.bg = true
+    local G = B.mapG
+    if G.building then B.SM.scan(G, 0.001) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
+  end
   if ctx.con_after then local okc, ec = pcall(ctx.con_tick); if not okc then ctx.con_after = nil; vim.msg = 'console: ' .. tostring(ec) end end   -- 28 окт
   -- 19 окт: превью pitch-команды (0U / 0D) у MIDI-ноты — изгиб по шагам, как его запишет клип; потом центр
   if ctx.bend_q then
@@ -22077,7 +22085,7 @@ local function frame()
     ctx.hb_last = string.format('%s %d %s/%s x' .. tostring(state.fontscale) .. ' %.0ffps snap %.1f layout %.1f draw %.1f upd %.1f ms max %.1f edit %.1f (%s) rebuild %.1f [%s]',
       os.date('%H:%M:%S'), #snap.cols, vim.mode, state.focus, fps.v,
       prof.snap / n * 1000, prof.layout / n * 1000, prof.draw / n * 1000, prof.upd / n * 1000,
-      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count'))) .. (ctx.fps_idle and ' idle' or (' busy ' .. ('%.1f'):format(reaper.time_precise() - idle.active_t) .. ' ' .. tostring(ctx.idle_why))) .. (' pc %d cpu %.0f%%'):format(draw.pc_hits or 0, ctx.cpu_pct or -1)
+      prof.max * 1000, edit.last_ms or 0, edit.last_desc or '', prof.rebuild or 0, prof.rb or '') .. (' start %.0f rerun %d keyrep %d lua %dKB'):format(prof.start_ms or -1, prof.reruns or 0, ctx.key_repeats or 0, math.floor(collectgarbage('count'))) .. (ctx.fps_idle and ' idle' or (' busy ' .. ('%.1f'):format(reaper.time_precise() - idle.active_t) .. ' ' .. tostring(ctx.idle_why))) .. (' pc %d cpu %.0f%% (%s) ep %d why %s'):format(draw.pc_hits or 0, ctx.cpu_pct or -1, ctx.cpu_det or '', ctx.pc_ep or 0, tostring(ctx.pc_why))
     reaper.SetExtState(EXT, 'hb', ctx.hb_last, false)
     prof.snap, prof.layout, prof.draw, prof.upd, prof.n, prof.max = 0, 0, 0, 0, 0, 0
   end
@@ -22143,6 +22151,15 @@ local function frame()
     -- (полный кадр ~10 мс × 33 = треть ядра впустую); любое действие — сразу полная частота
     ctx.fps_idle = (now_t - idle.active_t > 1.5) or nil   -- и при опции fps 30 / 25 / 24
     if ctx.fps_idle then fps_t = 8 end
+    -- 28 окт: кадр — только когда что-то поменялось: эпоха (ввод, правка, фокус, курсор …) и мышь те же, что в
+    -- прошлой отрисовке, транспорт и превью стоят — пульс 4 кадра / с (анимации, фоновые загрузки)
+    ctx.pc_epoch_calc(snap)
+    ctx.pc_live = is_playing or PV.playing() or nil
+    local fkey = ctx.pc_ep .. ':' .. gfx.mouse_x .. ',' .. gfx.mouse_y .. ',' .. gfx.mouse_cap
+    if state.pcache ~= false and not ctx.pc_live and fkey == ctx.f_drawn and not vim.picker and not vim.hydra and not HN.active then
+      ctx.fps_idle = true; fps_t = 4
+    end
+    ctx.f_key = fkey
     -- big fixed cursor (8 окт): кадр в буфер и при fps max — лупа копирует
     -- строку курсора из картинки, не из экрана
     ctx.bigbuf = state.bigcur or nil   -- 15 окт: cursor zoom — и без фиксированного курсора
@@ -22158,7 +22175,7 @@ local function frame()
       end
       if fps_buf.w0 ~= gfx.w or fps_buf.h0 ~= gfx.h then fps_buf.w0, fps_buf.h0 = gfx.w, gfx.h; fps_buf.last = 0 end
       if not fps_t or now_t - fps_buf.last >= 1 / fps_t - 0.004 or not idle.hover then
-        fps_buf.last = now_t
+        fps_buf.last = now_t; ctx.f_drawn = ctx.f_key   -- 28 окт: что видно на экране
         -- 8 окт: буфер чистится сам — U.begin_frame стёр экран ДО gfx.dest = 1021,
         -- а текст ×2 ложится сложением: прошлые кадры копились (видно с лупой)
         U.set(U.BG); gfx.rect(0, 0, gfx.w, gfx.h, 1)
@@ -22223,7 +22240,7 @@ local function frame()
   draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
   ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
-    pc_epoch = ctx.pc_epoch_calc(snap), hn_active = HN.active,   -- 28 окт: кэш панелей
+    pc_epoch = ctx.pc_ep, hn_active = HN.active, pc_live = ctx.pc_live,   -- 28 окт: кэш панелей (эпоха — в блоке простоя)
     ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
     aim_cut = ctx.aim_cut_row(),
     status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: CONTROL → FADE (fademode), CONTROL — жест по параметрам
@@ -29462,7 +29479,7 @@ local function frame()
     for k, p in pairs(draw.prof) do list[#list + 1] = { k, p.ema, p.max, p.kb or 0 } end
     table.sort(list, function(a, b) return a[2] > b[2] end)
     local parts = {}
-    for i = 1, math.min(10, #list) do parts[#parts + 1] = ('%s %.2f/%.1f/%.0fKB'):format(list[i][1], list[i][2], list[i][3], list[i][4]) end
+    for i = 1, math.min(tonumber(reaper.GetExtState('jf_dbg', 'topn')) or 10, #list) do parts[#parts + 1] = ('%s %.2f/%.1f/%.0fKB'):format(list[i][1], list[i][2], list[i][3], list[i][4]) end
     reaper.SetExtState('jf_dbg', 'top', table.concat(parts, ' | ') .. (' || lua %dKB'):format(math.floor(collectgarbage('count'))), false)
   end
   if state.debug and ctx.dlog and reaper.time_precise() - (ctx.jftop_logt or 0) > 5 then
@@ -30071,7 +30088,12 @@ frame = (function(inner)
       local cu = ctx.cpu_acc or { t0 = tn, s = 0 }
       ctx.cpu_acc = cu
       cu.s = cu.s + (tn - tq)
-      if tn - cu.t0 >= 1 then ctx.cpu_pct = cu.s / (tn - cu.t0) * 100; cu.t0, cu.s = tn, 0 end
+      if ctx.frame_skip then cu.ks, cu.kn = (cu.ks or 0) + (tn - tq), (cu.kn or 0) + 1 else cu.ds, cu.dn = (cu.ds or 0) + (tn - tq), (cu.dn or 0) + 1 end
+      if tn - cu.t0 >= 1 then
+        ctx.cpu_pct = cu.s / (tn - cu.t0) * 100
+        ctx.cpu_det = ('skip %d x %.1f ms, draw %d x %.1f ms'):format(cu.kn or 0, (cu.ks or 0) * 1000 / math.max(1, cu.kn or 0), cu.dn or 0, (cu.ds or 0) * 1000 / math.max(1, cu.dn or 0))
+        cu.t0, cu.s, cu.ks, cu.kn, cu.ds, cu.dn = tn, 0, 0, 0, 0, 0
+      end
     end
     if ok then err_streak = 0; return end
     collectgarbage('restart')   -- 21 окт: jftop останавливает сборщик на кадр — упавший кадр не оставляет его стоять
@@ -31351,9 +31373,24 @@ ctx.pc_epoch_calc = function(sn)
   local k = table.concat({ tostring(sn), state.focus or '', state.toptab or '', tostring(state.panes and state.panes.v or 0), tostring(state.theme),
     vim.mode or '', tostring(vim.cur.fi), tostring(vim.cur.row), tostring(vim.inst), tostring(reaper.GetProjectStateChangeCount(0)),
     tostring(idle.input_t), tostring(gfx.w), tostring(gfx.h), tostring(vim.msg), tostring(B and B.path) }, '|')
-  if k ~= ctx.pc_key or gfx.mouse_cap ~= 0 or gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0 then ctx.pc_key = k; ctx.pc_ep = ctx.pc_ep + 1 end
+  if k ~= ctx.pc_key or gfx.mouse_cap ~= 0 or gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0 then
+    if ctx.prof_ext then   -- отладка: какая часть ключа сменилась
+      local a1, b1 = {}, {}
+      for w in (ctx.pc_key .. '|'):gmatch('([^|]*)|') do a1[#a1 + 1] = w end
+      for w in (k .. '|'):gmatch('([^|]*)|') do b1[#b1 + 1] = w end
+      for i = 1, #b1 do if a1[i] ~= b1[i] then ctx.pc_why = i; break end end
+    end
+    ctx.pc_key = k; ctx.pc_ep = ctx.pc_ep + 1
+  end
   return ctx.pc_ep
 end
+-- 28 окт: курсор трекера вне фокуса — акцентом (опция cursor accent, hex), не тусклой линией
+ctx.curacc_apply = function()
+  local h = state.curacc or 'ff00ff'
+  local r, g, b = h:match('^#?(%x%x)(%x%x)(%x%x)$')
+  draw.CUR_ACC = r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil
+end
+ctx.curacc_apply()
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end

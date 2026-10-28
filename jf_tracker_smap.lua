@@ -1104,12 +1104,26 @@ end
 -- → hover { node = n } | { hub = h } | { style = true } | { slider = … } | nil
 local HUE = { kick = 1, snare = 2, hat = 3, clap = 4, tom = 5, cymbal = 6, perc = 7, bass = 8, loop = 9, fx = 10, vox = 11, synth = 12 }
 SM.EDGES_MAX = 4000                            -- рёбра файл—хаб — пока файлов не больше (иначе сплошная заливка)
+-- 28 окт: высота полосы опций — строки фильтров (перенос по ширине) + типы + ползунки
+function SM.opts_h(U, L, w)
+  local rows, fx = 1, 0
+  for _, f in ipairs(SM.FILTERS) do
+    local tw = U.measure(f.label) + 2 * L.pad + 2
+    if fx + tw > w - 2 * L.pad and fx > 0 then rows, fx = rows + 1, 0 end
+    fx = fx + tw
+  end
+  return (rows + 2) * L.rh + 3
+end
 function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   V.hist_by = {}
   for _, e in ipairs(V.hist or {}) do if not V.hist_by[e.path] then V.hist_by[e.path] = e end end
-  if G.building then SM.scan(G, SM.SCAN_S) end
-  if not G.building then SM.size_tick(G, SM.SCAN_S) end
+  -- 28 окт: обход / чтение индекса — фоном в тике main (SM.bg = true), не в отрисовке: кадр карты рисуется реже (кэш)
+  if G.building and not SM.bg then SM.scan(G, SM.SCAN_S) end
+  if not G.building and not SM.bg then SM.size_tick(G, SM.SCAN_S) end
   G.grav = V.grav
+  -- 28 окт: опции карты — своя полоса сверху модуля (не поверх вида): фильтры, типы, gravity / dimension
+  local oy0, oh = y, SM.opts_h(U, L, w)
+  if h > oh + 6 * L.rh then y, h = y + oh, h - oh else oh = 0 end
   for _ = 1, SM.ITERS do if not SM.step(G) then break end end
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
   U.set(U.LINE); gfx.rect(x, y, w, h, 0)
@@ -1225,50 +1239,40 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     U.set(U.PANEL); gfx.rect(tx, ty, tw, L.rh, 1); U.set(U.AMBER); gfx.rect(tx, ty, tw, L.rh, 0)
     U.text(tx + L.pad, ty, fit(lab, tw), U.TEXT)
   end
-  -- 27 окт (8): настройки слева снизу — типы файлов (samples midi rex auto tpl) и ползунки gravity / dimension
-  local sw = math.min(L.cw * 10, math.floor(w * 0.25))
-  local lw = U.measure('dimension ')
-  local right = x + w
-  local base = y + h - 3 * L.rh - 4
-  if w > lw + sw + 2 * L.pad and h > 8 * L.rh then
-    local tx = x + L.pad
-    U.set(U.BG); gfx.rect(x + 1, base - 1, math.max(lw + sw + L.pad, U.measure('samples midi rex auto tpl ') + 12 * L.pad), 3 * L.rh + 3, 1)
-    for _, t in ipairs(SM.TYPES) do
-      local on = V.types and V.types[t]
-      local tw = U.measure(t) + 2 * L.pad
-      local hot = mx >= tx and mx < tx + tw and my >= base and my < base + L.rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(tx, base, tw, L.rh - 1, 1)
-      U.set(on and U.AMBER or U.LINE); gfx.rect(tx, base, tw, L.rh - 1, 0)
-      U.text(tx + L.pad, base, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
-      if hot then hv = { mtype = t } end
-      tx = tx + tw + 2
+  -- 28 окт: полоса опций сверху (oy0 .. oy0 + oh): строки фильтров, строка типов, ползунки в одну строку
+  if oh > 0 then
+    U.set(U.PANEL); gfx.rect(x, oy0, w, oh, 1)
+    U.set(U.LINE); gfx.rect(x, oy0 + oh - 1, w, 1, 1)
+    local function btn(bx, by, lab, on, key, val)
+      local tw = U.measure(lab) + 2 * L.pad
+      local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.PANEL)); gfx.rect(bx, by, tw, L.rh - 1, 1)
+      U.set(on and U.AMBER or U.LINE); gfx.rect(bx, by, tw, L.rh - 1, 0)
+      U.text(bx + L.pad, by, lab, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      if hot then hv = { [key] = val } end
+      return tw
     end
-    -- 28 окт: фильтры — строкой над типами
-    do
-      local fy = base - L.rh - 2
-      local fx = x + L.pad
-      for _, f in ipairs(SM.FILTERS) do
-        local on = SM.FON[f.key]
-        local tw = U.measure(f.label) + 2 * L.pad
-        if fx + tw > x + w - 4 then fy = fy - L.rh - 1; fx = x + L.pad end
-        local hot = mx >= fx and mx < fx + tw and my >= fy and my < fy + L.rh
-        U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(fx, fy, tw, L.rh - 1, 1)
-        U.set(on and U.AMBER or U.LINE); gfx.rect(fx, fy, tw, L.rh - 1, 0)
-        U.text(fx + L.pad, fy, f.label, on and U.AMBER or (hot and U.TEXT or U.GREY))
-        if hot then hv = { mfilter = f.key } end
-        fx = fx + tw + 2
-      end
+    local fy, fx = oy0 + 1, x + L.pad
+    for _, f in ipairs(SM.FILTERS) do
+      local tw = U.measure(f.label) + 2 * L.pad
+      if fx + tw > x + w - L.pad and fx > x + L.pad then fy, fx = fy + L.rh, x + L.pad end
+      fx = fx + btn(fx, fy, f.label, SM.FON[f.key], 'mfilter', f.key) + 2
     end
-    for k, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
-      local sy = base + k * L.rh + 1
-      local sx = x + L.pad + lw
+    fy, fx = fy + L.rh, x + L.pad
+    for _, t in ipairs(SM.TYPES) do fx = fx + btn(fx, fy, t, V.types and V.types[t], 'mtype', t) + 2 end
+    fy = fy + L.rh
+    local sw = math.max(L.cw * 4, math.min(L.cw * 10, math.floor((w - 2 * L.pad) / 2) - U.measure('dimension ') - L.pad))
+    local sx0 = x + L.pad
+    for _, sl in ipairs({ { 'gravity', 'grav' }, { 'dimension', 'dim' } }) do
+      local lw = U.measure(sl[1] .. ' ')
+      local sx = sx0 + lw
       local v = V[sl[2]] or 0.5
-      local hot = mx >= sx - lw and mx < sx + sw and my >= sy and my < sy + L.rh
-      U.set(U.BG); gfx.rect(sx - lw, sy, lw + sw, L.rh, 1)
-      U.text(sx - lw, sy, sl[1], hot and U.AMBER or U.GREY)
-      U.set(U.DIM); gfx.rect(sx, sy + math.floor(L.rh / 2) - 1, sw, 2, 1)
-      U.set(hot and U.AMBER or U.TEXT); gfx.rect(sx, sy + 3, math.max(1, math.floor(sw * v + 0.5)), L.rh - 6, 1)
+      local hot = mx >= sx0 and mx < sx + sw and my >= fy and my < fy + L.rh
+      U.text(sx0, fy, sl[1], hot and U.AMBER or U.GREY)
+      U.set(U.DIM); gfx.rect(sx, fy + math.floor(L.rh / 2) - 1, sw, 2, 1)
+      U.set(hot and U.AMBER or U.TEXT); gfx.rect(sx, fy + 3, math.max(1, math.floor(sw * v + 0.5)), L.rh - 6, 1)
       if hot then hv = { slider = sl[2], x = sx, w = sw } end
+      sx0 = sx + sw + 2 * L.pad
     end
   end
   -- 27 окт: кнопка вида: graph / nebula (два положения) и счёт; текст — до ползунков
@@ -1289,7 +1293,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
       bx = bx + tw + 2
     end
     bx = bx - bw
-    local room = right - (bx + L.pad) - L.pad
+    local room = (x + w) - (bx + L.pad) - L.pad
     if room > U.measure('mm') then
       U.set(U.BG); gfx.rect(bx + L.pad, y + 2, math.min(room, U.measure(info)), L.rh - 1, 1)
       U.text(bx + L.pad, y + 2, fit(info, room), U.GREY)

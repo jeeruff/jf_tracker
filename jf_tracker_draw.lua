@@ -6752,7 +6752,8 @@ end
 D.PC_OK = { inst = true, browser = true, map = true, help = true, hints = true, notes = true, clipboard = true, undotree = true,
   actions = true, harm = true, reform = true, humanizer = true, renderer = true, console = true, tracks = true, patterns = true,
   matrix = true, fxb = true, sprops = true, nmod = true, macros = true, pm = true }
-D.PC_PLAY = { matrix = true, patterns = true, browser = true, map = true, inst = true }   -- плейхед / превью
+D.PC_OK.dsp = true
+D.PC_PLAY = { matrix = true, patterns = true, browser = true, map = true, inst = true, dsp = true }   -- плейхед / превью / метры
 D.pc_st = {}
 function D.pc_hit(id, c, info, inside, foc)
   if not (D.pc_on and D.PC_OK[id] and not c.min) then return false end
@@ -6760,7 +6761,7 @@ function D.pc_hit(id, c, info, inside, foc)
   local st = D.pc_st[id]
   local now = reaper.time_precise()
   if st and st.ep == info.pc_epoch and st.x == c.x and st.y == c.y and st.w == c.w and st.h == c.h and not inside and not st.inside
-     and not foc and now - st.t < 0.5 and not (info.playing and D.PC_PLAY[id]) and not info.hn_active then
+     and not foc and now - st.t < 0.5 and not (info.pc_live and D.PC_PLAY[id]) and not info.hn_active then
     gfx.blit(1022, 1, 0, c.x, c.y, c.w, c.h, c.x, c.y, c.w, c.h)
     D.pc_hits = (D.pc_hits or 0) + 1
     return true
@@ -8887,7 +8888,7 @@ function D.frame(L, snap, rows, state, info)
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
-              D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE
+              D.inv_bg = info.focus == 'tracker' and D.CURCELL or D.CUR_ACC or U.LINE   -- 28 окт: вне фокуса — акцент (опция cursor accent)
               local G, folded, inv_f, fw0, half = f.G or L, c.folded, inv, f.w, D.fx_half
               D.cur_box = function()
                 set(D.inv_bg)
@@ -9461,6 +9462,12 @@ function D.frame(L, snap, rows, state, info)
   -- DSP (9 окт, панели): место — лист dsp (L.pn_dsp), иначе полоса внизу
   local DX, DY, DH, DR = nil, L.dsp_y, L.dsp_h, L.win_w
   if L.pn then local r = L.pn_dsp; if r then DX, DY, DH, DR = r.x, r.y, r.h, r.x + r.w else DH = 0 end end
+  -- 28 окт: кэш и для DSP (транспорт стоит — метры стоят): прямоугольник листа
+  D.dpc = D.dpc or {}   -- поле D: в draw.frame предел 200 локальных
+  D.dpc.c = (DH > 0) and { x = DX or (L.browser_left and L.matrix_w or 0), y = DY, h = DH } or nil
+  if D.dpc.c then D.dpc.c.w = DR - D.dpc.c.x end
+  D.dpc.inside = D.dpc.c and mx >= D.dpc.c.x and mx < D.dpc.c.x + D.dpc.c.w and my >= D.dpc.c.y and my < D.dpc.c.y + D.dpc.c.h
+  D.dpc.b = nil
   if DH > 0 and info.khelp and info.khelp_draw then
     local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
     local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт)
@@ -9469,7 +9476,10 @@ function D.frame(L, snap, rows, state, info)
     set(D.SEP); gfx.rect(lx0, dy, DR - lx0, D.SEPW, 1)
     hover.khelp = info.khelp_draw(L, xo, dy, DR - xo, DH) or true
     L.dsp_rect = { xo, dy, DR - xo, DH }
+  elseif DH > 0 and not info.pinmx and D.pc_hit('dsp', D.dpc.c, info, D.dpc.inside, info.focus == 'dsp' or info.focus == 'fxb') then
+    -- 28 окт: DSP из кэша (L.dsp_rect — с прошлой отрисовки)
   elseif DH > 0 then
+    D.dpc.b = (not info.pinmx) and D.pc_begin('dsp', D.dpc.c) or nil
     local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
     local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт): DSP — правее него
     D.clip = { lx0, DR - 1, DY, DY + DH }                         -- 9 окт: ничего за правый край DSP
@@ -11560,7 +11570,7 @@ function D.frame(L, snap, rows, state, info)
         if not psel and not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + (spos and spos[pi] and spos[pi][3] or 1) * L.rh then psel = true end
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
-        local acc = pins and U.RED or (psel and U.AMBER or U.TEXT)
+        local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — акцентом курсора (опция cursor accent; в mono янтарь = текст)
         -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
         local tallh = spos and spos[pi] and spos[pi][3] or 1
         -- 24 окт: параметр под курсором трекера (огибающая / команда ноты) — контрастная рамка
@@ -11573,7 +11583,7 @@ function D.frame(L, snap, rows, state, info)
           local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           local x0 = bxc + L.pad
           local nmh = tallh * L.rh
-          local ncol_c = pins and U.RED or (psel and U.AMBER or U.TEXT)
+          local ncol_c = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT)
           -- 23 окт: имя строкой сверху, кнопки — две колонки вдвое уже (по строкам: 1 2 / 3 4 / 5 6)
           text(x0, py, fit(p.name or '', pw), ncol_c)
           local half = math.floor((pw - 2) / 2)
@@ -11625,7 +11635,7 @@ function D.frame(L, snap, rows, state, info)
             D.adsr_line(pts, U.BG, hot_i)
           end
           local lab = (pins and (info.dsp_ins.buf .. '_')) or ((LET[g.role[pi]] or '?') .. ' ' .. (v.s or ''))
-          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and U.AMBER or U.GREY))
+          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.GREY))
           if not drag and mx >= gx and mx < gx + gw and my >= py and my < py + L.rh then
             hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
           end
@@ -11713,7 +11723,7 @@ function D.frame(L, snap, rows, state, info)
         end
         local pnm, pnw = p.name or '', nw - L.pad - ms(p.mk or '')
         if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
-        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and U.AMBER or U.TEXT))
+        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT))
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix
@@ -11941,6 +11951,7 @@ function D.frame(L, snap, rows, state, info)
     L.dsp_rect = { fbw, dy, DR - fbw, DH }
     D.clip = nil
     if info.pinmx and info.PINS then D.pins_draw(L, info, fbw, dy, DR - fbw, DH, mx, my, hover) end   -- 24 окт: матрица пинов поверх DSP
+    D.pc_end(D.dpc.b, info, D.dpc.inside)
   end
 
   -- 11 окт: кнопка «<» и протяжка у линии трекер | браузер убраны — размеры и показ панелей у дерева (ручки, Ctrl+W)
