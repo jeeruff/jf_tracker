@@ -17818,6 +17818,7 @@ function view_actions()
     { 'Help (the whole help inside the tracker)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
+    { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
     { 'Quit REAPER (it asks to save a changed project)', key = 'q', fn = function() reaper.Main_OnCommand(40004, 0) end },   -- 28 окт: \\ q
   }
 end
@@ -21925,6 +21926,7 @@ local function frame()
     end
     ctx.note_offs = keep
   end
+  if ctx.con_after then local okc, ec = pcall(ctx.con_tick); if not okc then ctx.con_after = nil; vim.msg = 'console: ' .. tostring(ec) end end   -- 28 окт
   -- 19 окт: превью pitch-команды (0U / 0D) у MIDI-ноты — изгиб по шагам, как его запишет клип; потом центр
   if ctx.bend_q then
     local now = reaper.time_precise()
@@ -22515,6 +22517,7 @@ local function frame()
     act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
     hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,   -- 28 окт: панель hints
+    console_draw = function(Lx, x, y, w, h, foc) return ctx.CON.draw(U, Lx, x, y, w, h, foc, ctx.fit) end,   -- 28 окт: консоль
     slice_key = function(k) return ctx.slice_key(k) end, slice_note = function(k) return ctx.slice_note(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -28434,7 +28437,7 @@ local function frame()
   -- модуля через очередь — yy / dd / p (в VISUAL — y / d); матрица — свои коды блока; набор текста не трогаем
   do
     local m = ctx.mods()
-    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or DK.ins or OPT.active
+    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or DK.ins or OPT.active
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
       local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
       if what then
@@ -28825,7 +28828,7 @@ local function frame()
   elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли
   elseif c == ('f'):byte() and (vim.mode == 'normal' or vim.mode == 'visual' or vim.mode == 'vline' or ctx.f_in_insert()
-     or (vim.mode == 'insert' and state.focus ~= 'tracker' and not DK.ins and not (state.focus == 'top' and state.toptab == 'sample'))) and not vim.hydra and not vim.picker and not (state.focus == 'browser' and B.filtering) and not (state.focus == 'fxb' and FB.typing) and state.focus ~= 'notes'   -- 21 окт: и в VISUAL; 26 окт: и в browser / fx list (поиск там — /)
+     or (vim.mode == 'insert' and state.focus ~= 'tracker' and not DK.ins and not (state.focus == 'top' and state.toptab == 'sample'))) and not vim.hydra and not vim.picker and not (state.focus == 'browser' and B.filtering) and not (state.focus == 'fxb' and FB.typing) and state.focus ~= 'notes' and state.focus ~= 'console'   -- 21 окт: и в VISUAL; 26 окт: и в browser / fx list (поиск там — /)
      and not vim.pending and not vim.op and not ctx.hp_pend and not (state.focus == 'dsp' and (DK.pending or state.dsp_z)) then   -- 9 окт: префикс ждёт вторую клавишу (a f в DSP) — f его
     -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
     ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
@@ -28843,7 +28846,7 @@ local function frame()
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
   -- только его длина (слайс — свой кусок), через трек курсора
   if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console'
       or ((state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
@@ -28856,7 +28859,7 @@ local function frame()
   -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes'
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console'
     if state.khelp_big then
       -- большая справка: клавиши — ей (поиск, страницы, прокрутка); Esc / Enter — закрыть
       local r = ctx.DOC.key(c)
@@ -28903,7 +28906,7 @@ local function frame()
       if vim.picker or vim.hydra then return vim.key(c) end
       -- 5 окт: две гидры — ` главная (у главного модуля слева сверху), \ —
       -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
-      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
+      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or state.focus == 'console' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
       -- 6 окт: главное меню — \ (` больше не меню; в INSERT ` — note-off)
       local m0 = ctx.mods()
       if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты
@@ -28912,7 +28915,7 @@ local function frame()
       -- 15 окт: Esc в любом модуле сбрасывает недонабранное трекера (счётчик, ожидающую клавишу) — не висит тегом у курсора
       if c == 27 and state.focus ~= 'tracker' and (vim.count or vim.pending or vim.mlpend) then vim.count, vim.pending, vim.mlpend = nil, nil, nil end
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
-      if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and state.focus ~= 'console' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         ctx.context_here(); return                       -- 10 окт: \ в модуле — его быстрое меню, в нём \ — главное
       end
       -- 26 окт: стрелки = h j k l во всех модулях (Shift — H J K L, как Shift+hjkl), без Ctrl / Cmd / Opt;
@@ -29157,6 +29160,10 @@ local function frame()
       elseif state.focus == 'tracks' then   -- 11 окт: Track Manager
         if not draw.TL.typing and (vim.mode == 'cmd' or vim.mode == 'search') then return vim.key(c) end
         if not ctx.tlist_key(c) then return vim.key(c) end
+      elseif state.focus == 'console' then   -- 28 окт: консоль Strudel
+        local r = ctx.CON.key(c, ctx.mods())
+        reaper.SetExtState(EXT, 'con', ('%s|%s|%s'):format(tostring(r), ctx.CON.lines[ctx.CON.l] or '', ctx.CON.log[#ctx.CON.log] and ctx.CON.log[#ctx.CON.log].text or ''), false)   -- тест: строка и ответ
+        if r == 'leave' then ctx.set_focus('tracker') elseif r == 'eval' then ctx.con_run(false) elseif r == 'evalall' then ctx.con_run(true) end
       elseif state.focus == 'notes' and state.notes_open then
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
       elseif state.focus == 'fxb' and state.dsp and state.fxb then
@@ -29391,7 +29398,7 @@ local function frame()
       ctx.last_trace = table.concat(trace, '>')
       -- набранный текст (заметки, командная строка, поиск, пикер) — без самих
       -- символов: в логе только «text», код клавиши скрыт (6 окт)
-      local typing = state.focus == 'notes' or vim.mode == 'cmd' or vim.mode == 'search' or vim.picker
+      local typing = state.focus == 'notes' or state.focus == 'console' or vim.mode == 'cmd' or vim.mode == 'search' or vim.picker
       local lc, lraw = c, c_raw
       if typing and c >= 32 and c < 0x110000 and c ~= 127 then lc, lraw = 0, 0 end
       ctx.dlog(('key %d (raw %d) mode %s%s focus %s%s fi %d row %d field %s%s piano %s pending %s op %s buf %s -> %s @ %s%s'):format(
@@ -30606,6 +30613,142 @@ ctx.preview_bend = function(ch, slope, dur, tr)
   reaper.StuffMIDIMessage(0, 0xE0 | (ch or 0), 0, 64)
   local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0   -- трек только что взведён — нота уйдёт через 0.15 с
   ctx.bend_q = { ch = ch, slope = slope, t0 = now + delay, t1 = now + delay + dur, range = tr and CM.bend_range(tr) or 2 }
+end
+-- 28 окт: консоль — строка Strudel («t2: n("c e g").cmd("0R42")») пишет ноты в паттерн курсора (jf_tracker_console.lua).
+-- tN — трек REAPER N (как t135m); без префикса — трек курсора. Повтор — трек в паттерне переписывается целиком.
+-- Задержка (дробная строка) и команды — вторым проходом, когда снимок увидел новые ноты (ctx.con_after)
+ctx.CON = dofile(DIR .. '/jf_tracker_console.lua')
+ctx.CON.set(select(2, reaper.GetProjExtState(0, 'jf_tracker', 'console')) or '')
+ctx.con_col = function(n)
+  if not n then local f = L and L.flat[vim.cur.fi]; return f and f.col end
+  local tr = reaper.GetTrack(0, n - 1)
+  for _, c in ipairs(snap and snap.cols or {}) do if c.track == tr then return c end end
+end
+ctx.con_heads = function(col, r0, r1, pitch)
+  local hs = {}
+  for _, lane in ipairs(col.lanes or {}) do
+    for _, sub in ipairs(lane.subs or {}) do
+      for r, c in pairs(sub) do
+        if type(c) == 'table' and r >= r0 and r <= r1 and c.row0 == r and (c.kind == 'audio' or c.kind == 'midi') then
+          if not pitch or c.pitch == pitch then hs[#hs + 1] = c end
+          if not pitch then for _, h in ipairs(c.fold or {}) do hs[#hs + 1] = h end end
+        end
+      end
+    end
+  end
+  return hs
+end
+ctx.con_eval = function(line)
+  local C = ctx.CON
+  local r0, r1, rg = ctx.region_rows()
+  if not r0 then return false, 'no pattern at the cursor' end
+  local num, den = reaper.TimeMap_GetTimeSigAtTime(0, rg.pos)
+  local rpb = state.lpb * num * 4 / den
+  local bars = math.max(1, math.floor((r1 - r0 + 1) / rpb + 0.5))
+  local ok, p = pcall(C.plan, line, bars, rpb, { base = model.BASE_NOTE })
+  if not ok then return false, tostring(p):gsub('^.-:%d+: ', '') end
+  local targets = {}
+  if p.all then for n in pairs(C.chan) do targets[#targets + 1] = n end
+  else targets[1] = p.track_n or false end
+  local wrote, fail = 0, nil
+  for _, n in ipairs(targets) do
+    local col = ctx.con_col(n or nil)
+    if not col then return false, n and ('no track ' .. n) or 'no track under the cursor' end
+    local tr, lpb = col.track, state.lpb
+    local tn = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER'))
+    local inst = col.pool and col.pool[vim.inst]
+    if inst and inst.parent then inst = inst.parent end
+    local after = {}
+    edit.run('console t' .. tn, function()
+      local old = ctx.con_heads(col, r0, r1)
+      if #old > 0 then edit.delete(old, lpb) end
+      if p.clear then return end
+      -- slixer на треке — слайс k = нота base + k - 1 (slider2 Base note)
+      local sxbase
+      for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
+        local _, nm = reaper.TrackFX_GetFXName(tr, i, '')
+        if nm:lower():find('jf_slixer', 1, true) then sxbase = math.floor(reaper.TrackFX_GetParam(tr, i, 1) + 0.5); break end
+      end
+      for _, e in ipairs(p.events) do
+        local row = r0 + math.floor(e.row_f + 1e-6)
+        if row <= r1 then
+          local frac = (r0 + e.row_f) - row
+          local rows = math.max(1, math.floor(e.len_rows + 0.5))
+          local src = (e.inst and col.pool and col.pool[e.inst]) or inst
+          if src and src.parent then src = src.parent end
+          local pitch = e.pitch
+          if e.slice and src and src.slices and #src.slices > 0 and not sxbase then
+            local it = edit.insert_slice(tr, nil, lpb, row, src.item, e.slice)
+            if it then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', edit.row_time(row + rows, lpb, 0) - edit.row_time(row, lpb, 0)) end
+            pitch = nil
+          else
+            if e.slice then pitch = (sxbase or model.BASE_NOTE) + e.slice - 1 end
+            edit.msg = nil
+            edit.insert_note(tr, nil, lpb, row, pitch, e.vel, rows, sxbase and 'midi' or ctx.inst_src(col, src))   -- MIDI-путь ничего не возвращает: ошибка — только E.msg
+            if edit.msg then fail = edit.msg; break end
+          end
+          wrote = wrote + 1
+          local d = math.floor(frac * 256 + 0.5)
+          if d > 0 and d < 256 or e.cmd then after[#after + 1] = { row = row, pitch = pitch, delay = d > 0 and d < 256 and d or nil, cmd = e.cmd } end
+        end
+      end
+    end)
+    if #after > 0 then ctx.con_after = ctx.con_after or {}; ctx.con_after[#ctx.con_after + 1] = { guid = col.guid, list = after, snap0 = snap } end
+    if p.clear then C.chan[tn] = nil else C.chan[tn] = line end
+  end
+  model.invalidate()
+  if fail then return false, 'track ' .. tostring(targets[1] or '') .. ': ' .. fail end
+  reaper.SetProjExtState(0, 'jf_tracker', 'console', C.text())
+  if p.clear then return true, (p.all and 'hush - all channels' or 'cleared') .. ' in pattern ' .. tostring(rg.idx or '') end
+  return true, ('%d events in pattern %s (%d bar%s)'):format(wrote, tostring(rg.idx or ''), bars, bars == 1 and '' or 's')
+end
+-- кадр: снимок уже новый — задержки и команды на только что записанные ноты
+ctx.con_tick = function()
+  local q = ctx.con_after
+  if not q or not snap or q[1].snap0 == snap then return end
+  ctx.con_after = nil
+  edit.run('console commands', function()
+    for _, job in ipairs(q) do
+      local col
+      for _, c in ipairs(snap.cols or {}) do if c.guid == job.guid then col = c; break end end
+      if col then
+        for _, a in ipairs(job.list) do
+          local hs = ctx.con_heads(col, a.row, a.row, a.pitch)
+          if #hs > 0 then
+            if a.delay then edit.set_delay(hs, state.lpb, a.delay) end
+            if a.cmd and #a.cmd >= 4 then edit.set_fx(hs, state.lpb, a.cmd:sub(1, 2), tonumber(a.cmd:sub(3, 4), 16) or 0) end
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+end
+-- Enter — строка курсора, Cmd+Enter — все непустые строки
+ctx.con_run = function(all)
+  local C = ctx.CON
+  local list = {}
+  if all then for i, ln in ipairs(C.lines) do list[#list + 1] = i end else list[1] = C.l end
+  for _, i in ipairs(list) do
+    local ln = C.lines[i]
+    if ln and ln:match('%S') then
+      local ok, msg = ctx.con_eval(ln)
+      C.err[i] = (not ok) and msg or nil
+      C.say(ln .. '  -> ' .. tostring(msg), not ok)
+      if ok then C.push_hist(ln) end
+    end
+  end
+end
+ctx.console_open = function()
+  local PN, m = draw.panes, state.panes
+  if not m then vim.msg = 'console: panes are off (option panes)'; return end
+  if PN.visible(m, 'console') then
+    if state.focus == 'console' then ctx.pane_do(function() return PN.hide(m, 'console') end, 'console hidden') else ctx.pane_focus('console') end
+    return
+  end
+  ctx.pane_do(function() return PN.show(m, 'console') end, 'console shown')
+  ctx.pane_focus('console')
+  vim.msg = 'console: t1: n("c e g b") Enter - into the pattern at the cursor; Cmd+Enter - every line; Esc - back'
 end
 -- 28 окт: превью 0Rxy у MIDI-ноты — первая нота превью, затем копии каждые y/16 строки (y = 0 → 4/16), velocity
 -- ×(1 − x/16) на каждую, как их запишет jf_tracker_cmds; длина — нота (rows), не дольше 2 с

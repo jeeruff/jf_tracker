@@ -974,11 +974,25 @@ do
     { k = 'drag a module', t = {}, d = 'in CHAINS / ROUTE: drag a module onto another chain or between modules - it moves there (onto = parallel)' },
     'h l', 'w W', 'dw db', 'Z' }) }
 end
+KH.PAGES.console = { title = 'console (Strudel patterns)', e = {
+  { k = 't2: n("c e g b")', t = {}, d = 'a line = a channel: notes into the pattern at the cursor on track 2 (REAPER track number, as t135m); no tN: - the cursor track. A cycle is a bar: a pattern of 4 bars gets cycles 0..3' },
+  { k = 'mini-notation', t = {}, d = 'space - steps, [ ] subdivide, , chord, < > one per cycle, *n faster, /n slower, !n repeat, @n weight, ? sometimes, (k,n,r) euclid, ~ rest; notes c e g, f#3, bb2, numbers = steps from C-4' },
+  { k = '.fast .slow .rev .every .add .oct', t = {}, d = 'transform the pattern: .fast(2) .slow(2) .rev() .every(4, "rev") .add(7) .oct(-1)' },
+  { k = 's() .vel() .cmd() .i()', t = {}, d = 's("1 3 ~ 5") - slices (slixer: its base note + n - 1); .vel("1 0.5") - velocity by steps; .cmd("0R42") - a tracker command on every note (a pattern too: "0D20 ~"); .i(3) - instrument 3 of the lib' },
+  { k = 'Enter', t = {}, d = 'evaluate the line under the cursor: the track in the pattern is rewritten (the notes there before are replaced)' },
+  { k = 'Cmd+Enter', t = {}, d = 'evaluate every line' },
+  { k = 'Shift+Enter', t = {}, d = 'a new line' },
+  { k = 'Up Down', t = {}, d = 'on an empty line: the history of evaluated lines' },
+  { k = 't2: ~  hush', t = {}, d = 'clear the channel / every channel the console wrote, in this pattern' },
+  { k = 'Esc', t = {}, d = 'back to the tracker' },
+  { k = ':console  \\ E', t = {}, d = 'open the console (again - focus, then hide)' },
+} }
+KH.BARS.console = { { 'Enter', 'line' }, { 'Cmd+Enter', 'all' }, { 'S+Enter', 'new line' }, { 'Up Down', 'history' }, { 'Esc', 'back' } }
 KH.BARS.dsp_slixer = { { 'Opt+D', 'detect' }, { 'Opt+T', 'transient' }, { 'Opt+C', 'classify' }, { 'Opt+X', 'clear' }, { 'Opt+Z', 'undo' },
   { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
 KH.BARS.dsp_container = { { 'h l', 'fx' }, { 'c= c|', 'parallel / serial' }, { 'cc', 'pack' }, { 'cf', 'fold' }, { 'cv', 'grid / list' },
   { 'cb', 'bands' }, { 'zr', 'router' }, { 'P', 'pin ★' }, { 'Z', 'menu' }, { 'dd', 'delete' } }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

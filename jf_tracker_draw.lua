@@ -6857,6 +6857,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'clipboard' and info.clip_draw then
         info.clip_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'clipboard', hover)
+      elseif id == 'console' and info.console_draw then   -- 28 окт: консоль Strudel
+        info.console_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'console')
       elseif id == 'hints' and info.hints_draw then   -- 28 окт: что делает модуль под мышью
         info.hints_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'hints', hover)
       elseif id == 'help' and info.help_draw then   -- 17 окт: справка модуля в фокусе

@@ -585,6 +585,13 @@ one pattern. The keyboard on the left shows what the note keys play and hides wi
 options for its position or style. The mode word is the modeline, its own row under the tracker field; the status line is
 always the bottom row of the window.</p>
 
+<h2 id="console">Console</h2>
+<p>A live pattern language inside the tracker, Strudel mini-notation (<kbd>:console</kbd>, <kbd>\ E</kbd>). A line is a
+channel: <code>t2: n("c [e g] &lt;a b&gt;").fast(2)</code> writes its notes into the pattern at the cursor on track 2; without
+<code>tN:</code> it is the cursor track. A cycle is a bar. <kbd>Enter</kbd> evaluates the line again and rewrites that track in
+the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, <code>.vel("1 0.5")</code>,
+<code>.cmd("0R42")</code> tracker commands, <code>.i(3)</code> an instrument; <code>t2: ~</code> / <code>hush</code> clear.</p>
+
 <h2 id="ripple">Ripple</h2>
 <figure>
   <img src="help/ripple.png" alt="the transport strip, the rip button at the right end">
