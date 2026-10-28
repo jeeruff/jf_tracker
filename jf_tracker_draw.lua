@@ -129,6 +129,7 @@ function D.init(u, peaks_fn, matrix)
              [D.MODE_COL.visual] = true, [D.MODE_COL.cmd] = true, [D.REC] = true }   -- 15 окт: цвета режимов и O записи
   D.SL_DIM = U.mix(U.TEXT, U.BG, 0.1)   -- 28 окт: виджеты невыбранных параметров DSP
   D.CURCELL = D.CUR_ACC or U.MONO_CURSOR or U.TEXT   -- 28 окт: курсор в фокусе — акцентом (опция cursor accent)
+  if D.acc_apply then D.acc_apply() end
   D.OFFKEY = U.readable(U.mix(U.RED, U.TEXT, 0.35), U.BG, 4.0)   -- 21 окт: нота вне лада (с проверкой контраста)
   U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
@@ -5617,6 +5618,14 @@ end
 -- цвета контейнера (щели между ними залиты — видно, что это одно целое), справа — замыкание «out»; рамка сверху и снизу
 -- через все три части. Вложенный контейнер — подложка гуще (глубина). D.cst[f] — начало рэка (x, ряд, номер блока).
 -- 24 окт: цвет параллельной ветки (lane 1, 2, …) — скобка под её модулем / контейнером
+-- 28 окт: акцент курсора — и у его кромки, строки плейхеда и хвоста (один цвет с ячейкой курсора)
+function D.acc_apply()
+  local a = D.CUR_ACC
+  if not a then return end
+  D.CUR, D.CURTOP, D.PLAYC = a, a, a
+  D.PLAY = U.tint(a, 0.36)
+  D.CURCELL = a
+end
 local function lane_col(n) local P = { U.CYAN, U.GREEN, U.YELLOW, U.RED }; return P[(n - 1) % #P + 1] end
 D.lane_col = lane_col
 -- 28 окт: контейнер — только яркие [ ] внутри по краям: без линий над / под модулями, без ступенек и скобок

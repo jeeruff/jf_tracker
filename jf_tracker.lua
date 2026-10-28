@@ -405,7 +405,6 @@ local state = {
   copymedia = flag('copymedia', true),
   fxb = flag('fxb', true),
   hints = flag('hints', true),
-  pcache = flag('pcache', true),                -- 28 окт: кэш панелей
   notes_open = flag('notes', false),            -- редактор заметок в главном модуле (3 окт; раньше — на месте списка эффектов)
   view_reg = flag('viewreg', false),
   view_secmode = flag('viewsec', false),   -- 26 окт: вид — секция курсора (zs); с view_reg — project / section / pattern            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
@@ -637,7 +636,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'pcache', 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'clipsview', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mxlaunch', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13089,7 +13088,6 @@ ctx = {
       { key = 'xfademode', label = 'x-fade by', kind = 'cycle', values = { 'vol', 'fades' }, desc = 'vol - crossfades are volume ramps of the take envelopes, shown as values in the vol column (type vol on any row of a sample to add a point); fades - REAPER item fades', get = function() return state.xfademode or 'vol' end, set = function(v) state.xfademode = v end },
       flag('dspmeters', 'dsp meters', 'in / out meters and gain comp (c) at the edges of the DSP panel'),
       flag('hints', 'module hints', 'a line of key hints under every module'),
-      flag('pcache', 'pane cache', 'quiet panes (lib, browser, help, notes ...) redraw only when something changes, otherwise their last picture is copied - less CPU; off if a pane looks stale'),
       { sep = true, title = 'track' },
       { key = 'hdrfill', label = 'track header colour', kind = 'cycle', values = { 'off', 'line', 'header', 'full' }, desc = 'track colour in the header: none / strip under the name / name row / all', get = function() return state.hdrfill or 'line' end, set = function(v) state.hdrfill = v end },
       { key = 'hdrin', label = 'input row', kind = 'toggle', desc = 'input row in the track header: the input list by click (smart input: DSP module)', get = function() return state.hdrin end, set = function(v) state.hdrin = v end },
@@ -13153,7 +13151,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
-      { 'panes and bars', { 'pcache', 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
@@ -22160,7 +22158,9 @@ local function frame()
     ctx.pc_epoch_calc(snap)
     ctx.pc_live = is_playing or PV.playing() or nil
     local fkey = ctx.pc_ep .. ':' .. gfx.mouse_x .. ',' .. gfx.mouse_y .. ',' .. gfx.mouse_cap
-    if state.pcache ~= false and not ctx.pc_live and fkey == ctx.f_drawn and not vim.picker and not vim.hydra and not HN.active then
+    -- после действия секунду — полная частота: шлейф курсора, вспышки, затухания доигрывают плавно (28 окт: шлейф тупил)
+    if not ctx.pc_live and fkey == ctx.f_drawn and not vim.picker and not vim.hydra and not HN.active
+       and now_t - idle.active_t > 1.0 and now_t - idle.input_t > 1.0 then
       ctx.fps_idle = true; fps_t = 4
     end
     ctx.f_key = fkey
@@ -31372,7 +31372,7 @@ end
 -- 28 окт: эпоха кэша панелей — растёт при любом вводе / правке / смене снимка, фокуса, раскладки, курсора, инструмента
 ctx.pc_ep, ctx.pc_key = 0, ''
 ctx.pc_epoch_calc = function(sn)
-  draw.pc_on = state.pcache ~= false
+  draw.pc_on = false   -- 28 окт: кэш панелей выключен — замер без выигрыша, при работе лишние копии через буфер
   local k = table.concat({ tostring(sn), state.focus or '', state.toptab or '', tostring(state.panes and state.panes.v or 0), tostring(state.theme),
     vim.mode or '', tostring(vim.cur.fi), tostring(vim.cur.row), tostring(vim.inst), tostring(reaper.GetProjectStateChangeCount(0)),
     tostring(idle.input_t), tostring(gfx.w), tostring(gfx.h), tostring(vim.msg), tostring(B and B.path) }, '|')
@@ -31393,7 +31393,8 @@ ctx.curacc_apply = function()
   local r, g, b = h:match('^#?(%x%x)(%x%x)(%x%x)$')
   draw.CUR_ACC = r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil
   draw.ACC_KEEP = draw.CUR_ACC   -- mono: акцент не серится (D.mono_col)
-  draw.CURCELL = draw.CUR_ACC or draw.U_MONO_CURSOR or draw.CURCELL
+  draw.CURCELL = draw.CUR_ACC or draw.CURCELL
+  if draw.acc_apply and draw.CUR then draw.acc_apply() end
 end
 ctx.curacc_apply()
 -- 28 окт: цвет цепочки контейнера (ветки) — свой: P_EXT:jf_chcol трека «GUID контейнера|ветка=rrggbb;…»;
