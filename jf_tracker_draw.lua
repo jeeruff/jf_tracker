@@ -8906,7 +8906,7 @@ function D.frame(L, snap, rows, state, info)
                 elseif half then   -- 12 окт: половина поля команды
                   local fx = D.field_rect(G, inv_f); local w2 = ms('00')
                   if half == 'val' then gfx.rect(x + fx + w2 - 1, y, w2 + 2, L.rh, 1) else gfx.rect(x + fx - 1, y, w2 + 1, L.rh, 1) end
-                elseif inv_f == 'wave' then local fx, fw = D.field_rect(G, 'wave'); set(U.AMBER); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 0)   -- 16 окт: рамкой — волна видна
+                elseif inv_f == 'wave' then local fx, fw = D.field_rect(G, 'wave'); set(D.CUR_ACC or U.AMBER); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 0)   -- 16 окт: рамкой — волна видна
                 else local fx, fw = D.field_rect(G, inv_f); gfx.rect(x + fx - 1, y, fw + 2, L.rh, 1) end
               end
               if c.folded or r.row < 0 or r.clip then D.cur_box(); D.cur_box = nil end
@@ -8985,12 +8985,12 @@ function D.frame(L, snap, rows, state, info)
         -- выделение на лейне огибающей (6 окт): Shift+j/k, мышь — лёгкое
         -- высветление фона, линия и точки под ним видны
         if vc and vc.fi == ev.fi and vc.row == r.row then
-          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          set(info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE)   -- 28 окт: полый курсор (огибающая) — цветом курсора
           if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
         end
         -- курсор поля формы — под значением точки (строка ниже курсора)
         if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
-          set(info.focus == 'tracker' and U.AMBER or U.LINE)
+          set(info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE)
           gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
         draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or ((c.master or EG.env3) and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
