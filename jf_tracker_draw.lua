@@ -3255,8 +3255,57 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   -- 22 окт: быстрые пресеты трека — XY-пэд на пустом месте, в углах снапшоты 1..4 (все параметры FX трека),
   -- шайба — морф между ними; щелчок по пустому углу — запомнить, по полному — вызвать, Shift — перезаписать
   local sinfo = info.track_snaps and info.track_snaps(col)
-  local room = y + h - yy - 6
-  if sinfo and room >= 4 * L.rh then
+  D.snap_pad(L, sinfo, col, x, w, yy, y + h - yy - 6, mx, my, hover, hint)
+  -- 22 окт: mod · auto — у правого края блока две вертикальные кнопки: auto (сверху) и mod (снизу);
+  -- любая раскрытая — блок вдвое шире, справа панель: сверху автоматизация, снизу модуляция с редакторами
+  local tm = info.trk_mods and info.trk_mods(col)
+  local extra = 0
+  if tm then
+    local sw = L.th + 6
+    local sx = x + w
+    local hh = math.floor(h / 3)   -- 28 окт: третья — route (мини-роутер)
+    for bi, b in ipairs({ { 'wauto', 'auto ' .. (tm.nauto or 0), tm.wauto, y, hh }, { 'wmod', 'mod ' .. (tm.nmod or 0), tm.wmod, y + hh, hh },
+                          { 'wroute', 'route', tm.wroute, y + 2 * hh, h - 2 * hh } }) do
+      local by, bh2 = b[4], b[5]
+      local hot = mx >= sx and mx < sx + sw and my >= by and my < by + bh2
+      local bg = b[3] and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)
+      set(bg); gfx.rect(sx, by, sw, bh2, 1)
+      set((b[3] or hot) and U.AMBER or U.LINE); gfx.rect(sx, by, sw, bh2, 0)
+      local tl = math.min(ms(b[2]), bh2 - 6)
+      D.vtext(sx + math.floor((sw - L.th) / 2), by + 3, tl, b[2], (b[3] or hot) and U.AMBER or U.GREY, bg, true)
+      if hot then hover.trkmod = { col = col, what = b[1] } end
+      hint('trkmod', sx, by, sw, bh2, { what = b[1] })
+    end
+    extra = sw
+    if tm.wauto or tm.wmod or tm.wroute then
+      local pw, px = w, sx + sw
+      fill(rbg); gfx.rect(px, y, pw, h, 1)
+      extra = extra + pw
+      -- 28 окт: route — снизу (вся высота, если открыт один)
+      local rh2 = tm.wroute and ((tm.wauto or tm.wmod) and math.max(5 * L.rh, math.floor(h * 0.4)) or h) or 0
+      local h1 = h - rh2
+      local ah = tm.wauto and (tm.wmod and math.max(3 * L.rh, math.floor(h1 * 0.35)) or h1) or 0
+      if tm.wauto then D.auto_section(L, info, col, tm, px, y, pw, ah, hover) end
+      if tm.wmod then
+        if tm.wauto then set(U.LINE); gfx.rect(px + L.pad, y + ah - 1, pw - 2 * L.pad, 1, 1) end
+        D.mod_section(L, info, col, tm, px, y + ah, pw, h1 - ah, hover)
+      end
+      if tm.wroute then
+        if h1 > 0 then set(U.LINE); gfx.rect(px + L.pad, y + h1 - 1, pw - 2 * L.pad, 1, 1) end
+        D.route_section(L, info, col, px, y + h1, pw, rh2, hover)
+      end
+      set(U.LINE); gfx.rect(px, y, pw, h, 0)
+    end
+  end
+  U.TEXT, U.GREY = T0, G0
+  set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
+  return w + extra
+end
+
+-- 22 окт: XY-пэд снимков (4 угла, шайба — морф); 28 окт: общий — шапка трека и контейнер (col — псевдо-колонка)
+function D.snap_pad(L, sinfo, col, x, w, yy, room, mx, my, hover, hint)
+  if not (sinfo and room >= 4 * L.rh) then return end
+
     local side = math.max(4 * L.rh, math.min(w - 2 * L.pad, room))
     local px0, py0 = x + math.floor((w - side) / 2), yy + 3
     local cbw = math.max(L.btn_w or 0, ms('4') + 6)
@@ -3284,43 +3333,58 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       text(px0 + math.floor((side - ms('corners: save')) / 2), py0 + math.floor(side / 2) - L.rh, 'corners: save', U.DIM)
     end
     if onpad and not oncorner then hover.snappad = { col = col, x0 = px0, y0 = py0, side = side } end
-  end
-  -- 22 окт: mod · auto — у правого края блока две вертикальные кнопки: auto (сверху) и mod (снизу);
-  -- любая раскрытая — блок вдвое шире, справа панель: сверху автоматизация, снизу модуляция с редакторами
-  local tm = info.trk_mods and info.trk_mods(col)
-  local extra = 0
-  if tm then
-    local sw = L.th + 6
-    local sx = x + w
-    local hh = math.floor(h / 2)
-    for bi, b in ipairs({ { 'wauto', 'auto ' .. (tm.nauto or 0), tm.wauto, y, hh }, { 'wmod', 'mod ' .. (tm.nmod or 0), tm.wmod, y + hh, h - hh } }) do
-      local by, bh2 = b[4], b[5]
-      local hot = mx >= sx and mx < sx + sw and my >= by and my < by + bh2
-      local bg = b[3] and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)
-      set(bg); gfx.rect(sx, by, sw, bh2, 1)
-      set((b[3] or hot) and U.AMBER or U.LINE); gfx.rect(sx, by, sw, bh2, 0)
-      local tl = math.min(ms(b[2]), bh2 - 6)
-      D.vtext(sx + math.floor((sw - L.th) / 2), by + 3, tl, b[2], (b[3] or hot) and U.AMBER or U.GREY, bg, true)
-      if hot then hover.trkmod = { col = col, what = b[1] } end
-      hint('trkmod', sx, by, sw, bh2, { what = b[1] })
-    end
-    extra = sw
-    if tm.wauto or tm.wmod then
-      local pw, px = w, sx + sw
-      fill(rbg); gfx.rect(px, y, pw, h, 1)
-      extra = extra + pw
-      local ah = tm.wauto and (tm.wmod and math.max(3 * L.rh, math.floor(h * 0.35)) or h) or 0
-      if tm.wauto then D.auto_section(L, info, col, tm, px, y, pw, ah, hover) end
-      if tm.wmod then
-        if tm.wauto then set(U.LINE); gfx.rect(px + L.pad, y + ah - 1, pw - 2 * L.pad, 1, 1) end
-        D.mod_section(L, info, col, tm, px, y + ah, pw, h - ah, hover)
+end
+-- 28 окт: мини-роутер — схема цепочки маленькими прямоугольниками: последовательно — вправо (черта между),
+-- параллельно предыдущему — столбиком под ним; модули контейнера — с [ перед первым и ] после последнего; не
+-- влезло в ширину — следующей полосой ниже; выбранный — янтарём, выключенный — тускло; щелчок — к модулю
+function D.route_section(L, info, col, x, y, w, h, hover)
+  local nodes = info.route_nodes and info.route_nodes(col) or {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  text(x + L.pad, y + 2, fit('ROUTE', w - 2 * L.pad), U.AMBER)
+  local y0 = y + L.rh + 4
+  if #nodes == 0 then text(x + L.pad, y0, fit('no fx', w - 2 * L.pad), U.DIM); return end
+  local nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4)
+  local nh = L.rh
+  local gx = math.max(4, L.pad + 2)          -- зазор между столбцами (черта связи)
+  local bw = math.max(3, L.pad)              -- место под [ ]
+  local cx, row, band_y, band_h = x + L.pad, 0, y0, 1
+  local prev_x
+  local open = {}                            -- открытые контейнеры (глубина)
+  local sel = D.dsp_selk
+  for _, n in ipairs(nodes) do
+    local newcol = not ((n.par or 0) > 0 and prev_x)
+    if newcol then
+      local need = nw + gx + (n.cont and bw or 0)
+      if prev_x and cx + need > x + w - L.pad then   -- не влезло — полоса ниже
+        band_y = band_y + band_h * (nh + 2) + L.pad; band_h = 1; cx = x + L.pad; prev_x = nil
       end
-      set(U.LINE); gfx.rect(px, y, pw, h, 0)
+      if prev_x then set(U.DIM); gfx.rect(prev_x + nw, band_y + math.floor(nh / 2), cx - prev_x - nw, 1, 1) end
+      row = 0
+    else row = row + 1; band_h = math.max(band_h, row + 1) end
+    local nx = newcol and cx or prev_x
+    local ny = band_y + row * (nh + 2)
+    if ny + nh > y + h - 2 then break end
+    if newcol and n.cont then   -- [ перед контейнером
+      set(n.en and U.tint(U.AMBER, 0.6) or U.DIM)
+      gfx.rect(nx, ny, 2, nh, 1); gfx.rect(nx, ny, 4, 1, 1); gfx.rect(nx, ny + nh - 1, 4, 1, 1)
+      nx = nx + bw; cx = cx + bw
+    end
+    local hot = mx >= nx and mx < nx + nw and my >= ny and my < ny + nh
+    local isel = sel == n.k
+    local fillc = n.cont and U.tint(U.AMBER, 0.18) or (n.depth > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
+    set(hot and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(nx, ny, nw, nh, 1)
+    set((hot or isel) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(nx, ny, nw, nh, 0)
+    if (n.par or 0) > 0 and not newcol then set(U.DIM); gfx.rect(nx - 3, ny - 2, 1, nh + 2, 1) end   -- = : связка столбика
+    local lb = (n.name or '?'):gsub('^%s+', ''):sub(1, 3)
+    text(nx + math.floor((nw - ms(lb)) / 2), ny, lb, (hot or isel) and U.AMBER or (n.en and U.TEXT or U.GREY))
+    if hot then hover.trkmod = { col = col, what = 'rnode', k = n.k, par = n.par, name = n.name } end
+    if newcol then prev_x = nx; cx = nx + nw + gx end
+    for _ = 1, n.ncend or 0 do   -- ] после последнего модуля контейнера
+      local bx2 = (newcol and nx or prev_x) + nw + 1
+      set(U.tint(U.AMBER, 0.6)); gfx.rect(bx2, band_y, 2, nh, 1); gfx.rect(bx2 - 2, band_y, 4, 1, 1); gfx.rect(bx2 - 2, band_y + nh - 1, 4, 1, 1)
+      cx = cx + bw
     end
   end
-  U.TEXT, U.GREY = T0, G0
-  set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
-  return w + extra
 end
 
 -- 22 окт: LFO REAPER графикой — значение 0..1 формы shape в точке t (два периода на ширину)
@@ -5629,6 +5693,10 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local nw = vbx - x - 3
   text(x, y, fit('chain', nw), U.DIM); text(vbx + L.pad, y, 'mix', U.DIM)
   y = y + L.rh
+  -- 28 окт: список цепей — в своём окошке (тёмный фон, рамка): видно, что это список
+  local wy0 = y - 1
+  local wy1 = math.min(ymax, y + #chains * (L.rh + 1) + 1)
+  set(U.BG); gfx.rect(x - 2, wy0, w + 4, wy1 - wy0, 1)
   for _, c in ipairs(chains) do
     if y + L.rh > ymax then break end
     local kd = c.kd
@@ -5654,6 +5722,8 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh + 1
   end
+  set(U.LINE); gfx.rect(x - 2, wy0, w + 4, math.max(2, y - wy0 + 1), 0)
+  y = y + 3
   -- 25 окт: две цепи — кроссфейд одной ручкой нативно: mix второй цепи следует за mix первой с −100 % (база 1)
   if #chains == 2 and y + L.rh <= ymax then
     local b1 = btn(x, 'x-fade', 'cxfade')
@@ -5691,6 +5761,7 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
       y = y + L.rh
     end
   end
+  return y   -- 28 окт: низ отдела — под ним XY контейнера
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
@@ -9550,6 +9621,7 @@ function D.frame(L, snap, rows, state, info)
     D.fxgui_rect = {}   -- 27 окт: блоки с окном плагина поверх (gui) — заново каждый кадр
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
+    D.dsp_selk = sel.fx   -- 28 окт: мини-роутер — выбранный узел
     D.pmark('dsp: layout')
     for k, f in ipairs(fxs) do
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
@@ -10069,7 +10141,14 @@ function D.frame(L, snap, rows, state, info)
             end
           end
           -- 24 окт: отдел цепей — правее вкладок макросов / xy, во всю высоту
-          if nreal > 0 then D.cont_chains(L, info, f, bx + L.pad, ky + 1, bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover) end
+          if nreal > 0 then
+            local ye = D.cont_chains(L, info, f, bx + L.pad, ky + 1, bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover)
+            -- 28 окт: под цепями — XY контейнера: 4 угла = снимки всех модулей внутри, шайба — морф
+            if ye and info.cont_snaps then
+              local si, cc = info.cont_snaps(info.pool_col, f)
+              D.snap_pad(L, si, cc, bx + L.pad, bw - 2 * L.pad, ye + 2, by + bh - ye - 8, mx, my, hover, hint)
+            end
+          end
         elseif f.bands and #f.kids > 0 then
           -- 23 окт: ÷N bands (как Ableton): слева — полосы строками сверху вниз high … low (щелчок — открыть цепь),
           -- под ними — кроссовер (частоты сплиттера; правка идёт во все полосы); справа — эффекты выбранной полосы

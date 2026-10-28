@@ -1990,6 +1990,28 @@ ctx = {
   -- (hp, saw, off): перебор положений (у ступенчатых — все, иначе 101 точка), первое совпадение
   -- 22 окт: мини-панель mod · auto (блок трека DSP): автоматизированные (~) и модулированные (≈) параметры трека,
   -- у модулированных — что именно (LFO / ACS / link); кэш на снимок колонки (пересборка модели — новый)
+  -- 28 окт: мини-роутер в шапке трека: узлы цепочки (как видит DSP) — k, имя, глубина в контейнерах, параллельно ли
+  -- предыдущему, контейнер; кеш на поколение FX (model.fx_gen) — без запросов REAPER каждый кадр
+  route_nodes = function(col)
+    if not (col and col.track) then return {} end
+    ctx.rtn = ctx.rtn or setmetatable({}, { __mode = 'k' })
+    local c = ctx.rtn[col]
+    local gen = (model.fx_gen or 0) .. ':' .. #(col.fx or {})
+    if c and c.gen == gen then return c.nodes end
+    local nodes = {}
+    for k, f in ipairs(col.fx or {}) do
+      local par, depth = 0, 0
+      if f.inner and f.inner.wrap then par, depth = f.inner.par or 0, f.inner.depth or 1
+      elseif not f.inner and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+        local ok, pv = reaper.TrackFX_GetNamedConfigParm(col.track, f.i, 'parallel'); par = ok and (tonumber(pv) or 0) or 0
+      end
+      if not (f.inner and not f.inner.wrap) then   -- модули полос (÷N) — внутри своей полосы, не узлы цепочки
+        nodes[#nodes + 1] = { k = k, name = f.name or '?', depth = depth, par = par, cont = f.container and true or nil, en = f.enabled and not f.poff, ncend = f.cend and #f.cend or 0 }
+      end
+    end
+    ctx.rtn[col] = { gen = gen, nodes = nodes }
+    return nodes
+  end,
   trk_mods = function(col)
     if not (col and col.track) or model.is_take(col.track) then return nil end
     ctx.tmod = ctx.tmod or setmetatable({}, { __mode = 'k' })
@@ -2037,7 +2059,7 @@ ctx = {
     local t = dsp_target()
     local f = t and t.col == col and (col.fx or {})[dsp_sel.fx]
     local p = f and f.params and f.params[dsp_sel.param]
-    c.wauto, c.wmod = state.dsp_wauto, state.dsp_wmod
+    c.wauto, c.wmod, c.wroute = state.dsp_wauto, state.dsp_wmod, state.dsp_wroute
     c.sel = p and ((p.name or '?') .. ' · ' .. (f.name or '?'):sub(1, 8)) or nil
     c.selflags = nil
     for _, r in ipairs(c.rows) do r.sel = p and r.k == dsp_sel.fx and r.pi == dsp_sel.param or nil; if r.sel then c.selflags = { lfo = r.lfo, acs = r.acs, lnk = r.lnk, env = r.env } end end
@@ -2121,6 +2143,13 @@ ctx = {
     local col = h.col
     if h.what == 'wauto' then state.dsp_wauto = not state.dsp_wauto; return end
     if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
+    if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; return end   -- 28 окт: мини-роутер
+    if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — курсор DSP на этот модуль
+      dsp_sel.fx = h.k; dsp_sel.param = 1; ctx.set_focus('dsp')
+      local f = (col and col.fx or {})[h.k]
+      vim.msg = 'route: ' .. (f and f.name or '?') .. ((h.par or 0) > 0 and ' (= parallel to the previous)' or '')
+      return
+    end
     local c = ctx.trk_mods(col)
     if h.what == 'row' then
       local r = c and c.rows[h.r]; if not r then return end
@@ -2429,7 +2458,7 @@ ctx = {
     ctx.snapc = ctx.snapc or {}
     local e = ctx.snapc[col.guid]
     if not e or e.track ~= col.track then
-      local _, str = reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_snaps', '', false)
+      local _, str = reaper.GetSetMediaTrackInfo_String(col.track, ctx.snap_key(col), '', false)
       e = { track = col.track, snaps = ctx.SN.parse(str), x = 0.5, y = 0.5 }
       ctx.snapc[col.guid] = e
     end
@@ -2440,9 +2469,36 @@ ctx = {
     local e = ctx.snaps_of(col)
     return { has = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }, x = e.x, y = e.y, drag = ctx.snapdrag and ctx.snapdrag.col.guid == col.guid }
   end,
-  snaps_write = function(col, e) reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_snaps', ctx.SN.ser(e.snaps), true) end,
-  snap_fxmap = function(tr)
+  snaps_write = function(col, e) reaper.GetSetMediaTrackInfo_String(col.track, ctx.snap_key(col), ctx.SN.ser(e.snaps), true) end,
+  -- 28 окт: XY контейнера — «колонка» { cont = f }: свой ключ P_EXT, эффекты — модули внутри (адреса контейнера)
+  snap_key = function(col) return col.cont and ('P_EXT:jf_cs_' .. tostring(col.cont.fguid or col.cont.i)) or 'P_EXT:jf_snaps' end,
+  snap_addrs = function(col)
+    local out = {}
+    if col.cont then
+      local function walk(kids)
+        for _, kd in ipairs(kids or {}) do
+          if kd.i and not (kd.name or ''):find('jf_tracker_macro', 1, true) then out[#out + 1] = kd.i end
+          if kd.entry and kd.entry.kids then walk(kd.entry.kids) end
+        end
+      end
+      walk(col.cont.kids)
+    else for fx = 0, reaper.TrackFX_GetCount(col.track) - 1 do out[#out + 1] = fx end end
+    return out
+  end,
+  cont_col = function(col, f)   -- псевдо-колонка контейнера (кеш по GUID — шайба и снимки живут)
+    ctx.ccols = ctx.ccols or {}
+    local key = tostring(col.guid) .. ':' .. tostring(f.fguid or f.i)
+    local c = ctx.ccols[key]
+    if not c then c = { guid = key, track = col.track, name = f.name }; ctx.ccols[key] = c end
+    c.track, c.cont, c.name = col.track, f, f.name
+    return c
+  end,
+  snap_fxmap = function(tr, col)
     local m = {}
+    if col and col.cont then
+      for _, a in ipairs(ctx.snap_addrs(col)) do local g = reaper.TrackFX_GetFXGUID(tr, a); if g then m[g] = a end end
+      return m
+    end
     for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do local g = reaper.TrackFX_GetFXGUID(tr, fx); if g then m[g] = fx end end
     return m
   end,
@@ -2459,7 +2515,8 @@ ctx = {
   snap_save = function(col, i)
     local tr = col.track
     local s = {}
-    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do
+    local addrs = ctx.snap_addrs(col)
+    for _, fx in ipairs(addrs) do
       local g = reaper.TrackFX_GetFXGUID(tr, fx)
       local np = reaper.TrackFX_GetNumParams(tr, fx)
       for pi = 0, math.min(np - 3, 1024) - 1 do s[g .. '|' .. pi] = reaper.TrackFX_GetParamNormalized(tr, fx, pi) end   -- последние 3 — Bypass / Wet / Delta REAPER
@@ -2469,13 +2526,13 @@ ctx = {
     ctx.snaps_write(col, e)
     e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
     local n = 0; for _ in pairs(s) do n = n + 1 end
-    vim.msg = ('snapshot %d of %s saved: %d parameters of %d fx (click - recall, Shift+click - overwrite, drag the pad - morph)'):format(i, col.name or 'track', n, reaper.TrackFX_GetCount(tr))
+    vim.msg = ('snapshot %d of %s saved: %d parameters of %d fx (click - recall, Shift+click - overwrite, drag the pad - morph)'):format(i, col.name or 'track', n, #addrs)
   end,
   snap_recall = function(col, i)
     local e = ctx.snaps_of(col)
     if not e.snaps[i] then return ctx.snap_save(col, i) end
     reaper.Undo_BeginBlock2(0)
-    ctx.snap_apply(col.track, e.snaps[i], ctx.snap_fxmap(col.track))
+    ctx.snap_apply(col.track, e.snaps[i], ctx.snap_fxmap(col.track, col))
     reaper.Undo_EndBlock2(0, 'jf_tracker: snapshot ' .. i, -1)
     e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
     model.invalidate()
@@ -2490,7 +2547,7 @@ ctx = {
     for _, k in ipairs(keys) do if vals[k] then only[k] = vals[k] end end
     local row = vim.cur.row
     local t = ctx.row_time(row)
-    local n = edit.snap_points(col.track, only, ctx.snap_fxmap(col.track), t, 'XY ' .. (what or 'morph') .. ' -> automation')
+    local n = edit.snap_points(col.track, only, ctx.snap_fxmap(col.track, col), t, 'XY ' .. (what or 'morph') .. ' -> automation')
     if n > 0 and vim.step_advance then vim.step_advance() end   -- 22 окт: курсор шагает на step, как после ноты
     vim.msg = ('INSERT: %s -> automation at row %d - %d envelope points, cursor + step (u - undo)'):format(what or 'XY', row, n)
   end,
@@ -22271,10 +22328,12 @@ local function frame()
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
+    cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,   -- 28 окт: XY контейнера
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     msn_tog = ctx.MSN_TOG, msn_opt = ctx.MSN_OPT,
     macfold = state.dsp_macfold, xyopen = state.dsp_xyopen,   -- 24 окт: вкладка xy   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
-    trk_mods = function(col) return ctx.trk_mods(col) end,   -- 22 окт: мини-панель mod · auto в блоке трека
+    trk_mods = function(col) return ctx.trk_mods(col) end,
+    route_nodes = function(col) return ctx.route_nodes(col) end,   -- 28 окт: мини-роутер   -- 22 окт: мини-панель mod · auto в блоке трека
     modedit = function(col, c) return ctx.modsel(col, c) end,   -- 22 окт (3) (modsel занято строкой вкладки modulation): редактор модуляции выбранного параметра
     modtab = function() return state.modtab or 'lfo' end,
     modsl = ctx.MODSL,
@@ -25524,7 +25583,7 @@ local function frame()
       local e = ctx.snaps_of(h.col)
       local n = 0; for i = 1, 4 do if e.snaps[i] then n = n + 1 end end
       if n >= 2 then
-        ctx.snapdrag = { col = h.col, x0 = h.x0, y0 = h.y0, side = h.side, keys = ctx.SN.diff_keys(e.snaps), fxmap = ctx.snap_fxmap(h.col.track), last = {}, e = e }
+        ctx.snapdrag = { col = h.col, x0 = h.x0, y0 = h.y0, side = h.side, keys = ctx.SN.diff_keys(e.snaps), fxmap = ctx.snap_fxmap(h.col.track, h.col), last = {}, e = e }
       else vim.msg = 'XY presets: save at least two corners (click an empty corner)' end
       click = { t = now2, zone = 'snappad' }
     elseif hover.trsbtn then
