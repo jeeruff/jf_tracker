@@ -11731,9 +11731,11 @@ function D.frame(L, snap, rows, state, info)
           set(cc or (acc == U.TEXT and D.SL_DIM or acc)); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)   -- 28 окт: невыбранные — на 10 % тусклее (D.SL_DIM)
           end
         end
-        local pnm, pnw = p.name or '', nw - L.pad - ms(p.mk or '')
+        -- 28 окт: метка ~ / ≈ — без пробелов, прямо перед слайдером (правый край колонки имени); имя — до неё
+        local pnm, pnw = p.name or '', nw - L.pad - ((p.mk or '') ~= '' and (ms((p.mk:gsub(' ', ''))) + 2) or 0)
         if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
-        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT))
+        text(bxc + L.pad, py, fit(pnm, pnw), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT))
+        if (p.mk or '') ~= '' then text(bxc + nw - ms((p.mk:gsub(' ', ''))), py, (p.mk:gsub(' ', '')), U.CYAN) end
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix
