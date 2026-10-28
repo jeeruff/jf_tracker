@@ -5191,7 +5191,12 @@ ctx = {
     if other and ((which == 'start' and t >= other - 1e-6) or (which == 'end' and t <= other + 1e-6)) then
       vim.msg = which == 'start' and 'start must be before end' or 'end must be after start'; return
     end
+    -- 28 окт: =END вправо — то, что за ним (библиотека паттернов, =SESSION, их items), едет вместе с ним: иначе
+    -- оказывалось внутри песни; влево — за ним только места больше
+    local old = which == 'end' and model.marker_pos(model.END_MARKER)
+    local lib_moved = 0
     edit.run(name .. ' marker', function()
+      if old and t > old + 1e-6 then lib_moved = alias.shift_lib(old, t - old, { [name] = true }) end
       local _, nmk, nrg = reaper.CountProjectMarkers(0)
       for i = 0, nmk + nrg - 1 do
         local _, isr, _, _, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
@@ -5201,7 +5206,7 @@ ctx = {
     end)
     ctx.mx_refresh()
     local bt, m = reaper.TimeMap2_timeToBeats(0, t)
-    vim.msg = ('%s at %d.%d'):format(name, m + 1, math.floor(bt + 1e-6) + 1)
+    vim.msg = ('%s at %d.%d'):format(name, m + 1, math.floor(bt + 1e-6) + 1) .. (lib_moved > 0 and (' - what was after it moved along (%d)'):format(lib_moved) or '')
   end,
   -- колесом по полю: ±1 такт, доля в такте сохраняется
   seq_marker_nudge = function(which, d)

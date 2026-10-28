@@ -554,6 +554,51 @@ local function move_marks(list, delta)
   end
 end
 
+-- 28 окт: всё, что за точкой t (библиотека паттернов за =END, зона =SESSION, их items и огибающие), едет на delta
+-- целиком — без разрезов, трек LIB (сэмплы с 0) не трогается; маркеры с именами keep, стоящие ровно в t, — на месте
+-- (сам =END ставит вызывающий). Нужен, когда =END сдвигают вправо: иначе библиотека оказывалась внутри песни
+function A.shift_lib(t, delta, keep)
+  if math.abs(delta) < 1e-9 then return 0 end
+  local moved = 0
+  for _, tr in ipairs(tracks()) do
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+      if pos >= t - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos + delta); moved = moved + 1 end
+    end
+    if R.CountTrackEnvelopes then
+      for ei = 0, R.CountTrackEnvelopes(tr) - 1 do
+        local env = R.GetTrackEnvelope(tr, ei)
+        local n = R.CountEnvelopePoints(env)
+        local a, b, st = delta > 0 and n - 1 or 0, delta > 0 and 0 or n - 1, delta > 0 and -1 or 1
+        for pi = a, b, st do
+          local ok, pt, v, shape, tens, sel = R.GetEnvelopePoint(env, pi)
+          if ok and pt >= t - EPS then R.SetEnvelopePoint(env, pi, pt + delta, v, shape, tens, sel, true) end
+        end
+        if R.CountAutomationItems then
+          for ai = 0, R.CountAutomationItems(env) - 1 do
+            local ap = R.GetSetAutomationItemInfo(env, ai, 'D_POSITION', 0, false)
+            if ap >= t - EPS then R.GetSetAutomationItemInfo(env, ai, 'D_POSITION', ap + delta, true) end
+          end
+        end
+        if R.Envelope_SortPoints then R.Envelope_SortPoints(env) end
+      end
+    end
+  end
+  local list = {}
+  local i = 0
+  while true do
+    local ret, isrgn, pos, rgnend, name, idx, color = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    local kept = keep and not isrgn and keep[name] and math.abs(pos - t) < EPS
+    if pos >= t - EPS and not kept then list[#list + 1] = { i = i, idx = idx, isrgn = isrgn, pos = pos, rgnend = rgnend, name = name, color = color } end
+    i = i + 1
+  end
+  table.sort(list, function(x, y) if delta > 0 then return x.pos > y.pos end return x.pos < y.pos end)
+  move_marks(list, delta)
+  return moved + #list
+end
+
 function A.shift_after(t, delta)
   if math.abs(delta) < 1e-9 then return end
   for _, tr in ipairs(tracks()) do
