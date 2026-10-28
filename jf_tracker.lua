@@ -30756,7 +30756,7 @@ ctx.preview_retrig = function(tr, pitch, xy, rows)
   ctx.preview(tr, pitch, 'midi')
   local x, y = xy >> 4, xy & 15
   local rs = ctx.row_sec()
-  local step = rs * ((y > 0 and y or 4) / 16)
+  local step = math.max(0.03, rs * ((y > 0 and y or 4) / 16))   -- чаще кадра — ноты пачкой; не меньше 30 мс
   local now = reaper.time_precise()
   local delay = (ctx.note_ons and #ctx.note_ons > 0) and 0.15 or 0
   local dur = math.min(2, math.max(step, (rows or 4) * rs))

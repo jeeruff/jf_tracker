@@ -299,8 +299,10 @@ function C.rebuild(head, lpb, prev_semis)
               local j = 1
               local first = true
               while t < stop - 1e-4 and j <= 64 do
-                local pp = R.MIDI_GetPPQPosFromProjTime(take, pos + t)
-                local pnext = R.MIDI_GetPPQPosFromProjTime(take, pos + math.min(stop, t + every))
+                -- 28 окт: целые тики — метка копии (floor(pp + 0.5)) совпадает с тем, что хранит REAPER (дробный тик
+                -- он режет иначе: половина копий теряла метку, становилась нотами и не убиралась — залипание)
+                local pp = math.floor(R.MIDI_GetPPQPosFromProjTime(take, pos + t) + 0.5)
+                local pnext = math.floor(R.MIDI_GetPPQPosFromProjTime(take, pos + math.min(stop, t + every)) + 0.5)
                 if first then   -- исходная — до первого перезапуска
                   lout[#lout + 1] = ('%d:%d:%.3f'):format(math.floor(nt.sp + 0.5), nt.pi, nt.ep)
                   R.MIDI_SetNote(take, nt.k, nt.sel, nt.mu, nt.sp, math.max(nt.sp + 1, pp - 1), nt.ch, nt.pi, nt.ve, true)   -- 28 окт: тик зазора — note-off раньше note-on (legato / mono сэмплера иначе не перезапускал)

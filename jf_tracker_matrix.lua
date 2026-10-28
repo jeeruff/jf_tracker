@@ -589,11 +589,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local queued = MX.queued and MX.queued.idx == rg.idx and math.abs(MX.queued.pos - rg.pos) < 1e-6
     if playing then U.set(U.tint(U.AMBER, 0.22)); gfx.rect(0, y, W, rh, 1) end
     if queued then U.set(U.tint(U.CYAN, 0.30)); gfx.rect(0, y, W, rh, 1) end
-    -- плейхед внутри слота (детальный зум): тонкая линия по времени
-    if playing and rh > L.rh then
-      local fy = y + math.floor((info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0) * rh)
-      U.set(U.AMBER); gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 1, 1)
-    elseif playing then
+    -- 28 окт: горизонтальной линии плейхеда в высоком слоте нет (лишняя: слот и так подсвечен)
+    if playing and rh <= L.rh then
       -- 8 окт: строка в одну высоту — плейхед по горизонтали: полоса прогресса
       -- снизу и риска на месте (по клеткам паттерна, слева направо)
       local frac = (info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0)
