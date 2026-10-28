@@ -10716,7 +10716,7 @@ ctx = {
     swingbar = 'swing amount: drag left / right from the middle',
     velbar = 'velocity of the inserted notes 1..127: drag; { } (qwerty: c C) - step 8',
     mk1 = 'go to marker 1', mk2 = 'go to marker 2', mk3 = 'go to marker 3', mk4 = 'go to marker 4', mk5 = 'go to marker 5', mk6 = 'go to marker 6', mk7 = 'go to marker 7', mk8 = 'go to marker 8', mk9 = 'go to marker 9', mk10 = 'go to marker 10 (0)',
-    holdroll = 'held note key in INSERT: hold - the note lasts as long as you hold (an OFF where you let go); roll - the cursor rolls down while you hold, no OFF (the note rings to the next event). Opt+` switches',
+    holdroll = 'held note key in INSERT: hold - the note lasts as long as you hold (an OFF where you let go); roll - a drum roll: while you hold, the same note on every next row at the speed of the rows, no OFF. Opt+` switches',
     human = 'human: every inserted note a little different - timing, pitch, velocity / volume; click - 0 / 25 / 50 / 100 %',
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
     tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
@@ -18935,7 +18935,7 @@ end
 function ctx.holdroll_toggle()
   state.holdroll = not state.holdroll or nil
   reaper.SetExtState(EXT, 'holdroll', state.holdroll and '1' or '0', true)
-  vim.msg = state.holdroll and 'roll: hold a note key - the cursor rolls down, no OFF (the note rings to the next event)  (Opt+`)'
+  vim.msg = state.holdroll and 'roll: hold a note key - a drum roll: the same note on every next row at the speed of the rows, no OFF  (Opt+`)'
     or 'hold: hold a note key - the note lasts as long as you hold, an OFF where you let go  (Opt+`)'
 end
 function ctx.slx_slice_edit(f, frame, del_edge)
@@ -28682,6 +28682,12 @@ local function frame()
     -- 21 окт: нота уже тянется удержанием, клавиша физически нажата — повтор, даже если окно отпусканий ошиблось
     -- (короткое удержание давало вторую ноту: один повтор проходил как нажатие)
     local st = (ctx.hold_len or (state.holdroll and ctx.roll)) and nk and nk.c == c and reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(nk.t - 0.5)   -- 28 окт: и в roll
+    -- 28 окт (2): roll — новое нажатие той же клавиши (событие KEYDOWN после прошлого) — не повтор (было: курсор прыгал
+    -- к прошлому roll, нота не ставилась)
+    if st and not ctx.hold_len and reaper.JS_VKeys_GetDown then
+      local dn = reaper.JS_VKeys_GetDown(nk.t + 0.001)
+      if dn and dn:byte(vk) ~= 0 then st = nil; ctx.roll = nil end
+    end
     local still = st and st:byte(vk) ~= 0
     -- 21 окт: повтор из очереди, обработанный уже после отпускания (окно отпусканий его видит) — по темпу: та же клавиша
     -- меньше чем через 0.12 с после прошлого её события (повторы macOS идут через 30 мс; руками так не переударить)
@@ -28689,23 +28695,22 @@ local function frame()
     if la and la.c == c and now - la.t < 0.12 then still = true end
     ctx.nk_any = { c = c, t = now }
     if still or (up and up:byte(vk) == 0 and now - nk.t < 3) then
+      local c_held = c
       c = 0
       ctx.key_repeats = (ctx.key_repeats or 0) + 1
       -- 21 окт: держат клавишу ноты в INSERT — длина вставленной MIDI-ноты по времени удержания (тап — до следующего события)
       local lm = edit.last_midi
-      if state.holdroll and vim.mode == 'insert' and lm and now - lm.t_press < 30 and math.abs(lm.t_press - nk.t) < 0.5 then
-        -- 28 окт: roll — нота не обрезается (OFF нет, звучит до следующего события), курсор едет вниз по времени удержания
+      if state.holdroll and vim.mode == 'insert' then
+        -- 28 окт (2): roll — драмролл: пока держишь, та же нота на каждую следующую строку, в темпе строк (время строки
+        -- при воспроизведении); вставка — обычным нажатием (шаг курсора — как всегда), OFF нет
         local rl = ctx.roll
-        if not (rl and rl.t == lm.t_press) then rl = { t = lm.t_press, row = vim.cur.row }; ctx.roll = rl end
-        local rd = edit.row_time(rl.row + 1, state.lpb, 0) - edit.row_time(rl.row, state.lpb, 0)
-        if rd > 0 then
-          local r = rl.row + math.floor((now - lm.t_press) / rd)
-          if r ~= vim.cur.row then vim.cur.row = r; if ctx.scroll_to_cursor then ctx.scroll_to_cursor() end end
-        end
+        if not (rl and rl.c == c_held) then rl = { c = c_held, t = nk.t }; ctx.roll = rl end
+        local rd = edit.row_time(vim.cur.row + 1, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)
+        if rd > 0 and now - rl.t >= rd then rl.t = rl.t + rd; if now - rl.t > rd then rl.t = now end; c = c_held end
       elseif vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(now - lm.t_press) then
         ctx.hold_len = lm; reaper.UpdateArrange()
       end
-    else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) } end
+    else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) }; ctx.roll = nil end
   end
   -- журнал клавиш (4 окт): сырой код → после раскладки и фильтров, режим, фокус;
   -- ExtState jf_tracker/keylog — последние 24 нажатия (диагностика «не работает»)
