@@ -852,6 +852,14 @@ B.map_draw_fn = map_draw
 map_draw_inner = function(U, L, x, y, w, h)
   local G = B.mapG
   local key, files = map_source()
+  -- 28 окт: графы папок — в памяти (до 6): ушёл из папки посреди скана и вернулся — скан продолжается, а не сначала
+  B.map_graphs = B.map_graphs or {}
+  if G and G.root ~= key then
+    B.map_graphs[G.root] = G
+    local n = 0; for _ in pairs(B.map_graphs) do n = n + 1 end
+    if n > 6 then for k in pairs(B.map_graphs) do if k ~= key and k ~= G.root then B.map_graphs[k] = nil; break end end end
+    if B.map_graphs[key] then G = B.map_graphs[key]; B.map_graphs[key] = nil; B.mapG = G end
+  end
   if not G or G.root ~= key then
     if files then G = B.SM.from_files(key, files())   -- 27 окт: files — готовый список (db / proj / pm)
     else

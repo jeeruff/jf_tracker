@@ -1042,7 +1042,7 @@ function SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
     end
   end
   -- 28 окт: перерисовка буфера — по смене вида и раз в 2 с при новых анализах (было: каждый кадр, пока шёл анализ — 20 тыс. песчинок)
-  local now0 = R and R.time_precise and R.time_precise() or os.clock()
+  local now0 = reaper and reaper.time_precise and reaper.time_precise() or os.clock()   -- R здесь — радиус кучки
   if (SM.an_n or 0) ~= (G.sand_an or 0) and now0 - (G.sand_t or 0) > 2 then G.sand_an, G.sand_t = SM.an_n or 0, now0 end
   SM.buffered(G, ('sand|%d|%d|%d|%d|%.4f|%.1f|%.1f|%d|%d'):format(x, y, w, h, sc, cx, cy, G.ver, G.sand_an or 0), x, y, w, h, U, paint)
   -- подписи кучек (крупные первыми, без наложений), наведение — ближайшая песчинка в кучке под мышью
