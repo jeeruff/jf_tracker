@@ -11661,6 +11661,16 @@ function D.frame(L, snap, rows, state, info)
       if f.inner and f.inner.lane and not f.wrap then D.lane_close(L, f, bx, boxy, bh0) end
       if f.cend then bx = D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover) end
     end
+    -- 28 окт: конец цепочки — «+» (щелчок — поиск эффекта fzf, в конец цепи); при перетаскивании там щель
+    if not drag and #fxs > 0 then
+      local pw = math.max(3 * L.cw, ms('+') + 4 * L.pad)
+      local hot = mx >= bx and mx < bx + pw and my >= boxy and my < boxy + bh0
+      if hot then set(U.tint(U.AMBER, 0.15)); gfx.rect(bx, boxy, pw, bh0, 1) end
+      text(bx + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', hot and U.AMBER or U.tint(U.AMBER, 0.7))
+      if hot then hover.dspbtn = { fx = #fxs, what = 'chainadd' } end
+      hint('dspbtn', bx, boxy, pw, bh0, { fx = #fxs, what = 'chainadd' })
+      bx = bx + pw + L.pad
+    end
     -- окно цепочки — на экран; всё, что левее / правее, осталось в буфере
     D.dsp_total = wrap > 1 and 0 or (bx + px - cx0)   -- рядами — без прокрутки
     boxy, bh0 = boxy0, bh00
