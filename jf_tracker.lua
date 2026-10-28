@@ -15938,6 +15938,15 @@ ctx.tt_api = {
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
   modefonts = function() return ctx.MODEFONTS end,
   -- 22 окт: zf — модуль DSP сложен в полосу (имя вертикально + x B), zF — все модули (есть развёрнутые — сложить все, иначе развернуть)
+  dsp_par = function(k, v)   -- 28 окт: c= / c| — выбранный модуль параллельно предыдущему / последовательно
+    local col = dsp_target(); local f = col and (col.fx or {})[k]
+    if not f then vim.msg = 'no module'; return end
+    if v == nil then
+      local _, pv = reaper.TrackFX_GetNamedConfigParm(col.track, f.i, 'parallel'); v = (tonumber(pv) or 0) > 0 and 0 or 1
+    end
+    edit.fx_parallel(col.track, f.i, v)
+    vim.msg = f.name .. (v > 0 and ': parallel to the previous (=)  c| - serial' or ': serial (|)  c= - parallel')
+  end,
   dsp_cfold = function(k)   -- 28 окт: cf — сложить / развернуть контейнер под курсором (или тот, в котором модуль)
     local col = dsp_target(); local fxs = col and col.fx or {}
     local f = fxs[k]
@@ -18367,8 +18376,8 @@ function ctx.context_items(hover)
     if kd then
       add((kd.enabled and 'Bypass ' or 'Enable ') .. kd.name, function() edit.fx_bypass(col.track, kd.i) end, 'b')
       add('Open ' .. kd.name .. ' window', function() edit.fx_show(col.track, kd.i) end, 'o')
-      if kd.parallel > 0 then add('Serial: after the previous plugin', function() edit.fx_parallel(col.track, kd.i, 0) end, 's')
-      else add('Parallel to the previous plugin', function() edit.fx_parallel(col.track, kd.i, 1) end, 'p') end
+      if kd.parallel > 0 then add('Serial: after the previous plugin (c|)', function() edit.fx_parallel(col.track, kd.i, 0) end, 's')
+      else add('Parallel to the previous plugin (c=)', function() edit.fx_parallel(col.track, kd.i, 1) end, 'p') end
       add('Move out of the container', function() edit.fx_move_out(col.track, kd.i, f.i); vim.msg = kd.name .. ' moved out of ' .. f.name end, 'm')
       add('Rename ' .. kd.name .. ' … (:fxname)', function() state.fxname_target = { track = col.track, addr = kd.i }; vim.open_prompt('fxname ', '') end, 'n')
       add('Remove ' .. kd.name, function() edit.fx_remove(col.track, kd.i) end, 'x')
@@ -18387,13 +18396,21 @@ function ctx.context_items(hover)
       add('All plugins serial', function() for _, c in ipairs(f.kids or {}) do edit.fx_parallel(col.track, c.i, 0) end end, 's')
       add('All plugins parallel', function() for ki, c in ipairs(f.kids or {}) do if ki > 1 then edit.fx_parallel(col.track, c.i, 1) end end end, 'l')
       add('Rename container … (:fxname)', function() state.fxname_target = { track = col.track, addr = f.i }; vim.open_prompt('fxname ', '') end, 'n')
+      add('Fold the container with everything inside (cf)', function() ctx.dsp_cfold(k) end, 'f')
       add('--', function() end)
     end
     if col and f and not f.container and hover.dsp and not hover.dsp.param then   -- 23 окт: в полосы (было кнопкой ÷ — непонятно)
       add('Split into bands ... (3 / 4 / 5 band splitter, cb)', function() ctx.dsp_bands(hover.dsp.fx) end, nil)
     end
     if col and f then
-      add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name, function() edit.fx_bypass(col.track, f.i) end)
+      add((f.enabled and 'Bypass' or 'Enable') .. ' ' .. f.name .. ' (b)', function() edit.fx_bypass(col.track, f.i) end)
+      do   -- 28 окт: | / = — и для модуля верхнего уровня / в рэке (клавиши c| c=)
+        local okp, pv = reaper.TrackFX_GetNamedConfigParm(col.track, f.i, 'parallel')
+        local isp = okp and (tonumber(pv) or 0) > 0
+        local hover_k = hover.dsp and hover.dsp.fx
+        add(isp and 'Serial: after the previous (c|)' or 'Parallel to the previous (c=)', function() ctx.dsp_par(hover_k, isp and 0 or 1) end)
+        add('Fold into a header (zf)', function() ctx.dsp_mfold(hover_k) end)
+      end
       -- 24 окт: p — в контейнер (выбранные модули рядом, иначе этот), O — окно (как кнопка O в заголовке)
       local pk = DK.picked(dsp_sel)
       local pn = pk and #pk or 1
@@ -27278,7 +27295,7 @@ local function frame()
         local cp = ctx.mods().alt and 'copy ' or 'move '
         state.status = (kd0 and (cp .. dsp_drag.f.name .. ' into ' .. (kd0.band and 'the band ' or (kd0.chain and '' or 'pad ')) .. ((kd0.chain and kd0.chain.name) or (kd0.kid and kd0.kid.name) or '')
             .. (kd0.band and '' or (kd0.chain and ' (its end)' or (kd0.par and ': = a parallel chain' or ': | serial, after its sampler and fx'))) .. '  (Opt - copy)'))
-          or hover.dsp_gin and ('move ' .. dsp_drag.f.name .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1))
+          or hover.dsp_gin and ('move ' .. dsp_drag.f.name .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1) .. ((hover.dsp_gin.par or 0) > 0 and ', parallel (=, lower half)' or ', serial (|, upper half)'))
           or hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (bottom half)' or 'serial (top half)'))
           or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)'))
           or (tc and ('move ' .. dsp_drag.f.name .. ' → ' .. (tc.name or 'track') .. ' (instrument - first slot, effect - end of the chain)'))
@@ -27323,8 +27340,8 @@ local function frame()
       local gin = dd.active and not tc and hover.dsp_gin
       local gcol = gin and dsp_target()
       if gcol and gin.c and gin.c.i and gin.c ~= dd.f then
-        if edit.fx_into_at(gcol.track, gin.c.i, gin.pos, nil, 0, dd.f.i) then
-          vim.msg = dd.f.name .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1)
+        if edit.fx_into_at(gcol.track, gin.c.i, gin.pos, nil, gin.par or 0, dd.f.i) then
+          vim.msg = dd.f.name .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1) .. ((gin.par or 0) > 0 and ', parallel (=)' or '')
         else vim.msg = 'could not move ' .. dd.f.name .. ' there' end
         g = nil; hover.dsp_into = nil
       end
@@ -27345,9 +27362,19 @@ local function frame()
         local col = dsp_target()
         local dst = (g < s - 1) and tlist[g + 1] or tlist[g]
         if col and dst then
+          local mg = reaper.TrackFX_GetFXGUID(col.track, dd.f.i)
           edit.fx_move(col.track, dd.f.i, dst.i)
           for i, e in ipairs(col.fx or {}) do if e == dst then dsp_sel.fx = i end end
-          vim.msg = 'fx moved: ' .. dd.f.name
+          -- 28 окт: | / = щели — последовательно / параллельно предыдущему (по GUID: номер после переноса)
+          local want = hover.dsp_gpar or 0
+          for i = 0, reaper.TrackFX_GetCount(col.track) - 1 do
+            if mg and reaper.TrackFX_GetFXGUID(col.track, i) == mg then
+              local _, cur = reaper.TrackFX_GetNamedConfigParm(col.track, i, 'parallel')
+              if (tonumber(cur) or 0) ~= want and i > 0 then edit.fx_parallel(col.track, i, want) end
+              break
+            end
+          end
+          vim.msg = 'fx moved: ' .. dd.f.name .. (want > 0 and ', parallel (=)' or '')
         end
       end
       dsp_drag = nil
@@ -27388,12 +27415,12 @@ local function frame()
       if fxb_drag.active then
         state.status = (hover.dbpar and ('drop ' .. FB.short(fxb_drag.it.label) .. ' parallel to ' .. (hover.dbpar.name or '')))
           or (hover.dbplus and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbplus.first and ' at the start of the chain' or (' after ' .. (hover.dbplus.after and hover.dbplus.after.name or '')))))
-          or hover.dsp_gin and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1))
+          or hover.dsp_gin and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1) .. ((hover.dsp_gin.par or 0) > 0 and ', parallel (=, lower half)' or ', serial (|, upper half)'))
           or hover.dsp_into and ('insert ' .. FB.short(fxb_drag.it.label) .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (bottom half)' or 'serial (top half)'))
           or (hover.kitdrop and hover.kitdrop.chain and ('drop ' .. FB.short(fxb_drag.it.label) .. ' at the end of ' .. (hover.kitdrop.chain.name or 'the chain')))
           or (hover.kitdrop and ('drop ' .. FB.short(fxb_drag.it.label) .. ' into ' .. (hover.kitdrop.band and 'the band ' or 'pad ') .. (hover.kitdrop.kid and hover.kitdrop.kid.name or '')
             .. (hover.kitdrop.band and '' or (hover.kitdrop.par and ': = a parallel chain (right half)' or ': | serial, after its sampler and fx (left half)'))))
-          or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1))
+          or (hover.dsp_gap and ('insert ' .. FB.short(fxb_drag.it.label) .. ' at slot ' .. (hover.dsp_gap + 1) .. (hover.dsp_gpar == 1 and ', parallel to the previous (=, lower half)' or ', serial (|, upper half)'))
           or (hover.dbig and ('drop ' .. FB.short(fxb_drag.it.label) .. (hover.dbnode and (' after the row of ' .. hover.dbnode.name .. ' (Shift - parallel to it)') or ' at the end of the chain')))
           or ('drag ' .. FB.short(fxb_drag.it.label) .. ' onto the DSP panel'))
       end
@@ -27442,9 +27469,9 @@ local function frame()
       end
       if drop.active and not rt and hover.dsp_gin and hover.dsp_gin.c then   -- 24 окт: между модулями рэка — в его контейнер на это место
         local t = dsp_target(); local gin = hover.dsp_gin
-        if t and edit.fx_into_at(t.track, gin.c.i, gin.pos, drop.it.data, 0) then
+        if t and edit.fx_into_at(t.track, gin.c.i, gin.pos, drop.it.data, gin.par or 0) then
           FB.push_recent(drop.it); ctx.fxb_save()
-          vim.msg = '+ ' .. FB.short(drop.it.label) .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1)
+          vim.msg = '+ ' .. FB.short(drop.it.label) .. ' -> ' .. (gin.c.name or 'container') .. ' at ' .. (gin.pos + 1) .. ((gin.par or 0) > 0 and ', parallel (=)' or '')
         else vim.msg = 'could not add into the container there' end
         hover.dsp_into, hover.dsp_gap = nil, nil
         rt = true
@@ -27456,7 +27483,11 @@ local function frame()
           FB.push_recent(drop.it); ctx.fxb_save()
           vim.msg = '+ ' .. FB.short(drop.it.label) .. ' → container ' .. cf.name .. (hover.dsp_into_par == 1 and ', parallel' or '')
         else vim.msg = 'could not add into the container' end
-      elseif drop.active and not rt and hover.dsp_gap then ctx.fxb_add(drop.it, hover.dsp_gap)
+      elseif drop.active and not rt and hover.dsp_gap then
+        local gp = hover.dsp_gpar
+        ctx.fxb_add(drop.it, hover.dsp_gap)
+        local t = gp == 1 and dsp_target()   -- 28 окт: низ щели (=) — параллельно предыдущему
+        if t and hover.dsp_gap > 0 then edit.fx_parallel(t.track, hover.dsp_gap, 1); vim.msg = (vim.msg or '') .. ', parallel (=)' end
       elseif drop.active and not rt and hover.dbig then
         -- роутер (7 окт): на узел — после его ряда (Shift — параллельно узлу), мимо узлов — в конец
         local t = dsp_target()

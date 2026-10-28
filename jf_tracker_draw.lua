@@ -11685,6 +11685,20 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
+    -- 28 окт: щель броска — небольшой проём во всю высоту, две секции: верх | — последовательно, низ = — параллельно
+    -- предыдущему (половина под мышью — по высоте модуля); → 0 / 1
+    local function drop_slot(gx, y0, h0)
+      local sw2 = math.max(ms('=') + 2 * L.pad, 3 * L.pad)
+      local x0 = gx - math.floor(sw2 / 2)
+      local hh = math.floor(h0 / 2)
+      local low = my >= y0 + hh
+      set(U.BG); gfx.rect(x0, y0, sw2, h0, 1)
+      set(U.tint(U.CYAN, 0.3)); gfx.rect(x0, low and y0 + hh or y0, sw2, low and h0 - hh or hh, 1)
+      set(U.CYAN); gfx.rect(x0, y0, sw2, h0, 0); gfx.rect(x0, y0 + hh, sw2, 1, 1)
+      text(x0 + math.floor((sw2 - ms('|')) / 2), y0 + math.floor((hh - L.rh) / 2), '|', low and U.GREY or U.CYAN)
+      text(x0 + math.floor((sw2 - ms('=')) / 2), y0 + hh + math.floor((h0 - hh - L.rh) / 2), '=', low and U.CYAN or U.GREY)
+      return low and 1 or 0
+    end
     -- 24 окт: над модулем внутри рэка — место в его контейнере: левая половина — перед ним, правая — после
     if drag and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
       for _, b in ipairs(blocks) do
@@ -11692,8 +11706,8 @@ function D.frame(L, snap, rows, state, info)
         if inn and inn.wrap and inn.parent and b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then
           local before = mx < b.x + b.w / 2
           local gx = before and (b.x - math.floor(L.pad / 2) - 1) or (b.x + b.w + math.floor(L.pad / 2))
-          set(U.AMBER); gfx.rect(gx - 1, b.y, 3, b.h, 1); gfx.rect(gx - 4, b.y, 9, 2, 1); gfx.rect(gx - 4, b.y + b.h - 2, 9, 2, 1)
-          hover.dsp_gin = { c = inn.parent, pos = before and ((inn.ki or 1) - 1) or (inn.ki or 1), name = fxs[b.k] and fxs[b.k].name }
+          local par = drop_slot(gx, b.y, b.h)
+          hover.dsp_gin = { c = inn.parent, pos = before and ((inn.ki or 1) - 1) or (inn.ki or 1), name = fxs[b.k] and fxs[b.k].name, par = par }
           break
         end
       end
@@ -11707,8 +11721,7 @@ function D.frame(L, snap, rows, state, info)
       for i = 1, gap do if fxs[i] and not fxs[i].inner then tl = tl + 1 end end
       gap = tl
       local gy, gh = dy + 3 + L.rh, DH - L.rh - 6 - (L.hint_h or 0)
-      set(U.AMBER); gfx.rect(gx - 1, gy, 3, gh, 1)
-      gfx.rect(gx - 4, gy, 9, 2, 1); gfx.rect(gx - 4, gy + gh - 2, 9, 2, 1)
+      hover.dsp_gpar = drop_slot(gx, boxy, bh0)   -- 28 окт: | / = — как внутри рэка
       hover.dsp_gap = gap
     end
     if drag and drag.k then
