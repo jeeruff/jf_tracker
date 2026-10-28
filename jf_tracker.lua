@@ -28772,6 +28772,21 @@ local function frame()
   -- масштаб шрифта: Cmd + = / - (5 окт: как привычно на маке); 10 окт: Ctrl + = / -
   -- — шаг ±1 в любом режиме, как в Renoise (Ctrl+цифра — шаг 0..9); LPB — - + без модификаторов
   -- 13 окт: Ctrl+Option + / - — продолжить предыдущую команду колонки со значением ±1 (на следующий шаг)
+  -- 28 окт: Opt + - / = — подколонки нот лейна курсора (как - + над полем), Ctrl+Opt + - / = — колонки эффектов трека
+  -- (на поле команды Ctrl+Opt остаётся «продолжить команду ±1»); в INSERT с клавиатурой на поле ноты Opt+нота — аккорд
+  if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211 or c == 177 or c == 8212) and ctx.mods().alt and not ctx.mods().cmd
+     and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    local d = (c == 45 or c == 95 or c == 31 or c == 8211 or c == 8212) and -1 or 1
+    local f = L.flat and L.flat[vim.cur.fi]
+    local fld = vim.cur.field or 1
+    if ctx.mods().ctrl then
+      if f and f.col and fld < 4 then ctx.fx_cols_step(f.col, d); model.invalidate(); c = 0 end
+    elseif f and f.col and f.lane and not (vim.mode == 'insert' and vim.piano and fld == 1) then
+      local ln = f.lane
+      local n = math.max(1, #(ln.subs or {}), (state.subs_min or {})[f.col.guid .. ':' .. tostring(ln.idx)] or 0)
+      ctx.lane_subs(f.col, ln, d, n); ctx.relayout(); c = 0
+    end
+  end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31 or c == 8800 or c == 8211) and ctx.mods().ctrl and ctx.mods().alt and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     vim.fx_continue((c == 45 or c == 95 or c == 31 or c == 8211) and -1 or 1); model.invalidate(); c = 0
   end

@@ -2862,6 +2862,8 @@ function V.key_impl(c)
         V.tlist = (V.tlist or '') .. string.char(c); V.pending = 't'; V.msg = 't' .. V.tlist .. '  (a - arm, s - solo, m - mute these tracks)'; return
       end
       local tl = V.tlist; V.tlist = nil
+      -- 28 окт: счётчик перед t — тоже номера треков: 135tm = t135m (mute 1 3 5), 24ts, 12ta
+      if not tl and V.count and (c == ('a'):byte() or c == ('s'):byte() or c == ('m'):byte()) then tl = tostring(math.floor(V.count)) end
       if tl and (c == ('a'):byte() or c == ('s'):byte() or c == ('m'):byte()) then
         local nums = {}
         for d in tl:gmatch('%d') do nums[#nums + 1] = d == '0' and 10 or tonumber(d) end
