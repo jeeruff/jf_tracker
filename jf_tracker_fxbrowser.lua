@@ -65,6 +65,28 @@ end
 function FB.cat(it) return FB.tags.cat[FB.fxkey(it)] or '?' end
 function FB.is_fav(it) return FB.natfav[FB.fxkey(it)] or FB.ownfav[it.label] or false end
 function FB.set_tags(cat, dev, natfav) FB.tags = { cat = cat or {}, dev = dev or {} }; FB.natfav = natfav or {}; FB.gen = FB.gen + 1 end
+-- 28 окт: исключить из поиска — плагин ('p:' .. label) или папку дерева ('n:' .. k .. '=' .. v: разработчик, категория,
+-- тип); исключённое не попадает в результаты набора (/), в своей папке видно (тусклым, с x)
+FB.excl = {}
+function FB.node_key(nd) return 'n:' .. tostring(nd.k) .. '=' .. tostring(nd.v) end
+function FB.excluded(it)
+  if FB.excl['p:' .. (it.label or '')] then return true end
+  for key in pairs(FB.excl) do
+    local k, v = key:match('^n:([^=]+)=(.*)$')
+    if k and FB.node_ok_k(it, { k = k, v = v ~= 'nil' and v or nil }) then return true end
+  end
+  return false
+end
+-- → 'plugin' / 'folder' / nil, имя
+function FB.toggle_excl(it, nd)
+  local key, what, nm
+  if nd and nd.k ~= 'all' and nd.k ~= 'fav' and nd.k ~= 'rec' then key, what, nm = FB.node_key(nd), 'folder', tostring(nd.v or nd.k)
+  elseif it then key, what, nm = 'p:' .. it.label, 'plugin', FB.short and FB.short(it.label) or it.label end
+  if not key then return nil end
+  FB.excl[key] = (not FB.excl[key]) or nil
+  FB.gen = FB.gen + 1
+  return what, nm, FB.excl[key] == true
+end
 function FB.toggle_fav(it)
   if not it then return end
   if FB.ownfav[it.label] then FB.ownfav[it.label] = nil else FB.ownfav[it.label] = true end
@@ -139,6 +161,7 @@ local function node_ok(it, nd, rec_i)
   elseif k == 'dev' then return FB.dev(it) == nd.v end
   return true
 end
+function FB.node_ok_k(it, nd) return node_ok(it, nd, {}) end
 FB.node_ok = node_ok
 
 local function score(hay, term)
@@ -202,6 +225,7 @@ function FB.results()
   for _, it in ipairs(src) do
     if tree then if not node_ok(it, FB.node, rec_i) then goto skip end
     elseif (folder == 'fav' and not FB.is_fav(it)) or (folder == 'rec' and not rec_i[it.label]) then goto skip end
+    if #terms > 0 and next(FB.excl) and FB.excluded(it) then goto skip end   -- 28 окт: исключённое — не в поиске
     do
     local hay, lab, name = hay_of(it)
     local total, ok = 0, true
@@ -276,6 +300,12 @@ function FB.key(c, mods)
     if (ch == 'h' or c == 1818584692) and FB.tree_on then FB.col = 1; return true end
     if (ch == 'l' or c == 1919379572) and FB.tree_on then FB.col = 2; return true end
     if ch == '*' then FB.toggle_fav(FB.selected()); return true end
+    if ch == 'x' then   -- 28 окт: исключить из поиска (в дереве — папку, в списке — плагин); ещё раз — вернуть
+      local nd = tree and rows[FB.tree_cur] and rows[FB.tree_cur].node or nil
+      local what, nm, on = FB.toggle_excl(not tree and FB.selected() or nil, nd)
+      FB.last_excl = what and (('%s %s %s search (x again - back)'):format(what, nm, on and 'excluded from' or 'back in')) or 'x: pick a plugin or a folder (developer, category, type)'
+      return 'excl'
+    end
     -- 22 окт: a — к треку курсора, A (Shift = выбранные) — к выбранным трекам, n — на новый трек
     if ch == 'a' then return 'add' elseif ch == 'A' then return 'addsel' elseif ch == 'n' then return 'addnew' end
     if c == 13 then
@@ -335,7 +365,8 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
         if sel then U.list_cursor(x + 1, ry, tw - 3, L.rh, true) elseif on then U.set(U.tint(U.CYAN, 0.18)); gfx.rect(x + 1, ry, tw - 3, L.rh, 1) end
         local cnt = tostring(r.n or 0)
         local ix = x + L.pad + (r.depth or 1) * L.cw
-        U.text(ix, ry + 1, fit(r.label, x + tw - 2 * L.pad - U.measure(cnt) - ix), on and U.CYAN or U.TEXT)
+        local ex = r.node and FB.excl[FB.node_key(r.node)]
+        U.text(ix, ry + 1, fit((ex and 'x ' or '') .. r.label, x + tw - 2 * L.pad - U.measure(cnt) - ix), ex and U.DIM or (on and U.CYAN or U.TEXT))
         U.text(x + tw - L.pad - U.measure(cnt), ry + 1, cnt, U.DIM)
         if mx >= x and mx < x + tw and my >= ry and my < ry + L.rh then hover = { tree = idx } end
         if FB.hint then FB.hint('fxbtree', x + 1, ry, tw - 3, L.rh, idx) end
@@ -418,8 +449,10 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     local curc = sel and U.list_cursor(x + 1, ry, w - 3, L.rh, focused and (FB.col == 2 or not FB.tree_on))   -- 10 окт: курсор как в lib
     local name, kind = FB.short(r.it.label)
     if FB.is_fav(r.it) then name = '* ' .. name end          -- избранное видно в любой папке
+    local exl = FB.excl['p:' .. r.it.label]
+    if exl then name = 'x ' .. name end                       -- 28 окт: исключён из поиска
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
-    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or U.TEXT)
+    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.DIM or U.TEXT))
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
     if FB.hint then FB.hint('fxbrow', x + 1, ry, w - 3, L.rh, idx) end

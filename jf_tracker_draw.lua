@@ -3359,8 +3359,11 @@ function D.route_section(L, info, col, x, y, w, h, hover)
       end
     end
   end
-  local wx, wy = x + L.pad, y + L.rh + 4
-  local ww, wh = w - 2 * L.pad, y + h - 3 - wy
+  D.route_draw(L, nodes, col, x + L.pad, y + L.rh + 4, w - 2 * L.pad, y + h - 3 - (y + L.rh + 4), hover)
+end
+-- 28 окт: схема в окошке (шапка трека и вкладка route контейнера): nodes — узлы route_nodes (все / только внутри)
+function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
   if wh < L.rh + 4 then return end
   set(U.BG); gfx.rect(wx, wy, ww, wh, 1)
   set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
@@ -5632,28 +5635,12 @@ function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.inner and (f.inner.lane or f.inner.bi) and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
   return bx
 end
--- конец рэка: ] за последним модулем; при перетаскивании перед ней — поле броска в конец контейнера:
--- верх | — последовательно, низ = — параллельно (щелчок «+» — кнопка + в шапке контейнера)
+-- конец рэка: ] за последним модулем (добавить внутрь — кнопка + в шапке контейнера, бросок — щель у модуля)
 function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
-  local pw = math.max(L.cw * 3, ms('=') + 4 * L.pad)
   for _, c in ipairs(f.cend) do
     local st = D.cst[c]
     local x = bx - L.pad + brg(L)
-    if drag and st then
-      local lit = mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
-      local hh = math.floor(bh0 / 2)
-      local low = lit and my >= boxy + hh
-      set(U.BG); gfx.rect(x, boxy, pw, bh0, 1)
-      if lit then set(U.tint(U.CYAN, 0.25)); gfx.rect(x, low and boxy + hh or boxy, pw, low and bh0 - hh or hh, 1) end
-      set(lit and U.CYAN or U.DIM)
-      for dy = 0, bh0 - 1, 6 do gfx.rect(x, boxy + dy, 1, math.min(3, bh0 - dy), 1); gfx.rect(x + pw - 1, boxy + dy, 1, math.min(3, bh0 - dy), 1) end
-      gfx.rect(x, boxy + hh, pw, 1, 1)
-      text(x + math.floor((pw - ms('|')) / 2), boxy + math.floor((hh - L.rh) / 2), '|', (lit and not low) and U.CYAN or U.GREY)
-      text(x + math.floor((pw - ms('=')) / 2), boxy + hh + math.floor((bh0 - hh - L.rh) / 2), '=', low and U.CYAN or U.GREY)
-      D.rack_plus = D.rack_plus or {}
-      D.rack_plus[#D.rack_plus + 1] = { x = x, y = boxy, w = pw, h = bh0, k = st.k }
-      x = x + pw + brg(L)
-    end
+    -- 28 окт (2): поля броска в конце нет — щель «после последнего модуля» делает то же (была двойная плашка)
     if st and st.y == boxy then
       set(br_col(c)); sq_bracket(x, boxy, bh0, true, L)
     end
@@ -5680,10 +5667,24 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   local chains = {}
   for ki, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then chains[#chains + 1] = { ki = ki, kd = kd } end end
   if #chains == 0 or y + L.rh > ymax then return end
-  -- 24 окт: заголовок отдела строкой (подписи горизонтально)
+  -- 28 окт: заголовок — переключатели CHAINS | ROUTE | XY (одно на всю высоту); не chains — вернуть низ строки и вкладку
   set(U.LINE); gfx.rect(x0, y + L.rh - 2, w0, 1, 1)
-  text(x0, y, fit('CHAINS', w0), U.AMBER)   -- 24 окт: без числа («CHAINS 1» путал)
+  D.ctab = D.ctab or {}
+  local tkey = tostring(f.fguid or f.i)
+  local tab = D.ctab[tkey] or 'chains'
+  local tx = x0
+  for _, t in ipairs({ { 'chains', 'CHAINS' }, { 'route', 'ROUTE' }, { 'xy', 'XY' } }) do
+    local tw2 = ms(t[2]) + 2 * L.pad
+    if tx + tw2 > x0 + w0 then break end
+    local on = tab == t[1]
+    local hb = not drag and mx >= tx and mx < tx + tw2 and my >= y and my < y + L.rh - 2
+    if on then set(U.tint(U.AMBER, 0.25)); gfx.rect(tx, y, tw2, L.rh - 2, 1) end
+    text(tx + L.pad, y, t[2], (on or hb) and U.AMBER or U.GREY)
+    if hb then hover.dspbtn = { fx = k, f = f, what = 'ctab', tab = t[1], key = tkey } end
+    tx = tx + tw2 + 2
+  end
   y = y + L.rh + 1
+  if tab ~= 'chains' then return y, tab end
   local x, w = x0, w0
   local function btn(bx0, lbl, what, extra)
     local w2 = ms(lbl) + 2 * L.pad
@@ -5818,7 +5819,23 @@ function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
     local bn = (f.params[qy].pinname or f.params[qy].mlabel or 'y'):sub(1, 6)
     text(px0, py0 + side + 1, fit(('%s %d  %s %d'):format(an, math.floor(nx * 100 + 0.5), bn, math.floor(ny * 100 + 0.5)), side), U.GREY)
   end
-  if not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
+  -- 28 окт: углы 1..4 — снимки всех параметров модуля (пусто — запомнить, полный — вызвать, Shift — перезаписать);
+  -- шайба — по-прежнему два макроса
+  local oncorner
+  local si, sc = D.info and D.info.fx_snaps and D.info.fx_snaps(f)
+  if si and side >= 4 * L.rh then
+    local cbw = math.max(L.btn_w or 0, ms('4') + 6)
+    local corners = { { px0 + 1, py0 + 1 }, { px0 + side - cbw - 1, py0 + 1 }, { px0 + 1, py0 + side - L.rh }, { px0 + side - cbw - 1, py0 + side - L.rh } }
+    for i, c in ipairs(corners) do
+      local on = si.has[i]
+      local hot = not drag and mx >= c[1] and mx < c[1] + cbw and my >= c[2] and my < c[2] + L.rh - 1
+      set(hot and U.tint(U.AMBER, 0.35) or (on and U.tint(U.CYAN, 0.35) or U.PANEL)); gfx.rect(c[1], c[2], cbw, L.rh - 1, 1)
+      set(hot and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(c[1], c[2], cbw, L.rh - 1, 0)
+      text(c[1] + math.floor((cbw - ms(tostring(i))) / 2), c[2], tostring(i), hot and U.AMBER or (on and U.TEXT or U.GREY))
+      if hot then hover.snapc = { col = sc, i = i }; oncorner = true end
+    end
+  end
+  if not oncorner and not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
     hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = qx, qy = qy }
   end
 end
@@ -10157,11 +10174,20 @@ function D.frame(L, snap, rows, state, info)
           end
           -- 24 окт: отдел цепей — правее вкладок макросов / xy, во всю высоту
           if nreal > 0 then
-            local ye = D.cont_chains(L, info, f, bx + L.pad, ky + 1, bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover)
-            -- 28 окт: под цепями — XY контейнера: 4 угла = снимки всех модулей внутри, шайба — морф
-            if ye and info.cont_snaps then
+            local ye, ctab = D.cont_chains(L, info, f, bx + L.pad, ky + 1, bw - 2 * L.pad, by + bh - 3, k, drag, mx, my, hover)
+            -- 28 окт: вкладка XY — 4 угла = снимки всех модулей внутри, шайба — морф; ROUTE — схема того, что внутри
+            if ye and ctab == 'xy' and info.cont_snaps then
               local si, cc = info.cont_snaps(info.pool_col, f)
               D.snap_pad(L, si, cc, bx + L.pad, bw - 2 * L.pad, ye + 2, by + bh - ye - 8, mx, my, hover, hint)
+            elseif ye and ctab == 'route' and info.route_nodes and info.pool_col then
+              local inside = {}
+              for _, n in ipairs(info.route_nodes(info.pool_col)) do
+                local g = fxs[n.k]
+                local p = g and g.inner and g.inner.parent
+                while p and p ~= f do p = p.inner and p.inner.parent end
+                if p == f then inside[#inside + 1] = n end
+              end
+              D.route_draw(L, inside, info.pool_col, bx + L.pad, ye + 2, bw - 2 * L.pad, by + bh - ye - 8, hover)
             end
           end
         elseif f.bands and #f.kids > 0 then

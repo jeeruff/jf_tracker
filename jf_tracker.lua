@@ -2659,6 +2659,8 @@ ctx = {
     table.sort(fav)
     reaper.SetExtState(EXT, 'fxfav', table.concat(fav, '\n'), true)
     reaper.SetExtState(EXT, 'fxrecent', table.concat(FB.recent, '\n'), true)
+    local ex = {}; for k in pairs(FB.excl or {}) do ex[#ex + 1] = k end; table.sort(ex)
+    reaper.SetExtState(EXT, 'fxexcl', table.concat(ex, '\n'), true)   -- 28 окт: исключённые из поиска
   end,
   -- нативные папки и метки: reaper-fxtags.ini ([category] / [developer]) и
   -- Favorites из reaper-fxfolders.ini (пути плагинов → ключ имени файла)
@@ -2698,6 +2700,7 @@ ctx = {
     end
     FB.set_tags(cat, dev, fav)
     for l in (reaper.GetExtState(EXT, 'fxfav') or ''):gmatch('[^\n]+') do FB.ownfav[l] = true end
+    FB.excl = {}; for l in (reaper.GetExtState(EXT, 'fxexcl') or ''):gmatch('[^\n]+') do FB.excl[l] = true end
     FB.recent = {}
     for l in (reaper.GetExtState(EXT, 'fxrecent') or ''):gmatch('[^\n]+') do FB.recent[#FB.recent + 1] = l end
   end,
@@ -22404,6 +22407,19 @@ local function frame()
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
     cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,   -- 28 окт: XY контейнера
+    fx_snaps = function(f)   -- 28 окт: углы XY модуля — снимки его параметров (псевдо-контейнер из одного модуля)
+      local t = dsp_target()
+      if not t or t.take then return nil end   -- take FX — другие адреса (снимки трека не годятся)
+      local col = t.col
+      if not (col and col.track and col.guid and f) then return nil end
+      local key = 'm' .. tostring(f.fguid or f.i)
+      ctx.fxpseudo = ctx.fxpseudo or {}
+      local po = ctx.fxpseudo[key] or {}
+      ctx.fxpseudo[key] = po
+      po.fguid, po.i, po.name, po.kids = key, f.i, f.name, { { i = f.i, name = f.name } }
+      local c = ctx.cont_col(col, po)
+      return ctx.snaps_info(c), c
+    end,
     mixsnaps = ctx.mixsnaps_info(),   -- 22 окт: снапшоты SWS в микшере
     msn_tog = ctx.MSN_TOG, msn_opt = ctx.MSN_OPT,
     macfold = state.dsp_macfold, xyopen = state.dsp_xyopen,   -- 24 окт: вкладка xy   -- 22 окт: колонка MACRO свёрнута (по имени плагина)
@@ -23667,7 +23683,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
@@ -26043,6 +26059,7 @@ local function frame()
         local cur = state.dsp_xyopen[nm]
         if cur == nil then cur = hover.dspbtn.f.wrap and true or false end   -- 24 окт: у контейнера XY раскрыт сразу
         state.dsp_xyopen[nm] = not cur
+      elseif hover.dspbtn.what == 'ctab' then draw.ctab = draw.ctab or {}; draw.ctab[hover.dspbtn.key] = hover.dspbtn.tab   -- 28 окт: CHAINS / ROUTE / XY контейнера
       elseif hover.dspbtn.what == 'chainadd' then dsp_sel.fx = hover.dspbtn.fx; ctx.set_focus('dsp'); ctx.fx_picker()   -- 28 окт: + в конце цепи
       elseif hover.dspbtn.what == 'mfoldin' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 28 окт: f в шапке — сложить
       elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx   -- 22 окт: сложенный модуль — развернуть
@@ -29215,6 +29232,7 @@ local function frame()
         if c == 58 and FB.query == '' then return vim.key(c) end   -- 18 окт: : в пустом поиске — строка команды (тест набрал :pane в поиск и Enter добавил эффект)
         local r = FB.key(c, ctx.mods())
         if r == 'add' then ctx.fxb_add()
+        elseif r == 'excl' then vim.msg = FB.last_excl; ctx.fxb_save()   -- 28 окт: x — исключить из поиска
         elseif r == 'addsel' then ctx.fxb_add_sel()   -- 22 окт
         elseif r == 'addnew' then ctx.fxb_add_new()
         elseif r == 'gt' then ctx.tab_menu()        -- 21 окт: gt / gT — к модулям и вкладкам проектов и из fx list

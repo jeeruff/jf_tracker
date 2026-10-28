@@ -538,6 +538,24 @@ compressor curve, bands, delay taps), Airwindows get their category and descript
 <tr><td><kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd> <kbd>cc</kbd></td><td>delete, copy, paste, pack into a container</td></tr>
 <tr><td><code>:fxa</code> <code>:fxb</code> <code>:morph N</code></td><td>A/B snapshots of a block and a morph between them</td></tr>
 <tr><td><kbd>/</kbd> or the list on the left</td><td>add an effect; drag a block by its title to reorder</td></tr>
+<tr><td>drop between blocks</td><td>a small slot opens: its upper half <code>|</code> serial, the lower half <code>=</code> parallel to the previous block</td></tr>
+<tr><td><kbd>c=</kbd> <kbd>c|</kbd> <kbd>cf</kbd> <kbd>zf</kbd></td><td>parallel / serial to the previous; fold a container with everything inside; fold a block into a header</td></tr>
+</table>
+<h3>Containers</h3>
+<p>A container is marked only by its brackets: <code>[</code> before its header, <code>]</code> after its last block, bright
+when the container is selected. A parallel branch has a short coloured line under its blocks, a frequency band of a
+<code>÷N</code> split its band colour. The header switches between CHAINS (each chain: mix, <code>m</code> off, <code>s</code> only it),
+ROUTE (the map of the blocks inside, as the mini router below) and XY (its four corners are snapshots of every block
+inside, the puck morphs between them). An XY of a single block has the corners too: snapshots of that block.</p>
+<h3>Mini router</h3>
+<p>The third vertical button of the track block, <code>route</code>, under <code>auto</code> and <code>mod</code>, opens the
+chain as a map of small boxes, named by consonants (<code>slx</code>, <code>Cnt</code>). Serial blocks go to the right,
+joined by a line; a parallel block stands under the one it runs with; a container's blocks sit between <code>[</code> and
+<code>]</code>. The selected block is amber.</p>
+<table>
+<tr><td>click a box</td><td>the DSP cursor jumps to that block</td></tr>
+<tr><td>drag a box onto another</td><td>left half - before it, right half - after it, just below it - parallel to it (a cyan line shows where; blocks of the track chain - inside a container move them in DSP)</td></tr>
+<tr><td>slots <code>1 2 3 4</code></td><td>the whole FX chain of the track, to compare versions: an empty slot saves, a full one recalls (<kbd>u</kbd> undoes it), Shift+click saves over, Opt+click clears</td></tr>
 </table>
 
 <h2 id="values">Values by hand</h2>
