@@ -1088,7 +1088,7 @@ end
 -- ── примитивы ─────────────────────────────────────────────────────────────
 -- mono: серый по яркости, кроме ячейки курсора (D.CURCELL)
 local function mono(c)
-  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end   -- курсор, рамка INSERT, R и FX — цветные
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or c == D.ACC_KEEP or (D.KEEP and D.KEEP[c]) then return c end   -- курсор, рамка INSERT, R и FX — цветные
   local t = D.mono_tint
   if t then local l = math.max(c[1], c[2], c[3]); return { l * t[1], l * t[2], l * t[3] } end   -- по наибольшему каналу: уже тонированное не темнеет
   local l = 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3]
@@ -1098,7 +1098,7 @@ D.mono_col = mono
 -- текст в mono: не темнее порога — тусклые подписи (=START, пустые слоты,
 -- подсказки) иначе пропадали на тёмном фоне (3 окт); фон и линии — как есть
 local function mono_text(c)
-  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or (D.KEEP and D.KEEP[c]) then return c end
+  if not D.mono or c == D.CURCELL or c == D.FOCUS_INS or c == D.ACC_KEEP or (D.KEEP and D.KEEP[c]) then return c end
   local t = D.mono_tint
   if t then local l = math.max(0.40, c[1], c[2], c[3]); return { l * t[1], l * t[2], l * t[3] } end
   local l = math.max(0.40, 0.299 * c[1] + 0.587 * c[2] + 0.114 * c[3])
@@ -11570,7 +11570,7 @@ function D.frame(L, snap, rows, state, info)
         if not psel and not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + (spos and spos[pi] and spos[pi][3] or 1) * L.rh then psel = true end
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
-        local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — акцентом курсора (опция cursor accent; в mono янтарь = текст)
+        local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — цветом курсора: в mono тот же, что у курсора нот (D.CURCELL не серится), иначе опция cursor accent
         -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
         local tallh = spos and spos[pi] and spos[pi][3] or 1
         -- 24 окт: параметр под курсором трекера (огибающая / команда ноты) — контрастная рамка
@@ -11583,7 +11583,7 @@ function D.frame(L, snap, rows, state, info)
           local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           local x0 = bxc + L.pad
           local nmh = tallh * L.rh
-          local ncol_c = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT)
+          local ncol_c = pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT)
           -- 23 окт: имя строкой сверху, кнопки — две колонки вдвое уже (по строкам: 1 2 / 3 4 / 5 6)
           text(x0, py, fit(p.name or '', pw), ncol_c)
           local half = math.floor((pw - 2) / 2)
@@ -11635,7 +11635,7 @@ function D.frame(L, snap, rows, state, info)
             D.adsr_line(pts, U.BG, hot_i)
           end
           local lab = (pins and (info.dsp_ins.buf .. '_')) or ((LET[g.role[pi]] or '?') .. ' ' .. (v.s or ''))
-          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.GREY))
+          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.GREY))
           if not drag and mx >= gx and mx < gx + gw and my >= py and my < py + L.rh then
             hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
           end
@@ -11723,7 +11723,7 @@ function D.frame(L, snap, rows, state, info)
         end
         local pnm, pnw = p.name or '', nw - L.pad - ms(p.mk or '')
         if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
-        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CUR_ACC) or U.AMBER) or U.TEXT))
+        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT))
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix

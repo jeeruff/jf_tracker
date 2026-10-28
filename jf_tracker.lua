@@ -27951,9 +27951,8 @@ local function frame()
     gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
   end
   U.end_frame()
-  -- 28 окт: пропущенный кадр (fps 24 / простой) — без gfx.update: картинка та же, а обновление окна — это ещё и
-  -- масштабированная копия на экран (LICE_ScaledBlit ~10 % ядра). Мышь читается в кадрах с отрисовкой (≤ 125 мс)
-  if not (ctx.frame_skip and ctx.throttle and not ctx.bigbuf) then gfx.update() end
+  -- gfx.update — каждый тик: без него клавиши и мышь приходили только с кадром отрисовки (28 окт: трекер залипал)
+  gfx.update()
   local t_4 = reaper.time_precise()
   prof.snap = prof.snap + (t_1 - t_0); prof.layout = prof.layout + (t_2 - t_1)
   prof.draw = prof.draw + (t_3 - t_2); prof.upd = prof.upd + (t_4 - t_3); prof.n = prof.n + 1
@@ -31389,6 +31388,7 @@ ctx.curacc_apply = function()
   local h = state.curacc or 'ff00ff'
   local r, g, b = h:match('^#?(%x%x)(%x%x)(%x%x)$')
   draw.CUR_ACC = r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil
+  draw.ACC_KEEP = draw.CUR_ACC   -- mono: акцент не серится (D.mono_col)
 end
 ctx.curacc_apply()
 ctx.slx_last = ctx.slx_last or {}
