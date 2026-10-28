@@ -127,7 +127,8 @@ function D.init(u, peaks_fn, matrix)
   D.FXTXT = { 0.94, 1.0, 0.90 }                -- светлый текст на зелёном, как FX в REAPER
   D.KEEP = { [D.ARM] = true, [D.ARM_T] = true, [D.FXG] = true, [D.FXG_T] = true, [D.FXTXT] = true,
              [D.MODE_COL.visual] = true, [D.MODE_COL.cmd] = true, [D.REC] = true }   -- 15 окт: цвета режимов и O записи
-  D.CURCELL = U.MONO_CURSOR or U.TEXT
+  D.SL_DIM = U.mix(U.TEXT, U.BG, 0.1)   -- 28 окт: виджеты невыбранных параметров DSP
+  D.CURCELL = D.CUR_ACC or U.MONO_CURSOR or U.TEXT   -- 28 окт: курсор в фокусе — акцентом (опция cursor accent)
   D.OFFKEY = U.readable(U.mix(U.RED, U.TEXT, 0.35), U.BG, 4.0)   -- 21 окт: нота вне лада (с проверкой контраста)
   U.set = function(c, a) D.set(c, a) end           -- матрица / браузер / слайсер — через тот же фильтр
 end
@@ -8888,7 +8889,7 @@ function D.frame(L, snap, rows, state, info)
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
-              D.inv_bg = info.focus == 'tracker' and D.CURCELL or D.CUR_ACC or U.LINE   -- 28 окт: вне фокуса — акцент (опция cursor accent)
+              D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE   -- 28 окт: акцент — у курсора в фокусе (D.CURCELL), вне фокуса — тусклый
               local G, folded, inv_f, fw0, half = f.G or L, c.folded, inv, f.w, D.fx_half
               D.cur_box = function()
                 set(D.inv_bg)
@@ -11570,7 +11571,7 @@ function D.frame(L, snap, rows, state, info)
         if not psel and not drag and mx >= bxc + L.pad and mx < bxc + L.pad + pw and my >= py and my < py + (spos and spos[pi] and spos[pi][3] or 1) * L.rh then psel = true end
         -- строка параметра: имя | виджет | значение — без подложки, белым;
         -- выбранный параметр — янтарное имя и виджет
-        local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — цветом курсора: в mono тот же, что у курсора нот (D.CURCELL не серится), иначе опция cursor accent
+        local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — цветом курсора: в mono тот же, что у курсора нот (D.CURCELL не серится), иначе опция cursor accent
         -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
         local tallh = spos and spos[pi] and spos[pi][3] or 1
         -- 24 окт: параметр под курсором трекера (огибающая / команда ноты) — контрастная рамка
@@ -11583,7 +11584,7 @@ function D.frame(L, snap, rows, state, info)
           local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           local x0 = bxc + L.pad
           local nmh = tallh * L.rh
-          local ncol_c = pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT)
+          local ncol_c = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT)
           -- 23 окт: имя строкой сверху, кнопки — две колонки вдвое уже (по строкам: 1 2 / 3 4 / 5 6)
           text(x0, py, fit(p.name or '', pw), ncol_c)
           local half = math.floor((pw - 2) / 2)
@@ -11635,7 +11636,7 @@ function D.frame(L, snap, rows, state, info)
             D.adsr_line(pts, U.BG, hot_i)
           end
           local lab = (pins and (info.dsp_ins.buf .. '_')) or ((LET[g.role[pi]] or '?') .. ' ' .. (v.s or ''))
-          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.GREY))
+          text(gx + gw - labw + L.pad, py, fit(lab, labw - L.pad), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.GREY))
           if not drag and mx >= gx and mx < gx + gw and my >= py and my < py + L.rh then
             hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (mx - ex0) / math.max(1, ex1 - ex0))), onwidget = mx < ex1 + 4 }
           end
@@ -11653,8 +11654,8 @@ function D.frame(L, snap, rows, state, info)
         if p.kind == 'toggle' then
           local on = v.n >= 0.5
           local sz = L.rh - 6
-          set(on and acc or U.BG); gfx.rect(wx0, py + 3, sz, sz, 1)
-          set(on and acc or U.LINE); gfx.rect(wx0, py + 3, sz, sz, 0)
+          set(on and (acc == U.TEXT and D.SL_DIM or acc) or U.BG); gfx.rect(wx0, py + 3, sz, sz, 1)
+          set(on and (acc == U.TEXT and D.SL_DIM or acc) or U.LINE); gfx.rect(wx0, py + 3, sz, sz, 0)
         elseif p.kind == 'steps' and p.nsteps then
           local cur = (p.stepnorm and D.step_index and D.step_index(p, v.n) or math.floor(v.n * (p.nsteps - 1) + 0.5))
           -- выбором (4 окт): подписи положений в ряд — текущее голубым, под
@@ -11681,7 +11682,7 @@ function D.frame(L, snap, rows, state, info)
               local sx = wx0 + kk * (segw + 1)
               local hot = direct and not drag and mx >= sx and mx < sx + segw + 1 and my >= py and my < py + L.rh
               if hot then step_sv = kk / math.max(1, p.nsteps - 1) end
-              set(hot and U.AMBER or (kk == cur and acc or U.DIM)); gfx.rect(sx, py + 4, segw, L.rh - 8, (kk == cur or hot) and 1 or 0)
+              set(hot and U.AMBER or (kk == cur and (acc == U.TEXT and D.SL_DIM or acc) or U.DIM)); gfx.rect(sx, py + 4, segw, L.rh - 8, (kk == cur or hot) and 1 or 0)
             end
             if direct then step_direct = true end
           end
@@ -11713,17 +11714,17 @@ function D.frame(L, snap, rows, state, info)
             -- 22 окт: ноль посередине (pan, pitch, детюн) — ромбик от центра, как пан в шапке трека
             local ispan = (p.name or ''):lower():match('pan') ~= nil
             local dr = math.max(3, math.floor((L.rh - 6) / 2))   -- 22 окт: ромб на краю не наезжает на значение
-            U.dslider(wx0 + dr, cy, math.max(4, ww - 2 * dr), v.n, true, cc or acc, psel, L.rh, ispan)
+            U.dslider(wx0 + dr, cy, math.max(4, ww - 2 * dr), v.n, true, cc or (acc == U.TEXT and D.SL_DIM or acc), psel, L.rh, ispan)
           else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка
           -- цвет категории (громкость / фильтр / время …) — заливкой слайдера,
           -- не полоской у имени (3 окт: полоска липла к первой букве)
-          set(cc or acc); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)
+          set(cc or (acc == U.TEXT and D.SL_DIM or acc)); gfx.rect(wx0, py + 4, math.max(1, math.floor(v.n * ww + 0.5)), L.rh - 8, 1)   -- 28 окт: невыбранные — на 10 % тусклее (D.SL_DIM)
           end
         end
         local pnm, pnw = p.name or '', nw - L.pad - ms(p.mk or '')
         if D.FP and ms(pnm) > pnw then pnm = D.FP.abbr(pnm, math.max(1, math.floor(pnw / math.max(1, ms('m'))))) end   -- 22 окт: сокращение по словарю, а не обрезка по буквам (highpas → hp)
-        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and (D.mono and D.CURCELL or D.CUR_ACC)) or U.AMBER) or U.TEXT))
+        text(bxc + L.pad, py, fit(pnm, pnw) .. (p.mk or ''), pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT))
         if pins then   -- набор — поверх значения (у ступенчатых — поверх подписей)
           local ix = steps_inline and wx0 or vx
           local iw = bxc + L.pad + pw - ix

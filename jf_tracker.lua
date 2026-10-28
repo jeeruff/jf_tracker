@@ -12971,7 +12971,7 @@ ctx = {
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
-      { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'accent of the cursor: the tracker cursor while another panel has the focus, the selected DSP parameter - hex RGB; grey - the old look', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply() end },
+      { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'colour of the active cursor: the tracker cursor in focus and the selected DSP parameter - hex RGB; grey - the theme colour', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
 -- 18 окт: выключено --       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
       flag('ssbsync', 'session beatsync', 'an audio file dropped on a session cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its slot'),
@@ -31389,6 +31389,7 @@ ctx.curacc_apply = function()
   local r, g, b = h:match('^#?(%x%x)(%x%x)(%x%x)$')
   draw.CUR_ACC = r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil
   draw.ACC_KEEP = draw.CUR_ACC   -- mono: акцент не серится (D.mono_col)
+  draw.CURCELL = draw.CUR_ACC or draw.U_MONO_CURSOR or draw.CURCELL
 end
 ctx.curacc_apply()
 ctx.slx_last = ctx.slx_last or {}

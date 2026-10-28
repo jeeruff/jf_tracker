@@ -454,6 +454,8 @@ function SM.card_shape(hb)
 end
 function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   local cols, rows, top, cw, ch, top0 = SM.neb_layout(G, x, y, w, h, L)
+  -- 28 окт: карты ровно квадратные (сторона — меньшая из ширины / высоты ячейки), ряд — по центру
+  do local sq = math.floor(math.min(cw, ch)); x = x + math.floor((cw - sq) * cols / 2); cw, ch = sq, sq end
   local hv, hd
   local rmax = math.max(2, math.min(7, math.min(cw, ch) * 0.03)) * (0.4 + 1.6 * (V.dim or 0.5))
   local spread = 0.95 - 0.45 * (V.grav or 0.5)
@@ -484,14 +486,8 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     local c = col(hb)
     local bx0, by0, bw, bh = math.floor(qx0 + 4), math.floor(qy0 + 3), math.floor(cw - 8), math.floor(ch - 6)
     local face = U.mix(U.PANEL, U.TEXT, 0.06)
-    U.set(face)
-    gfx.rect(bx0 + 3, by0, bw - 6, bh, 1); gfx.rect(bx0, by0 + 3, bw, bh - 6, 1)
-    gfx.rect(bx0 + 1, by0 + 1, bw - 2, bh - 2, 1)
-    U.set(U.mix(c, U.BG, 0.3))
-    gfx.line(bx0 + 3, by0, bx0 + bw - 4, by0); gfx.line(bx0 + 3, by0 + bh - 1, bx0 + bw - 4, by0 + bh - 1)
-    gfx.line(bx0, by0 + 3, bx0, by0 + bh - 4); gfx.line(bx0 + bw - 1, by0 + 3, bx0 + bw - 1, by0 + bh - 4)
-    gfx.line(bx0, by0 + 3, bx0 + 3, by0); gfx.line(bx0 + bw - 4, by0, bx0 + bw - 1, by0 + 3)
-    gfx.line(bx0, by0 + bh - 4, bx0 + 3, by0 + bh - 1); gfx.line(bx0 + bw - 4, by0 + bh - 1, bx0 + bw - 1, by0 + bh - 4)
+    U.set(face); gfx.rect(bx0, by0, bw, bh, 1)   -- 28 окт: прямые углы (без скруглений — проще и быстрее)
+    U.set(U.mix(c, U.BG, 0.3)); gfx.rect(bx0, by0, bw, bh, 0)
     -- рамка рубашки (двойная тонкая), внутри — фигура
     local m = math.max(5, math.floor(math.min(bw, bh) * 0.08))
     U.set(U.mix(c, face, 0.45)); gfx.rect(bx0 + m, by0 + m + L.rh, bw - 2 * m, bh - 2 * m - 2 * L.rh, 0)
