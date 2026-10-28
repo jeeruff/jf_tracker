@@ -5588,11 +5588,20 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     end
     local hot = not drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
     local lit = drag and mx >= x and mx < x + pw and my >= boxy and my < boxy + bh0
-    set(hot and U.tint(U.AMBER, 0.2) or (lit and U.tint(U.CYAN, 0.25) or rack_col(d))); gfx.rect(x, boxy, pw, bh0, 1)
+    -- 28 окт: поле — тёмное; «+» только под мышью; при броске — две половины: верх | последовательно, низ = параллельно
+    set(hot and U.tint(U.AMBER, 0.2) or U.BG); gfx.rect(x, boxy, pw, bh0, 1)
+    if lit then
+      local hh = math.floor(bh0 / 2)
+      local low = my >= boxy + hh
+      set(U.tint(U.CYAN, 0.25)); gfx.rect(x, low and boxy + hh or boxy, pw, low and bh0 - hh or hh, 1)
+      set(U.CYAN); gfx.rect(x, boxy + hh, pw, 1, 1)
+      text(x + math.floor((pw - ms('|')) / 2), boxy + math.floor((hh - L.rh) / 2), '|', low and U.GREY or U.CYAN)
+      text(x + math.floor((pw - ms('=')) / 2), boxy + hh + math.floor((bh0 - hh - L.rh) / 2), '=', low and U.CYAN or U.GREY)
+    end
     set(lit and U.CYAN or U.tint(fr, 0.8))
     for dy = 0, bh0 - 1, 6 do gfx.rect(x, boxy + dy, 1, math.min(3, bh0 - dy), 1); gfx.rect(x + pw - 1, boxy + dy, 1, math.min(3, bh0 - dy), 1) end
     for dx = 0, pw - 1, 6 do gfx.rect(x + dx, boxy, math.min(3, pw - dx), 1, 1); gfx.rect(x + dx, boxy + bh0 - 1, math.min(3, pw - dx), 1, 1) end
-    text(x + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', (hot or lit) and U.AMBER or U.tint(U.AMBER, 0.7))
+    if hot then text(x + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', U.AMBER) end
     if st then
       D.rack_plus = D.rack_plus or {}
       D.rack_plus[#D.rack_plus + 1] = { x = x, y = boxy, w = pw, h = bh0, k = st.k }
@@ -5612,6 +5621,12 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
       if c.enabled and c.inner and c.inner.lane then set(lane_col(c.inner.lane)) end
       bracket(L, st.x, x + pw - 1, boxy, bh0, d)
       end
+      -- 28 окт: начало и конец контейнера — яркие [ ] в зазорах слева и справа (рамка рэка тусклая — края терялись)
+      local xl, xr = st.x - math.min(3, L.pad - 1), x + pw - 2 + math.min(3, L.pad - 1)
+      local y0, y1 = boxy - 3, boxy + bh0 + 2
+      set((c.enabled and not c.poff) and U.AMBER or U.GREY)
+      gfx.rect(xl, y0, 2, y1 - y0 + 1, 1); gfx.rect(xl, y0, 5, 2, 1); gfx.rect(xl, y1 - 1, 5, 2, 1)
+      gfx.rect(xr, y0, 2, y1 - y0 + 1, 1); gfx.rect(xr - 3, y0, 5, 2, 1); gfx.rect(xr - 3, y1 - 1, 5, 2, 1)
     end
     bx = x + pw + L.pad
   end
@@ -9696,10 +9711,10 @@ function D.frame(L, snap, rows, state, info)
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); D.mod_box(bx, by, bw, bh, true)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       -- 24 окт: выбранный — янтарь в 2 px, остальные — рамка тише (выбранный модуль терялся среди рамок рэка)
-      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or (f.enabled and (is_sel and U.AMBER or U.mix(U.LINE, U.TEXT, 0.35)) or U.DIM))); D.mod_box(bx, by, bw, bh, false)
+      set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or ((f.enabled and not f.poff) and (is_sel and U.AMBER or U.mix(U.LINE, U.TEXT, 0.35)) or U.DIM))); D.mod_box(bx, by, bw, bh, false)
       -- 27 окт: второй пиксель рамки — снаружи (в зазоре между модулями): внутри он ложился под кнопки шапки
       if is_sel and not ins_here then set(U.AMBER); D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false)
-      elseif f.enabled and info.dsp_learn ~= k and not ins_here then D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false) end   -- 2 px и у остальных
+      elseif f.enabled and not f.poff and info.dsp_learn ~= k and not ins_here then D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false) end   -- 2 px и у остальных
       if info.dsp_learn == k or ins_here then D.mod_box(bx - 1, by - 1, bw + 2, bh + 2, false) end     -- learn: двойная голубая рамка
       if vtw > 0 then
         local tx0, ty = bx + bw - vtw, by + L.rh + 2
@@ -9802,10 +9817,10 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: число эффектов — без jf_tracker_macro (ручки макросов — не эффект: «2 fx» при одном Surge)
       local nfx = 0
       if f.container then for _, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nfx = nfx + 1 end end end
-      local full = (f.enabled and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)
+      local full = ((f.enabled and not f.poff) and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
-      text(bx + L.pad, by + 1, nmtxt, f.enabled and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      text(bx + L.pad, by + 1, nmtxt, (f.enabled and not f.poff) and (f.container and U.AMBER or U.TEXT) or U.GREY)
       if info.gr_fx then D.gr_tag(L, bx + L.pad + ms(nmtxt) + L.pad + (iol and (iow + L.pad) or 0), by, info.gr_fx(f)) end   -- 27 окт: подавление этого эффекта
       if iol then
         local ix0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
@@ -11606,7 +11621,7 @@ function D.frame(L, snap, rows, state, info)
       if not drag and not hover.dsp and not hover.dspbtn and not hover.rs5k and mx >= bx and mx < bx + bw and my >= by and my < by + bh then hover.dsp = { fx = k, f = f } end
       if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов
       -- 24 окт: опция offdim — у выключенного (off) модуля параметры приглушены пеленой фона
-      if info.offdim and not f.enabled and bh > L.rh + 2 then set(U.BG, D.OFFDIM or 0.4); gfx.rect(bx + 1, by + L.rh + 1, bw - 2, bh - L.rh - 2, 1); gfx.a = 1 end
+      if info.offdim and not (f.enabled and not f.poff) and bh > L.rh + 2 then set(U.BG, D.OFFDIM or 0.4); gfx.rect(bx + 1, by + L.rh + 1, bw - 2, bh - L.rh - 2, 1); gfx.a = 1 end
       bx = bx + bw + L.pad
       end
       ::next_block::
@@ -11705,13 +11720,14 @@ function D.frame(L, snap, rows, state, info)
     -- двойная голубая рамка вместо черты; края блока — как раньше, до / после
     if drag and my >= dy and my < dy + DH and mx >= fbw then
       for _, b in ipairs(D.rack_plus or {}) do   -- 24 окт: поле «+» в конце рэка — в конец контейнера
-        if b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then hover.dsp_into, hover.dsp_into_par = b.k, 0 end
+        if b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then hover.dsp_into, hover.dsp_into_par = b.k, (my >= b.y + math.floor(b.h / 2)) and 1 or 0 end   -- 28 окт: верх | / низ =
       end
       for _, b in ipairs(blocks) do
         if b.cont and not b.bands and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
           set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
           hover.dsp_into = b.k
-          hover.dsp_into_par = mx >= b.x + b.w / 2 and 1 or 0     -- правая половина — parallel
+          hover.dsp_into_par = my >= b.y + b.h / 2 and 1 or 0     -- 28 окт: нижняя половина — parallel (как у поля «+»)
+          set(U.CYAN); gfx.rect(b.x + 2, math.floor(b.y + b.h / 2), b.w - 4, 1, 1)
         end
       end
     end

@@ -165,7 +165,7 @@ V.CHANGES = {
     'clips in the tracker body (zs, quick option clips) with live track headers; R records audio or MIDI right into the clip slot; dd deletes a clip; the clip under the mouse fills the item tab with draggable start / end and loop marks L, loop crossfade xf (off by default)',
     'notes sound on top of the instrument transpose: C-4 is the instrument as it sounds in the lib (q, slices, inserted notes, previews agreed)',
     'DSP: every plugin inside a container frame has its own B / x',
-    'DSP: a container is a frame with a column per plugin inside (collapses to a list when narrow); drop an fx from the list or a block onto it (left half serial, right half parallel); right click: unpack, add inside, presets, serial / parallel, rename (:fxname), move a plugin out; option dsp track block (off by default); blocks squeeze to fit the panel, a long chain scrolls to the selected block with <N / N> for the hidden ones',
+    'DSP: a container is a frame with a column per plugin inside (collapses to a list when narrow); drop an fx from the list or a block onto it (top half serial, bottom half parallel); right click: unpack, add inside, presets, serial / parallel, rename (:fxname), move a plugin out; option dsp track block (off by default); blocks squeeze to fit the panel, a long chain scrolls to the selected block with <N / N> for the hidden ones',
     'four new logos: tall cyan, thin box, glitch tiles and a marquee; :logo name shows any of them',
     'experimental (dev): pm cards - the browser pm tab as a grid of jf_pm project cards with thumbnails, big view over the whole window',
   } },

@@ -1849,6 +1849,7 @@ local function wrap_kids(tr, e, view, depth)
     if en and (en.name or ''):find('jf_tracker_macro', 1, true) then en = nil end   -- 24 окт: ручки макросов — в шапке контейнера
     if en then
       en.inner = { parent = e, wrap = true, ki = ki, par = kd.parallel or 0, depth = depth }
+      en.poff = (not e.enabled) or e.poff or nil   -- 28 окт: контейнер выключен — и всё внутри не звучит (рисуется off)
       en.cend = nil
       view[#view + 1] = en
       if en.container and en.kids and not en.kit and not en.bands and depth < 4 and M.cont_mode(tr, en) == 'wrap' then wrap_kids(tr, en, view, depth + 1) end

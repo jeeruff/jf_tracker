@@ -620,7 +620,7 @@ KH.PAGES = {
     { k = 'gui  :gui', t = {}, d = 'the gui button in the fx head (or :gui): the native window of the plugin sits right over its DSP block, frameless, and follows it; the block off the screen - the window closes; again - back to the tracker view' },
     { k = 'r', d = 'replace the selected fx: a fzf list right here (the focus stays in DSP), the new one takes its place, on / off kept, the old one removed - one undo' },
     { k = 'rclick', d = 'container: unpack, add fx inside, presets, all serial / parallel, rename (:fxname); on a plugin inside: bypass, window, serial / parallel, move out, remove' },
-    { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame; left half - serial, right half - parallel); the edges of a block - before / after it' },
+    { k = 'drag', d = 'into a container: drop an fx from the list or a block onto the middle of a container (cyan frame; top half - serial, bottom half - parallel; the dark field + at the end of a container - the same, top | / bottom =); the edges of a block - before / after it' },
     { k = 'aa', d = 'automate or show the envelope of the selected parameter: none - it is made; then the tracker cursor goes to its column', t = { 'aa', 'a' } },
     { k = 'ap A', d = 'pick a parameter to automate (fzf; also click trim in the track header, rclick trim: all parameters)', t = { 'ap', 'A' } },
     { k = 'ad', d = 'delete the automation of the selected parameter' },
