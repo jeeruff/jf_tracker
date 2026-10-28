@@ -950,7 +950,22 @@ function D.layout(snap, state, nregions)
           do   -- 27 окт: «+» / «~» перед нотой
             local fo = L.fold_on and lane.has_fold
             local em = L.envmark and li == 1 and si == 1 and c.marks
+            -- 28 окт: уровень ширины прячет команды / задержку — у ноты с ними тоже «~» (иначе 0R8B не видно вовсе)
+            local hm
+            if L.envmark and not narrow then
+              local G0 = G or L
+              local nf, nodel = G0.nfx or L.nfx, G0.narrow or G0.notes_only
+              for row, cell in pairs(lane.subs[si] or {}) do
+                if type(cell) == 'table' and (cell.kind == 'audio' or cell.kind == 'midi') then
+                  local fx = cell.fx
+                  if (nodel and (cell.delay or 0) > 0) or (fx and #fx > nf) then hm = hm or {}; hm[row] = true
+                  elseif fx and nf < L.nfx then for i = nf + 1, #fx do if fx[i] and fx[i] ~= '' then hm = hm or {}; hm[row] = true end end end
+                end
+              end
+            end
+            em = em or hm
             if not narrow and (fo or em) then G = L.foldG(G, fo and em) end
+            ln.hm = ln.hm or {}; ln.hm[si] = hm
           end
           if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
@@ -8857,7 +8872,8 @@ function D.frame(L, snap, rows, state, info)
               -- 27 окт: в строке есть автоматизация трека — «~» в колонке слева от ноты (сложенные ноты «+» важнее)
               -- «+» уже нарисован: «~» рядом (колонка в два знака) или под ним (высокая строка); без «+» — на его месте
               local G2 = f.G or L
-              if f.si == 1 and f.li == 1 and G2.x_fold and c.marks and c.marks[r.row] then
+              local hm = c.lanes[f.li] and c.lanes[f.li].hm and c.lanes[f.li].hm[f.si]
+              if G2.x_fold and ((f.si == 1 and f.li == 1 and c.marks and c.marks[r.row]) or (hm and hm[r.row])) then
                 if not (cell and cell.fold) then text(x + G2.x_fold, ty, '~', D.ENVMARK or U.AMBER)
                 elseif G2.fold_wide then text(x + G2.x_fold + ms('+'), ty, '~', D.ENVMARK or U.AMBER)
                 elseif L.fold2_tall then text(x + G2.x_fold, ty + L.th, '~', D.ENVMARK or U.AMBER) end
