@@ -117,6 +117,7 @@ model.DR = dofile(DIR .. '/jf_tracker_drumrack.lua')
 model.dsp_fold = reaper.GetExtState('jf_tracker', 'dspfold') == '1'   -- 16 окт: zf — страницы модулей свёрнуты
 draw.DR = model.DR
 draw.SX = dofile(DIR .. '/jf_tracker_slxpanel.lua')   -- 25 окт: пульт slixer в DSP, 1 в 1 с окном
+draw.RK = dofile(DIR .. '/jf_tracker_dsprack.lua')   -- 28 окт: геометрия цепочки (мини-роутер), тест test_dsprack
 model.drum_favs = {}
 for _, cat in ipairs(model.DR.CATS) do model.drum_favs[cat] = model.DR.parse_fav(reaper.GetExtState('jf_tracker', 'drumfav_' .. cat), cat) end
 model.fxclass = dofile(DIR .. '/jf_tracker_fxclass.lua')   -- классификатор параметров, автомодуль (3 окт)

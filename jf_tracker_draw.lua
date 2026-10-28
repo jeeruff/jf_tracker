@@ -3139,6 +3139,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   local tint = col.rgb and mode ~= 'off'
   local nbg = tint and U.mix(base, col.rgb, 0.30) or base
   local rbg = tint and U.mix(base, col.rgb, 0.18) or base
+  rbg = U.mix(rbg, { 0, 0, 0 }, 0.10)   -- 28 окт: блок трека в DSP на 10 % темнее
   local fill = tint and rawc or set
   fill(rbg); gfx.rect(x, y, w, h, 1)
   local T0, G0 = U.TEXT, U.GREY
@@ -3343,47 +3344,28 @@ function D.route_section(L, info, col, x, y, w, h, hover)
   text(x + L.pad, y + 2, fit('ROUTE', w - 2 * L.pad), U.AMBER)
   local y0 = y + L.rh + 4
   if #nodes == 0 then text(x + L.pad, y0, fit('no fx', w - 2 * L.pad), U.DIM); return end
-  local nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4)
-  local nh = L.rh
-  local gx = math.max(4, L.pad + 2)          -- зазор между столбцами (черта связи)
-  local bw = math.max(3, L.pad)              -- место под [ ]
-  local cx, row, band_y, band_h = x + L.pad, 0, y0, 1
-  local prev_x
-  local open = {}                            -- открытые контейнеры (глубина)
+  if not D.RK then return end
+  local boxes, links, br = D.RK.route_layout(nodes, { x = x + L.pad, y = y0, w = w - 2 * L.pad, h = y + h - 2 - y0,
+    nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4), nh = L.rh, gx = math.max(4, L.pad + 2), bw = math.max(3, L.pad), rgap = 2 })
+  set(U.GREY)   -- 28 окт: связи ярче
+  for _, l in ipairs(links) do gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
+  for _, b in ipairs(br) do
+    set(U.tint(U.AMBER, 0.6)); gfx.rect(b.x, b.y, 2, b.h, 1)
+    local hx = b.right and (b.x - 2) or b.x
+    gfx.rect(hx, b.y, 4, 1, 1); gfx.rect(hx, b.y + b.h - 1, 4, 1, 1)
+  end
   local sel = D.dsp_selk
-  for _, n in ipairs(nodes) do
-    local newcol = not ((n.par or 0) > 0 and prev_x)
-    if newcol then
-      local need = nw + gx + (n.cont and bw or 0)
-      if prev_x and cx + need > x + w - L.pad then   -- не влезло — полоса ниже
-        band_y = band_y + band_h * (nh + 2) + L.pad; band_h = 1; cx = x + L.pad; prev_x = nil
-      end
-      if prev_x then set(U.DIM); gfx.rect(prev_x + nw, band_y + math.floor(nh / 2), cx - prev_x - nw, 1, 1) end
-      row = 0
-    else row = row + 1; band_h = math.max(band_h, row + 1) end
-    local nx = newcol and cx or prev_x
-    local ny = band_y + row * (nh + 2)
-    if ny + nh > y + h - 2 then break end
-    if newcol and n.cont then   -- [ перед контейнером
-      set(n.en and U.tint(U.AMBER, 0.6) or U.DIM)
-      gfx.rect(nx, ny, 2, nh, 1); gfx.rect(nx, ny, 4, 1, 1); gfx.rect(nx, ny + nh - 1, 4, 1, 1)
-      nx = nx + bw; cx = cx + bw
-    end
-    local hot = mx >= nx and mx < nx + nw and my >= ny and my < ny + nh
+  for bi, b in ipairs(boxes) do
+    local n = b.n
+    local hot = mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h
     local isel = sel == n.k
-    local fillc = n.cont and U.tint(U.AMBER, 0.18) or (n.depth > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
-    set(hot and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(nx, ny, nw, nh, 1)
-    set((hot or isel) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(nx, ny, nw, nh, 0)
-    if (n.par or 0) > 0 and not newcol then set(U.DIM); gfx.rect(nx - 3, ny - 2, 1, nh + 2, 1) end   -- = : связка столбика
+    local fillc = n.cont and U.tint(U.AMBER, 0.18) or ((n.depth or 0) > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
+    set(hot and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
+    set((hot or isel) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
+    if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 2, 1, b.h + 2, 1) end   -- = : связка столбика
     local lb = (n.name or '?'):gsub('^%s+', ''):sub(1, 3)
-    text(nx + math.floor((nw - ms(lb)) / 2), ny, lb, (hot or isel) and U.AMBER or (n.en and U.TEXT or U.GREY))
+    text(b.x + math.floor((b.w - ms(lb)) / 2), b.y, lb, (hot or isel) and U.AMBER or (n.en and U.TEXT or U.GREY))
     if hot then hover.trkmod = { col = col, what = 'rnode', k = n.k, par = n.par, name = n.name } end
-    if newcol then prev_x = nx; cx = nx + nw + gx end
-    for _ = 1, n.ncend or 0 do   -- ] после последнего модуля контейнера
-      local bx2 = (newcol and nx or prev_x) + nw + 1
-      set(U.tint(U.AMBER, 0.6)); gfx.rect(bx2, band_y, 2, nh, 1); gfx.rect(bx2 - 2, band_y, 4, 1, 1); gfx.rect(bx2 - 2, band_y + nh - 1, 4, 1, 1)
-      cx = cx + bw
-    end
   end
 end
 
@@ -5605,7 +5587,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
   if (D.rack_ext or 0) < 3 then return end
-  set((f.enabled and not f.poff) and lane_col(f.inner.lane) or U.DIM)
+  set((f.enabled and not f.poff) and lane_col(f.inner.lane or f.inner.bi) or U.DIM)   -- 28 окт: полоса ÷N — своим цветом
   gfx.rect(st.x, boxy + bh0 + 1, math.max(2, bx - L.pad - st.x), 2, 1)   -- ветка — черта под модулем, без ножек
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
@@ -5614,7 +5596,7 @@ function D.rack_open(L, f, k, bx, boxy, bh0)
     D.cst[f] = { x = bx, y = boxy, k = k }
     bx = bx + 2 + brg(L)
   end
-  if f.inner and f.inner.lane and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
+  if f.inner and (f.inner.lane or f.inner.bi) and not f.wrap then D.lst = { f = f, x = bx, y = boxy } end
   return bx
 end
 -- конец рэка: ] за последним модулем; при перетаскивании перед ней — поле броска в конец контейнера:
@@ -9507,7 +9489,7 @@ function D.frame(L, snap, rows, state, info)
     local bh0 = boxh
     -- 24 окт: есть рэки контейнеров — под модулями полоса 7 px под их скобки, полоса прокрутки — ниже неё
     D.rack_band = 0
-    for _, f in ipairs(fxs) do if f.inner and f.inner.lane then D.rack_band = 4; break end end   -- 28 окт: только черты веток (скобок под модулями нет)
+    for _, f in ipairs(fxs) do if f.inner and (f.inner.lane or f.inner.bi) then D.rack_band = 4; break end end   -- 28 окт: и полосы ÷N   -- 28 окт: только черты веток (скобок под модулями нет)
     bh0 = bh0 - D.rack_band
     local function ncol_of(f)
       -- 19 окт: рэк drumrs5k в низкой панели — параметры пэда расходятся колонками вправо
@@ -9596,7 +9578,7 @@ function D.frame(L, snap, rows, state, info)
     local dest0, mx0 = gfx.dest, mx
     if D.dsp_bufw ~= gfx.w or D.dsp_bufh ~= gfx.h then gfx.setimgdim(700, gfx.w, gfx.h); D.dsp_bufw, D.dsp_bufh = gfx.w, gfx.h end
     gfx.dest = 700
-    D.rack_ext = (not info.dsp_wide) and D.rack_band or 0   -- 24 окт: под блоками — скобки рэков (полоса прокрутки ниже)
+    D.rack_ext = D.rack_band or 0   -- 24 окт: под блоками — черты веток; 28 окт: и в zz (ряды через L.pad — черта в зазоре)
     gfx.blit(dest0, 1, 0, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext, cx0, boxy - 4, cx1 - cx0, bh0 + 6 + D.rack_ext)   -- фон под блоками (24 окт: и 3 px над — рамка рэка)
     if mx < cx0 or mx >= cx1 then mx = -100000 end
     -- 23 окт: DSP развёрнут (zz) и высоко — модули рядами, как строки: слева направо, следующий ряд снова слева
@@ -11658,7 +11640,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + bw + L.pad
       end
       ::next_block::
-      if f.inner and f.inner.lane and not f.wrap then D.lane_close(L, f, bx, boxy, bh0) end
+      if f.inner and (f.inner.lane or f.inner.bi) and not f.wrap then D.lane_close(L, f, bx, boxy, bh0) end
       if f.cend then bx = D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover) end
     end
     -- 28 окт: конец цепочки — «+» (щелчок — поиск эффекта fzf, в конец цепи); при перетаскивании там щель
