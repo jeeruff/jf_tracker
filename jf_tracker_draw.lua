@@ -9569,11 +9569,15 @@ function D.frame(L, snap, rows, state, info)
         set(picked and U.tint(U.CYAN, 0.22) or U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
         set(f.enabled and (is_sel and U.AMBER or U.LINE) or U.DIM); gfx.rect(bx, boxy, fw, bh0, 0)
         local yy, on_btn = boxy + 1, false
-        for _, b in ipairs({ { 'x', 'del' }, { f.enabled and 'on' or 'off', 'bypass', onw } }) do
+        -- 28 окт: сложенный — заголовок: те же кнопки, что в шапке (x, on, ∆ дельта, e окно), столбиком; имя ниже
+        local sdl = info.fx_delta and info.fx_delta(f)
+        local sbt = { { 'x', 'del' }, { f.enabled and 'on' or 'off', 'bypass', onw } }
+        if bh0 > 7 * L.rh then sbt[3] = { '∆', 'delta' }; sbt[4] = { 'e', 'open' } end
+        for _, b in ipairs(sbt) do
           local kb = b[3] or kb
           local kx = bx + math.floor((fw - kb) / 2)
           local hot = not drag and mx >= kx and mx < kx + kb and my >= yy and my < yy + L.rh - 1
-          local lit = b[2] == 'bypass' and not f.enabled
+          local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and sdl)
           local hc = b[2] == 'del' and U.RED or U.AMBER
           set(hot and U.tint(hc, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(kx, yy, kb, L.rh - 1, 1)
           set(hot and hc or (lit and U.AMBER or U.LINE)); gfx.rect(kx, yy, kb, L.rh - 1, 0)
@@ -9704,9 +9708,9 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: B → on / off (понятнее; ширина — по «off», кнопка не прыгает)
       local onw = ms('off') + 2 * L.pad
       local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { f.enabled and 'on' or 'off', 'bypass', bx + bw - kb - onw - 4, onw }, { '∆', 'delta', bx + bw - 2 * kb - onw - 7 }, { 'e', 'open', bx + bw - 3 * kb - onw - 8 },
-                    { '+', 'lastp', bx + bw - 4 * kb - onw - 11 } }
+                    { '+', 'lastp', bx + bw - 4 * kb - onw - 11 }, { 'f', 'mfoldin', bx + bw - 5 * kb - onw - 14 } }   -- 28 окт: f — сложить в заголовок (zf)
       local dlt = info.fx_delta and info.fx_delta(f)
-      local tw = bw - 2 * L.pad - 4 * kb - onw - 12
+      local tw = bw - 2 * L.pad - 5 * kb - onw - 15
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
       if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - kb - onw - 5 end
       -- ReaEQ (7 окт): P — только параметры, G — только график

@@ -17629,6 +17629,7 @@ local function hint_go(t)
     ctx.set_focus('dsp'); dsp_sel.fx = d.fx
     local w = d.what
     if w == 'open' then ctx.dsp_show(d.fx) elseif w == 'bypass' then ctx.dsp_bypass(d.fx) elseif w == 'delta' then ctx.dsp_delta(d.fx)
+    elseif w == 'mfoldin' then ctx.dsp_mfold(d.fx)
     elseif w == 'lastp' then ctx.dsp_lastparam_menu(d.fx) elseif w == 'pprev' then ctx.dsp_preset(d.fx, 'prev') elseif w == 'pnext' then ctx.dsp_preset(d.fx, 'next')
     elseif w == 'preset' then ctx.dsp_preset(d.fx, 'pick') elseif w == 'del' then ctx.dsp_delete(d.fx, d.fx)
     elseif w == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: midi out рэка
@@ -23514,7 +23515,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
-  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
+  elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
@@ -25890,6 +25891,7 @@ local function frame()
         local cur = state.dsp_xyopen[nm]
         if cur == nil then cur = hover.dspbtn.f.wrap and true or false end   -- 24 окт: у контейнера XY раскрыт сразу
         state.dsp_xyopen[nm] = not cur
+      elseif hover.dspbtn.what == 'mfoldin' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 28 окт: f в шапке — сложить
       elseif hover.dspbtn.what == 'mfold' then dsp_sel.fx = hover.dspbtn.fx   -- 22 окт: сложенный модуль — развернуть
         -- 24 окт: внутри рэка — как аккордеон: этот развернуть, соседей сложить (Shift — только развернуть)
         if hover.dspbtn.f.inner and hover.dspbtn.f.inner.wrap and gfx.mouse_cap & 8 == 0 then ctx.dsp_accordion(hover.dspbtn.fx)
@@ -27826,9 +27828,18 @@ local function frame()
   -- 28 окт: Ctrl+- с клавиатуры не доходит до gfx.getchar (Ctrl+= доходит, логика шага верна — проверено инъекцией):
   -- берём физическое нажатие vk 0xBD; если getchar сам прислал Ctrl+- (45 / 31) — запасной путь выключается
   if c > 0 and (c == 45 or c == 31) and not from_q and ctx.mods().ctrl then ctx.kmin_native = true end
-  if c == 0 and not from_q and not ctx.kmin_native and ctx.win_focus and reaper.JS_VKeys_GetDown and ctx.mods().ctrl and not ctx.mods().cmd then
+  -- 28 окт (2): лог показал — getchar молчит; ctx.win_focus не требуем (кадр мог считать фокус иначе), минус — любым
+  -- из кодов (0xBD Windows / 0x2D / 0x1B mac kVK_ANSI_Minus / 0x6D цифровой); в debug — какие клавиши нажаты при Ctrl
+  if c == 0 and not from_q and not ctx.kmin_native and reaper.JS_VKeys_GetDown and ctx.mods().ctrl and not ctx.mods().cmd then
     local dn = reaper.JS_VKeys_GetDown(ctx.frame_t_prev or (ctx.frame_t - 0.05))
-    if dn and dn:byte(0xBD) ~= 0 then c = 45 end
+    if dn then
+      if state.debug then
+        local got = {}
+        for i = 1, #dn do if dn:byte(i) ~= 0 then got[#got + 1] = ('%d'):format(i) end end
+        if #got > 0 then ctx.dlog('ctrl, getchar 0: vk down ' .. table.concat(got, ' ')) end
+      end
+      if dn:byte(0xBD) ~= 0 or dn:byte(0x2D) ~= 0 or dn:byte(0x6D) ~= 0 then c = 45 end
+    end
   end
   -- 27 окт (7): Esc — выход из zz любой панели (кроме трекера: там Esc — INSERT), если Esc не нужен открытому меню / вводу
   if c == 27 and state.panes and state.panes.zoom and state.panes.zoom ~= 'tracker' and not (vim.picker or vim.hydra or vim.prompt or vim.mode == 'cmd' or vim.mode == 'search' or (OPT and OPT.active) or B.filtering)
