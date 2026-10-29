@@ -3421,7 +3421,7 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
     local hx = b.right and (b.x - 2) or b.x
     gfx.rect(hx, b.y, 4, 1, 1); gfx.rect(hx, b.y + b.h - 1, 4, 1, 1)
   end
-  local sel = D.dsp_selk
+  local sel = D.rsel or D.dsp_selk   -- 29 окт: свой курсор роутера (щелчок), DSP — двойным / Enter
   local rd = D.rdrag
   D.rdrop = nil
   for bi, b in ipairs(boxes) do

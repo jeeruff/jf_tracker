@@ -27402,8 +27402,13 @@ local function frame()
       local h = draw.rdrop
       if d.active and h and h.k then ctx.route_drop(d.col, d.k, h.k, h.mode)
       elseif not d.active then
-        dsp_sel.fx = d.k; dsp_sel.param = 1; ctx.set_focus('dsp')
-        vim.msg = 'route: ' .. (d.name or '?') .. ' (drag it: before / after / below = parallel)'
+        -- 29 окт: щелчок — выделить в роутере; двойной (или Enter) — к модулю в DSP
+        local now = reaper.time_precise()
+        local dbl = ctx.rclick_k == d.k and now - (ctx.rclick_t or 0) < 0.35
+        ctx.rclick_k, ctx.rclick_t = d.k, now
+        draw.rsel = d.k; ctx.set_focus('dsp')
+        if dbl then dsp_sel.fx = d.k; dsp_sel.param = 1; vim.msg = 'route: ' .. (d.name or '?') .. ' - in DSP'
+        else vim.msg = 'route: ' .. (d.name or '?') .. ' (double click / Enter - to it in DSP; x lift, dd delete, = + a; drag: before / after / below = parallel)' end
       end
     end
   end
@@ -31850,8 +31855,9 @@ ctx.rt_key = function(c)
   if #boxes == 0 then return false end
   local ch = c < 256 and string.char(c) or ''
   local cur = 1
-  for i, b in ipairs(boxes) do if b.n.k == dsp_sel.fx then cur = i end end
-  local function go(d) cur = math.max(1, math.min(#boxes, cur + d)); dsp_sel.fx = boxes[cur].n.k; dsp_sel.param = 1 end
+  local rk = draw.rsel or dsp_sel.fx
+  for i, b in ipairs(boxes) do if b.n.k == rk then cur = i end end
+  local function go(d) cur = math.max(1, math.min(#boxes, cur + d)); draw.rsel = boxes[cur].n.k end   -- 29 окт: курсор роутера, DSP не прыгает
   local DOWN, UP, LEFT, RIGHT = 1685026670, 30064, 1818584692, 1919379572
   local node = boxes[cur].n
   if ctx.rt_d and ch ~= 'd' then ctx.rt_d = nil end
@@ -31862,6 +31868,7 @@ ctx.rt_key = function(c)
   elseif ch == 'k' or ch == 'h' or c == UP or c == LEFT then go(-1)
   elseif ch == 'x' then
     draw.rlift = node.k; vim.msg = ('route: %s lifted - j k where, p / Enter after, P before, = parallel to it, Esc down'):format(node.name)
+  elseif c == 13 and not draw.rlift then dsp_sel.fx = node.k; dsp_sel.param = 1; vim.msg = 'route: ' .. (node.name or '?') .. ' - in DSP'
   elseif draw.rlift and (ch == 'p' or ch == 'P' or c == 13 or ch == '=') then
     local k = draw.rlift; draw.rlift = nil
     if k ~= node.k then ctx.route_drop(col, k, node.k, (ch == 'P') and 'before' or (ch == '=' and 'par' or 'after')) end
