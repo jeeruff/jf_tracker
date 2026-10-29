@@ -557,8 +557,10 @@ end
 function SM.neb_bound(hb, a)
   return hb.R * (1 + hb.lobe * math.sin(3 * a + hb.ph1) + 0.12 * math.sin(5 * a + hb.ph2) + 0.06 * math.sin(8 * a + hb.ph3))
 end
-function SM.neb_build(G)
-  if G.gal then return end
+function SM.neb_build(G, grav)
+  grav = grav or 0.5
+  if G.gal and math.abs((G.gal_grav or 0.5) - grav) < 0.02 then return end   -- 29 окт: гравитация — пересборка
+  G.gal_grav = grav
   local total = #G.nodes
   local show = math.min(total, SM.NEB_MAX)
   -- доля звёзд у группы: пропорционально, минимум одна; звёзды — первые файлы группы
@@ -589,7 +591,7 @@ function SM.neb_build(G)
       local A, B = hubs[i], hubs[j]
       local dx, dy = B.cx - A.cx, B.cy - A.cy
       local d = math.sqrt(dx * dx + dy * dy) + 1e-6
-      local want = (A.R + B.R) * 0.82
+      local want = (A.R + B.R) * (1.15 - 0.7 * grav)   -- гравитация: облака ближе друг к другу
       if d < want then local push = (want - d) / 2 / d; A.cx, A.cy = A.cx - dx * push, A.cy - dy * push; B.cx, B.cy = B.cx + dx * push, B.cy + dy * push end
     end end
   end
@@ -603,14 +605,21 @@ function SM.neb_build(G)
     for j = 1, hb.m do
       local u, v, wv, t = rnd(j + hb.ph1), rnd(j * 1.37 + hb.ph2), rnd(j * 0.71 + hb.ph3), rnd(j * 2.13 + hb.ph1)
       local ang = u * 6.283
-      local rad = bb(hb, ang) * (v ^ 0.55)                        -- плотнее к ядру
+      local rad = bb(hb, ang) * (v ^ (0.25 + 1.1 * grav))          -- гравитация: плотнее к ядру
       if wv > 0.88 then rad = bb(hb, ang) * (1 + 0.35 * t) end    -- гало: редкие звёзды за контуром
       -- волокна: сдвиг вдоль синусоиды от угла (хаос без сетки)
       local fx = 0.06 * hb.R * math.sin(ang * 7 + hb.ph2 + j * 0.01)
       local fy = 0.06 * hb.R * math.cos(ang * 5 + hb.ph3 + j * 0.013)
       hb.stars[#hb.stars + 1] = { x = hb.cx + rad * math.cos(ang) + fx, y = hb.cy + rad * math.sin(ang) * 0.85 + fy }
     end
-    hb.rect = { hb.cx - hb.R * 1.3, hb.cy - hb.R * 1.1, hb.cx + hb.R * 1.3, hb.cy + hb.R * 1.1 }   -- bbox (мини-карта)
+    -- зона группы — прямоугольник по звёздам ядра (без гало): рамка сектора и мини-карта
+    local bx0, by0, bx1, by1 = math.huge, -math.huge, math.huge, -math.huge
+    for _, st in ipairs(hb.stars) do
+      local dx, dy = st.x - hb.cx, (st.y - hb.cy) / 0.85
+      if math.sqrt(dx * dx + dy * dy) <= bb(hb, math.atan(dy, dx)) * 1.02 then bx0, bx1 = math.min(bx0, st.x), math.max(bx1, st.x); by0, by1 = math.min(by0, st.y), math.max(by1, st.y) end
+    end
+    if bx0 == math.huge then bx0, bx1, by0, by1 = hb.cx - hb.R, hb.cx + hb.R, hb.cy - hb.R, hb.cy + hb.R end
+    hb.rect = { bx0, by0, bx1, by1 }
   end
   -- звезда — файл группы (первые по порядку): по ней наведение и клик
   for _, hb in ipairs(G.hubs) do for j, st in ipairs(hb.stars) do st.n = hb.list[j]; if st.n then st.n.star = st end end end
@@ -627,7 +636,7 @@ function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, i
   local c = col(hb)
   local n = hb.n
   local function pos(nd)
-    local rr = math.sqrt((nd.k - 0.5) / n) * rad
+    local rr = ((nd.k - 0.5) / n) ^ (0.5 + 1.2 * (V.grav or 0.5)) * rad   -- 29 окт: гравитация — плотнее к центру
     local a = nd.k * 2.39996
     return cx + rr * math.cos(a), cy + rr * math.sin(a)
   end
@@ -642,7 +651,7 @@ function SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, i
       if px >= 0 and px < w and py >= 0 and py < h then if r < 1.5 then gfx.rect(px, py, 2, 2, 1) else gfx.circle(px, py, r, 1, 1) end end
     end
   end
-  SM.buffered(G, ('sys|%s|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d'):format(hb.name, x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver), x, y, w, h, U, paint)
+  SM.buffered(G, ('sys|%s|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d|%.2f'):format(hb.name, x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver, V.grav or 0.5), x, y, w, h, U, paint)
   -- подписи файлов: ближе к центру — первыми, без наложений
   local placed = {}
   local function free(ax, ay, aw, ah)
@@ -785,7 +794,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
     for _, hb in ipairs(G.hubs) do if hb.name == V.sys then return SM.draw_system(U, L, G, hb, x, y, w, h, V, playing, fit, col, mx, my, inside) end end
     V.sys = nil
   end
-  SM.neb_build(G)
+  SM.neb_build(G, V.grav)
   local top = y + L.rh + 4
   local gw, gh = w - 8, y + h - top - 4
   local zoom = V.zoom or 1
@@ -811,7 +820,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       end
     end
   end
-  SM.buffered(G, ('neb|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d'):format(x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver), x, y, w, h, U, paint)
+  SM.buffered(G, ('neb|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d|%.2f'):format(x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver, G.gal_grav or 0.5), x, y, w, h, U, paint)
   -- секторы — рамки поверх облака: уголки, подпись в левом верхнем углу; крупные первыми, подписи без наложений
   local hv, hd
   local order = {}
@@ -826,30 +835,18 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
   local function clipy(v) return math.max(top, math.min(y + h - 2, v)) end
   for _, hb in ipairs(order) do
     if hb.R then
-      -- 29 окт: контур сектора — по форме облака (многоугольник), подпись над ядром: имя группы и число файлов
+      -- 29 окт: зона группы — прямоугольник по её звёздам (как на карте), подпись над ядром: имя и число файлов
       local c = col(hb)
-      local NSEG = 40
-      local pts = {}
-      for q = 0, NSEG - 1 do
-        local a = q / NSEG * 6.283
-        local r = SM.neb_bound(hb, a) * 1.08
-        pts[q + 1] = { X(hb.cx + r * math.cos(a)), Y(hb.cy + r * math.sin(a) * 0.85) }
-      end
+      local rc = hb.rect
+      local bx0, by0, bx1, by1 = math.floor(X(rc[1])) - 3, math.floor(Y(rc[2])) - 3, math.floor(X(rc[3])) + 3, math.floor(Y(rc[4])) + 3
       local px0, py0 = math.floor(X(hb.cx)), math.floor(Y(hb.cy))
-      local hot = false
-      if inside then
-        local dx, dy = (mx - X(hb.cx)) / sx, (my - Y(hb.cy)) / sy / 0.85
-        local a = math.atan(dy, dx)
-        hot = math.sqrt(dx * dx + dy * dy) <= SM.neb_bound(hb, a) * 1.08
-      end
-      local vis = false
-      for _, p in ipairs(pts) do if p[1] >= x and p[1] < x + w and p[2] >= top and p[2] < y + h then vis = true; break end end
+      local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by1
+      local vis = bx1 > x and bx0 < x + w and by1 > top and by0 < y + h
       if vis then
-        U.set(U.mix(c, U.BG, hot and 0.2 or 0.6))
-        for q = 1, NSEG do
-          local a1, b1 = pts[q], pts[q % NSEG + 1]
-          gfx.line(clipx(a1[1]), clipy(a1[2]), clipx(b1[1]), clipy(b1[2]))
-        end
+        local cx0, cy0, cx1, cy1 = clipx(bx0), clipy(by0), clipx(bx1), clipy(by1)
+        U.set(hot and c or U.mix(U.TEXT, U.BG, 0.45))
+        gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
+        gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
         local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
