@@ -3273,7 +3273,10 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   -- 22 окт: быстрые пресеты трека — XY-пэд на пустом месте, в углах снапшоты 1..4 (все параметры FX трека),
   -- шайба — морф между ними; щелчок по пустому углу — запомнить, по полному — вызвать, Shift — перезаписать
   local sinfo = info.track_snaps and info.track_snaps(col)
-  D.snap_pad(L, sinfo, col, x, w, yy, y + h - yy - 6, mx, my, hover, hint)
+  -- 29 окт: мини-роутер — под XY (кнопка route — слева, под take fx); auto / mod открыты — роутер шире, под ними тоже
+  local tm0 = info.trk_mods and info.trk_mods(col)
+  local rh2 = (tm0 and tm0.wroute) and math.max(5 * L.rh, math.floor(h * 0.4)) or 0
+  D.snap_pad(L, sinfo, col, x, w, yy, y + h - rh2 - yy - 6, mx, my, hover, hint)
   -- 22 окт: mod · auto — у правого края блока две вертикальные кнопки: auto (сверху) и mod (снизу);
   -- любая раскрытая — блок вдвое шире, справа панель: сверху автоматизация, снизу модуляция с редакторами
   local tm = info.trk_mods and info.trk_mods(col)
@@ -3281,9 +3284,10 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
   if tm then
     local sw = L.th + 6
     local sx = x + w
-    local hh = math.floor(h / 3)   -- 28 окт: третья — route (мини-роутер)
-    for bi, b in ipairs({ { 'wauto', 'auto ' .. (tm.nauto or 0), tm.wauto, y, hh }, { 'wmod', 'mod ' .. (tm.nmod or 0), tm.wmod, y + hh, hh },
-                          { 'wroute', 'route', tm.wroute, y + 2 * hh, h - 2 * hh } }) do
+    local open = tm.wauto or tm.wmod
+    local th0 = (open and rh2 > 0) and (h - rh2) or h   -- роутер под панелью — кнопки над ним
+    local hh = math.floor(th0 / 2)
+    for bi, b in ipairs({ { 'wauto', 'auto ' .. (tm.nauto or 0), tm.wauto, y, hh }, { 'wmod', 'mod ' .. (tm.nmod or 0), tm.wmod, y + hh, th0 - hh } }) do
       local by, bh2 = b[4], b[5]
       local hot = mx >= sx and mx < sx + sw and my >= by and my < by + bh2
       local bg = b[3] and U.tint(U.AMBER, 0.30) or (hot and U.tint(U.AMBER, 0.20) or rbg)
@@ -3295,12 +3299,10 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       hint('trkmod', sx, by, sw, bh2, { what = b[1] })
     end
     extra = sw
-    if tm.wauto or tm.wmod or tm.wroute then
+    if tm.wauto or tm.wmod then
       local pw, px = w, sx + sw
       fill(rbg); gfx.rect(px, y, pw, h, 1)
       extra = extra + pw
-      -- 28 окт: route — снизу (вся высота, если открыт один)
-      local rh2 = tm.wroute and ((tm.wauto or tm.wmod) and math.max(5 * L.rh, math.floor(h * 0.4)) or h) or 0
       local h1 = h - rh2
       local ah = tm.wauto and (tm.wmod and math.max(3 * L.rh, math.floor(h1 * 0.35)) or h1) or 0
       if tm.wauto then D.auto_section(L, info, col, tm, px, y, pw, ah, hover) end
@@ -3308,12 +3310,14 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
         if tm.wauto then set(U.LINE); gfx.rect(px + L.pad, y + ah - 1, pw - 2 * L.pad, 1, 1) end
         D.mod_section(L, info, col, tm, px, y + ah, pw, h1 - ah, hover)
       end
-      if tm.wroute then
-        if h1 > 0 then set(U.LINE); gfx.rect(px + L.pad, y + h1 - 1, pw - 2 * L.pad, 1, 1) end
-        D.route_section(L, info, col, px, y + h1, pw, rh2, hover)
-      end
-      set(U.LINE); gfx.rect(px, y, pw, h, 0)
+      set(U.LINE); gfx.rect(px, y, pw, h1, 0)
     end
+  end
+  if rh2 > 0 then   -- 29 окт: роутер — под XY, на всю ширину блока (и под auto / mod, если они открыты)
+    local rw = w + extra
+    fill(rbg); gfx.rect(x, y + h - rh2, rw, rh2, 1)
+    set(U.LINE); gfx.rect(x + L.pad, y + h - rh2, rw - 2 * L.pad, 1, 1)
+    D.route_section(L, info, col, x, y + h - rh2, rw, rh2, hover)
   end
   U.TEXT, U.GREY = T0, G0
   set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
@@ -3399,12 +3403,12 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
   -- 29 окт: вертикальный вид (последовательно — вниз, параллельно — вправо); имя — шире (нет нужды в 3 буквах)
   -- 29 окт (2): прямоугольники стоят (повёрнуты на 90° против часовой): узкие высокие, имя — вертикально снизу вверх;
   -- последовательно — вправо, параллельно — столбиком ниже (раскладка route_layout)
-  local vert = D.route_vert ~= false
+  local vert = D.route_vert == true   -- 29 окт (3): стоячие — неудобно; по умолчанию снова в строку, 3-4 буквы
   local lay = D.RK.route_layout
   local maxpar, run = 1, 1
   for i, n in ipairs(nodes) do if i > 1 and (n.par or 0) > 0 then run = run + 1; maxpar = math.max(maxpar, run) else run = 1 end end
   local nhv = vert and math.max(4 * L.cw, math.min(ms('WWWWWWWWW') + 2 * L.pad, math.floor((wh - 2 * L.pad) / maxpar) - 4)) or L.rh
-  local nwv = vert and (L.rh + 2) or math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4)
+  local nwv = vert and (L.rh + 2) or math.max(ms('WWWW') + 2 * L.pad, 4 * L.cw + 4)
   local boxes, links, br = lay(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
     nw = nwv, nh = nhv, gx = vert and math.max(4, L.pad) or math.max(6, 2 * L.pad), bw = math.max(3, L.pad), rgap = 4 })
   set(U.GREY)
@@ -3430,7 +3434,7 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
     set((hot and not rd) and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
     set((hot or isel or moving) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
     if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 3, 1, b.h + 3, 1) end   -- = : связка столбика
-    local lb = D.RK.abbrev(n.name)
+    local lb = D.RK.abbrev(n.name, 4)
     if moving and D.rlift then set(U.tint(U.CYAN, 0.35)); gfx.rect(b.x, b.y, b.w, b.h, 1); set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0) end
     if tgt then set(U.CYAN); gfx.rect(b.x + b.w, b.y, 2, b.h, 1) end   -- вставится после него (правее)
     if isel and D.rkb then set(D.CUR_ACC or U.AMBER); gfx.rect(b.x - 1, b.y - 1, b.w + 2, b.h + 2, 0) end
@@ -5785,6 +5789,7 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     local selk = D.sel_i == kd.i
     local nhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
     set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
+    if D.ckb and D.ckb.k == k and D.ckb.ki == c.ki then set(D.CUR_ACC or U.AMBER); gfx.rect(x - 1, y - 1, w + 2, L.rh + 1, 0) end   -- 29 окт: курсор клавиатуры CHAINS
     -- 28 окт: ветка — полоска её цвета слева (тот же цвет, что черта под модулем)
     local lane = kd.entry and kd.entry.inner and kd.entry.inner.lane
     if lane then set(kd.enabled and ((D.chain_col and D.chain_col(f, lane)) or lane_col(lane)) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1) end
@@ -9650,23 +9655,25 @@ function D.frame(L, snap, rows, state, info)
     do
       local vw = L.rh + 2
       local gap = 2
-      local bh3 = math.floor((mbh - gap) / 2)   -- 29 окт: fx routing — кнопкой > у ROUTE (вкладка дублировала)
+      local bh3 = math.floor((mbh - 2 * gap) / 3)   -- 29 окт: третья — route (мини-роутер под XY); fx routing — > у ROUTE
       if bh3 >= 2 * L.cw then
-        local BT = { { 'track', false, 'track fx' }, { 'take', true, 'take fx' } }
+        local tmr = info.trk_mods and info.pool_col and info.trk_mods(info.pool_col)
+        local BT = { { 'track', false, 'track fx' }, { 'take', true, 'take fx' }, { 'route', 'wroute', 'route' } }
         for i, b in ipairs(BT) do
           local by = mby + (i - 1) * (bh3 + gap)
           local hot = mx >= bx and mx < bx + vw and my >= by and my < by + bh3
-          local on = b[2] ~= nil and (info.dsp_is_take or false) == b[2]
-          local g = on and not b[2]                      -- track fx включена — зелёная, как FX на канале REAPER
+          local on
+          if b[2] == 'wroute' then on = tmr and tmr.wroute or false else on = b[2] ~= nil and (info.dsp_is_take or false) == b[2] end
+          local g = on and b[2] == false                 -- track fx включена — зелёная, как FX на канале REAPER
           local bg = g and D.FXG_T or (hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.BG))
           local fg = g and D.FXTXT or (on and U.AMBER or (hot and U.AMBER or U.GREY))
           set(bg); gfx.rect(bx, by, vw, bh3, 1)
           set(g and D.FXG or ((on or hot) and U.AMBER or U.LINE)); gfx.rect(bx, by, vw, bh3, 0)
           local tl = math.min(ms(b[3]), bh3 - 4)
           D.vtext(bx + math.floor((vw - TH()) / 2), by + math.floor((bh3 - tl) / 2), tl, b[3], mono(fg), mono(bg))
-          if b[2] == nil then
-            if hot then hover.dsprouter = true end
-            hint('dsprouting', bx, by, vw, bh3, 'route')
+          if b[2] == 'wroute' then
+            if hot then hover.trkmod = { col = info.pool_col, what = 'wroute' } end
+            hint('trkmod', bx, by, vw, bh3, { what = 'wroute' })
           else
             if hot then hover.dsptarget = b[1] end
             hint('dsptarget', bx, by, vw, bh3, b[1])

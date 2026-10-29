@@ -2012,7 +2012,7 @@ ctx = {
     if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
     if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; return end   -- 28 окт: мини-роутер
     if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — нажал: тянуть (перенос / =), отпустил на месте — к модулю
-      draw.rkb = true; ctx.set_focus('dsp')   -- 29 окт: клавиатура мини-роутера (Esc — выход)
+      draw.rkb = true; draw.ckb = nil; ctx.set_focus('dsp')   -- 29 окт: клавиатура мини-роутера (Esc — выход)
       ctx.rdrag = { col = col, k = h.k, x0 = gfx.mouse_x, y0 = gfx.mouse_y, name = h.name }
       return
     end
@@ -26087,6 +26087,7 @@ local function frame()
         end
       elseif hover.dspbtn.what == 'pauto' then ctx.param_auto_open(hover.dspbtn.fx, hover.dspbtn.param)   -- 28 окт: метка ~ параметра
       elseif hover.dspbtn.what == 'cjump' then   -- 24 окт: имя цепи в шапке контейнера — курсор DSP на её модуль
+        draw.ckb = { k = hover.dspbtn.fx, ki = hover.dspbtn.ki }; draw.rkb = nil   -- 29 окт: клавиатура CHAINS (Esc — выход)
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
         vim.msg = (hover.dspbtn.kid.name or 'chain') .. ' (the module of this chain)'
@@ -29326,6 +29327,7 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
         if draw.rkb and ctx.rt_key(c) then return end   -- 29 окт: мини-роутер с клавиатуры
+        if draw.ckb and ctx.ch_key(c) then return end   -- 29 окт: CHAINS контейнера с клавиатуры
         if draw.notepop and c == 27 then draw.notepop = nil; return end   -- 22 окт
         if c == 13 and ctx.mods().ctrl and not DK.ins and not DK.pads then ctx.dsp_param_pop(dsp_sel.fx, dsp_sel.param); return end   -- 22 окт: Ctrl+Enter — выпадашка параметра
         if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
@@ -31879,6 +31881,57 @@ ctx.rt_key = function(c)
       ctx.pane_cmd('fxb show')
       vim.msg = 'fx: type to search, Enter inserts after ' .. (f.name or '') .. ', Esc back'
     else ctx.fx_picker() end
+  else return false end
+  model.invalidate()
+  return true
+end
+-- 29 окт: CHAINS С КЛАВИАТУРЫ (щелчок по имени цепи — вход, Esc — выход): j k — цепь (курсор DSP на её модуль),
+-- h l — mix −/+ 5 % (H L — 1 %), m — выкл., s — только она, dd — удалить цепь, a — эффект в конец контейнера (fx list)
+ctx.ch_key = function(c)
+  local t = dsp_target()
+  local cf = t and t.fx and t.fx[draw.ckb.k]
+  if not (cf and cf.container and cf.kids) then draw.ckb = nil; return false end
+  local list = {}
+  for ki, kd in ipairs(cf.kids) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then list[#list + 1] = ki end end
+  if #list == 0 then draw.ckb = nil; return false end
+  local pos = 1
+  for i, ki in ipairs(list) do if ki == draw.ckb.ki then pos = i end end
+  local ki = list[pos]
+  local kd = cf.kids[ki]
+  local ch = c < 256 and string.char(c) or ''
+  local DOWN, UP, LEFT, RIGHT = 1685026670, 30064, 1818584692, 1919379572
+  if ctx.ch_d and ch ~= 'd' then ctx.ch_d = nil end
+  local function sel(p2)
+    pos = math.max(1, math.min(#list, p2)); draw.ckb.ki = list[pos]
+    local k2 = cf.kids[list[pos]]
+    for kk, g in ipairs(t.fx) do if g.i == k2.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
+    vim.msg = ('chain %d of %d: %s  (h l mix, m off, s solo, dd delete, a add, Esc)'):format(pos, #list, k2.name or '?')
+  end
+  if c == 27 then draw.ckb = nil; vim.msg = 'chains: keys back to DSP'; return true
+  elseif ch == 'j' or c == DOWN then sel(pos + 1)
+  elseif ch == 'k' or c == UP then sel(pos - 1)
+  elseif ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT then
+    if kd.wet_i then
+      local v = ctx.fxp_get(kd.i, kd.wet_i) or 1
+      local st = (ch == 'H' or ch == 'L') and 0.01 or 0.05
+      v = math.max(0, math.min(1, v + ((ch == 'h' or ch == 'H' or c == LEFT) and -st or st)))
+      edit.fx_param(t.track, kd.i, kd.wet_i, v)
+      vim.msg = ('%s mix %d %%'):format(kd.name or 'chain', math.floor(v * 100 + 0.5))
+    end
+  elseif ch == 'm' then ctx.chain_ms(cf, ki, false)
+  elseif ch == 's' then ctx.chain_ms(cf, ki, true)
+  elseif ch == 'd' then
+    if ctx.ch_d then
+      ctx.ch_d = nil
+      for kk, g in ipairs(t.fx) do if g.i == kd.i then ctx.dsp_delete(kk, kk); break end end
+      draw.ckb.ki = list[math.max(1, pos - 1)]
+    else ctx.ch_d = true; vim.msg = 'chains: d - dd deletes ' .. (kd.name or 'the chain') end
+  elseif ch == 'a' then
+    ctx.fxb_insert = { o = t.track, parent = cf.i, pos = #cf.kids, pv = nil, what = 'at the end of ' .. (cf.name or 'the container') }
+    if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+    FB.query, FB.cur, FB.scroll = '', 1, 0
+    ctx.pane_cmd('fxb show')
+    vim.msg = 'fx: type to search, Enter adds it at the end of ' .. (cf.name or 'the container')
   else return false end
   model.invalidate()
   return true

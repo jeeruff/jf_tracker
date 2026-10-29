@@ -969,7 +969,8 @@ do
     'h l', 'w W', 'j k g G', '+ - ^A ^X', 'i', 'Z' }) }
   KH.PAGES.container = { title = 'DSP: container (rack)', e = from_dsp({
     'container', 'container XY',
-    { k = 'route keys', t = {}, d = 'the mini router (ROUTE: standing boxes with the names written upwards; serial to the right, parallel below; into / out of a container too): click a box - its keys: j k module, x lift, then j k where and p / Enter after, P before, = parallel to it; without a lifted one: = parallel to the one before, + serial, dd delete, a add an fx after it, b bypass; Esc puts down / leaves' },
+    { k = 'chain keys', t = {}, d = 'CHAINS of a container: click a chain name - its keys: j k chain (the DSP cursor on its module), h l mix -/+ 5 % (H L 1 %), m off, s solo, dd delete the chain, a add an fx at the end of the container, Esc back to DSP' },
+    { k = 'route keys', t = {}, d = 'the mini router (under the XY of the track block; route on the left under take fx shows it; 4 letters a box, serial to the right, parallel below; into / out of a container too): click a box - its keys: j k module, x lift, then j k where and p / Enter after, P before, = parallel to it; without a lifted one: = parallel to the one before, + serial, dd delete, a add an fx after it, b bypass; Esc puts down / leaves' },
     { k = 'variants 1..5', t = {}, d = 'next to CHAINS: slots of the whole container - every parameter of the modules inside, chain mix / on, the XY corners and the puck; an empty slot: click saves, a full one: click recalls (u - undo), Shift+click overwrites, Opt+click clears. ROUTE / XY - the switch under the chain list, the lower half shows the one that is lit' },
     { k = 'A<>B', t = {}, d = 'container with two chains: the A<>B button links their mix - one fades in while the other fades out (a crossfade of the chains); lit while the link is on, click - on / off' },
     '★ links', 'c= c|', 'cc', '[] (track block)', 'cf', 'cv', 'cb', 'zr',
