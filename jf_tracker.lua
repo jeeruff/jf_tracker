@@ -30891,7 +30891,10 @@ ctx.con_run = function(all)
   if all then for i, ln in ipairs(C.lines) do list[#list + 1] = i end else list[1] = C.l end
   for _, i in ipairs(list) do
     local ln = C.lines[i]
-    if ln and ln:match('%S') then
+    if ln and (ln:match('^%s*help%s*$') or ln:match('^%s*%?%s*$')) then   -- 29 окт: справка консоли
+      for _, h in ipairs(C.HELP) do C.say(h) end
+      C.err[i] = nil
+    elseif ln and ln:match('%S') then
       local ok, msg = ctx.con_eval(ln)
       C.err[i] = (not ok) and msg or nil
       C.say(ln .. '  -> ' .. tostring(msg), not ok)

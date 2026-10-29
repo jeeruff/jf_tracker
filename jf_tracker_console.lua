@@ -36,6 +36,7 @@ end
 function C.plan(line, bars, rpb, opts)
   opts = opts or {}
   local n, expr = C.split(line)
+  if expr == 'help' or expr == '?' then return { help = true, events = {} } end
   if expr == '' or expr == '~' or expr == 'hush' then return { track_n = n, clear = true, all = expr == 'hush', events = {} } end
   local events = {}
   local nb = math.max(1, math.floor(bars or 1))
@@ -54,6 +55,18 @@ function C.plan(line, bars, rpb, opts)
   return { track_n = n, clear = false, events = events }
 end
 
+-- 29 окт: справка консоли — `help` или `?` (строки в журнал)
+C.HELP = {
+  'console: Strudel patterns written into the pattern at the cursor',
+  '  t2: n("c e g b")        notes on track 2 (REAPER number); no t2: - the cursor track',
+  '  n("c [e g] <a b>")      space steps, [ ] subdivide, , chord, < > one per bar, ~ rest',
+  '  n("c*4")  c/2  c!3  c@3  c?  c(3,8)   faster, slower, repeat, weight, sometimes, euclid',
+  '  .fast(2) .slow(2) .rev() .every(4, "rev") .add(7) .oct(-1)   transform',
+  '  s("1 3 ~ 5")            slices of the instrument (slixer: base note + n - 1)',
+  '  .vel("1 0.5")  .cmd("0R42")  .i(3)    velocity, tracker command, lib instrument',
+  '  t2: ~   hush            clear the track / every channel in the pattern',
+  '  Enter line, Cmd+Enter all lines, Shift+Enter new line, Up Down history, Esc back',
+}
 -- ── редактор ──────────────────────────────────────────────────────────────
 local function clamp()
   if C.l < 1 then C.l = 1 elseif C.l > #C.lines then C.l = #C.lines end
@@ -199,7 +212,15 @@ function C.draw(U, L, x, y, w, h, focused, fit)
     end
     ry = ry + L.rh
   end
-  if nl == 1 and C.lines[1] == '' and not focused then U.text(x + L.pad, ey + 3, 't1: n("c e g b")   Enter - play it, Esc - back', U.DIM) end
+  -- 29 окт: пустой журнал — коротко, что это и как (help — всё)
+  if #C.log == 0 then
+    local hy = y + 2
+    for i, h in ipairs(C.HELP) do
+      if hy + L.rh > ey - 2 then break end
+      U.text(x + L.pad, hy, fit(h, w - 2 * L.pad), i == 1 and U.GREY or U.DIM); hy = hy + L.rh
+    end
+  end
+  if nl == 1 and C.lines[1] == '' and not focused then U.text(x + L.pad, ey + 3, 't1: n("c e g b")   Enter - write it, help - all of it, Esc - back', U.DIM) end
   if mx >= x and mx < x + w and my >= y and my < y + h then hover = my >= ey and 'text' or 'log' end
   return hover
 end

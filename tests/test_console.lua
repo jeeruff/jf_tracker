@@ -33,6 +33,7 @@ ok(#p.events == 3 and p.events[1].slice == 1 and p.events[3].slice == 5 and p.ev
 p = C.plan('n("c e").i(2).vel("1 0.5")', 1, 16)
 ok(p.events[1].inst == 2 and p.events[1].vel == 127 and p.events[2].vel == 64, '.i and .vel pattern')
 
+ok(C.plan('help', 1, 16).help and C.plan('?', 1, 16).help, 'help / ? - the help, not a pattern')
 -- снять
 p = C.plan('t3: ~', 1, 16)
 ok(p.clear and p.track_n == 3 and not p.all, 't3: ~ clears the channel')
