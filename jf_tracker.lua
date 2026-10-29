@@ -18825,12 +18825,26 @@ function ctx.route_drop(col, k, to, mode)
   local fxs = col and col.fx or {}
   local src, dst = fxs[k], fxs[to]
   if not (src and dst) or k == to then return end
-  if src.inner or dst.inner then vim.msg = 'route: inside a container - move it in DSP (drag the block)'; return end
   local tr = col.track
+  -- 29 окт: и внутрь контейнера / из него: место — в контейнере соседа (до / после него, = — параллельно ему)
+  if dst.inner and dst.inner.wrap and dst.inner.parent then
+    local c = dst.inner.parent
+    if c.inner then vim.msg = 'route: a container inside a container - move it in DSP'; return end
+    if src == c then return end
+    local pos = (dst.inner.ki or 1) - 1 + ((mode == 'before') and 0 or 1)
+    if edit.fx_into_at(tr, c.i, pos, nil, mode == 'par' and 1 or 0, src.i) then
+      vim.msg = ('route: %s -> %s, %s %s'):format(src.name or '?', c.name or 'container', mode == 'par' and 'parallel to' or mode, dst.name or '?')
+    else vim.msg = 'route: could not move it into the container' end
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    return
+  end
+  if dst.inner then vim.msg = 'route: a band module - move it in DSP'; return end
+  if src.inner and src.inner.parent and src.inner.parent.inner then vim.msg = 'route: from a container inside a container - move it in DSP'; return end
   local g = reaper.TrackFX_GetFXGUID(tr, src.i)
   local si, di = src.i, dst.i
   local target
-  if mode == 'before' then target = (si < di) and (di - 1) or di
+  if src.inner then target = (mode == 'before') and di or (di + 1)   -- 29 окт: из контейнера — верхний уровень не сдвигается
+  elseif mode == 'before' then target = (si < di) and (di - 1) or di
   else target = (si < di) and di or (di + 1) end
   if target ~= si then edit.fx_move(tr, si, target) end
   for i = 0, reaper.TrackFX_GetCount(tr) - 1 do
@@ -31851,7 +31865,8 @@ ctx.rt_key = function(c)
     if f and not f.inner then
       edit.fx_parallel(col.track, f.i, ch == '=' and 1 or 0)
       vim.msg = ('route: %s %s'):format(node.name, ch == '=' and 'parallel to the one before (=)' or 'serial (+)')
-    else vim.msg = 'route: inside a container - = / + in DSP (c= c|)' end
+    elseif f and f.inner and f.inner.wrap then edit.fx_parallel(col.track, f.i, ch == '=' and 1 or 0); vim.msg = ('route: %s %s (inside %s)'):format(node.name, ch == '=' and 'parallel (=)' or 'serial (+)', f.inner.parent and f.inner.parent.name or 'the container')
+    else vim.msg = 'route: a band module - = / + in DSP' end
   elseif ch == 'd' then
     if ctx.rt_d then ctx.rt_d = nil; ctx.dsp_delete(node.k, node.k) else ctx.rt_d = true; vim.msg = 'route: d - dd deletes ' .. node.name end
   elseif ch == 'b' then ctx.dsp_bypass(node.k)
