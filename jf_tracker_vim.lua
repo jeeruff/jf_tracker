@@ -4036,6 +4036,20 @@ V.field_get, V.field_set = field_get, field_set
 function V.field_yank(f0, f1, r0, r1, fld)
   local reg = { kind = 'field', fld = fld, rows = r1 - r0 + 1, vals = {} }
   local n = 0
+  -- 29 окт: колонка команд — каждая строка (команды строк внутри нот тоже), не только головы нот
+  if fld >= 4 then
+    local i = fld - 3
+    local last = (ctx.snap and ctx.snap() and ctx.snap().last_row) or r1
+    for fi = f0, f1 do
+      for row = r0, math.min(r1, last + 1) do
+        local fc = V.fx_cell(fi, row)
+        local code = fc and fc.fx[i]
+        if code then reg.vals[#reg.vals + 1] = { dr = row - r0, v = code }; n = n + 1 end
+      end
+    end
+    V.regs['"'] = reg
+    return n
+  end
   for _, h in ipairs(V.heads_in(f0, f1, r0, r1)) do
     local v = field_get(h, fld)
     if v ~= nil then reg.vals[#reg.vals + 1] = { dr = (h.row0 or r0) - r0, v = v }; n = n + 1 end
