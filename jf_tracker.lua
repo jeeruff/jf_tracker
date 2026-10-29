@@ -4691,7 +4691,9 @@ ctx = {
     end
     if not r then vim.msg = 'shotpane: no visible panel ' .. what .. ' (Ctrl+W g + letter shows it)'; return end
     ctx.shot_rect = r
-    ctx.shot_path = file ~= '' and (DIR .. '/help/' .. file:gsub('[^%w%._%-]', '_')) or nil
+    -- 29 окт: абсолютный путь (/ или ~) — как есть; иначе имя в help/
+    if file:sub(1, 1) == '~' then file = (os.getenv('HOME') or '') .. file:sub(2) end
+    ctx.shot_path = file ~= '' and (file:sub(1, 1) == '/' and file or (DIR .. '/help/' .. file:gsub('[^%w%._%-]', '_'))) or nil
     ctx.shot_at = reaper.time_precise() + 0.35   -- 17 окт: через пару кадров — без строки команды в кадре
   end,
   -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
@@ -21847,6 +21849,7 @@ local function frame()
     if f and f.col and not only[f.col.guid] then                 -- курсор — на первый показанный трек
       for i, f2 in ipairs(L.flat) do if f2.col and only[f2.col.guid] and not f2.env then vim.cur.fi = i; break end end
     end
+  elseif state.viper then pcall(ctx.viper_tick)
   else state.mxonly = nil end
   if (MX.anchor or next(MX.picks)) and #seq > 0 and snap then
     local r0, r1, c0, c1 = MX.block()
@@ -22170,6 +22173,7 @@ local function frame()
     else left = ((pe and pe.label) or state.focus):upper() end
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свои режимы клавиатуры: patternkb (ноты — паттерны) в трекере, clipkb палитры в матрице
+  if state.viper then left = 'VIPER ' .. left end   -- 29 окт
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
   elseif (state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb then left = 'CLIPKB' end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
@@ -28406,6 +28410,7 @@ local function frame()
   local quit = false
   -- 16 окт: Ctrl+Cmd+F12 — перезапуск трекера из файлов (как :reload)
   if c == 6697266 and ctx.mods().ctrl and ctx.mods().cmd then ctx.reloading = true; quit = true; c = 0 end
+  if c == 6697264 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.viper_toggle(); c = 0 end   -- 29 окт: Cmd+F10 — viper
   -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
   if c > 0 and ctx.PADS and ctx.PADS.on and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix')
      and vim.mode == 'normal' and not vim.picker and not vim.hydra and not vim.pending and not vim.op then
@@ -31759,6 +31764,45 @@ ctx.cvar_do = function(col, f, i, mode)
   c.cur = i; reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, 0, 'cur'), tostring(i), true)
   model.invalidate()
   vim.msg = ('variant %d recalled: %d parameters, XY corners (u - undo; Shift+click - save over it)'):format(i, n)
+end
+-- 29 окт: VIPER — трекер как часть REAPER (набросок, PLAN_VIPER.md): одна панель трекера, песню ведёт REAPER:
+-- показаны только треки выделенных в arrange айтемов (ничего не выделено — все), курсор трекера идёт за edit-курсором
+-- REAPER, вид — весь проект. Cmd+F10 / :viper — вкл / выкл; раскладка панелей и вид возвращаются
+ctx.viper_toggle = function()
+  local PN = draw.panes
+  if not state.viper then
+    ctx.viper_back = { panes = state.panes and PN.encode(state.panes) or nil, view_reg = state.view_reg, view_secmode = state.view_secmode, follow = state.follow }
+    state.viper = true
+    if state.panes and PN.preset then local pz = PN.preset('tracker', state.panes); if pz then state.panes = pz end end
+    ctx.view_mode('project'); state.follow = true
+    ctx.viper_cp = nil
+    relayout()
+    vim.msg = 'VIPER: the tracks of the items selected in REAPER, the cursor follows the REAPER cursor; Cmd+F10 / :viper - back'
+  else
+    local bk = ctx.viper_back or {}
+    state.viper = nil; state.mxonly = nil
+    if bk.panes and PN.decode then local m = PN.decode(bk.panes); if m then m.v = (state.panes and state.panes.v or 0) + 1; state.panes = m end end
+    state.view_reg, state.view_secmode, state.follow = bk.view_reg, bk.view_secmode, bk.follow
+    relayout()
+    vim.msg = 'viper off'
+  end
+end
+ctx.viper_tick = function()
+  if not (state.viper and snap) then return end
+  local only, any = {}, false
+  for i = 0, reaper.CountSelectedMediaItems(0) - 1 do
+    local tr = reaper.GetMediaItem_Track(reaper.GetSelectedMediaItem(0, i))
+    for _, c in ipairs(snap.cols) do if c.track == tr then only[c.guid] = true; any = true end end
+  end
+  state.mxonly = any and only or nil
+  local cp = reaper.GetCursorPosition()
+  if cp ~= ctx.viper_cp then
+    ctx.viper_cp = cp
+    if reaper.GetPlayState() & 1 == 0 and state.focus ~= 'tracker' or not ctx.win_focus then   -- курсор REAPER двинули снаружи
+      vim.cur.row = math.max(0, math.floor(model.row_of_time(cp, state.lpb) + 1e-6))
+      if L and L.nrows and (vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows) then state.row0 = math.max(0, vim.cur.row - math.floor(L.nrows / 2)) end
+    end
+  end
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
