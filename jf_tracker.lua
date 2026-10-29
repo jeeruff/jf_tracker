@@ -183,6 +183,7 @@ local state = {
   curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
   curacc = (function() local v = reaper.GetExtState(EXT, 'curacc'); return v ~= '' and v or 'ff00ff' end)(),
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
+  qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
   clipsnap = flag('clipsnap', true),    -- 29 окт: края MIDI-клипов — на доли   -- 29 окт: номера строк с 0001 (умолчание, как 1.1) или 0000   -- 28 окт: цвет курсора, когда фокус в другой панели
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
@@ -17861,6 +17862,7 @@ function view_actions()
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
+    { 'Quantize … (notes, OFFs, automation, item edges)', key = 'Q', fn = function() ctx.quant_menu() end },
     { 'Quit REAPER (it asks to save a changed project)', key = 'q', fn = function() reaper.Main_OnCommand(40004, 0) end },   -- 28 окт: \\ q
   }
 end
@@ -31566,6 +31568,122 @@ ctx.mx_scope = function()
   local s0, s1 = seq[ra], seq[rb]
   if not (s0 and s1) then return nil end
   return cols, math.floor(model.row_of_time(s0.pos, state.lpb) + 1e-6), math.ceil(model.row_of_time(s1.rgnend, state.lpb) - 1e-6) - 1
+end
+-- 29 окт: выборочный квантайз (\ Q, :quant): что — ноты / OFF / точки автоматизации / края айтемов (начало, конец),
+-- где — V-выделение, иначе трек курсора в такте / паттерне / треке (state.qscope). Всё — на ближайшую строку сетки.
+ctx.quant_range = function()
+  local F = L and L.flat or {}
+  if vim.mode == 'visual' or vim.mode == 'vline' then local f0, f1, r0, r1 = vim.visual_range(); return f0, f1, r0, r1, 'selection' end
+  local f = F[vim.cur.fi]
+  if not (f and f.col) then return nil end
+  local fa, fb = vim.cur.fi, vim.cur.fi
+  local function same(g) return g and g.col == f.col end
+  while same(F[fa - 1]) do fa = fa - 1 end
+  while same(F[fb + 1]) do fb = fb + 1 end
+  local sc = state.qscope
+  if sc == 'bar' then
+    local qn = reaper.TimeMap2_timeToQN(0, edit.row_time(vim.cur.row, state.lpb, 0))
+    local _, qms, qme = reaper.TimeMap_QNToMeasures(0, qn + 1e-6)
+    if qms and qme then
+      local r0 = math.floor(model.row_of_time(reaper.TimeMap2_QNToTime(0, qms), state.lpb) + 1e-6)
+      local r1 = math.ceil(model.row_of_time(reaper.TimeMap2_QNToTime(0, qme), state.lpb) - 1e-6) - 1
+      return fa, fb, r0, r1, 'bar'
+    end
+  elseif sc == 'pattern' then
+    local r0, r1 = ctx.region_rows()
+    if r0 then return fa, fb, r0, r1, 'pattern' end
+  end
+  return fa, fb, 0, (snap and snap.last_row or 0), 'track'
+end
+ctx.quant_do = function(what)
+  local f0, f1, r0, r1, where = ctx.quant_range()
+  if not f0 then vim.msg = 'quantize: put the cursor on a track'; return end
+  local lpb = state.lpb
+  local t0, t1 = edit.row_time(r0, lpb, 0), edit.row_time(r1 + 1, lpb, 0)
+  local function near_row(t) return math.floor(model.row_of_time(t, lpb) + 0.5) end
+  local n = { notes = 0, offs = 0, auto = 0, items = 0 }
+  local all = what == 'all'
+  edit.run('quantize ' .. what, function()
+    if all or what == 'notes' then
+      local list, rows = {}, {}
+      for _, h in ipairs(vim.heads_in(f0, f1, r0, r1)) do
+        if (h.kind == 'midi' or h.kind == 'audio') and h.row0 then
+          local d = tonumber(h.delay) or 0
+          local rr = math.floor(h.row0 + d / 256 + 0.5)
+          if d ~= 0 or rr ~= h.row0 then list[#list + 1] = h; rows[#list] = rr end
+        end
+      end
+      if #list > 0 then edit.retime(list, lpb, rows, nil, 'quantize'); n.notes = #list end
+    end
+    if all or what == 'offs' then
+      for _, o in ipairs(vim.offs_in(f0, f1, r0, r1)) do
+        edit.note_off({ o.cell.of }, lpb, o.row + ((o.cell.delay or 0) >= 128 and 1 or 0)); n.offs = n.offs + 1
+      end
+    end
+    if all or what == 'auto' then
+      for fi = f0, f1 do
+        local f = L.flat[fi]
+        if f and f.env then
+          local pts = edit.env_points(f.env, t0, t1)
+          local moved = false
+          for _, p in ipairs(pts) do local tq = edit.row_time(near_row(p.t), lpb, 0); if math.abs(tq - p.t) > 1e-6 then p.t = tq; moved = true end end
+          if moved then edit.env_put_points(f.env, t0, t1, pts); n.auto = n.auto + #pts end
+        end
+      end
+    end
+    if all or what == 'items' or what == 'start' or what == 'end' then
+      local seen = {}
+      for fi = f0, f1 do
+        local f = L.flat[fi]
+        local tr = f and f.col and not f.env and f.col.track
+        if tr and not seen[tr] then
+          seen[tr] = true
+          for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+            local it = reaper.GetTrackMediaItem(tr, i)
+            local pos, len = reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+            if pos < t1 and pos + len > t0 then
+              local tk = reaper.GetActiveTake(it)
+              local midi = tk and reaper.TakeIsMIDI(tk)
+              local np, ne = pos, pos + len
+              if what ~= 'end' then np = edit.row_time(near_row(pos), lpb, 0) end
+              if what ~= 'start' then ne = edit.row_time(near_row(pos + len), lpb, 0) end
+              if ne <= np then ne = edit.row_time(near_row(np) + 1, lpb, 0) end
+              if math.abs(np - pos) > 1e-6 or math.abs(ne - pos - len) > 1e-6 then
+                if midi and reaper.MIDI_SetItemExtents then
+                  reaper.MIDI_SetItemExtents(it, reaper.TimeMap2_timeToQN(0, np), reaper.TimeMap2_timeToQN(0, ne))   -- ноты на месте
+                elseif tk then
+                  -- аудио: начало — подрезка (offset едет с ним, звук не сдвигается), конец — длина
+                  local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+                  local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+                  reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', math.max(0, offs + (np - pos) * rate))
+                  reaper.SetMediaItemInfo_Value(it, 'D_POSITION', np)
+                  reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', ne - np)
+                end
+                n.items = n.items + 1
+              end
+            end
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('quantize %s (%s): %d note(s), %d OFF, %d point(s), %d item(s) moved to the row grid'):format(what, where, n.notes, n.offs, n.auto, n.items)
+end
+ctx.quant_menu = function()
+  local sc = state.qscope
+  local sel = (vim.mode == 'visual' or vim.mode == 'vline') and 'the selection' or ('the cursor track in the ' .. sc)
+  local function scope(k, v, lbl) return { key = k, label = 'scope: ' .. lbl .. (sc == v and '  (on)' or ''), fn = function() state.qscope = v; reaper.SetExtState(EXT, 'qscope', v, true); ctx.quant_menu() end } end
+  vim.open_hydra({ title = 'quantize to the row grid - ' .. sel, items = {
+    { key = 'n', label = 'notes (delay -> nearest row)', fn = function() ctx.quant_do('notes') end },
+    { key = 'o', label = 'OFFs (note ends -> nearest row)', fn = function() ctx.quant_do('offs') end },
+    { key = 'a', label = 'automation points -> nearest row', fn = function() ctx.quant_do('auto') end },
+    { key = 's', label = 'item starts (audio: trim, MIDI: notes stay)', fn = function() ctx.quant_do('start') end },
+    { key = 'e', label = 'item ends', fn = function() ctx.quant_do('end') end },
+    { key = 'i', label = 'items: starts and ends', fn = function() ctx.quant_do('items') end },
+    { key = 'A', label = 'all of the above', fn = function() ctx.quant_do('all') end },
+    scope('b', 'bar', 'bar of the cursor'), scope('p', 'pattern', 'pattern of the cursor'), scope('t', 'track', 'whole track'),
+  } })
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
