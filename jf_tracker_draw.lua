@@ -3396,10 +3396,17 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
   set(U.LINE); gfx.rect(wx, wy, ww, wh, 0)
   if #nodes == 0 then text(wx + L.pad, wy + 2, fit('no fx', ww - 2 * L.pad), U.DIM); return end
   if not D.RK then return end
-  local boxes, links, br = D.RK.route_layout(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
-    nw = math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4), nh = L.rh, gx = math.max(6, 2 * L.pad), bw = math.max(3, L.pad), rgap = 4 })
+  -- 29 окт: вертикальный вид (последовательно — вниз, параллельно — вправо); имя — шире (нет нужды в 3 буквах)
+  local vert = D.route_vert ~= false
+  local lay = vert and D.RK.route_layout_v or D.RK.route_layout
+  local nwv = vert and math.max(ms('WWWWWW') + 2 * L.pad, math.floor((ww - 2 * L.pad) / 2) - 4) or math.max(ms('WWW') + 2 * L.pad, 3 * L.cw + 4)
+  local boxes, links, br = lay(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
+    nw = nwv, nh = L.rh, gx = math.max(6, 2 * L.pad), bw = math.max(3, L.pad), rgap = vert and 3 or 4, ind = 2 * L.pad })
   set(U.GREY)
-  for _, l in ipairs(links) do gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
+  for _, l in ipairs(links) do
+    if l.v then gfx.rect(l.x, l.y1, 1, math.max(1, l.y2 - l.y1), 1) else gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
+  end
+  D.rboxes = boxes   -- клавиатура мини-роутера: порядок узлов
   for _, b in ipairs(br) do
     set(U.tint(U.AMBER, 0.6)); gfx.rect(b.x, b.y, 2, b.h, 1)
     local hx = b.right and (b.x - 2) or b.x
@@ -3412,13 +3419,17 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
     local n = b.n
     local hot = mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h
     local isel = sel == n.k
-    local moving = rd and rd.k == n.k
+    local moving = (rd and rd.k == n.k) or (D.rlift == n.k)   -- 29 окт: x — «поднят»
+    local tgt = D.rlift and D.rlift ~= n.k and isel           -- поднят другой: курсор — место вставки
     local fillc = n.cont and U.tint(U.AMBER, 0.18) or ((n.depth or 0) > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
     set((hot and not rd) and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
     set((hot or isel or moving) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
     if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 3, 1, b.h + 3, 1) end   -- = : связка столбика
-    local lb = D.RK.abbrev(n.name)
-    text(b.x + math.floor((b.w - ms(lb)) / 2), b.y, lb, (hot or isel or moving) and U.AMBER or (n.en and U.TEXT or U.GREY))
+    local lb = vert and fit(n.name or '?', b.w - 2 * L.pad) or D.RK.abbrev(n.name)
+    if moving and D.rlift then set(U.tint(U.CYAN, 0.35)); gfx.rect(b.x, b.y, b.w, b.h, 1); set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0) end
+    if tgt then set(U.CYAN); gfx.rect(b.x, b.y + b.h, b.w, 2, 1) end   -- вставится после него
+    if isel and D.rkb then set(D.CUR_ACC or U.AMBER); gfx.rect(b.x - 1, b.y - 1, b.w + 2, b.h + 2, 0) end
+    text(vert and (b.x + L.pad) or (b.x + math.floor((b.w - ms(lb)) / 2)), b.y, lb, (hot or isel or moving) and U.AMBER or (n.en and U.TEXT or U.GREY))
     -- бросок: левая половина — до, правая — после, ниже узла (до следующего ряда) — параллельно ему
     if rd and not moving and mx >= b.x - 3 and mx < b.x + b.w + 3 and my >= b.y and my < b.y + b.h + L.rh then
       local mode = my >= b.y + b.h and 'par' or (mx < b.x + b.w / 2 and 'before' or 'after')

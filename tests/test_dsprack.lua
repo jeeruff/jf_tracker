@@ -68,5 +68,15 @@ ok(RK.abbrev('Container') == 'Cnt', 'abbrev Container')
 ok(RK.abbrev('VST: ReaEQ (Cockos)') == 'RQ', 'abbrev drops prefix and vendor')
 ok(RK.abbrev('Eau') == 'Eau', 'too few consonants - the name start')
 
+-- 29 окт: вертикальный вид: последовательно — вниз, параллельно — вправо в той же строке, контейнер — отступ детей
+do
+  local nodes = { { k = 1, name = 'A' }, { k = 2, name = 'B', cont = true }, { k = 3, name = 'C', depth = 1 }, { k = 4, name = 'D', depth = 1, par = 1 }, { k = 5, name = 'E' } }
+  local b = RK.route_layout_v(nodes, { x = 0, y = 0, w = 200, h = 200, nw = 40, nh = 10, gx = 6, bw = 4, rgap = 2, ind = 8 })
+  ok(#b == 5, 'vertical: all five boxes')
+  ok(b[2].y > b[1].y and b[2].x == b[1].x, 'vertical: serial goes down')
+  ok(b[3].x == 8, 'vertical: inside a container - indented')
+  ok(b[4].y == b[3].y and b[4].x > b[3].x, 'vertical: parallel - to the right in the same row')
+  ok(b[5].y > b[3].y and b[5].x == 0, 'vertical: next serial below, no indent')
+end
 print(('test_dsprack: %d/%d ok'):format(n - fails, n))
 os.exit(fails == 0 and 0 or 1)

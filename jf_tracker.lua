@@ -2012,6 +2012,7 @@ ctx = {
     if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
     if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; return end   -- 28 окт: мини-роутер
     if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — нажал: тянуть (перенос / =), отпустил на месте — к модулю
+      draw.rkb = true; ctx.set_focus('dsp')   -- 29 окт: клавиатура мини-роутера (Esc — выход)
       ctx.rdrag = { col = col, k = h.k, x0 = gfx.mouse_x, y0 = gfx.mouse_y, name = h.name }
       return
     end
@@ -29310,6 +29311,7 @@ local function frame()
         -- в vim уходят только командная строка и поиск (: /)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
+        if draw.rkb and ctx.rt_key(c) then return end   -- 29 окт: мини-роутер с клавиатуры
         if draw.notepop and c == 27 then draw.notepop = nil; return end   -- 22 окт
         if c == 13 and ctx.mods().ctrl and not DK.ins and not DK.pads then ctx.dsp_param_pop(dsp_sel.fx, dsp_sel.param); return end   -- 22 окт: Ctrl+Enter — выпадашка параметра
         if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
@@ -31817,6 +31819,54 @@ ctx.viper_tick = function()
       if L and L.nrows and (vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows) then state.row0 = math.max(0, vim.cur.row - math.floor(L.nrows / 2)) end
     end
   end
+end
+-- 29 окт: МИНИ-РОУТЕР С КЛАВИАТУРЫ (щелчок по узлу — вход, Esc — выход): j k / h l — узел (курсор DSP за ним);
+-- x — поднять, затем j k — куда, p / Enter — вставить после, P — до, = — параллельно ему; без поднятого: = — параллельно
+-- предыдущему, + — последовательно, dd — удалить, a — эффект после (fx list), b — bypass, Esc — опустить / выйти
+ctx.rt_key = function(c)
+  local t = dsp_target()
+  local col = t and t.col
+  if not (col and not t.take) then draw.rkb = nil; return false end
+  local boxes = draw.rboxes or {}
+  if #boxes == 0 then return false end
+  local ch = c < 256 and string.char(c) or ''
+  local cur = 1
+  for i, b in ipairs(boxes) do if b.n.k == dsp_sel.fx then cur = i end end
+  local function go(d) cur = math.max(1, math.min(#boxes, cur + d)); dsp_sel.fx = boxes[cur].n.k; dsp_sel.param = 1 end
+  local DOWN, UP, LEFT, RIGHT = 1685026670, 30064, 1818584692, 1919379572
+  local node = boxes[cur].n
+  if ctx.rt_d and ch ~= 'd' then ctx.rt_d = nil end
+  if c == 27 then
+    if draw.rlift then draw.rlift = nil; vim.msg = 'route: put down' else draw.rkb = nil; vim.msg = 'route: keys back to DSP' end
+    return true
+  elseif ch == 'j' or ch == 'l' or c == DOWN or c == RIGHT then go(1)
+  elseif ch == 'k' or ch == 'h' or c == UP or c == LEFT then go(-1)
+  elseif ch == 'x' then
+    draw.rlift = node.k; vim.msg = ('route: %s lifted - j k where, p / Enter after, P before, = parallel to it, Esc down'):format(node.name)
+  elseif draw.rlift and (ch == 'p' or ch == 'P' or c == 13 or ch == '=') then
+    local k = draw.rlift; draw.rlift = nil
+    if k ~= node.k then ctx.route_drop(col, k, node.k, (ch == 'P') and 'before' or (ch == '=' and 'par' or 'after')) end
+  elseif ch == '=' or ch == '+' then
+    local f = col.fx[node.k]
+    if f and not f.inner then
+      edit.fx_parallel(col.track, f.i, ch == '=' and 1 or 0)
+      vim.msg = ('route: %s %s'):format(node.name, ch == '=' and 'parallel to the one before (=)' or 'serial (+)')
+    else vim.msg = 'route: inside a container - = / + in DSP (c= c|)' end
+  elseif ch == 'd' then
+    if ctx.rt_d then ctx.rt_d = nil; ctx.dsp_delete(node.k, node.k) else ctx.rt_d = true; vim.msg = 'route: d - dd deletes ' .. node.name end
+  elseif ch == 'b' then ctx.dsp_bypass(node.k)
+  elseif ch == 'a' then
+    local f = col.fx[node.k]
+    if f and not f.inner then
+      ctx.fxb_insert = { o = col.track, pos = f.i + 1, pv = nil, what = 'after ' .. (f.name or '') }
+      if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+      FB.query, FB.cur, FB.scroll = '', 1, 0
+      ctx.pane_cmd('fxb show')
+      vim.msg = 'fx: type to search, Enter inserts after ' .. (f.name or '') .. ', Esc back'
+    else ctx.fx_picker() end
+  else return false end
+  model.invalidate()
+  return true
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
