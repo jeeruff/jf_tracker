@@ -3359,12 +3359,22 @@ function D.route_section(L, info, col, x, y, w, h, hover)
   local nodes = info.route_nodes and info.route_nodes(col) or {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   text(x + L.pad, y + 2, fit('ROUTE', w - 2 * L.pad), U.AMBER)
+  do   -- 29 окт: > — большой fx routing (роутер REAPER в стиле трекера), был вкладкой слева
+    local gx = x + L.pad + ms('ROUTE') + L.pad
+    local gw = ms('>') + 2 * L.pad
+    local hot = mx >= gx and mx < gx + gw and my >= y + 2 and my < y + L.rh + 1
+    set(hot and U.tint(U.AMBER, 0.35) or U.PANEL); gfx.rect(gx, y + 2, gw, L.rh - 1, 1)
+    set(hot and U.AMBER or U.LINE); gfx.rect(gx, y + 2, gw, L.rh - 1, 0)
+    text(gx + L.pad, y + 2, '>', hot and U.AMBER or U.GREY)
+    if hot then hover.dsprouter = true end
+    if D.hint then D.hint('dsprouting', gx, y + 2, gw, L.rh - 1, 'route') end
+  end
   -- 28 окт (2): справа от заголовка — слоты цепей 1..4 (сравнение: вся цепочка FX трека), ниже — схема в окошке
   local cs = info.chslots and info.chslots(col)
   if cs then
     local sbw = ms('4') + 2 * L.pad
     local sx = x + w - L.pad - 4 * (sbw + 2)
-    if sx > x + L.pad + ms('ROUTE') + L.pad then
+    if sx > x + L.pad + ms('ROUTE') + ms('>') + 4 * L.pad then
       for i = 1, 4 do
         local bx2 = sx + (i - 1) * (sbw + 2)
         local hot = mx >= bx2 and mx < bx2 + sbw and my >= y + 2 and my < y + L.rh + 1
@@ -9622,9 +9632,9 @@ function D.frame(L, snap, rows, state, info)
     do
       local vw = L.rh + 2
       local gap = 2
-      local bh3 = math.floor((mbh - 2 * gap) / 3)
+      local bh3 = math.floor((mbh - gap) / 2)   -- 29 окт: fx routing — кнопкой > у ROUTE (вкладка дублировала)
       if bh3 >= 2 * L.cw then
-        local BT = { { 'track', false, 'track fx' }, { 'take', true, 'take fx' }, { 'route', nil, 'fx routing' } }
+        local BT = { { 'track', false, 'track fx' }, { 'take', true, 'take fx' } }
         for i, b in ipairs(BT) do
           local by = mby + (i - 1) * (bh3 + gap)
           local hot = mx >= bx and mx < bx + vw and my >= by and my < by + bh3
