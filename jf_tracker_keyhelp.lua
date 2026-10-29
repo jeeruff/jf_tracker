@@ -969,6 +969,7 @@ do
     'h l', 'w W', 'j k g G', '+ - ^A ^X', 'i', 'Z' }) }
   KH.PAGES.container = { title = 'DSP: container (rack)', e = from_dsp({
     'container', 'container XY',
+    { k = 'variants 1..5', t = {}, d = 'next to CHAINS: slots of the whole container - every parameter of the modules inside, chain mix / on, the XY corners and the puck; an empty slot: click saves, a full one: click recalls (u - undo), Shift+click overwrites, Opt+click clears. ROUTE / XY - the switch under the chain list, the lower half shows the one that is lit' },
     { k = 'A<>B', t = {}, d = 'container with two chains: the A<>B button links their mix - one fades in while the other fades out (a crossfade of the chains); lit while the link is on, click - on / off' },
     '★ links', 'c= c|', 'cc', '[] (track block)', 'cf', 'cv', 'cb', 'zr',
     { k = 'drag a module', t = {}, d = 'in CHAINS / ROUTE: drag a module onto another chain or between modules - it moves there (onto = parallel)' },

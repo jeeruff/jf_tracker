@@ -22409,7 +22409,8 @@ local function frame()
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
     dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
-    cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,   -- 28 окт: XY контейнера
+    cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,
+    cvars = function(col, f) return ctx.cvar_info(col, f) end,   -- 29 окт: слоты вариантов контейнера   -- 28 окт: XY контейнера
     fx_snaps = function(f)   -- 28 окт: углы XY модуля — снимки его параметров (псевдо-контейнер из одного модуля)
       local t = dsp_target()
       if not t or t.take then return nil end   -- take FX — другие адреса (снимки трека не годятся)
@@ -23694,6 +23695,7 @@ local function frame()
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
+  elseif hover.dspbtn and hover.dspbtn.what == 'cvar' then state.status = ('variant %d of %s: click - %s, Shift+click - save over it, Opt+click - clear (parameters, chain mix / on, the XY corners)'):format(hover.dspbtn.i, hover.dspbtn.f and hover.dspbtn.f.name or 'container', (ctx.cvar_info(dsp_target() and dsp_target().col, hover.dspbtn.f) or { has = {} }).has[hover.dspbtn.i] and 'recall' or 'save')
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', cxfade = 'A<>B: crossfade the two chains with one knob - the mix of the first: 100 % only A, 0 % only B (the mix of B follows inverted, a native REAPER link); click again - off', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
@@ -26075,6 +26077,7 @@ local function frame()
         local cur = state.dsp_xyopen[nm]
         if cur == nil then cur = hover.dspbtn.f.wrap and true or false end   -- 24 окт: у контейнера XY раскрыт сразу
         state.dsp_xyopen[nm] = not cur
+      elseif hover.dspbtn.what == 'cvar' then ctx.cvar_do(dsp_target() and dsp_target().col, hover.dspbtn.f, hover.dspbtn.i, ctx.mods().alt and 'clear' or (ctx.mods().shift and 'save' or 'click'))   -- 29 окт: варианты контейнера
       elseif hover.dspbtn.what == 'ctab' then draw.ctab = draw.ctab or {}; draw.ctab[hover.dspbtn.key] = hover.dspbtn.tab   -- 28 окт: CHAINS / ROUTE / XY контейнера
       elseif hover.dspbtn.what == 'chainadd' then dsp_sel.fx = hover.dspbtn.fx; ctx.set_focus('dsp'); ctx.fx_picker()   -- 28 окт: + в конце цепи
       elseif hover.dspbtn.what == 'mfoldin' then dsp_sel.fx = hover.dspbtn.fx; ctx.dsp_mfold(hover.dspbtn.fx)   -- 28 окт: f в шапке — сложить
@@ -31684,6 +31687,78 @@ ctx.quant_menu = function()
     { key = 'A', label = 'all of the above', fn = function() ctx.quant_do('all') end },
     scope('b', 'bar', 'bar of the cursor'), scope('p', 'pattern', 'pattern of the cursor'), scope('t', 'track', 'whole track'),
   } })
+end
+-- 29 окт: варианты контейнера — слоты 1..5 рядом с CHAINS: все параметры модулей внутри (и mix / вкл цепей) +
+-- разметка XY (углы и шайба). Трек: P_EXT:jf_cv_<guid>_<i> (параметры «guid|pi=v;…» и «E:guid=0/1»), jf_cvx_… —
+-- строка углов XY, jf_cvp_… — шайба. Пустой — запомнить, полный — вызвать, Shift — перезаписать, Opt — очистить
+ctx.cvar_key = function(f, i, what) return ('P_EXT:jf_cv%s_%s_%d'):format(what or '', tostring(f.fguid or f.i), i) end
+ctx.cvar_info = function(col, f)
+  if not (col and col.track and f) then return nil end
+  ctx.cvc = ctx.cvc or {}
+  local key = tostring(col.guid) .. ':' .. tostring(f.fguid or f.i)
+  local c = ctx.cvc[key]
+  if not c or c.track ~= col.track then
+    c = { track = col.track, has = {} }
+    for i = 1, 5 do local _, v = reaper.GetSetMediaTrackInfo_String(col.track, ctx.cvar_key(f, i), '', false); c.has[i] = v ~= '' end
+    local _, cur = reaper.GetSetMediaTrackInfo_String(col.track, ctx.cvar_key(f, 0, 'cur'), '', false)
+    c.cur = tonumber(cur)
+    ctx.cvc[key] = c
+  end
+  return c
+end
+ctx.cvar_do = function(col, f, i, mode)
+  local tr = col and col.track
+  if not (tr and f and reaper.ValidatePtr(tr, 'MediaTrack*')) then return end
+  local c = ctx.cvar_info(col, f)
+  local cc = ctx.cont_col(col, f)
+  local key = ctx.cvar_key(f, i)
+  if mode == 'clear' then
+    for _, w in ipairs({ '', 'x', 'p' }) do reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, i, w), '', true) end
+    c.has[i] = false; if c.cur == i then c.cur = nil end
+    vim.msg = ('variant %d cleared'):format(i); return
+  end
+  local addrs = ctx.snap_addrs(cc)
+  if mode == 'save' or not c.has[i] then
+    local parts = {}
+    for _, fx in ipairs(addrs) do
+      local g = reaper.TrackFX_GetFXGUID(tr, fx)
+      local np = reaper.TrackFX_GetNumParams(tr, fx)
+      for pi = 0, math.min(np, 1027) - 1 do parts[#parts + 1] = ('%s|%d=%.5f'):format(g, pi, reaper.TrackFX_GetParamNormalized(tr, fx, pi)) end   -- и Wet / Bypass
+      parts[#parts + 1] = ('E:%s=%d'):format(g, reaper.TrackFX_GetEnabled(tr, fx) and 1 or 0)
+    end
+    reaper.GetSetMediaTrackInfo_String(tr, key, table.concat(parts, ';'), true)
+    local _, xy = reaper.GetSetMediaTrackInfo_String(tr, ctx.snap_key(cc), '', false)
+    reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, i, 'x'), xy or '', true)
+    local e = ctx.snaps_of(cc)
+    reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, i, 'p'), ('%.4f,%.4f'):format(e.x or 0.5, e.y or 0.5), true)
+    c.has[i] = true; c.cur = i
+    reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, 0, 'cur'), tostring(i), true)
+    vim.msg = ('variant %d of %s saved: %d fx, the XY corners too (click - recall, Shift+click - overwrite, Opt+click - clear)'):format(i, f.name or 'container', #addrs)
+    return
+  end
+  local _, body = reaper.GetSetMediaTrackInfo_String(tr, key, '', false)
+  local fxmap = ctx.snap_fxmap(tr, cc)
+  reaper.Undo_BeginBlock2(0)
+  local n = 0
+  for tok in (body or ''):gmatch('[^;]+') do
+    local g, en = tok:match('^E:(.-)=(%d)$')
+    if g then local fx = fxmap[g]; if fx then reaper.TrackFX_SetEnabled(tr, fx, en == '1') end
+    else
+      local g2, pi, v = tok:match('^(.-)|(%d+)=([%d%.%-]+)$')
+      local fx = g2 and fxmap[g2]
+      if fx then reaper.TrackFX_SetParamNormalized(tr, fx, tonumber(pi), tonumber(v) or 0); n = n + 1 end
+    end
+  end
+  local _, xy = reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, i, 'x'), '', false)
+  reaper.GetSetMediaTrackInfo_String(tr, ctx.snap_key(cc), xy or '', true)
+  ctx.snapc = ctx.snapc or {}; ctx.snapc[cc.guid] = nil
+  local _, pp = reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, i, 'p'), '', false)
+  local px, py = (pp or ''):match('^([%d%.]+),([%d%.]+)$')
+  if px then local e = ctx.snaps_of(cc); e.x, e.y = tonumber(px), tonumber(py) end
+  reaper.Undo_EndBlock2(0, 'jf_tracker: container variant ' .. i, -1)
+  c.cur = i; reaper.GetSetMediaTrackInfo_String(tr, ctx.cvar_key(f, 0, 'cur'), tostring(i), true)
+  model.invalidate()
+  vim.msg = ('variant %d recalled: %d parameters, XY corners (u - undo; Shift+click - save over it)'):format(i, n)
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)

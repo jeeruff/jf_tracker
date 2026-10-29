@@ -5697,23 +5697,32 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   set(U.LINE); gfx.rect(x0, y + L.rh - 2, w0, 1, 1)
   D.ctab = D.ctab or {}
   local tkey = tostring(f.fguid or f.i)
-  -- 29 окт: CHAINS — всегда сверху; ROUTE | XY — что показать под ним, в нижней половине (щелчок по выбранному — убрать)
+  -- 29 окт: CHAINS — верхняя половина (всегда), рядом слоты вариантов 1..5 (параметры + mix / вкл цепей + углы XY);
+  -- ROUTE | XY — переключатель внизу половины, под ним нижняя половина (щелчок по горящему — убрать)
   local tab = D.ctab[tkey] or 'xy'
   if tab == 'chains' then tab = 'none' end
   text(x0 + L.pad, y, 'CHAINS', U.AMBER)
   local tx = x0 + ms('CHAINS') + 3 * L.pad
-  for _, t in ipairs({ { 'route', 'ROUTE' }, { 'xy', 'XY' } }) do
-    local tw2 = ms(t[2]) + 2 * L.pad
-    if tx + tw2 > x0 + w0 then break end
-    local on = tab == t[1]
-    local hb = not drag and mx >= tx and mx < tx + tw2 and my >= y and my < y + L.rh - 2
-    if on then set(U.tint(U.AMBER, 0.25)); gfx.rect(tx, y, tw2, L.rh - 2, 1) end
-    text(tx + L.pad, y, t[2], (on or hb) and U.AMBER or U.GREY)
-    if hb then hover.dspbtn = { fx = k, f = f, what = 'ctab', tab = on and 'none' or t[1], key = tkey } end
-    tx = tx + tw2 + 2
+  local cv = info.cvars and info.cvars(info.pool_col, f)
+  if cv then
+    local cbw = ms('8') + 2 * L.pad
+    for i = 1, 5 do
+      if tx + cbw > x0 + w0 then break end
+      local on, cur = cv.has[i], cv.cur == i
+      local hb = not drag and mx >= tx and mx < tx + cbw and my >= y and my < y + L.rh - 2
+      set(hb and U.tint(U.AMBER, 0.35) or (cur and U.tint(U.CYAN, 0.35) or (on and U.tint(U.CYAN, 0.12) or U.PANEL))); gfx.rect(tx, y, cbw, L.rh - 2, 1)
+      set(hb and U.AMBER or (on and U.CYAN or U.DIM)); gfx.rect(tx, y, cbw, L.rh - 2, 0)
+      text(tx + L.pad, y, tostring(i), hb and U.AMBER or (on and U.TEXT or U.GREY))
+      if hb then hover.dspbtn = { fx = k, f = f, what = 'cvar', i = i } end
+      if D.hint then D.hint('dspbtn', tx, y, cbw, L.rh - 2, { fx = k, what = 'cvar', i = i }) end
+      tx = tx + cbw + 1
+    end
   end
   y = y + L.rh + 1
-  ymax = (tab ~= 'none') and math.max(y + 3 * L.rh, math.floor((y + ymax) / 2)) or ymax   -- низ — под ROUTE / XY
+  local full = ymax
+  local hy = math.max(y + 4 * L.rh, math.floor((y + full) / 2))   -- строка переключателя — граница половин
+  if hy + L.rh > full then hy = full - L.rh end
+  ymax = hy - 2
   local x, w = x0, w0
   local function btn(bx0, lbl, what, extra)
     local w2 = ms(lbl) + 2 * L.pad
@@ -5816,7 +5825,20 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
       y = y + L.rh
     end
   end
-  return y, tab   -- 28 окт: низ отдела — под ним XY / ROUTE контейнера (29 окт: вкладка вторым)
+  -- 29 окт: переключатель ROUTE | XY — внизу половины цепей
+  set(U.LINE); gfx.rect(x0, hy - 1, w0, 1, 1)
+  local tx2 = x0
+  for _, t in ipairs({ { 'route', 'ROUTE' }, { 'xy', 'XY' } }) do
+    local tw2 = ms(t[2]) + 2 * L.pad
+    if tx2 + tw2 > x0 + w0 then break end
+    local on = tab == t[1]
+    local hb = not drag and mx >= tx2 and mx < tx2 + tw2 and my >= hy and my < hy + L.rh - 1
+    if on then set(U.tint(U.AMBER, 0.25)); gfx.rect(tx2, hy, tw2, L.rh - 1, 1) end
+    text(tx2 + L.pad, hy, t[2], (on or hb) and U.AMBER or U.GREY)
+    if hb then hover.dspbtn = { fx = k, f = f, what = 'ctab', tab = on and 'none' or t[1], key = tkey } end
+    tx2 = tx2 + tw2 + 2
+  end
+  return hy + L.rh, tab   -- низ переключателя — под ним ROUTE / XY (нижняя половина)
 end
 -- 23 окт: шапка эффекта внутри контейнера (цепь пэда, цепь полосы) — обычная шапка модуля: + O Δ B x справа
 -- (узко — только B x); возвращает ширину под имя
