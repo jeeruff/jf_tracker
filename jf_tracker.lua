@@ -31534,6 +31534,17 @@ ctx.param_auto_open = function(k, pi)
   if m and draw.panes and not draw.panes.visible(m, 'automation') then ctx.pane_do(function() return draw.panes.show(m, 'automation') end, 'automation shown') end
   if m and draw.panes then draw.panes.set_active(m, 'automation'); state.toptab = 'automation'; ctx.relayout() end
 end
+-- 29 окт: выделение матрицы (блок Shift / v, ячейки Cmd+щелчок) → треки (ci → true) и строки паттернов; нет — nil
+ctx.mx_scope = function()
+  if not (MX.anchor or next(MX.picks or {})) then return nil end
+  local cols = MX.sel_cols()
+  local ra, rb
+  if MX.anchor then ra, rb = MX.block() end
+  for _, p in pairs(MX.picks or {}) do ra = math.min(ra or p.ri, p.ri); rb = math.max(rb or p.ri, p.ri) end
+  local s0, s1 = seq[ra], seq[rb]
+  if not (s0 and s1) then return nil end
+  return cols, math.floor(model.row_of_time(s0.pos, state.lpb) + 1e-6), math.ceil(model.row_of_time(s1.rgnend, state.lpb) - 1e-6) - 1
+end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end

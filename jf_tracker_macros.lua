@@ -17,8 +17,8 @@ local MR = { sel = 1, scroll = 0, hot = nil }
 
 MR.BUILTIN = {
   -- 26 окт: OFF-макросы — первыми в списке
-  { name = 'off all',     body = ':offnotes all', hk = '`', desc = 'an OFF right after every note on every track in what you see (V - the selection)' },
-  { name = 'nooff all',   body = ':nooff all',    hk = '~', desc = 'remove every OFF on every track in what you see (V - the selection); the notes ring to the next event' },
+  { name = 'off all',     body = ':offnotes all', hk = '`', desc = 'an OFF right after every note of the selection: V in the tracker, a block / cells in the matrix; nothing selected - the cursor track in what you see' },
+  { name = 'clear off',   body = ':nooff all',    hk = '~', desc = 'remove every OFF of the selection: V in the tracker, a block / cells in the matrix; nothing selected - the cursor track in what you see; the notes ring to the next event' },
   { name = 'scramble',    body = ':scramble',     desc = 'slice notes swap their slices randomly (VISUAL, else the cursor track in the region)' },
   { name = 'arp up',      body = ':arp up',       desc = 'the chord on the cursor row becomes an arpeggio up over its length' },
   { name = 'arp random',  body = ':arp random',   desc = 'the chord on the cursor row - a random arpeggio' },
