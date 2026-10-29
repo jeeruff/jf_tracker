@@ -267,7 +267,10 @@ do
   local rows = M.rows(14, 4, 4)
   eq('rows n', #rows, 4)
   eq('row 16 bar', rows[3].bar, true)
-  eq('row 16 label', rows[3].label, '0016')
+  eq('row 16 label (from 0001)', rows[3].label, '0017')   -- 29 окт: умолчание — отсчёт с 0001, как 1.1 REAPER
+  M.ROW_BASE = 0
+  eq('row 16 label (from 0000)', M.rows(14, 4, 4)[3].label, '0016')
+  M.ROW_BASE = nil
   eq('row 15 not beat', rows[2].beat, false)
   eq('row 16 t', rows[3].t, 2.0)
 end

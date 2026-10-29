@@ -5253,7 +5253,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local fname = D.cursor_field_name(f, vc)
       local fcol = not f.env and not f.ml and not f.folded and (D.field_rgb(vc.sub or vc.field or 1) or (vc.sub == 'inst' and U.TEXT))
       local l1 = (f.col.name ~= '' and f.col.name) or 'track'
-      local l2 = ('%04d'):format(math.max(0, vc.row or 0))
+      local l2 = ('%04d'):format(math.max(0, vc.row or 0) + (D.ROW_BASE or 1))
       local cl = ms('col') + L.pad          -- пробел в битмапе — нулевой ширины: отступ L.pad
       local lw = math.max(ms(fit(l1, 14 * L.cw)), cl + ms(fname), cl + ms(l2), 10 * L.cw)
       order[#order + 1] = { w = lw, draw = function(gx)
@@ -5848,7 +5848,6 @@ function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
   set(U.LINE); gfx.rect(px0, py0, side, side, 0)
   set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
   local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
-  set(U.AMBER); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
   if py0 + side + L.rh <= y + h + 2 then
     -- 25 окт: подпись — имена параметров (★ контейнера / макросы плагина), не M1 / M2
     local an = (f.params[qx].pinname or f.params[qx].mlabel or 'x'):sub(1, 6)
@@ -5858,7 +5857,8 @@ function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
   -- 28 окт: углы 1..4 — снимки всех параметров модуля (пусто — запомнить, полный — вызвать, Shift — перезаписать);
   -- шайба — по-прежнему два макроса
   local oncorner
-  local si, sc = D.info and D.info.fx_snaps and D.info.fx_snaps(f)
+  local si, sc   -- 29 окт: and срезал второе значение — sc = nil, угол не запоминался (ошибка snaps_of)
+  if D.info and D.info.fx_snaps then si, sc = D.info.fx_snaps(f) end
   if si and side >= 4 * L.rh then
     local cbw = math.max(L.btn_w or 0, ms('4') + 6)
     local corners = { { px0 + 1, py0 + 1 }, { px0 + side - cbw - 1, py0 + 1 }, { px0 + 1, py0 + side - L.rh }, { px0 + side - cbw - 1, py0 + side - L.rh } }
@@ -5871,8 +5871,21 @@ function D.mac_xy(L, f, vals, x, y, w, h, k, drag, mx, my, hover)
       if hot then hover.snapc = { col = sc, i = i }; oncorner = true end
     end
   end
+  -- 29 окт: шайба — поверх цифр углов и в границах пэда (в углу — четверть круга)
+  set(U.AMBER); D.disc_clip(dx, dy, math.max(3, math.floor(L.rh / 3)), px0, py0, px0 + side - 1, py0 + side - 1)
   if not oncorner and not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side then
     hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = qx, qy = qy }
+  end
+end
+-- 29 окт: залитый круг, обрезанный прямоугольником (строками; gfx.circle не режется)
+function D.disc_clip(cx, cy, r, x0, y0, x1, y1)
+  for dy = -r, r do
+    local yy = cy + dy
+    if yy >= y0 and yy <= y1 then
+      local hw = math.floor(math.sqrt(math.max(0, r * r - dy * dy)) + 0.5)
+      local a, b = math.max(x0, cx - hw), math.min(x1, cx + hw)
+      if b >= a then gfx.rect(a, yy, b - a + 1, 1, 1) end
+    end
   end
 end
 function D.kid_head(L, info, cx, hy, w, kid, k, f, drag, mx, my, hover)
@@ -8152,6 +8165,8 @@ function D.frame(L, snap, rows, state, info)
         local one = false   -- 24 окт (вечер): кнопка 1 убрана (лишние кнопки в шапке) — моно-лейн: z1 / меню трека
         if nx + bw2 <= ln.x + ln.w then
           pm(nx + (one and (L.btn_w + 2) or 0), 'lanebtn', function(d) hover.lanebtn = { col = col, lane = ln.lane, d = d, n = ln.nsub } end)
+          -- 29 окт: сколько нотных колонок — числом сразу за − + (1 — одна колонка)
+          if nx + bw2 + 2 + ms('8') <= ln.x + ln.w then text(nx + bw2 + 2, by, tostring(ln.nsub or 1), (ln.nsub or 1) == 1 and U.GREY or U.CYAN) end
           local ox = nx
           if one then
             local on = info.mono_on(col)
@@ -9073,7 +9088,7 @@ function D.frame(L, snap, rows, state, info)
         or ({ 'note', 'vol', 'delay' })[fld] or ('fx ' .. (fld - 3))
       segs[#segs + 1] = { fname, 'col' }   -- 16 окт: подпись col (было field)
       local row = math.max(0, vc.row or 0)
-      segs[#segs + 1] = { ('%04d'):format(row), 'row' }
+      segs[#segs + 1] = { ('%04d'):format(row + (D.ROW_BASE or 1)), 'row' }
       if info.bbt then segs[#segs + 1] = { info.bbt(row), 'bar' } end
       for _, rg in ipairs(info.ruler and info.ruler.regions or {}) do
         if row >= rg.r0 and row < rg.r1 and (rg.name or '') ~= '' then segs[#segs + 1] = { rg.name, 'region' }; break end

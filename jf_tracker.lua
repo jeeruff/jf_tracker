@@ -181,7 +181,8 @@ local state = {
   theme = (function() local v = reaper.GetExtState(EXT, 'theme'); return v ~= '' and v or 'reaper' end)(),   -- тема трекера (3 окт)
   tlruler = (function() local v = reaper.GetExtState(EXT, 'tlruler'); return (v == 'beats' or v == 'time' or v == 'both') and v or 'off' end)(),   -- линейка у номеров (3 окт)
   curline = (function() local v = reaper.GetExtState(EXT, 'curline'); return (v == 'bottom' or v == 'off') and v or 'top' end)(),   -- линия курсора (3 окт)
-  curacc = (function() local v = reaper.GetExtState(EXT, 'curacc'); return v ~= '' and v or 'ff00ff' end)(),   -- 28 окт: цвет курсора, когда фокус в другой панели
+  curacc = (function() local v = reaper.GetExtState(EXT, 'curacc'); return v ~= '' and v or 'ff00ff' end)(),
+  rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,   -- 29 окт: номера строк с 0001 (умолчание, как 1.1) или 0000   -- 28 окт: цвет курсора, когда фокус в другой панели
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
   sidenarrow = flag('sidenarrow', false),       -- узкий сайдбар (кнопка <>)
@@ -12970,6 +12971,7 @@ ctx = {
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
+      { key = 'rowbase', label = 'row numbers from', kind = 'cycle', values = { '0001', '0000' }, desc = 'the first row of the project is 0001 (as REAPER counts 1.1) or 0000', get = function() return state.rowbase == 0 and '0000' or '0001' end, set = function(v) state.rowbase = v == '0000' and 0 or 1; reaper.SetExtState(EXT, 'rowbase', tostring(state.rowbase), true); model.ROW_BASE, draw.ROW_BASE = state.rowbase, state.rowbase; model.invalidate() end },
       { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'colour of the active cursor: the tracker cursor in focus and the selected DSP parameter - hex RGB; grey - the theme colour', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
 -- 18 окт: выключено --       flag('clipsview', 'clips', 'the tracker body shows the clips of the session zone: scenes (slots) x tracks, clips with waves and names; headers, inputs and arms stay live; zz in the tracker toggles it'),
@@ -13152,7 +13154,7 @@ ctx = {
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -28751,7 +28753,7 @@ local function frame()
     local fld = vim.cur.field or 1
     if ctx.mods().ctrl then
       if f and f.col and fld < 4 then ctx.fx_cols_step(f.col, d); model.invalidate(); c = 0 end
-    elseif f and f.col and f.lane and not (vim.mode == 'insert' and vim.piano and fld == 1) then
+    elseif f and f.col and f.lane then   -- 29 окт: и в INSERT с пианино (- = в frow — ноты, но Opt+- / Opt+= — колонки нот)
       local ln = f.lane
       local n = math.max(1, #(ln.subs or {}), (state.subs_min or {})[f.col.guid .. ':' .. tostring(ln.idx)] or 0)
       ctx.lane_subs(f.col, ln, d, n); ctx.relayout(); c = 0
@@ -31436,6 +31438,7 @@ ctx.curacc_apply = function()
   if draw.acc_apply and draw.CUR then draw.acc_apply() end
 end
 ctx.curacc_apply()
+model.ROW_BASE, draw.ROW_BASE = state.rowbase, state.rowbase   -- 29 окт
 -- 28 окт: цвет цепочки контейнера (ветки) — свой: P_EXT:jf_chcol трека «GUID контейнера|ветка=rrggbb;…»;
 -- нет своего — цвет по номеру ветки (D.lane_col). Выбор — палитра квадратиками с индексом xx, :chcol rrggbb
 ctx.CHPAL = {}

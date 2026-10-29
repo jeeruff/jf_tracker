@@ -992,9 +992,9 @@ local rows_c = {}
 function M.rows(row0, n, lpb)
   local sc, now = R.GetProjectStateChangeCount(0), R.time_precise()
   local c = rows_c
-  if c.out and c.row0 == row0 and c.n == n and c.lpb == lpb and c.sc == sc and now - c.t < 1 then return c.out end
+  if c.out and c.row0 == row0 and c.n == n and c.lpb == lpb and c.sc == sc and c.base == M.ROW_BASE and now - c.t < 1 then return c.out end
   local out = M.rows_build(row0, n, lpb)
-  rows_c = { out = out, row0 = row0, n = n, lpb = lpb, sc = sc, t = now }
+  rows_c = { out = out, row0 = row0, n = n, lpb = lpb, sc = sc, t = now, base = M.ROW_BASE }   -- 29 окт: и отсчёт подписей
   return out
 end
 function M.rows_build(row0, n, lpb)
@@ -1021,7 +1021,7 @@ function M.rows_build(row0, n, lpb)
       acc = M.accent(rin % rpb, rpb, rin // rpb, pats[m].p)
     end
     out[i] = { row = row, qn = qn, t = t, bar = row >= 0 and bar, beat = row >= 0 and beat, measure = meas, acc = acc,
-               label = row >= 0 and string.format('%04d', row % 10000) or string.format('-%03d', (-row) % 1000) }   -- 11 окт: до начала проекта — с минусом (было пусто)
+               label = row >= 0 and string.format('%04d', (row + (M.ROW_BASE or 1)) % 10000) or string.format('-%03d', (-row) % 1000) }   -- 29 окт: отсчёт с 0001 (как 1.1 REAPER) или 0000 — опция row numbers   -- 11 окт: до начала проекта — с минусом (было пусто)
   end
   return out
 end
@@ -1687,7 +1687,8 @@ local function mark_params(tr, A, out)
   for _, e in ipairs(out) do
     for _, p in ipairs(e.params or {}) do
       local fx = p.fx or e.i
-      local okm, act = A.GetNamedConfigParm and A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i))
+      local okm, act   -- 29 окт: «and» срезал второе значение (act всегда nil)
+      if A.GetNamedConfigParm then okm, act = A.GetNamedConfigParm(tr, fx, ('param.%d.mod.active'):format(p.i)) end
       p.auto = (R.GetFXEnvelope and not M.is_take(tr) and R.GetFXEnvelope(tr, fx, p.i, false) ~= nil) or false
       p.mod = (okm and act == '1') or false
       p.mk = (p.auto and ' ~' or '') .. (p.mod and ' ≈' or '')   -- 18 окт: модулирован — ≈ (просьба), автоматизирован — ~

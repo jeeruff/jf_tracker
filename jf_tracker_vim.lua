@@ -374,6 +374,27 @@ end
 -- 22 окт: шаг курсора после записи не из клавиш (XY-пресет → автоматизация в INSERT)
 function V.step_advance() V.cur.row = V.cur.row + step_rows(); ensure_visible() end
 -- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
+-- 29 окт: пустой слот команды (поле курсора) внутри ноты — команда сверху в том же слоте той же ноты сюда; → true, если поставлена
+function V.fx_prev_fill(fi, row)
+  local fld = V.cur.field or 1
+  if fld < 4 then return false end
+  local i = fld - 3
+  local fc = V.fx_cell(fi, row)
+  if not (fc and fc.head) or fc.fx[i] then return false end
+  local code
+  for r = row - 1, (fc.head.row0 or row) - 1, -1 do
+    local f2 = V.fx_cell(fi, r)
+    if not (f2 and f2.head == fc.head) then break end
+    if f2.fx[i] then code = f2.fx[i]; break end
+  end
+  if not code or #code < 4 then return false end
+  local cc = code:sub(1, 2)
+  local off = (fc.off > 0 and V.fx_rowable(cc)) and fc.off or nil
+  if fc.off > 0 and not off then V.msg = cc .. ' works on the note row only'; return false end
+  ctx.edit.set_fx({ fc.head }, lpb(), cc, tonumber(code:sub(3, 4), 16) or 0, off)
+  V.msg = ('%s from above - Ctrl+A / X again changes it'):format(code)
+  return true
+end
 function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
 
 -- swap (4 окт): событие под курсором ↔ k-е событие ниже в той же колонке
@@ -1418,7 +1439,8 @@ local function run_cmd(line)
   elseif cmd == 'xf' then
     -- 15 окт: модификаторы (jf_tracker_xform): VISUAL — блок, иначе трек курсора в регионе
     local XF = ctx.XF
-    local name, num = XF and XF.parse(arg)
+    local name, num   -- 29 окт: «and» срезал число (:xf rotate 4 → без 4)
+    if XF then name, num = XF.parse(arg) end
     if not name then V.msg = ':xf stretch k | reverse | rotate n | shuffle | gravity g | bounce r | fib | tuplet n | golden | vel k'; return end
     local hs, r0, r1
     if V.cmd_from == 'visual' or V.cmd_from == 'vline' then
@@ -2694,17 +2716,17 @@ function V.key_impl(c)
       -- 10 окт: g + цифры + Enter (или g) — на строку с этим номером (g12 ↵ → 0012); Esc — отмена
       if c >= 48 and c <= 57 and not V.op then
         V.gnum = (V.gnum or '') .. string.char(c); V.pending = 'g'
-        V.msg = 'g' .. V.gnum .. ' - Enter: go to row ' .. ('%04d'):format(tonumber(V.gnum)); return
+        V.msg = 'g' .. V.gnum .. ' - Enter: go to row ' .. ('%04d'):format(tonumber(V.gnum)); return   -- номер — как подпись строки (отсчёт rowbase)
       end
       if V.gnum and (c == 13 or c == ('g'):byte()) and not V.op then
         local r = tonumber(V.gnum) or 0; V.gnum = nil
         if r ~= V.cur.row and ctx.jump_mark then ctx.jump_mark() end
-        V.cur.row = math.max(0, r); V.count = nil; finish_move(); ensure_visible(); return
+        V.cur.row = math.max(0, r - (ctx.state.rowbase or 1)); V.count = nil; finish_move(); ensure_visible(); return   -- 29 окт: подпись 0001 = строка 0
       end
       V.gnum = nil
       if c == ('g'):byte() then
         -- 10 окт: Ngg — строка N, как её подпись (0012 = 12gg); было N−1, как строки Vim с 1
-        local t = { fi = V.cur.fi, row = V.count and n or 0, linewise = true }
+        local t = { fi = V.cur.fi, row = V.count and math.max(0, n - (ctx.state.rowbase or 1)) or 0, linewise = true }   -- 29 окт: Ngg — строка с подписью N
         -- 20 окт: опция gg proj/pat relative — в виде pattern gg ведёт на первую строку паттерна курсора
         if not V.count and ctx.state.ggrel and ctx.state.view_reg and ctx.region_rows then
           local r0 = ctx.region_rows(); if r0 then t.row = r0 end
@@ -3294,8 +3316,16 @@ function V.key_impl(c)
       finish_edit()
     end
   elseif c == ctrl('a') or c == ctrl('x') then   -- 27 окт: лейн / огибающая — пусто: значение сверху, дальше ±; иначе ноты
-    if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n)) then
-      apply(c == ctrl('a') and '+' or '-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
+    -- 29 окт: пустая клетка команды внутри ноты — сначала значение команды сверху (той же колонки, той же ноты), дальше ±;
+    -- Ctrl+Opt+A / X — то же и курсор на шаг step вниз
+    if not V.fx_prev_fill(V.cur.fi, V.cur.row) then
+      if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n)) then
+        apply(c == ctrl('a') and '+' or '-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
+      end
+    end
+    if ctx.mods and ctx.mods().alt then
+      local st = (type(V.step) == 'number' and V.step > 0) and V.step or 1
+      V.cur.row = V.cur.row + st
     end
     finish_edit()
   elseif ch == 'p' or ch == 'P' then
@@ -4303,7 +4333,8 @@ function V.smart()
                  local h0 = hs[1]
                  if h0 and h0.kind == 'midi' and h0.pitch and h0.item and ctx.preview then
                    local tr = reaper.GetMediaItem_Track(h0.item)
-                   local _, nt = E.midi_note_of and E.midi_note_of(h0, lpb())
+                   local _, nt
+                   if E.midi_note_of then _, nt = E.midi_note_of(h0, lpb()) end   -- 29 окт: «and» срезал nt
                    local pp = (nt and nt.pitch) or h0.pitch
                    if tr and letter == '0R' and ctx.preview_retrig then   -- 28 окт: слышно повторы, не одну ноту
                      ctx.preview_retrig(tr, pp, it.v, nt and nt.len_rows or h0.len_rows or h0.rows)
