@@ -4567,6 +4567,20 @@ function E.rtg_clean(it, take, dry)   -- dry: только сосчитать
   if #del > 0 then R.MIDI_Sort(take) end
   return #del
 end
+-- 29 окт: MIDI-клип с краями вне сетки (задержка первой ноты, протяжка) — края на доли: начало вниз, конец вверх
+-- (MIDI_SetItemExtents: ноты стоят на месте, клип только шире); опция clipsnap (по умолчанию вкл)
+E.CLIP_SNAP = true
+function E.clip_snap(it)
+  if not (E.CLIP_SNAP and R.MIDI_SetItemExtents) then return false end
+  local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local l = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local q0, q1 = R.TimeMap2_timeToQN(0, p), R.TimeMap2_timeToQN(0, p + l)
+  local a, b = math.floor(q0 + 1e-6), math.ceil(q1 - 1e-6)
+  if math.abs(a - q0) < 1e-4 and math.abs(b - q1) < 1e-4 then return false end
+  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1 and math.abs(a - q0) >= 1e-4 then return false end   -- луп источника: начало не трогать
+  R.MIDI_SetItemExtents(it, a, math.max(a + 1, b))
+  return true
+end
 function E.rtg_sync(dry)
   local n = 0
   for ti = 0, R.CountTracks(0) - 1 do
@@ -4579,6 +4593,7 @@ function E.rtg_sync(dry)
         if dry then n = n + E.rtg_clean(it, tk, true)
         elseif E.rtg_hash[tk] ~= h then
           n = n + E.rtg_clean(it, tk)
+          pcall(E.clip_snap, it)
           local _, h2 = R.MIDI_GetHash(tk, true, '')
           E.rtg_hash[tk] = h2
         end

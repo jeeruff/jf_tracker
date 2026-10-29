@@ -561,8 +561,10 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
     for _, nt in ipairs(notes) do
       local a, b = nt.qn + shift, nt.qn_end + shift
       -- нота должна начинаться внутри item; хвост режется по концу item
-      if a >= qn0 - 1e-7 and a < qn1 - 1e-7 then
-        if b > qn1 then b = qn1 end
+      -- 29 окт: опция show notes outside clips — ноты за краями клипа тускло (ghost, muted); по умолчанию скрыты
+      local inside = a >= qn0 - 1e-7 and a < qn1 - 1e-7
+      if inside or (M.OUTNOTES and k == 0) then
+        if inside and b > qn1 then b = qn1 end
         local r0, d0 = M.row_of_qn(a, lpb)
         local r1, d1 = M.row_of_qn(b, lpb)
         local head = {
@@ -570,7 +572,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
           note = M.note_name(nt.pitch), pitch = nt.pitch, semis = nt.pitch - M.BASE_NOTE,
           micro = M.micro_of_cents(nt.cents), ppq = nt.ppq,   -- 16 окт: микротон (MTS sysex перед нотой)
           vol = M.hex2(nt.vel), delay = d0, ch = nt.ch,
-          muted = muted_item or nt.muted, row0 = r0, fx = (function()
+          muted = muted_item or nt.muted or not inside, ghost = (not inside) or nil, outside = (not inside) or nil, row0 = r0, fx = (function()
             local nf = (k == 0) and note_fx(nt.qn - qn0) or nil
             if not nt.soff and not nt.nx and not nf then return midi_fx end
             local t = nt.soff and { ('0S%02X'):format(nt.soff) } or {}   -- 19 окт: 0Sxx ноты кита
