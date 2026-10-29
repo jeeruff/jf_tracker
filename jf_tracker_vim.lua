@@ -1841,9 +1841,10 @@ function V.key_impl(c)
     local m1 = ctx.mods and ctx.mods() or {}
     -- 20 окт: Opt+W (∑) в NORMAL — курсор на мастер (сложенный раскрывается); в INSERT Option+w — нота, как была
     -- 20 окт: Shift+Ctrl+F — найти сэмпл для этого места и поставить его в сэмплер (Shift+F — аудио item)
-    if c == 6 and m1.ctrl and m1.shift and V.mode == 'normal' and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('sampler'); return end
+    -- 29 окт: Shift+Opt+F — в сэмплер, Ctrl+Shift+F — выбрать базу (просьба: Shift+F — аудио item, сэмплер — Shift+Opt+F)
+    if c == 6 and m1.ctrl and m1.shift and V.mode == 'normal' and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('pickdb'); return end
     -- 20 окт: Shift+Opt+F (Ï) — выбрать базу для поиска сэмпла этого места (Shift+F — сразу поиск в базе)
-    if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('pickdb'); return end
+    if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('sampler'); return end
     if (cpd == 8721 or (m1.alt and c == 119)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
     -- 24 окт: Opt+V (√) в NORMAL / VISUAL — умное выделение: до конца субдоли, доли, такта, паттерна; в INSERT — нота
     if (cpd == 8730 or (m1.alt and not m1.shift and c == 118)) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.smart_select then ctx.smart_select(); return end

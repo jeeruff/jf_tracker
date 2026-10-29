@@ -24348,7 +24348,7 @@ local function frame()
   -- 20 окт: auto — мастер сложен, пока курсор не на нём; клик по сложенному мастеру — раскрыть и курсор на мастер
   if U.click and hover.mfoldauto then state.mfoldauto = not state.mfoldauto; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfoldauto and 'master auto: folded while the cursor is not on it (Opt+W / l from the last track / a click opens it)' or 'master auto off' end
   if U.click and (hover.mfold_meter or hover.mfold_open) then U.click = false; ctx.master_jump() end
-  if U.click and hover.khelp_big then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; U.click = false end   -- справка F1: раздел мышью
+  if U.click and (hover.khelp_big or hover.docsec) then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; if hover.docsec and state.focus ~= 'manual' and draw.panes.visible(state.panes, 'manual') then ctx.set_focus('manual') end; U.click = false end   -- справка F1 / панель manual: раздел мышью
   -- клип под мышью (6 окт) — во вкладке item (как курсор), раз на смену клетки
   -- 8 окт: клип во вкладке item — только выбранный (клик / курсор клип-мода),
   -- пока фокус в клипах или во вкладке (правка зоны клипа); фокус ушёл —
@@ -27950,7 +27950,7 @@ local function frame()
   if gfx.mouse_wheel ~= 0 then
     local step = gfx.mouse_wheel > 0 and -3 or 3
     if hover.ssbig then MX.SS.wheel(gfx.mouse_wheel, #seq)                        -- session: ряды сцен
-    elseif hover.khelp_big and ctx.DOC then ctx.DOC.wheel(gfx.mouse_wheel)        -- справка F1: прокрутка
+    elseif (hover.khelp_big or hover.docsec or (state.focus == 'manual' and L.pn and L.pn.by_panel and L.pn.by_panel.manual and (function() local r = L.pn.by_panel.manual.content; return gfx.mouse_x >= r.x and gfx.mouse_x < r.x + r.w and gfx.mouse_y >= r.y and gfx.mouse_y < r.y + r.h end)())) and ctx.DOC then ctx.DOC.wheel(gfx.mouse_wheel)        -- справка F1 / панель manual: прокрутка
     elseif hover.dsp and hover.dsp.param then
       local col = dsp_target(); local p = col and hover.dsp.f.params[hover.dsp.param]
       if p then local id = p.fx or hover.dsp.f.i; edit.fx_param(col.track, id, p.i, model.fxapi(col.track).GetParamNormalized(col.track, id, p.i) + (step > 0 and -0.02 or 0.02)) end
