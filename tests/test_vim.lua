@@ -1166,5 +1166,29 @@ V.cur = { fi = 1, row = 12, field = 1 }; keysin('gg'); eq('gg in pattern view: p
 keysin('G'); eq('G in pattern view: pattern end', V.cur.row, 20)
 state.view_reg = false; V.cur = { fi = 1, row = 12, field = 1 }; keysin('gg'); eq('gg in project view: row 0', V.cur.row, 0)
 state.ggrel = nil; RR = nil
+-- 29 окт: удаление — поля, несколько колонок, OFF с задержкой, x вырезает в регистр
+local function has(prefix) for _, c in ipairs(calls) do if c:find(prefix, 1, true) == 1 then return true end end return false end
+local function count(prefix) local k = 0; for _, c in ipairs(calls) do if c:find(prefix, 1, true) == 1 then k = k + 1 end end return k end
+-- vol-колонка в выделении: x — громкость по умолчанию у нот, в регистр поле
+reset(); V.cur = { fi = 1, row = 0, field = 2 }; keysin('v9jx')
+eq('x on vol column: kick vol default', has('vol:kick:128'), true); eq('…snare too', has('vol:snare:128'), true)
+eq('x on vol column: back to NORMAL', V.mode, 'normal'); eq('x cuts: register is the field', V.regs['"'] and V.regs['"'].kind, 'field')
+eq('x on vol column: notes stay', has('delete:'), false)
+-- delay-колонка: и задержка OFF (конец ноты внутри строки) — на начало строки
+reset(); snap.cols[1].lanes[1].subs[1][4] = { kind = 'off', of = snap.cols[1].lanes[1].subs[1][0], delay = 40 }
+V.cur = { fi = 1, row = 0, field = 3 }; keysin('v5jx')
+eq('x on delay column: note delay 0', has('delay:kick:0'), true); eq('…OFF delay cleared (note end to its row)', has('off:kick@4'), true)
+-- delay-колонка без OFF с задержкой — note_off не зовётся
+reset(); V.cur = { fi = 1, row = 0, field = 3 }; keysin('v3jx'); eq('no OFF delay: no note_off', has('off:'), false)
+-- команда: x убирает команду строк
+reset(); V.cur = { fi = 1, row = 0, field = 4 }; keysin('vx'); eq('x on command column clears 0P', has('clearfx:kick:0P'), true)
+-- несколько колонок (Opt+l — к следующему треку): x на поле нот — удаляет все ноты выделения
+reset(); keysin('v'); alt_down = true; V.key(172); V.key(172); alt_down = false; keysin('4jx')
+eq('x over several columns deletes all notes', last(), 'delete:kick,n60,ov')
+-- V-line на всех колонках
+reset(); keysin('Vjjjjx'); eq('V-line x deletes every column', last(), 'delete:kick,n60,ov')
+-- vol в нескольких колонках
+reset(); V.cur = { fi = 1, row = 0, field = 2 }; keysin('v'); alt_down = true; V.key(172); V.key(172); alt_down = false; keysin('5jx')
+eq('vol over several columns: every note (kick, n60, ov)', count('vol:'), 3); eq('…n60 of the 2nd track', has('vol:n60:128'), true)
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -4512,8 +4512,12 @@ ctx = {
     edit.env_ramp(e, t0, t1, v0, v1, (edit.row_time(r0 + 1, state.lpb, 0) - t0) / 2)
   end,
   env_del = function(e, row)
-    local t = edit.row_time(row, state.lpb, 0)
-    if not edit.env_del(e, t, (edit.row_time(row + 1, state.lpb, 0) - t) / 2) then vim.msg = 'no point here' end
+    -- 29 окт: вся строка (точка там, где её показывает модель: row_time(r) <= t < row_time(r + 1)), не ± полстроки;
+    -- и в регистр (x — вырезать)
+    local t, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+    local pts = ctx.env_points(e, row, row)
+    if #pts > 0 then vim.regs['"'] = { kind = 'env', rows = 1, pts = pts } end
+    if edit.env_del_range(e, t, t1) == 0 then vim.msg = 'no point here' end
   end,
   -- точки огибающей для Vim (2 окт): строки с точками (кэш на снимок), чтение,
   -- удаление и вставка диапазона строк. Время → строка тем же правилом, что

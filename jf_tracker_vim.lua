@@ -229,6 +229,24 @@ local function head_of(c)
 end
 
 -- головы событий в прямоугольнике [f0..f1] × [r0..r1] (по строке головы)
+-- 29 окт: OFF с задержкой в прямоугольнике → { { cell, row } … }
+function V.offs_in(f0, f1, r0, r1)
+  local F, out = flat(), {}
+  if f0 > f1 then f0, f1 = f1, f0 end
+  if r0 > r1 then r0, r1 = r1, r0 end
+  for fi = f0, f1 do
+    local f = F[fi]
+    if f then
+      for _, sub in ipairs(subs_of(f)) do
+        for r = r0, r1 do
+          local c = sub[r]
+          if c and c.kind == 'off' and c.of and (c.delay or 0) > 0 then out[#out + 1] = { cell = c, row = r } end
+        end
+      end
+    end
+  end
+  return out
+end
 function V.heads_in(f0, f1, r0, r1)
   local F = flat()
   if f0 > f1 then f0, f1 = f1, f0 end
@@ -3195,8 +3213,14 @@ function V.key_impl(c)
         local n = V.field_yank(f0, f1, r0, r1, fld); V.msg = ('yank: %d value(s) of the field - p puts them into the notes of the rows'):format(n); finish_move()
       else
         local hs = V.heads_in(f0, f1, r0, r1)
-        ctx.edit.run('clear field', function() for _, h in ipairs(hs) do V.field_set(h, fld, nil) end end)
-        V.msg = ('field cleared on %d note(s)'):format(#hs); finish_edit()
+        if c == ('x'):byte() then V.field_yank(f0, f1, r0, r1, fld) end   -- 29 окт: x — вырезать (в регистр)
+        local offs = fld == 3 and V.offs_in(f0, f1, r0, r1) or {}
+        ctx.edit.run('clear field', function()
+          for _, h in ipairs(hs) do V.field_set(h, fld, nil) end
+          -- 29 окт: задержка у OFF (конец ноты внутри строки) — тоже: конец на начало строки OFF
+          for _, o in ipairs(offs) do ctx.edit.note_off({ o.cell.of }, lpb(), o.row) end
+        end)
+        V.msg = ('field cleared on %d note(s)%s'):format(#hs, #offs > 0 and (', %d OFF'):format(#offs) or ''); finish_edit()
       end
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; done = true
     end

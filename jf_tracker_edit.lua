@@ -2980,6 +2980,17 @@ end
 function E.env_del_range(e, t0, t1)
   local n = #E.env_points(e, t0, t1)
   if n == 0 then return 0 end
+  -- 29 окт: Tempo map — это маркеры темпа: удалять маркерами (точки огибающей темпа не удалялись — 133 «не стиралось»)
+  local _, nm = R.GetEnvelopeName(e.env)
+  if nm == 'Tempo map' and R.DeleteTempoTimeSigMarker then
+    run('tempo delete', function()
+      for i = R.CountTempoTimeSigMarkers(0) - 1, 1, -1 do
+        local ok, tp = R.GetTempoTimeSigMarker(0, i)
+        if ok and tp >= t0 - 1e-9 and tp < t1 - 1e-9 then R.DeleteTempoTimeSigMarker(0, i) end
+      end
+    end)
+    return n
+  end
   run('envelope delete points', function() R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9) end)
   return n
 end
