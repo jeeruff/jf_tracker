@@ -21983,7 +21983,7 @@ local function frame()
     B.SM.bg = true
     local G = B.mapG
     -- обход папок — 3 мс за тик (раз в жизни папки), чтение индекса — 1 мс ×3
-    if G.building then B.SM.scan(G, G.rd and 0.001 or 0.003) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
+    if G.building then B.SM.scan(G, 0.003) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
     -- 28 окт: вид cloud — грубый анализ частот фоном: каждый 3-й тик два ещё не слышанных файла (шагом по списку,
     -- чтобы облако заполнялось равномерно); группы и облако пересобираются по мере (B.an_tick, раз в 1.5 с)
     if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then

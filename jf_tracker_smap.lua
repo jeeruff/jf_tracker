@@ -553,51 +553,65 @@ local function galaxy_star(k)
   local sx, sy = r * math.cos(a), r * math.sin(a) * 0.78
   return sx + (rnd(k + 0.13) - 0.5) * 0.06, sy + (rnd(k + 0.91) - 0.5) * 0.06
 end
+-- 29 окт: граница облака группы по углу: радиус с лопастями (3 и 5 гармоник) — звёзды внутри, контур сектора по ней
+function SM.neb_bound(hb, a)
+  return hb.R * (1 + hb.lobe * math.sin(3 * a + hb.ph1) + 0.12 * math.sin(5 * a + hb.ph2) + 0.06 * math.sin(8 * a + hb.ph3))
+end
 function SM.neb_build(G)
   if G.gal then return end
   local total = #G.nodes
   local show = math.min(total, SM.NEB_MAX)
   -- доля звёзд у группы: пропорционально, минимум одна; звёзды — первые файлы группы
-  local stars, k = {}, 0
   for _, hb in ipairs(G.hubs) do
     local m = math.max(1, math.floor(hb.n * show / math.max(1, total) + 0.5))
     hb.stars = {}
-    for j = 1, math.min(m, hb.n) do
-      k = k + 1
-      local sx, sy = galaxy_star(k)
-      stars[#stars + 1] = { x = sx, y = sy }
-    end
+    hb.m = math.min(m, hb.n)   -- 29 окт: сколько звёзд у группы (раньше считалось из пустого hb.stars = 0)
   end
-  -- kd-разбиение: группы делятся на две половины с близкой суммой звёзд, звёзды — по длинной оси прямоугольника
-  local function part(pts, hubs, x0, y0, x1, y1)
-    if #hubs == 1 then
-      local hb = hubs[1]
-      hb.rect = { x0, y0, x1, y1 }
-      for _, p in ipairs(pts) do hb.stars[#hb.stars + 1] = p end
-      return
-    end
-    local sum, need = 0, 0
-    for _, hb in ipairs(hubs) do need = need + hb.m end
-    local A, B, ca = {}, {}, 0
-    for _, hb in ipairs(hubs) do
-      if ca + hb.m <= need / 2 or #A == 0 then A[#A + 1] = hb; ca = ca + hb.m else B[#B + 1] = hb end
-    end
-    if #B == 0 then B[1] = table.remove(A); ca = ca - B[1].m end
-    local horiz = (x1 - x0) >= (y1 - y0)
-    table.sort(pts, function(p, q) if horiz then return p.x < q.x end; return p.y < q.y end)
-    local pa, pb = {}, {}
-    for i, p in ipairs(pts) do if i <= ca then pa[#pa + 1] = p else pb[#pb + 1] = p end end
-    local a, b = pts[ca], pts[ca + 1]
-    local cut
-    if horiz then cut = (a and b) and (a.x + b.x) / 2 or (x0 + x1) / 2 else cut = (a and b) and (a.y + b.y) / 2 or (y0 + y1) / 2 end
-    if horiz then part(pa, A, x0, y0, cut, y1); part(pb, B, cut, y0, x1, y1)
-    else part(pa, A, x0, y0, x1, cut); part(pb, B, x0, cut, x1, y1) end
-  end
-  for _, hb in ipairs(G.hubs) do hb.m = #hb.stars; hb.stars = {} end
+  -- 29 окт: каждая группа — своё облако (туманность): центры по спирали, расталкивание, радиус ~ sqrt(звёзд);
+  -- форма — лопасти (3 и 5 гармоник, фазы от имени) с хаосом (волокна, гало); контур сектора = та же формула
   local hubs = {}
-  for _, hb in ipairs(G.hubs) do hubs[#hubs + 1] = hb end
+  for _, hb in ipairs(G.hubs) do hb.stars = {}; hubs[#hubs + 1] = hb end
   table.sort(hubs, function(a, b) return a.m > b.m end)
-  part(stars, hubs, -1.05, -0.85, 1.05, 0.85)
+  local mmax = math.max(1, hubs[1] and hubs[1].m or 1)
+  local nh = #hubs
+  for i, hb in ipairs(hubs) do
+    local sh = SM.card_shape and SM.card_shape(hb) or { hsh = i * 17 }
+    local hsh = sh.hsh or (i * 17)
+    hb.R = 0.10 + 0.42 * math.sqrt(hb.m / mmax)
+    hb.ph1, hb.ph2, hb.ph3 = (hsh % 97) / 97 * 6.283, (hsh % 89) / 89 * 6.283, (hsh % 83) / 83 * 6.283
+    hb.lobe = 0.18 + 0.22 * ((hsh % 11) / 11)
+    local a = i * 2.39996 + 0.9
+    local rr = (nh == 1) and 0 or 0.25 + 0.75 * math.sqrt((i - 1) / math.max(1, nh - 1))
+    hb.cx, hb.cy = rr * math.cos(a), rr * math.sin(a) * 0.8
+  end
+  for _ = 1, 40 do   -- расталкивание: соседи не лезут друг в друга (лёгкое наложение остаётся — туманности)
+    for i = 1, nh do for j = i + 1, nh do
+      local A, B = hubs[i], hubs[j]
+      local dx, dy = B.cx - A.cx, B.cy - A.cy
+      local d = math.sqrt(dx * dx + dy * dy) + 1e-6
+      local want = (A.R + B.R) * 0.82
+      if d < want then local push = (want - d) / 2 / d; A.cx, A.cy = A.cx - dx * push, A.cy - dy * push; B.cx, B.cy = B.cx + dx * push, B.cy + dy * push end
+    end end
+  end
+  local x0, x1, y0, y1 = math.huge, -math.huge, math.huge, -math.huge
+  for _, hb in ipairs(hubs) do x0, x1 = math.min(x0, hb.cx - hb.R), math.max(x1, hb.cx + hb.R); y0, y1 = math.min(y0, hb.cy - hb.R), math.max(y1, hb.cy + hb.R) end
+  local sc = math.min(2.1 / math.max(1e-6, x1 - x0), 1.7 / math.max(1e-6, y1 - y0))
+  local ox, oy = (x0 + x1) / 2, (y0 + y1) / 2
+  for _, hb in ipairs(hubs) do
+    hb.cx, hb.cy, hb.R = (hb.cx - ox) * sc, (hb.cy - oy) * sc, hb.R * sc
+    local bb = SM.neb_bound
+    for j = 1, hb.m do
+      local u, v, wv, t = rnd(j + hb.ph1), rnd(j * 1.37 + hb.ph2), rnd(j * 0.71 + hb.ph3), rnd(j * 2.13 + hb.ph1)
+      local ang = u * 6.283
+      local rad = bb(hb, ang) * (v ^ 0.55)                        -- плотнее к ядру
+      if wv > 0.88 then rad = bb(hb, ang) * (1 + 0.35 * t) end    -- гало: редкие звёзды за контуром
+      -- волокна: сдвиг вдоль синусоиды от угла (хаос без сетки)
+      local fx = 0.06 * hb.R * math.sin(ang * 7 + hb.ph2 + j * 0.01)
+      local fy = 0.06 * hb.R * math.cos(ang * 5 + hb.ph3 + j * 0.013)
+      hb.stars[#hb.stars + 1] = { x = hb.cx + rad * math.cos(ang) + fx, y = hb.cy + rad * math.sin(ang) * 0.85 + fy }
+    end
+    hb.rect = { hb.cx - hb.R * 1.3, hb.cy - hb.R * 1.1, hb.cx + hb.R * 1.3, hb.cy + hb.R * 1.1 }   -- bbox (мини-карта)
+  end
   -- звезда — файл группы (первые по порядку): по ней наведение и клик
   for _, hb in ipairs(G.hubs) do for j, st in ipairs(hb.stars) do st.n = hb.list[j]; if st.n then st.n.star = st end end end
   G.gal = true
@@ -811,30 +825,45 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
   local function clipx(v) return math.max(x + 1, math.min(x + w - 2, v)) end
   local function clipy(v) return math.max(top, math.min(y + h - 2, v)) end
   for _, hb in ipairs(order) do
-    local rc = hb.rect
-    if rc then
-      local bx0, by0, bx1, by1 = math.floor(X(rc[1])), math.floor(Y(rc[2])), math.floor(X(rc[3])), math.floor(Y(rc[4]))
-      local vis = bx1 > x and bx0 < x + w and by1 > top and by0 < y + h
+    if hb.R then
+      -- 29 окт: контур сектора — по форме облака (многоугольник), подпись над ядром: имя группы и число файлов
+      local c = col(hb)
+      local NSEG = 40
+      local pts = {}
+      for q = 0, NSEG - 1 do
+        local a = q / NSEG * 6.283
+        local r = SM.neb_bound(hb, a) * 1.08
+        pts[q + 1] = { X(hb.cx + r * math.cos(a)), Y(hb.cy + r * math.sin(a) * 0.85) }
+      end
+      local px0, py0 = math.floor(X(hb.cx)), math.floor(Y(hb.cy))
+      local hot = false
+      if inside then
+        local dx, dy = (mx - X(hb.cx)) / sx, (my - Y(hb.cy)) / sy / 0.85
+        local a = math.atan(dy, dx)
+        hot = math.sqrt(dx * dx + dy * dy) <= SM.neb_bound(hb, a) * 1.08
+      end
+      local vis = false
+      for _, p in ipairs(pts) do if p[1] >= x and p[1] < x + w and p[2] >= top and p[2] < y + h then vis = true; break end end
       if vis then
-        local c = col(hb)
-        local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by1
-        local cx0, cy0, cx1, cy1 = clipx(bx0), clipy(by0), clipx(bx1), clipy(by1)
-        U.set(U.mix(c, U.BG, hot and 0.25 or 0.65))
-        gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
-        gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
-        local lab = ('%s %d'):format(SM.short(hb.name, math.max(3, math.floor((cx1 - cx0 - 6) / math.max(1, U.measure('M'))) - 5)):upper(), hb.n)
-        local lw = math.min(U.measure(lab), cx1 - cx0 - 6)
-        if lw > U.measure('MM') and cy1 - cy0 > L.rh + 2 and (hot or free(cx0 + 3, cy0 + 2, lw, L.rh)) then
-          placed[#placed + 1] = { cx0 + 3, cy0 + 2, lw, L.rh }
-          if hot then U.set(U.BG); gfx.rect(cx0 + 2, cy0 + 2, lw + 2, L.rh, 1) end
-          U.text(cx0 + 3, cy0 + 2, fit(lab, cx1 - cx0 - 6), hot and c or U.mix(c, U.BG, 0.2))
+        U.set(U.mix(c, U.BG, hot and 0.2 or 0.6))
+        for q = 1, NSEG do
+          local a1, b1 = pts[q], pts[q % NSEG + 1]
+          gfx.line(clipx(a1[1]), clipy(a1[2]), clipx(b1[1]), clipy(b1[2]))
+        end
+        local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
+        local lw = U.measure(lab)
+        local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
+        if hot or free(lx, ly, lw, L.rh) then
+          placed[#placed + 1] = { lx, ly, lw, L.rh }
+          U.set(U.BG, 0.55); gfx.rect(lx - 2, ly, lw + 4, L.rh, 1); gfx.a = 1
+          U.text(lx, ly, lab, hot and c or U.mix(c, U.TEXT, 0.25))
         end
         if hot then
           hv = hv or { hub = hb, sector = true }
           for _, st in ipairs(hb.stars) do
-            local px, py = X(st.x), Y(st.y)
-            local d = (mx - px) ^ 2 + (my - py) ^ 2
-            if st.n and d <= 36 and (not hd or d < hd) then hv, hd = { node = st.n, px = px, py = py, r = 2 }, d end
+            local sxp, syp = X(st.x), Y(st.y)
+            local d = (mx - sxp) ^ 2 + (my - syp) ^ 2
+            if st.n and d <= 36 and (not hd or d < hd) then hv, hd = { node = st.n, px = sxp, py = syp, r = 2 }, d end
           end
         end
       end
