@@ -31776,6 +31776,19 @@ ctx.viper_toggle = function()
     if state.panes and PN.preset then local pz = PN.preset('tracker', state.panes); if pz then state.panes = pz end end
     ctx.view_mode('project'); state.follow = true
     ctx.viper_cp = nil
+    -- шаг 1: LPB от сетки REAPER (1/16 → 4 строки на долю; триоли — ×3), шаг 2: один выделенный айтем — экран на него
+    do
+      local _, div = reaper.GetSetProjectGrid(0, false)
+      if div and div > 0 then
+        local rows = math.floor(0.25 / div + 0.5)   -- четверть = доля
+        if rows >= 1 and rows <= 128 then ctx.viper_lpb0 = state.lpb; ctx.set_lpb(rows) end
+      end
+      if reaper.CountSelectedMediaItems(0) == 1 then
+        local it = reaper.GetSelectedMediaItem(0, 0)
+        local r = math.floor(model.row_of_time(reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), state.lpb) + 1e-6)
+        vim.cur.row = math.max(0, r); state.row0 = math.max(0, r - 1)
+      end
+    end
     relayout()
     vim.msg = 'VIPER: the tracks of the items selected in REAPER, the cursor follows the REAPER cursor; Cmd+F10 / :viper - back'
   else
@@ -31783,6 +31796,7 @@ ctx.viper_toggle = function()
     state.viper = nil; state.mxonly = nil
     if bk.panes and PN.decode then local m = PN.decode(bk.panes); if m then m.v = (state.panes and state.panes.v or 0) + 1; state.panes = m end end
     state.view_reg, state.view_secmode, state.follow = bk.view_reg, bk.view_secmode, bk.follow
+    if ctx.viper_lpb0 then ctx.set_lpb(ctx.viper_lpb0); ctx.viper_lpb0 = nil end
     relayout()
     vim.msg = 'viper off'
   end
