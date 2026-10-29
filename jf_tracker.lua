@@ -2572,8 +2572,7 @@ ctx = {
     local pad = ctx.fxb_pad; ctx.fxb_pad = nil
     if pad and it and not pos then
       pad(it.data or it.label); FB.push_recent(it); ctx.fxb_save()
-      if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
-      return
+      return   -- 29 окт: фокус остаётся в списке эффектов (добавлять подряд)
     end
     if ins and it and not pos then   -- 18 окт: точка вставки роутера (+ / = по клику)
       local okb
@@ -2583,8 +2582,7 @@ ctx = {
         FB.push_recent(it); ctx.fxb_save(); ctx.db_cache = nil
         vim.msg = '+ ' .. FB.short(it.label) .. ' ' .. ins.what
       end
-      if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
-      return
+      return   -- 29 окт: фокус остаётся в списке эффектов (добавлять подряд)
     end
     local col = dsp_target()
     if not (it and col) then vim.msg = 'fx: nothing selected'; return end
@@ -2592,8 +2590,11 @@ ctx = {
     FB.push_recent(it); ctx.fxb_save()
     state.dsp = true
     vim.msg = '+ ' .. (FB.short(it.label)) .. (it.preset and (' [' .. it.preset .. ']') or '') .. ' → ' .. (col.take and ('take fx of ' .. col.name) or col.name) .. (pos and (' @' .. (pos + 1)) or '')
-    -- 5 окт: фокус — туда, откуда пришли к поиску эффектов
-    if state.focus == 'fxb' and state.fxb_back and state.fxb_back ~= 'fxb' then local b = state.fxb_back; state.fxb_back = nil; ctx.set_focus(b) end
+    -- 29 окт: фокус остаётся в fx (добавлять подряд); новый эффект — выбран и виден в DSP
+    dsp_sel.fx = pos and (pos + 1) or (#(col.fx or {}) + 1); dsp_sel.param = 1
+    local m = state.panes
+    if m and draw.panes and not draw.panes.visible(m, 'dsp') then ctx.pane_do(function() return draw.panes.show(m, 'dsp') end, 'dsp shown') end
+    model.invalidate()
   end,
   -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
   item_at_cursor = function()
@@ -9765,6 +9766,16 @@ ctx = {
   HELP_KEYS = 'help: / search, j k lines, J K section, o in the browser, Esc close, Shift+F1 tutorial',   -- 17 окт: легенда F1 — только в статусе
   help_big = function()
     if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end
+    -- 29 окт: справка — панель manual (не на всё окно); без панелей — как раньше поверх
+    local PN, m = draw.panes, state.panes
+    if state.panes_ui and m and PN then
+      state.khelp_big = false
+      if PN.visible(m, 'manual') then
+        if state.focus == 'manual' then ctx.pane_do(function() return PN.hide(m, 'manual') end, 'manual hidden') else ctx.pane_focus('manual') end
+      else ctx.pane_do(function() return PN.show(m, 'manual') end, 'manual shown'); ctx.pane_focus('manual') end
+      vim.msg = ctx.HELP_KEYS
+      return
+    end
     state.khelp_big = not state.khelp_big
     vim.msg = state.khelp_big and ctx.HELP_KEYS or ''
   end,
@@ -17846,7 +17857,7 @@ function view_actions()
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
-    { 'Help (the whole help inside the tracker)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
+    { 'Manual (the whole help, a pane)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
@@ -22612,6 +22623,7 @@ local function frame()
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
     hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,   -- 28 окт: панель hints
     console_draw = function(Lx, x, y, w, h, foc) return ctx.CON.draw(U, Lx, x, y, w, h, foc, ctx.fit) end,   -- 28 окт: консоль
+    manual_draw = function(Lx, x, y, w, h) if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end; return ctx.DOC.draw(Lx, x, y, w, h) end,   -- 29 окт: справка панелью
     slice_key = function(k) return ctx.slice_key(k) end, slice_note = function(k) return ctx.slice_note(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
       -- свой масштаб текста (− + в шапке заметок): битмап ×N на время отрисовки
@@ -28533,7 +28545,7 @@ local function frame()
   -- модуля через очередь — yy / dd / p (в VISUAL — y / d); матрица — свои коды блока; набор текста не трогаем
   do
     local m = ctx.mods()
-    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or DK.ins or OPT.active
+    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or DK.ins or OPT.active
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
       local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
       if what then
@@ -28961,7 +28973,12 @@ local function frame()
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
       or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console'
-    if state.khelp_big then
+    if state.focus == 'manual' and ctx.DOC then   -- 29 окт: панель manual
+      local r = ctx.DOC.key(c)
+      if r == 'leave' then ctx.set_focus('tracker')
+      elseif r == 'browser' then open_help() end
+      c = 0
+    elseif state.khelp_big then
       -- большая справка: клавиши — ей (поиск, страницы, прокрутка); Esc / Enter — закрыть
       local r = ctx.DOC.key(c)
       if r == 'leave' then state.khelp_big = false
@@ -29007,7 +29024,7 @@ local function frame()
       if vim.picker or vim.hydra then return vim.key(c) end
       -- 5 окт: две гидры — ` главная (у главного модуля слева сверху), \ —
       -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
-      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or state.focus == 'console' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
+      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
       -- 6 окт: главное меню — \ (` больше не меню; в INSERT ` — note-off)
       local m0 = ctx.mods()
       if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты

@@ -62,6 +62,7 @@ PN.PANELS = {
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
   { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true },   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
   { id = 'hints',      label = 'hints',      key = 'I', hint = 'hints',   side = 'top' },
+  { id = 'manual',     label = 'manual',     key = 'Z', hint = 'help',    side = 'right' },   -- 29 окт: вся справка (была на всё окно)
   { id = 'console',    label = 'console',    key = 'E', hint = 'console', side = 'bottom' },   -- 28 окт: Strudel-строки пишут ноты в паттерн (:console, \\ E)   -- 28 окт: что делает модуль под мышью / в фокусе (\\ h)
   { id = 'garden',     label = 'orca',       key = 'O', hint = 'orca',    side = 'top', tab = true, avail = 'dev' },
 }
@@ -950,6 +951,7 @@ PN.ABOUT = {
   renderer = 'The bouncer: render notes or a pattern of an instrument to audio and put it back as a sample in the lib.',
   help = 'The keys of the module you came from, as a list: the last used ones on top, the pressed key lights up. \\ ? opens the whole help.',
   console = 'A live pattern language (Strudel mini-notation) inside the tracker: a line t2: n("c [e g] <a b>").fast(2) writes its notes into the pattern at the cursor on track 2 (no tN: - the cursor track); Enter evaluates the line again and rewrites that track in the pattern. s("1 3 ~ 5") - slices, .vel("1 0.5"), .cmd("0R42") - tracker commands, .i(3) - instrument; t2: ~ or hush - clear. Enter line, Cmd+Enter all, Shift+Enter new line, Up / Down history, Esc back.',
+  manual = 'The whole manual of jf_tracker: sections on the left, / searches everything, j k lines, J K sections, o opens it in the browser, Esc back to the tracker.',
   hints = 'This pane: what the module under the mouse (or in focus) is and how to use it.',
   notes = 'Text notes of the project, kept in the project file.',
   fxb = 'All installed effects and instruments: a tree of groups (favourites, recent, types, categories, developers) and the list. / searches plugins and their presets, Enter adds to the cursor track, drag onto DSP inserts there (upper half serial, lower parallel), * favourite, x excludes from the search.',
