@@ -16655,7 +16655,8 @@ ctx.ctl_lane_start = function()
     local SG = { acv = true, tool = A.tool, vx = vx, vy = vy }
     local r, v = A.at(g, vx, vy)
     SG.r, SG.v, SG.r_s, SG.v_s = r, v, r, v
-    A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') }
+    if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
+    else A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') } end
     A.vpt = { math.floor(vx), math.floor(vy) }
     SG.sx, SG.sy = reaper.GetMousePosition()
     return SG
@@ -16688,6 +16689,7 @@ ctx.ctl_acv = function(SG)
   A.vpt = { math.floor(SG.vx), math.floor(SG.vy) }
   local r, v = A.at(g, SG.vx, SG.vy)
   if SG.tool == 'line' then A.stroke = { rows = A.span_rows(SG.r_s, SG.v_s, r, v, {}) }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
+  elseif SG.tool == 'shape' then local rows, a, b = A.shape_stroke(SG.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
   elseif r ~= SG.r or math.abs(v - SG.v) > 1e-3 then
     A.span_rows(SG.r, SG.v, r, v, A.stroke.rows, SG.tool == 'erase')
     SG.r, SG.v, SG.moved = r, v, true
@@ -16790,7 +16792,7 @@ ctx.acv_do = function(op, sp, curves)
     else
       local e = act.e
       local t2e = act.t2e or function(x) return x end
-      local ta, tb = t2e(sp.time(lo)), t2e(sp.time(hi + step))
+      local ta, tb = t2e(sp.time(op.a or lo)), t2e(sp.time(op.b or (hi + step)))   -- shape — ровно его отрезок
       if op.tool == 'erase' then edit.env_del_range(e, ta, tb)
       else
         local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
@@ -24827,8 +24829,9 @@ local function frame()
       if ctx.sl.acv then   -- 30 окт: палец отпущен — мазок в кривую
         local A = ctx.ACV
         local rows = A.stroke and A.stroke.rows
+        local sa, sb = A.stroke and A.stroke.a, A.stroke and A.stroke.b
         A.stroke, A.vpt = nil, nil
-        if ctx.sl.moved and rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = ctx.sl.tool }) end
+        if ctx.sl.moved and rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = ctx.sl.tool, a = sa, b = sb }) end
       elseif ctx.sl.lane then if ctx.sl.moved then ctx.ctl_lane_write(ctx.sl) end
       elseif ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
@@ -25221,7 +25224,12 @@ local function frame()
       if lfo_hover.legend then ctx.ACV.cur = lfo_hover.legend end   -- 15 окт: щелчок по легенде — активная кривая
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
-      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbshape then   -- 30 окт: форма для shape
+        local items = {}
+        for _, x in ipairs(A.SHAPE_LIST) do items[#items + 1] = { key = x[1], label = x[3] .. (A.shape == x[2] and '  *' or ''), fn = function() A.shape = x[2]; A.tool = 'shape'; vim.msg = 'shape: ' .. x[3] .. ' - drag over the canvas: the span, the height - up / down' end } end
+        vim.open_hydra({ title = 'canvas shape (as in Ableton: per grid cell)', items = items })
+      end
       if lfo_hover.tbsnap then A.snap = not A.snap; vim.msg = 'snap (S): ' .. (A.snap and 'the stroke goes by grid cells' or 'off - by rows') end
       if lfo_hover.tbgrid == -1 or lfo_hover.tbgrid == 1 then ctx.acv_key(lfo_hover.tbgrid < 0 and 91 or 93)
       elseif lfo_hover.tbgrid == 0 then
@@ -25236,7 +25244,8 @@ local function frame()
         if A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v }
-          A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') }
+          if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
+          else A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') } end
         end
       end
       if lfo_hover.field then
@@ -27181,14 +27190,16 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       local r, v = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
       if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}) }
+      elseif d.tool == 'shape' then local rows, a, b = A.shape_stroke(d.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }
       elseif r ~= d.r or math.abs(v - d.v) > 1e-3 then
         A.span_rows(d.r, d.v, r, v, A.stroke.rows, d.tool == 'erase')
         d.r, d.v = r, v
       end
     else
       local rows = A.stroke and A.stroke.rows
+      local sa, sb = A.stroke and A.stroke.a, A.stroke and A.stroke.b
       ctx.acv_mdrag = nil
-      if rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = d.tool }) end
+      if rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = d.tool, a = sa, b = sb }) end
       A.stroke = nil
     end
   end

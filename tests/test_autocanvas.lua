@@ -124,6 +124,19 @@ eq('[ stops at 1/8 row', ACV.grid, 0.125)
 ACV.grid, ACV.snap = 0.5, true
 r = ACV.at(geo, 100 + 75, 60); eq('snap 0.5 -> half rows', r, 23.5)
 rows = ACV.span_rows(16, 0, 17, 1, {}); eq('stroke by half rows: 16 16.5 17', rows[16] == 0 and rows[16.5] and rows[17] == 1, true)
+-- 30 окт: shape — формы по клеткам (Ableton): exp медленно внизу, log быстро; отрезок от начала протяжки
+ACV.grid, ACV.snap = 4, true
+ACV.key(('c'):byte(), { r0 = 0, r1 = 64 }, {}); eq('c - shape tool', ACV.tool, 'shape')
+ACV.shape = 'exp'
+local sr, sa, sb = ACV.shape_stroke(8, 0, 1)
+eq('shape span from the drag start, whole cells', sa == 0 and sb == 12, true)
+eq('exp: low at a quarter of the cell', sr[1] < 0.15 and sr[0] == 0, true)
+ACV.shape = 'log'
+sr = ACV.shape_stroke(0, 0, 1)
+eq('log: high at a quarter of the cell', sr[1] > 0.5, true)
+ACV.shape = 'ramp-'
+sr = ACV.shape_stroke(0, 4, 0.5)
+eq('saw- starts at the height', sr[0] == 0.5 and sr[4] == 0.5, true)
 ACV.grid = 4
 ACV.tool, ACV.snap = 'cur', true
 print(('%d checks, %d failed'):format(n, bad))

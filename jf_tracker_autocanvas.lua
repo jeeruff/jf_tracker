@@ -18,7 +18,20 @@ local ACV = { row = 0, anchor = nil, grid = 4, cur = 1, seed = 1 }
 -- 30 окт: инструменты мыши — cur (щелчок ставит курсор), draw (карандаш, d), line (прямая, D), erase (E);
 -- snap (S) — мазок по клеткам сетки, иначе по строкам. Мазок — превью ACV.stroke, запись при отпускании (main)
 ACV.tool, ACV.snap = 'cur', true
-ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'erase', 'erase' } }
+ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'shape', 'shape' }, { 'erase', 'erase' } }
+-- 30 окт: инструмент shape (c) — как рисование формами в Ableton: протяжка задаёт отрезок, форма повторяется в каждой
+-- клетке сетки, высота — вертикалью мыши; форма — кнопкой рядом (список)
+ACV.shape = 'sin'
+ACV.SHAPE_LIST = { { 't', 'tri', 'tri' }, { 'r', 'ramp+', 'saw+' }, { 'R', 'ramp-', 'saw-' }, { 's', 'sin', 'sin' }, { 'e', 'exp', 'exp' }, { 'l', 'log', 'log' }, { 'q', 'sqr', 'sqr' } }
+function ACV.shape_name(sh) for _, x in ipairs(ACV.SHAPE_LIST) do if x[2] == sh then return x[3] end end; return sh end
+-- мазок формой от строки ra до rb (включая клетку rb), высота v
+function ACV.shape_stroke(ra, rb, v)
+  local st = ACV.snap and ACV.grid or 1
+  local a, b = math.min(ra, rb), math.max(ra, rb) + math.max(st, 1)
+  local out = {}
+  for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.grid, v, ACV.seed)) do out[p.row] = p.v end
+  return out, a, b
+end
 ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { r0, v0, r1, v1 } }
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
 function ACV.at(g, mx, my)
@@ -95,6 +108,14 @@ function ACV.shape_points(shape, r0, r1, grid, level, seed)
     elseif shape == 'ramp-' then add(a, level, 0); add(a + wdt * 0.98, 0, 0)
     elseif shape == 'sqr' then add(a, level, 1); add(a + wdt / 2, 0, 1)
     elseif shape == 'rnd' then add(a, rnd(k, seed or 1) * level, 1)
+    elseif shape == 'exp' or shape == 'log' then   -- 30 окт: изгиб, как у Ableton: exp — медленно, потом круто; log — наоборот
+      local n, kk = 8, 4
+      for i = 0, n - 1 do
+        local x = i / n
+        local w = shape == 'exp' and (math.exp(kk * x) - 1) / (math.exp(kk) - 1) or math.log(1 + (math.exp(kk) - 1) * x) / kk
+        add(a + wdt * x, w * level, 0)
+      end
+      add(a + wdt * 0.98, level, 0)
     elseif shape == 'sin' or shape == 'tri' then
       local n = 8
       for i = 0, n - 1 do
@@ -165,6 +186,7 @@ function ACV.key(c, st, mods)
   if ch == 'd' then ACV.tool = ACV.tool == 'draw' and 'cur' or 'draw'; return true end
   if ch == 'D' then ACV.tool = ACV.tool == 'line' and 'cur' or 'line'; return true end
   if ch == 'E' then ACV.tool = ACV.tool == 'erase' and 'cur' or 'erase'; return true end
+  if ch == 'c' then ACV.tool = ACV.tool == 'shape' and 'cur' or 'shape'; return true end
   if ch == 'S' then ACV.snap = not ACV.snap; return true end
   if c == 27 then
     if ACV.anchor then ACV.anchor = nil; return true end
@@ -250,6 +272,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local hover
   local tb = {}
   for _, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1] } end
+  tb[#tb + 1] = { lab = ACV.shape_name(ACV.shape), shapepick = true, on = ACV.tool == 'shape' }
   tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap, gap = true }
   tb[#tb + 1] = { lab = '[', grid = -1, gap = true }
   tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
@@ -268,7 +291,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, y, b.w, rh - 1, 1) end
       U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, y, b.w, rh - 1, 0)
       U.text(bx + pad, y, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
-      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid } end
+      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick } end
       bx = bx + b.w + 2
     end
   end
