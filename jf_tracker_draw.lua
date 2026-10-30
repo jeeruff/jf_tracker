@@ -3313,8 +3313,8 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       set(U.LINE); gfx.rect(px, y, pw, h1, 0)
     end
   end
-  if rh2 > 0 then   -- 29 окт: роутер — под XY, на всю ширину блока (и под auto / mod, если они открыты)
-    local rw = w + extra
+  if rh2 > 0 then   -- 29 окт: роутер — под XY, в ширину блока; под auto / mod — только когда они открыты (кнопки не закрывать)
+    local rw = (tm0 and (tm0.wauto or tm0.wmod)) and (w + extra) or w
     fill(rbg); gfx.rect(x, y + h - rh2, rw, rh2, 1)
     set(U.LINE); gfx.rect(x + L.pad, y + h - rh2, rw - 2 * L.pad, 1, 1)
     D.route_section(L, info, col, x, y + h - rh2, rw, rh2, hover)
