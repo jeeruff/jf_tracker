@@ -104,26 +104,26 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 33513 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 32882 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 2911 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 6096 | ВСЕ записи трекера в проект REAPER. |
-| `jf_tracker_alias.lua` | 905 | алиасы паттернов (этап 6). |
+| `jf_tracker_alias.lua` | 754 | алиасы паттернов (этап 6). |
 | `jf_tracker_arr.lua` | 101 | аранжировки (9 окт): фиксированные лейны трека — его версии, аранжировка — именованный набор играющих лейнов всех треков (C_LANEPLAYS). |
 | `jf_tracker_cmds.lua` | 461 | команды-огибающие и генераторы (этап 7). |
 | `jf_tracker_chord.lua` | 202 | аккорды (8 окт): анализатор и гармонайзер. |
 | `jf_tracker_import.lua` | 184 | импорт нарезанных инструментов (2 окт). |
 | **клавиши и команды** | | |
-| `jf_tracker_vim.lua` | 4499 | Vim-слой трекера: режимы, движения, операторы. |
+| `jf_tracker_vim.lua` | 4497 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 130 | раскладка клавиш трекера. |
 | `jf_tracker_whichkey.lua` | 89 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1360 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_keyhelp.lua` | 1355 | контекстная справка по клавишам (2 окт). |
 | `jf_tracker_hints.lua` | 161 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 186 | клавиши модуля инструментов в духе Vim (2 окт). |
 | `jf_tracker_dspkeys.lua` | 234 | клавиши DSP-панели в духе Vim (2 окт). |
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 12626 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_draw.lua` | 12631 | отрисовка снимка трекера в gfx. |
 | `jf_tracker_panes.lua` | 977 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 257 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 121 | темы трекера (3 окт). |
@@ -132,7 +132,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_png.lua` | 78 | PNG без внешних программ (8 окт, снимки measure). |
 | `jf_tracker_logo.lua` | 517 | логотип JFTRACKER для about (главный модуль, 3 окт). |
 | **панели и вкладки** | | |
-| `jf_tracker_matrix.lua` | 1334 | матрица паттернов (этап 3). |
+| `jf_tracker_matrix.lua` | 1311 | матрица паттернов (этап 3). |
 | `jf_tracker_browser.lua` | 2298 | сайдбар-браузер (справа от трекера). |
 | `jf_tracker_fxbrowser.lua` | 491 | браузер эффектов слева от DSP-панели (2 окт). |
 | `jf_tracker_sampleprops.lua` | 499 | панель свойств сэмпла справа от волны (вкладка Sample, 2 окт; как свойства сэмпла в Renoise, но всё нативное: item и take REAPER). |
@@ -199,7 +199,6 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_smap.lua` | 1412 | карта сэмплов папки, как граф Obsidian (27 окт 2026). |
 | `jf_tracker_snaps.lua` | 81 | 22 окт: быстрые пресеты трека в DSP: 4 снапшота всех параметров FX трека в углах XY-пэда (1 — левый верх, 2 — правый верх, 3 — левый низ, 4 — правы… |
 | `jf_tracker_surge.lua` | 169 | патчи Surge XT из трекера (16 окт). |
-| `jf_tracker_szone.lua` | 31 | 21 окт: место зоны сессии (=SESSION) — расчёт без reaper.* (тест tests/test_szone.lua). |
 | `jf_tracker_themetab.lua` | 304 | вкладка theme окна Options (10 окт): темы и шрифты с примерами. |
 | `jf_tracker_theory.lua` | 434 | 21 окт: теория для harmonizer (чистый Lua, тест tests/test_theory.lua). |
 | `jf_tracker_tracks.lua` | 199 | дерево треков для модуля tracks (13 окт, как файловый менеджер lf). |

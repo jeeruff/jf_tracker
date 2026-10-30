@@ -1336,10 +1336,8 @@ local function run_cmd(line)
   elseif cmd == 'name' then ctx.mx_name(arg)
   elseif cmd == 'sec' then if ctx.sec_cmd then ctx.sec_cmd(arg) end   -- 18 окт: секция слота курсора матрицы
   elseif cmd == 'gain' then if ctx.gain_toggle then ctx.gain_toggle() end   -- 18 окт: измерители между эффектами
-  elseif cmd == 'pal' then   -- 18 окт: палитра — render / playlist / kb
-    if arg == 'render' then ctx.palette_render() elseif arg == 'playlist' then ctx.palette_to_playlist()
-    elseif arg == 'kb' then ctx.palette_kb()
-    else V.msg = 'pal render | playlist | kb' end
+  elseif cmd == 'pal' then   -- 18 окт: палитра — playlist (30 окт: render / kb убраны вместе с clipkb)
+    if arg == 'playlist' then ctx.palette_to_playlist() else V.msg = 'pal playlist' end
   elseif cmd == 'pnote' then if ctx.pat_note_set then ctx.pat_note_set(arg) end   -- 18 окт: заметка паттерна
   elseif cmd == 'redo' then ctx.edit.redo(); V.msg = 'redo'                     -- 5 окт: Ctrl+R теперь вкладка rec
   elseif cmd == 'undo' then ctx.edit.undo(); V.msg = 'undo'

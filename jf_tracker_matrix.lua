@@ -59,7 +59,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'sketch', 'sketch' }, { 'add', '+' } }   -- 23 окт: sketch — строка эскизов (была строкой-подсказкой)   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -351,7 +351,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
-    U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'clips' and MX.clips) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6) or (b[1] == 'follow' and MX.follow) or (b[1] == 'sketch' and (MX.sk_show or #(MX.sketch or {}) > 0))) and U.CYAN or U.TEXT))
+    U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (((b[1] == 'ruler' and MX.ruler) or (b[1] == 'se' and not (ctx.state and ctx.state.mxmarks == false)) or (b[1] == 'loops' and MX.loops) or (b[1] == 'fold' and MX.selmode) or (b[1] == 'pads' and ctx.PADS and ctx.PADS.on) or (b[1] == 'plist' and MX.plist) or (b[1] == 'vismetro' and MX.vismetro) or (b[1] == 'timesel' and (MX.ts1 or 0) > (MX.ts0 or 0) + 1e-6) or (b[1] == 'follow' and MX.follow)) and U.CYAN or U.TEXT))
     if hot then hover.btn = b[1] end
     MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, by + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
     if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, b[1]) end
@@ -360,12 +360,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   return by + L.rh - y0
   end
   if corner then hy = hy - L.rh - 2 else draw_btns(L.pad, hy + 1) end
-  -- 19 окт: sketchpad — эскизы X1 X2 … (набор clipkb Enter), строкой под кнопками
-  if ctx.sketch_draw then
-    local sh, shv = ctx.sketch_draw(L, 0, hy + L.rh + 2, W - 6)
-    for k, v in pairs(shv) do hover[k] = v end
-    if sh > 0 then hy = hy + sh end
-  end
   -- вертикальные имена треков
   local ny = hy + L.rh + 3
 
@@ -787,23 +781,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       -- 21 окт: нота через границу паттерна — янтарный уголок: внизу справа — уходит в следующий, вверху слева — пришла из прошлого
       if g.xout then U.set(U.AMBER); gfx.triangle(x + L.mx_cell_w - 2, y + rh - 2, x + L.mx_cell_w - 7, y + rh - 2, x + L.mx_cell_w - 2, y + rh - 7) end
       if g.xin then U.set(U.AMBER); gfx.triangle(x + 1, y + 1, x + 6, y + 1, x + 1, y + 6) end
-      -- 19 окт: clipkb в матрице — набранная клетка голубой рамкой, буква клавиши (1qaz… столбец = трек, ряд = видимый слот)
-      if MX.pal_kb and not rg.gap then
-        local pk = MX.pal_pick and MX.pal_pick[(rg.name or '') .. '@' .. rg.pos .. ':' .. ci]
-        if pk then
-          U.set(U.CYAN); gfx.rect(x, y, L.mx_cell_w, rh - 1, 0)
-          if pk.part then   -- 21 окт: часть паттерна — рамка на своём отрезке (время сверху вниз) и k/n в углу
-            local y0 = y + math.floor((pk.part[1] - 1) * (rh - 1) / pk.part[2])
-            local y1 = y + math.floor(pk.part[1] * (rh - 1) / pk.part[2])
-            gfx.rect(x + 1, y0 + 1, L.mx_cell_w - 2, math.max(2, y1 - y0 - 2), 0)
-            U.text(x + 3, y + 1, pk.part[1] .. '/' .. pk.part[2], U.CYAN)
-          else gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 3, 0) end
-        end
-        local r = ri - MX.scroll
-        local colk = MX.KEYCOLS and MX.KEYCOLS[ci - MX.hs]
-        local kl = r >= 1 and r <= 4 and colk and colk:sub(r, r)
-        if kl and kl ~= '' then U.text(x + L.mx_cell_w - 2 - U.measure(kl), y + rh - L.rh - 1, kl, pk and U.CYAN or U.AMBER) end
-      end
       local iw = L.mx_cell_w - 4
       if MX.fill then
         if MX.zoom == 'detail' then

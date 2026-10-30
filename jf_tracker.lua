@@ -90,10 +90,6 @@ end)()
 local GD = dofile(DIR .. '/jf_tracker_garden.lua')       -- вкладка Garden
 MX.DB = dofile(DIR .. '/jf_tracker_dspbig.lua')          -- DSP big: роутинг цепочки на всё окно, zz в DSP (7 окт); полем MX: предел локальных
 MX.WK = dofile(DIR .. '/jf_tracker_whichkey.lua')
-MX.SZ = dofile(DIR .. '/jf_tracker_szone.lua')          -- 21 окт: место зоны сессии (за песней)          -- подсказка второй клавиши в главном модуле (7 окт)
--- 30 окт: session / клипы удалены (замена — PLAN_PATLIB.md); от них остались столбцы клавиатуры clipkb палитры
-MX.KEYCOLS = { '1qaz', '2wsx', '3edc', '4rfv', '5tgb', '6yhn', '7ujm', '8ik,', '9ol.', '0p;/' }
-MX.kb_pos = function(ch) for k, col in ipairs(MX.KEYCOLS) do local r = col:find(ch, 1, true); if r then return k, r end end end
 MX.VD = dofile(DIR .. '/jf_tracker_video.lua')          -- вкладка video (9 окт); полем MX: предел локальных
 MX.VZ = dofile(DIR .. '/jf_tracker_visor.lua')          -- 10 окт: панель visor — шейдеры ReaVisor (страница isf в браузере) из трекера
 MX.VZ.vtext = draw.vtext                                -- 13 окт: вертикальные подписи колонок матрицы модуляций
@@ -236,7 +232,6 @@ local state = {
   aifill = flag('aifill', false),
   midilanes = flag('midilanes', true),
   aipoints = flag('aipoints', true),
-  ssbars = tonumber(ext('ssbars', 8)) or 8,
   lside_frac = tonumber(reaper.GetExtState(EXT, 'lside_frac')),   -- раздел матрица | браузер слева (8 окт)   -- высота clips над матрицей (тянется мышью)
   ssbsync = flag('ssbsync', true),
   mxclips = flag('mxclips', false),                 -- матрица в виде clips         -- длина зоны сессии в тактах (6 окт)
@@ -633,7 +628,7 @@ local function save_win()
   if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('ssbars', state.ssbars or 8); S('lside_frac', state.lside_frac or '')
+  S('lpb', state.lpb); S('fxcols', state.fxcols); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
@@ -3975,28 +3970,6 @@ ctx = {
         -- имя — вариант исходного (B1 → B2); следующие пустые — встык за ним (длинный не режется тактом)
         local clip, real = state.mx_clip, ctx.real_seq()
         local tgt, t_next = {}, nil
-        -- 17 окт: зона =SESSION (клипы) и её items — до вставки: новые паттерны на неё наедут — она уедет за них
-        local zone, zitems
-        do
-          local i = 0
-          while true do
-            local ret, isr, zp, ze, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
-            if not ret or ret == 0 then break end
-            if isr and nm == model.SESSION_REGION then zone = { pos = zp, rgnend = ze, idx = idx, col = col }; break end
-            i = i + 1
-          end
-          if zone then
-            zitems = {}
-            for ti = 0, reaper.CountTracks(0) - 1 do
-              local tr = reaper.GetTrack(0, ti)
-              for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
-                local it = reaper.GetTrackMediaItem(tr, k)
-                local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-                if p >= zone.pos - 1e-6 and p < zone.rgnend - 1e-6 then zitems[#zitems + 1] = it end
-              end
-            end
-          end
-        end
         for dr = 1, clip.nr do
           local rg = seq[MX.cur.ri + dr - 1]
           if rg and rg.gap then
@@ -4009,25 +3982,6 @@ ctx = {
             tgt[dr] = { pos = pos, rgnend = pos + len, name = nm }
             t_next = pos + len; made = made + 1
           else tgt[dr] = rg; t_next = nil end
-        end
-        -- новые паттерны заходят на зону session — сначала зона с клипами за них (через такт), потом вставка
-        if zone and t_next and made > 0 then
-          local last = 0
-          for dr = 1, clip.nr do if tgt[dr] and tgt[dr].rgnend > last then last = tgt[dr].rgnend end end
-          if last > zone.pos + 1e-6 then
-            -- 21 окт: за всё (ss_zone_home), и едут только клипы зоны (jf_session): было — все items диапазона,
-            -- а зона посреди песни утаскивала куски песни (бесхозные «?» в матрице)
-            local z0 = ctx.ss_zone_home(last)
-            local dt = z0 - zone.pos
-            for k = #zitems, 1, -1 do
-              local it = zitems[k]
-              local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
-              if tag ~= '' then reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.GetMediaItemInfo_Value(it, 'D_POSITION') + dt) end
-            end
-            reaper.SetProjectMarker3(0, zone.idx, true, zone.pos + dt, zone.rgnend + dt, model.SESSION_REGION, zone.col or 0)
-            state.ss_zone_new = nil
-            vim.msg = 'session zone moved after the new patterns'
-          end
         end
         local view = setmetatable({}, { __index = function(_, i) local d = i - MX.cur.ri + 1; if d >= 1 and d <= clip.nr then return tgt[d] end; return seq[i] end })
         n = alias.cells_paste(view, snap, MX.cur.ri, math.max(1, MX.cur.ci), clip)
@@ -10008,7 +9962,7 @@ ctx = {
       { key = 'e', label = 'sections strip: the section names on the left (also without the ruler)' .. on(MX.sections ~= false), fn = function() MX.sections = MX.sections == false; reaper.SetExtState(EXT, 'mxsec', MX.sections and '1' or '0', true); relayout()
         -- 25 окт: секций ещё нет — полоса пустая и не видна: сказать (было — «не реагирует»)
         vim.msg = 'sections strip ' .. (MX.sections and 'on' or 'off') .. ((MX.sections and not MX.has_sec) and ' - empty for now: Tr in the matrix makes a section (several patterns in a row)' or '') end },
-      -- 19 окт: пункт palette убран — палитра заменена кубиками в углу и clipkb в клетках (MX.palette_old)
+      -- 19 окт: пункт palette убран — палитра заменена кубиками в углу (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
       { key = 'm', label = 'minimize the pane (zm)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
     }
@@ -11197,134 +11151,11 @@ ctx = {
     end
     return c.root, c.obj, c.title
   end,
-  -- зона сессии: регион =SESSION за =END (трекер его не показывает); нет —
-  -- создаётся через такт после всего проекта, длиной ssbars тактов
-  ss_zone = function(qn)
-    -- маркеры читаются напрямую, не из regions: таблица обновляется снимком,
-    -- и два вызова подряд создавали две зоны (6 окт, песочница)
-    local i = 0
-    while true do
-      local ret, isrgn, pos, rgnend, name = reaper.EnumProjectMarkers3(0, i)
-      if not ret or ret == 0 then break end
-      if isrgn and name == model.SESSION_REGION then
-        local _, _, _, _, _, idx = reaper.EnumProjectMarkers3(0, i)
-        return ctx.ss_zone_clear_song({ pos = pos, rgnend = rgnend, session = true, name = name, idx = idx })
-      end
-      i = i + 1
-    end
-    -- только что созданный регион в этом же кадре через Enum ещё не виден —
-    -- иначе второй вызов создавал вторую зону (6 окт)
-    local c = state.ss_zone_new
-    if c and reaper.time_precise() - c.t < 5 then return c end
-    if not reaper.AddProjectMarker2 then return nil end
-    local z0 = ctx.ss_zone_home()
-    -- длина: НОК клипов (qn, 7 окт) или session bars
-    local _, meas = reaper.TimeMap2_timeToBeats(0, z0)
-    local z1 = qn and reaper.TimeMap2_QNToTime(0, reaper.TimeMap2_timeToQN(0, z0) + qn) or reaper.TimeMap2_beatsToTime(0, 0, meas + (state.ssbars or 8))
-    local idx = reaper.AddProjectMarker2(0, true, z0, z1, model.SESSION_REGION, -1, 0)
-    model.invalidate()
-    state.ss_zone_new = { pos = z0, rgnend = z1, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = idx }
-    return state.ss_zone_new
-  end,
-  -- начало новой зоны: через такт после всего проекта
-  -- 21 окт: песня для расчёта места зоны (jf_tracker_szone): =END напрямую (не кэш regions), регионы кроме зоны,
-  -- items с меткой jf_session или без — всё из проекта сейчас
-  ss_song = function()
-    local song = { end_pos = model.marker_pos(model.END_MARKER), regions = {}, items = {} }
-    local i = 0
-    while true do
-      local ret, isr, p, e, nm = reaper.EnumProjectMarkers3(0, i)
-      if not ret or ret == 0 then break end
-      if isr and nm ~= model.SESSION_REGION then song.regions[#song.regions + 1] = { pos = p, rgnend = e, name = nm } end
-      i = i + 1
-    end
-    for ti = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, ti)
-      for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
-        local it = reaper.GetTrackMediaItem(tr, k)
-        local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
-        song.items[#song.items + 1] = { pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'), tagged = tag ~= '' }
-      end
-    end
-    return song
-  end,
-  -- начало новой зоны: за всем, что не зона (=END, регионы — и библиотечные, items песни), через SZ.GAP_BARS тактов
-  ss_zone_home = function(skip)
-    local t = MX.SZ.after(ctx.ss_song())
-    if skip then t = math.max(t, skip) end
-    local _, meas = reaper.TimeMap2_timeToBeats(0, t)
-    return reaper.TimeMap2_beatsToTime(0, 0, math.floor(meas) + MX.SZ.GAP_BARS)
-  end,
-  -- 18 окт: зона наехала на регион песни (паттерны выросли, темп, перенос) — клипы садились поверх нот
-  -- и сдвинутыми (зона не на такте). Зона с её items (только P_EXT:jf_session) — уезжает за проект
-  -- 21 окт: «в песне» — и до =END, и поверх items песни (было: только поверх обычного региона — зона на 5.7 с
-  -- в пустых тактах песни не замечалась); под играющим транспортом — флаг, переезд после стопа (ss_zone_tick)
-  ss_zone_clear_song = function(z)
-    local hit = MX.SZ.in_song(z, ctx.ss_song())
-    if not hit then ctx.ss_zone_bad = nil; return z end
-    if playing() then ctx.ss_zone_bad = true; return z end
-    local q0 = reaper.TimeMap2_timeToQN(0, z.pos)
-    local qlen = reaper.TimeMap2_timeToQN(0, z.rgnend) - q0
-    local nz0 = ctx.ss_zone_home(z.rgnend)
-    local nq0 = reaper.TimeMap2_timeToQN(0, nz0)
-    reaper.Undo_BeginBlock()
-    for ti = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, ti)
-      for k = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
-        local it = reaper.GetTrackMediaItem(tr, k)
-        local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-        local _, tag = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
-        if tag ~= '' and p >= z.pos - 1e-6 and p < z.rgnend - 1e-6 then
-          reaper.SetMediaItemInfo_Value(it, 'D_POSITION', reaper.TimeMap2_QNToTime(0, nq0 + reaper.TimeMap2_timeToQN(0, p) - q0))
-        end
-      end
-    end
-    local nz1 = reaper.TimeMap2_QNToTime(0, nq0 + qlen)
-    reaper.SetProjectMarker3(0, z.idx, true, nz0, nz1, model.SESSION_REGION, 0)
-    reaper.Undo_EndBlock('session zone moved off the song', -1)
-    model.invalidate()
-    state.ss_zone_new = nil
-    vim.msg = ('session zone was over %s - moved after the project (only the clips moved)'):format(hit)
-    return { pos = nz0, rgnend = nz1, session = true, name = model.SESSION_REGION, idx = z.idx }
-  end,
-  -- зона под need долей (7 окт, полиметрия): длиннее — регион растёт, луп
-  -- транспорта следом, играющим клипам досаживается хвост [старый конец,
-  -- новый) их фазой (он впереди плейхеда — не щёлкнет); shrink — можно и
-  -- укоротить (никто не играет)
-  ss_zone_fit = function(z, need, sq, shrink)
-    if not (z and z.idx and need) then return z end
-    local q0 = reaper.TimeMap2_timeToQN(0, z.pos)
-    local cur = reaper.TimeMap2_timeToQN(0, z.rgnend) - q0
-    if math.abs(need - cur) < 1e-4 or (need < cur and not shrink) then return z end
-    local old_end, new_end = z.rgnend, reaper.TimeMap2_QNToTime(0, q0 + need)
-    reaper.SetProjectMarker3(0, z.idx, true, z.pos, new_end, model.SESSION_REGION, 0)
-    z.rgnend = new_end
-    if MX.SZ.in_song(z, ctx.ss_song()) then ctx.ss_zone_bad = true end   -- 21 окт: выросла в песню / библиотеку — переедет на стопе
-    state.ss_zone_new = { pos = z.pos, rgnend = new_end, session = true, name = model.SESSION_REGION, t = reaper.time_precise(), idx = z.idx }
-    local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
-    if math.abs(l0 - z.pos) < 1e-4 then reaper.GetSet_LoopTimeRange(true, true, z.pos, new_end, false) end
-    if new_end < old_end and snap then
-      edit.run('session zone ' .. need .. ' beats', function() for _, col in ipairs(snap.cols) do alias.session_clear(col.track, new_end, old_end) end end)
-    end
-    model.invalidate()
-    return z
-  end,
   ss_bar_after = function(t)
     local _, meas = reaper.TimeMap2_timeToBeats(0, t)
     local n = reaper.TimeMap2_beatsToTime(0, 0, meas + 1)
     if n <= t + 1e-6 then n = reaper.TimeMap2_beatsToTime(0, 0, meas + 2) end
     return n
-  end,
-  ss_play = function(z)
-    reaper.GetSet_LoopTimeRange(true, true, z.pos, z.rgnend, false)
-    reaper.GetSetRepeat(1)
-    reaper.SetEditCurPos(z.pos, true, true)
-    if not playing() then reaper.OnPlayButton() end
-  end,
-  ss_apply = function(desc, fn)
-    local ok, e = pcall(edit.run, desc, fn)
-    if not ok then vim.msg = 'session: ' .. tostring(e):match('[^\n]*$') end
-    model.invalidate()
   end,
   -- инфо трека для шапки (7 окт): кэш на полсекунды по треку
   hdr_cache = {},
@@ -12693,7 +12524,6 @@ ctx = {
       { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'colour of the active cursor: the tracker cursor in focus and the selected DSP parameter - hex RGB; grey - the theme colour', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end },
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       flag('ssbsync', 'drop beatsync', 'an audio file dropped on a matrix cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its pattern'),
-      { key = 'ssbars', label = 'hear zone bars', kind = 'num', min = 1, max = 64, step = 1, fmt = '%d', desc = 'length of the =SESSION zone where picked cells / sketches loop when you hear them (new zone only - delete the region to rebuild)', get = function() return state.ssbars or 8 end, set = function(v) state.ssbars = math.floor(v) end },
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
       { key = 'krdelay', label = 'key repeat delay', kind = 'num', min = 0, max = 800, step = 10, fmt = '%d ms', desc = 'a held key (j k h l, arrows, letters, Ctrl+letters) starts repeating after this pause; 0 - the macOS repeat as set in System Settings. Note keys in INSERT keep the system repeat (it measures the held note length)', get = function() return state.krdelay or 250 end, set = function(v) state.krdelay = v end },
       { key = 'krrate', label = 'key repeat rate', kind = 'num', min = 5, max = 60, step = 1, fmt = '%d / s', desc = 'how many times a second a held key repeats (after the delay above)', get = function() return state.krrate or 30 end, set = function(v) state.krrate = v end },
@@ -12876,7 +12706,7 @@ ctx = {
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
-      { 'drop and hear', { 'ssbsync', 'ssbars' } },
+      { 'drop', { 'ssbsync' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
     }
@@ -14818,16 +14648,10 @@ ctx = {
           { key = 'l', label = 'fixed lanes on/off (:lanes)', fn = ctx.toggle_lanes },
         } } end },
       { key = 'i', label = 'insert: note / slice / whole sample / automation', sub = function() return ctx.insert_hydra() end },
-      -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb), клетки палитры (clipkb)
-      { key = 'k', label = 'keyboard: notes / patterns / clips', sub = function() return { title = 'keyboard', items = {
+      -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb); 30 окт: clipkb убран
+      { key = 'k', label = 'keyboard: notes / patterns', sub = function() return { title = 'keyboard', items = {
           { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
           { key = 'p', label = 'patternkb - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
-          { key = 'c', label = 'clipkb - 1qaz 2wsx ... play the matrix cells' .. (MX.pal_kb and '  (on)' or ''), fn = function()
-              if not MX.palette then MX.palette = true; reaper.SetExtState(EXT, 'mxpal', '1', true); relayout() end
-              MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end
-              if MX.pal_kb then ctx.pane_focus('matrix') end
-              vim.msg = MX.pal_kb and 'clipkb: 1qaz 2wsx ... column = track, row = palette row; Shift - pick (together), Ctrl - silence, Esc - off' or 'clipkb off'
-            end },
         } } end },
       { key = 'I', label = 'instrument (pool)', sub = function()
           local it = {}
@@ -21829,8 +21653,6 @@ local function frame()
   -- на что наведена мышь (state.status)
   local mode, _, typed = vim.status()   -- 15 окт: набранное — у курсора (info.typed), не в статус и не в слово режима
   local left = mode ~= '' and mode or (state.focus ~= 'tracker' and '' or (vim.piano and 'KEYS' or 'NORMAL'))   -- 16 окт: клавиатура включена в NORMAL — слово KEYS (ноты на цифрах / F)
-  -- 8 окт: фокус в клипах — свой режим SESSION (клавиатура запускает клипы),
-  -- не KEYS: слой пианино тут не действует
   if state.focus ~= 'tracker' then
     -- 13 окт: подпись панели из реестра (properties, lib, item), не её id (было «SPROPS», «INST»)
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
@@ -21840,10 +21662,10 @@ local function frame()
       left = state.toptab == 'sample' and 'SAMPLER' or ((te and te.label) or state.toptab or 'top'):upper()
     else left = ((pe and pe.label) or state.focus):upper() end
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
-  -- 18 окт: свои режимы клавиатуры: patternkb (ноты — паттерны) в трекере, clipkb палитры в матрице
+  -- 18 окт: свой режим клавиатуры: patternkb (ноты — паттерны) в трекере
   if state.viper then left = 'VIPER ' .. left end   -- 29 окт
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
-  elseif (state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb then left = 'CLIPKB' end
+  end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
   local wf = gfx.getchar(65536)
@@ -23347,9 +23169,8 @@ local function frame()
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column (z)'
   elseif hover.matrix and hover.matrix.palbtn then
-    state.status = ({ kb = 'clipkb (c): keyboard columns 1qaz 2wsx ... = tracks, rows = palette rows; a key - listen, Shift - pick, Ctrl - silence, Esc - off',
-      render = 'render: the picked cells (one per track) become a new pattern at the end of the song (aliases)',
-      plist = '+playlist: the patterns of the picked cells (or of the cursor slot) go to the end of the current playlist',
+    state.status = ({
+      plist = '+playlist: the pattern of the cursor slot goes to the end of the current playlist',
       rec = 'rec: record the order of the patterns played (patternkb), again - write it after the song' })[hover.matrix.palbtn] or ''
   elseif hover.matrix and hover.matrix.palname then
     local pn = hover.matrix.palname
@@ -23363,7 +23184,6 @@ local function frame()
   elseif hover.matrix and hover.matrix.vis then state.status = 'visor of this slot' .. (hover.matrix.vis.name and (': ' .. hover.matrix.vis.name) or ' - none') .. ' - click: pick a scene / preset (an event v: at the slot start, the master visor column)'
   elseif hover.matrix and hover.matrix.btn == 'loops' then state.status = 'loops layer: cells show item loop periods; digits+Enter loop, > region end, < fit, + - period; :loops'
   elseif hover.matrix and (hover.matrix.btn == 'mkstart' or hover.matrix.btn == 'mkend') then state.status = 'sequence ' .. (hover.matrix.btn == 'mkstart' and '=START' or '=END') .. ' marker: click - type bar[.beat] + Enter, Shift+click - cursor row, wheel - one bar; :start / :end'
-  elseif hover.matrix and hover.matrix.btn == 'sketch' then state.status = 'sketchpad: c - clipkb, Shift + keys - cells of any patterns, Ctrl+Shift - a part, Enter - a sketch (X1 X2 ... in the row; click - the row on / off)'
   elseif hover.matrix and hover.matrix.btn == 'follow' then state.status = 'follow ' .. (MX.follow and 'on' or 'off') .. ': while you are in the tracker the matrix cursor stands on the slot and the track of the tracker cursor and scrolls to it; click - ' .. (MX.follow and 'off' or 'on')
   elseif hover.matrix and hover.matrix.btn == 'fold' then state.status = 'fold the matrix: slot numbers, track names and cells only (F)'
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
@@ -24116,8 +23936,6 @@ local function frame()
         else vim.msg = ('note %d: no pad   (Ctrl+Cmd: the window is a 4 x 4 pad grid)'):format(note) end
       end
     else ctx.pad_grid16 = nil; ctx.drum_pad_glide = nil; draw.pad_zone = nil end
-    -- clipkb (матрица / patterns): отпустил Shift — набранное звучит вместе (19 окт: здесь, а не в рисовании палитры)
-    if MX.pal_kb and MX.pal_shift and not mm.shift then MX.pal_shift = nil; ctx.palette_play_picks() end
     -- 19 окт: Ctrl+Cmd над строкой матрицы — jog / scrub по паттерну в лупе: палец влево-вправо по строке — место в паттерне
     -- (до строки трекера), паттерн играет лупом; другая строка — другой паттерн; отпустил — стоп, луп / курсор как были
     local hm = hover.matrix
@@ -25292,12 +25110,6 @@ local function frame()
         else ctx.mx_tsel = { a = ri, last = ri }; vim.msg = 'double-click - loop this slot; drag - several; Cmd+click - pick slots, the loop jumps between them' end
       end
       click = { t = now2, zone = 'mxtsel', row = ri }
-    elseif hover.matrix and hover.matrix.sketch then   -- 19 окт: эскиз: щелчок — звучит он, Shift — в последовательность
-      local k = hover.matrix.sketch
-      MX.sk_sel = MX.sk_sel or {}
-      if ctx.mods().shift then MX.sk_sel[k] = (not MX.sk_sel[k]) or nil else MX.sk_sel = { [k] = true } end
-      ctx.set_focus('matrix'); ctx.sketch_play()
-      click = { t = now2, zone = 'sketch' }
     elseif hover.matrix and hover.matrix.splbtn then   -- 19 окт: плейлист песни (секции)
       local b = hover.matrix.splbtn
       if b == 'pick' then ctx.spl_pick() elseif b == 'play' then if ctx.PLY then ctx.PLY = nil; reaper.OnStopButton() else ctx.spl_play() end
@@ -25328,22 +25140,6 @@ local function frame()
       elseif b == 'render' then ctx.chain_render()
       else ctx.pl_load(); local l = ctx.PL.lists[ctx.PL.cur]; if l then l.text = ''; ctx.pl_save() end; vim.msg = 'chain: cleared' end
       click = { t = now2, zone = 'chainbtn' }
-    elseif hover.matrix and hover.matrix.sketchbtn then
-      local b = hover.matrix.sketchbtn
-      if b == 'make' then ctx.sketch_add()
-      elseif b == 'hear' then local by = {}; for _, pk in pairs(MX.pal_pick or {}) do by[pk.ci] = pk end; if next(by) then ctx.palette_mix(by) else vim.msg = 'sketch: pick cells first' end
-      elseif b == 'done' then MX.sk_show = false; MX.sk_pickmode = nil; MX.pal_kb = false; MX.pal_pick = {}; ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); vim.msg = 'sketch: off'
-      elseif b == 'after' or b == 'before' then ctx.sketch_insert(b == 'before')
-      elseif b == 'play' then ctx.sketch_play()   -- 21 окт: > — слушать (= Ctrl+Space)
-      elseif b == 'edit' then ctx.sketch_edit()
-      else
-        local ks = ctx.sketch_order()
-        table.sort(ks, function(a2, b2) return a2 > b2 end)
-        for _, k in ipairs(ks) do table.remove(MX.sketch, k) end
-        for k, sk in ipairs(MX.sketch) do sk.name = 'X' .. k end
-        MX.sk_sel = {}; ctx.sketch_save(); vim.msg = ('sketch: %d removed'):format(#ks)
-      end
-      click = { t = now2, zone = 'sketchbtn' }
     elseif hover.matrix and hover.matrix.patbtn then   -- 27 окт: ряд команд панели patterns
       ctx.set_focus('patterns'); ctx.pat_btn(hover.matrix.patbtn)
       click = { t = now2, zone = 'patbtn' }
@@ -25358,9 +25154,7 @@ local function frame()
     elseif hover.matrix and hover.matrix.palbtn then   -- 18 окт: кнопки палитры
       local b = hover.matrix.palbtn
       ctx.set_focus('matrix')
-      if b == 'kb' then ctx.palette_kb()
-      elseif b == 'render' then ctx.palette_render()
-      elseif b == 'plist' then ctx.palette_to_playlist()
+      if b == 'plist' then ctx.palette_to_playlist()
       elseif b == 'rec' and ctx.PADS then ctx.pads_cmd('rec') end
       click = { t = now2, zone = 'mxpalbtn' }
     elseif hover.matrix and (hover.matrix.palcell or hover.matrix.palname) then   -- 18 окт: палитра — слушать
@@ -25397,18 +25191,6 @@ local function frame()
       click = { t = now2, zone = 'mxdur', row = hover.matrix.dur }
     elseif hover.matrix and hover.matrix.prev then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.prev, -1); click = { t = now2, zone = 'mxarrow' }
     elseif hover.matrix and hover.matrix.next then ctx.set_focus('matrix'); ctx.slot_cycle(hover.matrix.next, 1); click = { t = now2, zone = 'mxarrow' }
-    elseif hover.matrix and hover.matrix.ri and hover.matrix.ci and MX.sk_pickmode and MX.sk_show then   -- 25 окт: набор эскиза мышью
-      ctx.set_focus('matrix')
-      local rg, ci = seq[hover.matrix.ri], hover.matrix.ci
-      if rg and not rg.gap and snap.cols[ci] then
-        local p = { name = rg.name, src = rg, key = (rg.name or '') .. '@' .. rg.pos }
-        local key = p.key .. ':' .. ci
-        MX.pal_pick = MX.pal_pick or {}
-        if MX.pal_pick[key] then MX.pal_pick[key] = nil else MX.pal_pick[key] = { p = p, ci = ci } end
-        local n = 0; for _ in pairs(MX.pal_pick) do n = n + 1 end
-        vim.msg = ('sketch: %d cell(s) picked - make: a sketch, hear: listen, click again: unpick'):format(n)
-      end
-      click = { t = now2, zone = 'skpick' }
     elseif hover.matrix and hover.matrix.ri and hover.matrix.ci then
       ctx.set_focus('matrix'); ctx.pl_help = nil
       -- щелчок снимает блок; Shift+щелчок — блок от прежней клетки; Cmd+щелчок —
@@ -27541,7 +27323,6 @@ local function frame()
   ctx.mod_tick(c)
   ctx.pedal_tick()   -- 21 окт: ` отпущен — педаль вверх
   ctx.focus_back_tick()   -- 21 окт: мышь вернулась с окна плагина — клавиатура трекеру
-  ctx.ss_zone_tick()      -- 21 окт: зона сессии не стоит в песне
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
   if ctx.hold_len then
@@ -28465,8 +28246,7 @@ local function frame()
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
   -- только его длина (слайс — свой кусок), через трек курсора
   if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console'
-      or ((state.focus == 'matrix' or state.focus == 'patterns') and MX.pal_kb)) then   -- 18 окт: clipkb палитры — ! это Shift+1 (набор)
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console') then
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
     if e and (e.take or e.src) then ctx.preview_slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
@@ -28567,7 +28347,7 @@ local function frame()
         elseif c == 8 then me.buf = me.buf:sub(1, -2)
         elseif (c >= 48 and c <= 57) or c == 46 then if #me.buf < 7 then me.buf = me.buf .. string.char(c) end end
       elseif state.focus == 'patterns' then
-        -- 19 окт: панель patterns: c — clipkb (1qaz… — трек, ряд — паттерн), j k — прокрутка, остальное — Vim
+        -- 19 окт: панель patterns: j k — прокрутка, остальное — Vim
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local ch = c < 256 and string.char(c) or ''
         -- 19 окт: список: j k — выбор, g G — края, Space — слушать, Enter — к паттерну в трекере, n — заметка
@@ -28599,19 +28379,12 @@ local function frame()
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
-        -- 19 окт: clipkb прямо в матрице: 1qaz 2wsx … — столбец трек, ряд — видимый слот; Shift — набор из разных
-        -- паттернов, отпустил — звучат вместе; Enter — render (новый паттерн из набранного); Ctrl — тишина; Esc — выкл
-        if c == ('c'):byte() and not MX.pal_kb and not MX.pending then MX.pal_kb = true; MX.pal_pick = {}; vim.msg = 'clipkb: 1qaz 2wsx 3edc ... column = track, row = slot; Shift - pick from any patterns (let go - together), Enter - render, arrows / [ ] - other rows, Esc - off (letters are cells now, c too)'; return end
         if MX.spl_focus and ctx.spl_kb(c) then return end   -- 19 окт: строка секций плейлиста с клавиатуры
-        if c == ('C'):byte() and not MX.pal_kb and not MX.pending then ctx.pl_edit(); return end   -- 19 окт: C — набрать chain
-        if c == ('s'):byte() and not MX.pal_kb and not MX.pending then ctx.mx_sec_menu(); return end   -- 21 окт: s — подменю секций
-        if c == ('S'):byte() and not MX.pal_kb and not MX.pending then   -- 19 окт: строка секций над плейлистом; 21 окт: S (song) — s отдан подменю секций
+        if c == ('C'):byte() and not MX.pending then ctx.pl_edit(); return end   -- 19 окт: C — набрать chain
+        if c == ('s'):byte() and not MX.pending then ctx.mx_sec_menu(); return end   -- 21 окт: s — подменю секций
+        if c == ('S'):byte() and not MX.pending then   -- 19 окт: строка секций над плейлистом; 21 окт: S (song) — s отдан подменю секций
           MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
         end
-        if c == 32 and ctx.mods().ctrl and not ctx.mods().shift and #MX.sketch > 0 then ctx.sketch_play(); return end   -- 21 окт: Ctrl+Space — слушать эскиз
-        if MX.pal_kb and c == 13 then ctx.sketch_add(); return end   -- 19 окт: набранное — эскизом в sketchpad (render — p там)
-        if MX.pal_kb and c == 27 and MX.sk_edit then MX.sk_edit = nil end   -- 21 окт: Esc — правка эскиза отменена
-        if MX.pal_kb and ctx.palette_key(c) then return end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
         -- 28 окт: командная строка / поиск — vim (браузер забирал буквы «:reload»: l, Enter → файл в lib)
@@ -29578,21 +29351,6 @@ ctx.mx_to_visual = function()
   vim.cur.fi, vim.cur.row = f1, math.max(math.floor(a.r0 + 1e-6), math.ceil(b.r1 - 1e-6) - 1)
   ctx.rf_lastvis = { f0, f1, vim.anchor.row, vim.cur.row, nil }
 end
--- 21 окт: зона сессии на стопе — раз в 2 с (и сразу после стопа, если помечена): оказалась в песне — уезжает за неё
-ctx.ss_zone_tick = function()
-  if reaper.GetPlayState() & 5 ~= 0 then return end
-  local now = reaper.time_precise()
-  if not ctx.ss_zone_bad and now - (ctx.ss_zone_chk or 0) < 2 then return end
-  ctx.ss_zone_chk = now
-  local i = 0
-  while true do
-    local ret, isr, p, e, nm, idx = reaper.EnumProjectMarkers3(0, i)
-    if not ret or ret == 0 then break end
-    if isr and nm == model.SESSION_REGION then ctx.ss_zone_clear_song({ pos = p, rgnend = e, session = true, name = nm, idx = idx }); return end
-    i = i + 1
-  end
-  ctx.ss_zone_bad = nil
-end
 -- 21 окт: колонка волны по треку (tw): P_EXT:jf_wave '1' — всегда, '0' — никогда, нет — авто (есть аудио / кит с сэмплами)
 ctx.wave_pref_c = {}
 draw.wave_pref = function(col)
@@ -29683,11 +29441,6 @@ ctx.mx_btn_do = function(b)
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'timesel' then ctx.tsel_menu()
-  elseif b == 'sketch' then   -- 25 окт: кнопка — сразу набор: щелчок по клеткам (или Shift + клавиши clipkb), make — эскиз
-    MX.sk_show = not MX.sk_show
-    if MX.sk_show then ctx.set_focus('matrix'); MX.pal_kb = true; MX.pal_pick = {}; MX.sk_pickmode = true
-      vim.msg = 'sketch: click cells of any patterns (or Shift + clipkb keys), then make - a sketch X1; hear - listen to the picks'
-    else MX.sk_pickmode = nil; MX.pal_kb = false; MX.pal_pick = {}; vim.msg = 'sketch: off' end
   elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
     MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
     vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
@@ -31765,244 +31518,6 @@ ctx.pat_btn = function(b)
   if b == 'menu' then ctx.pat_menu() elseif b == 'glue' then ctx.pat_glue() elseif b == 'split' then ctx.pat_split_menu()
   elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename() end
 end
--- 19 окт: sketchpad матрицы — эскизы X1 X2 …: набранные в clipkb клетки (трек ← паттерн) копятся эскизом, а не сразу в песню.
--- Эскизы — строкой над слотами: щелчок — звучит, Shift+щелчок — в последовательность (несколько — подряд, лупом),
--- p — вставить последовательность в песню после слота курсора (P — перед), x — удалить эскиз. В памяти сессии
-MX.sketch = MX.sketch or {}
--- 21 окт: клетка эскиза — паттерн трека целиком или его часть k/n (part[ci] = { k, n }: 2/4 — вторая четверть);
--- e — эскиз обратно в набор clipkb (правка: Shift — клетки, Ctrl+Shift — часть), Enter — в тот же эскиз; эскизы в проекте
-ctx.sketch_add = function()
-  local cells, part, n = {}, {}, 0
-  for _, pk in pairs(MX.pal_pick or {}) do cells[pk.ci] = pk.p.src; part[pk.ci] = pk.part; n = n + 1 end
-  if n == 0 then vim.msg = 'sketch: pick cells first (Shift + clipkb keys)'; return end
-  local k = MX.sk_edit and MX.sketch[MX.sk_edit] and MX.sk_edit or (#MX.sketch + 1)
-  local was = MX.sk_edit == k
-  MX.sketch[k] = { name = 'X' .. k, cells = cells, part = part, n = n }
-  MX.sk_sel = { [k] = true }
-  MX.pal_pick = {}
-  MX.sk_edit = nil
-  ctx.sketch_save()
-  vim.msg = ('sketch X%d %s: %d track(s) - Ctrl+Space / > hears it, Shift+click lines several up, p puts them after the slot, e edits'):format(k, was and 'changed' or 'made', n)
-end
--- отрезок источника клетки (часть паттерна или весь)
-ctx.sk_seg = function(sk, ci)
-  local src = sk.cells[ci]
-  if not src then return nil end
-  local pt = sk.part and sk.part[ci]
-  if not pt then return src.pos, src.rgnend end
-  local len = src.rgnend - src.pos
-  return src.pos + (pt[1] - 1) * len / pt[2], src.pos + pt[1] * len / pt[2]
-end
-ctx.sk_len = function(sk)   -- поле ctx: предел 200 local
-  local l = 0
-  for ci in pairs(sk.cells) do local a, b = ctx.sk_seg(sk, ci); l = math.max(l, b - a) end
-  return l
-end
--- e: эскиз — обратно в набор clipkb (голубые рамки на его клетках), Enter — сохранить в него же
-ctx.sketch_edit = function()
-  local k = ctx.sketch_order()[1]
-  local sk = k and MX.sketch[k]
-  if not sk then vim.msg = 'sketch: pick one to edit (click X1 ...)'; return end
-  MX.pal_kb = true
-  MX.pal_pick = {}
-  for ci, src in pairs(sk.cells) do
-    local key = (src.name or '') .. '@' .. src.pos
-    MX.pal_pick[key .. ':' .. ci] = { p = { name = src.name, src = src, key = key }, ci = ci, part = sk.part and sk.part[ci] }
-  end
-  MX.sk_edit = k
-  ctx.set_focus('matrix')
-  vim.msg = ('sketch %s: edit - Shift + keys cells, Ctrl+Shift + key - a part (1/2 2/2 1/4 ...), Enter - keep, Esc - cancel'):format(sk.name)
-end
--- в проекте: строка на эскиз «Xn|guid=имя@pos/k/n;…»
-ctx.sketch_save = function()
-  local out = {}
-  for _, sk in ipairs(MX.sketch) do
-    local parts = {}
-    for ci, src in pairs(sk.cells) do
-      local col = snap and snap.cols[ci]
-      if col and col.guid then
-        local pt = sk.part and sk.part[ci]
-        parts[#parts + 1] = ('%s=%s@%.6f/%d/%d'):format(col.guid, src.name or '', src.pos, pt and pt[1] or 1, pt and pt[2] or 1)
-      end
-    end
-    out[#out + 1] = sk.name .. '|' .. table.concat(parts, ';')
-  end
-  reaper.SetProjExtState(0, 'jf_tracker', 'sketch', table.concat(out, '\n'))
-end
-ctx.sketch_ensure = function()
-  local proj = reaper.EnumProjects(-1)
-  if MX.sk_proj == proj or not (snap and seq) then return end
-  MX.sk_proj = proj
-  MX.sketch, MX.sk_sel, MX.sk_edit = {}, {}, nil
-  local _, raw = reaper.GetProjExtState(0, 'jf_tracker', 'sketch')
-  local ci_of = {}
-  for ci, col in ipairs(snap.cols) do if col.guid then ci_of[col.guid] = ci end end
-  for line in (raw or ''):gmatch('[^\n]+') do
-    local nm, rest = line:match('^([^|]*)|(.*)$')
-    if nm then
-      local sk = { name = 'X' .. (#MX.sketch + 1), cells = {}, part = {}, n = 0 }
-      for g, pat, pos, k, n in rest:gmatch('([^=;]+)=([^@;]*)@([%d%.%-]+)/(%d+)/(%d+)') do
-        local ci = ci_of[g]
-        local src
-        for _, rg in ipairs(seq) do if not rg.gap and rg.name == pat and math.abs(rg.pos - tonumber(pos)) < 1e-4 then src = rg; break end end
-        if not src then for _, rg in ipairs(seq) do if not rg.gap and rg.name == pat then src = rg; break end end end
-        if ci and src then
-          sk.cells[ci] = src; sk.n = sk.n + 1
-          if tonumber(n) > 1 then sk.part[ci] = { tonumber(k), tonumber(n) } end
-        end
-      end
-      if sk.n > 0 then MX.sketch[#MX.sketch + 1] = sk end
-    end
-  end
-end
--- Ctrl+Shift + клавиша clipkb: часть клетки по кругу — целиком, 1/2, 2/2, 1/4 … 4/4 (клетка берётся в набор)
-ctx.SK_PARTS = { false, { 1, 2 }, { 2, 2 }, { 1, 4 }, { 2, 4 }, { 3, 4 }, { 4, 4 } }
-ctx.sketch_part_step = function(pk)
-  local i = 1
-  for j, pt in ipairs(ctx.SK_PARTS) do if pt and pk.part and pt[1] == pk.part[1] and pt[2] == pk.part[2] then i = j end end
-  pk.part = ctx.SK_PARTS[i % #ctx.SK_PARTS + 1] or nil
-  return pk.part and (pk.part[1] .. '/' .. pk.part[2]) or 'whole'
-end
-ctx.sketch_order = function()
-  local out = {}
-  for k = 1, #MX.sketch do if (MX.sk_sel or {})[k] then out[#out + 1] = k end end
-  return out
-end
--- эскизы подряд в зоне =SESSION, лупом (как «вместе» палитры; стоп — palette_mix_stop)
-ctx.sketch_play = function(ks)
-  ks = ks or ctx.sketch_order()
-  if #ks == 0 and #MX.sketch > 0 then ks = { #MX.sketch } end   -- 21 окт: ничего не выбрано — последний
-  if #ks == 0 then vim.msg = 'sketch: pick one'; return end
-  if reaper.GetPlayState() & 1 == 1 and not ctx.pal_mix then vim.msg = 'sketch: the transport plays - stop it to hear'; return end
-  if ctx.mx_solo then ctx.mx_cell_preview_end() end
-  local qn = 0
-  for _, k in ipairs(ks) do local sk = MX.sketch[k]; local src = next(sk.cells) and select(2, next(sk.cells)); qn = qn + reaper.TimeMap2_timeToQN(0, src.pos + ctx.sk_len(sk)) - reaper.TimeMap2_timeToQN(0, src.pos) end
-  local zone = ctx.ss_zone(qn)
-  if not zone then vim.msg = 'sketch: no session zone'; return end
-  if ctx.ss_zone_fit then zone = ctx.ss_zone_fit(zone, qn, seq, true) or zone end
-  if not ctx.pal_mix then
-    local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
-    ctx.pal_mix = { l0 = l0, l1 = l1, rep = reaper.GetSetRepeat(-1), cur = reaper.GetCursorPosition() }
-  end
-  ctx.ss_apply('sketch: hear', function()
-    for _, c in ipairs(snap.cols) do if c.track then alias.session_clear(c.track, zone.pos, zone.rgnend) end end
-    local q0 = reaper.TimeMap2_timeToQN(0, zone.pos)
-    for _, k in ipairs(ks) do
-      local sk = MX.sketch[k]
-      local src0 = select(2, next(sk.cells))
-      local dq = reaper.TimeMap2_timeToQN(0, src0.pos + ctx.sk_len(sk)) - reaper.TimeMap2_timeToQN(0, src0.pos)
-      local a, b = reaper.TimeMap2_QNToTime(0, q0), reaper.TimeMap2_QNToTime(0, q0 + dq)
-      for ci, src in pairs(sk.cells) do
-        local col = snap.cols[ci]
-        local s0, s1 = ctx.sk_seg(sk, ci)
-        local pt = sk.part and sk.part[ci]
-        if col and col.track then alias.session_plant(col.track, src, a, b, a, nil, 'pal:' .. ci, nil, pt and { seg = { s0, s1 } } or nil) end   -- 21 окт: часть — отрезком, повторами до длины эскиза
-      end
-      q0 = q0 + dq
-    end
-  end)
-  ctx.ss_play(zone)
-  ctx.pal_mix.t = reaper.time_precise(); ctx.pal_on = 'mix'
-  local nm = {}
-  for _, k in ipairs(ks) do nm[#nm + 1] = MX.sketch[k].name end
-  vim.msg = ('sketch: %s (loop; Space - stop, p - into the song)'):format(table.concat(nm, ' '))
-end
--- в песню: каждый эскиз — новый паттерн (клетки — алиасами), подряд после слота курсора (before — перед)
-ctx.sketch_insert = function(before)
-  local ks = ctx.sketch_order()
-  if #ks == 0 then vim.msg = 'sketch: pick sketches (click / Shift+click)'; return end
-  ctx.palette_mix_stop()
-  local slot = seq[MX.cur.ri]
-  local at = slot and (before and slot.pos or slot.rgnend)
-  local made = {}
-  for _, k in ipairs(ks) do
-    local sk = MX.sketch[k]
-    local qn = reaper.TimeMap2_timeToQN(0, ctx.sk_len(sk))
-    ctx.mx_added = nil
-    ctx.mx_add(math.max(1, math.floor(qn / 4 + 0.5)))
-    local ri = ctx.mx_added and ctx.mx_added.ri
-    if ri and seq[ri] then
-      edit.run('sketch into the song', function()
-        for ci, src in pairs(sk.cells) do
-          local pt = sk.part and sk.part[ci]
-          local col = snap.cols[ci]
-          if pt and col and col.track then
-            -- 21 окт: часть паттерна — копии отрезка (повторами до конца нового паттерна), не алиасы; метка сессии снимается
-            local rg2 = seq[ri]
-            local s0, s1 = ctx.sk_seg(sk, ci)
-            alias.session_plant(col.track, src, rg2.pos, rg2.rgnend, rg2.pos, nil, 'skins', nil, { seg = { s0, s1 } })
-            for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
-              local it = reaper.GetTrackMediaItem(col.track, i)
-              local _, tg = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
-              if tg == 'skins' then reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', true) end
-            end
-          else
-            local clip = alias.cells_copy({ src }, snap, 1, 1, ci, ci, true)
-            alias.cells_paste(seq, snap, ri, ci, clip, true)
-          end
-        end
-      end)
-      ctx.mx_refresh()
-      local rg = seq[ri]
-      if at and rg and math.abs(rg.pos - at) > 1e-6 then
-        ctx.slot_op('sketch: move ' .. rg.name, function() alias.move_span(rg.pos, rg.rgnend, at) end)
-      end
-      if at and rg then at = at + (rg.rgnend - rg.pos) end
-      made[#made + 1] = rg and rg.name or '?'
-    end
-  end
-  vim.msg = ('sketch: %s into the song %s (u - undo)'):format(table.concat(made, ' '), before and 'before the slot' or 'after the slot')
-end
-ctx.sketch_draw = function(Lx, x, y, w)
-  local hv = {}
-  ctx.sketch_ensure()   -- 21 окт: эскизы проекта (после рестарта / смены вкладки)
-  if #MX.sketch == 0 and not MX.sk_show then return 0, hv end   -- 23 окт: пустая и выключена — строки нет
-  local mx, my = gfx.mouse_x, gfx.mouse_y
-  U.text(x + Lx.pad, y, 'sketch', U.GREY)
-  local bx = x + Lx.pad + U.measure('sketch ') + Lx.pad
-  -- 25 окт: набор — кнопки make / hear / done и подсказка, сколько выбрано
-  if MX.sk_show and MX.sk_pickmode then
-    local n = 0; for _ in pairs(MX.pal_pick or {}) do n = n + 1 end
-    for _, b in ipairs({ { 'make', 'make' }, { 'hear', 'hear' }, { 'done', 'done' } }) do
-      local bw = U.measure(b[1]) + 2 * Lx.pad
-      if bx + bw > x + w then break end
-      local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
-      local lit = b[2] == 'make' and n > 0
-      U.set(hot and U.tint(U.AMBER, 0.3) or (lit and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
-      U.set(lit and U.CYAN or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
-      U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or (lit and U.CYAN or U.TEXT))
-      if hot then hv.sketchbtn = b[2] end
-      bx = bx + bw + 2
-    end
-    if #MX.sketch == 0 then
-      local tip = n > 0 and (n .. ' picked - make') or 'click cells'
-      if bx + U.measure(tip) + Lx.pad <= x + w then U.text(bx + Lx.pad, y, tip, U.GREY) end
-      return Lx.rh + 2, hv
-    end
-    bx = bx + Lx.pad
-  end
-  for k, sk in ipairs(MX.sketch) do
-    local bw = U.measure(sk.name) + 2 * Lx.pad
-    if bx + bw > x + w - U.measure('> e P p x') - 6 * Lx.pad then break end
-    local on = (MX.sk_sel or {})[k]
-    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
-    U.set(on and U.tint(U.CYAN, 0.3) or (hot and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
-    U.set(on and U.CYAN or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
-    U.text(bx + Lx.pad, y, sk.name, on and U.CYAN or U.TEXT)
-    if hot then hv.sketch = k end
-    bx = bx + bw + 2
-  end
-  for _, b in ipairs({ { '>', 'play' }, { 'e', 'edit' }, { 'P', 'before' }, { 'p', 'after' }, { 'x', 'del' } }) do
-    local bw = U.measure(b[1]) + 2 * Lx.pad
-    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
-    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, Lx.rh - 1, 1)
-    U.set(U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
-    U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or U.TEXT)
-    if hot then hv.sketchbtn = b[2] end
-    bx = bx + bw + 2
-  end
-  return Lx.rh + 2, hv
-end
 -- 19 окт: блок над матрицей: кубики паттернов на всю ширину + строка chain (двойной щелчок по кубику — в цепь,
 -- > — слушать цепь, имя секции — выпадашкой, render — в матрицу перед слотом курсора, x — очистить)
 ctx.chain_add = function(name)
@@ -32230,8 +31745,7 @@ ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя па�
   if ctx.pal_snap ~= snap then ctx.pal_parts, ctx.pal_snap = {}, snap end
   local nvis = math.min(#list, h and math.max(1, math.floor((h - Lx.rh - 3) / rh)) or 6)
   MX.pal_scroll = math.max(0, math.min(math.max(0, #list - nvis), MX.pal_scroll or 0))
-  -- 18 окт: кнопки палитры — clipkb (столбцы 1qaz… — треки, ряды — паттерны), render (набранные клетки — новым
-  -- паттерном в конец песни), +playlist (их паттерны — в конец плейлиста), rec (порядок сыгранных паттернов — в песню)
+  -- 18 окт: кнопки палитры — +playlist (паттерн курсора — в конец плейлиста), rec (порядок сыгранных паттернов — в песню)
   local bx = x + Lx.pad
   local function pbtn(label, id, on)
     local bw = U.measure(label) + 2 * Lx.pad
@@ -32243,9 +31757,6 @@ ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя па�
     if hot then hover.palbtn = id end
     bx = bx + bw + Lx.pad
   end
-  local npick = 0; for _ in pairs(MX.pal_pick or {}) do npick = npick + 1 end
-  pbtn('c clipkb', 'kb', MX.pal_kb)
-  pbtn('render' .. (npick > 0 and (' ' .. npick) or ''), 'render', npick > 0)
   pbtn('+playlist', 'plist', false)
   pbtn('rec', 'rec', ctx.PADS and ctx.PADS.rec)
   local y0 = y + Lx.rh + 1
@@ -32281,13 +31792,6 @@ ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя па�
           U.set(U.BG); gfx.rect(cx + 2, ry + 2, U.measure(lab) + 2, Lx.rh - 1, 1)
           U.text(cx + 3, ry + 2, lab, U.TEXT)
         end
-        local pk = MX.pal_pick and MX.pal_pick[p.name .. ':' .. ci]
-        if pk then U.set(U.CYAN); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); gfx.rect(cx + 1, ry + 1, Lx.mx_cell_w - 2, rh - 3, 0) end
-        if MX.pal_kb and r <= 4 then   -- буква клавиши clipkb — справа сверху
-          local col_k = MX.KEYCOLS[ci - MX.hs]
-          local kl = col_k and col_k:sub(r, r)
-          if kl and kl ~= '' then U.text(cx + Lx.mx_cell_w - 2 - U.measure(kl), ry + rh - Lx.rh - 2, kl, pk and U.CYAN or U.AMBER) end   -- 18 окт: внизу справа, подпись A1-1 — сверху
-        end
         if ctx.pal_on == p.name .. ':' .. ci and ctx.mx_solo then U.set(U.GREEN); gfx.rect(cx, ry + rh - 3, Lx.mx_cell_w, 2, 1) end
         if hot then U.set(U.AMBER); gfx.rect(cx, ry, Lx.mx_cell_w, rh - 1, 0); hover.palcell = { p = p, ci = ci } end
       end
@@ -32295,9 +31799,7 @@ ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя па�
   end
   if #list > nvis then U.text(W - Lx.pad - U.measure('+99'), y, ('+%d'):format(#list - nvis), U.GREY) end
   if ctx.vbar then ctx.vbar('palette', x, y0, w, nvis * rh, MX.pal_scroll, nvis, #list) end   -- 18 окт: скроллбар палитры
-  if ctx.pal_mix and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_mix.t or 0) > 0.6 then ctx.palette_mix_stop() end   -- Space — стоп: луп вернуть
   -- прослушка с клавиши доиграла сама — соло снять, курсор вернуть
-  if ctx.mx_solo and ctx.mx_solo_owner == 'palkb' and reaper.GetPlayState() & 1 == 0 and reaper.time_precise() - (ctx.pal_t or 0) > 0.6 then ctx.mx_cell_preview_end(); ctx.pal_on = nil end
   -- зажатая прослушка палитры: отпустил кнопку — стоп
   if ctx.mx_solo and ctx.mx_solo_owner == 'palette' and gfx.mouse_cap & 1 == 0 then ctx.mx_cell_preview_end() end
   return Lx.rh + 1 + nvis * rh + 2, hover
@@ -32326,156 +31828,14 @@ ctx.pat_note_set = function(text)
   ctx.pnotes = ctx.pnotes or {}; ctx.pnotes[k] = text
   vim.msg = text == '' and ('pattern ' .. k .. ': note deleted') or ('pattern ' .. k .. ': ' .. text)
 end
--- 18 окт: clipkb палитры: столбец клавиатуры (1qaz, 2wsx … как SS.KEYCOLS) — видимый трек, ряд — видимая строка
--- палитры (1..4). Клавиша — слушать клетку (ещё раз — тишина); Shift + клавиши — набор (голубые рамки), отпустил
--- Shift — набранное звучит вместе (если из одного паттерна); Ctrl — тишина; Esc — выйти из clipkb
-ctx.palette_key = function(c)
-  local m = ctx.mods()
-  local ch = c > 0 and c < 256 and string.char(c) or ''
-  if m.ctrl and c >= 1 and c <= 26 and c ~= 8 and c ~= 9 and c ~= 13 then ch = string.char(c + 96) end
-  if c == 27 then MX.pal_kb, MX.pal_pick = false, {}; ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette clipkb off'; return true end
-  local SH = { ['!'] = '1', ['@'] = '2', ['#'] = '3', ['$'] = '4', ['%'] = '5', ['^'] = '6', ['&'] = '7', ['*'] = '8', ['('] = '9', [')'] = '0', ['<'] = ',', ['>'] = '.', [':'] = ';', ['?'] = '/' }
-  if ch == ':' then return false end            -- : — строка команды, не Shift+; палитры
-  -- 19 окт: в clipkb все буквы — клетки (и c, и h j k l), выход — Esc; окно 4 рядов: стрелки вверх / вниз — ряд, [ ] — 4 ряда, влево / вправо — трек
-  local inmx = state.focus == 'matrix'
-  local dr = (c == 30064 and -1) or (c == 1685026670 and 1) or (ch == '[' and -4) or (ch == ']' and 4) or nil
-  if dr then
-    if inmx then MX.scroll = math.max(0, math.min(math.max(0, #seq - 1), (MX.scroll or 0) + dr)); MX.cur.ri = math.max(1, math.min(#seq, MX.cur.ri + dr))
-    else MX.pal_scroll = math.max(0, (MX.pal_scroll or 0) + dr) end
-    vim.msg = 'clipkb: rows moved (arrows / [ ]), Esc - off'; return true
-  end
-  if c == 1818584692 or c == 1919379572 then MX.hs = math.max(0, (MX.hs or 0) + (c == 1919379572 and 1 or -1)); vim.msg = 'clipkb: tracks moved'; return true end
-  local base = SH[ch] or ch:lower()
-  local shift = m.shift or SH[ch] ~= nil or ch:match('%u') ~= nil
-  local k, r = MX.kb_pos(base)
-  if not k or base == '' then return false end
-  local list = ctx.pal_list or {}
-  local p, ci = list[(MX.pal_scroll or 0) + r], MX.hs + k
-  if state.focus == 'matrix' then   -- 19 окт: в матрице ряд клавиатуры — видимый слот песни
-    local rg = seq[(MX.scroll or 0) + r]
-    p = (rg and not rg.gap) and { name = rg.name, src = rg, key = (rg.name or '') .. '@' .. rg.pos } or nil
-  end
-  if not p or not (snap and snap.cols[ci]) then vim.msg = 'palette: nothing on this key'; return true end
-  local key = (p.key or p.name) .. ':' .. ci
-  if m.ctrl and shift then   -- 21 окт: Ctrl+Shift — часть клетки (время — Ctrl, набор — Shift)
-    MX.pal_pick = MX.pal_pick or {}
-    local pk = MX.pal_pick[key]
-    if not pk then pk = { p = p, ci = ci }; MX.pal_pick[key] = pk end
-    vim.msg = ('palette: %s of %s on track %d - Ctrl+Shift again: the next part; Enter - sketch'):format(ctx.sketch_part_step(pk), p.name or '?', ci)
-    return true
-  end
-  if m.ctrl then ctx.mx_cell_preview_end(); ctx.palette_mix_stop(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
-  if shift then
-    MX.pal_pick = MX.pal_pick or {}
-    if MX.pal_pick[key] then MX.pal_pick[key] = nil else MX.pal_pick[key] = { p = p, ci = ci } end
-    MX.pal_shift = true
-    local n = 0; for _ in pairs(MX.pal_pick) do n = n + 1 end
-    vim.msg = ('palette: %d picked - let go of Shift to hear them; render - a new pattern of them'):format(n)
-    return true
-  end
-  if ctx.pal_on == key and ctx.mx_solo then ctx.mx_cell_preview_end(); ctx.pal_on = nil; vim.msg = 'palette: silence'; return true end
-  ctx.palette_mix_stop()
-  ctx.palette_listen(p, ci, 'palkb'); ctx.pal_on = key
-  return true
-end
-ctx.palette_kb = function() MX.pal_kb = not MX.pal_kb; if not MX.pal_kb then MX.pal_pick = {} end; vim.msg = 'palette clipkb ' .. (MX.pal_kb and 'on' or 'off') end
--- набранное — вместе: треки одного паттерна звучат разом (соло на них); разные паттерны — только после render
--- 18 окт: клетки разных паттернов — вместе: копии в зону =SESSION (за песней), по треку на клетку, зона — лупом;
--- стоп (Ctrl+клавиша, Space, Esc) — луп, повтор и курсор как были. Главное: быстро найти, что с чем звучит
-ctx.palette_mix = function(by)
-  local need = 0
-  for _, pk in pairs(by) do local s0 = pk.p.src; need = math.max(need, reaper.TimeMap2_timeToQN(0, s0.rgnend) - reaper.TimeMap2_timeToQN(0, s0.pos)) end
-  if need <= 0 then return end
-  if reaper.GetPlayState() & 1 == 1 and not ctx.pal_mix then vim.msg = 'palette: the transport plays - stop it to hear the picks'; return end
-  if ctx.mx_solo then ctx.mx_cell_preview_end() end
-  local zone = ctx.ss_zone(need)
-  if not zone then vim.msg = 'palette: no session zone'; return end
-  if ctx.ss_zone_fit then zone = ctx.ss_zone_fit(zone, need, seq, true) or zone end
-  if not ctx.pal_mix then
-    local l0, l1 = reaper.GetSet_LoopTimeRange(false, true, 0, 0, false)
-    ctx.pal_mix = { l0 = l0, l1 = l1, rep = reaper.GetSetRepeat(-1), cur = reaper.GetCursorPosition() }
-  end
-  local n = 0
-  ctx.ss_apply('palette: hear together', function()
-    for _, c in ipairs(snap.cols) do if c.track then alias.session_clear(c.track, zone.pos, zone.rgnend) end end
-    for ci, pk in pairs(by) do
-      local col = snap.cols[ci]
-      if col and col.track then alias.session_plant(col.track, pk.p.src, zone.pos, zone.rgnend, zone.pos, nil, 'pal:' .. ci); n = n + 1 end
-    end
-  end)
-  ctx.ss_play(zone)
-  ctx.pal_mix.t = reaper.time_precise()
-  ctx.pal_on = 'mix'
-  local names = {}
-  for ci, pk in pairs(by) do names[#names + 1] = pk.p.name .. '-' .. ci end
-  table.sort(names)
-  vim.msg = ('palette: together %s (loop; Ctrl+key / Space - stop, render - keep as a pattern)'):format(table.concat(names, ' '))
-end
-ctx.palette_mix_stop = function()
-  local pm = ctx.pal_mix; if not pm then return end
-  ctx.pal_mix = nil
-  if reaper.GetPlayState() & 1 == 1 then reaper.OnStopButton() end
-  reaper.GetSet_LoopTimeRange(true, true, pm.l0, pm.l1, false)
-  reaper.GetSetRepeat(pm.rep)
-  reaper.SetEditCurPos(pm.cur, false, false)
-  if ctx.pal_on == 'mix' then ctx.pal_on = nil end
-  -- 18 окт: копии прослушки (метка pal:) — убрать: зона сдвигалась с песней, копии оставались мусором за концом
-  ctx.ss_apply('palette: stop', function()
-    for ti = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, ti)
-      for k = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
-        local it = reaper.GetTrackMediaItem(tr, k)
-        local _, tg = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_session', '', false)
-        if tg:sub(1, 4) == 'pal:' then reaper.DeleteTrackMediaItem(tr, it) end
-      end
-    end
-  end)
-end
-ctx.palette_play_picks = function()
-  local by, name, mixed = {}, nil, false
-  for _, pk in pairs(MX.pal_pick or {}) do
-    if name and name ~= pk.p.name then mixed = true end
-    name = pk.p.name; by[pk.ci] = pk
-  end
-  if mixed then ctx.palette_mix(by); return end
-  if not name then return end
-  local only, src = {}, nil
-  for ci, pk in pairs(by) do local col = snap.cols[ci]; if col and col.track then only[col.track] = true end; src = pk.p.src end
-  if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then vim.msg = 'palette: the transport plays - stop it to listen'; return end   -- своя прослушка — не помеха
-  ctx.mx_cell_preview(only, src.pos, src.rgnend, 'palkb'); ctx.pal_on = 'picks'; ctx.pal_t = reaper.time_precise()
-  vim.msg = 'palette: ' .. name .. ' - the picked tracks together'
-end
--- render: набранные клетки (по одной на трек) — новым паттерном в конец песни (алиасы клеток)
-ctx.palette_render = function()
-  local by, n, len = {}, 0, 0
-  for _, pk in pairs(MX.pal_pick or {}) do by[pk.ci] = pk; n = n + 1; len = math.max(len, pk.p.src.rgnend - pk.p.src.pos) end
-  if n == 0 then vim.msg = 'render: pick cells first (clipkb: Shift + keys)'; return end
-  local qn = reaper.TimeMap2_timeToQN(0, len)
-  local bars = math.max(1, math.floor(qn / 4 + 0.5))
-  ctx.mx_added = nil
-  ctx.mx_add(bars)
-  local ri = ctx.mx_added and ctx.mx_added.ri
-  if not (ri and seq[ri] and seq[ri].name == ctx.mx_added.name) then vim.msg = 'render: the new pattern was not found - nothing pasted'; return end
-  local done = 0
-  edit.run('palette render', function()
-    for ci, pk in pairs(by) do
-      local clip = alias.cells_copy({ pk.p.src }, snap, 1, 1, ci, ci, true)
-      done = done + alias.cells_paste(seq, snap, ri, ci, clip, true)
-    end
-  end)
-  ctx.mx_refresh()
-  MX.pal_pick = {}
-  vim.msg = ('render: %s - %d track(s) from the palette (aliases, %d item(s))'):format(seq[ri] and seq[ri].name or 'new pattern', n, done)
-end
 -- +playlist: паттерны набранных (или курсора матрицы) — в конец текущего плейлиста
 ctx.palette_to_playlist = function()
   ctx.pl_load()
   local P = ctx.PL
   local names, seen = {}, {}
-  for _, pk in pairs(MX.pal_pick or {}) do local c = pk.p.name:match('^%S+'); if not seen[c] then seen[c] = true; names[#names + 1] = c end end
   table.sort(names)
   if #names == 0 then local rg = seq[MX.cur.ri]; if rg and not rg.gap then names[1] = rg.name:match('^%S+') end end
-  if #names == 0 then vim.msg = '+playlist: pick cells (clipkb: Shift + keys)'; return end
+  if #names == 0 then vim.msg = '+playlist: put the matrix cursor on a pattern'; return end
   if #P.lists == 0 then P.lists[1] = { name = P.free_name(P.lists), text = '' }; P.cur = 1 end
   local l = P.lists[P.cur]
   l.text = ((l.text or '') .. ' ' .. table.concat(names, ' ')):gsub('^%s+', '')
@@ -33452,9 +32812,7 @@ ctx.mx_menu = function(pick)
       F('u', 'unstack: patterns at one place play one after the other', function() ctx.unstack() end),
     } } end },
     { key = 'k', label = 'keyboard …', sub = function() return { title = 'matrix: keyboard', items = {
-      K('c', 'clipkb: 1qaz 2wsx … play the cells, Shift picks a sketch', 'c'),
       F('p', 'patternkb: the note keys play the patterns (:patternkb)', function() vim.run_cmd('patternkb') end),
-      F('h', 'hear the sketch (Ctrl+Space)', function() ctx.sketch_play() end),
     } } end },
     { key = 'p', label = 'patternize the empty parts …', sub = function() return { title = 'matrix: patternize', items = pz } end },
     { key = 'o', label = 'pattern codes …', sub = function() return { title = 'matrix: pattern codes', items = cv } end },
