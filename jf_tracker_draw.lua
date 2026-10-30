@@ -3412,7 +3412,7 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
   local nhv = vert and math.max(4 * L.cw, math.min(ms('WWWWWWWWW') + 2 * L.pad, math.floor((wh - 2 * L.pad) / maxpar) - 4)) or L.rh
   local nwv = vert and (L.rh + 2) or math.max(ms('WWWW') + 2 * L.pad, 4 * L.cw + 4)
   local boxes, links, br = lay(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
-    nw = nwv, nh = nhv, gx = vert and math.max(4, L.pad) or math.max(6, 2 * L.pad), bw = math.max(3, L.pad), rgap = 4 })
+    nw = nwv, nh = nhv, gx = vert and math.max(4, L.pad) or math.max(6, 2 * L.pad, ms('=') + 4), bw = math.max(3, L.pad), rgap = 4 })
   set(U.GREY)
   for _, l in ipairs(links) do
     if l.v then gfx.rect(l.x, l.y1, 1, math.max(1, l.y2 - l.y1), 1) else gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
@@ -3435,7 +3435,7 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
     local fillc = n.cont and U.tint(U.AMBER, 0.18) or ((n.depth or 0) > 0 and U.tint(U.CYAN, 0.08 + 0.06 * math.min(3, n.depth)) or U.PANEL)
     set((hot and not rd) and U.tint(U.AMBER, 0.35) or fillc); gfx.rect(b.x, b.y, b.w, b.h, 1)
     set((hot or isel or moving) and U.AMBER or (n.en and U.LINE or U.DIM)); gfx.rect(b.x, b.y, b.w, b.h, 0)
-    if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then set(U.GREY); gfx.rect(b.x - 3, b.y - 3, 1, b.h + 3, 1) end   -- = : связка столбика
+    if (n.par or 0) > 0 and bi > 1 and boxes[bi - 1].x == b.x then text(b.x - ms('=') - 1, b.y, '=', U.GREY) end   -- 30 окт: параллельно — знак = слева (была черта)
     local lb = D.RK.abbrev(n.name, 4)
     if moving and D.rlift then set(U.tint(U.CYAN, 0.35)); gfx.rect(b.x, b.y, b.w, b.h, 1); set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0) end
     if tgt then set(U.CYAN); gfx.rect(b.x + b.w, b.y, 2, b.h, 1) end   -- вставится после него (правее)
