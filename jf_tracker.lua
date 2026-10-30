@@ -16673,7 +16673,89 @@ ctx.ctl_lane_start = function()
     if ev then v = ev.v else for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then v = ml.ev[ml.rows[k]].v; break end end end
     v = (v or (ml.kind == 'pb' and 64 or 0)) / 127
   else return nil end
-  return { lane = fl, row = row, v = math.max(0, math.min(1, v or 0)), x0 = gfx.mouse_x }
+  v = math.max(0, math.min(1, v or 0))
+  -- 30 окт: + Shift — джог: вертикаль — шаг (строка), горизонталь — значение шага; перо несёт значение дальше
+  if gfx.mouse_cap & 8 == 8 then
+    local sx, sy = reaper.GetMousePosition()
+    return { jog = true, lane = fl, row = row, v = v, map = { [row] = v }, sx = sx, sy = sy, acc = 0 }
+  end
+  return { lane = fl, row = row, v = v, x0 = gfx.mouse_x }
+end
+-- значение строки лейна / огибающей 0..1 (для джога: соседние шаги)
+ctx.ctl_val_at = function(fl, row)
+  if fl.env and fl.env.env then return edit.env_value(fl.env, edit.row_time(row, state.lpb, 0)) end
+  local ml = fl.ml
+  local ev = ml.ev and ml.ev[row]
+  if ev then return (ev.v or 0) / 127 end
+  for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then return (ml.ev[ml.rows[k]].v or 0) / 127 end end
+  return ml.kind == 'pb' and 64 / 127 or 0
+end
+ctx.ctl_jog = function(SG)
+  local sx, sy = reaper.GetMousePosition()
+  local dx, dy = sx - SG.sx, sy - SG.sy
+  if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
+  local JOG = math.max(8, L.rh)   -- пикселей на шаг
+  SG.acc = SG.acc + dy
+  local steps = SG.acc >= 0 and math.floor(SG.acc / JOG) or -math.floor(-SG.acc / JOG)
+  if steps ~= 0 then
+    SG.acc = SG.acc - steps * JOG
+    local d = steps > 0 and 1 or -1
+    for _ = 1, math.abs(steps) do
+      SG.row = math.max(0, SG.row + d)
+      SG.map[SG.row] = SG.v          -- перо: новый шаг получает текущее значение
+    end
+    SG.moved = true
+    vim.cur.row = SG.row; vim.ensure_visible()
+  end
+  if dx ~= 0 then
+    SG.v = math.max(0, math.min(1, SG.v + dx / 300 * (gfx.mouse_cap & 32 == 32 and 0.25 or 1)))
+    SG.map[SG.row] = SG.v; SG.moved = true
+  end
+  -- оверлей: шаги вокруг курсора столбиками (записанные — янтарём)
+  local fl = SG.lane
+  local name = fl.env and (fl.env.name or 'envelope') or (fl.ml.name or 'lane')
+  local Z = 2
+  local rh = L.rh * Z
+  local bw = math.max(240, math.floor(gfx.w * 0.4))
+  local N = 6
+  local bh = (2 * N + 1) * L.rh + 2 * rh + 8
+  local bx, by = math.floor((gfx.w - bw) / 2), math.floor((gfx.h - bh) / 2)
+  U.set(U.BG, 0.94); gfx.rect(bx - L.pad, by, bw + 2 * L.pad, bh, 1)
+  U.set(U.AMBER); gfx.rect(bx - L.pad, by, bw + 2 * L.pad, bh, 0)
+  draw.big_text(bx, by + 2, ('%s / %s   jog'):format(fl.col and fl.col.name or '', name), U.AMBER, Z)
+  local lw = U.measure('0000') + L.pad
+  for i = -N, N do
+    local r = SG.row + i
+    if r >= 0 then
+      local yy = by + rh + 4 + (i + N) * L.rh
+      local w2 = SG.map[r]
+      local v = w2 or ctx.ctl_val_at(fl, r)
+      U.text(bx, yy, ('%04d'):format(r), i == 0 and U.AMBER or U.GREY)
+      U.set(U.DIM); gfx.rect(bx + lw, yy + 2, bw - lw, L.rh - 4, 1)
+      U.set(i == 0 and U.AMBER or (w2 and U.mix(U.AMBER, U.BG, 0.3) or U.CYAN)); gfx.rect(bx + lw, yy + 2, math.max(1, math.floor((bw - lw) * v + 0.5)), L.rh - 4, 1)
+    end
+  end
+  local vt = fl.ml and ('%02X'):format(math.floor(SG.v * 127 + 0.5)) or ('%d%%'):format(math.floor(SG.v * 100 + 0.5))
+  draw.big_text(bx, by + bh - rh - 2, ('row %04d  %s'):format(SG.row, vt), U.TEXT, Z)
+  state.status = ('-- CONTROL JOG --  %s: up / down - the step, sideways - its value (Ctrl fine); let go - written'):format(name)
+end
+ctx.ctl_jog_write = function(SG)
+  local fl = SG.lane
+  if fl.ml then
+    local map = {}
+    for r, v in pairs(SG.map) do map[r] = v * 127 end
+    ctx.ml_write(fl, map, (fl.ml.name or 'lane') .. ' jog')
+  elseif fl.env and fl.env.env then
+    local e = fl.env
+    local lo, hi = math.huge, -math.huge
+    for r in pairs(SG.map) do lo = math.min(lo, r); hi = math.max(hi, r) end
+    local raw = function(v) return (e.min or 0) + v * ((e.max or 1) - (e.min or 0)) end
+    local pts = {}
+    for r = lo, hi do local v = SG.map[r]; if v then pts[#pts + 1] = { t = edit.row_time(r, state.lpb, 0), v = raw(v), shape = 1 } end end
+    edit.env_put_points(e, edit.row_time(lo, state.lpb, 0), edit.row_time(hi + 1, state.lpb, 0), pts)
+    model.invalidate()
+  end
+  vim.msg = 'jog: written'
 end
 ctx.ctl_acv = function(SG)
   local A = ctx.ACV
@@ -24598,7 +24680,7 @@ local function frame()
       local SG = ctx.sl
       -- 30 окт: фокус в трекере и курсор на автоматизации (огибающая / MIDI-лейн) — один большой слайдер значения строки
       if not SG then SG = ctx.ctl_lane_start(); ctx.sl = SG end
-      if SG and SG.acv then ctx.ctl_acv(SG) elseif SG and SG.lane then ctx.ctl_lane(SG) else
+      if SG and SG.acv then ctx.ctl_acv(SG) elseif SG and SG.jog then ctx.ctl_jog(SG) elseif SG and SG.lane then ctx.ctl_lane(SG) else
       if not SG then
         local best, bd
         for _, r in ipairs(draw.slr or {}) do
@@ -24832,6 +24914,7 @@ local function frame()
         local sa, sb = A.stroke and A.stroke.a, A.stroke and A.stroke.b
         A.stroke, A.vpt = nil, nil
         if ctx.sl.moved and rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = ctx.sl.tool, a = sa, b = sb }) end
+      elseif ctx.sl.jog then if ctx.sl.moved then ctx.ctl_jog_write(ctx.sl) end
       elseif ctx.sl.lane then if ctx.sl.moved then ctx.ctl_lane_write(ctx.sl) end
       elseif ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
