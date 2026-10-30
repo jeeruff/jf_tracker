@@ -20,6 +20,7 @@ local model
 -- 12 окт: модуляция по нотам — сверка automation items после каждой правки (jf_tracker_notemod.lua)
 local DIR = (debug.getinfo(1, 'S').source:sub(2):match('(.*)/') or '.')
 E.NM = dofile(DIR .. '/jf_tracker_notemod.lua')
+E.PH = dofile(DIR .. '/jf_tracker_phrase.lua')   -- 30 окт: фразы (PLAN_PHRASES.md)
 E.LY = dofile(DIR .. '/jf_tracker_layers.lua')   -- 19 окт: слоёный инструмент (¥)
 E.PK = dofile(DIR .. '/jf_tracker_premod.lua')   -- 22 окт: premod — кривая до ноты
 function E.init(m) model = m; m.LY = E.LY; E.NM.init(E, m) end
@@ -352,6 +353,7 @@ local function run(desc, fn)
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
   if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end
   if ok and depth == 1 then local okr, er = pcall(E.rtg_sync); if not okr then E.rtg_err = er end end   -- 28 окт: копии 0R без исходной ноты   -- 22 окт: premod — за нотами трека
+  if ok and depth == 1 then local okf, ef = pcall(E.PH.sync); if not okf then E.ph_err = ef end end   -- 30 окт: вхождения фраз за источником и триггером
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
   if depth == 0 then E.no_rescue = nil; E.census_best = nil; rf_cache = nil; E.pre_items = nil; E.nm_pre = nil; E.sec_pre = nil; E.tempo_pre = nil end
