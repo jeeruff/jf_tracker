@@ -11642,15 +11642,59 @@ ctx = {
       ctx.hint(e.kind, x, y, w2, L.rh, { col = col, k = e.k })
     end
     if vert then
-      local shown = math.min(#list, avail)
-      for n = 1, shown do
-        local e = list[n]
-        local y = y0 + (n - 1) * L.rh
-        if n == shown and #list > shown then U.text(cx + L.pad, y, '+' .. (#list - shown + 1), U.CYAN)
-        elseif e.kind == 'hdrparam' then pslider(e, cx, y, right - cx)
-        else chip(e, cx, y, right - cx, draw.fit_short(e.it.name or '', right - cx - 2 * L.pad)) end   -- тесно — согласными
+      -- 30 окт: контейнер — скобка [ слева от своих эффектов (вложенный — на ступень правее), фишки самого
+      -- контейнера нет; у эффекта внутри — | (за предыдущим) или =, если по ширине остаётся место под имя
+      local vl = {}
+      for _, e in ipairs(list) do if not (e.kind == 'hdrfx' and e.it.cont) then vl[#vl + 1] = e end end
+      local BW = 4
+      local markw = U.measure('=') + 2
+      local marks = true   -- знаки — только если имена с ними не короче, чем без них
+      for _, e in ipairs(vl) do
+        local ch = e.it.chain
+        if ch and e.kind == 'hdrfx' then
+          local w0 = right - cx - #ch * BW - 2 * L.pad
+          if draw.fit_short(e.it.name or '', w0 - markw) ~= draw.fit_short(e.it.name or '', w0) then marks = false; break end
+        end
       end
-      return math.min(#list, MAXL or #list)
+      local shown = math.min(#vl, avail)
+      local spans = {}   -- k контейнера → { глубина, первая строка, последняя }
+      for n = 1, shown do
+        local e = vl[n]
+        local y = y0 + (n - 1) * L.rh
+        local ch = e.it.chain
+        local ind = ch and #ch * BW or 0
+        if ch and not (n == shown and #vl > shown) then
+          for d, ck in ipairs(ch) do
+            local sp = spans[ck]
+            if not sp then sp = { d = d, a = n, b = n }; spans[ck] = sp end
+            sp.b = n
+          end
+        end
+        if n == shown and #vl > shown then U.text(cx + L.pad, y, '+' .. (#vl - shown + 1), U.CYAN)
+        elseif e.kind == 'hdrparam' then pslider(e, cx + ind, y, right - cx - ind)
+        else
+          local x2 = cx + ind
+          if ch and marks then
+            U.text(x2 + 1, y, e.it.par and '=' or '|', e.it.par and U.AMBER or U.GREY)
+            x2 = x2 + markw
+          elseif ch and e.it.par then   -- места на «=» нет — параллельный отмечен засечкой на скобке
+            U.set(U.AMBER); gfx.rect(cx + (#ch - 1) * BW + 1, y + math.floor(L.rh / 2) - 1, BW - 1, 2, 1)
+          end
+          chip(e, x2, y, right - x2, draw.fit_short(e.it.name or '', right - x2 - 2 * L.pad))   -- тесно — согласными
+        end
+      end
+      for ck, sp in pairs(spans) do
+        local bx = cx + (sp.d - 1) * BW
+        local ya, yb = y0 + (sp.a - 1) * L.rh + 1, y0 + sp.b * L.rh - 2
+        local hot = mx >= bx and mx < bx + BW and my >= ya and my <= yb
+        local f = col.fx[ck]
+        U.set(hot and U.AMBER or ((f and not f.enabled) and U.DIM or U.CYAN))
+        gfx.rect(bx, ya, 1, yb - ya + 1, 1); gfx.rect(bx, ya, BW - 1, 1, 1); gfx.rect(bx, yb, BW - 1, 1, 1)
+        local it = hi.fx[ck]
+        if hot and it then hover.hdrfx = { col = col, k = ck, it = it } end
+        if it then ctx.hint('hdrfx', bx, ya, BW, yb - ya + 1, { col = col, k = ck }) end
+      end
+      return math.min(#vl, MAXL or #vl)
     end
     for n, e in ipairs(list) do
       local lab = ctx.fit(e.it.name or '', L.cw * 9)
@@ -11673,8 +11717,21 @@ ctx = {
       if not e.parent and e.home == col.name then c.inst[#c.inst + 1] = { name = e.name or '?', i = i } end
     end
     local tcp = state.fxparams and ctx.tcp_params(col) or nil
+    -- 30 окт: контейнер в развёртке (его дети идут за ним) — в списке шапки скобкой вокруг детей, не фишкой;
+    -- у ребёнка — цепочка контейнеров (снаружи внутрь) и вид связи: | за предыдущим, = параллельно
+    local cmap = {}
+    for k, f in ipairs(col.fx or {}) do
+      local nx = col.fx[k + 1]
+      if f.container and nx and nx.inner and nx.inner.parent == f then cmap[f] = k end
+    end
     for k, f in ipairs(col.fx or {}) do
       local e = { name = f.name, off = not f.enabled, k = k, i = f.i }
+      if cmap[f] then e.cont = true end
+      if f.inner and cmap[f.inner.parent] then
+        local chain, p = {}, f.inner.parent
+        while p and cmap[p] do table.insert(chain, 1, cmap[p]); p = p.inner and p.inner.parent end
+        e.chain, e.par = chain, (f.inner.par or 0) > 0
+      end
       if tcp and col.track and f.i and reaper.ValidatePtr(col.track, 'MediaTrack*') then e.params = tcp[reaper.TrackFX_GetFXGUID(col.track, f.i) or ''] end
       c.fx[#c.fx + 1] = e
     end
