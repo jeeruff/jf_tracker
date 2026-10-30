@@ -7440,7 +7440,7 @@ function D.frame(L, snap, rows, state, info)
         local fill = on and (b[4] ~= 'auto' or env_shown) and not b[5]   -- b[5]: мониторинг «авто» — только контур
         -- 16 окт: ø — просто буква, без кнопки-фона
         if b[4] == 'phase' then
-          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
           -- 20 окт: в рамке, как соседние кнопки (включена — янтарная рамка)
           set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
           set((hot or on) and U.AMBER or U.DIM); gfx.rect(x, by, bwk, bh, 0)
@@ -7452,7 +7452,7 @@ function D.frame(L, snap, rows, state, info)
         -- 18 окт: ~ (автоматизация) — тоже просто знак, поярче: огибающие показаны — голубой, есть — текст, нет — серый
         -- (≈ — будущий знак модуляции)
         if b[4] == 'auto' then
-          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
           set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)   -- 20 окт: в рамке
           set(hot and U.AMBER or (env_shown and U.CYAN or U.DIM)); gfx.rect(x, by, bwk, bh, 0)
           text(x + math.floor((bwk - ms('~')) / 2), tyc, '~', hot and U.AMBER or (on and (env_shown and U.CYAN or U.TEXT) or U.GREY))
@@ -7462,7 +7462,7 @@ function D.frame(L, snap, rows, state, info)
           return
         end
         if b[4] == 'fxen' then   -- 25 окт: fx — буквами в рамке, зелёным при звучащих эффектах
-          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
           set(hot and D.CURROW or (on and U.tint(U.GREEN, 0.3) or U.PANEL)); gfx.rect(x, by, bwk, bh, 1)
           set(hot and U.AMBER or (on and U.GREEN or U.DIM)); gfx.rect(x, by, bwk, bh, 0)
           text(x + math.floor((bwk - ms('fx')) / 2), tyc, 'fx', hot and U.AMBER or (on and U.GREEN or U.GREY))
@@ -7475,7 +7475,7 @@ function D.frame(L, snap, rows, state, info)
           -- 30 окт: круг — в высоте соседних кнопок (bh), не bh + 2: был выше имени, потом залезал на fx ниже
           local r = math.floor((math.min(bwk, bh) - 1) / 2)
           local cx, cy = x + math.floor(bwk / 2), by + math.floor((bh - 1) / 2)
-          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
+          local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
           local rc = b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or (on and b[3] or BTXT)
           set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.circle(cx, cy, r, 1, 1)
           set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
@@ -7495,10 +7495,10 @@ function D.frame(L, snap, rows, state, info)
         set(on and b[3] or U.DIM); gfx.rect(x, by, bwk, bh, 0)
         text(x + math.floor((bwk - ms(b[1])) / 2), tyc, b[1], on and b[3] or (b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or BTXT))   -- 9 окт: R — красная всегда
         if b[4] == 'phase' then
-          if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.trkio = { col = col, what = 'phase' } end
+          if mx >= x and mx < x + bwk and my >= by and my < by + bh then hover.trkio = { col = col, what = 'phase' } end
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
         else
-          if mx >= x and mx < x + bwk and my >= by and my < by + bh + 2 then hover.btn = { col = col, what = b[4] } end
+          if mx >= x and mx < x + bwk and my >= by and my < by + bh then hover.btn = { col = col, what = b[4] } end
           hint('btn', x, by, bwk, bh + 2, { col = col, what = b[4] })
         end
         if b[4] == 'auto' then D.trim_at = D.trim_at or {}; D.trim_at[col.guid] = { x, by + L.rh - 1, x + bwk } end   -- меню trim под кнопкой
@@ -7513,8 +7513,8 @@ function D.frame(L, snap, rows, state, info)
       -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
       trim_w = math.max(ms('~'), ms('ø')) + 7; trim_x = c.x + c.w - L.pad - trim_w   -- 20 окт: ~ и ø — в рамке, чуть шире
-      local bhh = math.min(L.rh - 1, math.floor((L.rh - 3) * 1.15 + 0.5))
-      by = by - 1
+      -- 30 окт: 2 px между строками кнопок (и зоны щелчка без захода на соседнюю строку) — не прицеливаться
+      local bhh = L.rh - 3
       local phw = math.max(ms('~'), ms('ø')) + 7
       local ph_x = trim_x - 1 - phw
       -- 18 окт: узкий трек — r i m s сжимаются (до ширины буквы), чтобы /// влезли в первую строку
