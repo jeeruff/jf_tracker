@@ -25225,6 +25225,7 @@ local function frame()
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
       if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbshapeset then A.shape = lfo_hover.tbshapeset; A.tool = 'shape'; vim.msg = 'shape ' .. A.shape_name(A.shape) .. ': drag over the canvas - the span, up / down - the height (c - the tool)' end
       if lfo_hover.tbshape then   -- 30 окт: форма для shape
         local items = {}
         for _, x in ipairs(A.SHAPE_LIST) do items[#items + 1] = { key = x[1], label = x[3] .. (A.shape == x[2] and '  *' or ''), fn = function() A.shape = x[2]; A.tool = 'shape'; vim.msg = 'shape: ' .. x[3] .. ' - drag over the canvas: the span, the height - up / down' end } end

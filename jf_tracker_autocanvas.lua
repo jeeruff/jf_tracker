@@ -22,7 +22,9 @@ ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'shape
 -- 30 окт: инструмент shape (c) — как рисование формами в Ableton: протяжка задаёт отрезок, форма повторяется в каждой
 -- клетке сетки, высота — вертикалью мыши; форма — кнопкой рядом (список)
 ACV.shape = 'sin'
-ACV.SHAPE_LIST = { { 't', 'tri', 'tri' }, { 'r', 'ramp+', 'saw+' }, { 'R', 'ramp-', 'saw-' }, { 's', 'sin', 'sin' }, { 'e', 'exp', 'exp' }, { 'l', 'log', 'log' }, { 'q', 'sqr', 'sqr' } }
+-- 30 окт: подписи кнопок — буквы со знаком (без нарисованных кривых): ~ sin, ^ tri, / пила вверх, \ вниз, ? случай
+ACV.SHAPE_LIST = { { 's', 'sin', '~sin' }, { 't', 'tri', '^tri' }, { 'r', 'ramp+', '/swup' }, { 'R', 'ramp-', '\\swdn' },
+  { 'e', 'exp', 'exp' }, { 'l', 'log', 'log' }, { 'q', 'sqr', '[sqr' }, { 'n', 'rnd', '?rnd' } }
 function ACV.shape_name(sh) for _, x in ipairs(ACV.SHAPE_LIST) do if x[2] == sh then return x[3] end end; return sh end
 -- мазок формой от строки ra до rb (включая клетку rb), высота v
 function ACV.shape_stroke(ra, rb, v)
@@ -272,13 +274,21 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local hover
   local tb = {}
   for _, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1] } end
-  tb[#tb + 1] = { lab = ACV.shape_name(ACV.shape), shapepick = true, on = ACV.tool == 'shape' }
+  -- 30 окт: формы — все кнопками в ряд (выбор формы = инструмент shape); не влезает — одна кнопка со списком
+  local shapes_at = #tb + 1
+  for i, x in ipairs(ACV.SHAPE_LIST) do tb[#tb + 1] = { lab = x[3], shape = x[2], on = ACV.tool == 'shape' and ACV.shape == x[2], gap = i == 1 } end
+  local shapes_n = #ACV.SHAPE_LIST
   tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap, gap = true }
   tb[#tb + 1] = { lab = '[', grid = -1, gap = true }
   tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
   tb[#tb + 1] = { lab = ']', grid = 1 }
-  local tw = 0
-  for _, b in ipairs(tb) do b.w = U.measure(b.lab) + 2 * pad; tw = tw + b.w + 2 + (b.gap and pad or 0) end
+  local function width() local t = 0; for _, b in ipairs(tb) do b.w = U.measure(b.lab) + 2 * pad; t = t + b.w + 2 + (b.gap and pad or 0) end; return t end
+  local tw = width()
+  if w - 2 * pad - tw < U.measure('W') * 12 then
+    for _ = 1, shapes_n do table.remove(tb, shapes_at) end
+    table.insert(tb, shapes_at, { lab = ACV.shape_name(ACV.shape), shapepick = true, on = ACV.tool == 'shape', gap = true })
+    tw = width()
+  end
   local head = ('%s   %s%s'):format(act.name or 'curve', span.label or '',
     ACV.anchor and ('   v %d..%d'):format(math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row)) or '')
   local showtb = w - 2 * pad - tw >= U.measure('W') * 12
@@ -291,7 +301,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, y, b.w, rh - 1, 1) end
       U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, y, b.w, rh - 1, 0)
       U.text(bx + pad, y, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
-      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick } end
+      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick, tbshapeset = b.shape } end
       bx = bx + b.w + 2
     end
   end
