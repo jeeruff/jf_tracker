@@ -14866,7 +14866,7 @@ edit.start_at = function() if vim and vim.cur and state.focus ~= 'matrix' then r
 alias.init(model, edit)
 CM.init(model)
 edit.cmds = CM
--- 19 окт: диапазон pitch bend трека для команд 0U / 0D: у кита drumrs5k — Pitchbend range первого пэда, иначе ±2
+-- 19 окт: диапазон pitch bend трека для команд 0U / 0D: у кита drumrs5k — Pitchbend range первого пэда, у jf_slixer — его, иначе ±2
 CM.bend_range = function(tr)
   for _, col in ipairs(snap and snap.cols or {}) do
     if col.track == tr then
@@ -14884,6 +14884,29 @@ CM.bend_range = function(tr)
       end
     end
   end
+  -- 30 окт: jf_slixer (и в контейнере) — его диапазон колеса: пресет 12 / 5 / 3 или слайдер. Был ±2 на всё — у slixer
+  -- (±12) 0U выходил в 6 раз круче и упирался в край за долю строки
+  local function scan(id)
+    local _, fn = reaper.TrackFX_GetFXName(tr, id)
+    if (fn or ''):find('jf_slixer', 1, true) then
+      local sel, rng
+      for p = 0, reaper.TrackFX_GetNumParams(tr, id) - 1 do
+        local _, pn = reaper.TrackFX_GetParamName(tr, id, p)
+        if pn == 'Bend range preset' then sel = reaper.TrackFX_GetParam(tr, id, p)
+        elseif pn == 'Pitch wheel range (semitones)' then rng = reaper.TrackFX_GetParam(tr, id, p) end
+      end
+      if sel then return sel < 0.5 and (rng or 12) or sel < 1.5 and 12 or sel < 2.5 and 5 or 3 end
+    end
+    local ok, cnt = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_count')
+    if ok then
+      for j = 0, (tonumber(cnt) or 0) - 1 do
+        local _, sub = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_item.' .. j)
+        local r = tonumber(sub) and scan(tonumber(sub))
+        if r then return r end
+      end
+    end
+  end
+  for i = 0, reaper.TrackFX_GetCount(tr) - 1 do local r = scan(i); if r then return r end end
   return 2
 end
 -- высота предыдущего события в той же подколонке (для Gxx glide)
