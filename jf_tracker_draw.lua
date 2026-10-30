@@ -5578,7 +5578,7 @@ function D.draw_mixsnaps(L, info, hover)
   if nvis > want then
     local room = listh - want * rh - 4
     local side = math.min(w, room)
-    if side >= 4 * rh then nvis = want; padside = side end
+    if side >= 4 * rh then nvis = math.max(want, math.floor((listh - side - 4) / rh)); padside = side end   -- остаток под XY — снова списку
   end
   for i = 1, nvis do
     local ry = yy + (i - 1) * rh
