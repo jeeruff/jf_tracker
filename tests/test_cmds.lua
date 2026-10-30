@@ -23,5 +23,9 @@ local segs = C.segments(C.parse('0U08,0V48@0.25,0U00@0.5,0D04@1'), { ['0U'] = tr
 eq(#segs, 2, 'slide: 0U from 0, stopped at 0.5, 0D from 1')
 eq(segs[1][1], 0, 'seg 1 from 0'); eq(segs[1][2], 0.5, 'seg 1 to the 00'); eq(segs[2][1], 1, 'seg 2 from 1'); eq(segs[2][2], 2, 'seg 2 to the end')
 eq(segs[2][3].cmd, '0D', 'seg 2 is 0D')
+-- 30 окт: слайд в тиках Renoise — xx/16 полутона за тик, C.TPL тиков в строке
+eq(C.TPL, 12, 'ticks per line as in Renoise')
+eq(C.slope({ cmd = '0U', xx = 1 }), 0.75, '0U01 = 12/16 semitone per row')
+eq(C.slope({ cmd = '0D', xx = 0x10 }), -12, '0D10 = an octave down per row')
 print(('test_cmds: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

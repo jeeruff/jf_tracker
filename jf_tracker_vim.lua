@@ -4432,9 +4432,9 @@ function V.smart()
                    if tr and letter == '0R' and ctx.preview_retrig then   -- 28 окт: слышно повторы, не одну ноту
                      ctx.preview_retrig(tr, pp, it.v, nt and nt.len_rows or h0.len_rows or h0.rows)
                    elseif tr then ctx.preview(tr, pp, 'midi') end   -- 0S на ките мог сменить пэд
-                   -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — xx/16 полутона за строку
+                   -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — как в клипе (C.slope, тики Renoise)
                    if (letter == '0U' or letter == '0D') and ctx.preview_bend and ctx.row_sec then
-                     ctx.preview_bend(h0.ch or 0, (it.v / 16) * (letter == '0U' and 1 or -1) / ctx.row_sec(), 0.4, tr)
+                     ctx.preview_bend(h0.ch or 0, E.cmds.slope({ cmd = letter, xx = it.v }) / ctx.row_sec(), 0.4, tr)
                    end
                  elseif ctx.play_note_item and h0 and h0.item then ctx.play_note_item(h0.item) end
                end,
