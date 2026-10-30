@@ -7472,8 +7472,9 @@ function D.frame(L, snap, rows, state, info)
         end
         -- 15 окт: круглые — запись (кружок внутри; A — автоарм при выборе трека) и фаза (ø)
         if round then
-          local r = math.floor((math.min(bwk, bh + 2) - 1) / 2)   -- 16 окт: размером с соседние кнопки (как A в микшере REAPER)
-          local cx, cy = x + math.floor(bwk / 2), by + math.floor(bh / 2) + 2   -- 30 окт: на 2 px ниже — не наезжает на имя трека
+          -- 30 окт: круг — в высоте соседних кнопок (bh), не bh + 2: был выше имени, потом залезал на fx ниже
+          local r = math.floor((math.min(bwk, bh) - 1) / 2)
+          local cx, cy = x + math.floor(bwk / 2), by + math.floor((bh - 1) / 2)
           local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh + 2
           local rc = b[4] == 'arm' and U.readable(U.RED, U.PANEL, 3) or (on and b[3] or BTXT)
           set(fill and ((b[3] == D.ARM and D.ARM_T) or U.tint(b[3], 0.5)) or U.PANEL); gfx.circle(cx, cy, r, 1, 1)
