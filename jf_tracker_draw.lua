@@ -7845,7 +7845,7 @@ function D.frame(L, snap, rows, state, info)
           -- 9 окт: дуги значения нет — только точка-указатель
           -- указатель — яркая точка на краю (9 окт, вместо линии)
           local pcol = U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7)
-          local pr = math.max(1, math.floor(r / 4))
+          local pr = math.max(1, math.floor(r / 5))   -- 30 окт: шарик чуть меньше (было r / 4)
           local rr = r - pr - 1
           set(pcol)
           gfx.circle(cx + math.floor(math.sin(a) * rr + 0.5), cy - math.floor(math.cos(a) * rr + 0.5), pr, 1, 0)
