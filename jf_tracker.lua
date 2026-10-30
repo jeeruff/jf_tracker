@@ -16639,6 +16639,96 @@ ctx.acv_key = function(c)
   elseif type(r) == 'table' then ctx.acv_do(r, sp, curves); return true end
   return false
 end
+-- 30 окт: CONTROL на автоматизации — курсор трекера на огибающей / MIDI-лейне: один большой слайдер значения строки
+-- курсора (вбок — значение, Shift мельче); запись при отпускании Opt+Cmd, одним шагом undo
+ctx.ctl_lane_start = function()
+  -- 30 окт: фокус на холсте curve, инструмент draw / line / erase — палец по трекпаду рисует мазок от курсора холста
+  local A = ctx.ACV
+  if state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and A and A.tool ~= 'cur' and A.geo then
+    local g = A.geo
+    local sp = ctx.acv_span()
+    local act = ctx.acv_curves(sp)[A.cur]
+    local v0 = 0.5
+    if act then local ok, v = pcall(act.eval, sp.time(A.row)); if ok and v then v0 = math.max(0, math.min(1, v)) end end
+    local vx = g.gx + (A.row - g.r0) / math.max(1, g.nr) * g.gw
+    local vy = g.gy + g.gh - 2 - v0 * (g.gh - 4)
+    local SG = { acv = true, tool = A.tool, vx = vx, vy = vy }
+    local r, v = A.at(g, vx, vy)
+    SG.r, SG.v, SG.r_s, SG.v_s = r, v, r, v
+    A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') }
+    A.vpt = { math.floor(vx), math.floor(vy) }
+    SG.sx, SG.sy = reaper.GetMousePosition()
+    return SG
+  end
+  if state.focus ~= 'tracker' then return nil end
+  local fl = L and L.flat and L.flat[vim.cur.fi]
+  if not fl then return nil end
+  local row = vim.cur.row
+  local v
+  if fl.env and fl.env.env then v = edit.env_value(fl.env, edit.row_time(row, state.lpb, 0))
+  elseif fl.ml and fl.ml.kind ~= 'tx' and fl.col and fl.col.track then
+    local ml = fl.ml
+    local ev = ml.ev and ml.ev[row]
+    if ev then v = ev.v else for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then v = ml.ev[ml.rows[k]].v; break end end end
+    v = (v or (ml.kind == 'pb' and 64 or 0)) / 127
+  else return nil end
+  return { lane = fl, row = row, v = math.max(0, math.min(1, v or 0)), x0 = gfx.mouse_x }
+end
+ctx.ctl_acv = function(SG)
+  local A = ctx.ACV
+  local g = A.geo
+  if not g then return end
+  -- относительные сдвиги мыши (экран); курсор мыши — обратно в точку старта, чтобы трекпада хватало
+  local sx, sy = reaper.GetMousePosition()
+  local dx, dy = sx - SG.sx, sy - SG.sy
+  if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
+  local k = gfx.mouse_cap & 8 == 8 and 0.25 or 1
+  SG.vx = math.max(g.gx, math.min(g.gx + g.gw - 1, SG.vx + dx * k))
+  SG.vy = math.max(g.gy, math.min(g.gy + g.gh - 1, SG.vy + dy * k))
+  A.vpt = { math.floor(SG.vx), math.floor(SG.vy) }
+  local r, v = A.at(g, SG.vx, SG.vy)
+  if SG.tool == 'line' then A.stroke = { rows = A.span_rows(SG.r_s, SG.v_s, r, v, {}) }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
+  elseif r ~= SG.r or math.abs(v - SG.v) > 1e-3 then
+    A.span_rows(SG.r, SG.v, r, v, A.stroke.rows, SG.tool == 'erase')
+    SG.r, SG.v, SG.moved = r, v, true
+  end
+  A.row = math.max(g.r0, math.floor(r)); vim.cur.row = A.row; ctx.acv_row_seen = A.row
+  state.status = ('-- CONTROL --  %s with the finger: row %s  %d%%   (Shift fine; let Opt+Cmd go - written)'):format(SG.tool, tostring(r), math.floor(v * 100 + 0.5))
+end
+ctx.ctl_lane = function(SG)
+  local fl = SG.lane
+  local dx = gfx.mouse_x - SG.x0
+  SG.x0 = gfx.mouse_x
+  local bw = math.max(200, math.floor(gfx.w * 0.6))
+  if dx ~= 0 then SG.v = math.max(0, math.min(1, SG.v + dx / bw * (gfx.mouse_cap & 8 == 8 and 0.1 or 1))); SG.moved = true end
+  local name = fl.env and (fl.env.name or 'envelope') or (fl.ml.name or 'lane')
+  local valtxt
+  if fl.ml then valtxt = ('%02X  %d'):format(math.floor(SG.v * 127 + 0.5), math.floor(SG.v * 127 + 0.5))
+  else
+    local e = fl.env
+    local raw = (e.min or 0) + SG.v * ((e.max or 1) - (e.min or 0))
+    valtxt = ('%d%%  (%.3g)'):format(math.floor(SG.v * 100 + 0.5), raw)
+  end
+  local Z = 2
+  local rh = L.rh * Z
+  local bx = math.floor((gfx.w - bw) / 2)
+  local bh = 3 * rh
+  local by = math.floor(gfx.h / 2 - bh / 2)
+  U.set(U.BG, 0.94); gfx.rect(bx - L.pad, by - rh - 4, bw + 2 * L.pad, bh + 2 * rh + 8, 1)
+  U.set(U.AMBER); gfx.rect(bx - L.pad, by - rh - 4, bw + 2 * L.pad, bh + 2 * rh + 8, 0)
+  local title = ('%s / %s   row %04d'):format(fl.col and fl.col.name or '', name, SG.row)
+  draw.big_text(bx, by - rh - 2, title, U.AMBER, Z)
+  U.set(U.DIM); gfx.rect(bx, by, bw, bh - rh, 1)
+  U.set(U.AMBER); gfx.rect(bx, by, math.max(1, math.floor(bw * SG.v + 0.5)), bh - rh, 1)
+  if fl.ml and fl.ml.kind == 'pb' then U.set(U.TEXT); gfx.rect(bx + math.floor(bw * 64 / 127), by, 1, bh - rh, 1) end   -- центр бенда
+  draw.big_text(bx, by + bh - rh + 2, valtxt, U.TEXT, Z)
+  state.status = ('-- CONTROL --  %s row %d: %s   (sideways - value, Shift fine; let Opt+Cmd go - written)'):format(name, SG.row, valtxt)
+end
+ctx.ctl_lane_write = function(SG)
+  local fl = SG.lane
+  if fl.env and fl.env.env then ctx.env_set(fl.env, SG.row, SG.v); model.invalidate()
+  elseif fl.ml then ctx.ml_set(fl, SG.row, math.max(0, math.min(127, math.floor(SG.v * 127 + 0.5)))) end
+end
 ctx.acv_do = function(op, sp, curves)
   local ACV = ctx.ACV
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
@@ -16688,10 +16778,13 @@ ctx.acv_do = function(op, sp, curves)
   if op.op == 'put' then   -- 30 окт: мазок мыши — строки → значения 0..1 / false (стереть)
     local lo, hi, n = math.huge, -math.huge, 0
     for r in pairs(op.rows) do lo = math.min(lo, r); hi = math.max(hi, r); n = n + 1 end
-    local step = ACV.snap and math.max(1, ACV.grid) or 1
+    local step = ACV.snap and ACV.grid or 1
     if act.kind == 'ml' then
-      local map = {}
-      for r, v in pairs(op.rows) do map[r] = v and v * 127 or false end
+      -- MIDI-лейн — значение на строку: доли строки (сетка мельче строки) — последнее в строке
+      local map, keys = {}, {}
+      for r in pairs(op.rows) do keys[#keys + 1] = r end
+      table.sort(keys)
+      for _, r in ipairs(keys) do local v = op.rows[r]; map[math.floor(r + 1e-9)] = v and v * 127 or false end
       ctx.ml_write(act.f, map, act.f.ml.name .. ' ' .. op.tool)
     elseif act.kind == 'lfo' or act.kind == 'acs' then vim.msg = 'canvas: this curve is a modulation - draw on its envelope (Tab)'; return
     else
@@ -24501,6 +24594,9 @@ local function frame()
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local SG = ctx.sl
+      -- 30 окт: фокус в трекере и курсор на автоматизации (огибающая / MIDI-лейн) — один большой слайдер значения строки
+      if not SG then SG = ctx.ctl_lane_start(); ctx.sl = SG end
+      if SG and SG.acv then ctx.ctl_acv(SG) elseif SG and SG.lane then ctx.ctl_lane(SG) else
       if not SG then
         local best, bd
         for _, r in ipairs(draw.slr or {}) do
@@ -24725,9 +24821,16 @@ local function frame()
       else
         state.status = '-- CONTROL --  no sliders on the screen'
       end
+      end
       U.click, U.rclick = false, false
     elseif ctx.sl then
-      if ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
+      if ctx.sl.acv then   -- 30 окт: палец отпущен — мазок в кривую
+        local A = ctx.ACV
+        local rows = A.stroke and A.stroke.rows
+        A.stroke, A.vpt = nil, nil
+        if ctx.sl.moved and rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = ctx.sl.tool }) end
+      elseif ctx.sl.lane then if ctx.sl.moved then ctx.ctl_lane_write(ctx.sl) end
+      elseif ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
     end
     local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS, 21 окт: REFORM (Ctrl+Opt+Cmd) — не жест треков
@@ -25123,7 +25226,7 @@ local function frame()
       if lfo_hover.tbgrid == -1 or lfo_hover.tbgrid == 1 then ctx.acv_key(lfo_hover.tbgrid < 0 and 91 or 93)
       elseif lfo_hover.tbgrid == 0 then
         local items, bar = {}, state.lpb * 4
-        for i, g in ipairs({ 1, 2, 4, 8, 16, 32 }) do
+        for i, g in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32 }) do   -- 30 окт: и мельче строки
           if g <= bar then items[#items + 1] = { key = tostring(i), label = A.grid_label(g, state.lpb) .. (A.grid == g and '  *' or ''), fn = function() A.grid = g end } end
         end
         vim.open_hydra({ title = 'canvas grid ([ ] - finer / coarser)', items = items })

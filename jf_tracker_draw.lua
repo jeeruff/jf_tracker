@@ -7980,7 +7980,8 @@ function D.frame(L, snap, rows, state, info)
           -- 11 окт: деления мелким шрифтом — центр цифры на риске, помещается больше
           local sh = math.max(4, math.floor((L.th or L.rh) * D.SMALL))
           local ly = yy - D.SPACE - math.floor(sh / 2) - 1
-          if (not last_ly or ly >= last_ly + sh + 1) and ly + sh <= ty0 + th + math.floor(L.rh / 2) then
+          -- 30 окт: короткая коробка (микшер низкий) — без подписей: «+6» налезал на фейдер; риски остаются
+          if th >= 4 * (sh + 2) and (not last_ly or ly >= last_ly + sh + 1) and ly + sh <= ty0 + th + math.floor(L.rh / 2) then
             local ml = (m > 0 and '+' or '') .. m
             local mw = D.small_measure(ml)
             if lblw > 0 then

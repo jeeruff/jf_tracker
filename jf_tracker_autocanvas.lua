@@ -23,14 +23,15 @@ ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { r0, v0, r1, v1 
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
 function ACV.at(g, mx, my)
   local row = g.r0 + (mx - g.gx) / math.max(1, g.gw) * g.nr
-  row = math.max(g.r0, math.min(g.r0 + g.nr - 1, math.floor(row)))
-  if ACV.snap then local st = math.max(1, ACV.grid); row = g.r0 + math.floor((row - g.r0) / st) * st end
+  row = math.max(g.r0, math.min(g.r0 + g.nr - 1e-6, row))
+  -- 30 окт: сетка бывает мельче строки (1/2 … 1/8) — точки между строками; без snap — целые строки
+  if ACV.snap then local st = ACV.grid; row = g.r0 + math.floor((row - g.r0) / st + 1e-9) * st else row = math.floor(row) end
   local v = 1 - (my - g.gy - 2) / math.max(1, g.gh - 4)
   return row, clamp01(v)
 end
 -- строки мазка между двумя точками (линейно по значению); шаг — клетка сетки при snap, иначе строка
 function ACV.span_rows(ra, va, rb, vb, out, erase)
-  local st = ACV.snap and math.max(1, ACV.grid) or 1
+  local st = ACV.snap and ACV.grid or 1
   if rb < ra then ra, rb, va, vb = rb, ra, vb, va end
   local n = 0
   for r = ra, rb, st do
@@ -59,6 +60,7 @@ end
 -- подпись сетки: доля такта (lpb строк на долю, 4 доли) или строки
 function ACV.grid_label(grid, lpb)
   local bar = (lpb or 4) * 4
+  if grid < 1 then return '1/' .. math.floor(bar / grid + 0.5) end   -- 30 окт: мельче строки
   if bar % grid == 0 then return '1/' .. (bar // grid) end
   return grid .. ' rows'
 end
@@ -181,7 +183,8 @@ function ACV.key(c, st, mods)
   elseif ch == '[' or ch == ']' then
     if lfo then return { op = 'lfo', key = 'lfo.speed', mul = ch == '[' and 0.5 or 2 } end
     local g = ACV.grid
-    if ch == '[' then g = math.max(1, g // 2) else g = math.min((st.lpb or 4) * 4, g * 2) end
+    -- 30 окт: мельче строки — до 1/8 строки (точки между строками огибающей)
+    if ch == '[' then g = g > 1 and g // 2 or math.max(0.125, g / 2) else g = math.min((st.lpb or 4) * 4, g * 2) end
     ACV.grid = g
     return true
   elseif ch == 'w' or ch == 'b' then
@@ -240,6 +243,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local act = curves[ACV.cur]
   local function rx(row) return gx + math.floor((row - r0) / nr * gw + 0.5) end
   local function vy(v) return gy + gh - 2 - math.floor(clamp01(v) * (gh - 4) + 0.5) end
+  ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr }   -- 30 окт: для рисования пальцем (CONTROL)
   -- заголовок: активная кривая, отрезок, сетка
   -- 30 окт: панель инструментов справа в строке заголовка (буквами): cur draw line erase | snap | [ сетка ]
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -381,6 +385,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       end
     end
   end
+  if ACV.vpt then U.set(U.AMBER); gfx.circle(ACV.vpt[1], ACV.vpt[2], 4, 0, 1); gfx.circle(ACV.vpt[1], ACV.vpt[2], 1, 1, 1) end   -- 30 окт: палец (CONTROL)
   -- курсор холста: строка янтарём, кружок на активной кривой; плейхед зелёным
   local cx = rx(ACV.row)
   U.set(U.AMBER, focused and 0.9 or 0.5); gfx.rect(cx, gy, 1, gh, 1); gfx.a = 1

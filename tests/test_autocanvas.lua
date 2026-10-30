@@ -116,6 +116,15 @@ rows = ACV.span_rows(30, 1, 27, 0, {})
 eq('backwards stroke by rows', rows[27] == 0 and rows[30] == 1 and rows[28] ~= nil, true)
 rows = ACV.span_rows(2, 0, 4, 0, {}, true)
 eq('erase marks false', rows[2] == false and rows[3] == false and rows[4] == false, true)
+-- сетка мельче строки: подпись, [ ], точка между строками
+eq('grid 0.5 at lpb 4 = 1/32', ACV.grid_label(0.5, 4), '1/32')
+ACV.grid = 1; ACV.key(('['):byte(), { r0 = 0, r1 = 64, lpb = 4 }, {}); eq('[ below a row - 0.5', ACV.grid, 0.5)
+ACV.key(('['):byte(), { r0 = 0, r1 = 64, lpb = 4 }, {}); ACV.key(('['):byte(), { r0 = 0, r1 = 64, lpb = 4 }, {}); ACV.key(('['):byte(), { r0 = 0, r1 = 64, lpb = 4 }, {})
+eq('[ stops at 1/8 row', ACV.grid, 0.125)
+ACV.grid, ACV.snap = 0.5, true
+r = ACV.at(geo, 100 + 75, 60); eq('snap 0.5 -> half rows', r, 23.5)
+rows = ACV.span_rows(16, 0, 17, 1, {}); eq('stroke by half rows: 16 16.5 17', rows[16] == 0 and rows[16.5] and rows[17] == 1, true)
+ACV.grid = 4
 ACV.tool, ACV.snap = 'cur', true
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
