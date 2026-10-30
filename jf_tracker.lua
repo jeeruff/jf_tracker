@@ -11755,6 +11755,8 @@ ctx = {
       state.dsp = true; dsp_sel.fx = k
       -- 30 окт: панель DSP — вперёд (вкладка в стопке) или показать, если её нет на экране
       if state.panes and state.panes_ui and not draw.panes.set_active(state.panes, 'dsp') then draw.panes.show(state.panes, 'dsp') end
+      draw.dsp_sel_last, draw.dsp_noscroll = nil, nil   -- цепочку — к эффекту, даже если он уже был выбран
+      ctx.set_focus('dsp')
       relayout()
       if dbl and col.fx[k] then edit.fx_show(col.track, col.fx[k].i) end
       vim.msg = (col.name or '') .. ': ' .. ((col.fx[k] or {}).name or '')
