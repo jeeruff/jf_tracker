@@ -13040,6 +13040,7 @@ ctx = {
     if d < 0 and v < used then
       vim.open_hydra({ title = ('%s: %d columns are taken by overlapping notes'):format(col.name, used), items = {
         { key = 't', label = 'trim the overlaps - every note ends where the next one starts (drums: sounds the same)', fn = function() ctx.unoverlap(col) end },
+        { key = 'm', label = 'merge into one column - the left column wins: a note that starts over it goes, one that runs into it ends there', fn = function() ctx.merge_cols(col, lane) end },   -- 30 окт
         { key = 'k', label = 'keep them', fn = function() vim.msg = 'columns kept' end } } })
       state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
     end
@@ -31157,6 +31158,38 @@ ctx.ch_key = function(c)
   else return false end
   model.invalidate()
   return true
+end
+-- 30 окт: merge — ноты лейна в одну колонку, приоритет левой: нота правой колонки, начавшаяся поверх занятой строки,
+-- удаляется; заходящая на занятое — кончается перед ним; остальные остаются (колонка одна — наложений нет)
+ctx.merge_cols = function(col, lane)
+  if not (col and lane and lane.subs) then return end
+  local busy = {}
+  local function is_note(c) return type(c) == 'table' and (c.kind == 'audio' or c.kind == 'midi' or c.kind == 'cont') end
+  for r, c in pairs(lane.subs[1] or {}) do if type(r) == 'number' and is_note(c) then busy[r] = true end end
+  local del, cut = {}, {}
+  for si = 2, #lane.subs do
+    local heads = {}
+    for r, c in pairs(lane.subs[si]) do if type(r) == 'number' and type(c) == 'table' and (c.kind == 'audio' or c.kind == 'midi') and c.row0 == r then heads[#heads + 1] = c end end
+    table.sort(heads, function(a1, b1) return a1.row0 < b1.row0 end)
+    for _, h in ipairs(heads) do
+      if busy[h.row0] then del[#del + 1] = h
+      else
+        local stop
+        for r = h.row0 + 1, h.row0 + math.max(1, h.rows or 1) - 1 do if busy[r] then stop = r; break end end
+        if stop then cut[#cut + 1] = { h = h, row = stop } end
+        for r = h.row0, (stop or (h.row0 + math.max(1, h.rows or 1))) - 1 do busy[r] = true end
+      end
+    end
+  end
+  if #del == 0 and #cut == 0 then vim.msg = col.name .. ': nothing overlaps the left column'; return end
+  edit.run('merge columns', function()
+    for _, c in ipairs(cut) do edit.note_off({ c.h }, state.lpb, c.row - (edit.OFF_END and 1 or 0)) end
+    if #del > 0 then edit.delete(del, state.lpb) end
+  end)
+  state.subs_min = state.subs_min or {}
+  state.subs_min[col.guid .. ':' .. tostring(lane.idx)] = 1
+  model.invalidate(); ctx.relayout()
+  vim.msg = ('%s: one column - %d note(s) removed, %d shortened (u - undo)'):format(col.name, #del, #cut)
 end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
