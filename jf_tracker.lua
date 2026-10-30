@@ -2260,7 +2260,7 @@ ctx = {
     for _, r in ipairs(rows) do if r.slot == slot then r.name = (text or ''):gsub('^%s+', ''):gsub('%s+$', '') end end
     ctx.msn_write(rows)
   end,
-  -- 22 окт: XY микшера — 4 угла: громкость и пан всех треков (быстрый снапшот), шайба — морф; хранение —
+  -- 22 окт: XY микшера — 4 угла (30 окт: всё по фильтру снапшотов, mixxy_grab), шайба — морф; хранение —
   -- ProjExtState jf_tracker/mixxy (SN.ser), ключ «GUID трека|vol» (dB −60..+12 → 0..1) / «|pan» (−1..1 → 0..1)
   mixxy_of = function()
     if not ctx.mixxy then
@@ -2268,7 +2268,7 @@ ctx = {
       local _, src = reaper.GetProjExtState(0, 'jf_tracker', 'mixxysrc')
       local from = {}
       for i, sl in (src or ''):gmatch('(%d)=(%d+)') do from[tonumber(i)] = tonumber(sl) end
-      ctx.mixxy = { snaps = ctx.SN.parse(str), x = 0.5, y = 0.5, from = from }
+      ctx.mixxy = { snaps = ctx.SN.parse_compact(str), x = 0.5, y = 0.5, from = from }
     end
     return ctx.mixxy
   end,
@@ -2291,12 +2291,12 @@ ctx = {
     e.from[i] = r.slot; ctx.mixxy_src_write(e)
     e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
     ctx.msn_c = nil; model.invalidate()
-    vim.msg = ('mixer XY corner %d = snapshot %d: %s (volume and pan)'):format(i, r.slot, r.name)
+    vim.msg = ('mixer XY corner %d = snapshot %d: %s'):format(i, r.slot, r.name)
   end,
   mixxy_clear = function(i)
     local e = ctx.mixxy_of()
     e.snaps[i] = nil; e.from[i] = nil
-    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser(e.snaps)); ctx.mixxy_src_write(e)
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser_compact(e.snaps)); ctx.mixxy_src_write(e)
     ctx.msn_c = nil; vim.msg = ('mixer XY corner %d cleared'):format(i)
   end,
   mixxy_menu = function(i)
@@ -2310,27 +2310,123 @@ ctx = {
     end
     vim.open_hydra({ title = 'mixer XY corner ' .. i, items = items })
   end,
+  -- 30 окт: угол XY микшера — то же, что снапшот SWS по его фильтру (галочки панели): громкость, пан, mute, solo,
+  -- посылы (громкость / пан), FX (все параметры и вкл / выкл, и в контейнерах) всех треков и мастера. Ключи
+  -- «GUID трека|vol», «|pan», «|mute», «|solo», «|sv:GUID цели:n», «|sp:…», «|fx:GUID эффекта:номер», «|fe:GUID».
+  -- Переключатели (mute, solo, вкл FX) морфятся порогом 0.5
+  mixxy_tracks = function()
+    local out = { reaper.GetMasterTrack(0) }
+    for i = 0, reaper.CountTracks(0) - 1 do out[#out + 1] = reaper.GetTrack(0, i) end
+    return out
+  end,
+  mixxy_fxaddrs = function(tr)   -- адреса всех FX трека, включая вложенные в контейнеры
+    local out = {}
+    local function walk(id)
+      out[#out + 1] = id
+      local ok, cnt = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_count')
+      if ok then
+        for j = 0, (tonumber(cnt) or 0) - 1 do
+          local _, sub = reaper.TrackFX_GetNamedConfigParm(tr, id, 'container_item.' .. j)
+          if tonumber(sub) then walk(tonumber(sub)) end
+        end
+      end
+    end
+    for fx = 0, reaper.TrackFX_GetCount(tr) - 1 do walk(fx) end
+    return out
+  end,
+  mixxy_filter = function()
+    local inf = ctx.mixsnaps_info()
+    local t = inf and inf.tog
+    if not t then return { PAN = true, VOL = true, MUTE = true, FX = true, SOLO = true, SEND = true } end
+    return t
+  end,
   mixxy_grab = function()
+    local F = ctx.mixxy_filter()
     local s = {}
-    for i = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, i)
+    for _, tr in ipairs(ctx.mixxy_tracks()) do
       local g = reaper.GetTrackGUID(tr)
-      local v = reaper.GetMediaTrackInfo_Value(tr, 'D_VOL')
-      local db = v > 1e-6 and 20 * math.log(v, 10) or -60
-      s[g .. '|vol'] = math.max(0, math.min(1, (db + 60) / 72))
-      s[g .. '|pan'] = (reaper.GetMediaTrackInfo_Value(tr, 'D_PAN') + 1) / 2
+      if F.VOL then
+        local v = reaper.GetMediaTrackInfo_Value(tr, 'D_VOL')
+        local db = v > 1e-6 and 20 * math.log(v, 10) or -60
+        s[g .. '|vol'] = math.max(0, math.min(1, (db + 60) / 72))
+      end
+      if F.PAN then s[g .. '|pan'] = (reaper.GetMediaTrackInfo_Value(tr, 'D_PAN') + 1) / 2 end
+      if F.MUTE then s[g .. '|mute'] = reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') end
+      if F.SOLO then s[g .. '|solo'] = reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') > 0 and 1 or 0 end
+      if F.SEND then
+        local seen = {}
+        for k = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
+          local dst = reaper.GetTrackSendInfo_Value(tr, 0, k, 'P_DESTTRACK')
+          local dg = dst and reaper.GetTrackGUID(dst) or '?'
+          seen[dg] = (seen[dg] or 0) + 1
+          local key = dg .. ':' .. seen[dg]
+          local v = reaper.GetTrackSendInfo_Value(tr, 0, k, 'D_VOL')
+          local db = v > 1e-6 and 20 * math.log(v, 10) or -60
+          s[g .. '|sv:' .. key] = math.max(0, math.min(1, (db + 60) / 72))
+          s[g .. '|sp:' .. key] = (reaper.GetTrackSendInfo_Value(tr, 0, k, 'D_PAN') + 1) / 2
+        end
+      end
+      if F.FX then
+        for _, fx in ipairs(ctx.mixxy_fxaddrs(tr)) do
+          local fg = reaper.TrackFX_GetFXGUID(tr, fx)
+          if fg then
+            s[g .. '|fe:' .. fg] = reaper.TrackFX_GetEnabled(tr, fx) and 1 or 0
+            local np = reaper.TrackFX_GetNumParams(tr, fx)
+            for pi = 0, math.min(np - 3, 1024) - 1 do s[g .. '|fx:' .. fg .. ':' .. pi] = reaper.TrackFX_GetParamNormalized(tr, fx, pi) end   -- последние 3 — Bypass / Wet / Delta
+          end
+        end
+      end
     end
     return s
   end,
-  mixxy_apply = function(vals, last)
-    local map = {}
-    for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); map[reaper.GetTrackGUID(tr)] = tr end
+  -- cache — карты трек / FX / посылы (на время перетаскивания: строятся один раз)
+  mixxy_apply = function(vals, last, cache)
+    cache = cache or {}
+    if not cache.tr then
+      cache.tr, cache.fx, cache.snd = {}, {}, {}
+      for _, tr in ipairs(ctx.mixxy_tracks()) do
+        local g = reaper.GetTrackGUID(tr)
+        cache.tr[g] = tr
+        local fm = {}
+        for _, fx in ipairs(ctx.mixxy_fxaddrs(tr)) do local fg = reaper.TrackFX_GetFXGUID(tr, fx); if fg then fm[fg] = fx end end
+        cache.fx[g] = fm
+        local sm, seen = {}, {}
+        for k = 0, reaper.GetTrackNumSends(tr, 0) - 1 do
+          local dst = reaper.GetTrackSendInfo_Value(tr, 0, k, 'P_DESTTRACK')
+          local dg = dst and reaper.GetTrackGUID(dst) or '?'
+          seen[dg] = (seen[dg] or 0) + 1
+          sm[dg .. ':' .. seen[dg]] = k
+        end
+        cache.snd[g] = sm
+      end
+    end
     for k, v in pairs(vals) do
       if not last or math.abs((last[k] or -1) - v) > 1e-4 then
-        local g, w = k:match('^(.-)|(%a+)$')
-        local tr = g and map[g]
-        if tr and w == 'vol' then local db = v * 72 - 60; reaper.SetMediaTrackInfo_Value(tr, 'D_VOL', db <= -59.9 and 0 or 10 ^ (db / 20))
-        elseif tr and w == 'pan' then reaper.SetMediaTrackInfo_Value(tr, 'D_PAN', v * 2 - 1) end
+        local g, w = k:match('^(.-)|(.+)$')
+        local tr = g and cache.tr[g]
+        if tr then
+          if w == 'vol' then local db = v * 72 - 60; reaper.SetMediaTrackInfo_Value(tr, 'D_VOL', db <= -59.9 and 0 or 10 ^ (db / 20))
+          elseif w == 'pan' then reaper.SetMediaTrackInfo_Value(tr, 'D_PAN', v * 2 - 1)
+          elseif w == 'mute' then reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', v >= 0.5 and 1 or 0)
+          elseif w == 'solo' then reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', v >= 0.5 and 2 or 0)
+          else
+            local kind, rest = w:match('^(%a%a):(.+)$')
+            if kind == 'fx' then
+              local fg, pi = rest:match('^(.+):(%d+)$')
+              local fx = fg and cache.fx[g][fg]
+              if fx then reaper.TrackFX_SetParamNormalized(tr, fx, tonumber(pi), v) end
+            elseif kind == 'fe' then
+              local fx = cache.fx[g][rest]
+              if fx then reaper.TrackFX_SetEnabled(tr, fx, v >= 0.5) end
+            elseif kind == 'sv' or kind == 'sp' then
+              local sk = cache.snd[g][rest]
+              if sk then
+                if kind == 'sv' then local db = v * 72 - 60; reaper.SetTrackSendInfo_Value(tr, 0, sk, 'D_VOL', db <= -59.9 and 0 or 10 ^ (db / 20))
+                else reaper.SetTrackSendInfo_Value(tr, 0, sk, 'D_PAN', v * 2 - 1) end
+              end
+            end
+          end
+        end
         if last then last[k] = v end
       end
     end
@@ -2338,9 +2434,10 @@ ctx = {
   mixxy_save = function(i)
     local e = ctx.mixxy_of()
     e.snaps[i] = ctx.mixxy_grab()
-    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser(e.snaps))
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser_compact(e.snaps))
     ctx.msn_c = nil
-    vim.msg = ('mixer XY corner %d saved (volume and pan of every track; Shift+click - overwrite, right click - a snapshot)'):format(i)
+    local n = 0; for _ in pairs(e.snaps[i]) do n = n + 1 end
+    vim.msg = ('mixer XY corner %d saved: %d values by the snapshot filter (Shift+click - overwrite, right click - a snapshot)'):format(i, n)
   end,
   mixxy_recall = function(i)
     local e = ctx.mixxy_of()
@@ -23524,7 +23621,7 @@ local function frame()
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.mixsnap and hover.mixsnap.what == 'xyc' then state.status = 'XY corner: click - recall (empty - menu), Shift+click - save the mix now, right click - a snapshot from the list or clear'
-  elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph volume and pan between the corners (one undo)'
+  elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph the mix between the corners: what the snapshot filter takes (volume, pan, mute, solo, sends, fx) - one undo'
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap (S): selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
   elseif hover.sample and SL.ap_hot then state.status = 'spam: when you move a slice line and let go, that slice plays by itself; while dragging, a short roll at the edge (like SP-404)'
   elseif hover.sample and hover.sample.sbtn then state.status = ({ follow = 'follow: a slice you play on the keyboard (or MIDI) becomes the selected one - the list, the wave and the zoom jump to it', pthru = 'playthru: a slice plays on to the end of the item, not just to its own end', mono = 'mono: a new note cuts the previous one on this track (poly when off)', quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'transients (s t): cuts the sample at every detected hit at once - the cyan lines become slices; the - + buttons: fewer / more hits, x clears', ['sens-'] = 'fewer transients: only the strong hits; the slices follow', ['sens+'] = 'more transients', clear = 'remove all slices (x)', smkall = 'stretch: a stretch marker on every slice boundary of the item (and its edges) - then each hit can be pulled to the grid on its own (smk / squant), one undo', slq = 'q: where the next slice starts when you play slices - off (right after the last one), a row, 2 rows, a beat or a bar', snap = 'snap: slice lines stick to transients and the existing slices while you drag them', trim = 'trim: cut the silence at the start / end of the sample', scram = 'scramble: the slice notes of this track in the cursor region (or the VISUAL selection) swap their slices randomly - positions stay, one undo (:scramble)' })[hover.sample.sbtn] or hover.sample.sbtn
@@ -26799,7 +26896,8 @@ local function frame()
       if x ~= d.e.x or y ~= d.e.y or not d.moved then
         d.e.x, d.e.y = x, y
         local have = { d.e.snaps[1] ~= nil, d.e.snaps[2] ~= nil, d.e.snaps[3] ~= nil, d.e.snaps[4] ~= nil }
-        ctx.mixxy_apply(ctx.SN.blend(d.e.snaps, ctx.SN.weights(x, y, have), d.keys), d.last)
+        d.cache = d.cache or {}
+        ctx.mixxy_apply(ctx.SN.blend(d.e.snaps, ctx.SN.weights(x, y, have), d.keys), d.last, d.cache)
         d.moved = true
         -- 30 окт: фейдеры микшера рисуются из снимка модели — пересобрать на ходу (~20 раз в секунду), иначе они
         -- вставали на место только после отпускания

@@ -78,4 +78,57 @@ function SN.parse(str)
   return snaps
 end
 
+-- 30 окт: компактная строка (XY микшера: тысячи параметров всех треков). Значения, одинаковые во всех заполненных
+-- углах, — один раз (строка «c:»), в углах — только отличия; GUID в ключах — короткие номера (строка «g:»).
+-- В памяти углы остаются полными: морф и сравнение работают как раньше
+local GUIDP = '{%x+%-%x+%-%x+%-%x+%-%x+}'
+function SN.ser_compact(snaps)
+  local filled = {}
+  for i = 1, 4 do if snaps[i] then filled[#filled + 1] = i end end
+  if #filled == 0 then return '' end
+  local common = {}
+  for k, v in pairs(snaps[filled[1]]) do
+    local same = true
+    for j = 2, #filled do local u = snaps[filled[j]][k]; if not u or math.abs(u - v) > 5e-6 then same = false; break end end
+    if same then common[k] = v end
+  end
+  local gid, glist = {}, {}
+  local function short(k)
+    return (k:gsub(GUIDP, function(g)
+      if not gid[g] then glist[#glist + 1] = g; gid[g] = '#' .. #glist end
+      return gid[g]
+    end))
+  end
+  local function body(t, skip)
+    local parts = {}
+    for k, v in pairs(t) do if not (skip and skip[k]) then parts[#parts + 1] = ('%s=%s'):format(short(k), (('%.5f'):format(v):gsub('0+$', ''):gsub('%.$', ''))) end end
+    table.sort(parts)
+    return table.concat(parts, ';')
+  end
+  local lines = { 'c:' .. body(common) }
+  for _, i in ipairs(filled) do lines[#lines + 1] = i .. ':' .. body(snaps[i], common) end
+  local g = {}
+  for n, guid in ipairs(glist) do g[#g + 1] = '#' .. n .. '=' .. guid end
+  table.insert(lines, 1, 'g:' .. table.concat(g, ';'))
+  return table.concat(lines, '\n')
+end
+-- читает и компактную, и старую строку
+function SN.parse_compact(str)
+  if not (str or ''):find('^g:') then return SN.parse(str) end
+  local gmap, common, snaps = {}, {}, {}
+  local function long(k) return (k:gsub('#%d+', function(t) return gmap[t] or t end)) end
+  for line in str:gmatch('[^\n]+') do
+    local tag, b = line:match('^(%w):(.*)$')
+    if tag == 'g' then for t, guid in b:gmatch('(#%d+)=([^;]+)') do gmap[t] = guid end
+    elseif tag == 'c' then for k, v in b:gmatch('([^;=]+)=([^;]+)') do common[long(k)] = tonumber(v) end
+    elseif tonumber(tag) and tonumber(tag) >= 1 and tonumber(tag) <= 4 then
+      local t = {}
+      for k, v in b:gmatch('([^;=]+)=([^;]+)') do t[long(k)] = tonumber(v) end
+      snaps[tonumber(tag)] = t
+    end
+  end
+  for i = 1, 4 do local t = snaps[i]; if t then for k, v in pairs(common) do if t[k] == nil then t[k] = v end end end end
+  return snaps
+end
+
 return SN

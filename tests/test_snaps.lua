@@ -21,4 +21,25 @@ local back = SN.parse(SN.ser(s2))
 near(back[1]['{G1}|3'], 0.12345, 'ser/parse value'); eq(back[2], nil, 'empty corner stays empty'); near(back[3]['{G2}|0'], 0, 'corner 3')
 local part = SN.blend({ { a = 0 }, { a = 1, c = 1 } }, { 0.5, 0.5, 0, 0 }, { 'c' })
 near(part.c, 1, 'key only in one corner - from it')
+-- 30 окт: компактная строка — общие значения один раз, GUID короткими номерами, полные углы после чтения
+do
+  local T, F = '{0A1B2C3D-0000-1111-2222-333344445555}', '{99999999-AAAA-BBBB-CCCC-DDDDEEEEFFFF}'
+  local c1, c3 = {}, {}
+  for pi = 0, 499 do c1[T .. '|fx:' .. F .. ':' .. pi] = pi / 1000; c3[T .. '|fx:' .. F .. ':' .. pi] = pi / 1000 end
+  c1[T .. '|vol'] = 0.8; c3[T .. '|vol'] = 0.2
+  c3[T .. '|mute'] = 1   -- ключ только в одном углу
+  local str = SN.ser_compact({ c1, nil, c3 })
+  local full = SN.ser({ c1, nil, c3 })
+  eq(#str < #full / 4, true, ('compact is small: %d vs %d'):format(#str, #full))
+  eq(str:find(T, 1, true) ~= nil and select(2, str:gsub(T:gsub('%p', '%%%0'), '')) == 1, true, 'each GUID written once')
+  local back = SN.parse_compact(str)
+  near(back[1][T .. '|fx:' .. F .. ':123'], 0.123, 'common value restored into corner 1')
+  near(back[3][T .. '|fx:' .. F .. ':499'], 0.499, 'common value restored into corner 3')
+  near(back[1][T .. '|vol'], 0.8, 'differing value corner 1'); near(back[3][T .. '|vol'], 0.2, 'differing value corner 3')
+  eq(back[1][T .. '|mute'], nil, 'key of one corner stays there'); near(back[3][T .. '|mute'], 1, 'its value')
+  eq(back[2], nil, 'empty corner stays empty')
+  eq(#SN.diff_keys(back), 1, 'diff keys after the round trip: vol (mute is in one corner only)')
+  local old = SN.parse_compact(SN.ser({ { a = 0.5 } }))
+  near(old[1].a, 0.5, 'old format still read')
+end
 print(('%d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
