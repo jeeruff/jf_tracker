@@ -3411,9 +3411,11 @@ function D.route_draw(L, nodes, col, wx, wy, ww, wh, hover)
   for i, n in ipairs(nodes) do if i > 1 and (n.par or 0) > 0 then run = run + 1; maxpar = math.max(maxpar, run) else run = 1 end end
   local nhv = vert and math.max(4 * L.cw, math.min(ms('WWWWWWWWW') + 2 * L.pad, math.floor((wh - 2 * L.pad) / maxpar) - 4)) or L.rh
   local nwv = vert and (L.rh + 2) or math.max(ms('WWWW') + 2 * L.pad, 4 * L.cw + 4)
-  local boxes, links, br = lay(nodes, { x = wx + L.pad, y = wy + L.pad, w = ww - 2 * L.pad, h = wh - 2 * L.pad,
+  local eqw = ms('=') + 2   -- 30 окт: слева место под = параллельного в первом столбце
+  local boxes, links, br, _, wraps = lay(nodes, { x = wx + L.pad + eqw, y = wy + L.pad, w = ww - 2 * L.pad - eqw - ms('>') - 2, h = wh - 2 * L.pad,
     nw = nwv, nh = nhv, gx = vert and math.max(4, L.pad) or math.max(6, 2 * L.pad, ms('=') + 4), bw = math.max(3, L.pad), rgap = 4 })
   set(U.GREY)
+  for _, wr in ipairs(wraps or {}) do text(wr.x, wr.y, '>', U.GREY) end   -- 30 окт: цепочка продолжается полосой ниже
   for _, l in ipairs(links) do
     if l.v then gfx.rect(l.x, l.y1, 1, math.max(1, l.y2 - l.y1), 1) else gfx.rect(l.x1, l.y, math.max(1, l.x2 - l.x1), 1, 1) end
   end

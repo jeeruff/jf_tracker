@@ -8,7 +8,7 @@
 local RK = {}
 
 function RK.route_layout(nodes, o)
-  local boxes, links, br = {}, {}, {}
+  local boxes, links, br, wraps = {}, {}, {}, {}
   local nw, nh, gx, bw = o.nw, o.nh, o.gx, o.bw
   local rgap = o.rgap or 2
   local x1, y1 = o.x + o.w, o.y + o.h
@@ -20,6 +20,7 @@ function RK.route_layout(nodes, o)
     if newcol then
       local need = nw + (n.cont and bw or 0)
       if prev_x and cx + need > x1 then   -- не влезло — полоса ниже
+        wraps[#wraps + 1] = { x = prev_x + nw + 2, y = band_y }   -- 30 окт: перенос — знак > в конце полосы
         band_y = band_y + band_h * (nh + rgap) + gx; band_h = 1; cx = o.x; prev_x = nil
       end
       if prev_x then links[#links + 1] = { x1 = prev_x + nw, x2 = cx + (n.cont and bw or 0), y = band_y + math.floor(nh / 2) } end
@@ -36,7 +37,7 @@ function RK.route_layout(nodes, o)
       cx = cx + bw
     end
   end
-  return boxes, links, br, cut
+  return boxes, links, br, cut, wraps
 end
 
 -- 29 окт: вертикальный вид — последовательно вниз (строка на модуль), параллельно предыдущему — правее в той же строке;

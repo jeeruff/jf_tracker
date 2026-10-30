@@ -78,5 +78,13 @@ do
   ok(b[4].y == b[3].y and b[4].x > b[3].x, 'vertical: parallel - to the right in the same row')
   ok(b[5].y > b[3].y and b[5].x == 0, 'vertical: next serial below, no indent')
 end
+-- 30 окт: перенос полосы — знак > в конце прежней полосы
+do
+  local nodes = {}
+  for k = 1, 6 do nodes[k] = { k = k, name = 'N' .. k } end
+  local _, _, _, _, wraps = RK.route_layout(nodes, { x = 0, y = 0, w = 100, h = 200, nw = 30, nh = 10, gx = 6, bw = 4 })
+  ok(#wraps >= 1, 'a wrap is reported: ' .. #wraps)
+  ok(wraps[1] and wraps[1].y == 0 and wraps[1].x > 30, 'the > is at the end of the first band')
+end
 print(('test_dsprack: %d/%d ok'):format(n - fails, n))
 os.exit(fails == 0 and 0 or 1)
