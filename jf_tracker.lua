@@ -16695,7 +16695,7 @@ ctx.ctl_jog = function(SG)
   local dx, dy = sx - SG.sx, sy - SG.sy
   if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
   local JOG = math.max(8, L.rh)   -- пикселей на шаг
-  SG.acc = SG.acc + dy
+  SG.acc = SG.acc - dy   -- 30 окт: инверсно — палец вверх, шаг дальше (вниз по трекеру)
   local steps = SG.acc >= 0 and math.floor(SG.acc / JOG) or -math.floor(-SG.acc / JOG)
   if steps ~= 0 then
     SG.acc = SG.acc - steps * JOG
@@ -24838,7 +24838,8 @@ local function frame()
           local maph = vert and math.min(math.floor(gfx.h / (OZ.z == 2 and 2.5 or 4)), 8 * OZ.rh) or gfx.h
           local how = vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value'
           if state.ctlmap ~= false then
-          local mx0, my0 = gfx.w - mapw, gfx.h - maph
+          local lift = vert and 2 * L.rh or 0   -- 30 окт: столбцы микшера — чуть выше низа окна (над статусом)
+          local mx0, my0 = gfx.w - mapw, gfx.h - maph - lift
           U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
           -- 24 окт: общий хозяин (трек / эффект) — заголовком сверху, у слайдеров — только параметр (имя трека съедало его)
           local own = SG.list[1] and SG.list[1].own
