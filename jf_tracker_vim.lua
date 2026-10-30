@@ -709,13 +709,25 @@ function motion(c, n, op)
     end
     return { fi = fi, row = r, field = 1, linewise = true }
   elseif c == ('W'):byte() or c == ('B'):byte() then
-    -- 9 окт: W / B — только головы аудио / MIDI item своего трека (w / b — любое событие)
+    -- 30 окт: W / B — следующее / предыдущее событие на ЛЮБОМ треке (нота, item, точка автоматизации, событие лейна);
+    -- строки по порядку, в строке — слева направо (w / b — свой трек)
+    local F = flat()
     local fi, r = cur.fi, cur.row
     local dir = c == ('W'):byte() and 1 or -1
+    local last = ctx.snap().last_row or 0
     for _ = 1, n do
-      local nfi, nr = next_track(fi, r, dir, true)
-      if not nfi then break end
-      fi, r = nfi, nr
+      local hit
+      local rr, first = r, true
+      while rr >= 0 and rr <= last + 1 and not hit do
+        if dir > 0 then
+          for i = 1, #F do if (not first or i > fi) and F[i] and not F[i].folded and track_event(F[i], rr, false) then hit = { i, rr }; break end end
+        else
+          for i = #F, 1, -1 do if (not first or i < fi) and F[i] and not F[i].folded and track_event(F[i], rr, false) then hit = { i, rr }; break end end
+        end
+        first = false; rr = rr + dir
+      end
+      if not hit then break end
+      fi, r = hit[1], hit[2]
     end
     return { fi = fi, row = r, field = 1, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('e'):byte() then
@@ -2960,7 +2972,26 @@ function V.key_impl(c)
       V.count = nil; return
     elseif p == 'd' or p == 'y' or p == 'c' then
       -- 10 окт: dd — строки (5dd — пять, как в Vim); трек удаляет td (было dd с 4 окт)
-      if c == p:byte() then      -- dd yy cc: n строк
+      -- 30 окт: dd как в Vim — строки уходят, ниже подтягивается (как Backspace; Ndd — N строк); dw — очистить N строк
+      -- трека без сдвига (прежний dd), dW — то же на всех треках; целый item — di
+      if p == 'd' and c == ('d'):byte() and ctx.time_edit and not env_of(V.cur.fi) then
+        V.count = nil
+        ctx.time_edit('delete', V.cur.fi, V.cur.row, n, false); finish_edit()
+        return
+      end
+      if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) then
+        local F = flat()
+        local f0, f1 = V.cur.fi, V.cur.fi
+        if c == ('W'):byte() then f0, f1 = 1, #F end
+        local e = apply('d', f0, f1, V.cur.row, V.cur.row + n - 1); V.count = nil
+        if e then finish_edit() else finish_move() end
+        return
+      end
+      if p == 'd' and c == ('i'):byte() then
+        if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
+        V.count = nil; return
+      end
+      if c == p:byte() then      -- yy cc: n строк
         local f0, f1, r0, r1 = V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1
         local e = apply(p, f0, f1, r0, r1); V.count = nil
         if e then finish_edit() else finish_move() end
@@ -3057,10 +3088,6 @@ function V.key_impl(c)
       if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
         local em = V.empty_midi_at(V.cur.fi, V.cur.row)
         if em and ctx.delete_item then ctx.delete_item(em); V.msg = 'empty MIDI clip deleted'; V.count = nil; finish_edit(); return end
-      end
-      if p == 'd' and c == ('W'):byte() then
-        if ctx.delete_item_at_cursor() then finish_edit() else finish_move() end
-        V.count = nil; return
       end
       -- dt — вырезать выделенное время (весь проект, дальше сдвигается),
       -- dr — очистить трек в регионе, daw — все item трека (4 окт)
@@ -4010,7 +4037,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d row, nothing moves (3dd) | c automation column | C the cursor field in the whole track | w event | W whole item | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p up to the pause | P all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c automation column | C the cursor field in the whole track | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p up to the pause | P all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
