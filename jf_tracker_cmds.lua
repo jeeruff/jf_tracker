@@ -5,12 +5,11 @@
 -- внутри item очищаются и строятся заново, сгенерированные копии
 -- (P_EXT:jf_gen = guid родителя) удаляются и создаются снова. Всё
 -- нативное: точки take-огибающих, items, tempo-маркеры, MIDI pitchbend.
--- Доли — от строки; слайд 0U / 0D — в тиках Renoise (C.TPL на строку).
+-- Тиклесс: доли — от строки (xx/16 полутона на строку и т.п.).
 -- Коды — двухсимвольные, как в Renoise (12 окт: было по одной букве):
 --
---   0Uxx / 0Dxx питч вверх/вниз на xx/16 полутона за тик (C.TPL = 12 тиков в строке, как в Renoise);
---               MIDI — pitchbend в диапазоне инструмента, копится через ноты до 0U00 / 0D00 (сброс)
---               или конца клипа; аудио — take Pitch своей ноты
+--   0Uxx / 0Dxx питч вверх/вниз на xx/16 полутона за строку (стиль — C.MODE: renoise / ft2 / it / pt)
+--               (аудио — take Pitch; MIDI — pitchbend ±2 полутона)
 --   0Gxx        glide: от высоты предыдущего события к своей за xx строк
 --   0Vxy        vibrato: период 16/x строк (x=0 → 4), глубина y/8 полутона
 --   0Axy        arpeggio: 0, x, y полутонов по трети строки, ступенями
@@ -40,10 +39,45 @@ C.CODES = { ['0U'] = true, ['0D'] = true, ['0G'] = true, ['0V'] = true, ['0A'] =
 -- команда, огибающих не строит — исполняет main в кадре.
 
 function C.init(m) model = m end
--- 30 окт: тиков в строке, как в Renoise (по умолчанию 12): 0U / 0D — xx/16 полутона за тик
-C.TPL = 12
--- полутонов за строку у команды слайда (+ вверх, − вниз)
-function C.slope(c) return (c.xx / 16) * C.TPL * (c.cmd == '0U' and 1 or -1) end
+
+-- 30 окт: стиль слайда 0U / 0D (опция slide style) — как в трекере, откуда пришла привычка:
+--   renoise  xx/16 полутона за строку
+--   ft2      FastTracker 2, линейные частоты: xx/16 полутона за ТИК, тиков со слайдом speed − 1
+--   it       Schism / Impulse Tracker, линейные слайды: как ft2, память 00 у 0U и 0D общая
+--   pt       ProTracker: период Amiga −xx (вверх) / +xx за тик, высота нелинейна (зависит от ноты), 113..856
+-- Что делает 00 — отдельная опция (C.ZERO)
+-- Новая нота во всех — со своей высоты (слайд — внутри ноты)
+C.MODE, C.SPEED = 'renoise', 6
+C.ZERO = 'repeat'   -- 00 у 0U / 0D: repeat — повтор прошлого значения (как в Renoise), stop — слайд стоит (опция slide 00)
+C.MODES = { 'renoise', 'ft2', 'it', 'pt' }
+local function pt_period(pitch) return 428 * 2 ^ ((60 - (pitch or 60)) / 12) end   -- C-4 трекера (60) = C-2 ProTracker
+-- сдвиг в полутонах за rows строк слайда команды c от ноты pitch
+function C.slide_semis(c, rows, pitch)
+  local sgn = c.cmd == '0U' and 1 or -1
+  local m = C.MODE
+  if m == 'ft2' or m == 'it' then return sgn * c.xx / 16 * (C.SPEED - 1) * rows end
+  if m == 'pt' then
+    local p0 = pt_period(pitch)
+    local p = math.max(113, math.min(856, p0 - sgn * c.xx * (C.SPEED - 1) * rows))
+    p0 = math.max(113, math.min(856, p0))
+    return 12 * math.log(p0 / p, 2)
+  end
+  return sgn * c.xx / 16 * rows
+end
+-- 00 = повтор прошлого значения (C.ZERO = 'repeat'; it — память общая у 0U и 0D); stop — 00 останавливает слайд
+function C.slide_memory(list)
+  if C.ZERO ~= 'repeat' then return list end
+  local last, out = {}, {}
+  for _, c in ipairs(list) do
+    if c.cmd == '0U' or c.cmd == '0D' then
+      local key = C.MODE == 'it' and 'ud' or c.cmd
+      if c.xx == 0 and last[key] then c = { cmd = c.cmd, xx = last[key], x = last[key] >> 4, y = last[key] & 15, off = c.off }
+      elseif c.xx > 0 then last[key] = c.xx end
+    end
+    out[#out + 1] = c
+  end
+  return out
+end
 
 -- ── разбор / хранение ─────────────────────────────────────────────────────
 function C.parse(str)
@@ -216,32 +250,53 @@ function C.rebuild(head, lpb, prev_semis)
         if tt >= pos - 1e-6 and tt <= pos + len + 1e-6 then R.MIDI_DeleteCC(take, i) end
       end
     end
-    -- 12 окт: отрезки slide (0U / 0D со своих строк), линейно между границами
+    -- 12 окт: отрезки slide (0U / 0D со своих строк), pitchbend ±2 полутона, линейно между границами
     local tq = function(off) return R.TimeMap2_QNToTime(0, qn0 + off) - pos end
-    -- 30 окт: как в Renoise — xx/16 полутона за ТИК (C.TPL тиков в строке), и слайд идёт ЧЕРЕЗ ноты: бенд копится от
-    -- команды к команде до 0U00 / 0D00 (сброс в центр) или конца клипа. Было: 1/16 за строку и сброс на конце ноты
+    -- 19 окт: команда — у своей ноты: отрезок slide до конца этой ноты (или до следующей 0U / 0D), потом bend — в центр;
+    -- соседние ноты клипа не задеваются
     table.sort(list, function(a, b) return (a.off or 0) < (b.off or 0) end)
-    local sl = {}
-    for _, c in ipairs(list) do if c.cmd == '0U' or c.cmd == '0D' then sl[#sl + 1] = c end end
-    if #sl > 0 then
-      local brange = (C.bend_range and C.bend_range(tr)) or 2   -- 19 окт: диапазон bend инструмента (slixer, пэды кита)
+    local nends = {}
+    do
+      local _, nn = R.MIDI_CountEvts(take)
+      for k = 0, nn - 1 do
+        local _, _, _, sp, ep, _, pi = R.MIDI_GetNote(take, k)
+        nends[#nends + 1] = { s = R.MIDI_GetProjTimeFromPPQPos(take, sp) - pos, e = R.MIDI_GetProjTimeFromPPQPos(take, ep) - pos, pi = pi }
+      end
+    end
+    local function note_end(t)
+      local best, bp
+      for _, ne in ipairs(nends) do if math.abs(ne.s - t) < row_sec / 2 and (not best or ne.e > best) then best, bp = ne.e, ne.pi end end
+      return best, bp
+    end
+    local function note_over(t)   -- нота, что звучит в t (команда со смещением внутри длинной ноты)
+      for _, ne in ipairs(nends) do if ne.s <= t + 1e-6 and ne.e > t + 1e-6 then return ne end end
+    end
+    local segs = C.segments(C.slide_memory(list), { ['0U'] = true, ['0D'] = true }, tq, len)
+    if #segs > 0 then
+      local brange = (C.bend_range and C.bend_range(tr)) or 2   -- 19 окт: диапазон bend инструмента (пэды кита — их Pitchbend range)
       local function bend_at(semis) return math.max(0, math.min(16383, math.floor(8192 + semis / brange * 8191 + 0.5))) end
       local pts = { { 0, 0 } }
-      local acc = 0
-      for k, c in ipairs(sl) do
-        local a = math.max(0, math.min(len, tq(c.off or 0)))
-        local b = sl[k + 1] and math.max(a, math.min(len, tq(sl[k + 1].off or 0))) or len
-        if c.xx == 0 then
-          if acc ~= 0 then pts[#pts + 1] = { a, acc }; pts[#pts + 1] = { a + 0.0005, 0 } end
-          acc = 0
+      -- 30 окт: слайд внутри одной ноты копится от команды к команде (раньше каждая строка начинала с нуля);
+      -- новая нота — с нуля; стиль — C.slide_semis (pt нелинеен — точка на каждый тик)
+      local acc, cur_end, cur_pi = 0, nil, nil
+      for _, sg in ipairs(segs) do
+        local ne, npi = note_end(sg[1])
+        if ne then acc, cur_end, cur_pi = 0, ne, npi
         else
-          local slope = C.slope(c) / row_sec
-          pts[#pts + 1] = { a, acc }
-          acc = math.max(-brange, math.min(brange, acc + slope * (b - a)))
-          pts[#pts + 1] = { b, acc }
+          local no = note_over(sg[1])
+          if not (no and cur_end and math.abs(no.e - cur_end) < 1e-6) then acc = 0; cur_end, cur_pi = no and no.e, no and no.pi end
         end
+        local b = cur_end and math.min(sg[2], cur_end) or sg[2]
+        local rows = (b - sg[1]) / row_sec
+        local n = C.MODE == 'pt' and math.max(1, math.min(64, math.floor(rows * (C.SPEED - 1) + 0.5))) or 1
+        pts[#pts + 1] = { sg[1], acc }
+        for j = 1, n do
+          local v = acc + C.slide_semis(sg[3], rows * j / n, cur_pi)
+          pts[#pts + 1] = { sg[1] + (b - sg[1]) * j / n, math.max(-brange, math.min(brange, v)) }
+        end
+        acc = pts[#pts][2]
+        if not cur_end or b >= cur_end - 1e-6 then pts[#pts + 1] = { b + 0.0005, 0 }; acc = 0 end   -- после ноты — назад в центр
       end
-      if acc ~= 0 then pts[#pts + 1] = { len + 0.0005, 0 } end   -- за клипом — в центр
       for _, p in ipairs(pts) do
         local bnd = bend_at(p[2])
         local pp = R.MIDI_GetPPQPosFromProjTime(take, pos + p[1])
@@ -251,7 +306,7 @@ function C.rebuild(head, lpb, prev_semis)
       for i = 0, ncc2 - 1 do
         local _, _, _, ppq, typ = R.MIDI_GetCC(take, i)
         local tt = R.MIDI_GetProjTimeFromPPQPos(take, ppq)
-        if typ == 0xE0 and tt >= pos - 1e-6 and tt <= pos + len + 1e-3 then R.MIDI_SetCCShape(take, i, 1, 0, true) end
+        if typ == 0xE0 and tt >= pos - 1e-6 and tt <= pos + len + 1e-6 then R.MIDI_SetCCShape(take, i, 1, 0, true) end
       end
       R.MIDI_Sort(take)
     end
@@ -339,7 +394,7 @@ function C.rebuild(head, lpb, prev_semis)
   local ts = function(off) return (R.TimeMap2_QNToTime(0, qn0 + off) - pos) * rate end   -- время take (источник)
   local rs = row_sec * rate                                                              -- строка во времени take
   if penv then
-    local slides = C.segments(list, { ['0U'] = true, ['0D'] = true }, ts, tlen)
+    local slides = C.segments(C.slide_memory(list), { ['0U'] = true, ['0D'] = true }, ts, tlen)
     local vibs = C.segments(list, { ['0V'] = true }, ts, tlen)
     local arps = C.segments(list, { ['0A'] = true }, ts, tlen)
     local glide
@@ -350,8 +405,7 @@ function C.rebuild(head, lpb, prev_semis)
       local acc = 0
       for _, sg in ipairs(slides) do
         if t <= sg[1] then break end
-        local slope = C.slope(sg[3]) / rs
-        acc = acc + slope * (math.min(t, sg[2]) - sg[1])
+        acc = acc + C.slide_semis(sg[3], (math.min(t, sg[2]) - sg[1]) / rs, head.pitch)   -- 30 окт: стиль слайда
       end
       return acc
     end
@@ -377,7 +431,13 @@ function C.rebuild(head, lpb, prev_semis)
       local times, seen = {}, {}
       local function add(t) t = math.max(0, math.min(tlen, t)); local k = ('%.6f'):format(t); if not seen[k] then seen[k] = true; times[#times + 1] = t end end
       add(0); add(tlen)
-      for _, sg in ipairs(slides) do add(sg[1]); add(sg[2]); add(sg[1] - 1e-4) end
+      for _, sg in ipairs(slides) do
+        add(sg[1]); add(sg[2]); add(sg[1] - 1e-4)
+        if C.MODE == 'pt' then   -- нелинейно — точка на тик
+          local n = math.min(64, math.floor((sg[2] - sg[1]) / rs * (C.SPEED - 1) + 0.5))
+          for j = 1, n - 1 do add(sg[1] + (sg[2] - sg[1]) * j / n) end
+        end
+      end
       for _, vs in ipairs(vibs) do
         local period = (vs[3].x > 0 and 16 / vs[3].x or 4) * rs
         local n = math.max(2, math.floor((vs[2] - vs[1]) / period * 8))

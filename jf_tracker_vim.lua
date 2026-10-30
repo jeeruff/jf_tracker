@@ -393,7 +393,7 @@ end
 function V.step_advance() V.cur.row = V.cur.row + step_rows(); ensure_visible() end
 -- код живёт в строке (огибающая / генератор / песня) или у всей ноты (свойство item: 0S 0M 0P SI …)
 -- 29 окт: пустой слот команды (поле курсора) внутри ноты — команда сверху в том же слоте той же ноты сюда; → true, если поставлена
-function V.fx_prev_fill(fi, row)
+function V.fx_prev_fill(fi, row, delta)   -- delta (30 окт, Ctrl+Opt+A / X) — сразу «сверху ± delta»
   local fld = V.cur.field or 1
   if fld < 4 then return false end
   local i = fld - 3
@@ -409,8 +409,9 @@ function V.fx_prev_fill(fi, row)
   local cc = code:sub(1, 2)
   local off = (fc.off > 0 and V.fx_rowable(cc)) and fc.off or nil
   if fc.off > 0 and not off then V.msg = cc .. ' works on the note row only'; return false end
-  ctx.edit.set_fx({ fc.head }, lpb(), cc, tonumber(code:sub(3, 4), 16) or 0, off)
-  V.msg = ('%s from above - Ctrl+A / X again changes it'):format(code)
+  local v = math.max(0, math.min(255, (tonumber(code:sub(3, 4), 16) or 0) + (delta or 0)))
+  ctx.edit.set_fx({ fc.head }, lpb(), cc, v, off)
+  V.msg = delta and ('%s%02X - the one above %+d'):format(cc, v, delta) or ('%s from above - Ctrl+A / X again changes it'):format(code)
   return true
 end
 function V.fx_rowable(code) return ctx.edit and ctx.edit.cmds and ctx.edit.cmds.CODES and ctx.edit.cmds.CODES[code] and true or false end
@@ -3383,12 +3384,14 @@ function V.key_impl(c)
   elseif c == ctrl('a') or c == ctrl('x') then   -- 27 окт: лейн / огибающая — пусто: значение сверху, дальше ±; иначе ноты
     -- 29 окт: пустая клетка команды внутри ноты — сначала значение команды сверху (той же колонки, той же ноты), дальше ±;
     -- Ctrl+Opt+A / X — то же и курсор на шаг step вниз
-    if not V.fx_prev_fill(V.cur.fi, V.cur.row) then
-      if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n)) then
+    -- 30 окт: с Opt (шаг вниз) пустая клетка — сразу «сверху ± 1»: второго нажатия на ней не будет (было 41 41 41)
+    local stepd = ctx.mods and ctx.mods().alt
+    if not V.fx_prev_fill(V.cur.fi, V.cur.row, stepd and ((c == ctrl('a') and 1 or -1) * n) or nil) then
+      if not (ctx.nudge_lane and ctx.nudge_lane(V.cur.fi, V.cur.row, (c == ctrl('a') and 1 or -1) * n, stepd)) then
         apply(c == ctrl('a') and '+' or '-', V.cur.fi, V.cur.fi, V.cur.row, V.cur.row)
       end
     end
-    if ctx.mods and ctx.mods().alt then
+    if stepd then
       local st = (type(V.step) == 'number' and V.step > 0) and V.step or 1
       V.cur.row = V.cur.row + st
     end
@@ -4432,9 +4435,9 @@ function V.smart()
                    if tr and letter == '0R' and ctx.preview_retrig then   -- 28 окт: слышно повторы, не одну ноту
                      ctx.preview_retrig(tr, pp, it.v, nt and nt.len_rows or h0.len_rows or h0.rows)
                    elseif tr then ctx.preview(tr, pp, 'midi') end   -- 0S на ките мог сменить пэд
-                   -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — как в клипе (C.slope, тики Renoise)
+                   -- 19 окт: 0U / 0D — изгиб слышно: pitch bend шагами за время превью (0.4 с), наклон — xx/16 полутона за строку
                    if (letter == '0U' or letter == '0D') and ctx.preview_bend and ctx.row_sec then
-                     ctx.preview_bend(h0.ch or 0, E.cmds.slope({ cmd = letter, xx = it.v }) / ctx.row_sec(), 0.4, tr)
+                     ctx.preview_bend(h0.ch or 0, E.cmds.slide_semis({ cmd = letter, xx = it.v }, 1, pp) / ctx.row_sec(), 0.4, tr)   -- 30 окт: стиль слайда
                    end
                  elseif ctx.play_note_item and h0 and h0.item then ctx.play_note_item(h0.item) end
                end,

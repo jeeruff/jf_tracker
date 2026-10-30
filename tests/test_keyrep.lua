@@ -71,4 +71,15 @@ do
   local hold = run({ { 0.1, 1.1 } }, J, VKJ, 0.03, 2.5, true)
   eq('two taps after a hold = +2', m, hold + 2)
 end
+-- 30 окт: кадры медленнее системного повтора (45 мс, каждый пятый 90): буфер копит повторы ОС, их читают после
+-- отпускания — раньше каждый сдвигал срез GetUp за отпускание, и повтор шёл ещё до 0.5 с (3-5 лишних шагов)
+do
+  local i = 0
+  local slow = function() i = i + 1; return (i % 5 == 0) and 0.09 or 0.045 end
+  for _, hold in ipairs({ 0.6, 1.0, 1.7 }) do
+    i = 0
+    local _, a = run({ { 0.1, 0.1 + hold } }, J, VKJ, slow, 3.5, true)
+    eq(('slow frames, hold %.1fs: nothing after release'):format(hold), a, 0)
+  end
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)

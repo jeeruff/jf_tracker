@@ -34,7 +34,7 @@ SM.key(('z'):byte()); eq(SM.p.items[SM.p.sel].label:sub(1, 1), '9', 'z: no such 
 SM.key(('e'):byte()); eq(got, 0x9E, '9e: written at once, no Enter'); eq(SM.p, nil, '…and closed')
 local vi = SM.values(256, nil, true)
 eq(vi[0x9F].sub, '158', 'hex cell shows the decimal'); eq(vi[0x9F].tip:find('9E = 158', 1, true) ~= nil, true, 'tip: 9E = 158')
-eq(SM.FX_MEAN['0U'](8), '+6 semitone per row', '0U 08 meaning (12 ticks a row)'); eq(SM.FX_MEAN.SF(0x8E), '+14 cents', 'SF 8E meaning'); eq(SM.FX_MEAN.ZT(0x80), 'tempo 128 BPM', 'ZT 80 meaning')
+eq(SM.FX_MEAN['0U'](8), '+0.5 semitone per row', '0U 08 meaning'); eq(SM.FX_MEAN.SF(0x8E), '+14 cents', 'SF 8E meaning'); eq(SM.FX_MEAN.ZT(0x80), 'tempo 128 BPM', 'ZT 80 meaning')
 SM.open({ title = 'n', items = (SM.notes(60, 4)), cols = 12, sel = 49, on_pick = function(it) got = it.v end })
 SM.key(('d'):byte()); SM.key(('#'):byte()); SM.key(('4'):byte()); eq(got, 63, 'd#4 typed -> D#4 at once')
 SM.open({ title = 'n', items = (SM.notes(60, 4)), cols = 12, sel = 49, on_pick = function(it) got = it.v end }); got = nil

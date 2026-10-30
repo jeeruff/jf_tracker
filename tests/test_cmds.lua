@@ -23,9 +23,22 @@ local segs = C.segments(C.parse('0U08,0V48@0.25,0U00@0.5,0D04@1'), { ['0U'] = tr
 eq(#segs, 2, 'slide: 0U from 0, stopped at 0.5, 0D from 1')
 eq(segs[1][1], 0, 'seg 1 from 0'); eq(segs[1][2], 0.5, 'seg 1 to the 00'); eq(segs[2][1], 1, 'seg 2 from 1'); eq(segs[2][2], 2, 'seg 2 to the end')
 eq(segs[2][3].cmd, '0D', 'seg 2 is 0D')
--- 30 окт: слайд в тиках Renoise — xx/16 полутона за тик, C.TPL тиков в строке
-eq(C.TPL, 12, 'ticks per line as in Renoise')
-eq(C.slope({ cmd = '0U', xx = 1 }), 0.75, '0U01 = 12/16 semitone per row')
-eq(C.slope({ cmd = '0D', xx = 0x10 }), -12, '0D10 = an octave down per row')
+-- 30 окт: стили слайда 0U / 0D и 00
+local function nearc(a, b, w) eq(math.abs(a - b) < 1e-6, true, w .. ' (' .. tostring(a) .. ')') end
+C.MODE, C.SPEED, C.ZERO = 'renoise', 6, 'repeat'
+nearc(C.slide_semis({ cmd = '0U', xx = 16 }, 1, 60), 1, 'renoise: 0U10 = a semitone per row')
+nearc(C.slide_semis({ cmd = '0D', xx = 1 }, 2, 60), -2 / 16, 'renoise: 0D01 two rows')
+C.MODE = 'ft2'; nearc(C.slide_semis({ cmd = '0U', xx = 1 }, 1, 60), 5 / 16, 'ft2: 0U01 = 5 ticks x 1/16 at speed 6')
+C.MODE = 'it'; C.SPEED = 3; nearc(C.slide_semis({ cmd = '0D', xx = 4 }, 1, 60), -0.5, 'it: speed 3 - 2 ticks x 4/16')
+C.MODE, C.SPEED = 'pt', 6
+nearc(C.slide_semis({ cmd = '0U', xx = 1 }, 1, 60), 12 * math.log(428 / 423, 2), 'pt: period 428 - 5')
+eq(C.slide_semis({ cmd = '0U', xx = 1 }, 1, 72) > C.slide_semis({ cmd = '0U', xx = 1 }, 1, 60), true, 'pt: higher note - bigger step')
+nearc(C.slide_semis({ cmd = '0U', xx = 255 }, 4, 60), 12 * math.log(428 / 113, 2), 'pt: period stops at 113')
+C.MODE = 'renoise'
+local m = C.slide_memory({ { cmd = '0D', xx = 3, off = 0 }, { cmd = '0D', xx = 0, off = 1 }, { cmd = '0U', xx = 0, off = 2 } })
+eq(m[2].xx, 3, '00 repeats the last 0D'); eq(m[3].xx, 0, 'renoise: 0U has its own memory')
+C.MODE = 'it'; m = C.slide_memory({ { cmd = '0D', xx = 3, off = 0 }, { cmd = '0U', xx = 0, off = 1 } }); eq(m[2].xx, 3, 'it: 0U and 0D share the memory')
+C.ZERO = 'stop'; m = C.slide_memory({ { cmd = '0D', xx = 3, off = 0 }, { cmd = '0D', xx = 0, off = 1 } }); eq(m[2].xx, 0, 'slide 00 = stop keeps 00')
+C.MODE, C.ZERO = 'renoise', 'repeat'
 print(('test_cmds: %d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

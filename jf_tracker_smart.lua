@@ -285,7 +285,7 @@ end
 -- Z — песня. Единственный список кодов для ввода, меню и подсказок
 SM.FX = {
   { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx; slixer: of the slice)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
-  { '0U', 'pitch up xx/16 semitone per tick (12 a row), slides on through the notes; 00 - back to center' }, { '0D', 'pitch down xx/16 semitone per tick (12 a row), slides on through the notes; 00 - back to center' },
+  { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
   { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
   { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0O', 'volume down xx/256 per row' },
   { '0R', 'retrigger every y/16 row, volume falls by x/16 each' }, { '0Y', 'maybe: probability xx/FF' },
@@ -303,8 +303,8 @@ SM.FX_MEAN = {
   ['0S'] = function(v) return ('start at %d%% (sliced audio: slice %d)'):format(math.floor(v / 256 * 100 + 0.5), v) end,
   ['0M'] = function(v) return ('volume %d%%'):format(math.floor(v / 128 * 100 + 0.5)) end,
   ['0P'] = function(v) if v == 128 then return 'centre' end; return (v < 128 and 'left ' or 'right ') .. math.floor(math.abs(v - 128) / 128 * 100 + 0.5) .. '%' end,
-  ['0U'] = function(v) return st(v / 16 * 12) .. ' semitone per row' end,   -- 30 окт: xx/16 за тик, 12 тиков (Renoise)
-  ['0D'] = function(v) return st(-v / 16 * 12) .. ' semitone per row' end,
+  ['0U'] = function(v) return st(v / 16) .. ' semitone per row' end,
+  ['0D'] = function(v) return st(-v / 16) .. ' semitone per row' end,
   ['0G'] = function(v) return ('glide over %d rows'):format(v) end,
   ['0V'] = function(v) local x, y = v >> 4, v & 15; return x == 0 and 'vibrato off' or ('period %s rows, depth %s semitone'):format(st(16 / x):gsub('^%+', ''), st(y / 8):gsub('^%+', '')) end,
   ['0A'] = function(v) return ('arpeggio 0, +%d, +%d semitones'):format(v >> 4, v & 15) end,
