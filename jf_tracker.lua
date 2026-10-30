@@ -15777,6 +15777,8 @@ ctx.np_open = function(item, at)
     local cell = f and f.sub and f.sub[vim.cur.row]
     if cell and cell.kind == 'cont' then cell = cell.of end
     item = cell and cell.kind == 'audio' and cell.item
+    -- 30 окт: MIDI-нота — своё окно (нота, velocity, длина, задержка, канал, mute)
+    if not item and cell and cell.kind == 'midi' and not (vim.mode == 'visual' or vim.mode == 'vline') then ctx.npm_open(cell, f, at); return end
   end
   -- 20 окт: выделение (v / V) — все аудио-ноты в нём: правка панели идёт по всем сразу
   local multi
@@ -15799,6 +15801,87 @@ ctx.np_open = function(item, at)
   end
   if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
   ctx.NP = { item = item, multi = multi, sel = (ctx.NP and ctx.NP.sel) or 1, at = at or ctx.cursor_anchor() }
+end
+-- 30 окт: СВОЙСТВА MIDI-НОТЫ (Ctrl+Enter на MIDI-ноте): j k строка, h l значение (H L — крупно), Esc / Enter — закрыть
+ctx.NPM_ROWS = { { k = 'note', label = 'note' }, { k = 'vel', label = 'velocity' }, { k = 'len', label = 'length (rows)' },
+  { k = 'delay', label = 'delay /256' }, { k = 'ch', label = 'channel' }, { k = 'muted', label = 'mute' } }
+ctx.npm_open = function(cell, f, at)
+  ctx.NPM = { row = vim.cur.row, fi = vim.cur.fi, ppq = cell.ppq, pitch = cell.pitch, sel = (ctx.NPM and ctx.NPM.sel) or 1, at = at or ctx.cursor_anchor() }
+  vim.msg = 'MIDI note: j k row, h l value (H L big step), Esc / Enter close'
+end
+ctx.npm_head = function()
+  local M = ctx.NPM
+  if not M then return nil end
+  local f = L and L.flat and L.flat[M.fi]
+  local c = f and f.sub and f.sub[M.row]
+  if c and c.kind == 'cont' then c = c.of end
+  if not (c and c.kind == 'midi') then return nil end
+  return c
+end
+ctx.npm_vals = function(h)
+  local _, n = edit.midi_note_of(h, state.lpb)
+  if not n then return nil end
+  local len = model.row_of_time(reaper.MIDI_GetProjTimeFromPPQPos(h.take, n.eppq), state.lpb) - model.row_of_time(reaper.MIDI_GetProjTimeFromPPQPos(h.take, n.sppq), state.lpb)
+  return { note = model.note_name(n.pitch), vel = tostring(n.vel), len = ('%.2f'):format(len), delay = tostring(math.floor(h.delay or 0)), ch = tostring(n.ch + 1), muted = n.muted and 'on' or 'off', n = n, lenr = len }
+end
+ctx.npm_adjust = function(k, d)
+  local h = ctx.npm_head(); if not h then ctx.NPM = nil; return end
+  local v = ctx.npm_vals(h); if not v then return end
+  local lpb = state.lpb
+  if k == 'note' then edit.set_pitch({ h }, lpb, math.max(0, math.min(127, v.n.pitch + d))); ctx.NPM.pitch = v.n.pitch + d
+  elseif k == 'vel' then edit.set_vol({ h }, lpb, math.max(1, math.min(127, v.n.vel + d)))
+  elseif k == 'delay' then edit.set_delay({ h }, lpb, math.max(0, math.min(255, math.floor(h.delay or 0) + d * 8)))
+  elseif k == 'ch' then edit.midi_note_set(h, lpb, 'ch', v.n.ch + d)
+  elseif k == 'muted' then edit.midi_note_set(h, lpb, 'muted', not v.n.muted)
+  elseif k == 'len' then
+    local rows = math.max(1, math.floor(v.lenr + 0.5) + d)
+    local t1 = edit.row_time(ctx.NPM.row + rows, lpb, 0)
+    edit.midi_note_set(h, lpb, 'len', reaper.MIDI_GetPPQPosFromProjTime(h.take, t1))
+  end
+  model.invalidate()
+end
+ctx.npm_key = function(c)
+  local M = ctx.NPM
+  local ch = c < 256 and string.char(c) or ''
+  local R2 = ctx.NPM_ROWS
+  if c == 27 or c == 13 then ctx.NPM = nil
+  elseif ch == 'j' or c == keys.down then M.sel = math.min(#R2, M.sel + 1)
+  elseif ch == 'k' or c == keys.up then M.sel = math.max(1, M.sel - 1)
+  elseif ch == 'l' or ch == 'h' or ch == 'L' or ch == 'H' or c == keys.right or c == keys.left then
+    local d = (ch == 'h' or ch == 'H' or c == keys.left) and -1 or 1
+    local k = R2[M.sel].k
+    if ch == 'H' or ch == 'L' then d = d * ((k == 'note') and 12 or ((k == 'vel') and 10 or 4)) end
+    ctx.npm_adjust(k, d)
+  end
+end
+ctx.npm_draw = function()
+  local M = ctx.NPM
+  local h = ctx.npm_head()
+  local v = h and ctx.npm_vals(h)
+  if not v then ctx.NPM = nil; return end
+  local R2 = ctx.NPM_ROWS
+  local lw, vw = 0, U.measure('W') * 8
+  for _, r in ipairs(R2) do lw = math.max(lw, U.measure(r.label)) end
+  lw = lw + 2 * L.pad
+  local w = lw + vw + 2 * L.pad
+  local hh = (#R2 + 1) * L.rh + 2 * L.pad
+  local x = math.max(2, math.min(gfx.w - w - 2, (M.at and M.at.x) or 40))
+  local y = (M.at and M.at.y) or 40
+  if y + hh > gfx.h - 2 then y = math.max(2, y - hh - L.rh) end
+  U.set(U.PANEL); gfx.rect(x, y, w, hh, 1)
+  U.set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, hh, 0); gfx.rect(x + 1, y + 1, w - 2, hh - 2, 0)
+  U.text(x + L.pad, y + L.pad, ctx.fit('MIDI note ' .. v.note, w - 2 * L.pad), U.AMBER)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  for i, r in ipairs(R2) do
+    local ry = y + L.pad + i * L.rh
+    local hot = mx >= x and mx < x + w and my >= ry and my < ry + L.rh
+    if i == M.sel or hot then U.set(U.tint(U.AMBER, i == M.sel and 0.3 or 0.15)); gfx.rect(x + 2, ry, w - 4, L.rh, 1) end
+    U.text(x + L.pad, ry, r.label, (i == M.sel) and U.AMBER or U.GREY)
+    U.text(x + lw, ry, ctx.fit(v[r.k] or '', vw), U.TEXT)
+    if hot and U.click then M.sel = i; U.click = false end
+    if hot and gfx.mouse_wheel ~= 0 then ctx.npm_adjust(r.k, gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0 end
+  end
+  if (U.click or U.rclick) and not (mx >= x and mx < x + w and my >= y and my < y + hh) then ctx.NPM = nil end
 end
 ctx.np_entry = function()
   local NP = ctx.NP
@@ -22872,6 +22955,7 @@ local function frame()
   end
   -- 18 окт: попапы не наслаиваются — меню из окна ноты встаёт рядом справа (не влезает — слева), окно ноты под ним
   if ctx.NP then ctx.np_draw() end   -- 13 окт: свойства ноты
+  if ctx.NPM then ctx.npm_draw() end   -- 30 окт: свойства MIDI-ноты
   local nr = ctx.NP and ctx.np_rect
   if pop and nr and not (anchor and anchor.box) then anchor = { x = nr[1] + nr[3] + 4, y = nr[5] or nr[2], right = nr[1] - 4 } end
   draw.popup(L, pop, anchor)
@@ -27663,6 +27747,7 @@ local function frame()
   end
   -- 13 окт: свойства ноты — Ctrl+Enter на ноте, пока открыта — клавиши её
   if ctx.NP and c > 0 and not vim.picker and not vim.hydra then ctx.np_key(c); c = 0 end
+  if ctx.NPM and c > 0 and not vim.picker and not vim.hydra then ctx.npm_key(c); c = 0 end   -- 30 окт
   if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then ctx.np_open(); c = 0 end
   do
     local m = ctx.mods()

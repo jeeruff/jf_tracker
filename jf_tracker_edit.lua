@@ -2734,6 +2734,21 @@ E.human = 0
 E.HUM = nil
 local function HV(k, d) local h = E.HUM; if h and h.on and h.on[k] == false then return 0 end; return (h and h.v and h.v[k]) or d end
 E.hum_v = HV
+-- 30 окт: свойства MIDI-ноты (окно Ctrl+Enter): поле k = 'ch' | 'muted' | 'len' (конец, PPQ) | 'rel' (release velocity);
+-- release — через MIDI_SetNote не задаётся, в REAPER это note-off velocity (MIDI_SetEvt ниже не трогаем — пропуск)
+function E.midi_note_set(h, lpb, k, v)
+  local i, n = midi_note(h, lpb)
+  if not i then return false end
+  run('note ' .. k, function()
+    local ch, mu, e = n.ch, n.muted, n.eppq
+    if k == 'ch' then ch = math.max(0, math.min(15, math.floor(v))) end
+    if k == 'muted' then mu = v and true or false end
+    if k == 'len' then e = math.max(n.sppq + 1, v) end
+    R.MIDI_SetNote(h.take, i, n.sel, mu, n.sppq, e, ch, n.pitch, n.vel, false)
+    R.MIDI_Sort(h.take)
+  end)
+  return true
+end
 E.midi_note_of = function(h, lpb) return midi_note(h, lpb) end   -- 19 okt: высота ноты после правки (превью команды)
 function E.humanize(it, tk)
   local h = (E.human or 0) / 100
