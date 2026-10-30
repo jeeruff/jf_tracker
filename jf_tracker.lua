@@ -14634,7 +14634,8 @@ ctx = {
         } } end },
       { key = 'A', label = 'about', fn = function() ctrl_action('about', 0) end },
       -- 9 окт: \ q — макросы (как запись q): записанные, свои, встроенные; буква — проиграть у курсора
-      { key = 'q', label = 'macros: play one at the cursor', sub = function() return ctx.mac_hydra() end },
+      { key = 'M', label = 'macros: play one at the cursor', sub = function() return ctx.mac_hydra() end },   -- 30 окт: q — выход из REAPER
+      { key = 'q', label = 'quit REAPER (it asks to save a changed project)', fn = function() reaper.Main_OnCommand(40004, 0) end },
       { key = 'r', label = 'record', sub = function() return { title = 'record', items = {
           { key = 'a', label = (col and col.armed) and 'disarm track' or 'arm track', fn = ctx.rec_arm },
           { key = 'i', label = 'choose input', sub = function() return ctx.hydra_inputs() end },
@@ -17367,7 +17368,6 @@ function view_actions()
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
     { 'Quantize … (notes, OFFs, automation, item edges)', key = 'Q', fn = function() ctx.quant_menu() end },
-    { 'Quit REAPER (it asks to save a changed project)', key = 'q', fn = function() reaper.Main_OnCommand(40004, 0) end },   -- 28 окт: \\ q
   }
 end
 
