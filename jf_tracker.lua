@@ -14634,7 +14634,7 @@ ctx = {
         } } end },
       { key = 'A', label = 'about', fn = function() ctrl_action('about', 0) end },
       -- 9 окт: \ q — макросы (как запись q): записанные, свои, встроенные; буква — проиграть у курсора
-      { key = 'M', label = 'macros: play one at the cursor', sub = function() return ctx.mac_hydra() end },   -- 30 окт: q — выход из REAPER
+      { key = '@', label = 'macros: play one at the cursor', sub = function() return ctx.mac_hydra() end },   -- 30 окт: @ — как @ в Vim (q — выход из REAPER)
       { key = 'q', label = 'quit REAPER (it asks to save a changed project)', fn = function() reaper.Main_OnCommand(40004, 0) end },
       { key = 'r', label = 'record', sub = function() return { title = 'record', items = {
           { key = 'a', label = (col and col.armed) and 'disarm track' or 'arm track', fn = ctx.rec_arm },
