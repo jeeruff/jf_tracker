@@ -3005,18 +3005,37 @@ function E.env_points(e, t0, t1)
   end
   return out
 end
+-- 30 окт: правка темпа сдвигает айтемы (их timebase — доли), а регионы и маркеры проекта стоят во времени —
+-- паттерны съезжали с сетки (slixerimba: A2 16.02..21.18 долей). Обёртка: позиции маркеров / регионов в долях до
+-- правки, после — обратно в эти доли по новой карте темпа
+function E.keep_markers_qn(fn)
+  local list, i = {}, 0
+  while true do
+    local ret, isrgn, pos, rgnend, name, idx, col = R.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    list[#list + 1] = { isrgn = isrgn, q0 = R.TimeMap2_timeToQN(0, pos), q1 = isrgn and R.TimeMap2_timeToQN(0, rgnend) or nil, name = name, idx = idx, col = col }
+    i = i + 1
+  end
+  fn()
+  R.UpdateTimeline()
+  for _, m in ipairs(list) do
+    local p = R.TimeMap2_QNToTime(0, m.q0)
+    local e = m.isrgn and R.TimeMap2_QNToTime(0, m.q1) or 0
+    R.SetProjectMarker3(0, m.idx, m.isrgn, p, e, m.name, m.col)
+  end
+end
 function E.env_del_range(e, t0, t1)
   local n = #E.env_points(e, t0, t1)
   if n == 0 then return 0 end
   -- 29 окт: Tempo map — это маркеры темпа: удалять маркерами (точки огибающей темпа не удалялись — 133 «не стиралось»)
   local _, nm = R.GetEnvelopeName(e.env)
   if nm == 'Tempo map' and R.DeleteTempoTimeSigMarker then
-    run('tempo delete', function()
+    run('tempo delete', function() E.keep_markers_qn(function()
       for i = R.CountTempoTimeSigMarkers(0) - 1, 1, -1 do
         local ok, tp = R.GetTempoTimeSigMarker(0, i)
         if ok and tp >= t0 - 1e-9 and tp < t1 - 1e-9 then R.DeleteTempoTimeSigMarker(0, i) end
       end
-    end)
+    end) end)
     return n
   end
   run('envelope delete points', function() R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9) end)

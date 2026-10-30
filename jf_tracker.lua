@@ -9933,7 +9933,7 @@ ctx = {
     local rg = state.bpm_rg
     if not (v and rg) then vim.msg = 'BPM: a number'; return end
     v = math.max(20, math.min(400, v))
-    edit.run('pattern tempo', function()
+    edit.run('pattern tempo', function() edit.keep_markers_qn(function()   -- 30 окт: регионы остаются на своих долях
       local hit
       for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
         local _, tpos = reaper.GetTempoTimeSigMarker(0, i)
@@ -9944,7 +9944,7 @@ ctx = {
         reaper.SetTempoTimeSigMarker(0, hit, tpos, -1, -1, v, num, den, lin)
       else reaper.SetTempoTimeSigMarker(0, -1, rg.pos, -1, -1, v, 0, 0, false) end
       reaper.UpdateTimeline()
-    end)
+    end) end)
     vim.msg = ('pattern %s: %.2f BPM from its start (a tempo marker; Cmd+Z back)'):format(rg.name ~= '' and rg.name or '', v)
     model.invalidate()
   end,
@@ -27562,7 +27562,7 @@ local function frame()
       if v then
         v = math.max(20, math.min(400, v))
         local t = edit.row_time(vim.cur.row, state.lpb, 0)
-        edit.run('tempo change', function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, false) end)
+        edit.run('tempo change', function() edit.keep_markers_qn(function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, false) end) end)   -- 30 окт: регионы на долях
         reaper.UpdateTimeline(); model.invalidate()
         vim.msg = ('tempo change %.2f BPM at row %d (Enter - the project tempo)'):format(v, vim.cur.row)
       end
