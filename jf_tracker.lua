@@ -12881,7 +12881,7 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
-      flag('ctlmap', 'control overlay', 'CONTROL (Opt+Cmd+mouse): the trackpad map (strips of the bank, an XY square) and the box with the name and value over the window; off - only the frame of the bank and the status line'),
+      flag('ctlmap', 'control overlay', 'CONTROL (Ctrl+Opt+mouse): the trackpad map (strips of the bank, an XY square) and the box with the name and value over the window; off - only the frame of the bank and the status line'),
       flag('ctlx2', 'control font x2', 'CONTROL: the overlay text (names, value) twice as big - readable from afar'),
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
       { key = 'bigname', label = 'big trackname', kind = 'cycle', values = { 'off', '1.5', '2' }, desc = 'the track name in its header bigger: x1.5 / x2 (the header grows by it)', get = function() return state.bigname or 'off' end, set = function(v) state.bigname = v; reaper.SetExtState(EXT, 'bigname', v, true); relayout() end },
@@ -16640,7 +16640,7 @@ ctx.acv_key = function(c)
   return false
 end
 -- 30 окт: CONTROL на автоматизации — курсор трекера на огибающей / MIDI-лейне: один большой слайдер значения строки
--- курсора (вбок — значение, Shift мельче); запись при отпускании Opt+Cmd, одним шагом undo
+-- курсора (вбок — значение, Shift мельче); запись при отпускании Ctrl+Opt, одним шагом undo
 ctx.ctl_lane_start = function()
   -- 30 окт: фокус на холсте curve, инструмент draw / line / erase — палец по трекпаду рисует мазок от курсора холста
   local A = ctx.ACV
@@ -16708,7 +16708,7 @@ ctx.ctl_jog = function(SG)
     vim.cur.row = SG.row; vim.ensure_visible()
   end
   if dx ~= 0 then
-    SG.v = math.max(0, math.min(1, SG.v + dx / 300 * (gfx.mouse_cap & 32 == 32 and 0.25 or 1)))
+    SG.v = math.max(0, math.min(1, SG.v + dx / 300))
     SG.map[SG.row] = SG.v; SG.moved = true
   end
   -- оверлей: шаги вокруг курсора столбиками (записанные — янтарём)
@@ -16737,7 +16737,7 @@ ctx.ctl_jog = function(SG)
   end
   local vt = fl.ml and ('%02X'):format(math.floor(SG.v * 127 + 0.5)) or ('%d%%'):format(math.floor(SG.v * 100 + 0.5))
   draw.big_text(bx, by + bh - rh - 2, ('row %04d  %s'):format(SG.row, vt), U.TEXT, Z)
-  state.status = ('-- CONTROL JOG --  %s: up / down - the step, sideways - its value (Ctrl fine); let go - written'):format(name)
+  state.status = ('-- CONTROL JOG --  %s: up / down - the step, sideways - its value; let Ctrl+Opt+Shift go - written'):format(name)
 end
 ctx.ctl_jog_write = function(SG)
   local fl = SG.lane
@@ -16777,7 +16777,7 @@ ctx.ctl_acv = function(SG)
     SG.r, SG.v, SG.moved = r, v, true
   end
   A.row = math.max(g.r0, math.floor(r)); vim.cur.row = A.row; ctx.acv_row_seen = A.row
-  state.status = ('-- CONTROL --  %s with the finger: row %s  %d%%   (Shift fine; let Opt+Cmd go - written)'):format(SG.tool, tostring(r), math.floor(v * 100 + 0.5))
+  state.status = ('-- CONTROL --  %s with the finger: row %s  %d%%   (Shift fine; let Ctrl+Opt go - written)'):format(SG.tool, tostring(r), math.floor(v * 100 + 0.5))
 end
 ctx.ctl_lane = function(SG)
   local fl = SG.lane
@@ -16806,7 +16806,7 @@ ctx.ctl_lane = function(SG)
   U.set(U.AMBER); gfx.rect(bx, by, math.max(1, math.floor(bw * SG.v + 0.5)), bh - rh, 1)
   if fl.ml and fl.ml.kind == 'pb' then U.set(U.TEXT); gfx.rect(bx + math.floor(bw * 64 / 127), by, 1, bh - rh, 1) end   -- центр бенда
   draw.big_text(bx, by + bh - rh + 2, valtxt, U.TEXT, Z)
-  state.status = ('-- CONTROL --  %s row %d: %s   (sideways - value, Shift fine; let Opt+Cmd go - written)'):format(name, SG.row, valtxt)
+  state.status = ('-- CONTROL --  %s row %d: %s   (sideways - value, Shift fine; let Ctrl+Opt go - written)'):format(name, SG.row, valtxt)
 end
 ctx.ctl_lane_write = function(SG)
   local fl = SG.lane
@@ -22383,7 +22383,7 @@ local function frame()
     end
   end
   draw.pc_hits = 0   -- 28 окт: панелей из кэша за кадр (hb)
-  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для CONTROL (Opt+Cmd с 26 окт)
+  draw.slr = {}                                     -- 14 окт: прямоугольники параметров для CONTROL (Ctrl+Opt с 30 окт)
   draw.smk_hot = nil   -- 16 окт: маркер под мышью — заново каждый кадр (draw_wave)
   ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
@@ -24672,8 +24672,11 @@ local function frame()
       end
       ctx.im = nil
     end
-    local sl_pan = gfx.mouse_cap & 52 == 52 and ctx.sl ~= nil and not ctx.cm_gest
-    local sl_raw = (gfx.mouse_cap & 52 == 20 or sl_pan)   -- 26 окт: CONTROL — Opt+Cmd (было Ctrl+Cmd), + Ctrl — пан
+    -- 30 окт: CONTROL — Ctrl+Opt (было Opt+Cmd; жест треков переехал туда), старт — после сдвига мыши > 6 px: клавиши
+    -- Ctrl+Opt+буква не мигают оверлеем; пан из CONTROL убран (будет свой режим); + Shift на автоматизации — JOG
+    local sl_mods = gfx.mouse_cap & 52 == 48 and not ctx.im
+    if sl_mods then ctx.sl_g0 = ctx.sl_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.sl_g0 = nil end
+    local sl_raw = sl_mods and (ctx.sl ~= nil or math.abs(gfx.mouse_x - ctx.sl_g0[1]) + math.abs(gfx.mouse_y - ctx.sl_g0[2]) > 6)
     sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не CONTROL
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
@@ -24778,7 +24781,7 @@ local function frame()
         local n = #SG.list
         local vert = SG.ori == 'v'
         local k = SG.sel or SG.k0 or 1
-        if SG.ori ~= 'xy' and not sl_pan then
+        if SG.ori ~= 'xy' then
           -- от точки нажатия: шаг выбора — доля окна на слайдер (весь трекпад — все n), старт — ближайший
           local pos, pos0, span = vert and SG.mx or SG.my, vert and SG.px0 or SG.py0, vert and gfx.w or gfx.h
           local stepx = math.max(L.rh * 2, span / math.max(1, n) / 2)
@@ -24787,12 +24790,6 @@ local function frame()
         if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
         local cur = SG.list[k]
         local ts = tgts(cur)
-        -- 16 окт: Ctrl+Cmd+Option на фейдере (26 окт: к держимому Opt+Cmd добавить Ctrl) — пан его канала, вбок (значение сразу, без порога)
-        if sl_pan and cur.trk and ts[1] and ts[1].kind == 'trk' then
-          ts = { trk(tcol(cur), 'pan') }
-          if not SG.pan then SG.pan, SG.x0, SG.y0 = true, SG.mx, SG.my end
-          SG.live = true
-        elseif SG.pan then SG.pan = nil; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
         if not SG.live then
           local ax, ay = math.abs(SG.mx - SG.ax), math.abs(SG.my - SG.ay)
           local along, across = vert and ay or ax, vert and ax or ay      -- по оси значения / по оси выбора
@@ -24804,7 +24801,7 @@ local function frame()
           local dx, dy = SG.mx - SG.x0, SG.y0 - SG.my        -- вверх — больше
           SG.x0, SG.y0 = SG.mx, SG.my
           if SG.ori == 'xy' then if dx ~= 0 and ts[1] then nudge(ts[1], dx) end; if dy ~= 0 and ts[2] then nudge(ts[2], dy) end
-          elseif vert and not SG.pan then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end   -- 16 окт: пан — вбок и у фейдеров
+          elseif vert then if dy ~= 0 and ts[1] then nudge(ts[1], dy) end
           elseif dx ~= 0 and ts[1] then nudge(ts[1], dx) end
         end
         -- рамка группы на месте и выбранный слайдер
@@ -24832,11 +24829,11 @@ local function frame()
             gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4 * OZ.z, 1, 1)
             OZ.tx(qx + L.pad, qy + 2, OZ.fit(cur.name or '', sd - 2 * L.pad), U.AMBER)
           end
-          state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Opt+Cmd go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
+          state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Ctrl+Opt go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
           local mapw = vert and gfx.w or math.min(math.floor(gfx.w / (OZ.z == 2 and 2.5 or 3.5)), L.cw * 34 * OZ.z)   -- 27 окт: шире — имена вдвое крупнее
           local maph = vert and math.min(math.floor(gfx.h / (OZ.z == 2 and 2.5 or 4)), 8 * OZ.rh) or gfx.h
-          local how = SG.pan and 'pan - sideways' or ((vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value') .. (cur.trk and ', + Ctrl: pan' or ''))
+          local how = vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value'
           if state.ctlmap ~= false then
           local mx0, my0 = gfx.w - mapw, gfx.h - maph
           U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
@@ -24899,7 +24896,7 @@ local function frame()
           OZ.tx(dx0 + L.pad, dy0 + 1, OZ.fit(desc, dw - 2 * L.pad), U.AMBER)
           OZ.tx(dx0 + L.pad, dy0 + 1 + OZ.rh, OZ.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
           end
-          state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Opt+Cmd go - done)'):format(cur.name or '?', k, n,
+          state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Ctrl+Opt go - done)'):format(cur.name or '?', k, n,
             ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
       else
@@ -24919,41 +24916,14 @@ local function frame()
       elseif ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
     end
-    local gest_raw = gfx.mouse_cap & 48 == 48 and not ctx.im   -- 16 окт: ITEMS, 21 окт: REFORM (Ctrl+Opt+Cmd) — не жест треков
+    local gest_raw = gfx.mouse_cap & 52 == 20 and not ctx.im   -- 30 окт: жест треков — Opt+Cmd (Ctrl+Opt отдан CONTROL), без пан-пэда
     if gest_raw then ctx.cm_g0 = ctx.cm_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.cm_g0 = nil end
     local gest = gest_raw and (ctx.cm_gest ~= nil or math.abs(gfx.mouse_x - ctx.cm_g0[1]) + math.abs(gfx.mouse_y - ctx.cm_g0[2]) > 6)
-    local ctrl = gfx.mouse_cap & 32 == 32 and not gest_raw and not sl_raw and not ctx.im   -- 21 окт: REFORM — без Ctrl-мыши
+    local ctrl = gfx.mouse_cap & 32 == 32 and gfx.mouse_cap & 16 == 0 and not gest_raw and not sl_raw and not ctx.im   -- 21 окт: REFORM — без Ctrl-мыши; 30 окт: Ctrl+Opt — CONTROL
     if gest then
       if CM.latch then local L = CM.release(); if L and L.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
       local cols = snap and snap.cols or {}
       local g0 = ctx.cm_gest
-      local pcol = gfx.mouse_cap & 4 == 4 and g0 and cols[g0.ti]
-      if not pcol then ctx.cm_pp = nil end   -- Cmd отпущен — следующий пан-пэд от новой точки
-      if pcol and reaper.ValidatePtr(pcol.track, 'MediaTrack*') then
-        -- + Cmd (8 окт): трек держится, всё окно — пан-пэд: x — пан / баланс,
-        -- y — ширина (верх широко, середина 0, низ — каналы местами);
-        -- двойной пан — левый / правый расходятся или перекрещиваются
-        local tr = pcol.track
-        local dual = reaper.GetMediaTrackInfo_Value(tr, 'I_PANMODE') == 6
-        -- 11 окт: относительно — от точки нажатия Cmd и текущих значений трека
-        if not (ctx.cm_pp and ctx.cm_pp.tr == tr) then
-          local p0, w0
-          if dual then
-            local l0, r0 = reaper.GetMediaTrackInfo_Value(tr, 'D_DUALPANL'), reaper.GetMediaTrackInfo_Value(tr, 'D_DUALPANR')
-            p0, w0 = (l0 + r0) / 2, (r0 - l0) / 2
-          else p0, w0 = reaper.GetMediaTrackInfo_Value(tr, 'D_PAN'), reaper.GetMediaTrackInfo_Value(tr, 'D_WIDTH') end
-          ctx.cm_pp = { gfx.mouse_x, gfx.mouse_y, p0, w0, tr = tr }
-        end
-        local pn, wd, l, r = CM.panpad_rel(ctx.cm_pp, gfx.mouse_x, gfx.mouse_y, gfx.w, gfx.h)
-        if dual then edit.track_value(tr, 'D_DUALPANL', l); edit.track_value(tr, 'D_DUALPANR', r); pcol.panL, pcol.panR = l, r
-        else edit.track_value(tr, 'D_PAN', pn); edit.track_value(tr, 'D_WIDTH', wd); pcol.pan, pcol.width = pn, wd end   -- 9 окт: снимок — сразу
-        g0.moved, g0.mode, g0.mx, g0.my, g0.ax, g0.ay, g0.dy = true, 'fader', gfx.mouse_x, gfx.mouse_y, 0, 0, 0   -- Cmd отпущен — снова фейдер, без скачка
-        state.kslider = { col = pcol, what = dual and 'panl' or 'pan' }
-        state.status = dual and ('-- PAN PAD --  %s  L %+.0f%%  R %+.0f%%   (up: apart, down: crossed, sideways: balance)'):format(pcol.name or '', l * 100, r * 100)
-          or ('-- PAN PAD --  %s  pan %+.0f%%  width %+.0f%%   (sideways: pan, up: wider, down: narrower / reversed)'):format(pcol.name or '', pn * 100, wd * 100)
-        U.click, U.rclick = false, false
-        goto cm_gest_done
-      end
       local ti0
       if not g0 then
         -- 9 окт: старт — трек под мышью, иначе трек курсора
@@ -24978,10 +24948,9 @@ local function frame()
         state.status = ('-- TRACKS --  %d / %d  %s  %s   (sideways: track, then up / down: its fader; Shift fine)'):format(g.ti, #cols, g.mode == 'fader' and '[fader]' or '[pick]', ctx.cm_io.show(t))
       end
       U.click, U.rclick = false, false
-      ::cm_gest_done::
     elseif ctx.cm_gest then
       if ctx.cm_gest.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: track faders'); model.invalidate() end
-      ctx.cm_gest = nil; ctx.cm_pp = nil
+      ctx.cm_gest = nil
     end
     if gest then
     elseif ctrl and not CM.latch then
