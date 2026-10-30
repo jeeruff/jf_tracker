@@ -13,7 +13,34 @@
 --   write (bool), eval(t) → 0..1, points = { {t, v01} … } (активной), mod = { v = {...} } }.
 -- Без reaper.* — тест tests/test_autocanvas.lua. Записи делает main через ctx.acv_do(op).
 
+local function clamp01(v) return math.max(0, math.min(1, v)) end
 local ACV = { row = 0, anchor = nil, grid = 4, cur = 1, seed = 1 }
+-- 30 окт: инструменты мыши — cur (щелчок ставит курсор), draw (карандаш, d), line (прямая, D), erase (E);
+-- snap (S) — мазок по клеткам сетки, иначе по строкам. Мазок — превью ACV.stroke, запись при отпускании (main)
+ACV.tool, ACV.snap = 'cur', true
+ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'erase', 'erase' } }
+ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { r0, v0, r1, v1 } }
+-- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
+function ACV.at(g, mx, my)
+  local row = g.r0 + (mx - g.gx) / math.max(1, g.gw) * g.nr
+  row = math.max(g.r0, math.min(g.r0 + g.nr - 1, math.floor(row)))
+  if ACV.snap then local st = math.max(1, ACV.grid); row = g.r0 + math.floor((row - g.r0) / st) * st end
+  local v = 1 - (my - g.gy - 2) / math.max(1, g.gh - 4)
+  return row, clamp01(v)
+end
+-- строки мазка между двумя точками (линейно по значению); шаг — клетка сетки при snap, иначе строка
+function ACV.span_rows(ra, va, rb, vb, out, erase)
+  local st = ACV.snap and math.max(1, ACV.grid) or 1
+  if rb < ra then ra, rb, va, vb = rb, ra, vb, va end
+  local n = 0
+  for r = ra, rb, st do
+    local f = rb > ra and (r - ra) / (rb - ra) or 0
+    if erase then out[r] = false else out[r] = va + (vb - va) * f end   -- не «erase and false or …»: and false в Lua проваливается в or
+    n = n + 1
+    if n > 4000 then break end
+  end
+  return out
+end
 local U, ctx, LG
 
 function ACV.init(u, c, lg) U, ctx, LG = u, c, lg end
@@ -24,7 +51,6 @@ ACV.SHAPES = { f = 'flat', r = 'ramp+', R = 'ramp-', s = 'sin', t = 'tri', q = '
 ACV.LFO_SHAPE = { s = 0, q = 1, R = 2, r = 3, t = 4, n = 5 }
 ACV.LFO_NAMES = { [0] = 'sin', 'sqr', 'saw<', 'saw>', 'tri', 'rnd' }
 
-local function clamp01(v) return math.max(0, math.min(1, v)) end
 local function rnd(k, seed)
   local x = math.sin((k + 1) * 12.9898 + seed * 78.233) * 43758.5453
   return x - math.floor(x)
@@ -133,6 +159,11 @@ function ACV.key(c, st, mods)
     return false
   end
   if ch == 'z' then ACV.zpend = true; return true end
+  -- 30 окт: инструменты мыши и привязка
+  if ch == 'd' then ACV.tool = ACV.tool == 'draw' and 'cur' or 'draw'; return true end
+  if ch == 'D' then ACV.tool = ACV.tool == 'line' and 'cur' or 'line'; return true end
+  if ch == 'E' then ACV.tool = ACV.tool == 'erase' and 'cur' or 'erase'; return true end
+  if ch == 'S' then ACV.snap = not ACV.snap; return true end
   if c == 27 then
     if ACV.anchor then ACV.anchor = nil; return true end
     return { op = 'leave' }
@@ -210,9 +241,33 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local function rx(row) return gx + math.floor((row - r0) / nr * gw + 0.5) end
   local function vy(v) return gy + gh - 2 - math.floor(clamp01(v) * (gh - 4) + 0.5) end
   -- заголовок: активная кривая, отрезок, сетка
-  local head = ('%s   %s   grid %s%s'):format(act.name or 'curve', span.label or '', ACV.grid_label(ACV.grid, span.lpb),
+  -- 30 окт: панель инструментов справа в строке заголовка (буквами): cur draw line erase | snap | [ сетка ]
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local hover
+  local tb = {}
+  for _, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1] } end
+  tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap, gap = true }
+  tb[#tb + 1] = { lab = '[', grid = -1, gap = true }
+  tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
+  tb[#tb + 1] = { lab = ']', grid = 1 }
+  local tw = 0
+  for _, b in ipairs(tb) do b.w = U.measure(b.lab) + 2 * pad; tw = tw + b.w + 2 + (b.gap and pad or 0) end
+  local head = ('%s   %s%s'):format(act.name or 'curve', span.label or '',
     ACV.anchor and ('   v %d..%d'):format(math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row)) or '')
-  U.text(x + pad, y + 1, ctx.fit(head, w - 2 * pad), focused and U.AMBER or U.CYAN)
+  local showtb = w - 2 * pad - tw >= U.measure('W') * 12
+  U.text(x + pad, y + 1, ctx.fit(head, w - 2 * pad - (showtb and tw + pad or 0)), focused and U.AMBER or U.CYAN)
+  if showtb then
+    local bx = x + w - pad - tw
+    for _, b in ipairs(tb) do
+      if b.gap then bx = bx + pad end
+      local hot = mx >= bx and mx < bx + b.w and my >= y and my < y + rh - 1
+      if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, y, b.w, rh - 1, 1) end
+      U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, y, b.w, rh - 1, 0)
+      U.text(bx + pad, y, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
+      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid } end
+      bx = bx + b.w + 2
+    end
+  end
   -- поле
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
   -- сетка: клетки тускло, такты ярче; уровни 25 / 50 / 75
@@ -306,6 +361,26 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     local row = span.row_of and span.row_of(p[1]) or r0
     if row >= r0 and row <= r1 then gfx.rect(rx(row) - 1, vy(p[2]) - 1, 3, 3, 1) end
   end
+  -- 30 окт: мазок мыши (draw / line / erase) — превью до отпускания
+  if ACV.stroke then
+    local list = {}
+    for r, v in pairs(ACV.stroke.rows or {}) do list[#list + 1] = r end
+    table.sort(list)
+    local px, py
+    for _, r in ipairs(list) do
+      local v = ACV.stroke.rows[r]
+      if r >= r0 and r < r1 then
+        if v == false then U.set(U.RED, 0.5); gfx.rect(rx(r), gy, math.max(1, rx(r + 1) - rx(r)), gh, 1); gfx.a = 1; px = nil
+        else
+          local yy = vy(v)
+          U.set(U.AMBER)
+          if px then gfx.line(px, py, rx(r), yy) end
+          gfx.rect(rx(r) - 1, yy - 1, 3, 3, 1)
+          px, py = rx(r), yy
+        end
+      end
+    end
+  end
   -- курсор холста: строка янтарём, кружок на активной кривой; плейхед зелёным
   local cx = rx(ACV.row)
   U.set(U.AMBER, focused and 0.9 or 0.5); gfx.rect(cx, gy, 1, gh, 1); gfx.a = 1
@@ -324,8 +399,6 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     gfx.a = 1
   end
   -- легенда: имя и значение в строке курсора; активная янтарём
-  local mx, my = gfx.mouse_x, gfx.mouse_y
-  local hover
   local lx, ly = lay.side and (gx + gw + pad) or (x + pad), lay.side and gy or (y + rh + 1)
   local lw = lay.side and lay.lw or (w - 2 * pad)
   for i, cv in ipairs(curves) do
@@ -350,7 +423,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   end
   if not hover and mx >= gx and mx < gx + gw and my >= gy and my < gy + gh then
     local row = r0 + (mx - gx) / gw * nr
-    hover = { pane = 'curve', curve_t = span.t0 + (span.t1 - span.t0) * (mx - gx) / math.max(1, gw - 1), row = math.floor(row) }
+    hover = { pane = 'curve', curve_t = span.t0 + (span.t1 - span.t0) * (mx - gx) / math.max(1, gw - 1), row = math.floor(row),
+      geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr } }   -- 30 окт: геометрия — для мазка мыши
   end
   return hover
 end

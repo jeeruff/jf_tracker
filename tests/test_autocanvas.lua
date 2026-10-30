@@ -97,5 +97,25 @@ lay = ACV.layout(L, 600, 200, 2)
 gfx.mouse_x, gfx.mouse_y = lay.gx + lay.gw + L.pad + 2, lay.gy + 14 + 2
 hv = ACV.draw(L, 0, 0, 600, 200, curves, span, true)
 eq('legend hover', hv and hv.legend, 2)
+-- 30 окт: инструменты мыши — клавиши, точка холста → строка / значение, мазок по строкам и клеткам
+ACV.tool, ACV.snap, ACV.grid = 'cur', true, 4
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d - draw', ACV.tool, 'draw')
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d again - cur', ACV.tool, 'cur')
+ACV.key(('D'):byte(), { r0 = 0, r1 = 64 }, {}); eq('D - line', ACV.tool, 'line')
+ACV.key(('E'):byte(), { r0 = 0, r1 = 64 }, {}); eq('E - erase', ACV.tool, 'erase')
+ACV.key(('S'):byte(), { r0 = 0, r1 = 64 }, {}); eq('S - snap off', ACV.snap, false)
+local geo = { gx = 100, gy = 10, gw = 160, gh = 104, r0 = 16, nr = 16 }
+local r, v = ACV.at(geo, 100 + 75, 10 + 2)
+eq('x -> row without snap', r, 23); eq('top -> 1', math.abs(v - 1) < 1e-6, true)
+ACV.snap = true
+r = ACV.at(geo, 100 + 75, 60); eq('snap -> grid cell start', r, 20)
+local rows = ACV.span_rows(16, 0, 28, 1, {})
+eq('stroke by cells: 16 20 24 28', rows[16] == 0 and rows[20] and rows[24] and rows[28] == 1 and rows[17] == nil, true)
+ACV.snap = false
+rows = ACV.span_rows(30, 1, 27, 0, {})
+eq('backwards stroke by rows', rows[27] == 0 and rows[30] == 1 and rows[28] ~= nil, true)
+rows = ACV.span_rows(2, 0, 4, 0, {}, true)
+eq('erase marks false', rows[2] == false and rows[3] == false and rows[4] == false, true)
+ACV.tool, ACV.snap = 'cur', true
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

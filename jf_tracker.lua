@@ -16685,6 +16685,33 @@ ctx.acv_do = function(op, sp, curves)
     return
   end
   if act.write == false then vim.msg = 'canvas: this curve is view only'; return end
+  if op.op == 'put' then   -- 30 окт: мазок мыши — строки → значения 0..1 / false (стереть)
+    local lo, hi, n = math.huge, -math.huge, 0
+    for r in pairs(op.rows) do lo = math.min(lo, r); hi = math.max(hi, r); n = n + 1 end
+    local step = ACV.snap and math.max(1, ACV.grid) or 1
+    if act.kind == 'ml' then
+      local map = {}
+      for r, v in pairs(op.rows) do map[r] = v and v * 127 or false end
+      ctx.ml_write(act.f, map, act.f.ml.name .. ' ' .. op.tool)
+    elseif act.kind == 'lfo' or act.kind == 'acs' then vim.msg = 'canvas: this curve is a modulation - draw on its envelope (Tab)'; return
+    else
+      local e = act.e
+      local t2e = act.t2e or function(x) return x end
+      local ta, tb = t2e(sp.time(lo)), t2e(sp.time(hi + step))
+      if op.tool == 'erase' then edit.env_del_range(e, ta, tb)
+      else
+        local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
+        local pts, keys = {}, {}
+        for r in pairs(op.rows) do keys[#keys + 1] = r end
+        table.sort(keys)
+        for _, r in ipairs(keys) do if op.rows[r] then pts[#pts + 1] = { t = t2e(sp.time(r)), v = raw(op.rows[r]), shape = 0 } end end
+        edit.env_put_points(e, ta, tb, pts)
+      end
+    end
+    ctx.acv_cc = nil
+    vim.msg = ('%s: %s, rows %d..%d (%d)'):format(act.name, op.tool, lo, hi, n)
+    return
+  end
   if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127
     local f = act.f
     local cur = act.eval(sp.time(ACV.row)) * 127
@@ -25089,8 +25116,25 @@ local function frame()
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
       if lfo_hover.legend then ctx.ACV.cur = lfo_hover.legend end   -- 15 окт: щелчок по легенде — активная кривая
+      -- 30 окт: панель инструментов холста
+      local A = ctx.ACV
+      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbsnap then A.snap = not A.snap; vim.msg = 'snap (S): ' .. (A.snap and 'the stroke goes by grid cells' or 'off - by rows') end
+      if lfo_hover.tbgrid == -1 or lfo_hover.tbgrid == 1 then ctx.acv_key(lfo_hover.tbgrid < 0 and 91 or 93)
+      elseif lfo_hover.tbgrid == 0 then
+        local items, bar = {}, state.lpb * 4
+        for i, g in ipairs({ 1, 2, 4, 8, 16, 32 }) do
+          if g <= bar then items[#items + 1] = { key = tostring(i), label = A.grid_label(g, state.lpb) .. (A.grid == g and '  *' or ''), fn = function() A.grid = g end } end
+        end
+        vim.open_hydra({ title = 'canvas grid ([ ] - finer / coarser)', items = items })
+      end
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
+        if A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
+          local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
+          ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v }
+          A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') }
+        end
       end
       if lfo_hover.field then
         LG.sel = lfo_hover.field
@@ -27028,6 +27072,22 @@ local function frame()
       b = math.max(0, math.min(L.hs_n - 1, b))
       state.hscroll = L.hs_list[b + 1] or state.hscroll
     else draw.hsb_drag = nil end
+  end
+  if ctx.acv_mdrag then   -- 30 окт: мазок мыши по холсту curve (draw / line / erase)
+    local d, A = ctx.acv_mdrag, ctx.ACV
+    if gfx.mouse_cap & 1 == 1 then
+      local r, v = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+      if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}) }
+      elseif r ~= d.r or math.abs(v - d.v) > 1e-3 then
+        A.span_rows(d.r, d.v, r, v, A.stroke.rows, d.tool == 'erase')
+        d.r, d.v = r, v
+      end
+    else
+      local rows = A.stroke and A.stroke.rows
+      ctx.acv_mdrag = nil
+      if rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = d.tool }) end
+      A.stroke = nil
+    end
   end
   if ctx.mixxydrag then   -- 22 окт: XY микшера — морф громкости и пана всех треков, отпустил — одна отмена
     local d = ctx.mixxydrag
