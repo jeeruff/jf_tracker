@@ -24676,7 +24676,10 @@ local function frame()
     -- Ctrl+Opt+буква не мигают оверлеем; пан из CONTROL убран (будет свой режим); + Shift на автоматизации — JOG
     local sl_mods = gfx.mouse_cap & 52 == 48 and not ctx.im
     if sl_mods then ctx.sl_g0 = ctx.sl_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.sl_g0 = nil end
-    local sl_raw = sl_mods and (ctx.sl ~= nil or math.abs(gfx.mouse_x - ctx.sl_g0[1]) + math.abs(gfx.mouse_y - ctx.sl_g0[2]) > 6)
+    -- JOG (+ Shift, курсор трекера на автоматизации) — сразу, без порога: Ctrl+Opt+Shift клавиш почти нет, без движения не пишет
+    local jog_now = sl_mods and gfx.mouse_cap & 8 == 8 and state.focus == 'tracker' and (function()
+      local f = L and L.flat and L.flat[vim.cur.fi]; return f and ((f.env and f.env.env) or (f.ml and f.ml.kind ~= 'tx')) and true or false end)()
+    local sl_raw = sl_mods and (ctx.sl ~= nil or jog_now or math.abs(gfx.mouse_x - ctx.sl_g0[1]) + math.abs(gfx.mouse_y - ctx.sl_g0[2]) > 6)
     sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не CONTROL
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
