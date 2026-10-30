@@ -7846,7 +7846,7 @@ function D.frame(L, snap, rows, state, info)
           -- указатель — яркая точка на краю (9 окт, вместо линии)
           local pcol = U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7)
           local pr = math.max(1, math.floor(r / 5))   -- 30 окт: шарик чуть меньше (было r / 4)
-          local rr = r - pr - 1
+          local rr = r - pr - 3   -- 30 окт: на 2 px ближе к центру
           set(pcol)
           gfx.circle(cx + math.floor(math.sin(a) * rr + 0.5), cy - math.floor(math.cos(a) * rr + 0.5), pr, 1, 0)
           if val and kx + 2 * r + 1 + L.pad + ms(val) <= sx + fx_w then text(kx + 2 * r + 1 + L.pad, ky + math.floor((2 * r + 1 - L.th) / 2), val, U.GREY) end
