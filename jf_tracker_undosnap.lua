@@ -49,6 +49,16 @@ function US.restore(UT, data, label)
     elseif p[1] == 'K' then marks = p[2]
     elseif p[1] == 'P' then tempo = p[2] end
   end
+  -- 30 окт: карта темпа — первой. Позиции в chunk'ах и маркерах — секунды по карте снимка; при тайм-базе «доли»
+  -- REAPER сам двигает айтемы и регионы на каждой смене темпа — восстановленные до неё съезжали с долей
+  if tempo then
+    for k = R.CountTempoTimeSigMarkers(0) - 1, 0, -1 do R.DeleteTempoTimeSigMarker(0, k) end
+    for _, l in ipairs(lines(tempo)) do
+      local tp, bpm, num, den, lin = l:match('^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$')
+      if tp then R.SetTempoTimeSigMarker(0, -1, tonumber(tp), -1, -1, tonumber(bpm), tonumber(num), tonumber(den), lin == '1') end
+    end
+    R.UpdateTimeline()
+  end
   -- треки: лишние — прочь, недостающие — вставить, порядок — как в снимке, chunk — из снимка
   local keep = {}
   for _, w in ipairs(want) do keep[w.guid] = true end
@@ -77,14 +87,6 @@ function US.restore(UT, data, label)
       local isr, pos, rend, idx, col, name = l:match('^(%d)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t(.*)$')
       if isr then R.AddProjectMarker2(0, isr == '1', tonumber(pos), tonumber(rend), name, tonumber(idx), tonumber(col)) end
     end
-  end
-  if tempo then
-    for k = R.CountTempoTimeSigMarkers(0) - 1, 0, -1 do R.DeleteTempoTimeSigMarker(0, k) end
-    for _, l in ipairs(lines(tempo)) do
-      local tp, bpm, num, den, lin = l:match('^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$')
-      if tp then R.SetTempoTimeSigMarker(0, -1, tonumber(tp), -1, -1, tonumber(bpm), tonumber(num), tonumber(den), lin == '1') end
-    end
-    R.UpdateTimeline()
   end
   R.PreventUIRefresh(-1)
   R.TrackList_AdjustWindows(false)
