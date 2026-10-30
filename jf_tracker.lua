@@ -31191,6 +31191,19 @@ ctx.merge_cols = function(col, lane)
   model.invalidate(); ctx.relayout()
   vim.msg = ('%s: one column - %d note(s) removed, %d shortened (u - undo)'):format(col.name, #del, #cut)
 end
+-- 30 окт: :eu — Евклид на треке курсора: нота строки курсора (иначе C-4), до конца паттерна (нет — n строк)
+ctx.euclid_here = function(k, n, r)
+  local f = L and L.flat[vim.cur.fi]
+  if not (f and f.col and f.col.track and not f.env) then vim.msg = ':eu: put the cursor on a track'; return end
+  n = n or 16
+  local c = f.sub and f.sub[vim.cur.row]
+  local h = c and (c.kind == 'cont' and c.of or c)
+  local pitch = (h and h.pitch) or model.BASE_NOTE
+  local _, r1 = ctx.region_rows()
+  local it = edit.euclid_loop(f.col.track, f.col.fixed and f.lane and f.lane.idx or nil, state.lpb, vim.cur.row, n, k, r or 0, pitch, vim.vel or 100, r1 and (r1 + 1) or nil)
+  model.invalidate()
+  vim.msg = it and ('euclid %d/%d%s: %s, looped to the pattern end (u - undo)'):format(k, n, (r and r ~= 0) and (' r' .. r) or '', model.note_name(pitch)) or 'euclid: could not make the item'
+end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end

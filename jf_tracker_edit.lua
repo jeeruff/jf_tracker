@@ -1569,6 +1569,34 @@ local function midi_item_at(track, lane_idx, t)
   return nil
 end
 
+-- 30 окт: Евклид геометрией айтема — новый MIDI-айтем на n строк от row: k нот (Бьёрклунд, ротация r), источник
+-- зациклен (B_LOOPSRC) и айтем протянут до stop_row — повторы играет REAPER, скрипт в игре не нужен
+function E.euclid_loop(track, lane_idx, lpb, row, n, k, r, pitch, vel, stop_row)
+  n = math.max(1, math.floor(n)); k = math.max(0, math.min(n, math.floor(k)))
+  local t0, tn = row_time(row, lpb, 0), row_time(row + n, lpb, 0)
+  local t1 = row_time(math.max(row + n, stop_row or (row + n)), lpb, 0)
+  local made
+  run(('euclid %d/%d'):format(k, n), function()
+    local it = R.CreateNewMIDIItemInProj(track, t0, tn, false)
+    if not it then return end
+    if lane_idx then R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane_idx) end
+    local tk = R.GetActiveTake(it)
+    for i = 0, n - 1 do
+      local hit = ((((i + (r or 0)) % n) * k) % n) < k
+      if hit then
+        local a = R.MIDI_GetPPQPosFromProjTime(tk, row_time(row + i, lpb, 0))
+        local b = R.MIDI_GetPPQPosFromProjTime(tk, row_time(row + i + 1, lpb, 0))
+        R.MIDI_InsertNote(tk, false, false, a, math.max(a + 1, b - 1), 0, math.max(0, math.min(127, pitch or 60)), math.max(1, math.min(127, vel or 100)), true)
+      end
+    end
+    R.MIDI_Sort(tk)
+    R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', ('e%d/%d%s'):format(k, n, (r or 0) ~= 0 and (' r' .. r) or ''), true)
+    R.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 1)
+    R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
+    made = it
+  end)
+  return made
+end
 -- новый MIDI-item от строки row на bars тактов (по размеру такта в этой точке)
 local function new_midi_item(track, lane_idx, t)
   local qn = R.TimeMap2_timeToQN(0, t)
