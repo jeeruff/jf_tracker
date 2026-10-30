@@ -31204,6 +31204,81 @@ ctx.euclid_here = function(k, n, r)
   model.invalidate()
   vim.msg = it and ('euclid %d/%d%s: %s, looped to the pattern end (u - undo)'):format(k, n, (r and r ~= 0) and (' r' .. r) or '', model.note_name(pitch)) or 'euclid: could not make the item'
 end
+-- 30 окт: ручной Евклид / полиметр геометрией айтема (без :eu):
+-- tg — все айтемы трека курсора в паттерне курсора — в один (Glue REAPER: MIDI — один MIDI-айтем, аудио — файл);
+-- t} — строка курсора = конец лупа: источник айтема кончается здесь, айтем зациклен и тянется до конца паттерна;
+-- t+ / t- — rate айтема под курсором ×2 / ÷2 (длина айтема на сетке остаётся, повторов больше / меньше)
+ctx.item_under = function()
+  local f = L and L.flat[vim.cur.fi]
+  if not (f and f.col and f.col.track) then return nil end
+  local t = edit.row_time(vim.cur.row, state.lpb, 0) + 1e-6
+  for i = 0, reaper.CountTrackMediaItems(f.col.track) - 1 do
+    local it = reaper.GetTrackMediaItem(f.col.track, i)
+    local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    if t >= p and t < p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') then return it, f end
+  end
+  return nil, f
+end
+ctx.item_glue = function()
+  local f = L and L.flat[vim.cur.fi]
+  if not (f and f.col and f.col.track) then vim.msg = 'tg: put the cursor on a track'; return end
+  local _, _, rg = ctx.region_rows()
+  if not rg then vim.msg = 'tg: no pattern here'; return end
+  local tr, n = f.col.track, 0
+  edit.run('glue track in pattern', function()
+    reaper.SelectAllMediaItems(0, false)
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, i)
+      local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      if p >= rg.pos - 1e-6 and p < rg.rgnend - 1e-6 then reaper.SetMediaItemSelected(it, true); n = n + 1 end
+    end
+    if n > 0 then reaper.Main_OnCommand(41588, 0) end   -- Item: Glue items
+    reaper.SelectAllMediaItems(0, false)
+  end)
+  model.invalidate()
+  vim.msg = n > 0 and ('tg: %d item(s) of %s glued into one (pattern %s)'):format(n, f.col.name or 'track', tostring(rg.idx or '')) or 'tg: no items of this track in the pattern'
+end
+ctx.item_loop_end = function()
+  local it = ctx.item_under()
+  if not it then vim.msg = 't}: no item under the cursor'; return end
+  local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local te = edit.row_time(vim.cur.row, state.lpb, 0)
+  if te <= p + 1e-6 then vim.msg = 't}: the loop end must be after the item start'; return end
+  local _, r1 = ctx.region_rows()
+  local stop = r1 and edit.row_time(r1 + 1, state.lpb, 0) or (p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'))
+  local tk = reaper.GetActiveTake(it)
+  edit.run('loop end', function()
+    if tk and reaper.TakeIsMIDI(tk) and reaper.MIDI_SetItemExtents then
+      reaper.MIDI_SetItemExtents(it, reaper.TimeMap2_timeToQN(0, p), reaper.TimeMap2_timeToQN(0, te))   -- источник = до строки
+    elseif tk then
+      -- аудио: кусок до строки склеивается в свой файл (Glue) — он и становится источником лупа
+      reaper.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 0)
+      reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', te - p)
+      reaper.SelectAllMediaItems(0, false); reaper.SetMediaItemSelected(it, true)
+      reaper.Main_OnCommand(41588, 0)   -- Item: Glue items
+      it = reaper.GetSelectedMediaItem(0, 0) or it
+      reaper.SelectAllMediaItems(0, false)
+    end
+    reaper.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 1)
+    reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', math.max(te - p, stop - p))
+  end)
+  model.invalidate()
+  vim.msg = ('t}: loop of %d row(s), repeats to the pattern end (u - undo)'):format(math.floor(model.row_of_time(te, state.lpb) - model.row_of_time(p, state.lpb) + 0.5))
+end
+ctx.item_rate = function(k)
+  local it = ctx.item_under()
+  if not it then vim.msg = 't+ / t-: no item under the cursor'; return end
+  local tk = reaper.GetActiveTake(it)
+  if not tk then return end
+  local r = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * k
+  r = math.max(1 / 16, math.min(16, r))
+  edit.run('item rate', function()
+    reaper.SetMediaItemInfo_Value(it, 'B_LOOPSRC', 1)
+    reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', r)
+  end)
+  model.invalidate()
+  vim.msg = ('item rate x%s (t+ x2, t- /2; audio: the pitch moves too unless preserve pitch)'):format((r >= 1 and ('%g'):format(r)) or ('1/%g'):format(1 / r))
+end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end
