@@ -26801,6 +26801,10 @@ local function frame()
         local have = { d.e.snaps[1] ~= nil, d.e.snaps[2] ~= nil, d.e.snaps[3] ~= nil, d.e.snaps[4] ~= nil }
         ctx.mixxy_apply(ctx.SN.blend(d.e.snaps, ctx.SN.weights(x, y, have), d.keys), d.last)
         d.moved = true
+        -- 30 окт: фейдеры микшера рисуются из снимка модели — пересобрать на ходу (~20 раз в секунду), иначе они
+        -- вставали на место только после отпускания
+        local now = reaper.time_precise()
+        if now - (d.inv or 0) > 0.05 then d.inv = now; model.invalidate() end
       end
       state.status = ('mixer XY: morph %d values  x %.2f  y %.2f'):format(#d.keys, x, y)
     else
