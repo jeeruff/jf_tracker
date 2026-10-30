@@ -5439,6 +5439,31 @@ ctx = {
       end
     end
   end,
+  -- 30 окт: несколько строк лейна одним шагом undo: map[row] = 0..127 или false (убрать) — холст curve
+  ml_write = function(f, map, label)
+    local tr, ml = f.col.track, f.ml
+    local n = 0
+    edit.run(label or (ml.name .. ' values'), function()
+      for row, v in pairs(map) do
+        local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
+        local tk = ctx.ml_take(tr, t0)
+        if tk then
+          local p0, p1 = reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1)
+          ctx.ml_clear(tk, ml, p0, p1)
+          if v then
+            v = math.max(0, math.min(127, math.floor(v + 0.5)))
+            if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
+            elseif ml.kind == 'pb' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xE0, 0, 0, v)
+            else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
+          end
+          reaper.MIDI_Sort(tk)
+          n = n + 1
+        end
+      end
+    end)
+    model.invalidate()
+    return n
+  end,
   ml_set = function(f, row, v)
     local tr = f.col.track
     local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
@@ -16472,7 +16497,7 @@ ctx.acv_curves = function(sp)
   local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
   local tgt = ctx.lfo_target()
   local col = cur_col()
-  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0)
+  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0) .. ':' .. tostring(sp and sp.t1) .. ':' .. tostring(vim.cur.fi)
   if ctx.acv_cc and ctx.acv_cc.key == key then return ctx.acv_cc.list end
   local list, seen = {}, {}
   local PAL = { U.CYAN, U.AMBER, U.RED, U.TEXT }
@@ -16494,6 +16519,23 @@ ctx.acv_curves = function(sp)
     list[i] = { kind = 'env', e = e, env = e.env, name = name, rgb = rgb, write = write ~= false,
       track = reaper.Envelope_GetParentTrack and reaper.Envelope_GetParentTrack(e.env) or nil,
       eval = function(t) return edit.env_value(e, t) end, points = pts }
+  end
+  -- 30 окт: курсор на MIDI-лейне (PB / CC / PC) — первой кривой он сам, в отрезке proj / sec / pat; клавиши пишут в лейн
+  local fl = L and L.flat and L.flat[vim.cur.fi]
+  if fl and fl.ml and fl.col and fl.ml.kind ~= 'tx' and sp then
+    local ml = fl.ml
+    local rows = ml.rows or {}
+    local pts = {}
+    for _, r in ipairs(rows) do if r >= sp.r0 and r < sp.r1 and ml.ev[r] then pts[#pts + 1] = { sp.time(r), (ml.ev[r].v or 0) / 127 } end end
+    local rest = ml.kind == 'pb' and 64 / 127 or 0
+    list[1] = { kind = 'ml', f = fl, name = (fl.col.name or '') .. ' / ' .. (ml.name or 'lane'), rgb = U.CYAN, write = true, points = pts,
+      track = fl.col.track,
+      eval = function(t)
+        local r = sp.row_of(t)
+        local v
+        for _, rr in ipairs(rows) do if rr <= r + 1e-6 then v = ml.ev[rr] and ml.ev[rr].v else break end end
+        return v and v / 127 or rest
+      end }
   end
   if tgt and tgt.e then add(tgt.e, tgt.label or (tgt.e.name or 'envelope')) end
   if col then
@@ -16643,6 +16685,31 @@ ctx.acv_do = function(op, sp, curves)
     return
   end
   if act.write == false then vim.msg = 'canvas: this curve is view only'; return end
+  if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127
+    local f = act.f
+    local cur = act.eval(sp.time(ACV.row)) * 127
+    local map, what = {}, nil
+    if op.op == 'nudge' then map[ACV.row] = cur + op.d * 127; what = 'nudge'
+    elseif op.op == 'level' then map[ACV.row] = op.v * 127; what = 'level'
+    elseif op.op == 'del' then
+      local a, b = ACV.row, ACV.row + 1
+      if ACV.anchor then a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }); ACV.anchor = nil end
+      for r = a, b - 1 do map[r] = false end
+      what = ('rows %d..%d cleared'):format(a, b - 1)
+    elseif op.op == 'fill' then
+      local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }, true)
+      local level = cur / 127
+      if level < 0.02 then level = 1 end
+      if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end
+      for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do if p.row < b then map[p.row] = p.v * 127 end end
+      ACV.anchor = nil
+      what = ('%s on rows %d..%d'):format(op.shape, a, b - 1)
+    else return end
+    ctx.ml_write(f, map, f.ml.name .. ' curve')
+    ctx.acv_cc = nil
+    vim.msg = ('%s: %s at row %d'):format(act.name, what, ACV.row)
+    return
+  end
   local e = act.e
   local t2e = act.t2e or function(x) return x end        -- огибающая take — время take
   local rowdur = math.max(1e-4, t2e(sp.time(ACV.row + 1)) - t2e(sp.time(ACV.row)))
