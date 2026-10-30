@@ -11752,7 +11752,10 @@ ctx = {
   hdr_pick = function(kind, col, k, dbl)
     for i, f in ipairs(L.flat or {}) do if f.col == col then vim.cur.fi = i; break end end
     if kind == 'fx' then
-      state.dsp = true; dsp_sel.fx = k; relayout()
+      state.dsp = true; dsp_sel.fx = k
+      -- 30 окт: панель DSP — вперёд (вкладка в стопке) или показать, если её нет на экране
+      if state.panes and state.panes_ui and not draw.panes.set_active(state.panes, 'dsp') then draw.panes.show(state.panes, 'dsp') end
+      relayout()
       if dbl and col.fx[k] then edit.fx_show(col.track, col.fx[k].i) end
       vim.msg = (col.name or '') .. ': ' .. ((col.fx[k] or {}).name or '')
     elseif kind == 'inst' then
@@ -24766,8 +24769,9 @@ local function frame()
     local kind = hover.hdrfx and 'fx' or (hover.hdrinst and 'inst' or 'send')
     local now3 = reaper.time_precise()
     local lc = ctx.hdr_last
-    local dbl = lc and lc.kind == kind and lc.col == h2.col and lc.k == h2.k and now3 - lc.t < 0.35
-    ctx.hdr_last = { kind = kind, col = h2.col, k = h2.k, t = now3 }
+    -- 30 окт: трек — по GUID: клик выбирает эффект в DSP, модель пересобирается, колонка — уже другая таблица
+    local dbl = lc and lc.kind == kind and h2.col and lc.guid == h2.col.guid and lc.k == h2.k and now3 - lc.t < 0.35
+    ctx.hdr_last = { kind = kind, col = h2.col, guid = h2.col and h2.col.guid, k = h2.k, t = now3 }
     ctx.hdr_pick(kind, h2.col, h2.k, dbl)   -- 8 окт: клик — выбрать эффект в DSP, двойной — нативное окно (и с param тоже)
     -- 9 окт: вставку можно протянуть на другой трек (как блоки DSP)
     if kind == 'fx' and h2.it and h2.it.i and h2.col then
