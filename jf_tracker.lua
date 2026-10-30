@@ -4537,6 +4537,17 @@ ctx = {
         if not seen[r] then seen[r] = true; rows_[#rows_ + 1] = r end
       end
     end
+    -- 30 окт: темп мастера — и смены карты темпа (TimeMap), как их показывает колонка: w / b ходят по ним
+    if (e.name or ''):lower():find('tempo', 1, true) and reaper.TimeMap2_GetNextChangeTime then
+      local t, n = 0, 0
+      while n < 4096 do
+        local c = reaper.TimeMap2_GetNextChangeTime(0, t)
+        if not c or c < 0 or c <= t - 1e-9 then break end
+        local r = math.floor(model.row_of_time(c, state.lpb) + 1e-6)
+        if not seen[r] then seen[r] = true; rows_[#rows_ + 1] = r end
+        t, n = c + 1e-6, n + 1
+      end
+    end
     table.sort(rows_)
     env_rows_cache[e.env] = { snap = snap, lpb = state.lpb, rows = rows_ }
     return rows_
