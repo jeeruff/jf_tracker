@@ -2168,7 +2168,7 @@ ctx = {
     if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then return nil end
     local now = reaper.time_precise()
     local c = ctx.msn_c
-    if c and now - c.t < 0.5 then c.tab = state.mixsnap_tab or 'list'; c.xy = ctx.mixxy_info(); return c end
+    if c and now - c.t < 0.5 then c.xy = ctx.mixxy_info(); return c end
     c = { t = now, rows = ctx.msn_rows(), tog = {}, opt = {}, prompt = state.msn_prompt }
     local _, cur = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnapcur')
     c.cur = tonumber(cur)
@@ -2180,13 +2180,12 @@ ctx = {
     elseif T.VIS and not (T.PAN or T.VOL or T.MUTE or T.FX or T.SOLO or T.SEND or T.TOGSEL) then c.mode = 'vis'
     else c.mode = 'custom' end
     if state.msn_custom then c.mode = 'custom' end
-    c.tab = state.mixsnap_tab or 'list'
     c.xy = ctx.mixxy_info()
     ctx.msn_c = c
     return c
   end,
   msn_cmd = function(k) local id = reaper.NamedCommandLookup('_SWSSNAPSHOT_' .. k); if id ~= 0 then reaper.Main_OnCommand(id, 0) end; ctx.msn_c = nil end,
-  -- what: new / recall / save / del / prev / next / up / down / mode / tog / opt / prompt / win / tab
+  -- what: new / recall / save / del / prev / next / up / down / mode / tog / opt / prompt / win / filtermenu / xyc
   mixsnap_do = function(what, arg)
     if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then vim.msg = 'snapshots need SWS'; return end
     local rows = ctx.msn_rows()
@@ -2248,8 +2247,11 @@ ctx = {
       for _, t in ipairs(ctx.MSN_OPT) do items[#items + 1] = { key = ok2[t[1]], label = (inf.opt[t[1]] and '[x] ' or '[ ] ') .. t[2], fn = function() ctx.mixsnap_do('opt', t[1]) end } end
       items[#items + 1] = { key = 'n', label = (state.msn_prompt and '[x] ' or '[ ] ') .. 'prompt for name', fn = function() ctx.mixsnap_do('prompt') end }
       vim.open_hydra({ title = 'snapshots filter (SWS)', items = items })
-    elseif what == 'tab' then state.mixsnap_tab = arg; ctx.msn_c = nil
-    elseif what == 'xyc' then if ctx.mods().shift or not (ctx.mixxy_of().snaps[arg]) then ctx.mixxy_save(arg) else ctx.mixxy_recall(arg) end
+    elseif what == 'xyc' then
+      local e = ctx.mixxy_of()
+      if ctx.mods().shift then ctx.mixxy_save(arg); e.from[arg] = nil; ctx.mixxy_src_write(e)
+      elseif not e.snaps[arg] then ctx.mixxy_menu(arg)   -- 30 окт: пустой угол — меню: микшер сейчас или снапшот из списка
+      else ctx.mixxy_recall(arg) end
     end
   end,
   msn_name = function(text)
@@ -2263,13 +2265,50 @@ ctx = {
   mixxy_of = function()
     if not ctx.mixxy then
       local _, str = reaper.GetProjExtState(0, 'jf_tracker', 'mixxy')
-      ctx.mixxy = { snaps = ctx.SN.parse(str), x = 0.5, y = 0.5 }
+      local _, src = reaper.GetProjExtState(0, 'jf_tracker', 'mixxysrc')
+      local from = {}
+      for i, sl in (src or ''):gmatch('(%d)=(%d+)') do from[tonumber(i)] = tonumber(sl) end
+      ctx.mixxy = { snaps = ctx.SN.parse(str), x = 0.5, y = 0.5, from = from }
     end
     return ctx.mixxy
   end,
   mixxy_info = function()
     local e = ctx.mixxy_of()
-    return { has = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }, x = e.x, y = e.y, drag = ctx.mixxydrag ~= nil }
+    return { has = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }, from = e.from, x = e.x, y = e.y, drag = ctx.mixxydrag ~= nil }
+  end,
+  -- 30 окт: угол = снапшот SWS из списка: вызвать его (микшер становится им) и снять громкость / пан в угол; номер
+  -- снапшота — подпись угла (ProjExtState mixxysrc «угол=слот»). Морф — по громкости и пану, как у углов
+  mixxy_src_write = function(e)
+    local t = {}
+    for i = 1, 4 do if e.from[i] then t[#t + 1] = i .. '=' .. e.from[i] end end
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixxysrc', table.concat(t, ';'))
+  end,
+  mixxy_from_snap = function(i, r)
+    ctx.msn_cmd('GET' .. r.slot)
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixsnapcur', tostring(r.slot))
+    local e = ctx.mixxy_of()
+    ctx.mixxy_save(i)
+    e.from[i] = r.slot; ctx.mixxy_src_write(e)
+    e.x, e.y = (i == 2 or i == 4) and 1 or 0, (i == 3 or i == 4) and 1 or 0
+    ctx.msn_c = nil; model.invalidate()
+    vim.msg = ('mixer XY corner %d = snapshot %d: %s (volume and pan)'):format(i, r.slot, r.name)
+  end,
+  mixxy_clear = function(i)
+    local e = ctx.mixxy_of()
+    e.snaps[i] = nil; e.from[i] = nil
+    reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser(e.snaps)); ctx.mixxy_src_write(e)
+    ctx.msn_c = nil; vim.msg = ('mixer XY corner %d cleared'):format(i)
+  end,
+  mixxy_menu = function(i)
+    local e = ctx.mixxy_of()
+    local items = { { key = 's', label = (e.snaps[i] and 'overwrite' or 'save') .. ' with the mix now (Shift+click)', fn = function() ctx.mixxy_save(i); e.from[i] = nil; ctx.mixxy_src_write(e) end } }
+    if e.snaps[i] then items[#items + 1] = { key = 'x', label = 'clear', fn = function() ctx.mixxy_clear(i) end } end
+    local keys = 'abcdefghijkl'
+    for k, r in ipairs(ctx.msn_rows()) do
+      if k > #keys then break end
+      items[#items + 1] = { key = keys:sub(k, k), label = ('snapshot %d: %s'):format(r.slot, r.name), fn = function() ctx.mixxy_from_snap(i, r) end }
+    end
+    vim.open_hydra({ title = 'mixer XY corner ' .. i, items = items })
   end,
   mixxy_grab = function()
     local s = {}
@@ -2300,7 +2339,8 @@ ctx = {
     local e = ctx.mixxy_of()
     e.snaps[i] = ctx.mixxy_grab()
     reaper.SetProjExtState(0, 'jf_tracker', 'mixxy', ctx.SN.ser(e.snaps))
-    vim.msg = ('mixer XY corner %d saved (volume and pan of every track; Shift+click - overwrite)'):format(i)
+    ctx.msn_c = nil
+    vim.msg = ('mixer XY corner %d saved (volume and pan of every track; Shift+click - overwrite, right click - a snapshot)'):format(i)
   end,
   mixxy_recall = function(i)
     local e = ctx.mixxy_of()
@@ -23460,6 +23500,8 @@ local function frame()
       or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
+  elseif hover.mixsnap and hover.mixsnap.what == 'xyc' then state.status = 'XY corner: click - recall (empty - menu), Shift+click - save the mix now, right click - a snapshot from the list or clear'
+  elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph volume and pan between the corners (one undo)'
   elseif hover.sample and hover.sample.sbtn == 'snap' then state.status = 'snap (S): selection edges, slice markers and the slice zone stick to transients and slice markers (within 8 px)'
   elseif hover.sample and SL.ap_hot then state.status = 'spam: when you move a slice line and let go, that slice plays by itself; while dragging, a short roll at the edge (like SP-404)'
   elseif hover.sample and hover.sample.sbtn then state.status = ({ follow = 'follow: a slice you play on the keyboard (or MIDI) becomes the selected one - the list, the wave and the zoom jump to it', pthru = 'playthru: a slice plays on to the end of the item, not just to its own end', mono = 'mono: a new note cuts the previous one on this track (poly when off)', quant = 'smart quantize: loud transients to beats, soft to 16ths, length to whole bars / beats - stretch markers, one undo (Q, :quantize)', autotrim = 'autotrim: cut the silence at the start and the end (-48 dB from the peak; z) - all notes of this instrument, one undo', eq2 = 'slice into 2 equal parts', eq4 = '4 equal parts', eq8 = '8 equal parts', eq16 = '16 equal parts', eq32 = '32 equal parts', eq64 = '64 equal parts', trans = 'transients (s t): cuts the sample at every detected hit at once - the cyan lines become slices; the - + buttons: fewer / more hits, x clears', ['sens-'] = 'fewer transients: only the strong hits; the slices follow', ['sens+'] = 'more transients', clear = 'remove all slices (x)', smkall = 'stretch: a stretch marker on every slice boundary of the item (and its edges) - then each hit can be pulled to the grid on its own (smk / squant), one undo', slq = 'q: where the next slice starts when you play slices - off (right after the last one), a row, 2 rows, a beat or a bar', snap = 'snap: slice lines stick to transients and the existing slices while you drag them', trim = 'trim: cut the silence at the start / end of the sample', scram = 'scramble: the slice notes of this track in the cursor region (or the VISUAL selection) swap their slices randomly - positions stay, one undo (:scramble)' })[hover.sample.sbtn] or hover.sample.sbtn
@@ -26446,6 +26488,8 @@ local function frame()
     state.kc_scale = 0; vim.msg = 'keycaster: default size'
   elseif U.rclick and hover.trkmod and (hover.trkmod.what == 'row' or hover.trkmod.what == 'pk' or hover.trkmod.what == 'cv') then   -- pk: меню длины подката, cv: убрать точку кривой
     ctx.trkmod_do(hover.trkmod, true); U.rclick = false
+  elseif U.rclick and hover.mixsnap and hover.mixsnap.what == 'xyc' then   -- 30 окт: угол XY — снапшот из списка
+    ctx.mixxy_menu(hover.mixsnap.arg); U.rclick = false
   elseif U.rclick and hover.mixsnap and hover.mixsnap.what == 'row' then
     local i = hover.mixsnap.i
     local r = ctx.msn_rows()[i]

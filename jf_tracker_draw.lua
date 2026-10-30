@@ -5496,9 +5496,7 @@ function D.draw_mixsnaps(L, info, hover)
   if not x1 then return end
   local y0, h = L.mix_y + 3, L.mix_h - 6
   local x, w = x0 + L.pad, x1 - x0 - 2 * L.pad
-  -- 26 окт: узко (united stepruler сужает место слева от полос) — вкладка «snap» вместо «snapshots»
-  local narrow = w < ms('snapshots xy') + 6 * L.pad
-  if w < ms('snap xy') + 6 * L.pad or h < 3 * L.rh then return end
+  if w < ms('new prev') + 6 * L.pad or h < 3 * L.rh then return end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local rh = L.rh
   local function btn(bx, by, label, on, sel, h2)
@@ -5520,20 +5518,13 @@ function D.draw_mixsnaps(L, info, hover)
     if hot then hover.mixsnap = h2 end
     hint('mixsnap', bx, by, bw, rh, h2)
   end
-  local yy = y0
-  -- вкладки
-  local tx = x
-  for _, t in ipairs({ { narrow and 'snap' or 'snapshots', 'list' }, { 'xy', 'xy' } }) do
-    tx = tx + btn(tx, yy, t[1], false, ms0.tab == t[2], { what = 'tab', arg = t[2] }) + 2
-  end
-  set(U.LINE); gfx.rect(x, yy + rh, w, 1, 1)   -- 23 окт: вкладки отделены полоской от кнопок
-  yy = yy + rh + 3
-  if ms0.tab == 'xy' then
-    local xy = ms0.xy or { has = {} }
-    local side = math.max(4 * rh, math.min(w, y0 + h - yy - 4))
-    if yy + side > y0 + h + 1 then return end
-    local px0, py0 = x + math.floor((w - side) / 2), yy + 2
-    local cbw = ms('4') + 2 * L.pad
+  -- 30 окт: XY — под списком (вкладки xy больше нет: одно место); угол — снапшот из списка (правый клик) или микшер сейчас
+  local function xypad(py0, side)
+    local xy = ms0.xy or { has = {}, from = {} }
+    local px0 = x + math.floor((w - side) / 2)
+    local function lab(i) return (xy.from or {})[i] and (i .. ':' .. xy.from[i]) or tostring(i) end
+    local cbw = 0
+    for i = 1, 4 do cbw = math.max(cbw, ms(lab(i)) + 2 * L.pad) end
     local onpad = mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side
     set(U.BG); gfx.rect(px0, py0, side, side, 1)
     set(onpad and U.AMBER or U.LINE); gfx.rect(px0, py0, side, side, 0)
@@ -5542,7 +5533,7 @@ function D.draw_mixsnaps(L, info, hover)
     local oncorner
     for i, c in ipairs(corners) do
       local hot = mx >= c[1] and mx < c[1] + cbw and my >= c[2] and my < c[2] + rh - 1
-      btn(c[1], c[2], tostring(i), xy.has[i], false, { what = 'xyc', arg = i })
+      btn(c[1], c[2], lab(i), xy.has[i], false, { what = 'xyc', arg = i })
       if hot then oncorner = true end
     end
     local n = 0; for i = 1, 4 do if xy.has[i] then n = n + 1 end end
@@ -5550,12 +5541,12 @@ function D.draw_mixsnaps(L, info, hover)
       local cx, cy = px0 + math.floor((xy.x or 0.5) * (side - 1)), py0 + math.floor((xy.y or 0.5) * (side - 1))
       set(xy.drag and U.AMBER or U.CYAN)
       for d = 0, 4 do gfx.rect(cx - d, cy - 4 + d, 2 * d + 1, 1, 1); gfx.rect(cx - d, cy + 4 - d, 2 * d + 1, 1, 1) end
-    elseif side > ms('corners: save') + 2 * cbw then
-      text(px0 + math.floor((side - ms('corners: save')) / 2), py0 + math.floor(side / 2) - rh, 'corners: save', U.DIM)
+    elseif side >= ms('xy: corners') + 2 * L.pad and side >= 3 * rh then
+      text(px0 + math.floor((side - ms('xy: corners')) / 2), py0 + math.floor((side - rh) / 2), 'xy: corners', U.DIM)
     end
     if onpad and not oncorner then hover.mixsnap = { what = 'xypad', x0 = px0, y0 = py0, side = side } end
-    return
   end
+  local yy = y0
   -- кнопки: new prev next up down sws (+ filter, если блок фильтра не влезает)
   local FB = (1 + 3 + 4 + 5) * rh + 4                           -- блок фильтра: заголовок, 3 режима, 4 строки галочек, 5 опций
   local inline = (y0 + h) - (yy + 2 * rh + 4 * rh) >= FB      -- под таблицей хотя бы 4 строки
@@ -5582,6 +5573,13 @@ function D.draw_mixsnaps(L, info, hover)
   yy = yy + rh
   local listh = (inline and (y0 + h - FB) or (y0 + h)) - yy
   local nvis = math.max(1, math.floor(listh / rh))
+  local want = math.max(3, math.min(12, #ms0.rows + 1))   -- 30 окт: строк — по снапшотам (SWS: 12), остаток — XY
+  local padside
+  if nvis > want then
+    local room = listh - want * rh - 4
+    local side = math.min(w, room)
+    if side >= 4 * rh then nvis = want; padside = side end
+  end
   for i = 1, nvis do
     local ry = yy + (i - 1) * rh
     local r = ms0.rows[i]
@@ -5601,6 +5599,7 @@ function D.draw_mixsnaps(L, info, hover)
   end
   if #ms0.rows > nvis then text(x + w - ms('+' .. (#ms0.rows - nvis)), yy + (nvis - 1) * rh, '+' .. (#ms0.rows - nvis), U.GREY) end
   set(U.LINE); gfx.rect(x, yy - rh, w, nvis * rh + rh, 0)
+  if padside then xypad(yy + nvis * rh + 4, padside) end
   if not inline then return end
   -- фильтр SWS и опции
   local fy = y0 + h - FB + 4

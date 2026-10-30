@@ -22,8 +22,9 @@ D.set_font(state)
 local L = D.layout({ cols = { { guid = 'A', name = 'A', lanes = { { idx = 0, subs = { {} }, items = {} } }, envs = {}, depth = 0 } } }, state, 0)
 local TOG = { { 'PAN', 'pan' }, { 'VOL', 'volume' }, { 'MUTE', 'mute' }, { 'FX', 'fx chain' }, { 'SOLO', 'solo' }, { 'SEND', 'sends' }, { 'VIS', 'vis' }, { 'TOGSEL', 'selection' } }
 local OPT = { { 'APPLYLOAD', 'filter on recall' }, { 'SELONLY', 'save sel' }, { 'SELONLYRECALL', 'recall sel' }, { 'SHOWONLYSEL', 'show sel' } }
-for _, tab in ipairs({ 'list', 'xy' }) do
-  for _, hh in ipairs({ 8 * L.rh, 30 * L.rh }) do
+-- 30 окт: вкладки xy нет — XY под списком, когда под ним есть место
+do local tab = 'list'
+  for _, hh in ipairs({ 8 * L.rh, 30 * L.rh, 45 * L.rh }) do
     L.mix_pane = { x = 0, y = 100, w = 260, h = hh }; L.mix_y, L.mix_h = 100, hh
     L.cols = { { x = 260 } }
     local info = { msn_tog = TOG, msn_opt = OPT, mixsnaps = { tab = tab, rows = { { slot = 1, name = 'Verse', date = '22.10.26', time = '21:40:00' }, { slot = 3, name = 'Drop', date = '', time = '' } },
@@ -39,12 +40,14 @@ for _, tab in ipairs({ 'list', 'xy' }) do
       end
     end
     ::done::
-    eq(found.tab, true, tab .. ' ' .. hh .. ': tabs in hover')
-    if tab == 'list' then
+    eq(found.tab, nil, tab .. ' ' .. hh .. ': no tabs')
+    do
       eq(found.row, true, 'list ' .. hh .. ': a row in hover'); eq(found.new, true, 'list ' .. hh .. ': new button')
       if hh > 20 * L.rh then eq(found.tog, true, 'tall: filter checkboxes inline'); eq(found.mode, true, 'tall: modes inline')
       else eq(found.filtermenu, true, 'low: filter button instead') end
-    else eq(found.xyc, true, 'xy ' .. hh .. ': corners'); eq(found.xypad, true, 'xy ' .. hh .. ': pad') end
+      if hh > 20 * L.rh then eq(found.xyc, true, hh .. ': XY corners under the list'); eq(found.xypad, true, hh .. ': XY pad under the list')
+      else eq(found.xypad, nil, 'low: no room - no XY') end
+    end
   end
 end
 print(('test_mixsnaps: %d checks, %d failed'):format(n, bad)); os.exit(bad == 0 and 0 or 1)
