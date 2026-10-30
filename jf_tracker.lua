@@ -186,7 +186,6 @@ local state = {
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
   slidezero = reaper.GetExtState(EXT, 'slidezero') == 'stop' and 'stop' or 'repeat',   -- 30 окт: 00 у 0U / 0D
-  knobstyle = reaper.GetExtState(EXT, 'knobstyle') == 'arc' and 'arc' or 'dot',   -- 30 окт: лицо кноба пана
   clipsnap = flag('clipsnap', true),    -- 29 окт: края MIDI-клипов — на доли   -- 29 окт: номера строк с 0001 (умолчание, как 1.1) или 0000   -- 28 окт: цвет курсора, когда фокус в другой панели
   prevmode = (function() local v = reaper.GetExtState(EXT, 'prevmode'); return (v == 'hold' or v == 'sec') and v or 'full' end)(),
   side = flag('side', false),                   -- сайдбар-браузер
@@ -12753,7 +12752,6 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
-      { key = 'knobstyle', label = 'knob style', kind = 'cycle', values = { 'dot', 'arc' }, desc = 'pan knobs of the strips: dot - a bright dot on the edge; arc - the scale arc from the center to the value and a triangle pointer', get = function() return state.knobstyle end, set = function(v) state.knobstyle = v; reaper.SetExtState(EXT, 'knobstyle', v, true); draw.KNOB_STYLE = v end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
       { key = 'slidespeed', label = 'slide speed (ticks)', kind = 'cycle', values = { 6, 3, 4, 5, 8, 12 }, desc = 'ticks a row for the ft2 / it / pt slide styles (the tracker speed; 6 by default, the slide runs speed - 1 ticks)', get = function() return state.slidespeed end, set = function(v) state.slidespeed = tonumber(v) or 6; reaper.SetExtState(EXT, 'slidespeed', tostring(state.slidespeed), true); edit.cmds.SPEED = state.slidespeed end },
       { key = 'slidezero', label = 'slide 00', kind = 'cycle', values = { 'repeat', 'stop' }, desc = '0U00 / 0D00: repeat - the last value of the command again (as in Renoise, FT2, Schism); stop - the slide stops there', get = function() return state.slidezero end, set = function(v) state.slidezero = v; reaper.SetExtState(EXT, 'slidezero', v, true); edit.cmds.ZERO = v end },
@@ -12940,7 +12938,7 @@ ctx = {
       { 'cursor and editing', { 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
-      { 'headers and mixer', { 'knobstyle', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
+      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
@@ -31111,8 +31109,7 @@ end
 ctx.curacc_apply()
 model.ROW_BASE, draw.ROW_BASE = state.rowbase, state.rowbase   -- 29 окт
 model.OUTNOTES, edit.CLIP_SNAP = state.outnotes, state.clipsnap
-CM.MODE, CM.SPEED, CM.ZERO = state.slidemode, state.slidespeed, state.slidezero
-draw.KNOB_STYLE = state.knobstyle   -- 30 окт   -- 30 окт: стиль слайда 0U / 0D
+CM.MODE, CM.SPEED, CM.ZERO = state.slidemode, state.slidespeed, state.slidezero   -- 30 окт: стиль слайда 0U / 0D
 -- 28 окт: цвет цепочки контейнера (ветки) — свой: P_EXT:jf_chcol трека «GUID контейнера|ветка=rrggbb;…»;
 -- нет своего — цвет по номеру ветки (D.lane_col). Выбор — палитра квадратиками с индексом xx, :chcol rrggbb
 ctx.CHPAL = {}

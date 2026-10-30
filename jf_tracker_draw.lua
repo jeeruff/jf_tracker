@@ -6652,38 +6652,6 @@ D.FADER_W = function(L) return math.max(3 * L.cw + 4, ms('-48') + 6) end   -- ш
 D.MINI_W = function(L) return L.cw + 5 end   -- 11 окт: мини-полоса (свёрнутая колонка / низкий микшер)
 -- 11 окт: мини-полоса — мини-кноб панорамы сверху, под ним фейдер в знак шириной
 -- (метр + риска уровня); свёрнутая колонка и микшер ниже 3 строк фейдера
--- 30 окт: лицо кноба пана — опция knob style: dot (точка на краю, как было) / arc (дуга шкалы от центра до значения
--- и треугольник-указатель). frac 0..1, центр шкалы — верх (0.5)
-D.KNOB_STYLE = 'dot'
-function D.pan_knob_face(cx, cy, r, frac, kdark, hot)
-  local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
-  local pcol = U.readable(hot and U.AMBER or U.TEXT, kdark, 7)
-  if D.KNOB_STYLE ~= 'arc' or r < 4 then
-    set(kdark); gfx.circle(cx, cy, r, 1, 0)
-    set(hot and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
-    local pr = math.max(1, math.floor(r / 4))
-    local rr = r - pr - 1
-    set(pcol)
-    if r < 4 then gfx.rect(cx + math.floor(math.sin(a) * (r - 2) + 0.5), cy - math.floor(math.cos(a) * (r - 2) + 0.5), 1, 1, 1)
-    else gfx.circle(cx + math.floor(math.sin(a) * rr + 0.5), cy - math.floor(math.cos(a) * rr + 0.5), pr, 1, 0) end
-    return
-  end
-  -- шкала: тусклая дуга 270°, яркая — от центра (верх) к значению; толщина 2 пикселя
-  set(U.mix(U.LINE, U.BG, 0.3))
-  for k = 0, 1 do gfx.arc(cx, cy, r - k, -0.75 * math.pi, 0.75 * math.pi, 1) end
-  if math.abs(a) > 0.02 then
-    set(hot and U.AMBER or U.CYAN)
-    for k = 0, 1 do gfx.arc(cx, cy, r - k, math.min(0, a), math.max(0, a), 1) end
-  end
-  -- треугольник внутри кольца: остриё к значению
-  local sa, ca = math.sin(a), math.cos(a)
-  local tip = r - 3
-  local base = math.max(2, math.floor(r * 0.35))
-  local hw = math.max(2, math.floor(r * 0.3))
-  local bx, by = cx + sa * base * 0.2, cy - ca * base * 0.2
-  set(pcol)
-  gfx.triangle(cx + sa * tip, cy - ca * tip, bx - ca * hw, by - sa * hw, bx + ca * hw, by + sa * hw)
-end
 function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local live = info.trs_live
   local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
@@ -6696,7 +6664,11 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
     local khot = mx >= x and mx < x + kd and my >= y0 and my < y0 + kd
     local kon = ks and ks.what == 'pan' and ks.col and ks.col.guid == col.guid
     local kdark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
-    D.pan_knob_face(cx, cy, r, frac, kdark, khot or kon)
+    set(kdark); gfx.circle(cx, cy, r, 1, 0)
+    set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
+    local a = (frac - 0.5) * 1.5 * math.pi
+    set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
+    gfx.rect(cx + math.floor(math.sin(a) * (r - 2) + 0.5), cy - math.floor(math.cos(a) * (r - 2) + 0.5), 1, 1, 1)
     if khot then hover.trs = { col = col, what = 'pan', knob = true, sv = frac } end
     if D.csel_on(col.guid, 'pan') then csel_frame(x - 1, y0 - 1, kd + 2, kd + 2) end
     hint('trs', x, y0, kd, kd, { col = col, what = 'pan' })
@@ -7866,7 +7838,17 @@ function D.frame(L, snap, rows, state, info)
           local ks = info.kslider
           local kon = ks and ks.what == what and ks.col and ks.col.guid == col.guid
           local kdark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
-          D.pan_knob_face(cx, cy, r, frac, kdark, khot or kon)   -- 30 окт: лицо — опция knob style (dot / arc)
+          set(kdark); gfx.circle(cx, cy, r, 1, 0)
+          set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
+          -- шкала: от центра (верх) до значения — дуга цветом, риска — указатель
+          local a = (frac - 0.5) * 1.5 * math.pi                   -- −135° … +135°, 0 — верх
+          -- 9 окт: дуги значения нет — только точка-указатель
+          -- указатель — яркая точка на краю (9 окт, вместо линии)
+          local pcol = U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7)
+          local pr = math.max(1, math.floor(r / 4))
+          local rr = r - pr - 1
+          set(pcol)
+          gfx.circle(cx + math.floor(math.sin(a) * rr + 0.5), cy - math.floor(math.cos(a) * rr + 0.5), pr, 1, 0)
           if val and kx + 2 * r + 1 + L.pad + ms(val) <= sx + fx_w then text(kx + 2 * r + 1 + L.pad, ky + math.floor((2 * r + 1 - L.th) / 2), val, U.GREY) end
           if khot then hover.trs = { col = col, what = what, knob = true, sv = frac } end
           if D.csel_on(col.guid, what) then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
