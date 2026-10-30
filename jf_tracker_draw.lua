@@ -3313,14 +3313,16 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       set(U.LINE); gfx.rect(px, y, pw, h1, 0)
     end
   end
-  if rh2 > 0 then   -- 29 окт: роутер — под XY, в ширину блока; под auto / mod — только когда они открыты (кнопки не закрывать)
-    local rw = (tm0 and (tm0.wauto or tm0.wmod)) and (w + extra) or w
-    fill(rbg); gfx.rect(x, y + h - rh2, rw, rh2, 1)
-    set(U.LINE); gfx.rect(x + L.pad, y + h - rh2, rw - 2 * L.pad, 1, 1)
-    D.route_section(L, info, col, x, y + h - rh2, rw, rh2, hover)
-  end
   U.TEXT, U.GREY = T0, G0
   set(U.LINE); gfx.rect(x, y, w, h, 0)                -- рамка, как у блоков FX
+  if rh2 > 0 then   -- 29 окт: роутер — под XY, в ширину блока; под auto / mod — только когда они открыты (кнопки не закрывать)
+    -- 30 окт: поверх рамок — расширенный роутер одним полем, без вертикальных разделителей блока / кнопок / панели
+    local rw = (tm0 and (tm0.wauto or tm0.wmod)) and (w + extra) or w
+    fill(rbg); gfx.rect(x + 1, y + h - rh2, rw - 2, rh2 - 1, 1)
+    set(U.LINE); gfx.rect(x + L.pad, y + h - rh2, rw - 2 * L.pad, 1, 1)
+    D.route_section(L, info, col, x, y + h - rh2, rw, rh2, hover)
+    set(U.LINE); gfx.rect(x, y + h - rh2, rw, rh2, 0)
+  end
   return w + extra
 end
 
