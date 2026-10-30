@@ -43,8 +43,7 @@ do local tab = 'list'
     eq(found.tab, nil, tab .. ' ' .. hh .. ': no tabs')
     do
       eq(found.row, true, 'list ' .. hh .. ': a row in hover'); eq(found.new, true, 'list ' .. hh .. ': new button')
-      if hh > 20 * L.rh then eq(found.tog, true, 'tall: filter checkboxes inline'); eq(found.mode, true, 'tall: modes inline')
-      else eq(found.filtermenu, true, 'low: filter button instead') end
+      eq(found.filtermenu, true, hh .. ': filter - a button (30 окт: never inline)'); eq(found.tog, nil, hh .. ': no inline checkboxes')
       if hh > 20 * L.rh then eq(found.xyc, true, hh .. ': XY corners under the list'); eq(found.xypad, true, hh .. ': XY pad under the list')
       else eq(found.xypad, nil, 'low: no room - no XY') end
     end

@@ -5509,15 +5509,6 @@ function D.draw_mixsnaps(L, info, hover)
     hint('mixsnap', bx, by, bw, rh - 2, h2)
     return bw
   end
-  local function check(bx, by, bw, label, on, h2, radio)
-    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
-    local bs = rh - 6
-    set(on and U.CYAN or U.DIM); gfx.rect(bx, by + 3, bs, bs, on and 1 or 0)
-    if radio and not on then set(U.DIM); gfx.rect(bx + 2, by + 5, bs - 4, bs - 4, 0) end
-    text(bx + bs + L.pad, by, fit(label, bw - bs - L.pad), hot and U.AMBER or (on and U.TEXT or U.GREY))
-    if hot then hover.mixsnap = h2 end
-    hint('mixsnap', bx, by, bw, rh, h2)
-  end
   -- 30 окт: XY — под списком (вкладки xy больше нет: одно место); угол — снапшот из списка (правый клик) или микшер сейчас
   local function xypad(py0, side)
     local xy = ms0.xy or { has = {}, from = {} }
@@ -5548,10 +5539,8 @@ function D.draw_mixsnaps(L, info, hover)
   end
   local yy = y0
   -- кнопки: new prev next up down sws (+ filter, если блок фильтра не влезает)
-  local FB = (1 + 3 + 4 + 5) * rh + 4                           -- блок фильтра: заголовок, 3 режима, 4 строки галочек, 5 опций
-  local inline = (y0 + h) - (yy + 2 * rh + 4 * rh) >= FB      -- под таблицей хотя бы 4 строки
-  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' } }
-  if not inline then B[#B + 1] = { 'filter', 'filtermenu' } end
+  -- 30 окт: фильтр SWS и опции — только кнопкой filter (меню) рядом с sws; место под таблицей — списку и XY
+  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' } }
   local bx = x
   for _, b in ipairs(B) do
     local bw = ms(b[1]) + 2 * L.pad
@@ -5571,7 +5560,7 @@ function D.draw_mixsnaps(L, info, hover)
   if showd then text(x + nw + namew, yy, 'date', U.GREY) end
   if showt then text(x + w - tw, yy, 'time', U.GREY) end
   yy = yy + rh
-  local listh = (inline and (y0 + h - FB) or (y0 + h)) - yy
+  local listh = (y0 + h) - yy
   local nvis = math.max(1, math.floor(listh / rh))
   local want = math.max(3, math.min(12, #ms0.rows + 1))   -- 30 окт: строк — по снапшотам (SWS: 12), остаток — XY
   local padside
@@ -5600,21 +5589,6 @@ function D.draw_mixsnaps(L, info, hover)
   if #ms0.rows > nvis then text(x + w - ms('+' .. (#ms0.rows - nvis)), yy + (nvis - 1) * rh, '+' .. (#ms0.rows - nvis), U.GREY) end
   set(U.LINE); gfx.rect(x, yy - rh, w, nvis * rh + rh, 0)
   if padside then xypad(yy + nvis * rh + 4, padside) end
-  if not inline then return end
-  -- фильтр SWS и опции
-  local fy = y0 + h - FB + 4
-  text(x, fy, fit('filter', w), U.GREY); fy = fy + rh
-  for _, m in ipairs({ { 'full', 'full track mix' }, { 'vis', 'current visibility' }, { 'custom', 'custom' } }) do
-    check(x, fy, w, m[2], ms0.mode == m[1], { what = 'mode', arg = m[1] }, true); fy = fy + rh
-  end
-  local half = math.floor(w / 2)
-  for k, t in ipairs(info.msn_tog or {}) do
-    local cx = x + ((k - 1) % 2) * half
-    check(cx + L.pad, fy + math.floor((k - 1) / 2) * rh, half - L.pad, t[2], ms0.tog[t[1]], { what = 'tog', arg = t[1] })
-  end
-  fy = fy + 4 * rh
-  for _, t in ipairs(info.msn_opt or {}) do check(x, fy, w, t[2], ms0.opt[t[1]], { what = 'opt', arg = t[1] }); fy = fy + rh end
-  check(x, fy, w, 'prompt for name', ms0.prompt, { what = 'prompt' })
 end
 -- 23 окт: дети контейнера — колонками; маленькие (до 5 параметров) подряд по цепочке (serial) — друг под другом
 -- в одной колонке: сигнал течёт сверху вниз. rows — строк под параметры. → place[ki] = { c = колонка с 0,
