@@ -9034,6 +9034,14 @@ function D.frame(L, snap, rows, state, info)
           gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
         end
         draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or ((c.master or EG.env3) and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
+        do   -- 30 окт: JOG — новые значения шагов огибающей: столбик и точка янтарём до записи
+          local jv = D.jog and D.jog.env == ev.e.env and D.jog.map[r.row]
+          if jv then
+            local bx0, bw0 = ev.x + EG.env_bx, EG.env_bar_w
+            set(U.AMBER, D.jog.row == r.row and 0.7 or 0.35); gfx.rect(bx0, y + 2, math.max(1, math.floor(jv * (bw0 - 1) + 0.5)), L.rh - 4, 1); gfx.a = 1
+            set(U.AMBER); gfx.circle(bx0 + math.floor(jv * (bw0 - 1) + 0.5), y + math.floor(L.rh / 2), 2, 1, 1)
+          end
+        end
         if in_body and mx >= ev.x and mx < ev.x + ev.w then
           hover.col = c.col; hover.env = ev.e; hover.envv = env_vals[ev][i]; hover.fi = ev.fi
           hover.envx = math.max(0, math.min(1, (mx - ev.x - L.env_bx) / (EG.env_bar_w - 1)))
@@ -9073,7 +9081,12 @@ function D.frame(L, snap, rows, state, info)
               set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
             end
           end
-          if e then
+          -- 30 окт: JOG (CONTROL) — значения шагов прямо в клетках: столбик янтарём и новое число, до записи
+          local jv = D.jog and D.jog.mlname == ml.name and D.jog.track == c.col.track and D.jog.map[r.row]
+          if jv then
+            set(U.AMBER, D.jog.row == r.row and 0.85 or 0.45); gfx.rect(m.x + 1, y + 1, math.max(1, math.floor(jv * (m.w - 2) + 0.5)), L.rh - 2, 1); gfx.a = 1
+            text(m.x + L.pad, ty, fit(D.envfmt == 'hex' and ('%02X'):format(math.floor(jv * 127 + 0.5)) or tostring(math.floor(jv * 127 + 0.5)), m.w - L.pad), D.jog.row == r.row and U.BG or U.TEXT)
+          elseif e then
             local txt = ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis' or ml.kind == 'chd'
             local t = txt and ((e.text ~= '' and e.text) or 'mark') or (ml.kind == 'sx' and 'SX' or (D.envfmt == 'hex' and ('%02X'):format(e.v or 0) or tostring(e.v or 0)))
             -- 13 окт: visor / cmd — текст команды строкой (без картинок поверх строк), секции через пробел:

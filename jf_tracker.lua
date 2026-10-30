@@ -183,6 +183,7 @@ local state = {
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
   qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
+  jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
   slidezero = reaper.GetExtState(EXT, 'slidezero') == 'stop' and 'stop' or 'repeat',   -- 30 окт: 00 у 0U / 0D
@@ -12752,6 +12753,7 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
+      { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
       { key = 'slidespeed', label = 'slide speed (ticks)', kind = 'cycle', values = { 6, 3, 4, 5, 8, 12 }, desc = 'ticks a row for the ft2 / it / pt slide styles (the tracker speed; 6 by default, the slide runs speed - 1 ticks)', get = function() return state.slidespeed end, set = function(v) state.slidespeed = tonumber(v) or 6; reaper.SetExtState(EXT, 'slidespeed', tostring(state.slidespeed), true); edit.cmds.SPEED = state.slidespeed end },
       { key = 'slidezero', label = 'slide 00', kind = 'cycle', values = { 'repeat', 'stop' }, desc = '0U00 / 0D00: repeat - the last value of the command again (as in Renoise, FT2, Schism); stop - the slide stops there', get = function() return state.slidezero end, set = function(v) state.slidezero = v; reaper.SetExtState(EXT, 'slidezero', v, true); edit.cmds.ZERO = v end },
@@ -12936,7 +12938,7 @@ ctx = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
+      { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -16694,8 +16696,8 @@ ctx.ctl_jog = function(SG)
   local sx, sy = reaper.GetMousePosition()
   local dx, dy = sx - SG.sx, sy - SG.sy
   if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
-  local JOG = math.max(8, L.rh)   -- пикселей на шаг
-  SG.acc = SG.acc - dy   -- 30 окт: инверсно — палец вверх, шаг дальше (вниз по трекеру)
+  local JOG = math.max(4, math.floor(L.rh / 2))   -- пикселей на шаг (30 окт: чувствительнее — полстроки)
+  SG.acc = SG.acc + (state.jogdir == 'normal' and dy or -dy)   -- опция jog direction: invert — палец вверх, шаг дальше
   local steps = SG.acc >= 0 and math.floor(SG.acc / JOG) or -math.floor(-SG.acc / JOG)
   if steps ~= 0 then
     SG.acc = SG.acc - steps * JOG
@@ -16711,33 +16713,12 @@ ctx.ctl_jog = function(SG)
     SG.v = math.max(0, math.min(1, SG.v + dx / 300))
     SG.map[SG.row] = SG.v; SG.moved = true
   end
-  -- оверлей: шаги вокруг курсора столбиками (записанные — янтарём)
+  -- 30 окт: вместо оверлея — значения шагов прямо в клетках лейна (draw.jog), курсор трекера — на шаге
   local fl = SG.lane
   local name = fl.env and (fl.env.name or 'envelope') or (fl.ml.name or 'lane')
-  local Z = 2
-  local rh = L.rh * Z
-  local bw = math.max(240, math.floor(gfx.w * 0.4))
-  local N = 6
-  local bh = (2 * N + 1) * L.rh + 2 * rh + 8
-  local bx, by = math.floor((gfx.w - bw) / 2), math.floor((gfx.h - bh) / 2)
-  U.set(U.BG, 0.94); gfx.rect(bx - L.pad, by, bw + 2 * L.pad, bh, 1)
-  U.set(U.AMBER); gfx.rect(bx - L.pad, by, bw + 2 * L.pad, bh, 0)
-  draw.big_text(bx, by + 2, ('%s / %s   jog'):format(fl.col and fl.col.name or '', name), U.AMBER, Z)
-  local lw = U.measure('0000') + L.pad
-  for i = -N, N do
-    local r = SG.row + i
-    if r >= 0 then
-      local yy = by + rh + 4 + (i + N) * L.rh
-      local w2 = SG.map[r]
-      local v = w2 or ctx.ctl_val_at(fl, r)
-      U.text(bx, yy, ('%04d'):format(r), i == 0 and U.AMBER or U.GREY)
-      U.set(U.DIM); gfx.rect(bx + lw, yy + 2, bw - lw, L.rh - 4, 1)
-      U.set(i == 0 and U.AMBER or (w2 and U.mix(U.AMBER, U.BG, 0.3) or U.CYAN)); gfx.rect(bx + lw, yy + 2, math.max(1, math.floor((bw - lw) * v + 0.5)), L.rh - 4, 1)
-    end
-  end
+  draw.jog = { track = fl.col and fl.col.track, mlname = fl.ml and fl.ml.name, env = fl.env and fl.env.env, map = SG.map, row = SG.row }
   local vt = fl.ml and ('%02X'):format(math.floor(SG.v * 127 + 0.5)) or ('%d%%'):format(math.floor(SG.v * 100 + 0.5))
-  draw.big_text(bx, by + bh - rh - 2, ('row %04d  %s'):format(SG.row, vt), U.TEXT, Z)
-  state.status = ('-- CONTROL JOG --  %s: up / down - the step, sideways - its value; let Ctrl+Opt+Shift go - written'):format(name)
+  state.status = ('-- CONTROL JOG --  %s row %04d  %s   (up / down - the step, sideways - its value; let Ctrl+Opt+Shift go - written)'):format(name, SG.row, vt)
 end
 ctx.ctl_jog_write = function(SG)
   local fl = SG.lane
@@ -24680,6 +24661,7 @@ local function frame()
     local jog_now = sl_mods and gfx.mouse_cap & 8 == 8 and state.focus == 'tracker' and (function()
       local f = L and L.flat and L.flat[vim.cur.fi]; return f and ((f.env and f.env.env) or (f.ml and f.ml.kind ~= 'tx')) and true or false end)()
     local sl_raw = sl_mods and (ctx.sl ~= nil or jog_now or math.abs(gfx.mouse_x - ctx.sl_g0[1]) + math.abs(gfx.mouse_y - ctx.sl_g0[2]) > 6)
+    if not (ctx.sl and ctx.sl.jog) then draw.jog = nil end   -- столбики JOG — только пока он идёт
     sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не CONTROL
     if sl_raw then
       if CM.latch then local L0 = CM.release(); if L0 and L0.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: ctrl mouse'); model.invalidate() end end
@@ -24915,7 +24897,7 @@ local function frame()
         local sa, sb = A.stroke and A.stroke.a, A.stroke and A.stroke.b
         A.stroke, A.vpt = nil, nil
         if ctx.sl.moved and rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = ctx.sl.tool, a = sa, b = sb }) end
-      elseif ctx.sl.jog then if ctx.sl.moved then ctx.ctl_jog_write(ctx.sl) end
+      elseif ctx.sl.jog then draw.jog = nil; if ctx.sl.moved then ctx.ctl_jog_write(ctx.sl) end
       elseif ctx.sl.lane then if ctx.sl.moved then ctx.ctl_lane_write(ctx.sl) end
       elseif ctx.sl.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: control'); model.invalidate() end
       ctx.sl = nil
