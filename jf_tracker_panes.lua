@@ -54,7 +54,6 @@ PN.PANELS = {
   { id = 'modulation', label = 'modulation', key = 'u', hint = 'modulation', side = 'top', tab = true, avail = 'merged' },   -- 18 окт: страница automation (M) — сама вкладка не показывается   -- 12 окт: матрица LFO / ACS / link REAPER — своя вкладка
   { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
-  { id = 'clips',      label = 'clips',      key = 'C', hint = 'session', side = 'top', tab = true },   -- 10 окт: клипы сессии — своя панель (свои шапки треков), куда угодно
   { id = 'macros',     label = 'macros',     key = 'q', hint = 'macros',  side = 'top', tab = true },   -- 9 окт: записанные / свои / встроенные макросы
   { id = 'scopes',     label = 'scopes',     key = 'c', hint = 'master',  side = 'top', tab = true },
   { id = 'master',     label = 'master',     key = 'S', hint = 'master',  side = 'top', tab = true },
@@ -630,7 +629,6 @@ PN.LATE = {
   { 'visor', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'visor', 'matrix') end },
   -- 12 окт: вкладка automation отделилась от modulation — старая строка знает только modulation
   { 'automation', function(m) return PN.visible(m, 'modulation') and stack_keep(m, 'automation', 'modulation') end },
-  { 'clips', function(m) return PN.visible(m, 'matrix') and stack_keep(m, 'clips', 'matrix') end },
   { 'macros', function(m)
     for _, at in ipairs({ 'sample', 'retro', 'automation' }) do if PN.visible(m, at) then return stack_keep(m, 'macros', at) end end
   end },
@@ -963,7 +961,6 @@ PN.ABOUT = {
   modulation = 'Modulation of FX parameters: LFOs and links of the cursor track, shown with their curves.',
   midi = 'MIDI of the cursor track: CC, pitch bend and program changes as lanes.',
   harm = 'The harmonizer: the key of the song, its chords by degree (click writes one), what chord sounds now, staff and tab views, progressions and just intonation.',
-  clips = 'Session clips like Ableton: the matrix as scenes x tracks; launch a clip or a scene on the quantize boundary into the =SESSION loop zone.',
   macros = 'Macros: recorded (q), saved and built-in; play one at the cursor, give it a key, edit its body.',
   scopes = 'Scopes of the tracks: oscilloscope, spectrum or spectrogram per track (JSFX bridge).',
   master = 'The master track: its chain, meters and loudness.',

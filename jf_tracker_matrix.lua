@@ -57,7 +57,6 @@ function MX.init(u, c) U, ctx = u, c end
 local cache = { snap = nil, regs = nil, grid = nil }
 MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матрице z
 
--- clips — сразу за fold (6 окт): в конце ряда кнопка уходила под ручки < > = у линии раздела
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
   { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'sketch', 'sketch' }, { 'add', '+' } }   -- 23 окт: sketch — строка эскизов (была строкой-подсказкой)   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
@@ -66,7 +65,7 @@ local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна 
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
 -- синхронизирует после каждой правки), loops — только в режиме .dev (Garden)
 local function btns()
-  if MX.fold and not MX.clips then return FOLD_BTNS end   -- свёрнутая: fold и clips   -- clips поверх fold: нужен весь ряд, чтобы выключить
+  if MX.fold then return FOLD_BTNS end   -- свёрнутая: одна кнопка
   local out = {}
   for _, b in ipairs(BTNS) do
     local hide = (b[1] == 'sync' and ctx and ctx.autosync_on and ctx.autosync_on()) or (b[1] == 'loops' and not (ctx and ctx.dev_on and ctx.dev_on()))
@@ -77,7 +76,6 @@ local function btns()
 end
 MX.loops = false         -- слой лупов (бывший Garden, 2 окт): период лупа в ячейках, клавиши лупов
 MX.ruler = true          -- вертикальная линейка тактов слева (кнопка ruler, R)
-MX.clips = false         -- вид clips (6 окт): сессия в панели матрицы — сцены × треки, запуск клипов (кнопка clips, zz — на всё окно)
 MX.fold = false          -- свёрнутая матрица (3 окт): номера, имена треков, ячейки — без имён / длин / линейки (кнопка fold, F)
 MX.ENV_PTS = 12          -- отсчётов огибающей на ячейку в детальном зуме
 
@@ -274,7 +272,6 @@ function MX.width(L, nregions, ncols)
   -- 11 окт: колонка visor — превью сцены слота, справа от треков (когда visor включён / есть сцены)
   MX.vis_w = (ctx and ctx.visor_col_on and ctx.visor_col_on()) and math.floor(L.mx_cell_w * 1.6) or 0
   local w = math.max(L.mx_label_w + ncols * L.mx_cell_w + (MX.vis_w > 0 and (MX.vis_w + 2) or 0) + L.pad + knob_w, MX.btns_w + L.pad + knob_w)   -- ряд кнопок не под ручками
-  if MX.clips then w = math.max(w, L.cw * 8 + math.min(ncols, 6) * L.cw * 8 + 3 * L.pad + knob_w) end   -- clips: клетки не уже 8 знаков (до 6 треков без прокрутки)
   return w
 end
 
@@ -341,8 +338,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     end
   end
   MX.overflow = over
-  -- 19 окт: кнопки — в пустом углу над слотами (левее имён треков), потоком; свёрнутая / clips — ряд сверху, как было
-  local corner = not MX.fold and not MX.clips
+  -- 19 окт: кнопки — в пустом углу над слотами (левее имён треков), потоком; свёрнутая — ряд сверху, как было
+  local corner = not MX.fold
   if corner then list = btns(); MX.overflow = {} end
   local function draw_btns(x0, y0, x1)
   local bx, by = x0, y0
@@ -363,23 +360,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   return by + L.rh - y0
   end
   if corner then hy = hy - L.rh - 2 else draw_btns(L.pad, hy + 1) end
-  MX.ss_split_y = nil
-  -- вид clips (6 окт): вместо слотов — сетка сессии (компактная), hover — её поля
-  -- clips (6 окт, просьба): клипы сверху — компактно, матрица слотов ниже
-  if MX.clips and ctx.ss_draw then
-    local avail = ybot - hy - L.rh - 2
-    -- высота: тянется мышью за линию снизу (ctx.ss_px), иначе — по рядам, до 45 %
-    local px = ctx.ss_px and ctx.ss_px()
-    local ch = px and math.max(3 * L.rh, math.min(avail - 6 * L.rh, px))
-      or (ctx.ss_height and ctx.ss_height(W - 6, math.floor(avail * 0.45)) or math.floor(avail * 0.4))
-    MX.ss_top = hy + L.rh + 2                              -- верх блока клипов
-    MX.ss_split_y = MX.ss_top + ch                         -- линия раздела clips | слоты (ручка высоты)
-    local hv = ctx.ss_draw(L, 0, hy + L.rh + 2, W - 6, ch)
-    for k, v in pairs(hv) do hover[k] = v end
-    hover.sess_view = true
-    U.set(U.LINE); gfx.rect(0, hy + L.rh + 2 + ch, W - 4, 1, 1)
-    hy = hy + ch + 2
-  end
   -- 19 окт: sketchpad — эскизы X1 X2 … (набор clipkb Enter), строкой под кнопками
   if ctx.sketch_draw then
     local sh, shv = ctx.sketch_draw(L, 0, hy + L.rh + 2, W - 6)
@@ -502,7 +482,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           bx = btn(bx, ay, 'dup', 'arrdup')
           bx = btn(bx, ay, 'clear', 'arrclear')         -- 10 окт: пустой лист (новые пустые лейны)
           bx = btn(bx, ay, 'del', 'arrdel')
-          if ctx.mx_launch_on then btn(bx, ay, 'clips', 'arrclips', ctx.mx_launch_on()) end
         end
         ay = ay + L.rh + 1
       end
@@ -821,7 +800,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           else gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 3, 0) end
         end
         local r = ri - MX.scroll
-        local colk = MX.SS and MX.SS.KEYCOLS and MX.SS.KEYCOLS[ci - MX.hs]
+        local colk = MX.KEYCOLS and MX.KEYCOLS[ci - MX.hs]
         local kl = r >= 1 and r <= 4 and colk and colk:sub(r, r)
         if kl and kl ~= '' then U.text(x + L.mx_cell_w - 2 - U.measure(kl), y + rh - L.rh - 1, kl, pk and U.CYAN or U.AMBER) end
       end
@@ -923,18 +902,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           local tw = U.measure(lt)
           U.set(U.PANEL); gfx.rect(x + math.floor((L.mx_cell_w - tw) / 2) - 1, y + 1, tw + 2, L.rh - 1, 1)
           U.text(x + math.floor((L.mx_cell_w - tw) / 2), y + 1, lt, U.CYAN)
-        end
-      end
-      -- клипы (9 окт, экспериментально): клетка — клип сессии; играет —
-      -- зелёная рамка и «>», ждёт границы — мигает янтарём
-      if ctx.mx_clip_state and g.state ~= 'empty' then
-        local cs = ctx.mx_clip_state(ri, ci)
-        if cs == 'live' then
-          U.set(U.GREEN); gfx.rect(x, y, L.mx_cell_w, rh, 0); gfx.rect(x + 1, y + 1, L.mx_cell_w - 2, rh - 2, 0)
-          U.set(U.BG); gfx.rect(x + 2, y + 1, U.measure('>') + 2, L.rh - 2, 1)
-          U.text(x + 3, y + 1, '>', U.GREEN)
-        elseif cs == 'pend' and math.floor(reaper.time_precise() * 4) % 2 == 0 then
-          U.set(U.AMBER); gfx.rect(x, y, L.mx_cell_w, rh, 0)
         end
       end
       if MX.anchor then
@@ -1214,7 +1181,6 @@ function MX.key(c, regions, snap)
     elseif op == 'y' and ch == 'y' then ctx.slot_yank()
     elseif op == 'y' and ch == 'p' then ctx.slot_new('clone')        -- yp — дубль (5 окт: одна клавиша на функцию)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
-    elseif op == 'z' and ch == 'z' then if ctx.ss_big then ctx.ss_big() end   -- session (6 окт)
     elseif op == 'z' and ch == 'i' then MX.toggle_zoom()
     elseif op == 'T' and ch == 'r' then ctx.tsel_section()
     else ctx.msg(op .. ch .. ': not a matrix command (? - help)') end

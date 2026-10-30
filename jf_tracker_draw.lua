@@ -612,7 +612,7 @@ function D.layout(snap, state, nregions)
   -- матрица: свёрнута — узкая полоса с кнопкой >; ширина мышью (ручка = на линии раздела)
   L.mx_strip_w = ms('>') + 2 * L.pad + 6
   if state.mx_hidden then L.matrix_w = L.mx_strip_w
-  elseif MX and MX.fold and not MX.clips and state.mx_fold_px then L.matrix_w = math.max(L.cw * 6, (MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_fold_px))   -- fold: своя ширина мышью
+  elseif MX and MX.fold and state.mx_fold_px then L.matrix_w = math.max(L.cw * 6, (MX.btns_w or 0) + L.pad, math.min(math.floor(gfx.w * 0.6), state.mx_fold_px))   -- fold: своя ширина мышью
   elseif state.mx_px and MX and not MX.fold then L.matrix_w = math.max((MX.btns_w or 0) + L.pad + ms('>') + 2 * L.pad + 6, math.min(math.floor(gfx.w * 0.6), state.mx_px)) end
   -- линейка слева от номеров строк (2 окт): имена регионов и маркеров
   -- горизонтально на своих строках, цвет регионов — как линейка REAPER
@@ -699,17 +699,13 @@ function D.layout(snap, state, nregions)
   L.status_in = 0
   L.dsp_h = state.khelp and math.max(7 * L.rh + 8, math.floor(gfx.h * 0.22))
     or (state.dsp and math.max(4 * L.rh + 8, math.floor(gfx.h * 0.18)) or 0)
-  -- session (7 окт): 7 строк под шапками треков — клипы; трекер под ними
-  -- 7 окт: модуль клипов — по умолчанию 30 строк, не больше половины места
-  -- под шапками; высоту тянут мышью за нижнюю границу (state.ss_px)
-  -- строка effects (7 окт): эффекты и сенды трека — под шапками, над клипами
+  -- строка effects (7 окт): эффекты и сенды трека — под шапками
   -- 8 окт: узкий трек — эффекты столбиком; высота строки — по самому
   -- длинному столбику прошлого кадра (D.fxrow_lines ставит main), до 6 строк
   L.fxrow_h = (state.fxrow and not L.mixer) and ((D.fxrow_lines or 1) * L.rh + 2) or 0   -- в микшере эффекты — часть его полосы
   L.fxrow_y = L.header_y + L.header_h
   L.sess_y = L.fxrow_y + L.fxrow_h
-  -- 7 окт: в полтора раза ниже — 20 строк, не больше трети места
-  L.sess_h = state.clipsview and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((gfx.h - L.sess_y - L.status_h) * 0.33))) or 0
+  L.sess_h = 0                                   -- 30 окт: клипы сессии удалены; sess_y — место toppos clips
   L.body_y = L.sess_y + L.sess_h + (L.toppos == 'clips' and L.top_h or 0) + L.jr_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
@@ -818,9 +814,7 @@ function D.layout(snap, state, nregions)
     L.fxrow_y = L.header_y + L.header_h
     L.sess_y = L.fxrow_y + L.fxrow_h
     local bot = tr.y + tr.h
-    -- 10 окт: развёрнут другой модуль (zoom, например big item) — клипов сессии над трекером нет
-    local zoomed_other = state.panes and ((state.panes.zoom and state.panes.zoom ~= 'tracker') or state.panes.zoomv)
-    L.sess_h = (state.clipsview and not zoomed_other) and math.max(4 * L.rh, math.min(state.ss_px or (20 * L.rh), math.floor((bot - L.sess_y) * 0.33))) or 0
+    L.sess_h = 0
     L.body_y = L.sess_y + L.sess_h + L.jr_h         -- 9 окт: линейка прыжков — между клипами и строками
     -- 11 окт: модуль mixer — полоски рисуются в его листе (по колонкам трекера), в теле трекера места не берут
     local mxl = L.mix_bottom and lay.by_panel.mixer
@@ -4212,15 +4206,6 @@ local function draw_topbar(L, info)
   elseif tab == 'grid' then
     -- monome (jf_grid): шина, владелец, мини-грид, легенда
     draw_mono(L, info, sx0, cy0, sx1 - sx0, H - 2, hover)
-  elseif tab == 'clips' then
-    -- clips (6 окт): сессия вкладкой — сцены × треки; поля hover наверх для клика / колеса / меню
-    if info.clips_draw then
-      local hv = info.clips_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2)
-      if mx >= sx0 and mx < sx1 and my >= cy0 and my < H - 2 then   -- только над вкладкой
-        hover.ssbig, hover.topclips = true, true
-        hover.sess, hover.sessrow, hover.sesscol, hover.sessbtn = hv.sess, hv.sessrow, hv.sesscol, hv.sessbtn
-      end
-    end
   elseif tab == 'video' then
     -- video (9 окт, jf_tracker_video.lua): пульт видео трека и список видео-item
     if info.video_draw then hover.video = info.video_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
@@ -6969,7 +6954,6 @@ function D.panes_frame(L, snap, state, info, hover, ph)
             return MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks, view = D.mx_view,
               env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end }, ct.y, ct.w, ct.h)
           end)
-          if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
         end
       elseif id == 'tracks' then
         D.track_list(L, state, snap, info, hover, ct.x + 1, ct.y + 2, ct.w - 2, ct.h - 4, foc == 'tracks')   -- 11 окт: Track Manager
@@ -8488,13 +8472,9 @@ function D.frame(L, snap, rows, state, info)
     x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn')
     x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn')
     small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn')
-    -- ряд 1 (7 окт): session (клипы вместо строк трекера)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
-      -- 9 окт: кнопка — clips (клипы в теле трекера); session — зона, где клипы записаны
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
-      -- 18 окт: клипы в теле трекера выключены (REAPER не для нелинейной игры; сессия — потом в матрице)
-      -- local x1 = small(bx, hy + 1 + L.rh, 'clips', 'session', info.clipsview, 'viewbtn')
       local x1 = bx
       local x2 = small(x1, hy + 1 + L.rh, full and 'effects' or 'fx', 'effects', info.fxrow, 'viewbtn')   -- строка эффектов и сендов треков (7 окт)
       -- 8 окт: param — рядом с effects (одно место; было в строке effects и в
@@ -9431,9 +9411,6 @@ function D.frame(L, snap, rows, state, info)
   elseif MX and L.matrix_w > 0 and not state.mx_hidden and not L.pn then
     hover.matrix = MX.draw(L, snap, info.regions or {}, { play_row = ph, sig_at = info.sig_at, cur_ci = info.cur_ci, cur_region = info.cur_region, cur_region_full = info.cur_region_full, pat_num = info.pat_num, loop_cells = info.loop_cells, loop_text = info.loop_text, region_rgb = info.region_rgb, bar_label = info.mx_bar_label, ticks = info.mx_ticks, marks = info.mx_marks, view = D.mx_view,
       env_shown = function(col) local v = state.trackenvs and state.trackenvs[col.guid]; if v == nil then v = state.envs end; return v end })
-    -- вид clips (6 окт): поля сессии — наверх, их ждут обработчики клика / колеса / меню
-    -- только когда мышь над матрицей (6 окт: иначе клики по ВСЕМУ окну уходили в сессию — фокус и опции мышью отваливались)
-    if hover.matrix and hover.matrix.sess_view and hover.matrix.inside then hover.ssbig = true; hover.sess, hover.sessrow, hover.sesscol = hover.matrix.sess, hover.matrix.sessrow, hover.matrix.sesscol end
   end
   -- кнопки на линии раздела матрица | трекер (2 окт): внизу < свернуть / > развернуть,
   -- над ней = — ручка ширины (тянуть, двойной клик — авто)

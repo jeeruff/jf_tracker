@@ -237,7 +237,7 @@ KH.PAGES = {
     { k = 'tR', d = 'track routing: sends S, receives R, hw outs O (popup)' },
     { k = 'tj tk', d = 'move the track right / left (3tj - three places)' },
     { k = 'mouse', d = 'right drag: select a block (a right click without moving: the menu); left drag: move the event or the selected block under the mouse; Shift+drag: extend the block (option select block with = left swaps the buttons)' },
-    { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next session quantize when playing, from the cursor when stopped; the mark typed in CAPITALS (Shift) dips: there in the first half, back in the second (no count - 1 bar)' },
+    { k = '2f', d = 'mixer: f on a dB mark glides the fader there in 2 bars (2,f - beats); from the next bar when playing, from the cursor when stopped; the mark typed in CAPITALS (Shift) dips: there in the first half, back in the second (no count - 1 bar)' },
     { k = 'Ctrl+mouse', d = 'hold Control and move the mouse: the selected params / faders change (else the one under the mouse, else the keyboard slider); up = more, Shift fine; two selected = XY. Cmd+click: add / remove, Shift+click: a range of params of one effect, Esc: clear' },
     { k = 'Opt+Cmd+mouse', d = 'CONTROL (+ Ctrl over a fader - its pan): a bank of up to 8 sliders nearest the mouse is framed (fx parameters in a track header, v / p of a track, a DSP device column, mixer faders, an XY pad); horizontal sliders - up / down picks, sideways changes; vertical faders - sideways picks, up / down changes; XY - both; it moves only after a clear move along its axis (Shift fine); let go - one undo' },
     { k = 'Ctrl+Opt+Cmd+mouse', m = 'reform gestures', d = 'REFORM gestures over selected notes (v / V): mouse up / down - shift by rows, two fingers up / down or a pinch - scale, two fingers sideways - curve, Shift fine; let go - kept (u - undo)' },
@@ -323,7 +323,7 @@ KH.PAGES = {
     { k = 'amber corners', t = {}, d = 'a note crosses the pattern edge: bottom right - it runs into the next pattern, top left - it came from the previous one; deleting a pattern trims such audio notes, no tails left' },
     { k = 's', m = 'section menu', d = 'section menu of the cursor slot: new (from selected slots / time selection), duplicate, linked, launch, show, loop, rename, remove' },
     { k = 'S', m = 'song: section row', d = 'song: the section row above the playlist (h l, Enter, 3 Enter, x, Space, Esc; any other key - back to the matrix)' },
-    { k = 'buttons', t = {}, d = 'menu view sync trim patternkb timesel follow + live in the empty corner over the slot numbers (follow - the matrix cursor goes with the tracker cursor, on by default) (left of the track names); folded / clips - a row on top' },
+    { k = 'buttons', t = {}, d = 'menu view sync trim patternkb timesel follow + live in the empty corner over the slot numbers (follow - the matrix cursor goes with the tracker cursor, on by default) (left of the track names); folded - a row on top' },
     { k = 'sketch', t = {}, d = 'sketchpad: the sketch button starts it - click cells of any patterns (or Shift + clipkb keys), hear - listen to the picks together, make - a sketch X1 X2 ... in the row, done - off; a click on a sketch - hear it, p P - into the song after / before the slot, e - edit, x - remove' },
     { k = 'Ctrl+Shift+key', m = 'part of a cell', d = 'clipkb: a part of that cell for the sketch - whole, 1/2, 2/2, 1/4 ... 4/4 (it repeats to the sketch length); the part is framed in the cell' },
     { k = 'Ctrl+Space', m = 'hear the sketch', d = 'matrix: the picked sketch(es) play in a loop (= > on the sketch row); e - edit it in clipkb, Enter keeps' },
@@ -356,7 +356,7 @@ KH.PAGES = {
     { k = ':patternkb', m = 'patterns on note keys', d = 'MPC style (the patternkb button; = :pads): the note keys play the patterns of the song - 1 f1 2 ... = the 1st 2nd 3rd pattern, the key shows by its name; quant - seamless when the playing one ends (REAPER smooth seek), sudden - at once at the same place inside (a short gap: the render-ahead buffer refills); rec - record the order, again - write it after the song as linked repeats; off' },
     { k = ':pl', m = 'playlist as text', d = 'playlist (the playlist button - a block on top of the matrix): the order as text - A1 A1 B1x2 C1:16 D1-8 D1/2 B2+8 verse 4: pattern / section name or region number; xN repeat, :N the first N rows, /N a part, -N skip N rows, +N then its first N rows again; Tab completes names; play (seamless on whole patterns), write (after the song), new dup name del next prev - named playlists in the project' },
     { k = 'vismetro', m = 'beat count column', d = 'matrix button: the size column always shown, the playing pattern counts its beats there - 1/4 2/4 3/4 4/4' },
-    { k = 'autoarm', m = 'auto-arm all tracks', d = 'button under clips (top left corner): auto-arm on every track (the selected track is armed for recording), again - off; lit when all have it' },
+    { k = 'autoarm', m = 'auto-arm all tracks', d = 'button in the top left corner: auto-arm on every track (the selected track is armed for recording), again - off; lit when all have it' },
     { k = 'h past the first track', m = 'cursor to region name', g = 'move', d = 'the cursor goes to the region name (Enter / i - rename) and to its number < NN > (Enter - next pattern)' },
     { k = 'Ctrl+h j k l', m = 'move like hjkl', g = 'move', d = 'move like h j k l' },
     { k = 'Ctrl+Up Down', m = 'duplicate slot above / below', g = 'slot', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },
@@ -367,7 +367,7 @@ KH.PAGES = {
     { k = 'v HJKL', m = 'block select', g = 'block', d = 'block select; in block: y copy, d x cut, M mute', t = { 'v', 'H', 'J', 'K', 'L' } },
     { k = '^C ^X ^V ^N', m = 'block copy / cut / paste', g = 'block', d = 'block copy / cut / paste / mute' },
     { k = 'u ⌘⇧Z', m = 'undo / redo', d = 'undo / redo' },
-    { k = 'z', m = 'view menu', g = 'view', d = 'view menu (= the view button): i detail, f fill, r ruler, s s/e, b bpm column, z session (clips over the whole window)', t = { 'z' } },
+    { k = 'z', m = 'view menu', g = 'view', d = 'view menu (= the view button): i detail, f fill, r ruler, s s/e, b bpm column', t = { 'z' } },
     { k = 'z f', t = { 'z' }, m = 'fill: lit or empty', g = 'view', d = 'fill: cells show their content (lit) or stay an empty grid - only the view' },
     { k = 't', m = 'trim past region', g = 'slot', d = 'trim: cut items that run past their region (the button trim)' },
     { k = 'R', m = 'bar ruler on / off', g = 'view', d = 'ruler of bars on the left on / off (button ruler)' },
@@ -477,25 +477,6 @@ KH.PAGES = {
     { k = '..', d = 'empty slot: retro p / Enter puts the capture here; drop a retro / sample selection or a file' },
     { k = 'u', d = 'undo' },
     { k = 'Esc', d = 'back to tracker' },
-  } },
-  session = { title = 'session: clips over the whole window (zz in the matrix)', e = {
-    { k = 'h j k l', d = 'cell (scene row x track column)' },
-    { k = 'Enter o', d = 'launch the clip at the next quantize boundary (its items loop in the =SESSION zone with their own phase)' },
-    { k = 'O s', d = 'scene: launch every clip of the cursor row; 3s - scene 3 (a number, then s); empty cells stop their tracks' },
-    { k = 'f', d = 'labels: f + letters launches that clip' },
-    { k = 'F', d = 'pick several clips: labels on the clips, type them (again - unpick), Enter launches them together on the quantize boundary, Esc' },
-    { k = 'x X', d = 'stop this track / all tracks at the boundary' },
-    { k = 'q', d = 'quantize: bar / beat / now (:session quant ...)' },
-    { k = 'Space', d = 'transport play / stop' },
-    { k = 'Q', d = 'session off: transport stop, zone cleared, repeat off (:session off)' },
-    { k = 'drop', t = {}, d = 'a file or a pm card dropped on a cell becomes its clip (goes into the slot of that track)' },
-    { k = 'rclick', t = {}, d = 'menu: launch / scene / stop / quantize / off' },
-    { k = 'zz Esc', d = 'back to the matrix - the clips keep playing' },
-    { k = 'c', d = 'clipkb: the keyboard columns launch clips - 1qaz the first track, 2wsx the second ... 0p;/ the tenth, top-down the 4 visible scenes; a clip - launch (playing - stop), an empty slot - record into it; Shift + keys - pick several, let go of Shift - they start together; Ctrl + key - stop the track; Backspace - stop all; Esc - clipkb off' },
-    { k = 'A-Tab', d = 'next pane in the tree order (Shift - back)' },
-    { k = 'R', d = 'record into the clip: arms the track, the slot as the auto-punch selection, a bar of count-in, stops at the slot end' },
-    { k = 'dd Del', d = 'delete the clip (its items in the slot)' },
-    { k = 'item tab', t = {}, d = 'the clip under the mouse / cursor fills the wave: drag its start / end, the loop marks L; xf - loop crossfade 0 / 10 / 30 / 60 / 120 ms (off by default)' },
   } },
   pm = { title = 'pm cards (jf_pm, experimental)', e = {
     { k = 'h j k l', d = 'move over the cards (also arrows); g G - first / last' },
@@ -920,9 +901,6 @@ KH.BARS = {
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' } },
   inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
            { 'Space', 'listen' }, { '/', 'find' }, { 'R', 'ξ random' }, { '[ ]', 'ξ back / fwd' } },
-  session = { { 'c', 'clipkb' }, { 'click > x', 'launch / stop' }, { 'o', 'record' }, { 'a', 'follow' }, { 'drop', 'file' }, { 'f', 'labels' }, { 'wheel', 'scenes' } },
-  clipmode = { { 'q..p a..l z..m', 'launch' }, { 'Shift', 'scene' }, { '1..0', 'stop' }, { 'Bksp', 'stop all' }, { 'arrows', 'scenes' },
-               { '.', 'follow' }, { ',', 'quant' }, { '/', 'rec' }, { 'Space', 'play' }, { ';', 'labels' }, { 'Tab', 'tracker' } },
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
   browser = { { 'Enter', 'open/add' }, { 'a', 'add to' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { "'1..'0", 'marks' },
@@ -996,7 +974,7 @@ KH.BARS.dsp_slixer = { { 'Opt+D', 'detect' }, { 'Opt+T', 'transient' }, { 'Opt+C
   { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
 KH.BARS.dsp_container = { { 'h l', 'fx' }, { 'c= c|', 'parallel / serial' }, { 'cc', 'pack' }, { 'cf', 'fold' }, { 'cv', 'grid / list' },
   { 'cb', 'bands' }, { 'zr', 'router' }, { 'P', 'pin ★' }, { 'Z', 'menu' }, { 'dd', 'delete' } }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'session', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)
