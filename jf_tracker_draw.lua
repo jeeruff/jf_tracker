@@ -8686,7 +8686,12 @@ function D.frame(L, snap, rows, state, info)
       -- 8 окт: param — рядом с effects (одно место; было в строке effects и в
       -- уголке микшера); не влезает слово — «p»
       local plb = (x2 + ms('param') + 4 <= bx + bw) and 'param' or ((x2 + ms('p') + 4 <= bx + bw) and 'p' or nil)
-      if plb then small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn') end
+      if plb then
+        local x3 = small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn')
+        -- 31 окт: mixer — рядом с param (чтобы найти; F3 / m), не влезает словом — «mix»
+        local mlb = (x3 + ms('mixer') + 2 <= bx + bw) and 'mixer' or ((x3 + ms('mix') + 2 <= bx + bw) and 'mix' or nil)
+        if mlb then small(x3, hy + 1 + L.rh, mlb, 'mixer', state.mixer, 'viewbtn') end
+      end
       -- 18 окт: autoarm — под clips (просьба; был в шапке мастера): все треки на автоарм / обратно, горит — у всех
       local all, nt = true, reaper.CountTracks(0)
       for i = 0, nt - 1 do if reaper.GetMediaTrackInfo_Value(reaper.GetTrack(0, i), 'B_AUTO_RECARM') ~= 1 then all = false; break end end
@@ -12678,7 +12683,9 @@ function D.frame(L, snap, rows, state, info)
         -- 31 окт: INSERT — рамка по всему модулю трекера (шапки, полоса эффектов, строки): поле строк часть сторон
         -- теряло (верх закрывала полоса эффектов, правый край уходил под соседнюю панель)
         local fr = ((ins or insany) and rects.tracker) or tf
-        set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0)
+        -- 31 окт: NORMAL — белой рамки поля строк нет (верх модуля уже в рамке фокуса; без полосы эффектов она шла
+        -- белой чертой над строками); цветная — только в других режимах
+        if info.vmode ~= 'normal' or ins or insany then set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0) end
         if ins or insany then gfx.rect(fr[1] + 1, fr[2] + 1, fr[3] - 2, fr[4] - 2, 0) end
         D.ins_frame = (ins or insany) and fr or nil
       end

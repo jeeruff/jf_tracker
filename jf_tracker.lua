@@ -18545,6 +18545,7 @@ local function hint_go(t)
   elseif t.kind == 'tlist' then ctx.tlist_do(d.ci, d.what)   -- 11 окт: track list по f
   elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
+  elseif t.kind == 'viewbtn' and d == 'mixer' then ctx.toggle_mixer()
   elseif t.kind == 'viewbtn' and d == 'foldfast' then ctx.foldfast_toggle()   -- 31 окт: хинт fold переключал вид на project
   elseif t.kind == 'viewbtn' then ctx.view_mode(d == 'reg' and 'pattern' or (d == 'sec' and 'section' or 'project'))
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
@@ -24763,6 +24764,7 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
+  elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - a + at the right of the note column, no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
@@ -26577,6 +26579,7 @@ local function frame()
     elseif hover.viewbtn == 'rowjumps' then state.rowjumps = not state.rowjumps; relayout(); vim.msg = 'line numbers (row jumps) ' .. (state.rowjumps and 'on' or 'off')
     elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
+    elseif hover.viewbtn == 'mixer' then ctx.toggle_mixer()   -- 31 окт: кнопка mixer в уголке
     elseif hover.viewbtn == 'foldfast' then ctx.foldfast_toggle()      -- 19 окт: fold быстрых нот
     elseif hover.tlist_hdr then ctx.tlist_column(hover.tlist_hdr); click = { t = now2, zone = 'tlist' }   -- 11 окт: tracks — весь столбец
     elseif hover.tlist and hover.tlist.what == 'cell' then
