@@ -29657,7 +29657,9 @@ local function frame()
   do
     local CB = ctx.CB
     local r = vim.regs['"']
-    if r and r ~= CB.last then
+    -- 31 окт: пустой регистр (dw / x на пустом месте) — не в историю: «empty 0 ev» засорял буфер вставки π
+    local empty = r and r.kind ~= 'env' and #(r.events or r.cells or r) == 0 and not r.pts
+    if r and r ~= CB.last and not empty then
       CB.last = r
       for k = #CB.hist, 1, -1 do if CB.hist[k].reg == r then table.remove(CB.hist, k) end end
       table.insert(CB.hist, 1, { reg = r, t = os.date('%H:%M:%S') })
