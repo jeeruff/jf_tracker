@@ -3576,6 +3576,34 @@ function D.auto_section(L, info, col, tm, x, y, w, h, hover)
 end
 
 -- ползунок настройки модуляции: имя, полоса, значение; протяжка — ctx.mdrag
+-- 31 окт: 8 слотов быстрой загрузки slixer плитками в полосе sx0..sx1 на высоте qy (мини-волна, имя поверх)
+function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
+  local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
+  if qw < L.cw * 3 then return false end
+  local sl = info.slx_slots() or {}
+  for i = 0, 7 do
+    local e = sl[i + 1] or {}
+    local qx, qh = sx0 + i * (qw + 2), L.rh - 1
+    local full = e.path and e.path ~= ''
+    local hot = not drag and mx >= qx and mx < qx + qw and my >= qy and my < qy + qh
+    set(hot and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(qx, qy, qw, qh, 1)
+    local pk = full and info.slx_slot_peaks and info.slx_slot_peaks(e.path, 24)
+    if pk then
+      set(U.tint(U.CYAN, hot and 0.45 or 0.3))
+      local n = math.min(#pk, qw - 2)
+      for c = 0, n - 1 do
+        local v = pk[math.floor(c * #pk / n) + 1] or 0
+        local hh = math.max(1, math.floor(v * (qh - 2) + 0.5))
+        gfx.rect(qx + 1 + math.floor(c * (qw - 2) / n), qy + math.floor((qh - hh) / 2), math.max(1, math.floor((qw - 2) / n)), hh, 1)
+      end
+    end
+    set(hot and U.AMBER or U.LINE); gfx.rect(qx, qy, qw, qh, 0)
+    text(qx + 2, qy, fit(full and e.name or tostring(i + 1), qw - 4), hot and U.AMBER or (full and U.TEXT or U.DIM))
+    if hot then hover.dspbtn = { fx = k, f = f, what = 'qslot', slot = i, path = e.path or '', name = e.name } end
+    hint('dspbtn', qx, qy, qw, qh, { fx = k, what = 'qslot', slot = i })
+  end
+  return true
+end
 local function mslider(L, col, x, yy, w, sl, val, fmtx, hover, enabled)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local lw, vw = ms('depth') + L.pad, ms('1000 ms') + L.pad   -- подписи до 5 букв (rate att rel offs), значение до 7
@@ -10024,13 +10052,7 @@ function D.frame(L, snap, rows, state, info)
       -- кружок, имя, in / out, пресет и слоты (шапка читалась плохо); пульт под них уже на f.slx_hdrw
       f.slx_bry = by   -- поле, не local: лимит 200 локалей функции
       f.slx_hdrw = nil
-      if f.view == 'slixer' and not f.container and #bxs > 1 then
-        f.slx_bry = by + L.rh + 1
-        local minx = math.huge
-        for _, b in ipairs(bxs) do minx = math.min(minx, b[3] - 1) end
-        f.slx_hdrw = bx + bw - minx + L.pad
-        tw = bw - 2 * L.pad
-      end
+      -- 31 окт (вечер): назад — кнопки шапки снова в шапке, вниз (в ряд пульта под detect) ушли слоты быстрой загрузки
 
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
@@ -10095,38 +10117,7 @@ function D.frame(L, snap, rows, state, info)
       -- 27 окт: slixer — 8 слотов быстрой загрузки плитками в свободном месте шапки: мини-волна, имя поверх;
       -- щелчок — загрузить (заказ 10), пустой — номер тускло
       D.pmark('dsp: slx slots')
-      if f.view == 'slixer' and info.slx_slots and tw > 0 then
-        local sx0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + 2 * L.pad + (iol and (iow + L.pad) or 0) + ((info.dspleft and ptw > 0) and (ptw + L.pad) or 0)
-        local sx1 = math.huge
-        if f.slx_bry == by then for _, bb in ipairs(bxs) do sx1 = math.min(sx1, bb[3]) end else sx1 = bx + bw - L.pad end
-        if ptw > 0 and not info.dspleft then sx1 = bx + 2 * L.pad + tw end
-        sx1 = sx1 - 2 * L.pad
-        local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
-        if qw >= L.cw * 3 then
-          local sl = info.slx_slots() or {}
-          for i = 0, 7 do
-            local e = sl[i + 1] or {}
-            local qx, qy, qh = sx0 + i * (qw + 2), by + 1, L.rh - 1
-            local full = e.path and e.path ~= ''
-            local hot = not drag and mx >= qx and mx < qx + qw and my >= qy and my < qy + qh
-            set(hot and U.tint(U.AMBER, 0.25) or U.BG); gfx.rect(qx, qy, qw, qh, 1)
-            local pk = full and info.slx_slot_peaks and info.slx_slot_peaks(e.path, 24)
-            if pk then
-              set(U.tint(U.CYAN, hot and 0.45 or 0.3))
-              local n = math.min(#pk, qw - 2)
-              for c = 0, n - 1 do
-                local v = pk[math.floor(c * #pk / n) + 1] or 0
-                local hh = math.max(1, math.floor(v * (qh - 2) + 0.5))
-                gfx.rect(qx + 1 + math.floor(c * (qw - 2) / n), qy + math.floor((qh - hh) / 2), math.max(1, math.floor((qw - 2) / n)), hh, 1)
-              end
-            end
-            set(hot and U.AMBER or U.LINE); gfx.rect(qx, qy, qw, qh, 0)
-            text(qx + 2, qy, fit(full and e.name or tostring(i + 1), qw - 4), hot and U.AMBER or (full and U.TEXT or U.DIM))
-            if hot then hover.dspbtn = { fx = k, f = f, what = 'qslot', slot = i, path = e.path or '', name = e.name }; on_btn = true end
-            hint('dspbtn', qx, qy, qw, qh, { fx = k, what = 'qslot', slot = i })
-          end
-        end
-      end
+      -- 31 окт: слоты — в пульте, в свободном конце ряда под detect (D.slx_slots после кнопок пульта)
       if f.inner and not f.inner.wrap then set(U.tint(U.AMBER, 0.55)); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0) end   -- 24 окт: в рэке — без второй рамки (слипалась)
       if tw > 0 then
         for _, b in ipairs(bxs) do
@@ -10261,6 +10252,7 @@ function D.frame(L, snap, rows, state, info)
         local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad - (f.slx_hdrw or 0), L.rh, ms, L.pad)   -- 31 окт: справа — кнопки шапки
         local _, nb2 = D.SX.layout(low or {}, 0, 0, bw - 2 * L.pad, L.rh, ms, L.pad)   -- 26 окт: MIDI · ARP под волной
         if not (low and #low > 0) then nb2 = 0 end
+        if info.slx_slots then nb2 = nb2 + 1 end   -- 31 окт: строка слотов быстрой загрузки — в самом низу модуля
         nbr = nbr + nb2
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
         local wr = math.min(16, nfit - need - nbr - 1 - 1)   -- 26 окт: до 16 строк — волна + прицел
@@ -11319,6 +11311,8 @@ function D.frame(L, snap, rows, state, info)
         local x0, y0, w0 = bx + L.pad, by + L.rh + 1, bw - 2 * L.pad
         local hb = D.SX.draw_buttons(U, L, G.lay, text, ms, set, mx, my, drag)
         if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h } end
+        -- 31 окт: слоты быстрой загрузки — строкой в самом низу модуля (как было в окне плагина)
+        if info.slx_slots then D.slx_slots(L, info, f, k, x0, x0 + w0, by + bh - L.rh - 2, hover, mx, my, drag) end
         local wy = y0 + (G.nbr - (G.nb2 or 0)) * L.rh
         D.slx_zoom = D.slx_zoom or {}
         local zst = D.slx_zoom[f.i]
