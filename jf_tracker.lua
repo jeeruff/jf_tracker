@@ -13610,10 +13610,16 @@ ctx = {
   end,
   unsolo_all = function()
     edit.run('unsolo / unmute all', function()
-      for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', 0); reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', 0) end
+      -- 31 окт: библиотека (трек LIB) остаётся заглушённой — её айтемы лежат на таймлайне песни и звучали все разом
+      for i = 0, reaper.CountTracks(0) - 1 do
+        local tr = reaper.GetTrack(0, i)
+        local _, nm = reaper.GetTrackName(tr)
+        reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', 0)
+        reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', model.is_lib_name(nm) and 1 or 0)
+      end
     end)
     model.invalidate()
-    vim.msg = 'every track: solo and mute off (u - undo)'
+    vim.msg = 'every track: solo and mute off, the LIB stays muted (u - undo)'
   end,
   rec_arm_list = function(nums)
     local trs = {}
