@@ -11711,7 +11711,7 @@ ctx = {
       -- 8 окт: шапка подменяет U.TEXT / U.GREY под свою заливку (на светлой —
       -- тёмные), а плашка тёмная — цвет подтягиваем к фону самой плашки
       U.text(x + L.pad, y, lab, U.readable(hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)), cbg, 4.5))
-      if hot then hover[e.kind] = { col = col, k = e.k, it = e.it } end
+      if hot then hover[e.kind] = { col = col, k = e.k, it = e.it, x = x, y = y, w = w2, vert = vert } end   -- 31 окт: место фишки — для броска
       ctx.hint(e.kind, x, y, w2, L.rh, { col = col, k = e.k })
     end
     if vert then
@@ -24041,8 +24041,11 @@ local function frame()
   if ctx.ins_drag and ctx.ins_drag.active then   -- 9 окт: вставка на другой трек
     local d = ctx.ins_drag
     local m = d.mark
-    if m then U.set(U.AMBER); gfx.rect(m.x, m.y - 1, 2, m.h + 1, 1) end
-    local where = m and (m.before and ('  before ' .. m.before) or ('  after ' .. m.after)) or '  (end of chain)'
+    if m and m.horiz then
+      U.set(U.AMBER); gfx.rect(m.x, m.y, m.w, 2, 1)
+      U.text(m.x + m.w + 2, m.y - math.floor(L.rh / 2), (m.par or 0) > 0 and '=' or '|', U.AMBER)   -- 31 окт: как ляжет: | за / = параллельно
+    elseif m then U.set(U.AMBER); gfx.rect(m.x, m.y - 1, 2, m.h + 1, 1) end
+    local where = m and ((m.before and ('  before ' .. m.before) or ('  after ' .. m.after)) .. (m.horiz and ((m.par or 0) > 0 and ', = parallel (right side)' or ', | serial (right third - parallel)') or '')) or '  (end of chain)'
     local tn = d.target and ((d.target.name ~= '' and d.target.name) or 'track')
     draw.ghost(d.name .. ((d.target and (d.target.track ~= d.col.track or m)) and ('  -> ' .. tn .. where .. ((gfx.mouse_cap & 16 == 16) and ' (copy)' or '')) or '  (drop on a track or between its inserts; Opt - copy)'))
   end
@@ -25820,10 +25823,22 @@ local function frame()
         -- 9 окт: над фишкой вставки — место в цепи: левая половина — перед
         -- ней, правая — после (и на своём треке — переставить)
         local h = hover.hdrfx
+        d.cont, d.cpos, d.par = nil, nil, 0
         if h and h.col and h.col.track and h.it and h.it.i and h.x then
-          local after = gfx.mouse_x >= h.x + h.w / 2
+          -- 31 окт: столбик — верх / низ фишки = до / после; правая треть = параллельно (=); внутри контейнера — в него
+          local after
+          if h.vert then after = gfx.mouse_y >= h.y + L.rh / 2 else after = gfx.mouse_x >= h.x + h.w / 2 end
+          local par = h.vert and gfx.mouse_x >= h.x + h.w * 0.66 and 1 or 0
+          local f = h.col.fx and h.col.fx[h.k]
           d.target, d.pos = h.col, h.it.i + (after and 1 or 0)
-          d.mark = { x = after and (h.x + h.w) or (h.x - 2), y = h.y, h = L.rh, before = not after and (h.it.name or 'fx') or nil, after = after and (h.it.name or 'fx') or nil }
+          if f and f.inner and f.inner.parent and f.inner.parent.i then
+            d.cont, d.cpos = f.inner.parent.i, (f.inner.ki or 1) - 1 + (after and 1 or 0)
+          end
+          d.par = par
+          if h.vert then d.mark = { x = h.x, y = after and (h.y + L.rh - 1) or (h.y - 1), w = h.w, horiz = true, par = par }
+          else d.mark = { x = after and (h.x + h.w) or (h.x - 2), y = h.y, h = L.rh } end
+          d.mark.before = not after and (h.it.name or 'fx') or nil
+          d.mark.after = after and (h.it.name or 'fx') or nil
         end
       end
     else
@@ -25833,6 +25848,17 @@ local function frame()
       local copy = gfx.mouse_cap & 16 == 16
       -- свой трек — только с местом в цепи (перестановка или копия туда)
       if same and d.pos and not copy and (d.pos == d.fxi or d.pos == d.fxi + 1) then dst = nil end   -- на то же место
+      if dst and same and d.cont and reaper.ValidatePtr(dst.track, 'MediaTrack*') then   -- 31 окт: в контейнер на место (| или =)
+        if edit.fx_into_at(dst.track, d.cont, d.cpos, nil, d.par or 0, d.fxi) then vim.msg = (copy and 'copied ' or 'moved ') .. d.name .. ((d.par or 0) > 0 and ' (= parallel)' or ' (| serial)') end
+        model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+        dst = nil
+      end
+      if dst and same and d.pos and not copy then   -- из контейнера на верхний уровень — перенос (REAPER оставлял оригинал)
+        local hf = d.col.fx
+        local inside = false
+        for _, f0 in ipairs(hf or {}) do if f0.i == d.fxi and f0.inner then inside = true end end
+        if inside then edit.fx_out_to(dst.track, d.fxi, d.pos, 'move fx out: ' .. d.name); vim.msg = 'moved ' .. d.name .. ' out of the container'; dst = nil end
+      end
       if dst and (not same or d.pos) and reaper.ValidatePtr(dst.track, 'MediaTrack*') and reaper.ValidatePtr(d.col.track, 'MediaTrack*') then
         local to = d.pos or reaper.TrackFX_GetCount(dst.track)
         if same and not copy and to > d.fxi then to = to - 1 end            -- перенос вниз по своей цепи: место после изъятия
