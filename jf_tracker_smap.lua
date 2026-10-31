@@ -52,6 +52,13 @@ function SM.category(name, sub)
   return sub and ('/' .. sub) or 'other'
 end
 
+-- 31 окт: группа — суммарная (категория по имени файла или IRs), а не папка-пак
+function SM.summary(hb)
+  local n = hb.name or ''
+  if n:sub(1, 1) ~= '/' then return true end
+  local b = n:gsub('^[/!_%s]+', ''):lower()
+  return b == 'irs' or b == 'ir' or b == 'impulses'
+end
 -- 27 окт (8): типы файлов карты: сэмплы, MIDI, REX, automation items, шаблоны треков; не-сэмплы — своей группой по типу
 SM.TYPES = { 'samples', 'midi', 'rex', 'auto', 'tpl' }
 SM.EXT_TYPE = { wav = 'samples', aif = 'samples', aiff = 'samples', flac = 'samples', mp3 = 'samples', ogg = 'samples', m4a = 'samples',
@@ -873,7 +880,8 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
         local lab = (hb.name:gsub('^/', '')):upper()
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
-        if hot or (SM.NAMES and free(lx, ly, lw, L.rh)) then   -- 31 окт: имена поверх (опция names), без числа файлов
+        -- 31 окт: на облаке — только суммарные имена (категории kick snare synth … и IRs), имена папок — под мышью
+        if hot or (SM.NAMES and SM.summary(hb) and free(lx, ly, lw, L.rh)) then   -- имена поверх (опция names), без числа файлов
           placed[#placed + 1] = { lx, ly, lw, L.rh }
           U.set(U.BG, 0.55); gfx.rect(lx - 2, ly, lw + 4, L.rh, 1); gfx.a = 1
           U.text(lx, ly, lab, hot and c or U.mix(c, U.TEXT, 0.25))
