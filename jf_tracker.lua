@@ -67,6 +67,7 @@ local PV = dofile(DIR .. '/jf_tracker_preview.lua')
 local alias = dofile(DIR .. '/jf_tracker_alias.lua')
 local B = dofile(DIR .. '/jf_tracker_browser.lua')
 B.SM = dofile(DIR .. '/jf_tracker_smap.lua')   -- 27 окт: карта сэмплов папки (граф, как в Obsidian)
+B.SM.MASS = reaper.GetExtState('jf_tracker', 'mapmass') ~= '0'   -- 31 окт: точки по размеру файла (по умолчанию)
 local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH

@@ -615,7 +615,9 @@ function SM.neb_build(G, grav)
       -- волокна: сдвиг вдоль синусоиды от угла (хаос без сетки)
       local fx = 0.06 * hb.R * math.sin(ang * 7 + hb.ph2 + j * 0.01)
       local fy = 0.06 * hb.R * math.cos(ang * 5 + hb.ph3 + j * 0.013)
-      hb.stars[#hb.stars + 1] = { x = hb.cx + rad * math.cos(ang) + fx, y = hb.cy + rad * math.sin(ang) * 0.85 + fy }
+      -- 31 окт: расстояния слегка случайные (без ровных спиралей и рядов)
+      local jx, jy = 0.035 * hb.R * (rnd(j * 3.11 + hb.ph3) - 0.5), 0.035 * hb.R * (rnd(j * 1.93 + hb.ph1) - 0.5)
+      hb.stars[#hb.stars + 1] = { x = hb.cx + rad * math.cos(ang) + fx + jx, y = hb.cy + rad * math.sin(ang) * 0.85 + fy + jy }
     end
     -- зона группы — прямоугольник по звёздам ядра (без гало): рамка сектора и мини-карта
     local bx0, by0, bx1, by1 = math.huge, -math.huge, math.huge, -math.huge
@@ -818,7 +820,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       U.set(U.mix(col(hb), U.TEXT, 0.35))
       for _, st in ipairs(hb.stars) do
         local px, py = X(st.x) - ox, Y(st.y) - oy
-        local r = (st.n and st.n.r or 0.5) * rmax
+        local r = (SM.MASS and st.n and st.n.r or 0.5) * rmax   -- 31 окт: mass — по размеру файла, point — одинаковые
         if px >= 0 and px < w and py >= 0 and py < h then
           if r < 1.3 then gfx.rect(px, py, 1, 1, 1) else gfx.circle(px, py, r, 1, 1) end
         end
@@ -857,10 +859,9 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
         local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
-        if hot or free(lx, ly, lw, L.rh) then
-          placed[#placed + 1] = { lx, ly, lw, L.rh }
+        if hot then   -- 31 окт (просьба): в nebula только точки — имя группы лишь под мышью
           U.set(U.BG, 0.55); gfx.rect(lx - 2, ly, lw + 4, L.rh, 1); gfx.a = 1
-          U.text(lx, ly, lab, hot and c or U.mix(c, U.TEXT, 0.25))
+          U.text(lx, ly, lab, c)
         end
         if hot then
           hv = hv or { hub = hb, sector = true }
@@ -1291,7 +1292,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
           local px, py = hx + n.ox * sc, hy + n.oy * sc
           local an = SM.AN[n.path]
           -- этап 2: проанализирован — размер по громкости, dimension раздувает яркие (покрытие спектра)
-          local r = an and (0.3 + 0.7 * an.l) * (1 + (V.dim or 0.5) * 1.5 * an.b) * rmax * 0.7 or n.r * rmax
+          local r = not SM.MASS and 0.5 * rmax or (an and (0.3 + 0.7 * an.l) * (1 + (V.dim or 0.5) * 1.5 * an.b) * rmax * 0.7 or n.r * rmax)
           if px >= -r and px < w + r and py >= -r and py < h + r then
             if r < 1.5 then gfx.rect(px, py, r < 0.9 and 1 or 2, r < 0.9 and 1 or 2, 1) else gfx.circle(px, py, r, 1, 1) end
           end
@@ -1337,6 +1338,8 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
         end
       end
     end
+    -- 31 окт: след прослушанного — как в nebula
+    SM.hist_path(U, G, V, function(nd) if nd.h and nd.ox then return HX(nd.h) + nd.ox * sc, HY(nd.h) + nd.oy * sc end end, col)
     local pn = playing and G.bypath and G.bypath[playing]
     if pn then U.set(U.AMBER); gfx.circle(HX(pn.h) + pn.ox * sc, HY(pn.h) + pn.oy * sc, math.max(2, pn.r * rmax) + 1, 1, 1) end
     if hv and hv.node then U.set(U.TEXT); gfx.circle(hv.px, hv.py, hv.r + 2, 0, 1) end
@@ -1379,6 +1382,8 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     end
     local fy, fx = oy0 + 1, x + L.pad
     for _, t in ipairs(SM.TYPES) do fx = fx + btn(fx, fy, t, V.types and V.types[t], 'mtype', t) + 2 end
+    fx = fx + L.pad
+    fx = fx + btn(fx, fy, SM.MASS and 'mass' or 'point', SM.MASS, 'mmass', true) + 2   -- 31 окт: точки по размеру файла / одинаковые
     fy = fy + L.rh
     local sw = math.max(L.cw * 4, math.min(L.cw * 10, math.floor((w - 2 * L.pad) / 2) - U.measure('dimension ') - L.pad))
     local sx0 = x + L.pad

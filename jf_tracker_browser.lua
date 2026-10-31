@@ -943,7 +943,7 @@ map_draw_inner = function(U, L, x, y, w, h)
     if gfx.mouse_cap & 1 == 1 then B.mapV.px, B.mapV.py = pan.px + mx - pan.mx, pan.py + my - pan.my else B.map_pan = nil end
   end
   B.map_hv = hv
-  if hv and hv.mfilter then return 'mapflt_' .. hv.mfilter elseif hv and hv.hprint then return 'maphprint' elseif hv and hv.mtype then return 'mapty_' .. hv.mtype elseif hv and hv.hist then return 'maphist' .. hv.hist elseif hv and hv.slider then return 'mapsl' elseif hv and hv.back then return 'mapback' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
+  if hv and hv.mfilter then return 'mapflt_' .. hv.mfilter elseif hv and hv.hprint then return 'maphprint' elseif hv and hv.mmass then return 'mapmass' elseif hv and hv.mtype then return 'mapty_' .. hv.mtype elseif hv and hv.hist then return 'maphist' .. hv.hist elseif hv and hv.slider then return 'mapsl' elseif hv and hv.back then return 'mapback' elseif hv and hv.style then return 'mapstyle' elseif hv and hv.random then return 'maprandom' elseif hv and hv.node then return 'mapnode' elseif hv and hv.hub then return 'maphub' elseif inside then return 'mapbg' end
   return nil
 end
 
@@ -1526,6 +1526,10 @@ function B.click(what)
     local G = B.mapG
     if G and not G.building then G.nodes = G.raw; G.neb, G.gal, G.lab_order, G.tree = nil, nil, nil, nil; B.SM.finish(G) end
     if ctx.msg then ctx.msg(('map filter %s %s: %d of %d files'):format(k, B.SM.FON[k] and 'on' or 'off', G and #G.nodes or 0, G and #(G.raw or {}) or 0)) end
+  elseif what == 'mapmass' then   -- 31 окт: точки по размеру файла (mass) / одинаковые (point)
+    B.SM.MASS = not B.SM.MASS; R.SetExtState('jf_tracker', 'mapmass', B.SM.MASS and '1' or '0', true)
+    if B.mapG then B.mapG.ver = B.mapG.ver + 1 end
+    if ctx.msg then ctx.msg('map points: ' .. (B.SM.MASS and 'mass - by the file size' or 'point - all the same')) end
   elseif what:match('^mapty_') then   -- 27 окт (8): типы файлов карты вкл / выкл
     local t = what:sub(7)
     B.mapV.types[t] = not B.mapV.types[t] or nil
