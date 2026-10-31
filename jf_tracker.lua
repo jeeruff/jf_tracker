@@ -17056,6 +17056,104 @@ ctx.phrase_make = function(name)
   model.invalidate()
   vim.msg = ('phrase ph:%s: %d item(s) into the library, a C-4 trigger in their place (other notes transpose, velocity scales)'):format(name, moved)
 end
+-- 31 окт: панель phrases — фразы проекта (регионы ph:NAME) с длиной и числом вхождений; кэш по счётчику правок
+ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
+ctx.phr_list = function()
+  local sc = reaper.GetProjectStateChangeCount(0)
+  if ctx.phr_cc and ctx.phr_cc.sc == sc then return ctx.phr_cc.list end
+  local R = reaper
+  local list, by, i = {}, {}, 0
+  while true do
+    local r, isr, p, e, nm, idx = R.EnumProjectMarkers3(0, i)
+    if not r or r == 0 then break end
+    local n = isr and nm:match('^ph:(.+)$')
+    if n and not by[n] then
+      by[n] = { name = n, pos = p, rend = e, idx = idx, lenq = R.TimeMap2_timeToQN(0, e) - R.TimeMap2_timeToQN(0, p), n = 0 }
+      list[#list + 1] = by[n]
+    end
+    i = i + 1
+  end
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for k = 0, R.CountTrackMediaItems(tr) - 1 do
+      local tk = R.GetActiveTake(R.GetTrackMediaItem(tr, k))
+      local tn = tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) or ''
+      local n = tn:match('^ph:(.+)$')
+      if n and by[n] then by[n].n = by[n].n + 1 end
+    end
+  end
+  table.sort(list, function(a, b) return a.name:lower() < b.name:lower() end)
+  ctx.phr_cc = { sc = sc, list = list }
+  return list
+end
+ctx.phr_find = function(name) for _, r in ipairs(ctx.phr_list()) do if r.name == name then return r end end end
+-- триггеры фразы: { { tr, it, tk } }
+ctx.phr_triggers = function(name)
+  local R, out = reaper, {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for k = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, k)
+      local tk = R.GetActiveTake(it)
+      if tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) == 'ph:' .. name then out[#out + 1] = { tr = tr, it = it, tk = tk } end
+    end
+  end
+  return out
+end
+ctx.phr_rename = function(a, b)
+  local r = ctx.phr_find(a)
+  if not r then vim.msg = 'phrase ' .. a .. ': not found'; return end
+  if ctx.phr_find(b) then vim.msg = 'phrase ' .. b .. ' already exists'; return end
+  edit.run('phrase rename', function()
+    reaper.SetProjectMarker3(0, r.idx, true, r.pos, r.rend, 'ph:' .. b, 0)
+    for _, t in ipairs(ctx.phr_triggers(a)) do reaper.GetSetMediaItemTakeInfo_String(t.tk, 'P_NAME', 'ph:' .. b, true) end
+  end)
+  ctx.phr_cc = nil; model.invalidate()
+  vim.msg = ('phrase %s -> %s'):format(a, b)
+end
+ctx.phr_do = function(op)
+  local R = reaper
+  if op.op == 'new' then ctx.phrase_make(''); ctx.phr_cc = nil; return end
+  local r = op.name and ctx.phr_find(op.name)
+  if not r then return end
+  if op.op == 'confirm' then vim.msg = 'phrase ' .. r.name .. ': x again - delete the source, its items and every trigger'
+  elseif op.op == 'insert' then
+    local col = cur_col()
+    if not (col and col.track) then vim.msg = 'phrase: no track at the cursor'; return end
+    local t = edit.row_time(vim.cur.row, state.lpb, 0)
+    local t1 = R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, t) + r.lenq)
+    edit.run('phrase ' .. r.name .. ' at the cursor', function()
+      local it = R.CreateNewMIDIItemInProj(col.track, t, t1)
+      local tk = it and R.GetActiveTake(it)
+      if tk then
+        R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', 'ph:' .. r.name, true)
+        R.MIDI_InsertNote(tk, false, false, 0, R.MIDI_GetPPQPosFromProjTime(tk, t1), 0, 60, 100, false)
+      end
+    end)
+    ctx.phr_cc = nil; model.invalidate()
+    vim.msg = ('phrase %s at row %d (%s): change the note - transposed, velocity - louder / quieter'):format(r.name, vim.cur.row, col.name or '')
+  elseif op.op == 'goto' then
+    vim.cur.row = math.max(0, math.floor(model.row_of_time(r.pos, state.lpb) + 0.5))
+    vim.ensure_visible(); ctx.set_focus('tracker')
+    vim.msg = 'phrase ' .. r.name .. ': its source - edit it, every instance follows'
+  elseif op.op == 'rename' then vim.open_prompt('phrename ' .. r.name .. ' ', '')
+  elseif op.op == 'delete' then
+    edit.run('phrase delete ' .. r.name, function()
+      for _, t in ipairs(ctx.phr_triggers(r.name)) do R.DeleteTrackMediaItem(t.tr, t.it) end
+      for ti = 0, R.CountTracks(0) - 1 do
+        local tr = R.GetTrack(0, ti)
+        for k = R.CountTrackMediaItems(tr) - 1, 0, -1 do
+          local it = R.GetTrackMediaItem(tr, k)
+          local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+          if p >= r.pos - 1e-6 and p < r.rend - 1e-6 then R.DeleteTrackMediaItem(tr, it) end
+        end
+      end
+      R.DeleteProjectMarker(0, r.idx, true)
+    end)
+    ctx.phr_cc = nil; model.invalidate()
+    vim.msg = 'phrase ' .. r.name .. ' deleted'
+  end
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end
@@ -22910,6 +23008,7 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
+    phr_draw = function(Lx, x, y, w, h, foc) return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = ctx.lfo_target()
       return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
@@ -25575,6 +25674,16 @@ local function frame()
       ctx.dsp_autoitem(d.k, d.pi)
       ctx.dsp_env_focus = nil
       click = { t = now2, zone = 'acvnew' }
+    elseif hover.phr then   -- 31 окт: панель phrases — щелчок строка, двойной — в курсор; new
+      ctx.set_focus('phrases')
+      if hover.phr.btn == 'new' then ctx.phr_do({ op = 'new' })
+      elseif hover.phr.row then
+        local same = ctx.PHP.sel == hover.phr.row
+        ctx.PHP.sel = hover.phr.row
+        local r = ctx.phr_list()[hover.phr.row]
+        if dbl and same and click.zone == 'phr' and r then ctx.phr_do({ op = 'insert', name = r.name }) end
+      end
+      click = { t = now2, zone = 'phr' }
     elseif hover.lfogen then   -- 31 окт: панель lfogen
       ctx.set_focus('lfogen')
       ctx.lfo_field_click(hover.lfogen)
@@ -29518,6 +29627,12 @@ local function frame()
         if r == 'changed' then ctx.rd_save()
         elseif r == 'render' then ctx.rd_render()
         elseif r == 'leave' then ctx.set_focus('tracker')
+        elseif not r then return vim.key(c) end
+      elseif state.focus == 'phrases' then   -- 31 окт: панель фраз
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local r = ctx.PHP.key(ctx.phr_list(), c)
+        if r == 'leave' then ctx.set_focus('tracker')
+        elseif type(r) == 'table' then ctx.phr_do(r)
         elseif not r then return vim.key(c) end
       elseif state.focus == 'lfogen' then   -- 31 окт: панель генератора кривых
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end

@@ -384,6 +384,15 @@ KH.PAGES = {
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },
   } },
+  phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
+    { k = 'j k  g G', d = 'the phrase' },
+    { k = 'Enter', d = 'the phrase at the tracker cursor, on the cursor track: one trigger note C-4 (another note transposes it, velocity scales it, its length cuts it)' },
+    { k = 'e', d = 'to its source in the library (the tracker cursor goes there): edit it - every instance follows' },
+    { k = 'n', d = 'a new phrase from the V block (else the pattern of the cursor) on the cursor track (= :phrase)' },
+    { k = 'r', d = 'rename (the source and every trigger)' },
+    { k = 'x x', d = 'delete: the source, its items and every trigger' },
+    { k = 'Esc', d = 'back to the tracker' },
+  } },
   lfogen = { title = 'lfogen - the curve generator into the envelope at the cursor (Ctrl+W g G)', e = {
     { k = 'j k', d = 'field: type (lfo / podkat / follow), shape, period, depth, center, phase, points, buttons' },
     { k = 'h l', d = 'value (Shift: fine); the mouse - click a button, drag a slider, wheel' },
@@ -898,6 +907,7 @@ KH.PAGES = {
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
   -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
+  phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
   reform = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { '0', 'reset' }, { 'Space', 'listen' }, { 'Enter', 'keep' }, { 'Esc', 'revert' }, { 'f', 'jump' } },
