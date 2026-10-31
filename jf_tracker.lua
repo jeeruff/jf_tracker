@@ -183,6 +183,7 @@ local state = {
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
   qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
+  dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
   jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
@@ -12775,6 +12776,7 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
+      { key = 'dspauto', label = 'dsp follows cursor', kind = 'toggle', desc = 'the bottom tabs follow the tracker cursor: a track with an instrument plugin - dsp; an envelope lane drawn as a graph (narrow) - dsp on its effect; a lane with numbers - nothing (Enter / double click - its curve); off - the tabs stay where you put them', get = function() return state.dspauto end, set = function(v) state.dspauto = v; reaper.SetExtState(EXT, 'dspauto', v and 'on' or 'off', true) end },
       { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
       { key = 'slidespeed', label = 'slide speed (ticks)', kind = 'cycle', values = { 6, 3, 4, 5, 8, 12 }, desc = 'ticks a row for the ft2 / it / pt slide styles (the tracker speed; 6 by default, the slide runs speed - 1 ticks)', get = function() return state.slidespeed end, set = function(v) state.slidespeed = tonumber(v) or 6; reaper.SetExtState(EXT, 'slidespeed', tostring(state.slidespeed), true); edit.cmds.SPEED = state.slidespeed end },
@@ -12959,7 +12961,7 @@ ctx = {
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -26753,6 +26755,11 @@ local function frame()
             else reaper.Main_OnCommand(40153, 0) end
           end
         end
+        -- 31 окт: двойной щелчок по огибающей / MIDI-лейну — его кривая на холсте (как Enter)
+        if dbl and click.zone == 'body' and click.fi == hover.fi and click.row == hover.row.row then
+          local fl2 = L.flat[hover.fi]
+          if fl2 and (fl2.env or fl2.ml) then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row; ctx.curve_open() end
+        end
         click = { t = now2, zone = 'body', fi = hover.fi, row = hover.row.row }
       end
     end
@@ -28323,8 +28330,24 @@ local function frame()
     if col and col.guid and ctx.dspauto_trk ~= col.guid then
       ctx.dspauto_trk = col.guid
       local ti = ctx.track_insts(col)
-      if vim.cur.sub ~= 'wave' and ti[1] and ti[1].fx and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
+      if state.dspauto and vim.cur.sub ~= 'wave' and ti[1] and ti[1].fx and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
     end
+    -- 31 окт: пришёл на огибающую эффекта, нарисованную графиком (узкая колонка) — dsp на этом эффекте (график уже
+    -- виден в трекере); колонка с числами — ничего: кривая по Enter / двойному щелчку
+    local ek = fc and fc.env and fc.compact and tostring(fc.env.env) or nil
+    if ek and ctx.dspauto_env ~= ek and state.dspauto and col and col.track then
+      local tr = col.track
+      for k, f in ipairs(col.fx or {}) do
+        local hit
+        for p = 0, math.min(256, reaper.TrackFX_GetNumParams(tr, f.i)) - 1 do if reaper.GetFXEnvelope(tr, f.i, p, false) == fc.env.env then hit = p; break end end
+        if hit then
+          dsp_sel.fx = k
+          if state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'dsp') then relayout() end
+          break
+        end
+      end
+    end
+    ctx.dspauto_env = ek
     -- 22 окт: курсор пришёл на колонку волны — вкладка item (сэмпл, слайсы), а не dsp; ушёл и вернулся — снова
     local onw = fc and vim.cur.sub == 'wave' and (vim.cur.fi .. ':' .. tostring(col and col.guid)) or nil
     if onw and ctx.waveauto_at ~= onw and state.panes and state.panes_ui and draw.panes.set_active(state.panes, 'sample') then state.toptab = 'sample'; relayout() end
