@@ -29696,7 +29696,8 @@ local function frame()
     local m = ctx.mods()
     local NAMES = { [27] = 'esc', [13] = 'enter', [32] = 'space', [8] = 'bs', [9] = 'tab', [keys.up] = 'up', [keys.down] = 'down',
                     [keys.left] = 'left', [keys.right] = 'right', [6579564] = 'del', [1752132965] = 'home', [6647396] = 'end' }
-    local nm = NAMES[c_raw]
+    -- 31 окт: Ctrl+H / I / M приходят кодами 8 / 9 / 13 — с зажатым Ctrl это ctrl+буква, не bs / tab / enter
+    local nm = (m.ctrl and c_raw >= 1 and c_raw <= 26) and ('ctrl+' .. string.char(c_raw + 96)) or NAMES[c_raw]
     if not nm then
       -- 6 окт: Cmd+буква на macOS приходит тем же кодом 1..26, что Ctrl+буква —
       -- ctrl пишем, только если Ctrl зажат (или Cmd не зажат)
