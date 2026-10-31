@@ -10548,6 +10548,25 @@ function D.frame(L, snap, rows, state, info)
               hint('dspbtn', mox, hy, mow, L.rh - 1, { fx = k, what = 'kmidi' })
               ah = ah + mow + 2   -- счётчик пэдов и кнопки правее — после неё
             end
+            -- 31 окт: new kit (случайный кит: все / выбранный / 16 видимых) и ‹ ξ › — похожий сэмпл выбранному пэду
+            do
+              local bl = { { 'new kit', 'knew' } }
+              if ks > 0 then bl[#bl + 1] = { '<', 'kxprev' }; bl[#bl + 1] = { 'ξ', 'kxi' }; bl[#bl + 1] = { '>', 'kxnext' } end
+              local nx = bx + 2 + ah
+              for _, b2 in ipairs(bl) do
+                local w2 = ms(b2[1]) + 2 * L.pad
+                if nx + w2 < bx + bw1 - ms('cell') - ms('list') - 6 * L.pad then
+                  local hn = not drag and mx >= nx and mx < nx + w2 and my >= hy and my < hy + L.rh
+                  set(hn and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(nx, hy, w2, L.rh - 1, 1)
+                  set(hn and U.AMBER or U.LINE); gfx.rect(nx, hy, w2, L.rh - 1, 0)
+                  text(nx + L.pad, hy, b2[1], hn and U.AMBER or (b2[2] == 'knew' and U.TEXT or U.CYAN))
+                  if hn then hover.dspbtn = { fx = k, f = f, what = b2[2], ki = ks, kkey = kkey } end
+                  hint('dspbtn', nx, hy, w2, L.rh - 1, { fx = k, what = b2[2] })
+                  nx = nx + w2 + 2; ah = ah + w2 + 2
+                end
+              end
+              D.kit_win = D.kit_win or {}; D.kit_win[kkey] = D.kit_scroll and D.kit_scroll[kkey]   -- видимые 16: ряд окна
+            end
             local cm = info.drumcell or 'note'
             local cl_lbl = 'cell'   -- 23 окт: просто cell (режим подписи — в выпадашке)
             local cw2 = ms(cl_lbl) + 2 * L.pad

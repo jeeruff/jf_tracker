@@ -17155,6 +17155,93 @@ ctx.phr_do = function(op)
     vim.msg = 'phrase ' .. r.name .. ' deleted'
   end
 end
+-- 31 окт: drumrs5k — похожий сэмпл пэду (класс по имени файла / пэда, ближние по звуку, если прослушаны) из индекса
+-- карты; ‹ › — назад / вперёд по выпавшим (первый шаг назад — исходный); new kit — случайные сэмплы классов пэдов
+ctx.pad_hist = {}
+ctx.pad_cands = function(kid)
+  local G = B.mapG
+  if not G or G.building or #G.nodes == 0 then return nil, 'open the map pane once on your samples folder - its index is where the samples come from' end
+  local SM = B.SM
+  local nm = (kid.file and kid.file:match('[^/]+$')) or kid.name or ''
+  local cat = SM.cat_of(nm, nil)
+  if cat:sub(1, 1) == '/' or cat == 'other' then cat = SM.cat_of(kid.name or '', nil) end
+  local cands = {}
+  for _, n in ipairs(G.nodes) do if n.cat == cat and n.path ~= kid.file then cands[#cands + 1] = n end end
+  if #cands == 0 then return nil, ('nothing of the class "%s" in the map index'):format(cat) end
+  -- похожие по звуку: прослушан сам пэд — 40 ближайших по яркости / громкости / длине, из них случайный
+  local a0 = kid.file and SM.AN[kid.file]
+  if a0 and #cands > 40 then
+    local function dist(n) local a = SM.AN[n.path]; if not a then return 9 end; return (a.b - a0.b) ^ 2 + (a.l - a0.l) ^ 2 + ((a.d or 1) - (a0.d or 1)) ^ 2 / 4 end
+    table.sort(cands, function(p, q) return dist(p) < dist(q) end)
+    for i = #cands, 41, -1 do cands[i] = nil end
+  end
+  return cands, cat
+end
+ctx.pad_load = function(tr, kid, path)
+  reaper.TrackFX_SetNamedConfigParm(tr, kid.rs5k_i, 'FILE0', path); reaper.TrackFX_SetNamedConfigParm(tr, kid.rs5k_i, 'DONE', '')
+  local pi = model.rs5k_pidx(model.fxapi(tr), tr, kid.rs5k_i)
+  if pi.start then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.start, 0) end
+  if pi.stop then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.stop, 1) end
+end
+ctx.pad_similar = function(f, ki, d)
+  local tgt = dsp_target(); local kid = f and f.kids and f.kids[ki]
+  if not (tgt and kid and kid.rs5k_i) then vim.msg = 'ξ: pick a pad with a sample'; return end
+  local tr = tgt.track
+  local gid = reaper.TrackFX_GetFXGUID(tr, kid.rs5k_i) or tostring(ki)
+  local H = ctx.pad_hist[gid] or { list = {}, i = 0, orig = kid.file }
+  ctx.pad_hist[gid] = H
+  local path
+  if d then
+    local ni = math.max(0, math.min(#H.list, H.i + d))
+    if ni == H.i then vim.msg = d < 0 and 'ξ: the original sample already' or 'ξ: no newer pick - ξ rolls a new one'; return end
+    H.i = ni; path = ni == 0 and H.orig or H.list[ni]
+  else
+    local cands, why = ctx.pad_cands(kid)
+    if not cands then vim.msg = 'ξ: ' .. why; return end
+    path = cands[math.random(#cands)].path
+    while #H.list > H.i do H.list[#H.list] = nil end
+    H.list[#H.list + 1] = path; H.i = #H.list
+  end
+  if not path then return end
+  edit.run('pad: similar sample', function() ctx.pad_load(tr, kid, path) end)
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  if ctx.preview_file then ctx.preview_file(path) end
+  vim.msg = ('ξ %s: %s (%d/%d; < > - back / forward)'):format(kid.name or 'pad', path:match('[^/]+$'), H.i, #H.list)
+end
+ctx.kit_new_menu = function(f, ks, kkey)
+  local tgt = dsp_target(); if not (tgt and f and f.kids) then return end
+  local tr = tgt.track
+  local function roll(list, what)
+    local n, miss = 0, 0
+    edit.run('new kit (' .. what .. ')', function()
+      for _, kid in ipairs(list) do
+        if kid.rs5k_i then
+          local cands = ctx.pad_cands(kid)
+          if cands then
+            local p = cands[math.random(#cands)].path
+            local gid = reaper.TrackFX_GetFXGUID(tr, kid.rs5k_i) or ''
+            local H = ctx.pad_hist[gid] or { list = {}, i = 0, orig = kid.file }
+            ctx.pad_hist[gid] = H; H.list[#H.list + 1] = p; H.i = #H.list
+            ctx.pad_load(tr, kid, p); n = n + 1
+          else miss = miss + 1 end
+        end
+      end
+    end)
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = ('new kit (%s): %d pad(s) got a new sample of their class%s; < > on a pad - back to the old one'):format(what, n, miss > 0 and (', ' .. miss .. ' without a class / match') or '')
+  end
+  local wb = draw.kit_win and draw.kit_win[kkey]
+  local items = {
+    { key = 'a', label = ('all pads (%d)'):format(#f.kids), fn = function() roll(f.kids, 'all') end },
+  }
+  if ks and ks > 0 then items[#items + 1] = { key = 's', label = 'the selected pad: ' .. (f.kids[ks].name or ks), fn = function() roll({ f.kids[ks] }, 'selected') end } end
+  if wb then items[#items + 1] = { key = 'v', label = 'the 16 visible pads', fn = function()
+    local l = {}; for _, kid in ipairs(f.kids) do if kid.note and kid.note >= wb * 4 and kid.note < wb * 4 + 16 then l[#l + 1] = kid end end
+    roll(l, '16 visible')
+  end } end
+  vim.open_hydra({ title = 'new kit: a random sample of the same class (kick, snare, hat ...) for every pad', items = items })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end
@@ -26349,6 +26436,9 @@ local function frame()
         local col = dsp_target(); if col then edit.fx_remove(col.track, hover.dspbtn.kid.i); model.invalidate(); vim.msg = 'removed ' .. hover.dspbtn.kid.name .. ' from ' .. hover.dspbtn.f.name end
       elseif hover.dspbtn.what == 'ksize' then ctx.drum_size_menu()   -- 19 окт: размер пэдов
       elseif hover.dspbtn.what == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: MIDI out рэка
+      elseif hover.dspbtn.what == 'knew' then ctx.kit_new_menu(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.kkey)   -- 31 окт
+      elseif hover.dspbtn.what == 'kxi' or hover.dspbtn.what == 'kxprev' or hover.dspbtn.what == 'kxnext' then
+        ctx.pad_similar(hover.dspbtn.f, hover.dspbtn.ki, ({ kxi = nil, kxprev = -1, kxnext = 1 })[hover.dspbtn.what])
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
       elseif hover.dspbtn.what == 'macfold' then   -- 22 окт: MACRO — свернуть / развернуть
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
