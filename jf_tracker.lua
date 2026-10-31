@@ -368,7 +368,7 @@ local state = {
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   krdelay = tonumber(reaper.GetExtState(EXT, 'krdelay')) or 250, krrate = tonumber(reaper.GetExtState(EXT, 'krrate')) or 30,   -- 27 окт: свой автоповтор зажатой клавиши (0 — системный)
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
-  framefx = (function() local v = reaper.GetExtState(EXT, 'framefx'); return v == 'edge' and 'cracks' or v end)(),   -- 31 окт: рамка трекера: cracks / edge / blood / grunge / lightning ('' — по опции cracks)
+  framefx = (function() local v = reaper.GetExtState(EXT, 'framefx'); return (v == 'edge' or v == 'grunge') and 'cracks' or v end)(),   -- 31 окт: рамка трекера: cracks / edge / blood / grunge / lightning ('' — по опции cracks)
   unhuman = reaper.GetExtState(EXT, 'unhuman') == '1',   -- 31 окт: сыгранное с MIDI-клавиатуры — ровно по строкам, одна velocity
   holdroll = reaper.GetExtState(EXT, 'holdroll') == '1' or nil,
   rollstep = reaper.GetExtState(EXT, 'rollstep') == '1' or nil,   -- 28 окт: roll + Ctrl+A / X — копия на шаг ниже с ±1   -- 28 окт: удержание ноты: hold — длина по времени (OFF), roll — курсор едет, без OFF
@@ -12986,7 +12986,7 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('insred', 'INSERT cursor red', 'in INSERT the cursor accent (cell, edge, playhead) turns red - the keys write; off - the cursor accent colour as always'),
-      { key = 'framefx', label = 'frame (experimental)', kind = 'cycle', values = { 'off', 'cracks', 'blood', 'grunge', 'lightning' }, desc = 'a frame inside the tracker: cracks all over, blood (ragged rim, drips, splatter), grunge (stains, scratches), lightning (flickers); red in INSERT (:frame)', get = function() return (state.framefx ~= nil and state.framefx ~= '') and state.framefx or (state.cracks and 'cracks' or 'off') end, set = function(v) state.framefx = v; state.cracks = v ~= 'off' end },
+      { key = 'framefx', label = 'frame (experimental)', kind = 'cycle', values = { 'off', 'cracks', 'blood', 'lightning' }, desc = 'a frame inside the tracker: cracks all over, blood (ragged rim, drips, splatter), lightning (flickers); red in INSERT (:frame)', get = function() return (state.framefx ~= nil and state.framefx ~= '') and state.framefx or (state.cracks and 'cracks' or 'off') end, set = function(v) state.framefx = v; state.cracks = v ~= 'off' end },
       flag('bloodviz', 'blood visualizer (experimental)', 'a pool of blood along the bottom with waves; the sound of a track throws drops - they stretch, wobble and splash back, ripples run to the neighbours (:blood)'),
       flag('sand', 'sand visualizer (experimental)', 'a sand bed under every track; the sound of the track throws grains up - louder, higher (:sand)'),
       flag('cracks', 'cracks (experimental)', 'cracks along the inner edge of the tracker and impact webs in the corners and empty space; the colours around seep through them, red in INSERT (:cracks toggles)'),

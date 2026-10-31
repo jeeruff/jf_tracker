@@ -7564,8 +7564,8 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
       local len = r < 0.12 and deep * (0.4 + rnd() * 0.6) or (r < 0.5 and reach * (0.15 + rnd() * 0.25) or reach * (0.4 + rnd() * 0.8))
       crack(px, py, ang + (rnd() - 0.5) * 0.8, len, src(ox, oy), r < 0.12 and 2 or 1.5, 1)
     end
-  elseif style == 'blood' or style == 'grunge' then
-    local blood = style == 'blood'
+  elseif style == 'blood' then
+    local blood = true
     local function col(v) if blood then return { 0.55 + 0.35 * v, 0.02, 0.03 } end; return { 0.45 + 0.25 * v, 0.15 + 0.08 * v, 0.10 } end
     -- кайма: вертикальные / горизонтальные полоски переменной толщины (по 2 px)
     local th = { ragged(blood and 16 or 10, blood and 26 or 18), ragged(blood and 12 or 10, 20), ragged(blood and 14 or 10, 22), ragged(blood and 12 or 10, 20) }
@@ -10024,7 +10024,7 @@ function D.frame(L, snap, rows, state, info)
   do local ins = info.vmode == 'insert'
     local ex = (L.total_w or W) - tx0
     local fs = (state.framefx and state.framefx ~= '' and state.framefx ~= 'off') and state.framefx or (state.cracks and 'cracks') or nil
-    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood' and fs ~= 'grunge', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
+    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
   if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
   if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
