@@ -17222,7 +17222,7 @@ end
 -- айтемы режутся по краям блока, середины уезжают в библиотеку (регион ph:NAME за =END, с начала такта), на месте
 -- блока — MIDI-триггер на треке курсора с тейком ph:NAME и одной нотой C-4 на всю длину; PH.sync (в edit.run)
 -- кладёт копии обратно — звучит как было, но теперь это одна нота
-ctx.phrase_make = function(name)
+ctx.phrase_make = function(name, rng)   -- rng (31 окт): { f0, f1, r0, r1 } вместо блока V / паттерна (Opt+Shift+R)
   name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
   if name == '' then
     local used, i = {}, 0
@@ -17232,7 +17232,8 @@ ctx.phrase_make = function(name)
   end
   local F = L and L.flat or {}
   local f0, f1, r0, r1
-  if vim.mode == 'visual' or vim.mode == 'vline' then f0, f1, r0, r1 = vim.visual_range(); vim.mode = 'normal'
+  if rng then f0, f1, r0, r1 = rng[1], rng[2], rng[3], rng[4]
+  elseif vim.mode == 'visual' or vim.mode == 'vline' then f0, f1, r0, r1 = vim.visual_range(); vim.mode = 'normal'
   else r0, r1 = ctx.region_rows(); f0, f1 = 1, #F end
   if not (r0 and r1 and r1 >= r0) then vim.msg = 'phrase: no rows'; return end
   local tracks, seen = {}, {}
@@ -29390,6 +29391,10 @@ local function frame()
     if ci == 27 then ctx.mac_set_hotkey(r, nil) else ctx.mac_set_hotkey(r, MX.MR.hk_encode(ci, ctx.mods())) end
     c = 0
   end
+  -- 31 окт: ‰ (Opt+Shift+R) в NORMAL — последнее сыгранное новой фразой (в INSERT / KEYS это нотная клавиша — не трогаем)
+  if (c == 8240 or c == 0x75000000 + 8240) and state.focus == 'tracker' and vim.mode == 'normal' and not vim.piano and not vim.picker and not vim.hydra and not vim.pending then
+    ctx.retro_phrase(); c = 0
+  end
   -- 16 окт: π (Opt+P) — умная вставка из буферов; в qwerty при клавиатуре / INSERT π — нота p рядом, не трогаем
   if (c == 960 or c == 0x75000000 + 960) and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search'
      and not (keys.layout ~= 'frow' and (vim.mode == 'insert' or vim.piano)) then
@@ -30725,7 +30730,9 @@ end
 -- 21 окт: R — умный ввод из ретро-буфера MIDI REAPER (пишет всегда, пока трек взведён, и без транспорта): последняя
 -- сыгранная фраза — на трек курсора, первая нота — ровно на строку курсора (тишина до неё срезана). Действие 40211
 -- (взведённые и выделенные) — на время только этот трек выделен; выделение и курсор REAPER — как были
-ctx.retro_insert = function()
+-- 31 окт: Opt+Shift+R — то же, но сыгранное сразу становится новой фразой (pN), на месте — её триггер
+ctx.retro_phrase = function() ctx.retro_insert(true) end
+ctx.retro_insert = function(as_phrase)
   local f = L and L.flat and L.flat[vim.cur.fi]
   local tr = f and f.col and f.col.track
   if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'R: a track under the cursor'; return end
@@ -30777,6 +30784,14 @@ ctx.retro_insert = function()
   if not made then vim.msg = 'R: nothing in the retro buffer of this track (it records while armed - play something first)'; return end
   local _, nn = reaper.MIDI_CountEvts(reaper.GetActiveTake(made))
   vim.msg = ('R: %d note(s) of the last played - from row %04d (u - undo)'):format(nn or 0, vim.cur.row)
+  if as_phrase then
+    -- строки сыгранного: от курсора до конца айтема — блок фразы на треке курсора
+    local e = reaper.GetMediaItemInfo_Value(made, 'D_POSITION') + reaper.GetMediaItemInfo_Value(made, 'D_LENGTH')
+    local r1 = math.max(vim.cur.row, math.ceil(model.row_of_time(e, state.lpb) - 1e-6) - 1)
+    ctx.phrase_make('', { vim.cur.fi, vim.cur.fi, vim.cur.row, r1 })
+    vim.msg = ('Opt+Shift+R: %d note(s) of the last played - a new phrase at row %04d (phrases pane; u - undo)'):format(nn or 0, vim.cur.row)
+    return
+  end
   ctx.retro_overflow(made, f.col, t_row)
 end
 -- 21 окт: сыгранное длиннее паттерна — меню: дублировать паттерн (хвост — в копию), хвост — в следующий паттерн,
