@@ -8656,8 +8656,9 @@ function D.frame(L, snap, rows, state, info)
       -- 31 окт: свой цвет (oc) — и выключенная слегка им подкрашена (видно, какая кнопка какой вид)
       local cv = (oc and on) and U.mix(cc, U.BG, 0.2) or cc   -- 31 окт: включённая цветная — чуть тусклее
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, oc and 0.18 or 0.25) or (oc and U.tint(oc, 0.08) or U.BG))); gfx.rect(x, y, w1, L.rh, 1)
-      set(hot and U.AMBER or (on and cv or (oc and U.mix(oc, U.LINE, 0.6) or U.LINE))); gfx.rect(x, y, w1, L.rh, 0)
-      text(x + 1, y, label, hot and U.AMBER or (on and cv or (oc and U.mix(oc, U.TEXT, 0.6) or U.TEXT)))
+      -- 31 окт: невыбранные цветные — тусклее (рамка и буквы ближе к фону)
+      set(hot and U.AMBER or (on and cv or (oc and U.mix(U.mix(oc, U.LINE, 0.6), U.BG, 0.3) or U.LINE))); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and cv or (oc and U.mix(U.mix(oc, U.TEXT, 0.6), U.BG, 0.35) or U.TEXT)))
       if hot then hover[kind] = what end
       hint(kind, x, y, w1, L.rh, what)
       return x + w1 + 2
