@@ -12047,10 +12047,13 @@ function D.frame(L, snap, rows, state, info)
     end
     -- 28 окт: конец цепочки — «+» (щелчок — поиск эффекта fzf, в конец цепи); при перетаскивании там щель
     if not drag and #fxs > 0 then
-      local pw = math.max(3 * L.cw, ms('+') + 4 * L.pad)
+      -- 31 окт: с подсказками (hints) — «+ [drop fx here]» рамкой, видно, что сюда бросать
+      local lab = info.hints and '+ [drop fx here]' or '+'
+      local pw = math.max(3 * L.cw, ms(lab) + 4 * L.pad)
       local hot = mx >= bx and mx < bx + pw and my >= boxy and my < boxy + bh0
       if hot then set(U.tint(U.AMBER, 0.15)); gfx.rect(bx, boxy, pw, bh0, 1) end
-      text(bx + math.floor((pw - ms('+')) / 2), boxy + math.floor((bh0 - L.rh) / 2), '+', hot and U.AMBER or U.tint(U.AMBER, 0.7))
+      if info.hints then set(hot and U.AMBER or U.tint(U.AMBER, 0.35)); gfx.rect(bx + 2, boxy + 2, pw - 4, bh0 - 4, 0) end
+      text(bx + math.floor((pw - ms(lab)) / 2), boxy + math.floor((bh0 - L.rh) / 2), lab, hot and U.AMBER or U.tint(U.AMBER, 0.7))
       if hot then hover.dspbtn = { fx = #fxs, what = 'chainadd' } end
       hint('dspbtn', bx, boxy, pw, bh0, { fx = #fxs, what = 'chainadd' })
       bx = bx + pw + L.pad

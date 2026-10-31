@@ -508,7 +508,7 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
       name = no .. ' ' .. name
     end
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
-    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.DIM or (mk and U.CYAN or U.TEXT)))
+    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.GREY or (mk and U.CYAN or U.TEXT)))
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
     if FB.hint then FB.hint('fxbrow', x + 1, ry, w - 3, L.rh, idx) end
