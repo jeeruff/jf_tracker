@@ -2874,10 +2874,19 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   -- тонкий (5 окт): буква сверху, две полоски, число дБ — в статусе по наведению
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  text(x + math.floor((w - ms(label)) / 2), y + 1, label, U.GREY)
   local pk = math.max(lv and lv[1] or 0, lv and lv[2] or 0)
   D.meter_db = D.meter_db or {}
   D.meter_db[what] = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+  -- 31 окт: вместо буквы — пик (держится 2 с): целые дБ, клип (> 0) красным; тишина — пусто
+  D.pkhold = D.pkhold or {}
+  local now = reaper.time_precise()
+  local ph = D.pkhold[what]
+  if not ph or D.meter_db[what] >= ph.db or now - ph.t > 2 then ph = { db = D.meter_db[what], t = now }; D.pkhold[what] = ph end
+  if ph.db > -60 then
+    local s = ph.db >= -0.05 and (ph.db > 0.05 and ('+%d'):format(math.ceil(ph.db)) or '0') or tostring(math.floor(ph.db + 0.5))
+    if ms(s) > w then s = ph.db >= -0.05 and '!' or tostring(math.floor(ph.db / 10 + 0.5) * 10):sub(1, 2) end
+    text(x + math.floor((w - ms(s)) / 2), y + 1, s, ph.db > 0.05 and U.RED or (ph.db > -9 and U.AMBER or U.GREY))
+  end
   local my0, mh = y + L.rh + 1, h - L.rh - 2
   if mh > 4 then
     local bw = math.max(2, math.floor((w - 3) / 2))
