@@ -4140,7 +4140,7 @@ ctx = {
     -- track — по всей дорожке до =LIB (клипы следующих регионов подтягиваются)
     -- 21 окт: что вижу, то и получаю — вид project (zp) — по всей дорожке, ноты переходят границы паттернов; вид pattern — в паттерне,
     -- вытолкнутое за его конец удаляется (как Renoise). Опция BS mode = track — по всей дорожке всегда
-    local trackwide = state.bsmode == 'track' or not state.view_reg
+    local trackwide = state.bsmode == 'track'   -- 31 окт: только явная опция; вид project больше не включает «по всей дорожке» (как Renoise)
     -- 19 окт: граница — =END (маркера =LIB с 8 окт нет: по дорожке сдвигалась бы и библиотека паттернов за =END)
     if trackwide then rg = nil; limit = model.marker_pos(model.END_MARKER) or (reaper.GetProjectLength(0) + 60) end
     if t1 > limit then t1 = limit end
@@ -12988,19 +12988,7 @@ ctx = {
       { key = 'slidespeed', label = 'slide speed (ticks)', kind = 'cycle', values = { 6, 3, 4, 5, 8, 12 }, desc = 'ticks a row for the ft2 / it / pt slide styles (the tracker speed; 6 by default, the slide runs speed - 1 ticks)', get = function() return state.slidespeed end, set = function(v) state.slidespeed = tonumber(v) or 6; reaper.SetExtState(EXT, 'slidespeed', tostring(state.slidespeed), true); edit.cmds.SPEED = state.slidespeed end },
       { key = 'slidezero', label = 'slide 00', kind = 'cycle', values = { 'repeat', 'stop' }, desc = '0U00 / 0D00: repeat - the last value of the command again (as in Renoise, FT2, Schism); stop - the slide stops there', get = function() return state.slidezero end, set = function(v) state.slidezero = v; reaper.SetExtState(EXT, 'slidezero', v, true); edit.cmds.ZERO = v end },
       { key = 'rowbase', label = 'row numbers from', kind = 'cycle', values = { '0001', '0000' }, desc = 'the first row of the project is 0001 (as REAPER counts 1.1) or 0000', get = function() return state.rowbase == 0 and '0000' or '0001' end, set = function(v) state.rowbase = v == '0000' and 0 or 1; reaper.SetExtState(EXT, 'rowbase', tostring(state.rowbase), true); model.ROW_BASE, draw.ROW_BASE = state.rowbase, state.rowbase; model.invalidate() end },
-      { key = 'curacc', label = 'cursor accent', kind = 'cycle', values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'colour of the active cursor: the tracker cursor in focus and the selected DSP parameter - hex RGB; grey - the theme colour', get = function() return state.curacc or 'ff00ff' end, dropdown = true, pick = function()   -- 31 окт: выпадашка цветов + свой цвет (системный диалог)
-        local function setc(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end
-        local items = {}
-        for i, c in ipairs({ { 'ff00ff', 'magenta' }, { '00ffff', 'cyan' }, { 'ffb000', 'amber' }, { '00ff66', 'green' }, { 'ffffff', 'white' }, { 'ff4040', 'red' }, { 'grey', 'theme grey' } }) do
-          items[#items + 1] = { key = tostring(i), label = c[2] .. '  ' .. c[1] .. ((state.curacc or 'ff00ff') == c[1] and '  *' or ''), fn = function() setc(c[1]) end }
-        end
-        items[#items + 1] = { key = 'c', label = 'custom colour...', fn = function()
-          local cur = tonumber((state.curacc or 'ff00ff'):match('^%x+$') or 'ff00ff', 16) or 0xff00ff
-          local ok, nc = reaper.GR_SelectColor(nil, reaper.ColorToNative((cur >> 16) & 255, (cur >> 8) & 255, cur & 255))
-          if ok and ok ~= 0 and nc then local r, g, b2 = reaper.ColorFromNative(nc); setc(('%02x%02x%02x'):format(r, g, b2)) end
-        end }
-        vim.open_hydra({ title = 'cursor accent', items = items })
-      end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end },
+      { key = 'curacc', label = 'cursor accent', kind = 'cycle', swatch = true, values = { 'ff00ff', '00ffff', 'ffb000', '00ff66', 'ffffff', 'grey' }, desc = 'colour of the active cursor (the tracker cursor in focus, the selected DSP parameter): magenta cyan amber green white, or the theme grey; red is INSERT (option INSERT cursor red)', get = function() return state.curacc or 'ff00ff' end, set = function(v) state.curacc = v; reaper.SetExtState(EXT, 'curacc', v, true); ctx.curacc_apply(); if ctx.apply_theme then ctx.apply_theme(state.theme) end end },   -- 31 окт: квадратики, без выпадашки и красного
       { key = 'curline', label = 'cursor line', kind = 'cycle', values = { 'top', 'bottom', 'off' }, desc = 'cursor lines (amber cursor, green REAPER cursor): top / bottom edge / none', get = function() return state.curline or 'top' end, set = function(v) state.curline = v end },
       flag('ssbsync', 'drop beatsync', 'an audio file dropped on a matrix cell gets beatsync: stretched to the nearest power of two of beats at the tempo of its pattern'),
       { key = 'human', label = 'human (exp.)', kind = 'num', min = 0, max = 100, step = 5, fmt = '%d %%', desc = 'experimental: every inserted slice / sample note is a little different - pitch up to +-8 cents, volume +-1 dB, playrate +-0.3 % at 100 %; 0 - off', get = function() return state.human or 0 end, set = function(v) state.human = v; edit.human = v end },
@@ -13035,7 +13023,7 @@ ctx = {
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
       { key = 'envmark', label = 'mark automation rows', kind = 'toggle', desc = 'a ~ at the right edge of the note column on every row where the track has automation - a point of any envelope (shown or hidden) or an automation item; in the same narrow column as the + of folded notes: both on a row - +~ side by side (the column gets 2 chars), or ~ under + when rows are tall', get = function() return state.envmark end, set = function(v) state.envmark = v; model.ENVMARK = v; model.invalidate(); relayout() end },
       { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - a + at the right edge of the note column (where the folded notes unfold) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
-      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert - BS / Ins (delete / insert rows); 21 Oct: the view decides - project view (zp) moves notes across patterns up to =END, pattern view keeps it in the pattern (pushed out - deleted); track - across patterns always. pattern (default, as in Renoise) - inside the region, everything below moves up, empty rows appear at the pattern end, a MIDI clip that reaches the region end keeps its length; track - along the whole track up to =END (the pattern library after =END stays), the clips of the next regions move too', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
+      { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'pattern', 'track' }, desc = 'Backspace / Insert (delete / insert rows): pattern (default, as in Renoise) - only inside the pattern of the cursor, what is pushed past its end is deleted, other patterns are never touched; track - across patterns up to =END (the next clips move whole)', get = function() return state.bsmode or 'pattern' end, set = function(v) state.bsmode = v end },
       flag('hdrmeter', 'header meter', 'a thin meter under v in the track header (armed audio - the input level; MIDI on the track input - a yellow flash); the yellow MIDI bar on the track itself stays'),
       flag('tababc', 'tabs a-z', 'tabs in every pane stack in alphabetical order (labels and Tab / Ctrl+Tab); off - the order you put them in'),
       { key = 'pvsolo', label = 'preview only its track', kind = 'toggle', desc = 'a previewed note / pad (mouse, keys) sounds only on its own track: other armed tracks on all-MIDI input lose the arm for 0.8 s; off - every armed track hears the virtual keyboard (layering by arm); MIDI out sends work either way', get = function() return state.pvsolo end, set = function(v) state.pvsolo = v end },
@@ -33251,6 +33239,7 @@ ctx.CHPAL = {}
 end)()
 ctx.chcol_c = setmetatable({}, { __mode = 'k' })
 ctx.chcol_rgb = function(h) local r, g, b = (h or ''):match('^#?(%x%x)(%x%x)(%x%x)$'); return r and { tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 } or nil end
+ctx.hex_rgb = ctx.chcol_rgb   -- 31 окт: квадратики цветов в опциях
 ctx.chain_col_map = function(tr)
   local c = ctx.chcol_c[tr]
   local now = reaper.time_precise()

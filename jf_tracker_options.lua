@@ -934,7 +934,21 @@ function O.draw(L, W, H)
         local room = bx + bw - L.pad - vx
         local tot = 0
         for _, v in ipairs(it.values) do tot = tot + U.measure(tostring(v)) + 2 * L.pad + 2 end
-        if tot <= room and not it.dropdown then
+        if it.swatch then   -- 31 окт: квадратики цветов (cursor accent): щелчок / h l — выбор, без выпадашки
+          local cur = it.get()
+          local sw = rh - 2
+          local x = vx
+          for k, v in ipairs(it.values) do
+            local on2 = v == cur
+            local h2 = mx >= x and mx < x + sw and my >= y and my < y + rh
+            if h2 then O.hbtn = { i = i, k = k } end
+            local c = v == 'grey' and U.GREY or ctx.hex_rgb(v) or U.GREY
+            U.set(c); gfx.rect(x + 1, y + 2, sw - 2, sw - 2, 1)
+            U.set(on2 and U.AMBER or (h2 and U.TEXT or U.LINE)); gfx.rect(x, y + 1, sw, sw, 0)
+            if on2 then gfx.rect(x - 1, y, sw + 2, sw + 2, 0) end
+            x = x + sw + 3
+          end
+        elseif tot <= room and not it.dropdown then
           local cur = it.get()
           local x = vx
           for k, v in ipairs(it.values) do

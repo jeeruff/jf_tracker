@@ -9194,10 +9194,12 @@ function D.frame(L, snap, rows, state, info)
     end
     -- до ячеек этой строки: нижний пиксель — уходящему, верхний+1 — следующему
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
+    -- 31 окт: граница паттерна — явная (Backspace / Insert живут внутри паттерна): 2 px цветом паттерна,
+    -- что начинается здесь (нет цвета — ярче линии такта); конец предыдущего — его цветом строкой выше
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
     if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
-    elseif patb[r.row] then set(U.LINE); gfx.rect(tx0, y, W - tx0, 2, 1) end
+    elseif patb[r.row] then set((eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5)); gfx.rect(tx0, y, W - tx0, 2, 1) end
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)
