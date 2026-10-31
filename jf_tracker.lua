@@ -16969,7 +16969,7 @@ ctx.select_all = function()
     vim.msg = 'Cmd+A: select all is not in this module yet (tracker, curve canvas)'
   end
 end
--- 31 окт: :phrase NAME — блок (V; все его треки) или паттерн курсора (все треки) → фраза (PLAN_PHRASES.md шаг 2):
+-- 31 окт: :phrase NAME — блок (V) или паттерн курсора на ТРЕКЕ КУРСОРА → фраза (PLAN_PHRASES.md шаг 2):
 -- айтемы режутся по краям блока, середины уезжают в библиотеку (регион ph:NAME за =END, с начала такта), на месте
 -- блока — MIDI-триггер на треке курсора с тейком ph:NAME и одной нотой C-4 на всю длину; PH.sync (в edit.run)
 -- кладёт копии обратно — звучит как было, но теперь это одна нота
@@ -16994,6 +16994,7 @@ ctx.phrase_make = function(name)
   local cc = F[vim.cur.fi] and F[vim.cur.fi].col
   local anchor = (cc and cc.track and seen[cc.track] and cc.track) or tracks[1]
   if not anchor then vim.msg = 'phrase: no track'; return end
+  tracks = { anchor }   -- 31 окт (просьба): фраза — один трек, трек курсора (проще); синхронизация умеет и несколько
   local t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0)
   local R = reaper
   local q0, q1 = R.TimeMap2_timeToQN(0, t0), R.TimeMap2_timeToQN(0, t1)
