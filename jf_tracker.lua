@@ -5491,10 +5491,11 @@ ctx = {
   end,
   ml_clear = function(tk, ml, p0, p1)
     local _, _, ccn, txn = reaper.MIDI_CountEvts(tk)
-    if ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'pb' then   -- 27 окт: и pitch bend
+    if ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'pb' or ml.kind == 'at' or ml.kind == 'pat' then   -- 27 окт: и pitch bend; 31 окт: AT / PAT
       for k = ccn - 1, 0, -1 do
         local _, _, _, ppq, cm, _, m2 = reaper.MIDI_GetCC(tk, k)
-        if ppq >= p0 and ppq < p1 and ((ml.kind == 'cc' and cm == 0xB0 and m2 == ml.num) or (ml.kind == 'pc' and cm == 0xC0) or (ml.kind == 'pb' and cm == 0xE0)) then reaper.MIDI_DeleteCC(tk, k) end
+        if ppq >= p0 and ppq < p1 and ((ml.kind == 'cc' and cm == 0xB0 and m2 == ml.num) or (ml.kind == 'pc' and cm == 0xC0) or (ml.kind == 'pb' and cm == 0xE0)
+           or (ml.kind == 'at' and cm == 0xD0) or (ml.kind == 'pat' and cm == 0xA0)) then reaper.MIDI_DeleteCC(tk, k) end
       end
     else
       for k = txn - 1, 0, -1 do
@@ -5502,6 +5503,22 @@ ctx = {
         if ppq >= p0 and ppq < p1 and ((ml.kind == 'sx' and typ == -1) or (ml.kind == 'tx' and typ and typ >= 1)) then reaper.MIDI_DeleteTextSysexEvt(tk, k) end
       end
     end
+  end,
+  -- 31 окт: одно событие лейна по его виду (AT / PAT писались program change — в лейне появлялась колонка PC);
+  -- PAT — на ноту, что звучит в этой точке (нет — C-4)
+  ml_ins = function(tk, ml, p0, v)
+    if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
+    elseif ml.kind == 'pb' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xE0, 0, 0, v)   -- 27 окт: PB — старший байт
+    elseif ml.kind == 'at' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xD0, 0, v, 0)
+    elseif ml.kind == 'pat' then
+      local pitch = 60
+      local _, nn = reaper.MIDI_CountEvts(tk)
+      for k = 0, nn - 1 do
+        local _, _, _, sp, ep, _, pi = reaper.MIDI_GetNote(tk, k)
+        if sp <= p0 + 1 and ep > p0 then pitch = pi; break end
+      end
+      reaper.MIDI_InsertCC(tk, false, false, p0, 0xA0, 0, pitch, v)
+    else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
   end,
   -- 30 окт: несколько строк лейна одним шагом undo: map[row] = 0..127 или false (убрать) — холст curve
   ml_write = function(f, map, label)
@@ -5516,9 +5533,7 @@ ctx = {
           ctx.ml_clear(tk, ml, p0, p1)
           if v then
             v = math.max(0, math.min(127, math.floor(v + 0.5)))
-            if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
-            elseif ml.kind == 'pb' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xE0, 0, 0, v)
-            else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
+            ctx.ml_ins(tk, ml, p0, v)
           end
           reaper.MIDI_Sort(tk)
           n = n + 1
@@ -5537,9 +5552,7 @@ ctx = {
     edit.run(ml.name .. ' value', function()
       local p0, p1 = reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1)
       ctx.ml_clear(tk, ml, p0, p1)
-      if ml.kind == 'cc' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xB0, 0, ml.num, v)
-      elseif ml.kind == 'pb' then reaper.MIDI_InsertCC(tk, false, false, p0, 0xE0, 0, 0, v)   -- 27 окт: PB — старший байт (было: писался program change)
-      else reaper.MIDI_InsertCC(tk, false, false, p0, 0xC0, 0, v, 0) end
+      ctx.ml_ins(tk, ml, p0, v)   -- 31 окт: по виду лейна (AT / PAT больше не program change)
       reaper.MIDI_Sort(tk)
     end)
     model.invalidate()

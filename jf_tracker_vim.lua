@@ -1861,6 +1861,11 @@ function V.plays_note(c)
 end
 
 function V.key_impl(c)
+  -- 31 окт: INSERT на hex-поле (лейн CC / PC / AT, команда): d набирался цифрой D, и w после него был простым
+  -- движением — dw не удалял. D одна в наборе + w W b e (не hex-цифры) = оператор d, как везде
+  if V.mode == 'insert' and (c == 119 or c == 87 or c == 98 or c == 101) and V.hexbuf and V.hexbuf:upper() == 'D' then
+    V.hexbuf = nil; V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true
+  end
   if c <= 0 then return end
   local E = ctx.edit
   local st = ctx.state

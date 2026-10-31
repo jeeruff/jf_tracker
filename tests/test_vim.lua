@@ -246,6 +246,7 @@ reset()
 keysin('dw');      eq('dw: kick only (exclusive)', last(), 'delete:kick')
 V.cur.row = 8; keysin('dw'); eq('dw clears the cursor row of the track (30 окт)', last(), 'delete:snare')
 reset(); V.cur.row = 5; keysin('dw'); eq('dw on an empty row → the next note (31 окт: was nothing)', last(), 'delete:snare')
+reset(); V.cur.row = 8; V.mode = 'insert'; V.hexbuf = 'D'; keysin('w'); eq('INSERT, D in the hex buffer + w = dw (31 окт)', last(), 'delete:snare'); V.mode = 'normal'
 -- 19 окт: de внутри ноты — хвост ноты (она кончается перед курсором), не следующая нота
 reset(); V.cur.row = 2; keysin('de'); eq('de inside kick: kick ends before row 2', last(), 'off:kick@' .. (E.OFF_END and 1 or 2))
 reset(); keysin('de'); eq('de on the kick head: the kick only, not the snare', last(), 'delete:kick')
