@@ -370,6 +370,8 @@ function B.map_cd(path)
   end
   B.map_dcur = 1
   for i, e in ipairs(B.map_dirs()) do if (path .. '/' .. e.name) == from then B.map_dcur = i end end   -- выше — курсор на папке, откуда пришли
+  -- 31 окт: граф папки — в память (не выбрасывать): назад — сразу, вниз — подпапка из него без нового обхода
+  if B.mapG and B.mapG.root then B.map_graphs = B.map_graphs or {}; B.map_graphs[B.mapG.root] = B.mapG end
   B.mapG = nil
 end
 function B.map_enter(i)
@@ -869,14 +871,22 @@ map_draw_inner = function(U, L, x, y, w, h)
   if G and G.root ~= key then
     B.map_graphs[G.root] = G
     local n = 0; for _ in pairs(B.map_graphs) do n = n + 1 end
-    if n > 6 then for k in pairs(B.map_graphs) do if k ~= key and k ~= G.root then B.map_graphs[k] = nil; break end end end
+    -- 31 окт: самый большой граф (корень сэмплов) не выкидывать — из него собираются подпапки
+    local big; for k, g in pairs(B.map_graphs) do if not big or #(g.raw or g.nodes) > #(B.map_graphs[big].raw or B.map_graphs[big].nodes) then big = k end end
+    if n > 6 then for k in pairs(B.map_graphs) do if k ~= key and k ~= G.root and k ~= big then B.map_graphs[k] = nil; break end end end
     if B.map_graphs[key] then G = B.map_graphs[key]; B.map_graphs[key] = nil; B.mapG = G end
   end
   if not G or G.root ~= key then
     if files then G = B.SM.from_files(key, files())   -- 27 окт: files — готовый список (db / proj / pm)
     else
+      -- 31 окт: предок уже прочитан (в памяти) — подпапка из него сразу, без обхода диска
+      local par
+      for rk, pg in pairs(B.map_graphs) do
+        if not pg.building and not pg.rd and type(rk) == 'string' and key:sub(1, #rk + 1) == rk .. '/' and (not par or #rk > #par.root) then par = pg end
+      end
+      if par then G = B.SM.sub_of(par, key); G.cached = true end
       -- 27 окт (2): папка — из индекса на диске сразу; фоном — тихая проверка изменений (подмена, только если другое)
-      G = B.SM.load_cache(key, B.map_cache_file(key))
+      G = G or B.SM.load_cache(key, B.map_cache_file(key))
       -- 27 окт (10): проверка изменений — не чаще раза в сутки на папку (обход 6700 папок по кадрам — десятки секунд CPU)
       local ck = 'mapchk_' .. key:gsub('[^%w]', '_')
       local last = tonumber(R.GetExtState('jf_tracker', ck)) or 0

@@ -250,6 +250,20 @@ function SM.from_files(key, files)
   end
   return SM.finish(G)
 end
+-- 31 окт: подпапка из готового графа предка — без нового обхода диска («пересчитывает постоянно»): файлы под key,
+-- группа (sub) — первая папка внутри key
+function SM.sub_of(P, key)
+  local pre = key .. '/'
+  local G = { root = key, nodes = {}, hubs = {}, t = 0, temp = 0.12, ver = 0 }
+  for _, n in ipairs(P.raw or P.nodes) do
+    if n.path:sub(1, #pre) == pre then
+      local rel = n.path:sub(#pre + 1)
+      local sub = rel:match('^([^/]+)/')
+      G.nodes[#G.nodes + 1] = { path = n.path, name = n.name, cat = SM.cat_of(n.name, sub), dir = n.dir, sub = sub }
+    end
+  end
+  return SM.finish(G)
+end
 -- место файла в хабе: k-й по спирали Фибоначчи (диск без наложений, плотность ровная)
 local function place(n, k)
   local a, rr = k * 2.39996, SM.U * math.sqrt(k + SM.K0)
@@ -1029,7 +1043,7 @@ end
 -- графа, радиус по логарифму числа файлов (папка киков не размером с солнце), песчинки — спиралью по яркости
 function SM.sand_grain(n)
   local a = SM.AN[n.path]
-  if not a then return 1.2, nil, 0.75 end
+  if not a then return 1.2, nil, 0.45 end   -- 31 окт: не прослушанные — видно (0.75 — почти чёрные, «пока не наведу»)
   local low = 1 - (a.b or 0.5)                                   -- 1 — низ, 0 — верх
   local short = a.d and math.max(0, math.min(1, 1 - math.log(1 + a.d) / math.log(1 + 8))) or 0.5   -- 1 — короткий
   local size = 0.8 + 3.2 * low * (1 - 0.6 * short)                -- низкие крупнее, короткие мельче
