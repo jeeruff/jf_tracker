@@ -9956,13 +9956,14 @@ function D.frame(L, snap, rows, state, info)
       -- Δ (4 окт; буква, не значок — философия: только буквы алфавитов) — delta solo REAPER (:delta): слышна разница вход − выход эффекта
       -- 11 окт: + — меню последнего тронутого параметра этого эффекта (как кнопка Param в REAPER)
       -- 24 окт: B → on / off (понятнее; ширина — по «off», кнопка не прыгает)
-      local onw = ms('off') + 2 * L.pad
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { f.enabled and 'on' or 'off', 'bypass', bx + bw - kb - onw - 4, onw }, { '∆', 'delta', bx + bw - 2 * kb - onw - 7 }, { 'e', 'open', bx + bw - 3 * kb - onw - 8 },
+      -- 31 окт: on / off — не кнопкой справа, а кружком перед именем (яркий — включён, тёмный — выключен); onw = −3 убирает её место
+      local onw = -3
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { '∆', 'delta', bx + bw - 2 * kb - onw - 7 }, { 'e', 'open', bx + bw - 3 * kb - onw - 8 },
                     { '+', 'lastp', bx + bw - 4 * kb - onw - 11 }, { 'f', 'mfoldin', bx + bw - 5 * kb - onw - 14 } }   -- 28 окт: f — сложить в заголовок (zf)
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 5 * kb - onw - 15
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
-      if tw < L.cw * 8 then bxs = { bxs[1], bxs[2] }; tw = bw - 2 * L.pad - kb - onw - 5 end
+      if tw < L.cw * 8 then bxs = { bxs[1] }; tw = bw - 2 * L.pad - kb - 2 end
       -- ReaEQ (7 окт): P — только параметры, G — только график
       if f.view == 'eq' and tw > L.cw * 8 + kb then
         bxs[#bxs + 1] = { info.eqgraph and 'P' or 'G', 'vmode', bxs[#bxs][3] - kb - 2 }
@@ -9986,7 +9987,7 @@ function D.frame(L, snap, rows, state, info)
         D.fxgui_rect[f.fguid] = { x = bx + 1, y = by + L.rh + 1, w = bw - 2, h = bh - L.rh - 2, fi = f.fx or f.i, vis = bx >= cx0 and bx + bw <= cx1 }
       end
       -- 24 окт: [] — пустой контейнер внутрь этого (вложенность любая)
-      if f.container and not f.kit and not f.bands and not f.inner and #bxs > 2 and tw > L.cw * 8 + kb then
+      if f.container and not f.kit and not f.bands and not f.inner and #bxs > 1 and tw > L.cw * 8 + kb then
         local cwb = ms('[]') + 2 * L.pad
         bxs[#bxs + 1] = { '[]', 'cnew', bxs[#bxs][3] - cwb - 2, cwb }
         tw = tw - cwb - 2
@@ -10021,10 +10022,20 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: число эффектов — без jf_tracker_macro (ручки макросов — не эффект: «2 fx» при одном Surge)
       local nfx = 0
       if f.container then for _, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nfx = nfx + 1 end end end
-      local full = ((f.enabled and not f.poff) and '' or '(off) ') .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)
+      local full = '  ' .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)   -- 31 окт: два знака — место кружка on / off
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, (f.enabled and not f.poff) and (f.container and U.AMBER or U.TEXT) or U.GREY)
+      do   -- 31 окт: кружок on / off перед именем: щелчок — включить / выключить (bypass)
+        local on = f.enabled and not f.poff
+        local cr = math.max(3, math.floor(L.rh / 3))
+        local ccx, ccy = bx + L.pad + math.floor(ms('  ') / 2), by + 1 + math.floor(L.rh / 2)
+        local hot = not drag and math.abs(mx - ccx) <= cr + 3 and my >= by + 1 and my < by + L.rh
+        set(on and (hot and U.AMBER or U.GREEN) or (hot and U.AMBER or U.DIM)); gfx.circle(ccx, ccy, cr, 1, 1)
+        if not on then set(U.GREY); gfx.circle(ccx, ccy, cr, 0, 1) end
+        if hot then hover.dspbtn = { fx = k, f = f, what = 'bypass' }; on_btn = true end
+        hint('dspbtn', ccx - cr - 2, by + 1, 2 * cr + 4, L.rh - 1, { fx = k, what = 'bypass' })
+      end
       if info.gr_fx then D.gr_tag(L, bx + L.pad + ms(nmtxt) + L.pad + (iol and (iow + L.pad) or 0), by, info.gr_fx(f)) end   -- 27 окт: подавление этого эффекта
       if iol then
         local ix0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
