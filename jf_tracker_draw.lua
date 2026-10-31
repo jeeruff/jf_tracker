@@ -395,7 +395,7 @@ function D.panes_layout(state, L, nregions, ncols)
   s.hi = D.hint_mode(state)
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
-  D.TABGAP = 3                                           -- 19 окт: пустота над вкладками — панели видно отдельно
+  D.TABGAP = 0                                           -- 19 окт: пустота над вкладками — панели видно отдельно
   M.tab_h = L.rh + 2 + D.TABGAP                         -- подпись листа — вкладкой над рамкой
   M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.hint_trk = (state.hints and state.hintpos == 'tabs') and (L.rh + 1) or nil   -- 15 окт: tabs — подсказки в строке вкладок; у трекера вкладок нет — его строка внизу

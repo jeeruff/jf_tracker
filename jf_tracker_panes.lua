@@ -277,7 +277,7 @@ local function place_leaf(lay, M, n, x, y, w, h)
     cell.tab = { x = x, y = y, w = w, h = th }
     local ws, tot = {}, 0
     for _, id in ipairs(n.panes) do
-      if avail(M, id) then ws[id] = (M.tabw and M.tabw(id) or (#PN.BY[id].label * M.cw)) + 2 * M.pad; tot = tot + ws[id] end
+      if avail(M, id) then ws[id] = (M.tabw and M.tabw(id) or (#PN.BY[id].label * M.cw)) + M.pad + 3; tot = tot + ws[id] end   -- 31 окт: вкладки встык
     end
     local k = tot > w and (w / tot) or 1              -- не влезают — ужать поровну
     local tx = x

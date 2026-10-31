@@ -2066,7 +2066,7 @@ function B.draw(U, L, x, y, w, h)
     U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or (tc or U.GREY)))
     if hot then hover = what end
     if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
-    return bx + bw + L.pad
+    return bx + bw + 1   -- 31 окт: кнопки встык (был зазор в pad)
   end
   local wrap_marks = false
   do
