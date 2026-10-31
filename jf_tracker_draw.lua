@@ -8684,7 +8684,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     D.rglen_at = nil
-    if info.cur_region then
+    if info.cur_region and not D.len_in_fx then   -- 31 окт: длина и x2 /2 — над именем паттерна в полосе эффектов
       local rg = info.cur_region
       -- x2 /2 справа от длины — и в низкой шапке (20 окт: markers ушли в ряд 1)
       local rx = bx + bw

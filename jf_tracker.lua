@@ -13411,6 +13411,16 @@ ctx = {
       vim.msg = 'region is not in the sequence (=START..=END)'
       return
     end
+    if what == 'clear' then   -- 31 окт: clr — все события паттерна на всех треках; второй щелчок в течение 2 с
+      if not (ctx.rgclr_t and reaper.time_precise() - ctx.rgclr_t < 2) then ctx.rgclr_t = reaper.time_precise(); vim.msg = 'clr: click again to clear the pattern (every track)'; return end
+      ctx.rgclr_t = nil
+      local r0, r1 = ctx.region_rows()
+      local hs = vim.heads_in(1, #(L and L.flat or {}), r0, r1)
+      if #hs > 0 then edit.delete(hs, state.lpb) end
+      model.invalidate()
+      vim.msg = ('pattern cleared: %d event(s) (u - undo)'):format(#hs)
+      return
+    end
     local f = what == 'double' and 2 or 0.5
     local qlen = (rg.qn1 - rg.qn0) * f
     if qlen * state.lpb < 1 - 1e-6 then vim.msg = 'min 1 step'; return end
@@ -23893,6 +23903,41 @@ local function frame()
         U.text(bx + 5, y0 + 1, ctx.fit('no pattern', bw - 7), U.DIM)
       end
       if nhot then hover.rghead = true end
+      -- 31 окт: над именем — длина паттерна < 32 >, над ней x2 /2 dup clr (из шапки сюда, если полоса высокая)
+      draw.len_in_fx = rgf and (L.fxrow_h or 0) >= 3 * L.rh or nil
+      if draw.len_in_fx then
+        local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+        local r0, r1 = ctx.region_rows()
+        local ly = y0 - L.rh
+        local s2 = tostring(r0 and r1 and (r1 - r0 + 1) or 0)
+        local aw = U.measure('<') + 4
+        local inb = my0 >= ly and my0 < ly + L.rh
+        local hl = inb and mx0 >= bx and mx0 < bx + aw
+        local hr = inb and mx0 >= bx + bw - aw and mx0 < bx + bw
+        local hn = inb and not hl and not hr and mx0 >= bx and mx0 < bx + bw
+        U.set(hn and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, ly + 1, bw, L.rh - 1, 1)
+        U.set(hn and U.AMBER or U.LINE); gfx.rect(bx, ly + 1, bw, L.rh - 1, 0)
+        U.text(bx + math.floor((bw - U.measure(s2)) / 2), ly, s2, hn and U.AMBER or U.TEXT)
+        U.text(bx + 2, ly, '<', hl and U.AMBER or U.GREY); U.text(bx + bw - U.measure('>') - 2, ly, '>', hr and U.AMBER or U.GREY)
+        if hl then hover.rglen = -1 elseif hr then hover.rglen = 1 elseif hn then hover.rglen = 0 end
+        local by2 = ly - L.rh
+        local bxs = bx
+        for _, b in ipairs({ { 'x2', 'double' }, { '/2', 'half' }, { 'dup', 'clone' }, { 'clr', 'clear' } }) do
+          local w2 = U.measure(b[1]) + 6
+          if bxs + w2 > bx + bw then   -- не влезло — рядом выше (полоса высокая — места хватает)
+            if by2 - L.rh < L.fxrow_y - L.rh then break end   -- и строка шапки над полосой (у столбца строк она пустая)
+            by2, bxs = by2 - L.rh, bx
+          end
+          local h2 = mx0 >= bxs and mx0 < bxs + w2 and my0 >= by2 and my0 < by2 + L.rh
+          local armed = b[2] == 'clear' and ctx.rgclr_t and reaper.time_precise() - ctx.rgclr_t < 2
+          U.set(armed and U.tint(U.RED, 0.4) or (h2 and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(bxs, by2 + 1, w2, L.rh - 1, 1)
+          U.set(h2 and U.AMBER or U.LINE); gfx.rect(bxs, by2 + 1, w2, L.rh - 1, 0)
+          U.text(bxs + 3, by2, b[1], armed and U.RED or (h2 and U.AMBER or U.TEXT))
+          if h2 then hover.rgbtn = b[2] end
+          bxs = bxs + w2 + 2
+        end
+        local _ = rg
+      end
     end
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local MAXL = state.fxparams and 14 or 6
@@ -24407,7 +24452,7 @@ local function frame()
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn then state.status = ({ reg = 'pattern: view only the pattern of the cursor (the playing one with follow) - zp; transpose (F1 F2) takes what you see', sec = 'section: view the section of the cursor (intro, hook ...) - zs; transpose takes what you see', all = 'project: view the whole project - zp / zs back; transpose takes the whole track' })[hover.viewbtn] or ''
-  elseif hover.rgbtn then state.status = ({ half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'clone: an exact copy to the right with a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
+  elseif hover.rgbtn then state.status = ({ clear = 'clr: clear the pattern - every event on every track (click twice)', half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'dup: an exact copy of the pattern right after it, a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.dsptrkname then state.status = ctx.hover_tip_dsptrk
   elseif hover.tlist_tip then state.status = 'tracks: ' .. hover.tlist_tip .. ' - click toggles, drag down the column sets the same, header - whole column'
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step, click the number: a list of lengths; later regions and items ripple (:len N)'
