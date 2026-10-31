@@ -847,13 +847,8 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by1
       local vis = bx1 > x and bx0 < x + w and by1 > top and by0 < y + h
       if vis then
-        -- 31 окт: рамка зоны — только под мышью: 150 рамок по разбросу звёзд расчерчивали всё поле
-        if hot then
-          local cx0, cy0, cx1, cy1 = clipx(bx0), clipy(by0), clipx(bx1), clipy(by1)
-          U.set(c)
-          gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
-          gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
-        end
+        -- 31 окт: рамок зон нет совсем (просьба): прямоугольники по разбросу звёзд огромные и пересекаются —
+        -- под мышью загорались десятки; группу видно по цвету облака и подписи
         local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
