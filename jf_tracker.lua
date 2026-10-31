@@ -20302,6 +20302,14 @@ function ctx.slx_do(h)
   local t = dsp_target(); local tr = t and t.col and t.col.track
   if not tr then return end
   local function setp(name, val) local _, pi = ctx.slx_param(fi, name); if pi then reaper.TrackFX_SetParam(tr, fi, pi, val) end end
+  -- 31 окт: root — клавиатурой (щелчок по клавише = нота среза 1), как ноты у параметров DSP
+  if it.kind == 'val' and it.name == 'Base note' then
+    local v = ctx.slx_param(fi, 'Base note')
+    draw.notepop = { x = gfx.mouse_x, y = gfx.mouse_y + 4, cur = v and math.floor(v + 0.5), name = 'root (slice 1)',
+      set = function(n) setp('Base note', n); vim.msg = 'slixer root: ' .. n end }
+    vim.msg = 'slixer root: click a key (Esc - close)'
+    return
+  end
   if it.kind == 'menu' then
     local items = {}
     for k2, lab in ipairs(it.items) do
@@ -26431,7 +26439,7 @@ local function frame()
     local np = draw.notepop
     if U.click and hover.notepop then
       local n = hover.notepop
-      ctx.dsp_type_value(np.k, np.pi, np.root and (np.lo - n) or n)
+      if np.set then np.set(n) else ctx.dsp_type_value(np.k, np.pi, np.root and (np.lo - n) or n) end   -- 31 окт: свой обработчик (root slixer)
     end
     if hover.notepop or not hover.notepop_in or U.rclick then draw.notepop = nil end
     U.click, U.rclick = false, false
