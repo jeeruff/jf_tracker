@@ -515,7 +515,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if RW > 0 and MX.ruler and not MX.fold then   -- 23 окт: без ruler RW — только полоса секций, линейки нет
       U.set(U.LINE); gfx.rect(0, y, RW - 2, 1, 1)
       local sc = sec_first[ri]
-      local scc = sec_of[ri] and ((info.region_rgb and info.region_rgb(sec_of[ri].color)) or U.CYAN)
+      local scc = sec_of[ri] and U.AMBER   -- 31 окт: секции — всегда жёлтые
       local _ = sc
       if info.bar_label and not MX.st_on then U.text(L.pad + (MX.sec_w or 0), y + 1, info.bar_label(rg.pos), U.GREY) end   -- 18 окт: имя секции — вертикально на полосе слева
       if info.ticks then
@@ -854,7 +854,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
     for sc, b in pairs(box) do
-      local c = (info.region_rgb and info.region_rgb(sc.color)) or U.CYAN
+      local c = U.AMBER   -- 31 окт: секции — всегда жёлтые (не смешиваются цветом с паттернами)
       -- 18 окт: полоса цвета секции слева во всю её высоту, имя — вертикально
       local sw = MX.sec_w or 0
       if sw > 0 then
@@ -1243,7 +1243,7 @@ function MX.song_draw(L, x, y, w, h, snap, regions, ph_row, hover)
   for _, s in ipairs((regions and regions.sections) or (ctx.all_sections and ctx.all_sections()) or {}) do
     local a, b = px(math.max(ra, s.r0 or ra)), px(math.min(rb, s.r1 or rb))
     if b > a then
-      local c = (s.color and s.color ~= 0 and ctx.region_rgb and ctx.region_rgb(s.color)) or U.CYAN
+      local c = U.AMBER   -- 31 окт: секции — всегда жёлтые
       U.set(U.tint(c, 0.35)); gfx.rect(a, y, b - a, L.rh, 1)
       U.set(c); gfx.rect(a, y, 1, L.rh, 1)
       if b - a > U.measure('mm') then U.text(a + 2, y + 1, ctx.fit(s.name or '', b - a - 3), U.TEXT) end

@@ -8667,10 +8667,10 @@ function D.frame(L, snap, rows, state, info)
     -- 26 окт: + section (zs): project | sec | pattern — что видно, то и правит транспозиция
     local wide = ms('project') + ms('sec') + ms('pattern') + 9 <= bw
     local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
-    -- 31 окт: порядок proj pat sec, цвета по порядку — красный, жёлтый, зелёный
+    -- 31 окт: порядок proj sec pat (от большого к малому), цвета — красный, жёлтый (секции везде жёлтые), зелёный
     x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn', U.RED)
-    x0 = small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.AMBER)
-    small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn', U.GREEN)
+    x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn', U.AMBER)
+    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
@@ -9033,7 +9033,7 @@ function D.frame(L, snap, rows, state, info)
       patb[math.floor(rg.r0 + 0.5)] = true; patb[math.floor(rg.r1 + 0.5)] = true
     end
     for _, sc in ipairs(info.sections or {}) do
-      local c = (info.region_rgb and sc.color and sc.color ~= 0 and info.region_rgb(sc.color)) or U.CYAN
+      local c = U.AMBER   -- 31 окт: секции — всегда жёлтые (не цветом региона, не путаются с паттернами)
       secb[math.floor(sc.r0 + 0.5)] = c; secb[math.floor(sc.r1 + 0.5)] = c
     end
   end
