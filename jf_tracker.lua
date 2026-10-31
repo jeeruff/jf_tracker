@@ -12026,7 +12026,7 @@ ctx = {
       for _, id in ipairs({ 'visor', 'map' }) do if PN.visible(state.panes, id) then PN.hide(state.panes, id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
-    if state.ogfont then state.fontscale = 2; draw.set_font(state) end
+    if state.ogfont then state.fontscale = math.min(4, (tonumber(state.fontscale) or 2) * 2); draw.set_font(state) end   -- 31 окт: вдвое крупнее текущего (2 и так по умолчанию)
     state.og = true
     model.invalidate(); relayout()
     snap = model.snapshot(state.lpb)
@@ -12884,7 +12884,13 @@ ctx = {
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
       { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), only they are shown, visor and map hidden; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
-      { key = 'ogfont', label = 'og-mode font x2', kind = 'toggle', desc = 'OG-mode with the bitmap font twice as big', get = function() return state.ogfont end, set = function(v) state.ogfont = v; reaper.SetExtState(EXT, 'ogfont', v and '1' or '0', true) end },
+      { key = 'ogfont', label = 'og-mode font x2', kind = 'toggle', desc = 'OG-mode with the bitmap font twice as big', get = function() return state.ogfont end, set = function(v)
+        state.ogfont = v; reaper.SetExtState(EXT, 'ogfont', v and '1' or '0', true)
+        if state.og and state.og_back then   -- сразу, если OG-mode уже включён
+          local b = tonumber(state.og_back.fontscale) or 2
+          state.fontscale = v and math.min(4, b * 2) or b; draw.set_font(state); relayout()
+        end
+      end },
       { key = 'ogch1', label = 'og channel 1', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track1 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[1]) end, set = function(v) state.og_ch[1] = v; reaper.SetExtState(EXT, 'ogch1', v, true) end, pick = function() ctx.og_pick(1) end },
       { key = 'ogch2', label = 'og channel 2', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track2 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[2]) end, set = function(v) state.og_ch[2] = v; reaper.SetExtState(EXT, 'ogch2', v, true) end, pick = function() ctx.og_pick(2) end },
       { key = 'ogch3', label = 'og channel 3', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track3 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[3]) end, set = function(v) state.og_ch[3] = v; reaper.SetExtState(EXT, 'ogch3', v, true) end, pick = function() ctx.og_pick(3) end },
