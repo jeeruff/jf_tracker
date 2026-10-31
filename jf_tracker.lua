@@ -17691,6 +17691,45 @@ ctx.acv_do = function(op, sp, curves)
   if op.op == 'leave' then ctx.set_focus('tracker'); return end
   if op.op == 'addp' then ctx.acv_add_param(); return end
   if not act then vim.msg = 'canvas: no curve - Opt+A on a knob, or the cursor on an envelope lane'; return end
+  -- 31 окт: y / p — копия точек (строка курсора или выделение v) и вставка с курсора; значения 0..1
+  if op.op == 'yank' or op.op == 'paste' then
+    if act.kind == 'lfo' or act.kind == 'acs' then vim.msg = 'canvas: LFO / ACS have no points to copy'; return end
+    if op.op == 'yank' then
+      local a, b = ACV.row, ACV.row + 1
+      if ACV.anchor then a, b = math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row) + 1; ACV.anchor = nil end
+      local reg = { len = b - a }
+      for _, p in ipairs(act.points or {}) do
+        local r = sp.row_of(p[1])
+        if r >= a - 1e-6 and r < b - 1e-6 then reg[#reg + 1] = { d = r - a, v = p[2] } end
+      end
+      ACV.reg = reg
+      vim.msg = ('%s: %d point(s) copied (rows %d..%d) - p puts them at the cursor'):format(act.name, #reg, a, b - 1)
+      return
+    end
+    local reg = ACV.reg
+    if not (reg and #reg > 0) then vim.msg = 'canvas: nothing copied (y / yy / v … y)'; return end
+    local r0 = ACV.row
+    if act.kind == 'ml' then
+      local map = {}
+      for _, q in ipairs(reg) do map[math.floor(r0 + q.d + 0.5)] = q.v * 127 end
+      ctx.ml_write(act.f, map, act.f.ml.name .. ' paste')
+    else
+      local e = act.e
+      local t2e = act.t2e or function(x) return x end
+      local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
+      local pts = {}
+      for _, q in ipairs(reg) do
+        local r = r0 + q.d
+        local rf = math.floor(r)
+        local t = t2e(sp.time(rf) + (sp.time(rf + 1) - sp.time(rf)) * (r - rf))
+        pts[#pts + 1] = { t = t, v = raw(q.v) }
+      end
+      edit.env_put_points(e, t2e(sp.time(r0)), t2e(sp.time(r0 + math.max(1, reg.len))), pts)
+    end
+    ctx.acv_cc = nil
+    vim.msg = ('%s: %d point(s) pasted at row %d'):format(act.name, #reg, r0)
+    return
+  end
   if op.op == 'mod' then
     -- m / e: LFO / ACS параметра активной кривой (модуляционная — её параметр; огибающая FX — найти её параметр)
     local col = cur_col(); local tr = act.track or (col and col.track)
@@ -26451,7 +26490,7 @@ local function frame()
       end
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
-      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', sel = 'sel (T): drag - select rows; diamonds: corners tilt, sides stretch, inside moves; Esc - off', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (i): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', sel = 'sel (T): drag - select rows; diamonds: corners tilt, sides stretch, inside moves; Esc - off', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
       if lfo_hover.tbshapeset then A.shape = lfo_hover.tbshapeset; A.tool = 'shape'; vim.msg = 'shape ' .. A.shape_name(A.shape) .. ': drag over the canvas - the span, up / down - the height (c - the tool)' end
       if lfo_hover.tbshape then   -- 30 окт: форма для shape
         local items = {}

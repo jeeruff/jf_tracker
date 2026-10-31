@@ -104,8 +104,12 @@ end
 eq('legend hover', got, 2)
 -- 30 окт: инструменты мыши — клавиши, точка холста → строка / значение, мазок по строкам и клеткам
 ACV.tool, ACV.snap, ACV.grid = 'cur', true, 4
-ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d - draw', ACV.tool, 'draw')
-ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d again - cur', ACV.tool, 'cur')
+ACV.key(('i'):byte(), { r0 = 0, r1 = 64 }, {}); eq('i - draw (31 окт)', ACV.tool, 'draw')
+ACV.key(('i'):byte(), { r0 = 0, r1 = 64 }, {}); eq('i again - cur', ACV.tool, 'cur')
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); local dw = ACV.key(('w'):byte(), { r0 = 0, r1 = 64 }, {}); eq('dw - delete', type(dw) == 'table' and dw.op, 'del')
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); local dd = ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('dd - delete', type(dd) == 'table' and dd.op, 'del')
+ACV.key(('y'):byte(), { r0 = 0, r1 = 64 }, {}); local yy = ACV.key(('y'):byte(), { r0 = 0, r1 = 64 }, {}); eq('yy - copy', type(yy) == 'table' and yy.op, 'yank')
+local pp = ACV.key(('p'):byte(), { r0 = 0, r1 = 64 }, {}); eq('p - paste', type(pp) == 'table' and pp.op, 'paste')
 ACV.key(('D'):byte(), { r0 = 0, r1 = 64 }, {}); eq('D - line', ACV.tool, 'line')
 ACV.key(('E'):byte(), { r0 = 0, r1 = 64 }, {}); eq('E - erase', ACV.tool, 'erase')
 ACV.key(('S'):byte(), { r0 = 0, r1 = 64 }, {}); eq('S - snap off', ACV.snap, false)

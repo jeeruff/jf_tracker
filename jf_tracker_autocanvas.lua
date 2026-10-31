@@ -15,7 +15,7 @@
 
 local function clamp01(v) return math.max(0, math.min(1, v)) end
 local ACV = { row = 0, anchor = nil, grid = 4, cur = 1, seed = 1 }
--- 30 окт: инструменты мыши — cur (щелчок ставит курсор), draw (карандаш, d), line (прямая, D), erase (E);
+-- 30 окт: инструменты мыши — cur (щелчок ставит курсор), draw (карандаш, i; 31 окт — d теперь удаление dd / dw), line (прямая, D), erase (E);
 -- snap (S) — мазок по клеткам сетки, иначе по строкам. Мазок — превью ACV.stroke, запись при отпускании (main)
 ACV.tool, ACV.snap = 'cur', true
 ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'shape', 'shape' }, { 'erase', 'erase' }, { 'sel', 'sel' } }
@@ -258,8 +258,19 @@ function ACV.key(c, st, mods)
     return false
   end
   if ch == 'z' then ACV.zpend = true; return true end
-  -- 30 окт: инструменты мыши и привязка
-  if ch == 'd' then ACV.tool = ACV.tool == 'draw' and 'cur' or 'draw'; return true end
+  -- 31 окт: как в трекере — dd / dw удалить точку (выделение v — все в нём; пусто — следующую), yy / y — копировать,
+  -- p — вставить с курсора; рисование мышью — i (было d)
+  if ACV.dpend then
+    local k = ACV.dpend; ACV.dpend = nil
+    if c == 27 then return true end
+    if k == 'd' and (ch == 'd' or ch == 'w' or ch == 'e') then return { op = 'del' } end
+    if k == 'y' and (ch == 'y' or ch == 'w') then return { op = 'yank' } end
+    return true
+  end
+  if ch == 'd' then if ACV.anchor then return { op = 'del' } end; ACV.dpend = 'd'; return true end
+  if ch == 'y' then if ACV.anchor then return { op = 'yank' } end; ACV.dpend = 'y'; return true end
+  if ch == 'p' then return { op = 'paste' } end
+  if ch == 'i' then ACV.tool = ACV.tool == 'draw' and 'cur' or 'draw'; return true end
   if ch == 'D' then ACV.tool = ACV.tool == 'line' and 'cur' or 'line'; return true end
   if ch == 'E' then ACV.tool = ACV.tool == 'erase' and 'cur' or 'erase'; return true end
   if ch == 'c' then ACV.tool = ACV.tool == 'shape' and 'cur' or 'shape'; return true end
@@ -528,11 +539,20 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       end
     end
   end
-  -- точки активной
-  U.set(act.rgb or U.GREEN)
+  -- точки активной (31 окт: крупнее, кружком с обводкой фона; в выделении v / на строке курсора — янтарём)
+  local sa, sb = nil, nil
+  if ACV.anchor then sa, sb = math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row) end
+  local pr = math.max(3, math.floor(Lx.rh / 4))
   for _, p in ipairs(act.points or {}) do
     local row = span.row_of and span.row_of(p[1]) or r0
-    if row >= r0 and row <= r1 then gfx.rect(rx(row) - 1, vy(p[2]) - 1, 3, 3, 1) end
+    if row >= r0 and row <= r1 then
+      local px, py = rx(row), vy(p[2])
+      local ri = math.floor(row + 1e-6)
+      local sel = (sa and ri >= sa and ri <= sb) or ri == ACV.row
+      U.set(U.BG); gfx.circle(px, py, pr + 1, 1, 1)
+      U.set(sel and U.AMBER or (act.rgb or U.GREEN)); gfx.circle(px, py, pr, 1, 1)
+      if sel then U.set(U.BG); gfx.circle(px, py, math.max(1, pr - 2), 1, 1); U.set(U.AMBER); gfx.circle(px, py, math.max(1, pr - 3), 1, 1) end
+    end
   end
   -- 30 окт: мазок мыши (draw / line / erase) — превью до отпускания
   if ACV.stroke then
@@ -599,16 +619,18 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   if ACV.vpt then U.set(U.AMBER); gfx.circle(ACV.vpt[1], ACV.vpt[2], 4, 0, 1); gfx.circle(ACV.vpt[1], ACV.vpt[2], 1, 1, 1) end   -- 30 окт: палец (CONTROL)
   -- курсор холста: строка янтарём, кружок на активной кривой; плейхед зелёным
   local cx = rx(ACV.row)
-  U.set(U.AMBER, focused and 0.9 or 0.5); gfx.rect(cx, gy, 1, gh, 1); gfx.a = 1
+  U.set(U.AMBER, focused and 0.9 or 0.5); gfx.rect(cx - 1, gy, focused and 2 or 1, gh, 1); gfx.a = 1
   local cv_now = cache.ys[ACV.cur] and cache.ys[ACV.cur][math.max(0, math.min(gw - 1, cx - gx))] or 0
   U.set(U.AMBER); gfx.circle(cx, vy(cv_now), 3, 1, 1)
   if span.play_row and span.play_row >= r0 and span.play_row < r1 then U.set(U.GREEN); gfx.rect(rx(span.play_row), gy, 1, gh, 1) end
   U.set(U.LINE); gfx.rect(gx, gy, gw, gh, 0)
   -- 15 окт: рамка правки — то, что сейчас изменят клавиши: клетка сетки под курсором или v-диапазон
   -- (целыми клетками, как заливка); у LFO / ACS — весь отрезок (модуляция одна на параметр)
-  do
+  -- 31 окт: рамка — только у выделения v (без него — клетка сетки шириной в несколько строк казалась огромным курсором,
+  -- который прыгал не так, как шаги); курсор — линия строки и точка на кривой
+  if ACV.anchor and act.kind ~= 'lfo' and act.kind ~= 'acs' then
     local a, b
-    if act.kind == 'lfo' or act.kind == 'acs' then a, b = r0, r1 else a, b = ACV.range(span, true) end
+    a, b = ACV.range(span, false)
     local fx0, fx1 = math.max(gx, rx(a)), math.min(gx + gw, rx(b))
     U.set(U.AMBER, focused and 1 or 0.45); gfx.rect(fx0, gy, math.max(2, fx1 - fx0), gh, 0)
     if focused then gfx.rect(fx0 + 1, gy + 1, math.max(1, fx1 - fx0 - 2), gh - 2, 0) end
