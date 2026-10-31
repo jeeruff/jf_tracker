@@ -7645,7 +7645,7 @@ function D.cracks(x, y, w, h, red, ex, style)
   local now = reaper.time_precise()
   local dirty = false
   ex = math.max(0, math.min(w, math.floor(ex or w)))
-  local flick = style == 'lightning' and math.floor(now * 4) or 0   -- молния мерцает: новый разряд 4 раза в секунду
+  local flick = 0   -- 31 окт: молния статична (форма одна), яркость — от звука ниже
   if not (c and c.x == x and c.y == y and c.w == w and c.h == h and c.ex == ex and c.style == style and c.flick == flick) then
     c = { x = x, y = y, w = w, h = h, prims = {}, src = {}, t = 0, ex = ex, style = style, flick = flick }
     crk_build(c, style, w, h, ex, x, y, flick)
@@ -7690,6 +7690,14 @@ function D.cracks(x, y, w, h, red, ex, style)
   end
   local om = gfx.mode
   gfx.mode = 1; gfx.a = 1
+  if style == 'lightning' then   -- 31 окт: молния горит от звука мастера: тихо — еле видна, удар — вспышка, гаснет за ~0.3 с
+    local mt = reaper.GetMasterTrack(0)
+    local pk = mt and math.max(reaper.Track_GetPeakInfo(mt, 0) or 0, reaper.Track_GetPeakInfo(mt, 1) or 0) or 0
+    local lv = pk > 0 and math.max(0, math.min(1, (20 * math.log(pk, 10) + 42) / 42)) or 0
+    local dt = math.min(0.1, now - (c.lt or now)); c.lt = now
+    c.glow = math.max(lv, (c.glow or 0) - dt * 3)
+    gfx.a = 0.12 + 0.88 * c.glow ^ 1.5
+  end
   gfx.blit(CRK_IMG, 1, 0, 0, 0, w, h, x, y, w, h)
   gfx.mode = om or 0; gfx.a = 1
 end
