@@ -16692,10 +16692,23 @@ ctx.ctl_val_at = function(fl, row)
   for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then return (ml.ev[ml.rows[k]].v or 0) / 127 end end
   return ml.kind == 'pb' and 64 / 127 or 0
 end
-ctx.ctl_jog = function(SG)
+-- 31 окт: относительный сдвиг мыши; курсор назад — только у края экрана (перенос каждый кадр глушил движение)
+ctx.mouse_rel = function(SG)
   local sx, sy = reaper.GetMousePosition()
   local dx, dy = sx - SG.sx, sy - SG.sy
-  if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
+  SG.sx, SG.sy = sx, sy
+  if reaper.JS_Mouse_SetPosition then
+    local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, sx, sy, sx, sy, true)
+    t, b = math.min(t, b), math.max(t, b)
+    if sx < l + 24 or sx > r - 24 or sy < t + 24 or sy > b - 24 then
+      SG.sx, SG.sy = (l + r) // 2, (t + b) // 2; reaper.JS_Mouse_SetPosition(SG.sx, SG.sy)
+    end
+  end
+  return dx, dy
+end
+ctx.ctl_jog = function(SG)
+  local dx, dy = ctx.mouse_rel(SG)
+  dy = dy * (gfx.ext_retina and gfx.ext_retina > 1 and gfx.ext_retina or 1)   -- экран в точках, строки в пикселях
   local JOG = math.max(4, math.floor(L.rh / 2))   -- пикселей на шаг (30 окт: чувствительнее — полстроки)
   SG.acc = SG.acc + (state.jogdir == 'normal' and dy or -dy)   -- опция jog direction: invert — палец вверх, шаг дальше
   local steps = SG.acc >= 0 and math.floor(SG.acc / JOG) or -math.floor(-SG.acc / JOG)
@@ -16742,18 +16755,7 @@ ctx.ctl_acv = function(SG)
   local A = ctx.ACV
   local g = A.geo
   if not g then return end
-  -- относительные сдвиги мыши (экран). 31 окт: курсор назад к старту — только у края экрана (как жест треков):
-  -- перенос каждый кадр глушил движение (macOS после переноса курсора теряет события) — от мазка оставалась мелочь
-  local sx, sy = reaper.GetMousePosition()
-  local dx, dy = sx - SG.sx, sy - SG.sy
-  SG.sx, SG.sy = sx, sy
-  if reaper.JS_Mouse_SetPosition then
-    local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, sx, sy, sx, sy, true)
-    t, b = math.min(t, b), math.max(t, b)
-    if sx < l + 24 or sx > r - 24 or sy < t + 24 or sy > b - 24 then
-      SG.sx, SG.sy = (l + r) // 2, (t + b) // 2; reaper.JS_Mouse_SetPosition(SG.sx, SG.sy)
-    end
-  end
+  local dx, dy = ctx.mouse_rel(SG)   -- 31 окт: без переноса курсора каждый кадр — от мазка оставалась мелочь
   -- экран в точках, холст в пикселях буфера: на Retina точка = 2 пикселя
   local k = (gfx.ext_retina and gfx.ext_retina > 1 and gfx.ext_retina or 1) * (gfx.mouse_cap & 8 == 8 and 0.25 or 1)
   SG.vx = math.max(g.gx, math.min(g.gx + g.gw - 1, SG.vx + dx * k))
