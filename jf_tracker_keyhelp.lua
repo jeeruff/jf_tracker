@@ -44,7 +44,7 @@ KH.PAGES = {
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
     { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (1 f1 2 f2 ... = slice 01 02 ..., shown as the command 0S01 0S02 in the fx column - edit it there; the whole sample: Ctrl+Shift+1 (Ctrl+Shift + slice key - from that slice to the end); qwerty: q 2 w 3 ...); not sliced - the sample at that pitch. Shift+Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Option+note - chord, as on any sample; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). The selected slice: picked in the slice list, with Cmd+J / K, or the last one played' },
     { k = 'Opt+J / K', d = 'previous / next instrument of the lib (samples, plugins, automation; a count jumps N)' },
-    { k = 'Ctrl+Opt+H L', d = 'playrate of the selected instrument slower / faster (a count - N steps)' },
+    { k = 'Ctrl+Opt+H L', d = 'playrate of the selected instrument slower / faster (a count - N steps); on an fx column - fewer / more command columns of the track' },
     { k = 'Ctrl+Cmd+F1 F2', d = 'transpose the selected instrument of the lib -1 / +1 semitone (Shift - an octave)' },
     { k = 'Opt+1..0', d = 'instrument 1..10 of the lib; plugin instruments are numbered across the project (as in REAPER, any track - any instrument): one on another track takes the cursor to that track' },
     { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back), in INSERT too (Cmd is never a note)' },

@@ -29267,6 +29267,12 @@ local function frame()
   do
     local m = ctx.mods()
     local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or DK.ins or OPT.active
+    -- 31 окт: Ctrl+Opt+H / L в трекере — колонок команд fx у трека курсора меньше / больше
+    if m.ctrl and m.alt and not m.cmd and not busy and state.focus == 'tracker' and (vim.cur.field or 1) >= 4 and (c == 8 or c == 12 or c == 104 or c == 108) then   -- на колонке fx (иначе — playrate инструмента)
+      local f0 = L and L.flat and L.flat[vim.cur.fi]
+      if f0 and f0.col then ctx.fx_cols_step(f0.col, (c == 8 or c == 104) and -1 or 1) end
+      c = 0
+    end
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
       local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
       -- 31 окт: Cmd+A — выделить всё видимое в модуле в фокусе (macOS шлёт тот же код 1, что Ctrl+A — тот остаётся +1)
