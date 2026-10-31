@@ -7624,7 +7624,7 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
     -- молния по периметру: середины смещаются (midpoint displacement), 2..3 разряда, отростки внутрь
     local pts = {}
     local per = 2 * (w + h)
-    local nseg = math.max(24, math.floor(per / 24))
+    local nseg = math.max(16, math.floor(per / 40))
     local function ring(p)   -- по часовой без разрывов: верх →, право ↓, низ ←, лево ↑
       p = p % per
       if p < w then return p, 2 elseif p < w + h then return w - 3, p - w
@@ -7637,18 +7637,18 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
       local m = { (a[1] + b[1]) / 2 + (rnd() - 0.5) * disp, (a[2] + b[2]) / 2 + (rnd() - 0.5) * disp }
       m[1] = math.max(2, math.min(w - 3, m[1])); m[2] = math.max(2, math.min(h - 3, m[2]))
       bolt(a, m, disp / 2, depth - 1, wd); bolt(m, b, disp / 2, depth - 1, wd)
-      if depth == 2 and rnd() < 0.18 then
+      if depth == 2 and rnd() < 0.3 then
         local ang = math.atan(h / 2 - m[2], w / 2 - m[1]) + (rnd() - 0.5) * 1.4
         local ln = 15 + rnd() * 60
-        bolt(m, { m[1] + math.cos(ang) * ln, m[2] + math.sin(ang) * ln }, ln * 0.5, 3, 1)
+        bolt(m, { m[1] + math.cos(ang) * ln, m[2] + math.sin(ang) * ln }, ln * 0.5, 2, 1)
       end
     end
-    for layer = 1, 2 + math.floor(rnd() * 2) do
+    for layer = 1, 2 do
       local off = 6 + layer * 5 + rnd() * 6
       for i = 1, #pts - 1 do
         local a, b = pts[i], pts[i + 1]
         local function inw(p) local dx, dy = w / 2 - p[1], h / 2 - p[2]; local l = math.max(1, math.sqrt(dx * dx + dy * dy)); return { p[1] + dx / l * off, p[2] + dy / l * off } end
-        bolt(inw(a), inw(b), 26, 4, layer == 1 and 2 or 1)
+        bolt(inw(a), inw(b), 30, 3, layer == 1 and 2 or 1)
       end
     end
   end
@@ -7660,7 +7660,7 @@ function D.cracks(x, y, w, h, red, ex, style)
   local now = reaper.time_precise()
   local dirty = false
   ex = math.max(0, math.min(w, math.floor(ex or w)))
-  local flick = style == 'lightning' and math.floor(now * 8) or 0   -- молния мерцает: новый разряд 8 раз в секунду
+  local flick = style == 'lightning' and math.floor(now * 4) or 0   -- молния мерцает: новый разряд 4 раза в секунду
   if not (c and c.x == x and c.y == y and c.w == w and c.h == h and c.ex == ex and c.style == style and c.flick == flick) then
     c = { x = x, y = y, w = w, h = h, prims = {}, src = {}, t = 0, ex = ex, style = style, flick = flick }
     crk_build(c, style, w, h, ex, x, y, flick)
@@ -7694,7 +7694,7 @@ function D.cracks(x, y, w, h, red, ex, style)
         if red then local v = 0.75 + 0.25 * ((math.floor(p[2]) + math.floor(p[3])) % 4) / 4; cr, cg, cb = v, 0.07, 0.06 end
         local a = 0.9 * (1 - 0.55 * math.min(1, p[7]))
         local wd = p[8] or 1
-        if glow then gfx.set(cr, cg, cb, 0.12); gfx.line(p[2] - 1, p[3] - 1, p[4] - 1, p[5] - 1, 1); gfx.line(p[2] + 1, p[3] + 1, p[4] + 1, p[5] + 1, 1) end
+        if glow and wd > 1.5 then gfx.set(cr, cg, cb, 0.12); gfx.line(p[2] - 1, p[3] - 1, p[4] - 1, p[5] - 1, 1); gfx.line(p[2] + 1, p[3] + 1, p[4] + 1, p[5] + 1, 1) end
         gfx.set(cr, cg, cb, a); gfx.line(p[2], p[3], p[4], p[5], 1)
         if wd > 1.3 then gfx.set(cr, cg, cb, a * math.min(1, wd - 1)); gfx.line(p[2] + 1, p[3], p[4] + 1, p[5], 1) end
         if wd > 2.2 then gfx.set(cr, cg, cb, a * 0.6); gfx.line(p[2], p[3] + 1, p[4], p[5] + 1, 1) end
