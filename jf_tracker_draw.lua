@@ -7427,6 +7427,12 @@ function D.frame(L, snap, rows, state, info)
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
   D.OFF_IT = state.offit and true or nil
+  -- 31 окт: опция INSERT cursor red — в INSERT акцент курсора (ячейка, кромка, плейхед) красный; в конце кадра — обратно
+  D.acc_save = nil
+  if state.insred and info and info.vmode == 'insert' and D.acc_apply then
+    D.acc_save = { D.CUR_ACC, D.CUR, D.CURTOP, D.PLAYC, D.PLAY, D.CURCELL }
+    D.CUR_ACC = D.FOCUS_INS; D.acc_apply()
+  end
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
@@ -12837,6 +12843,7 @@ function D.frame(L, snap, rows, state, info)
     else gfx.rect(hd.x - 1, y0, 3, y1 - y0, 1) end
   end
 
+  if D.acc_save then local a = D.acc_save; D.CUR_ACC, D.CUR, D.CURTOP, D.PLAYC, D.PLAY, D.CURCELL = a[1], a[2], a[3], a[4], a[5], a[6]; D.acc_save = nil end   -- 31 окт
   return hover
 end
 
