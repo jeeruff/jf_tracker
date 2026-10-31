@@ -592,7 +592,7 @@ function D.layout(snap, state, nregions)
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- 24 окт: узкая колонка по умолчанию — 3 знака значения (вид values) и тонкая ручка automation item слева
   L.G3 = setmetatable({ env_bx = 4, env_bar_w = ms('000'), env_compact = true, env3 = true }, { __index = L })
-  L.env3_w = 4 + ms('000') + 2 * L.pad
+  L.env3_w = 4 + ms(state.envfmt == 'hex' and '00' or '000') + 2 * L.pad   -- 31 окт: hex — два знака, без пустого запаса
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
   -- браузер слева (7 окт, опция browserleft): lib + браузер — в левой колонке
@@ -8416,7 +8416,10 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: имя параметра — коротко: «S01 сэмпл: Pitch adjust / drumrs5k …» → «Pitch adjust» (префикс съедал всё место)
       local en = (ev.e.name or ''):gsub(' / .*$', '')
       en = en:match(':%s*(.+)$') or en
-      text(ev.x + L.pad, ly2 + 2, fit(en, room and (bx0 - ev.x - 2 * L.pad) or (ev.w - 2 * L.pad)), env_colour(ev.e))
+      local ew2 = room and (bx0 - ev.x - 2 * L.pad) or (ev.w - 2 * L.pad)
+      -- 31 окт: не влезает — сокращение по согласным на всю ширину (A Filter 1 Cutoff → Fl / Flt), а не обрубок «A F»
+      if ms(en) > ew2 and D.RK and D.RK.abbrev then en = D.RK.abbrev(en, math.max(1, math.floor(ew2 / math.max(1, ms('W'))))) end
+      text(ev.x + L.pad, ly2 + 2, fit(en, ew2), env_colour(ev.e))
       local on_btn = false
       if room then
         for k, b in ipairs(nb == 2 and { { '+', 1 }, { '-', -1 } } or { { '-', -1 } }) do
