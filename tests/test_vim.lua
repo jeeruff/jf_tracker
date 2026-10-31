@@ -1192,5 +1192,13 @@ reset(); keysin('Vjjjjx'); eq('V-line x deletes every column', last(), 'delete:k
 -- vol в нескольких колонках
 reset(); V.cur = { fi = 1, row = 0, field = 2 }; keysin('v'); alt_down = true; V.key(172); V.key(172); alt_down = false; keysin('5jx')
 eq('vol over several columns: every note (kick, n60, ov)', count('vol:'), 3); eq('…n60 of the 2nd track', has('vol:n60:128'), true)
+do   -- 31 окт: INSERT, колонка команд — gg / G прыгают, а не набирают код 0G
+  local sv = { V.mode, V.cur.row, V.cur.field }
+  V.mode = 'insert'; V.cur.field = 4; V.cur.sub = nil; V.hexbuf = nil; V.cur.row = 6
+  keysin('gg'); eq('INSERT fx column: gg - to the top', V.cur.row, 0)
+  V.cur.row = 2; keysin('G'); eq('INSERT fx column: G - down', V.cur.row > 2, true)
+  eq('…and stays in INSERT', V.mode, 'insert')
+  V.mode, V.cur.row, V.cur.field, V.hexbuf = sv[1], sv[2], sv[3], nil
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

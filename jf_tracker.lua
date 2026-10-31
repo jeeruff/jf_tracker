@@ -33643,8 +33643,8 @@ ctx.slx_wave = function(col, pitch, row)
   local rows_f = model.row_of_time(t0 + (v.frames * (b - a)) / v.sr * fac, state.lpb) - row
   if rows_f <= 0 then return nil end
   local P, memo = v.peaks, {}
-  -- 31 окт: thru — нота играет дальше своего среза, но OFF её всё равно обрывает (волна шла за OFF)
-  return { rows_f = rows_f, start_f = 0, obey = true, choke = 0, tail_f = tail_f,
+  -- 31 окт: thru (как играет slixer) — нота звучит дальше и после OFF, до следующей ноты / конца сэмпла: хвост тусклый
+  return { rows_f = rows_f, start_f = 0, obey = not v.thru, choke = 0, tail_f = tail_f,
     kpk = function(n)
       local p = memo[n]
       if p then return p end

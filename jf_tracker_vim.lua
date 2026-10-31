@@ -2516,6 +2516,13 @@ function V.key_impl(c)
       -- 12 окт: команда на строке без ноты — звучащей ноте (как в Renoise: команда действует на играющую ноту;
       -- у нас команды хранятся в ноте, и показываются у неё)
       if fld >= 4 and #heads == 0 then heads = V.covering(V.cur.fi, V.cur.row) end
+      -- 31 окт: gg / G в колонке команд — к началу / концу, как в NORMAL (эффектов GG / G нет: g начинал код 0G)
+      if fld >= 4 and ((c == ('G'):byte() and not V.hexbuf) or (c == ('g'):byte() and V.hexbuf and (V.hexbuf:upper() == 'G' or V.hexbuf:upper() == '0G'))) then
+        V.hexbuf = nil
+        if V.fx_back then V.cur.sub = nil; V.fx_back = nil end
+        if c == ('g'):byte() then V.mode = 'normal'; V.pending = 'g'; return as_normal(c) end   -- первая g ушла в набор — gg целиком
+        return as_normal(c)
+      end
       -- 12 окт: ` в колонке команд — стоп того, что здесь действует (0D… → 0D00), как note-off у ноты
       if fld >= 4 and c == ('`'):byte() then
         V.hexbuf = nil
