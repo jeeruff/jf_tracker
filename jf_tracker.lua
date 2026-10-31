@@ -18656,6 +18656,7 @@ local function hint_go(t)
   local d = t.data
   -- 15 окт: прыжок не на фейдер — режим FADE прежнего фейдера снят (f на take volume крутил громкость канала)
   if not (t.kind == 'trs' or t.kind == 'trsbtn' or (t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar'))) then state.kslider = nil end
+  if t.kind == 'fxcol' then vim.cur.fi, vim.cur.field, vim.cur.sub = d.fi, d.field, nil; ctx.set_focus('tracker'); return end   -- 31 окт: колонка команд
   if t.kind == 'opttab' then OPT.set_tab(d); return end   -- 31 окт
   if t.kind == 'optrow' then OPT.sel = d; return end
   if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда

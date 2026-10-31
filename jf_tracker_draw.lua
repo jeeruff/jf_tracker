@@ -7056,7 +7056,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
         -- 31 окт: подписи не влезают (обрезки «f», «manua») — активная целиком и «>» со списком всех вкладок стопки
         local cramped = false
-        for _, t in ipairs(c.tabs) do if ms(D.ic(t.id, PN.BY[t.id].label)) > t.w - 2 then cramped = true; break end end   -- 31 окт: по настоящей ширине вкладки (вкладки встык — запас был лишним, > стояла везде)
+        for _, t in ipairs(c.tabs) do if t.w - L.pad - 2 < 3 * ms('W') then cramped = true; break end end   -- 31 окт: > — только когда панель так узка, что подпись короче 3 знаков; иначе все вкладки (подписи ужимаются)
         local tabs = c.tabs
         if cramped and #c.tabs > 1 then
           local t0 = c.tabs[1]
@@ -8540,6 +8540,24 @@ function D.frame(L, snap, rows, state, info)
     -- третья строка: что делает каждая подколонка (просьба 1 окт). Подписи
     -- короче ширины поля на символ, чтобы соседние не слипались; полное
     -- описание — в статус-баре при наведении (hover.caption)
+    -- 31 окт: f-прыжки на колонки команд (fx 1..N) каждой подколонки — метка в строке лейнов шапки над колонкой
+    if not c.folded then
+      local hyl = hy + L.lane_row * L.rh
+      for _, ln in ipairs(c.lanes) do
+        for si = 1, ln.nsub do
+          local fl = L.flat[ln.f0 + si - 1]
+          local G = (fl or {}).G or L
+          if fl and not (G.narrow or G.notes_only) then
+            local sx = ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w)
+            local sw = fl.w or L.sub_w
+            for k = 1, (G.nfx or L.nfx) do
+              local fx = (G.x_fx or L.x_fx)[k]
+              if fx and fx < sw then hint('fxcol', sx + fx, hyl, L.w_fx, L.rh, { fi = ln.f0 + si - 1, field = 3 + k }) end
+            end
+          end
+        end
+      end
+    end
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
       local cy3 = hy + (L.lane_row + 1) * L.rh + 2
       local caph = L.cap_rows * L.rh - 4
