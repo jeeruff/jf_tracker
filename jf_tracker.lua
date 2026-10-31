@@ -33633,7 +33633,7 @@ ctx.slx_wave = function(col, pitch, row)
   if not (k and v.starts[k] and v.ends[k] and v.ends[k] > v.starts[k]) then return nil end
   local a, b = v.starts[k] / v.frames, v.ends[k] / v.frames
   -- 31 окт: как играет slixer — срез растянут (Stretch среза + общий: 0.5 = x1, скорость 8^(1-2s)); thru — нота
-  -- играет дальше среза до конца сэмпла (хвост тусклее), OFF её не обрывает
+  -- играет дальше среза до конца сэмпла (хвост тусклее), до OFF / следующей ноты
   local sx = tonumber(v.stx and v.stx[k]) or 0.5
   if sx <= 0 or sx > 1 then sx = 0.5 end
   local fac = 8 ^ (2 * sx - 1)
@@ -33643,7 +33643,8 @@ ctx.slx_wave = function(col, pitch, row)
   local rows_f = model.row_of_time(t0 + (v.frames * (b - a)) / v.sr * fac, state.lpb) - row
   if rows_f <= 0 then return nil end
   local P, memo = v.peaks, {}
-  return { rows_f = rows_f, start_f = 0, obey = not v.thru, choke = 0, tail_f = tail_f,
+  -- 31 окт: thru — нота играет дальше своего среза, но OFF её всё равно обрывает (волна шла за OFF)
+  return { rows_f = rows_f, start_f = 0, obey = true, choke = 0, tail_f = tail_f,
     kpk = function(n)
       local p = memo[n]
       if p then return p end
