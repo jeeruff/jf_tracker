@@ -4753,8 +4753,13 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
   if dt <= 0 then return end
   run(('delete time %.3fs'):format(dt), function()
     for _, tr in ipairs(tracks) do
-      for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
-        local it = R.GetTrackMediaItem(tr, i)
+      -- 31 окт: список айтемов — заранее: сдвиг / разрез пересортировывает трек, и по индексу один и тот же клип
+      -- обрабатывался дважды (следующий паттерн уезжал и обрезался до строки — «Backspace удалил всё»)
+      local list = {}
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do list[#list + 1] = R.GetTrackMediaItem(tr, i) end
+      for li = #list, 1, -1 do
+        local it = list[li]
+        if not R.ValidatePtr(it, 'MediaItem*') then goto td_next end
         local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
         local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
         -- 12 окт: аудио-нота — одно событие, как в Renoise: проходит через удаляемые строки — короче на них
@@ -4836,6 +4841,7 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             end
           else R.DeleteTrackMediaItem(tr, it) end
         end
+        ::td_next::
       end
       env_shift(tr, t0, t1, dt, limit, 'del')
     end
