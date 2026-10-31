@@ -26498,6 +26498,12 @@ local function frame()
     elseif hover.pool then
       ctx.set_focus('inst')
       -- 19 окт: Shift+щелчок — несколько инструментов: диапазон от выбранного до щёлкнутого (как v)
+      -- 31 окт: Cmd+щелчок — отметить / снять (как m): dd / x / yy — по отметкам
+      if ctx.mods().cmd and not hover.pool.empty then
+        local i = hover.pool.i
+        IK.marks[i] = (not IK.marks[i]) or nil
+        vim.msg = ('lib: %d marked - dd / x cut them, yy yank, u unmark (Cmd+click, m)'):format(IK.nmarks())
+      end
       if ctx.mods().shift and not hover.pool.empty then IK.anchor = IK.anchor or vim.inst else IK.anchor = nil end
       state.prev_by_mouse = true
       pool_select(hover.pool.i)

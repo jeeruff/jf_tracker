@@ -453,6 +453,7 @@ KH.PAGES = {
   inst = { title = 'lib', e = {
     { k = 'c', d = 'convert: l slices to the lib, s slice to drumrs5k (a pad per slice), w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track); in the lib and the item tab ! slices at transients instead' },
+    { k = 'm  Cmd+click', d = 'mark / unmark an instrument (several, not in a row; Shift+click - a range): dd / x cut the marked, yy yanks them, u unmarks' },
     { k = 'j k', d = 'instrument down / up (and onto the name of a lib folder: h / l / Enter - fold / open)' },
     { k = 'R [ ]  Opt+Shift+H L', t = {}, d = 'ξ - a random sample for the selected instrument (Opt+Shift+L - forward, past the end a new one; Opt+Shift+H - back): like the name of its lib folder (kick), else the first word of its name, from the map index (open the map pane once on your samples); [ ] - back / forward through what came up (back from the first - the original sound); also the < ξ > buttons on the row' },
     { k = 'm u r (lf)', t = {}, d = 'as in lf: m - mark the instrument and go down (amber), u - unmark all (no marks - u is undo), dd / x - cut the marked, yy - yank them, r - rename' },
