@@ -27587,7 +27587,10 @@ local function frame()
         if it.src == 'p' and it.name and pf and pf.params then for i2, p2 in ipairs(pf.params) do if p2.name == it.name or p2.full == it.name then pi0 = i2; break end end end
         if pi0 then dsp_sel.param = pi0; draw.SX.cur = nil else dsp_sel.param = nil; draw.SX.cur = draw.SX.key_of(it) end
       end
-      if hover.slx.trk and hover.slx.it.slider then ctx.slx_vdrag = { h = hover.slx }; ctx.slx_vdrag_tick()   -- 27 окт: слайдер sens — щелчок / протяжка по дорожке
+      local tk = hover.slx.trk
+      if tk and hover.slx.it.slider and gfx.mouse_x >= tk.x - 2 and gfx.mouse_x < tk.x + tk.w + 2 then ctx.slx_vdrag = { h = hover.slx }; ctx.slx_vdrag_tick()   -- 27 окт: слайдер — щелчок / протяжка по дорожке
+      elseif hover.slx.it.slider or (hover.slx.it.kind == 'val' and hover.slx.it.name ~= 'Base note') then   -- 31 окт: по имени — только выбор (было: протяжка от мыши левее дорожки — значение в 0)
+        state.status = ('slixer: %s - drag the bar, wheel or h l to change'):format(hover.slx.it.lab or '')
       else ctx.slx_do(hover.slx) end
       click = { t = now2, zone = 'slx' }
     elseif hover.slxaim and not B.drag then   -- 26 окт: прицел — spam / точный сдвиг границы
