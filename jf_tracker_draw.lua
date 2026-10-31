@@ -9114,7 +9114,10 @@ function D.frame(L, snap, rows, state, info)
   local patb, secb = {}, {}
   if state.rgedges ~= false then
     for _, rg in ipairs(info.ruler and info.ruler.regions or {}) do
-      patb[math.floor(rg.r0 + 0.5)] = true; patb[math.floor(rg.r1 + 0.5)] = true
+      -- 31 окт: у границы — имена: что кончается (prv) и что начинается (nxt), подписи у линии
+      local a0, a1 = math.floor(rg.r0 + 0.5), math.floor(rg.r1 + 0.5)
+      patb[a0] = patb[a0] or {}; patb[a0].nxt = rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))
+      patb[a1] = patb[a1] or {}; patb[a1].prv = rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))
     end
     for _, sc in ipairs(info.sections or {}) do
       local c = U.AMBER   -- 31 окт: секции — всегда жёлтые (не цветом региона, не путаются с паттернами)
@@ -9199,7 +9202,7 @@ function D.frame(L, snap, rows, state, info)
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
     if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
-    elseif patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5) } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
+    elseif patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5), patb[r.row].prv, patb[r.row].nxt, eg and eg.prv } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)
@@ -9528,7 +9531,12 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
-  for _, e in ipairs(D.pat_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 2, e[3], 4, 1) end   -- 31 окт: граница паттерна — 4 px через весь трекер, цветом паттерна
+  for _, e in ipairs(D.pat_lines or {}) do   -- 31 окт: граница паттерна — 4 px через весь трекер, цветом паттерна; имена: над линией — что кончается, под ней — что начинается
+    set(e[4]); gfx.rect(e[1], e[2] - 2, e[3], 4, 1)
+    local gx = L.matrix_w + L.pad
+    if e[5] then local s5 = e[5]; text(gx, e[2] - 2 - L.th, s5, e[7] or U.GREY, U.BG) end
+    if e[6] then text(gx, e[2] + 2, e[6], e[4], U.BG) end
+  end
   D.pat_lines = nil
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil
