@@ -16952,14 +16952,23 @@ ctx.acv_tree = function(curves)
   local rows, used = {}, {}
   local cc = cur_col()
   -- кривые без огибающей трека (vel, MIDI-лейн, LFO) — сверху, вне папок
-  for i, cv in ipairs(curves) do if not cv.env or not cv.track then rows[#rows + 1] = { i = i, name = cv.name } end end
+  -- 31 окт: MIDI-лейны (PAT PB CC …) — тоже в папке своего трека (у amen были одной строкой вне папок, только лейн курсора)
+  local mlcur
+  for i, cv in ipairs(curves) do if cv.kind == 'ml' then mlcur = { i = i, ml = cv.f and cv.f.ml } end end
+  for i, cv in ipairs(curves) do if (not cv.env or not cv.track) and cv.kind ~= 'ml' then rows[#rows + 1] = { i = i, name = cv.name } end end
   for _, c in ipairs(snap and snap.cols or {}) do
-    if c.envs and #c.envs > 0 then
+    local mls = {}
+    for _, ml in ipairs(c.mlanes or {}) do if ml.kind ~= 'tx' then mls[#mls + 1] = ml end end
+    if (c.envs and #c.envs > 0) or #mls > 0 then
       local open = A.tfold[c.guid]
       if open == nil then open = cc and c.guid == cc.guid end
-      rows[#rows + 1] = { hdr = true, name = (c.name ~= '' and c.name or 'track') .. ' (' .. #c.envs .. ')', guid = c.guid, open = open }
+      rows[#rows + 1] = { hdr = true, name = (c.name ~= '' and c.name or 'track') .. ' (' .. (#(c.envs or {}) + #mls) .. ')', guid = c.guid, open = open }
       if open then
-        for _, e in ipairs(c.envs) do
+        for _, ml in ipairs(mls) do
+          local on = mlcur and mlcur.ml == ml
+          rows[#rows + 1] = { i = on and mlcur.i or nil, name = ml.name or 'lane', mlane = ml }
+        end
+        for _, e in ipairs(c.envs or {}) do
           local hid = A.hidden[e.env]
           if not hid or A.showhidden then rows[#rows + 1] = { i = idx[e.env], env = e.env, name = e.name or 'env', hidden = hid } end
           used[e.env] = true
@@ -26704,6 +26713,9 @@ local function frame()
         end
       end
       if lfo_hover.addp then ctx.acv_add_param() end
+      if lfo_hover.mlane then   -- 31 окт: MIDI-лейн в списке кривых — курсор трекера на него (он становится кривой холста)
+        for fi, f in ipairs(L.flat or {}) do if f.ml == lfo_hover.mlane then vim.cur.fi = fi; ctx.ACV.cur = 1; ctx.acv_cc = nil; break end end
+      end
       if lfo_hover.tfold then   -- 31 окт: папка трека в списке кривых
         local A = ctx.ACV
         local cur = A.tfold[lfo_hover.tfold]

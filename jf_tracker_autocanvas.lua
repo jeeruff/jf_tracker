@@ -714,7 +714,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
         elseif r.i and ACV.multi[ACV.mkey(curves[r.i])] then U.set(U.tint(U.CYAN, 0.2)); gfx.rect(lx, iy, lw, rh, 1) end
         if r.i then U.set(curves[r.i].rgb or U.GREEN); gfx.rect(lx + pad + 1, iy + 2, 3, rh - 4, 1) end
         U.text(lx + pad + 6, iy, ctx.fit(lab, lw - pad - 8), on and U.AMBER or (r.hidden and U.DIM or (r.i and U.TEXT or U.GREY)))
-        if hot then hover = r.i and { pane = 'curve', legend = r.i, lenv = r.env } or { pane = 'curve', lpin = r.env, lenv = r.env } end
+        if hot then hover = r.i and { pane = 'curve', legend = r.i, lenv = r.env } or (r.mlane and { pane = 'curve', mlane = r.mlane }) or { pane = 'curve', lpin = r.env, lenv = r.env } end
       end
     end
     curves = {}   -- обычный список ниже не рисуется
