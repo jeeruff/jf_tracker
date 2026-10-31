@@ -675,8 +675,10 @@ function O.draw(L, W, H)
   -- 13 окт: окно опций — одного размера на всех вкладках, почти во всё окно (раньше прыгало по вкладкам)
   if not O.compact then
     -- 18 окт: в полтора раза меньше окна трекера (просьба: трекер вокруг виден)
-    bw = math.floor((W - 4 * L.pad) / 1.5)
-    nvis = math.max(3, math.floor((H - 4 * L.pad) / 1.5 / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
+    -- 31 окт: не влезло в полтора раза меньшее окно — на всё окно (всё сразу на экране), остаток — прокруткой с полосой
+    local k = (O.big and O.tab == O.big_tab) and 1.02 or 1.5
+    bw = math.floor((W - 4 * L.pad) / k)
+    nvis = math.max(3, math.floor((H - 4 * L.pad) / k / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
   end
   local bh = (nvis + 5 + ((#O.tabs > 0) and 1 or 0)) * rh   -- 14 окт: +1 строка — поиск в 2 строки
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
@@ -752,7 +754,17 @@ function O.draw(L, W, H)
   local by0 = by
   if not O.compact then by = by + rh * ((#O.tabs > 0) and 3 or 2) end   -- список — под вкладками и поиском (2 строки)
   O.nvis = cap
-  local masonry = O.masonry_plan(L, bx, by + rh + 4, bw, nvis * rh)   -- 15 окт: разделы рамками в колонки (см. O.masonry_plan)
+  local masonry = O.masonry_plan(L, bx, by + rh + 4, bw - 8, nvis * rh)   -- 15 окт: разделы рамками в колонки (см. O.masonry_plan)
+  if masonry and masonry.over > 0 and not O.compact and not O.big then O.big, O.big_tab = true, O.tab end   -- 31 окт: следующий кадр — на всё окно
+  -- 31 окт: полоса прокрутки справа, когда всё не влезло (колесо / j k)
+  if masonry and masonry.over > 0 then
+    local ty, th = by + rh + 4, nvis * rh
+    local tot = th + masonry.over
+    local kh = math.max(rh, math.floor(th * th / tot))
+    local ky = ty + math.floor((th - kh) * (O.mscroll or 0) / math.max(1, masonry.over))
+    U.set(U.LINE); gfx.rect(bx + bw - 6, ty, 3, th, 1)
+    U.set(U.AMBER); gfx.rect(bx + bw - 7, ky, 5, kh, 1)
+  end
   if masonry then O.scroll = 0 end
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
