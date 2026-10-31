@@ -10026,7 +10026,8 @@ ctx = {
     local hv = { fi = vim.cur.fi, row = { row = vim.cur.row }, field = vim.cur.field, fsub = vim.cur.sub,
                  cell = f and f.sub and f.sub[vim.cur.row], col = f and f.col }
     local r = vim.cur.row - (rows[1] and rows[1].row or 0)
-    local anchor = (f and f.x and r >= 0 and r < L.nrows) and { kind = 'xy', x = f.x, y = L.body_y + (r + 1) * L.rh } or nil
+    local anchor = (f and f.x and r >= 0 and r < L.nrows) and { kind = 'xy', x = f.x, y = L.body_y + (r + 1) * L.rh } or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    anchor.quick = true   -- 31 окт: с клавиатуры (\) — последним пунктом \ главное меню
     if ctx.open_context then ctx.open_context(hv, anchor) end
   end,
   -- шаг слайдера шапки (колесо, клавиатура): громкость 0.5 dB, панорама 0.02;
@@ -15083,7 +15084,6 @@ ctx = {
     local hover = { fi = vim.cur.fi, cell = f and f.sub and f.sub[vim.cur.row], col = col }
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local items = {
-      { key = '\\', label = 'context: what is under the cursor', fn = function() ctx.context_here() end },
       { key = ',', label = 'REAPER preferences', fn = function() reaper.Main_OnCommand(40016, 0) end },   -- 9 окт: \ , — как Cmd+, в macOS
       { key = 'e', label = 'event / selection', sub = function() return group('event', event_actions(hover)) end },
       { key = 't', label = 'track' .. (col and (': ' .. col.name) or ''), sub = function() return col and group('track ' .. col.name, track_actions(col)) or { title = 'track', items = {} } end },
@@ -15212,7 +15212,7 @@ ctx = {
       { key = '/', label = 'search', fn = function() vim.mode = 'search'; vim.searchline = '' end },
       { key = '?', label = 'keys cheat sheet', sub = function() return ctx.hydra_keys() end },
     }
-    return { title = '` menu', items = items }
+    return { title = '\\ main menu', items = items }
   end,
   hydra_keys = function()
     local K = {

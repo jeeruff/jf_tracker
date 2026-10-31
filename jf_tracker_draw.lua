@@ -5120,7 +5120,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if it.big and it.vlab then
           -- 16 окт: подпись длиннее двух строк (step) — выше, в верхний отступ полосы (до 3 px), не в строку listen
           local vh = (it.vlab_rows or 2) * L.rh
-          local up = math.max(0, math.min(3, ms(it.vlab) - vh))
+          local up = math.max(0, math.min(ms(it.vlab) - vh, cy - (L.piano_y or 0) - 1))   -- 31 окт: вверх до края полосы (было до 3 px — у широких шрифтов step резался до ste)
           D.vtext(cx, cy - up, vh + up + 2, it.vlab, U.DIM, U.PANEL)   -- 31 окт: подпись step тусклее кнопок   -- +2 — зазор до строки listen
           -- 19 окт: step сменился — цифра вспыхивает крупнее (×4 → ×2 за полсекунды), янтарём
           local fl = it[1] == 'step' and D.step_flash and reaper.time_precise() - D.step_flash

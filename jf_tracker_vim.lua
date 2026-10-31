@@ -2271,7 +2271,8 @@ function V.key_impl(c)
   end
   -- лидер \ — hydra действий (контекстное меню с клавиатуры), ? — шпаргалка
   if c == ('\\'):byte() and not (V.mode == 'insert' and (env_of(V.cur.fi) or (V.cur.field or 1) == 2)) then
-    if ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return   -- 6 окт: \ — главное меню, \\ — контекст
+    -- 31 окт: \ — меню того, что под курсором; \\ — главное (было наоборот)
+    if ctx.context_here then ctx.context_here() elseif ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return
   end
 
   record(c)

@@ -174,7 +174,7 @@ KH.PAGES = {
     { k = '/', d = 'commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)' },
     { k = 'n N *', d = 'next / previous match of the last search, search the name under the cursor' },
     { k = ':', d = 'command line (Tab completes)' },
-    { k = '\\', d = 'the main menu of everything (v view, P project, o options ...)' },
+    { k = '\\', d = 'the menu of what is under the cursor (note, envelope, clip ...); \\ again - the main menu of everything (v view, P project, o options ...)' },
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },
     { k = 'tg  t}  t+ t-', t = {}, d = 'manual Euclid / polymeter by item geometry: tg glues every item of the cursor track in the pattern into one; t} on a row of it - the loop ends here, the item repeats it to the pattern end (k notes in n rows = Euclid); t+ / t- - the item rate x2 / /2' },
     { k = '\\ q', t = {}, d = 'quit REAPER (as File: Quit - it asks to save a changed project)' },
