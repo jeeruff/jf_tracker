@@ -16926,6 +16926,28 @@ ctx.acv_add_param = function()
     vim.msg = 'canvas: ' .. r.label .. ' added (stacked; Shift+click in the list - out of the lanes)'
   end)
 end
+-- 31 окт: Cmd+A — всё видимое в контексте: трекер — блок VISUAL на все колонки и строки вида (proj / sec / pat),
+-- холст curve — весь отрезок для sel
+ctx.select_all = function()
+  local f = state.focus
+  if f == 'tracker' or f == 'insert' then
+    local a, b = ctx.view_rows()
+    local n = #(L and L.flat or {})
+    if not (a and b and n > 0) then return end
+    if vim.mode == 'insert' then vim.mode = 'normal' end
+    vim.cur.row = math.max(a, math.min(b, vim.cur.row))
+    vim.mode = 'visual'; vim.vfield, vim.vtrack = nil, nil
+    vim.anchor = { fi = 1, row = a }
+    vim.vbox = { 1, n, a, b, at = { fi = vim.cur.fi, row = vim.cur.row } }
+    vim.msg = ('Cmd+A: everything you see - %d column(s), rows %d..%d (Esc - off)'):format(n, a, b)
+  elseif f == 'top' and state.toptab == 'automation' and mod_pane == 'curve' then
+    local sp = ctx.acv_span()
+    ctx.ACV.tool = 'sel'; ctx.ACV.sel = { a = sp.r0, b = sp.r1 }
+    vim.msg = 'Cmd+A: the whole span selected - drag a diamond to transform, hum - humanize'
+  else
+    vim.msg = 'Cmd+A: select all is not in this module yet (tracker, curve canvas)'
+  end
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end
@@ -28696,6 +28718,8 @@ local function frame()
     local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or DK.ins or OPT.active
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
       local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
+      -- 31 окт: Cmd+A — выделить всё видимое в модуле в фокусе (macOS шлёт тот же код 1, что Ctrl+A — тот остаётся +1)
+      if c == 1 or c == 97 then ctx.select_all(); c = 0; what = nil end
       if what then
         if state.focus == 'matrix' then
           c = what == 'y' and 3 or (what == 'd' and 24 or 22)   -- матрица: Ctrl+C / X / V блока (MX.key)

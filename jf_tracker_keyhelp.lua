@@ -184,6 +184,7 @@ KH.PAGES = {
     { k = '\\Ps', d = 'save project (\\PS: save as)' },
     { k = 'f', d = 'hint labels: jump anywhere by two letters; the tracker first - every note, every beat row (darker dots) of each track; in INSERT too, on the note field (where f is not a note; in vol / fx it is hex F)' },
     { k = 'tt', d = 'new track after the cursor track (3tt - three)' },
+    { k = 'Cmd+A', d = 'select everything you see in the module: the tracker - all columns x the rows of the view (proj / sec / pat) as a VISUAL block; the curve canvas - the whole span (sel). Ctrl+A stays +1 on the field' },
     { k = 'Cmd+C X V', d = 'copy / cut / paste in every module, as everywhere: the copy keys of the module (yy / dd / p, in VISUAL y / d; the matrix - its block); in INSERT the tracker steps out and back' },
     { k = 'T', m = 'transposer', d = 'Shift+T - the transposer dropdown: semitones, octaves, degrees of the key, to the chord of the row, just, 1/6 tones, where (selection / column / track / all tracks in what you see); listen - hear it moved; also :tr, the harmonizer button transpose' },
     { k = 'F1 F2', d = 'in the tracker: transpose the selection (else the note of the row) -1 / +1; F11 F12 - an octave (as in Renoise); F2 from another module - to the tracker' },
