@@ -15904,7 +15904,7 @@ OPT.ask.init(U, ctx)
 -- 10 окт: вкладка theme окна Options — темы карточками, шрифты своим шрифтом
 ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
-ctx.MODEFONTS = { 'off', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
+ctx.MODEFONTS = { 'off', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
   -- 16 окт: ещё — системные и уже установленные в ~/Library/Fonts (проверено fc-list)
   'Noto Sans Glagolitic', 'Savoye LET',
   'Eau de rose', 'Discognate', 'DemonCubicBlock NKP Shade', 'P0T-NOoDLE', 'mOsOul', 'MicroKnight', 'Topaz a600a1200a400', 'DepartureMono Nerd Font', '3270 Nerd Font' }
@@ -32785,17 +32785,6 @@ ctx.qtz_grid_name = function(g)
   if math.abs(n - math.floor(n + 0.5)) < 1e-3 then return '1/' .. math.floor(n + 0.5) end
   return ('%.3f beat'):format(g)
 end
-ctx.qtz_toggle = function()
-  local col = cur_col()
-  local tr = col and col.track
-  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'qtz: a track under the cursor'; return end
-  local q, ch = ctx.qtz_get(tr)
-  if not q then return end
-  q.on = not q.on
-  if q.on and not ctx.qtz_cache.grid_set then q.grid = 1 / math.max(1, state.lpb) end   -- первое включение — шаг трекера
-  ctx.qtz_set(tr, q, ch, q.on and 'on' or 'off')
-  vim.msg = q.on and ('qtz on: %s records its MIDI input quantized to %s, %d%%'):format(col.name or '', ctx.qtz_grid_name(q.grid), q.str) or ('qtz off: %s records as played'):format(col.name or '')
-end
 -- 31 окт: выпадашка qtz (щелчок по кнопке) — всё квантование входа трека курсора; меню остаётся открытым до Esc
 ctx.qtz_menu = function()
   local col = cur_col()
@@ -32812,7 +32801,7 @@ ctx.qtz_menu = function()
   end end
   local function mark(c) return c and '* ' or '  ' end
   local step = 1 / math.max(1, state.lpb)
-  local function grid(k, g, lab) return { key = k, label = mark(q.on and math.abs(q.grid - g) < 1e-4) .. 'grid ' .. lab, fn = chg('grid ' .. lab, function(x) x.grid = g; x.on = true; ctx.qtz_cache.grid_set = true end) } end
+  local function grid(k, g, lab) return { key = k, label = mark(q.on and math.abs(q.grid - g) < 1e-4) .. 'grid ' .. lab, fn = chg('grid ' .. lab, function(x) x.grid = g; x.on = true end) } end
   local function str(k, p) return { key = k, label = mark(q.str == p) .. ('strength %d%%'):format(p), fn = chg(('strength %d%%'):format(p), function(x) x.str = p end) } end
   local function pos(k, p, lab) return { key = k, label = mark(q.pos == p) .. 'to the ' .. lab, fn = chg('to the ' .. lab, function(x) x.pos = p end) } end
   local items = {

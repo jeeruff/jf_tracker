@@ -5589,15 +5589,27 @@ local function glagolitic(w)
   end
   return table.concat(out)
 end
-D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {} }
+-- 31 окт: орочье — орхонские руны (Noto Sans Old Turkic, есть в macOS): латиница по звуку, справа налево
+local ORK = { A = 0x10C00, E = 0x10C00, I = 0x10C03, O = 0x10C06, U = 0x10C06, B = 0x10C09, V = 0x10C09, D = 0x10C11,
+  G = 0x10C0D, Y = 0x10C16, J = 0x10C16, K = 0x10C34, Q = 0x10C34, C = 0x10C32, L = 0x10C1E, M = 0x10C22, N = 0x10C23,
+  P = 0x10C2F, F = 0x10C2F, R = 0x10C3A, S = 0x10C3D, X = 0x10C3D, T = 0x10C43, Z = 0x10C14, H = 0x10C34, W = 0x10C06 }
+local function orkhon(w)
+  local out = {}
+  for ch in w:upper():gmatch('.') do
+    if ORK[ch] then table.insert(out, 1, utf8.char(ORK[ch])) elseif ch == '-' then table.insert(out, 1, utf8.char(0x205A)) end   -- ⁚ — разделитель слов
+  end
+  return table.concat(out)
+end
+D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {}, ['Noto Sans Old Turkic'] = {} }
 for k, v in pairs(MW) do
   D.MODE_SCRIPT['Ponomar'][k], D.MODE_SCRIPT['Songti SC'][k], D.MODE_SCRIPT['Diwan Thuluth'][k] = v[1], v[2], v[3]
   D.MODE_SCRIPT['pIqaD qolqoS'][k] = klingon(v[4])
   D.MODE_SCRIPT['Noto Sans Glagolitic'][k] = glagolitic(v[1])
+  D.MODE_SCRIPT['Noto Sans Old Turkic'][k] = orkhon(k)
 end
 -- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
 -- 15 окт: множитель размера — у шрифта мелкое очко при той же высоте строки (арабский был вдвое мельче)
-D.MODE_FONT_SCALE = { ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
+D.MODE_FONT_SCALE = { ['Noto Sans Old Turkic'] = 1.3, ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 -- 22 окт: выпадашка-клавиатура для параметра-ноты DSP (note lo / hi, root): 0..127, текущая — голубым, под мышью —
@@ -7067,8 +7079,24 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local pcol = pm and function(pid) return D.pane_col(pid, pm, state.shadehue) end or nil
         set(fon and D.FOCUS or (pcol and U.mix(pcol(id), U.PANEL, 0.55)) or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
-        -- 31 окт (2): вкладки панели — всегда все (подписи ужимаются); «>» со списком — только у подвкладок (просьба)
+        -- 31 окт: подписи не влезают (обрезки «f», «manua») — активная целиком и «>» со списком всех вкладок стопки
+        local cramped = false
+        do local lt = c.tabs[#c.tabs]; cramped = lt ~= nil and lt.x + lt.w > c.x + c.w + 1 end   -- 31 окт (3): > — только когда вкладки (по 3 знака минимум) не влезают в ширину панели; иначе все вкладки
         local tabs = c.tabs
+        if cramped and #c.tabs > 1 then
+          local t0 = c.tabs[1]
+          for _, t in ipairs(c.tabs) do if t.id == id then t0 = t end end
+          local x0 = c.tabs[1].x
+          local lw = math.min(ms(D.ic(t0.id, PN.BY[t0.id].label)) + 2 * L.pad, c.w - ms('>') - 4 * L.pad)
+          tabs = { { id = t0.id, x = x0, y = t0.y, w = lw, h = t0.h } }
+          local mx0 = x0 + lw + L.pad
+          local mw = ms('>') + 2 * L.pad
+          local mhot = mx >= mx0 and mx < mx0 + mw and my >= t0.y and my < t0.y + t0.h
+          set(mhot and D.CURROW or U.PANEL); gfx.rect(mx0, tyt, mw, tth - 1, 1)
+          set(U.LINE); gfx.rect(mx0, tyt, mw, 1, 1); gfx.rect(mx0, tyt, 1, tth, 1); gfx.rect(mx0 + mw - 1, tyt, 1, tth, 1)
+          text(mx0 + L.pad, tyt + 1, '>', mhot and U.AMBER or U.GREY)
+          if mhot then local ids = {}; for _, t in ipairs(c.tabs) do ids[#ids + 1] = t.id end; hover.ptabmore = ids end
+        end
         for _, t in ipairs(tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - L.pad - 2)
           if lbl ~= '' then

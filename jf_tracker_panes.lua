@@ -291,7 +291,8 @@ local function place_leaf(lay, M, n, x, y, w, h)
   end
   if n.min then hh = 0; cell.min = true end   -- 20 окт: свёрнут — без строки клавиш и тела
   if hh > 0 then cell.hint = { x = x, y = y + h - hh, w = w, h = hh } end
-  cell.content = { x = x, y = y + th, w = w, h = n.min and 0 or math.max(0, h - th - hh) }
+  local tg = th > 0 and 4 or 0   -- 31 окт: 4 px между вкладками и модулем
+  cell.content = { x = x, y = y + th + tg, w = w, h = n.min and 0 or math.max(0, h - th - tg - hh) }
   lay.cells[#lay.cells + 1] = cell
   for _, id in ipairs(n.panes) do if avail(M, id) then lay.by_panel[id] = cell end end
   if not n.min then lay.rects[act] = cell.content end
