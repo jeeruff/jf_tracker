@@ -7253,6 +7253,40 @@ function D.sf_draw(L, info, state)
   end
   D.clip = keep
 end
+-- 31 окт: идёт запись — то, что пишется, видно сразу (REAPER отдаёт айтем только после стопа): ноты входа красным
+-- на своей строке, пик аудио-входа — красная полоса строки (дБ: −60..0 = 0..ширина). После стопа их сменяют айтемы
+local REC_NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+function D.recg_draw(L, info, state)
+  local g = info.recg
+  if not g then return end
+  local row0 = state.row0 or 0
+  local ytop, ybot = L.body_y, L.body_y + L.body_h
+  for _, c in ipairs(L.cols or {}) do
+    local e = c.col and g[c.col.guid]
+    local ln = c.lanes and c.lanes[1]
+    if e and ln and ln.x and ln.w and not c.folded then
+      local x, w = ln.x + 1, ln.w - 2
+      local keep = D.clip; D.clip = { x, x + w }
+      for r, pk in pairs(e.pk) do
+        local y = ytop + (r - row0) * L.rh
+        if y >= ytop and y + L.rh <= ybot and pk > 0.001 then
+          local f = math.max(0, math.min(1, (20 * math.log(pk, 10) + 60) / 60))
+          gfx.set(D.REC[1], D.REC[2], D.REC[3], 0.5); gfx.rect(x, y + 1, math.max(1, math.floor(w * f)), L.rh - 2, 1); gfx.a = 1
+        end
+      end
+      for _, n in ipairs(e.notes) do
+        local y = ytop + (math.floor(n.r) - row0) * L.rh
+        if y >= ytop and y + L.rh <= ybot then
+          local s = REC_NN[n.p % 12 + 1] .. math.max(0, n.p // 12 - 1)
+          local tx = ln.x + L.x_note
+          set(U.BG); gfx.rect(tx, y, ms(s) + 1, L.rh, 1)
+          text(tx, y, s, D.REC)
+        end
+      end
+      D.clip = keep
+    end
+  end
+end
 -- 20 окт: правый край последней видимой колонки трека (мастер сложен — граница его полосы)
 function D.cols_edge(L)
   local e
@@ -9343,6 +9377,7 @@ function D.frame(L, snap, rows, state, info)
   end
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
   D.sf_draw(L, info, state)      -- 20 окт: Shift+F — призрак сэмпла на месте вставки
+  D.recg_draw(L, info, state)    -- 31 окт: идёт запись — что пишется, сразу
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil

@@ -21052,21 +21052,52 @@ local function midi_input_ok(col)
   if inp < 0 or inp & 4096 == 0 then return false end
   return true, (inp >> 5) & 63, inp & 31        -- устройство (63 = все), канал (0 = все)
 end
+-- 31 окт: идёт запись — показывать сразу, что пишется (растущий айтем REAPER отдаёт только после стопа): треки на
+-- записи с MIDI-входом — ноты входа на строке своего времени (projPos события), с аудио-входом — пик входа на строке
+-- плейхеда (максимум за строку). Только в памяти, в проект не пишется; стоп — сброс, дальше видны настоящие айтемы.
+-- fresh — новые события MIDI (из poll_midi_in), без него — кадровый опрос пиков
+ctx.recg_tick = function(fresh)
+  if reaper.GetPlayState() & 4 ~= 4 then ctx.recg = nil; return end
+  local g = ctx.recg
+  if not g then g = {}; ctx.recg = g end
+  local lpb = state.lpb
+  for _, c in ipairs(snap and snap.cols or {}) do
+    if c.track and not c.master and c.guid and reaper.ValidatePtr(c.track, 'MediaTrack*') and reaper.GetMediaTrackInfo_Value(c.track, 'I_RECARM') == 1 then   -- арм живой: снимок мог не пересобраться
+      local inp = math.floor(reaper.GetMediaTrackInfo_Value(c.track, 'I_RECINPUT'))
+      local e = g[c.guid]
+      if not e then e = { notes = {}, pk = {} }; g[c.guid] = e end
+      if inp >= 0 and inp & 4096 ~= 0 then
+        local dv, ch = (inp >> 5) & 63, inp & 31
+        for _, ev in ipairs(fresh or {}) do
+          local st, p, v = ev.buf:byte(1) or 0, ev.buf:byte(2) or 0, ev.buf:byte(3) or 0
+          if (st & 0xF0) == 0x90 and v > 0 and (dv == 63 or dv == ev.dev) and (ch == 0 or (st & 0x0F) + 1 == ch) and #e.notes < 4096 then
+            e.notes[#e.notes + 1] = { r = model.row_of_time(ev.pos or reaper.GetPlayPosition(), lpb), p = p, v = v }
+          end
+        end
+      elseif inp >= 0 and not fresh then
+        local pk = math.max(reaper.Track_GetPeakInfo(c.track, 0), reaper.Track_GetPeakInfo(c.track, 1))
+        local r = math.floor(model.row_of_time(reaper.GetPlayPosition(), lpb))
+        if pk > (e.pk[r] or 0) then e.pk[r] = pk end
+      end
+    end
+  end
+end
 local function poll_midi_in()
   if not reaper.MIDI_GetRecentInputEvent then return end
   -- собрать новые события (свежие сверху → разворачиваем)
   local fresh = {}
   local i = 0
   while i < 64 do
-    local seq, buf, _, dev = reaper.MIDI_GetRecentInputEvent(i)
+    local seq, buf, _, dev, ppos = reaper.MIDI_GetRecentInputEvent(i)
     if not seq or seq == 0 then break end
     if midiin.seq and seq <= midiin.seq then break end
-    fresh[#fresh + 1] = { seq = seq, buf = buf, dev = dev }
+    fresh[#fresh + 1] = { seq = seq, buf = buf, dev = dev, pos = ppos }
     i = i + 1
   end
   if #fresh == 0 then return end
   if not midiin.seq then midiin.seq = fresh[1].seq; return end   -- старт: старое не пишем
   midiin.seq = fresh[1].seq
+  if reaper.GetPlayState() & 4 == 4 then ctx.recg_tick(fresh) end   -- 31 окт: запись — ноты входа видны сразу
   -- 19 окт: индикатор входа в шапке — трек, чей вход MIDI (устройство / канал) принял событие, вспыхивает жёлтым
   do
     local now = reaper.time_precise()
@@ -22732,7 +22763,7 @@ local function frame()
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
-    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in)
+    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in); T('rec ghost', ctx.recg_tick)
     T('poll_audio_in', poll_audio_in, reaper.time_precise()); T('settle_puts', settle_puts, reaper.time_precise()); T('mm_settle', mm_settle, reaper.time_precise()); T('learn_poll', learn_poll)
   end
 
@@ -23224,7 +23255,7 @@ local function frame()
   ctx.key_tick()   -- 21 окт: лад для подсветки нот вне лада (раз в 0.5 с)
   hover = draw.frame(L, snap, rows, state, {
     pc_epoch = ctx.pc_ep, hn_active = HN.active, pc_live = ctx.pc_live,   -- 28 окт: кэш панелей (эпоха — в блоке простоя)
-    ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing,
+    ph_row = ph_row, cur_row = model.row_of_time(curpos, state.lpb), playing = is_playing, recg = ctx.recg,
     aim_cut = ctx.aim_cut_row(),
     status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: CONTROL → FADE (fademode), CONTROL — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
