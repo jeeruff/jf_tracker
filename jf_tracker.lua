@@ -184,7 +184,8 @@ local state = {
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
   qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
-  dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
+  dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',
+  dspslim = reaper.GetExtState(EXT, 'dspslim') ~= 'off',   -- 31 окт: модули с 1..3 параметрами — узко, вертикальные слайдеры   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
   jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
@@ -12778,6 +12779,7 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
+      { key = 'dspslim', label = 'fold small modules', kind = 'toggle', desc = 'DSP: a module with 1-3 parameters (no own view) is drawn narrow - the on / off dot and x on top, its name vertically, the parameters as vertical sliders (drag up / down), the value under each', get = function() return state.dspslim end, set = function(v) state.dspslim = v; reaper.SetExtState(EXT, 'dspslim', v and 'on' or 'off', true) end },
       { key = 'dspauto', label = 'dsp follows cursor', kind = 'toggle', desc = 'the bottom tabs follow the tracker cursor: a track with an instrument plugin - dsp; an envelope lane drawn as a graph (narrow) - dsp on its effect; a lane with numbers - nothing (Enter / double click - its curve); off - the tabs stay where you put them', get = function() return state.dspauto end, set = function(v) state.dspauto = v; reaper.SetExtState(EXT, 'dspauto', v and 'on' or 'off', true) end },
       { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
@@ -12966,7 +12968,7 @@ ctx = {
       { 'cursor and editing', { 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
-      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
+      { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'dspslim', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
@@ -23019,7 +23021,7 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dspslim = state.dspslim, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
     cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,
     cvars = function(col, f) return ctx.cvar_info(col, f) end,   -- 29 окт: слоты вариантов контейнера   -- 28 окт: XY контейнера
