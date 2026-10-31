@@ -75,10 +75,14 @@ local function key_at(it)
   return it.lab:lower():find(it.key, 1, true)
 end
 SX.key_at = key_at
+-- 31 окт: ширина кнопки не зависит от текущего значения (иначе «transient» → «pitch» менял ширину всего модуля):
+-- меню — по самому длинному пункту, число — не уже 5 знаков
 local function bw_of(it, ms, pad)
-  local w = ms(it.lab) + 2 * pad
+  local lab = it.lab
+  if it.kind == 'menu' and it.items then for _, x in ipairs(it.items) do if ms(x) > ms(lab) then lab = x end end end
+  local w = ms(lab) + 2 * pad
   if it.key and not key_at(it) then w = w + ms(it.key) + 3 end
-  if it.kind == 'val' then w = w + ms(' ' .. (it.val or '')) end
+  if it.kind == 'val' then w = w + math.max(ms(' ' .. (it.val or '')), ms(' 00.00')) end
   if it.slider then w = w + ms('WWWWW') + pad end   -- 27 окт: дорожка слайдера между подписью и числом
   if it.kind == 'menu' then w = w + 7 end
   return w

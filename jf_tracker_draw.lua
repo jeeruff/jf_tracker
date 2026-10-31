@@ -9904,6 +9904,10 @@ function D.frame(L, snap, rows, state, info)
         local rows, low = D.SX.items(v0, function(name) return info.slx_param and info.slx_param(f.i, name) end)
         D.pmark('dsp: slx natw')
         local nat = math.max(D.SX.natural_w(rows, ms, L.pad), D.SX.natural_w({ (function() local fl = {}; for _, r in ipairs(low or {}) do for _, it in ipairs(r) do fl[#fl + 1] = it end end; return fl end)() }, ms, L.pad)) + 2 * L.pad + 2
+        -- 31 окт: ширина модуля только растёт за сессию — значение в кнопке не двигает соседей и волну
+        D.slx_natw = D.slx_natw or {}
+        local nk = tostring(f.fguid or f.i)
+        nat = math.max(nat, D.slx_natw[nk] or 0); D.slx_natw[nk] = nat
         bw = math.max(bw, math.min(cx1 - cx0 - 2 * L.pad, nat))
       end
       -- 19 окт: рэк drumrs5k на всё окно в виде list — модуль во всю ширину DSP (таблица пэдов не вылезает за рамку)
