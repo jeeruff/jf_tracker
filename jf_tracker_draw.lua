@@ -3604,6 +3604,25 @@ function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
   end
   return true
 end
+-- 31 окт: модуль ровно с двумя параметрами — XY-пэд внизу блока (X — первый, Y — второй), тянуть мышью
+function D.xy2(L, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag)
+  local ix = {}
+  for pi, p in ipairs(f.params or {}) do if not p.mfader then ix[#ix + 1] = pi end end
+  if #ix ~= 2 then return end
+  local side = math.min(pw, bh - (L.rh + 1) - 4 * L.rh - 6)
+  if side < L.rh * 3 then return end
+  local px0, py0 = bx + L.pad + math.floor((pw - side) / 2), by + bh - side - 3
+  local nx = vals[ix[1]] and vals[ix[1]].n or 0.5
+  local ny = vals[ix[2]] and vals[ix[2]].n or 0.5
+  set(U.PANEL); gfx.rect(px0, py0, side, side, 1)
+  set(U.LINE); gfx.rect(px0, py0, side, side, 0)
+  set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
+  local hot = not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side
+  local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
+  set(hot and U.AMBER or U.CYAN); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
+  text(px0 + 2, py0 + side - L.rh, fit('x ' .. (f.params[ix[1]].name or '') .. '  y ' .. (f.params[ix[2]].name or ''), side - 4), U.DIM)
+  if hot then hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = ix[1], qy = ix[2] } end
+end
 local function mslider(L, col, x, yy, w, sl, val, fmtx, hover, enabled)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local lw, vw = ms('depth') + L.pad, ms('1000 ms') + L.pad   -- подписи до 5 букв (rate att rel offs), значение до 7
@@ -9930,67 +9949,6 @@ function D.frame(L, snap, rows, state, info)
         bx = bx + fw + L.pad
         goto next_block
       end
-      -- 31 окт: опция fold small — модуль с 1..3 параметрами (без своего вида) — узкий: кружок on / off и x сверху,
-      -- имя вертикально, параметры — вертикальными слайдерами (тянуть вверх / вниз), значение под каждым
-      if info.dspslim and not f.container and not f.kit and not f.view and not f.rs5k and not f.pages and not (f.inner and not f.inner.wrap) and f.params then   -- и внутри контейнера
-        local np = 0
-        for _, p in ipairs(f.params) do if not p.mfader then np = np + 1 end end
-        if np >= 1 and np <= 3 then
-          local nw = L.th + 2 * L.pad
-          local sw = math.max(L.cw * 5, L.th + 2 * L.pad)
-          local fw = nw + np * (sw + 2) + 2
-          wrap_next(fw)
-          D.dsp_vx[k] = { bx + px - cx0, fw }
-          if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end
-          nshown = nshown + 1
-          local is_sel = sel.fx == k
-          blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, inner = f.inner }   -- скобка цепи под модулем
-          set(U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
-          set(is_sel and U.AMBER or (f.enabled and U.LINE or U.DIM)); gfx.rect(bx, boxy, fw, bh0, 0)
-          local on_btn = false
-          -- кружок on / off и x
-          local cr = math.max(3, math.floor(L.rh / 3))
-          local ccx, ccy = bx + L.pad + cr + 2, boxy + 1 + math.floor((L.rh - 1) / 2)
-          local hc = not drag and math.abs(mx - ccx) <= cr + 3 and my >= boxy and my < boxy + L.rh
-          set(f.enabled and U.GREEN or U.LINE); gfx.circle(ccx, ccy, cr, 1, 1)
-          if hc then set(U.AMBER); gfx.circle(ccx, ccy, cr + 1, 0, 1); hover.dspbtn = { fx = k, f = f, what = 'bypass' }; on_btn = true end
-          local xb = ms('x') + 2 * L.pad
-          local xx = bx + fw - xb - 2
-          local hx2 = not drag and mx >= xx and mx < xx + xb and my >= boxy and my < boxy + L.rh
-          set(hx2 and U.tint(U.RED, 0.35) or U.BG); gfx.rect(xx, boxy + 1, xb, L.rh - 1, 1)
-          set(hx2 and U.RED or U.LINE); gfx.rect(xx, boxy + 1, xb, L.rh - 1, 0)
-          text(xx + L.pad, boxy + 1, 'x', hx2 and U.RED or U.TEXT)
-          if hx2 then hover.dspbtn = { fx = k, f = f, what = 'del' }; on_btn = true end
-          local y0, y1 = boxy + L.rh + 2, boxy + bh0 - 2
-          -- имя вертикально (щелчок — выбрать модуль)
-          local hn = not drag and not on_btn and mx >= bx and mx < bx + nw and my >= y0 and my < y1
-          D.vtext(bx + math.floor((nw - L.th) / 2), y0 + 1, y1 - y0 - 2, f.name or '', (hn or is_sel) and U.AMBER or (f.enabled and U.TEXT or U.GREY), U.BG)
-          if hn then hover.dsp = { fx = k, f = f } end
-          -- вертикальные слайдеры
-          local vals = info.fx_values and info.fx_values(f) or {}
-          local sx = bx + nw + 2
-          for pi, p in ipairs(f.params) do
-            if not p.mfader then
-              local v = vals[pi] or { n = 0, s = '' }
-              local ty0, ty1 = y0 + 2, y1 - L.rh - 2          -- дорожка; под ней — значение
-              local th = math.max(1, ty1 - ty0)
-              local psel = is_sel and sel.param == pi
-              local hot = not drag and mx >= sx and mx < sx + sw and my >= y0 and my < y1
-              local cxs = sx + math.floor(sw / 2)
-              set(U.DIM); gfx.rect(cxs - 1, ty0, 2, th, 1)
-              local fh = math.floor(math.max(0, math.min(1, v.n)) * th + 0.5)
-              set((hot or psel) and U.AMBER or U.CYAN); gfx.rect(cxs - 3, ty1 - fh, 6, math.max(1, fh), 1)
-              text(sx + math.max(0, math.floor((sw - ms(fit(v.s or '', sw))) / 2)), y1 - L.rh, fit(v.s or '', sw), (hot or psel) and U.AMBER or U.GREY)
-              if hot then hover.dsp = { fx = k, f = f, param = pi, sv = math.max(0, math.min(1, (ty1 - my) / th)), onwidget = true } end
-              hint('dspparam', sx, y0, sw, y1 - y0, { fx = k, param = pi })
-              if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k), dsp = true, fx = p.fx or f.i, p = p.i, name = p.name, own = f.name, pn = p.name, x = sx, y = ty0, w = sw, h = th } end
-              sx = sx + sw + 2
-            end
-          end
-          bx = bx + fw + L.pad
-          goto next_block
-        end
-      end
       local ncol = ncol_of(f)
       -- ширина колонки: 22 знака; тесно — оставшиеся блоки делят место
       -- поровну, но не уже 14 знаков (имя и значения режет fit)
@@ -11616,6 +11574,7 @@ function D.frame(L, snap, rows, state, info)
         local qx, qy = f.params[f.xy_x], f.params[f.xy_y]
         if D.slr and qx and qy then D.slr[#D.slr + 1] = { g = 'dspxy:' .. tostring(k), dsp = true, xy = { qx.fx or f.i, qx.i, qy.fx or f.i, qy.i }, name = f.name or 'XY', x = px0, y = py0, w = side, h = side } end   -- 14 окт: CONTROL — XY
       end
+      if not f.xy and not f.view and not f.container and not f.kit and not f.rs5k and not f.wave then D.xy2(L, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag) end   -- 31 окт
       if f.wave then
         -- сэмплер (RS5K): волна файла с зоной start..end, ручки тянутся мышью,
         -- бросок файла из браузера — новый сэмпл
