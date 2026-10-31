@@ -5807,7 +5807,10 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
     local selk = false
     for _, kk in ipairs(c.kds) do if D.sel_i == kk.i then selk = true end end
     local nhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
-    set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
+    -- 31 окт: цепь выделена своим цветом (строка и её модули), выключенная — серым
+    local ccol = (D.chain_col and D.chain_col(f, (kd.entry and kd.entry.inner and kd.entry.inner.lane) or ci)) or lane_col((kd.entry and kd.entry.inner and kd.entry.inner.lane) or ci)
+    if not c.on then ccol = U.DIM end
+    set(U.tint(ccol, selk and 0.45 or (nhot and 0.35 or 0.25))); gfx.rect(x, y, nw, L.rh - 1, 1)
     if D.ckb and D.ckb.k == k and D.ckb.ki == c.ki then set(D.CUR_ACC or U.AMBER); gfx.rect(x - 1, y - 1, w + 2, L.rh + 1, 0) end   -- 29 окт: курсор клавиатуры CHAINS
     -- 28 окт: ветка — полоска её цвета слева (тот же цвет, что черта под модулем)
     -- цвет цепи (тот же, что черта под её модулями): номер потока
@@ -5837,7 +5840,8 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
       if y + L.rh > ymax then break end
       local fhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
       local fsel = D.sel_i == kk.i
-      if fsel or fhot then set(U.tint(U.CYAN, fsel and 0.3 or 0.12)); gfx.rect(x + 2 * L.pad, y, nw - 2 * L.pad, L.rh - 1, 1) end
+      set(U.tint(ccol, fsel and 0.35 or (fhot and 0.2 or 0.1))); gfx.rect(x + 2 * L.pad, y, nw - 2 * L.pad, L.rh - 1, 1)
+      set(ccol); gfx.rect(x, y, 3, L.rh - 1, 1)   -- полоска цвета цепи и у её модулей
       text(x + 3 * L.pad, y, fit(kk.name or '?', nw - 4 * L.pad), kk.enabled and (fsel and U.TEXT or U.GREY) or U.DIM)
       if fhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', kid = kk } end
       btn(bxs, 'm', 'cfxm', { ki = kk.i, on = not kk.enabled, col = U.RED })
