@@ -5600,16 +5600,34 @@ local function orkhon(w)
   end
   return table.concat(out)
 end
-D.MODE_SCRIPT = { ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {}, ['Noto Sans Old Turkic'] = {} }
+-- 31 окт: эльфийское — тенгвар (Tengwar Telcontar, CSUR U+E000…; brew font-tengwar-telcontar): согласная — тенгва,
+-- гласная — техта над предыдущей согласной (как в квенья), без неё — над коротким носителем
+local TENG = { T = 0xE000, P = 0xE001, C = 0xE003, K = 0xE003, Q = 0xE003, D = 0xE004, B = 0xE005, J = 0xE006, G = 0xE007,
+  F = 0xE009, V = 0xE00D, N = 0xE010, M = 0xE011, W = 0xE015, R = 0xE018, L = 0xE01A, S = 0xE01C, Z = 0xE01E, H = 0xE020 }
+local TEHTA = { A = 0xE040, E = 0xE046, I = 0xE044, Y = 0xE044, O = 0xE04A, U = 0xE04C }
+local function tengwar(w)
+  local out, prev = {}, false
+  for ch in w:upper():gmatch('.') do
+    if TEHTA[ch] then
+      if not prev then out[#out + 1] = utf8.char(0xE02E) end   -- короткий носитель
+      out[#out + 1] = utf8.char(TEHTA[ch]); prev = false
+    elseif ch == 'X' then out[#out + 1] = utf8.char(0xE003, 0xE01C); prev = true
+    elseif TENG[ch] then out[#out + 1] = utf8.char(TENG[ch]); prev = true
+    elseif ch == '-' then out[#out + 1] = ' '; prev = false end
+  end
+  return table.concat(out)
+end
+D.MODE_SCRIPT = { ['Tengwar Telcontar'] = {}, ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {}, ['Noto Sans Old Turkic'] = {} }
 for k, v in pairs(MW) do
   D.MODE_SCRIPT['Ponomar'][k], D.MODE_SCRIPT['Songti SC'][k], D.MODE_SCRIPT['Diwan Thuluth'][k] = v[1], v[2], v[3]
   D.MODE_SCRIPT['pIqaD qolqoS'][k] = klingon(v[4])
   D.MODE_SCRIPT['Noto Sans Glagolitic'][k] = glagolitic(v[1])
   D.MODE_SCRIPT['Noto Sans Old Turkic'][k] = orkhon(k)
+  D.MODE_SCRIPT['Tengwar Telcontar'][k] = tengwar(k)
 end
 -- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
 -- 15 окт: множитель размера — у шрифта мелкое очко при той же высоте строки (арабский был вдвое мельче)
-D.MODE_FONT_SCALE = { ['Noto Sans Old Turkic'] = 1.3, ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
+D.MODE_FONT_SCALE = { ['Tengwar Telcontar'] = 1.4, ['Noto Sans Old Turkic'] = 1.3, ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 -- 22 окт: выпадашка-клавиатура для параметра-ноты DSP (note lo / hi, root): 0..127, текущая — голубым, под мышью —

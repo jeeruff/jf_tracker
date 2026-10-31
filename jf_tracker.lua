@@ -15906,7 +15906,7 @@ OPT.ask.init(U, ctx)
 -- 10 окт: вкладка theme окна Options — темы карточками, шрифты своим шрифтом
 ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
-ctx.MODEFONTS = { 'off', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
+ctx.MODEFONTS = { 'off', 'Tengwar Telcontar', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
   -- 16 окт: ещё — системные и уже установленные в ~/Library/Fonts (проверено fc-list)
   'Noto Sans Glagolitic', 'Savoye LET',
   'Eau de rose', 'Discognate', 'DemonCubicBlock NKP Shade', 'P0T-NOoDLE', 'mOsOul', 'MicroKnight', 'Topaz a600a1200a400', 'DepartureMono Nerd Font', '3270 Nerd Font' }
@@ -19009,6 +19009,7 @@ function event_actions(hover)
     add('Mute ' .. what .. (sel and ' (M)' or ' (v … M)'), function() edit.mute(heads, lpb) end, 'm')   -- 20 окт: в NORMAL M — трек, нота — выделением
     add('Transpose ... (Opt+F1 F2, F11 F12)', function() vim.transpose_smart() end, 'T')   -- 20 окт: t — подменю трека   -- 12 окт: одна выпадашка вместо четырёх пунктов
   end
+  add('Bar / pattern edge here … (the tempo follows this track)', function() ctx.edge_menu() end, 'b')   -- 31 окт: и в меню под курсором
   add('Split at row (s)', function()
     local cov = {}
     for fi = f0, f1 do for _, h in ipairs(vim.covering(fi, vim.cur.row)) do cov[#cov + 1] = h end end
