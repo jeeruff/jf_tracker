@@ -9482,6 +9482,43 @@ function D.frame(L, snap, rows, state, info)
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
   D.sf_draw(L, info, state)      -- 20 окт: Shift+F — призрак сэмпла на месте вставки
   D.recg_draw(L, info, state)    -- 31 окт: идёт запись — что пишется, сразу
+  -- 31 окт: f-прыжки на линиях такта / доли — в каждую колонку команд, огибающую и MIDI-лейн; и на уже стоящие
+  -- объекты этих колонок (команда, точка огибающей, событие лейна)
+  do
+    local by0, by1 = L.body_y, L.body_y + L.body_h
+    for i, r in ipairs(rows) do
+      local y = L.body_y + (i - 1) * L.rh
+      if y >= by0 and y + L.rh <= by1 and not r.clip then
+        local line = r.bar or r.beat
+        for _, c in ipairs(L.cols) do
+          if c.x and not c.folded then
+            for _, ln in ipairs(c.lanes or {}) do
+              for si = 1, ln.nsub or 0 do
+                local fi = ln.f0 + si - 1
+                local f = L.flat[fi]
+                local G = (f and f.G) or L
+                if f and f.x and not (G.narrow or G.notes_only) then
+                  local cell = f.sub and f.sub[r.row]
+                  local fxs = cell and (cell.fx or (cell.kind == 'cont' and cell.fx)) or nil
+                  for k = 1, (G.nfx or L.nfx) do
+                    local fxx = (G.x_fx or L.x_fx)[k]
+                    if fxx and fxx < (f.w or L.sub_w) and (line or (fxs and fxs[k])) then hint('cell', f.x + fxx, y, L.w_fx, L.rh, { fi = fi, row = r.row, field = 3 + k }) end
+                  end
+                end
+              end
+            end
+            for _, ev in ipairs(c.envs or {}) do
+              local v = env_vals[ev] and env_vals[ev][i]
+              if line or (v and v.pt) then hint('cell', ev.x, y, ev.w, L.rh, { fi = ev.fi, row = r.row, field = 1 }) end
+            end
+          end
+        end
+        for fi, f in ipairs(L.flat) do
+          if f.ml and f.x and (line or (f.ml.ev and f.ml.ev[r.row] ~= nil)) then hint('cell', f.x, y, f.w or L.cw * 3, L.rh, { fi = fi, row = r.row, field = 1 }) end
+        end
+      end
+    end
+  end
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil
