@@ -856,12 +856,13 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       if vis then
         -- 31 окт: рамок зон нет совсем (просьба): прямоугольники по разбросу звёзд огромные и пересекаются —
         -- под мышью загорались десятки; группу видно по цвету облака и подписи
-        local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
+        local lab = (hb.name:gsub('^/', '')):upper()
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
-        if hot then   -- 31 окт (просьба): в nebula только точки — имя группы лишь под мышью
+        if hot or free(lx, ly, lw, L.rh) then   -- 31 окт: имена поверх — да (просьба), без числа файлов
+          placed[#placed + 1] = { lx, ly, lw, L.rh }
           U.set(U.BG, 0.55); gfx.rect(lx - 2, ly, lw + 4, L.rh, 1); gfx.a = 1
-          U.text(lx, ly, lab, c)
+          U.text(lx, ly, lab, hot and c or U.mix(c, U.TEXT, 0.25))
         end
         if hot then
           hv = hv or { hub = hb, sector = true }
