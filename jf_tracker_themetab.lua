@@ -122,7 +122,9 @@ function TT.draw(x, y, w, h, emb, part)
   for _, f in ipairs(fonts) do if f.size then ph = math.max(ph, f.size + 4) end end
   local pw = ms('x') * 34
   local fcols = math.max(1, math.floor((w + pad) / (pw + pad)))
-  TT.tcols, TT.fcols, TT.nt, TT.nf = tcols, fcols, #themes, #fonts
+  -- 31 окт: каждая часть — только свои размеры (широкий блок тем считал 5 колонок шрифтов — j k в шрифтах слева прыгали через 5)
+  if showT then TT.tcols, TT.nt = tcols, #themes end
+  if showF then TT.fcols, TT.nf = fcols, #fonts end
   font_img(fonts, pw, ph)
   local trows = math.ceil(#themes / tcols)
   -- 31 окт: размер и интервал не влезают в одну строку (крупный шрифт, узкий блок) — интервал второй строкой
@@ -143,7 +145,7 @@ function TT.draw(x, y, w, h, emb, part)
   local mfs = ctx.modefonts and ctx.modefonts() or {}
   local mh = 3 * L.th + 4
   local mcols = math.max(1, math.floor((w + pad) / (pw + pad)))
-  TT.mcols, TT.nm = mcols, #mfs
+  if showF then TT.mcols, TT.nm = mcols, #mfs end
   local my0 = fy0 + rh + math.ceil(#fonts / fcols) * ph + pad
   if TT.sec == 3 and showF then local r = ((TT.i[3] or 1) - 1) // mcols; sy0 = my0 + rh + r * (mh + 2); sy1 = sy0 + mh end
   local total = showF and (my0 + rh + math.ceil(#mfs / mcols) * (mh + 2)) or tH
