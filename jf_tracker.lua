@@ -18656,6 +18656,8 @@ local function hint_go(t)
   local d = t.data
   -- 15 окт: прыжок не на фейдер — режим FADE прежнего фейдера снят (f на take volume крутил громкость канала)
   if not (t.kind == 'trs' or t.kind == 'trsbtn' or (t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar'))) then state.kslider = nil end
+  if t.kind == 'opttab' then OPT.set_tab(d); return end   -- 31 окт
+  if t.kind == 'optrow' then OPT.sel = d; return end
   if t.kind == 'ptab' then ctx.pane_focus(d)                      -- 9 окт: подпись панели / вкладки — фокус туда
   elseif t.kind == 'fxbbtn' then                                   -- 9 окт: fx list — папка / * / поиск
     ctx.set_focus('fxb')
@@ -24826,7 +24828,7 @@ local function frame()
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
-  if OPT.active then OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end end   -- 31 окт: выпадашка из опций — поверх окна опций
+  if OPT.active then OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end; if HN.active then HN.draw(U, L) end end   -- 31 окт: метки f поверх опций   -- 31 окт: выпадашка из опций — поверх окна опций
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if ctx.LOGOPOP then ctx.logo_draw() end
   if ctx.SP and ctx.SP.on then ctx.SP.hints = state.hints; ctx.SP.draw(U, draw, L, gfx.w, gfx.h - L.status_h) end
@@ -30270,6 +30272,11 @@ local function frame()
     c = 0
   end
   if OPT.ask.active and c ~= 0 then OPT.ask.key(c); c = 0 end
+  if OPT.active and c ~= 0 and HN.active then   -- 31 окт: прыжок в окне опций — метки его строк / вкладок
+    local r = HN.key(c)
+    if type(r) == 'table' then pcall(hint_go, r) end
+    c = 0
+  end
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
   if ctx.SP and ctx.SP.on and c ~= 0 then
     if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
@@ -32659,6 +32666,10 @@ ctx.qtz_toggle = function()
   edit.run('input quantize ' .. (on and 'on' or 'off'), function() reaper.SetTrackStateChunk(tr, ch, false) end)
   ctx.qtz_cache[tr] = on
   vim.msg = on and ('qtz on: %s records its MIDI input quantized to the step (1/%d beat)'):format(col.name or '', state.lpb) or ('qtz off: %s records as played'):format(col.name or '')
+end
+-- 31 окт: f в окне опций — метки только его строк и вкладок
+ctx.opt_hints = function()
+  if HN.start(function(t) return t.kind == 'optrow' or t.kind == 'opttab' end) then vim.msg = 'options: type the label, Esc' else vim.msg = 'no targets' end
 end
 ctx.autozoom_toggle = function()
   state.autozoom = not state.autozoom or nil

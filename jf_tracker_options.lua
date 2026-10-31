@@ -201,7 +201,11 @@ function O.key(c)
     elseif TX.char(c) then O.query = O.query .. TX.char(c); O.sel = 1; O.rebuild() end
     return true
   end
-  if ch == '/' or ch == 'f' then O.typing = true; O.query = ''; O.rebuild(); return true end
+  if ch == '/' then O.typing = true; O.query = ''; O.rebuild(); return true end
+  if ch == 'f' and ctx.opt_hints then ctx.opt_hints(); return true end   -- 31 окт: f — прыжок (метки строк и вкладок опций); поиск — /
+  -- 31 окт: Cmd / Ctrl + h l — между вкладками опций (как между панелями)
+  if (c == 8 or c == 12) and ctx.mods and (ctx.mods().ctrl or ctx.mods().cmd) then O.step_tab(c == 8 and -1 or 1); return true end
+  if (ch == 'h' or ch == 'l') and ctx.mods and ctx.mods().cmd then O.step_tab(ch == 'h' and -1 or 1); return true end
   if c == 9 or ch == ']' then O.step_tab(shift and -1 or 1); return true end
   if c == 25 or ch == '[' then O.step_tab(-1); return true end
   if c == 27 and O.query ~= '' then O.query = ''; O.rebuild(); return true end
@@ -751,6 +755,7 @@ function O.draw(L, W, H)
       local on = t == O.tab and O.query == ''
       local hot = mx >= tx and mx < tx + w and my >= ty and my < ty + rh
       if hot then O.tab_hot = t end
+      if ctx.hint then ctx.hint('opttab', tx, ty, w, rh - 1, t) end   -- 31 окт: f-прыжок на вкладку опций
       U.set(on and U.tint(U.AMBER, 0.35) or (hot and U.PANEL or U.BG)); gfx.rect(tx, ty, w, rh - 1, 1)
       U.set(on and U.AMBER or (hot and U.TEXT or U.LINE)); gfx.rect(tx, ty, w, rh - 1, 0)
       U.text(tx + L.pad, ty, t, on and U.AMBER or (hot and U.TEXT or U.GREY))
@@ -898,6 +903,7 @@ function O.draw(L, W, H)
     else
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + rh
       if hot then O.hover = i end
+      if ctx.hint then ctx.hint('optrow', bx, y, bw, rh, i) end   -- 31 окт: f-прыжок на строку опций
       if i == O.sel then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(bx + 1, y, bw - 2, rh, 1)
       elseif hot then U.set(U.PANEL); gfx.rect(bx + 1, y, bw - 2, rh, 1) end
       local masked = it.masked and it.masked()
