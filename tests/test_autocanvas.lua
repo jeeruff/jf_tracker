@@ -107,6 +107,8 @@ ACV.tool, ACV.snap, ACV.grid = 'cur', true, 4
 ACV.key(('i'):byte(), { r0 = 0, r1 = 64 }, {}); eq('i - draw (31 окт)', ACV.tool, 'draw')
 ACV.key(('i'):byte(), { r0 = 0, r1 = 64 }, {}); eq('i again - cur', ACV.tool, 'cur')
 ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); local dw = ACV.key(('w'):byte(), { r0 = 0, r1 = 64 }, {}); eq('dw - delete', type(dw) == 'table' and dw.op, 'del')
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); ACV.key(('3'):byte(), { r0 = 0, r1 = 64 }, {}); local d3 = ACV.key(('w'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d3w - three forward', d3 and d3.n == 3 and d3.dir, 1)
+ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); local db = ACV.key(('b'):byte(), { r0 = 0, r1 = 64 }, {}); eq('db - backward', db and db.dir, -1)
 ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); local dd = ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('dd - delete', type(dd) == 'table' and dd.op, 'del')
 ACV.key(('y'):byte(), { r0 = 0, r1 = 64 }, {}); local yy = ACV.key(('y'):byte(), { r0 = 0, r1 = 64 }, {}); eq('yy - copy', type(yy) == 'table' and yy.op, 'yank')
 local pp = ACV.key(('p'):byte(), { r0 = 0, r1 = 64 }, {}); eq('p - paste', type(pp) == 'table' and pp.op, 'paste')

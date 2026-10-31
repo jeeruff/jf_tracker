@@ -261,9 +261,15 @@ function ACV.key(c, st, mods)
   -- 31 окт: как в трекере — dd / dw удалить точку (выделение v — все в нём; пусто — следующую), yy / y — копировать,
   -- p — вставить с курсора; рисование мышью — i (было d)
   if ACV.dpend then
-    local k = ACV.dpend; ACV.dpend = nil
+    local k = ACV.dpend
+    -- 31 окт: d3w — счётчик после d; dw / de — точка курсора или следующая, db — предыдущая; N штук подряд
+    if ch:match('^%d$') then ACV.dcount = (ACV.dcount or '') .. ch; return true end
+    ACV.dpend = nil
+    local n = tonumber(ACV.dcount or '') or 1; ACV.dcount = nil
     if c == 27 then return true end
-    if k == 'd' and (ch == 'd' or ch == 'w' or ch == 'e') then return { op = 'del' } end
+    if k == 'd' and (ch == 'w' or ch == 'e') then return { op = 'del', dir = 1, n = n } end
+    if k == 'd' and ch == 'b' then return { op = 'del', dir = -1, n = n } end
+    if k == 'd' and ch == 'd' then return { op = 'del' } end
     if k == 'y' and (ch == 'y' or ch == 'w') then return { op = 'yank' } end
     return true
   end

@@ -17873,6 +17873,29 @@ ctx.acv_do = function(op, sp, curves)
     vim.msg = ('%s: %d%% at row %d'):format(act.name, math.floor(v * 100 + 0.5), ACV.row)
     return
   end
+  -- 31 окт: dw / db (d3w) — N точек от курсора вперёд (с его строки) / назад (до неё), курсор — на место удалённой
+  if op.op == 'del' and op.dir and act.kind ~= 'lfo' and act.kind ~= 'acs' then
+    local rows, seen = {}, {}
+    for _, p in ipairs(act.points or {}) do
+      local r = math.floor(sp.row_of(p[1]) + 1e-6)
+      if not seen[r] and ((op.dir > 0 and r >= ACV.row) or (op.dir < 0 and r < ACV.row)) then seen[r] = true; rows[#rows + 1] = r end
+    end
+    table.sort(rows, function(a, b) if op.dir > 0 then return a < b end return a > b end)
+    while #rows > (op.n or 1) do rows[#rows] = nil end
+    if #rows == 0 then vim.msg = op.dir > 0 and 'dw: no point here or after' or 'db: no point before'; return end
+    if act.kind == 'ml' then
+      local map = {}
+      for _, r in ipairs(rows) do map[r] = false end
+      ctx.ml_write(act.f, map, act.name .. ' delete')
+    else
+      local t2e = act.t2e or function(x) return x end
+      edit.run('delete point(s)', function() for _, r in ipairs(rows) do edit.env_del_range(act.e, t2e(sp.time(r)), t2e(sp.time(r + 1))) end end)
+    end
+    if op.dir < 0 then ACV.row = rows[#rows] end
+    ctx.acv_cc = nil
+    vim.msg = ('%s: %d point(s) deleted (%s)'):format(act.name, #rows, op.dir > 0 and 'dw' or 'db')
+    return
+  end
   if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127
     local f = act.f
     local cur = act.eval(sp.time(ACV.row)) * 127
