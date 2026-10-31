@@ -9078,7 +9078,7 @@ function D.frame(L, snap, rows, state, info)
     D.kw_heads = D.kw_heads or setmetatable({}, { __mode = 'k' })
     for fi, f in ipairs(L.flat) do
       local G = f.G or L
-      if f.x and f.lane and f.sub and (G.w_wave or 0) > 0 and f.col and info.kit_wave(f.col) then
+      if f.x and f.lane and f.sub and ((G.w_wave or 0) > 0 or D.wave_back) and f.col and info.kit_wave(f.col) then   -- 31 окт: и фоном
         local hs = D.kw_heads[f.sub]
         if not hs then
           hs = {}
@@ -9221,7 +9221,22 @@ function D.frame(L, snap, rows, state, info)
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else
-              cell = f.sub[r.row]; draw_cell(f.G or L, cell, x, y, ty, inv)
+              cell = f.sub[r.row]
+              -- 31 окт: волна slixer / кита фоном (вид back) — под текстом, во всю ширину подколонки
+              local kwb = D.wave_back and kwmap and kwmap[fi] and kwmap[fi][r.row]
+              if kwb and not (cell and (cell.kind == 'audio' or (cell.kind == 'cont' and cell.of and cell.of.kind == 'audio'))) then
+                local G = D.wave_back_geo
+                local B0 = f.G or L
+                if not G or G.base ~= B0 then
+                  G = setmetatable({ base = B0, w_wave = 0, wave = 'off', x_note = B0.pad, w_note = math.max(4, (B0.sub_w or 40) - 2 * B0.pad) }, { __index = B0 })
+                  D.wave_back_geo = G
+                end
+                local p0, pm0 = D.PEAK, D.PEAKM
+                D.PEAK, D.PEAKM = D.PEAKB, D.PEAKMB
+                draw_wave(G, kwb[1], kwb[2], x, y, kwb[1].muted, false)
+                D.PEAK, D.PEAKM = p0, pm0
+              end
+              draw_cell(f.G or L, cell, x, y, ty, inv)
               -- 27 окт: в строке есть автоматизация трека — «~» в колонке слева от ноты (сложенные ноты «+» важнее)
               -- «+» уже нарисован: «~» рядом (колонка в два знака) или под ним (высокая строка); без «+» — на его месте
               local G2 = f.G or L
@@ -9236,7 +9251,7 @@ function D.frame(L, snap, rows, state, info)
               -- 20 окт: метка-прыжок и на каждой ноте (её поле ноты)
               if cell and (cell.kind == 'audio' or cell.kind == 'midi') then hint('note', x + ((f.G or L).x_note or 0), y, math.max(ms('aa'), (f.G or L).w_note or 0), L.rh, { fi = fi, row = r.row }) end
               local kw = kwmap and kwmap[fi] and kwmap[fi][r.row]
-              if kw and not (cell and (cell.kind == 'audio' or (cell.kind == 'cont' and cell.of and cell.of.kind == 'audio'))) then draw_wave(f.G or L, kw[1], kw[2], x, y, kw[1].muted, false) end
+              if kw and not D.wave_back and not (cell and (cell.kind == 'audio' or (cell.kind == 'cont' and cell.of and cell.of.kind == 'audio'))) then draw_wave(f.G or L, kw[1], kw[2], x, y, kw[1].muted, false) end
             end
             -- 13 окт: набираемая команда / значение — прямо в ячейке курсора («0R__»), не только в статусе
             if inv and info.hexbuf and info.hexbuf ~= '' and type(inv) == 'number' and inv >= 2 and not c.folded and not f.env then
