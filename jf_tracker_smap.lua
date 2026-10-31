@@ -489,26 +489,13 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
       local rr, a = math.sqrt((n.k - 0.5) / hb.n) * spread, n.k * 2.39996
       qx, qy = rr * math.cos(a), rr * math.sin(a)
     end
-    local m = math.max(5, math.floor(math.min(cw - 8, ch - 6) * 0.08)) + 6
-    return qx0 + cw / 2 + qx * (cw / 2 - 4 - m), qy0 + ch / 2 + qy * (ch / 2 - 3 - m - L.rh)
+    -- 31 окт: без карт — фигура на всю ячейку, сверху строка имени
+    local m = 4
+    return qx0 + cw / 2 + qx * (cw / 2 - m), qy0 + L.rh + (ch - L.rh) / 2 + qy * ((ch - L.rh) / 2 - m)
   end
   -- точки — в буфер, пока вид тот же
-  -- 27 окт (10): игральная карта: светлая карта со скруглёнными углами, рубашка — рамка с фигурой Хладни внутри
-  local function card(ox, oy, hb)
-    local i = hb.cell - 1
-    local qx0, qy0 = x + (i % cols) * cw - ox, top + math.floor(i / cols) * ch - oy
-    local c = col(hb)
-    local bx0, by0, bw, bh = math.floor(qx0 + 4), math.floor(qy0 + 3), math.floor(cw - 8), math.floor(ch - 6)
-    local face = U.mix(U.PANEL, U.TEXT, 0.06)
-    U.set(face); gfx.rect(bx0, by0, bw, bh, 1)   -- 28 окт: прямые углы (без скруглений — проще и быстрее)
-    U.set(U.mix(c, U.BG, 0.3)); gfx.rect(bx0, by0, bw, bh, 0)
-    -- рамка рубашки (двойная тонкая), внутри — фигура
-    local m = math.max(5, math.floor(math.min(bw, bh) * 0.08))
-    U.set(U.mix(c, face, 0.45)); gfx.rect(bx0 + m, by0 + m + L.rh, bw - 2 * m, bh - 2 * m - 2 * L.rh, 0)
-    U.set(U.mix(c, face, 0.7)); gfx.rect(bx0 + m + 2, by0 + m + L.rh + 2, bw - 2 * m - 4, bh - 2 * m - 2 * L.rh - 4, 0)
-  end
   local function dots(ox, oy)
-    for _, hb in ipairs(G.hubs) do card(ox, oy, hb) end
+    -- 31 окт (просьба): карт и рамок нет — только фигуры Хладни и имя
     for _, hb in ipairs(G.hubs) do
       local c = col(hb)
       U.set(U.mix(c, U.TEXT, 0.15), 0.85)
@@ -529,12 +516,16 @@ function SM.draw_cards(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside
     if qy0 + ch < top0 or qy0 + ch > y + h + 2 then goto next_card end   -- 27 окт: только целые карточки (подпись нижней лезла на плеер)
     local c = col(hb)
     -- 27 окт (10): индексы игральной карты — имя группы слева сверху, число файлов справа снизу (цвет группы)
-    local bx0, by0, bx1, by1 = math.floor(qx0 + 4), math.floor(qy0 + 3), math.floor(qx0 + cw - 4), math.floor(qy0 + ch - 3)
-    local room = bx1 - bx0 - 8
-    U.text(bx0 + 4, by0 + 2, fit(SM.short(hb.name, math.max(3, math.floor(room / math.max(1, U.measure('M'))))):upper(), room), c)
-    local cnt = tostring(hb.n)
-    U.text(bx1 - 4 - U.measure(cnt), by1 - L.rh - 1, cnt, U.mix(c, U.BG, 0.2))
-    if inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by0 + L.rh + 3 then hv = { hub = hb } end
+    -- 31 окт: имя и число файлов одной строкой над фигурой, по центру ячейки
+    local bx0, by0, bx1 = math.floor(qx0 + 4), math.floor(qy0 + 1), math.floor(qx0 + cw - 4)
+    local room = bx1 - bx0
+    local cnt = ' ' .. hb.n
+    local nm = fit(SM.short(hb.name, math.max(3, math.floor((room - U.measure(cnt)) / math.max(1, U.measure('M'))))), room - U.measure(cnt))
+    local lw = U.measure(nm .. cnt)
+    local lx = math.floor(qx0 + (cw - lw) / 2)
+    local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by0 + L.rh
+    U.text(lx, by0, nm, hot and U.TEXT or c); U.text(lx + U.measure(nm), by0, cnt, U.mix(c, U.BG, 0.35))
+    if hot then hv = { hub = hb } end
     -- ближайшая точка — только в секторе под мышью
     if inside and not hv and mx >= qx0 and mx < qx0 + cw and my >= qy0 and my < qy0 + ch then
       for _, n in ipairs(hb.list) do
