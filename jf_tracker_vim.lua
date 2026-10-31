@@ -886,7 +886,8 @@ local function apply(op, f0, f1, r0, r1)
       for _, sub in ipairs(fl and subs_of(fl) or {}) do
         for r = r0, r1 do
           local c = sub[r]
-          if c and c.kind == 'off' and c.of then
+          if c and c.kind == 'off' and c.of and c.of.stub then E.all_off_del(c.of)   -- 31 окт: OFF без ноты (CC 123)
+          elseif c and c.kind == 'off' and c.of then
             local nxt
             for r2 = r + 1, r + 4096 do local c2 = sub[r2]; if c2 and (c2.kind == 'audio' or c2.kind == 'midi') then nxt = r2; break end end
             local last = nxt and (nxt - 1) or (ctx.region_end_row and ctx.region_end_row(r)) or (r + 16)
@@ -1096,6 +1097,12 @@ function V.note_off_scope(scope)
   if #heads == 0 and scope == 'sub' and cur and cur.sub then   -- 21 окт: тонкая нота выше — дотянуть её до этого OFF
     local h = V.head_above(cur.sub, V.cur.row)
     if h then heads[1] = h end
+  end
+  -- 31 окт: ничего не звучит (подколонка) — OFF всё равно ставится: all notes off на трек
+  if #heads == 0 and scope == 'sub' and cur and cur.col and not cur.ml and ctx.edit.all_off then
+    ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+    V.msg = 'OFF: all notes off here (stops whatever still sounds on the track)'
+    return 1
   end
   ctx.edit.note_off(heads, lpb(), V.cur.row)          -- пусто — note_off ничего не делает
   V.msg = ('note off (%s): %d'):format(scope == 'all' and 'all tracks' or (scope == 'track' and 'track' or 'subcolumn'), #heads)

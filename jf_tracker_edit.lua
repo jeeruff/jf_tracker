@@ -1631,6 +1631,29 @@ local function new_midi_item(track, lane_idx, t)
   return it, R.GetActiveTake(it)
 end
 
+-- 31 окт: OFF там, где ничего не звучит — CC 123 (all notes off) в MIDI-айтеме строки (нет айтема — новый, как у
+-- ноты): глушит всё, что ещё играет на треке (хвосты slixer thru, ноты из прошлого паттерна)
+function E.all_off(track, lane_idx, lpb, row)
+  local t = row_time(row, lpb, 0)
+  run('note off (all notes off)', function()
+    local it, tk = midi_item_at(track, lane_idx, t)
+    if not it then it, tk = new_midi_item(track, lane_idx, t) end
+    if not tk then return end
+    local ppq = R.MIDI_GetPPQPosFromProjTime(tk, t)
+    R.MIDI_InsertCC(tk, false, false, ppq, 0xB0, 0, 123, 0)
+    R.MIDI_Sort(tk)
+  end)
+end
+function E.all_off_del(stub)
+  if not (stub and stub.take and R.ValidatePtr(stub.take, 'MediaItem_Take*')) then return end
+  run('delete OFF', function()
+    local _, _, ncc = R.MIDI_CountEvts(stub.take)
+    for k = ncc - 1, 0, -1 do
+      local _, _, _, ppq, cm, _, m2 = R.MIDI_GetCC(stub.take, k)
+      if cm == 0xB0 and m2 == 123 and math.abs(ppq - stub.ppq) < 1 then R.MIDI_DeleteCC(stub.take, k) end
+    end
+  end)
+end
 -- 21 окт: E.sus_t (ставит vim) — нота звучит до следующего события подколонки / OFF / конца паттерна, как в трекерах
 -- (было — один шаг); не дальше конца своего MIDI item
 local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted, t_row)

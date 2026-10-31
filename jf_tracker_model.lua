@@ -604,6 +604,24 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
       end
     end
   end
+  -- 31 окт: OFF без ноты — CC 123 (all notes off) в клипе: показывается OFF в первой подколонке, если строка свободна
+  local _, _, ncc = R.MIDI_CountEvts(take)
+  for k = 0, (ncc or 0) - 1 do
+    local _, _, _, ppq, cm, _, m2 = R.MIDI_GetCC(take, k)
+    if cm == 0xB0 and m2 == 123 then
+      local q = R.MIDI_GetProjQNFromPPQPos(take, ppq)
+      if q >= qn0 - 1e-7 and q < qn1 - 1e-7 then
+        local r, d = M.row_of_qn(q, lpb)
+        if not lane.subs[1] then lane.subs[1] = {} end
+        local s1 = lane.subs[1]
+        if not s1[r] then
+          s1[r] = { kind = 'off', explicit = true, alloff = true, delay = d,
+            of = { kind = 'midi', stub = true, item = it, take = take, ppq = ppq, row0 = r, rows = 1, pitch = 60, note = '---', vol = '00', delay = 0, fx = {}, muted = true } }
+          if lane.last_row == nil or r > lane.last_row then lane.last_row = r end
+        end
+      end
+    end
+  end
 end
 
 -- ── снимок ────────────────────────────────────────────────────────────────
@@ -2222,7 +2240,8 @@ function M.track_midilanes(tr, lpb, guid)
       for k = 0, (ccn or 0) - 1 do
         local _, _, _, ppq, chanmsg, _, m2, m3 = R.MIDI_GetCC(tk, k)
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
-        if chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)
+        if chanmsg == 0xB0 and m2 == 123 then   -- 31 окт: all notes off — это OFF в колонке нот, не лейн CC
+        elseif chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)
         elseif chanmsg == 0xC0 then put(lane('pc', 'pc'), row, m2)
         -- 11 окт: aftertouch (канальный / полифонический) и pitch bend — тоже лейны (записывались, но не были видны)
         elseif chanmsg == 0xD0 then put(lane('at', 'at'), row, m2)
