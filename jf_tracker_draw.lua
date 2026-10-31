@@ -846,7 +846,17 @@ function D.layout(snap, state, nregions)
     L.trk_bot = bot
     L.top_y, L.dsp_y = 0, bot
   end
+  L.piano_pad = 0
   L.nrows = math.max(1, math.floor(L.body_h / L.rh))
+  -- 31 окт: остаток высоты тела (меньше строки) — полосе транспорта под трекером, не дырой между строками и полосой
+  if L.tppos == 'tracker' and L.body_h > L.nrows * L.rh then
+    local rem = L.body_h - L.nrows * L.rh
+    L.body_h = L.nrows * L.rh
+    L.piano_h, L.low_h = L.piano_h + rem, L.low_h + rem
+    L.piano_pad = rem
+    if not L.mix_pane then L.mix_y, L.route_y = L.mix_y - rem, L.route_y - rem end
+    L.hsb_y, L.mode_y, L.piano_y = L.hsb_y - rem, L.mode_y - rem, L.piano_y - rem
+  end
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
   L.mstrip_w = L.label_w + (L.ruler_right and L.rg_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
   L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.mstrip_w >= 6 * L.cw or false
@@ -4869,7 +4879,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   if L.tppos ~= 'tracker' then set(D.SEP); gfx.rect(x, y, w, 1, 1) end   -- 16 окт: под трекером линию даёт его низ — была двойная
-  local ly = y + 3
+  local ly = y + 3 + math.floor((L.piano_pad or 0) / 2)   -- 31 окт: остаток высоты тела — поровну сверху и снизу содержимого
   local x_all, w_all = x, w
   -- 16 окт: модлайна нет — слово режима снова в полосе, слева (ширина постоянная: по самому широкому
   -- из NORMAL / INSERT / VISUAL, длиннее — обрезается); остальное правее
@@ -4973,7 +4983,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
     local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
     if kw >= 4 then
-      local ky, kh = y + 2, 2 * L.rh + 3
+      local ky, kh = ly - 1, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
       local held, last = p.held or {}, p.last
       -- 16 окт: колёса — pitch и mod вертикальными фейдерами с ромбиком слева от клавиш: показывают вход
