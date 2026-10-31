@@ -7680,14 +7680,15 @@ function D.vhs(x, y, w, h, red)
       gfx.a = 1
     end
   end
-  -- PLAY и счётчик
-  local blink = math.floor(now * 1.5) % 2 == 0
-  gfx.set(tint[1], tint[2], tint[3], 0.85)
-  gfx.x, gfx.y = x + 14, y + 12; gfx.drawstr(blink and 'PLAY' or 'PLAY')
-  local pp = reaper.GetPlayState() & 1 == 1 and reaper.GetPlayPosition() or reaper.GetCursorPosition()
-  local s2 = math.floor(pp)
-  local lab = ('SP %d:%02d:%02d'):format(s2 // 3600, (s2 // 60) % 60, s2 % 60)
-  gfx.x, gfx.y = x + 14, y + h - 12 - gfx.texth; gfx.drawstr(lab)
+  -- 31 окт: PLAY — только когда играет, вдвое крупнее; справа внизу — настоящие часы и дата, как на кассете
+  local col = { tint[1], tint[2], tint[3] }
+  if reaper.GetPlayState() & 1 == 1 then D.big_text(x + 14, y + 10, 'PLAY', col, 2) end
+  local t1 = os.date('%I:%M:%S %p'):gsub('^0', ' ')
+  local t2 = os.date('%b. %d %Y'):upper()
+  local w1, w2 = D.big_measure(t1, 2), D.big_measure(t2, 2)
+  local lh = 2 * gfx.texth + 4
+  D.big_text(x + w - 14 - w1, y + h - 12 - 2 * lh, t1, col, 2)
+  D.big_text(x + w - 14 - w2, y + h - 12 - lh, t2, col, 2)
   gfx.a = 1
 end
 function D.cracks(x, y, w, h, red, ex, style)
