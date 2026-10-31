@@ -18993,7 +18993,7 @@ function event_actions(hover)
       if head.kind == 'audio' then ctx.np_open(head.item, { x = gfx.mouse_x, y = gfx.mouse_y + 4 }); return end   -- 18 окт: окно свойств ноты (Ctrl+Enter)
       select_item_in_reaper(head.item)
       reaper.Main_OnCommand(40153, 0)
-    end, 'i')
+    end, 'E')   -- 31 окт: E — редактор (MIDI) / свойства (аудио); i — вставить MIDI item
     add('Select item in REAPER', function() select_item_in_reaper(head.item) end, 'l')
     if head.kind == 'audio' then add('To the sampler (RS5K on this track)', function() ctx.to_sampler(head.item, nil, nil, head.name) end, 'S') end   -- 10 окт
     if head.kind == 'audio' and ctx.item_file(head.item) then add('To sliXer (jf_slixer on this track slices and plays it)', function() ctx.to_slixer(ctx.item_file(head.item), cur_col()) end, 'X') end   -- 25 окт
@@ -19029,7 +19029,7 @@ function event_actions(hover)
         if f.col.fixed and f.lane then reaper.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', f.lane.idx) end
       end)
     end
-  end, 'b')   -- 20 окт: n — переименовать трек
+  end, 'i')   -- 31 окт: i — insert (было b)   -- 20 окт: n — переименовать трек
   return out
 end
 
