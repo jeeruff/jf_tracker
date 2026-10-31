@@ -25017,7 +25017,7 @@ local function frame()
   elseif cell and cell.kind == 'midi' then
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note or '?', cell.vol or '', (cell.ch or 0) + 1, cell.muted and '  muted' or '')
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
-  elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here, drag: change the value from it (Shift - finer); INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
+  elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here, drag: select (INSERT too); draw - hold Ctrl+Shift+Opt; steps view - drag changes the value (Shift - finer); rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspab then state.status = hover.dspab.f.name .. ': A / B morph - drag between the two snapshots (:fxa, :fxb store them, :morph N)'
   elseif hover.dspmeter then
     local db = draw.meter_db and draw.meter_db[hover.dspmeter] or -150
@@ -28505,7 +28505,7 @@ local function frame()
       if hover.field == 2 then
         -- поле формы: только курсор туда (правка — буквами в INSERT, ^A ^X)
         if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 2 end
-      elseif vim.mode ~= 'insert' and ctx.env_mode(hover.env) ~= 'steps' then
+      elseif vim.mode == 'insert' or ctx.env_mode(hover.env) ~= 'steps' then   -- 31 окт: и в INSERT мышь — только курсор / выделение (провёл — значение вписалось); рисовать — Ctrl+Shift+Opt
         -- NORMAL / VISUAL: клик только ставит курсор на строку огибающей (2 окт);
         -- точку от мыши пишет только INSERT (12 окт: вид «шаги» — фейдеры, мышь пишет всегда)
         -- 31 окт: протяжка — выделение блока (VISUAL от строки нажатия), как на нотах
