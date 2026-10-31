@@ -245,6 +245,7 @@ keysin('8jdw');    eq('dw at 8 → snare', last(), 'delete:snare')
 reset()
 keysin('dw');      eq('dw: kick only (exclusive)', last(), 'delete:kick')
 V.cur.row = 8; keysin('dw'); eq('dw clears the cursor row of the track (30 окт)', last(), 'delete:snare')
+reset(); V.cur.row = 5; keysin('dw'); eq('dw on an empty row → the next note (31 окт: was nothing)', last(), 'delete:snare')
 -- 19 окт: de внутри ноты — хвост ноты (она кончается перед курсором), не следующая нота
 reset(); V.cur.row = 2; keysin('de'); eq('de inside kick: kick ends before row 2', last(), 'off:kick@' .. (E.OFF_END and 1 or 2))
 reset(); keysin('de'); eq('de on the kick head: the kick only, not the snare', last(), 'delete:kick')
@@ -662,8 +663,8 @@ keysin('dd'); eq('dd on an envelope deletes its row points (10 окт: трек 
 V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')
 V.cur.row = 15; keysin('p'); eq('p on env → paste points', last(), 'envpaste:Vol@15:1')
 V.cur = { fi = 1, row = 18, field = 1 }; keysin('p'); eq('env register on note column → message, no paste', last(), 'envpaste:Vol@15:1')
-V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → clears 2 rows from the cursor (30 окт: dw = clear rows)', last(), 'envdelr:Vol@0-1')
-V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw on env → its cursor row', last(), 'envdelr:Vol@5-5')
+V.cur = { fi = efi3, row = 0, field = 1 }; keysin('d2w'); eq('d2w on env → the next 2 points (31 окт: empty row - next events)', last(), 'envdelr:Vol@3-9')
+V.cur = { fi = efi3, row = 5, field = 1 }; keysin('dw'); eq('dw on an empty env row → the next point', last(), 'envdelr:Vol@9-9')
 V.cur = { fi = efi3, row = 5, field = 1 }; keysin('db'); eq('db from empty env row → back to previous point', last(), 'envdelr:Vol@3-5')
 V.cur = { fi = 1, row = 17, field = 1 }; keysin('W'); eq('W stops on envelope points too (30 окт: any event)', V.cur.fi * 100 + V.cur.row, 420)
 -- шаг next (3 окт): на следующий объект трека — любая его подколонка

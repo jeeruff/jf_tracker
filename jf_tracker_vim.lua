@@ -3027,7 +3027,11 @@ function V.key_impl(c)
         ctx.time_edit('delete', V.cur.fi, V.cur.row, n, false); finish_edit()
         return
       end
-      if p == 'd' and (c == ('w'):byte() or c == ('W'):byte()) then
+      -- 31 окт: только когда в строках есть что чистить и колонка не огибающая / лейн / команда (у них свой dw ниже);
+      -- пустая строка — dw берёт следующее событие, как до 30 окт (иначе dw на пустом месте молча ничего не делал)
+      local fw = flat()[V.cur.fi]
+      local wspecial = c == ('w'):byte() and fw and (fw.env or (fw.ml and fw.ml.ev) or ((not fw.narrow) and (V.cur.field or 1) >= 4))
+      if p == 'd' and (c == ('W'):byte() or (c == ('w'):byte() and not wspecial and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row + n - 1) > 0)) then
         local F = flat()
         local f0, f1 = V.cur.fi, V.cur.fi
         if c == ('W'):byte() then f0, f1 = 1, #F end
