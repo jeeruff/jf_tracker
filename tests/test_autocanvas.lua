@@ -94,9 +94,14 @@ local hv = ACV.draw(L, 0, 0, 600, 200, curves, span, true)
 eq('draw ok', hv, nil)
 gfx.mouse_x, gfx.mouse_y = 500, lay.gy + 20
 lay = ACV.layout(L, 600, 200, 2)
-gfx.mouse_x, gfx.mouse_y = lay.gx + lay.gw + L.pad + 2, lay.gy + 14 + 2
-hv = ACV.draw(L, 0, 0, 600, 200, curves, span, true)
-eq('legend hover', hv and hv.legend, 2)
+-- 31 окт: на 600 px панель инструментов переносится строками — легенда ниже; ищем строку второй кривой
+local got
+for yy = lay.gy, 200, 2 do
+  gfx.mouse_x, gfx.mouse_y = lay.gx + lay.gw + L.pad + 2, yy
+  hv = ACV.draw(L, 0, 0, 600, 200, curves, span, true)
+  if hv and hv.legend == 2 then got = 2; break end
+end
+eq('legend hover', got, 2)
 -- 30 окт: инструменты мыши — клавиши, точка холста → строка / значение, мазок по строкам и клеткам
 ACV.tool, ACV.snap, ACV.grid = 'cur', true, 4
 ACV.key(('d'):byte(), { r0 = 0, r1 = 64 }, {}); eq('d - draw', ACV.tool, 'draw')

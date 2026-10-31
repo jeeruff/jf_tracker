@@ -356,25 +356,38 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   tb[#tb + 1] = { lab = ']', grid = 1 }
   local function width() local t = 0; for _, b in ipairs(tb) do b.w = U.measure(b.lab) + 2 * pad; t = t + b.w + 2 + (b.gap and pad or 0) end; return t end
   local tw = width()
-  if w - 2 * pad - tw < U.measure('W') * 12 then
-    for _ = 1, shapes_n do table.remove(tb, shapes_at) end
-    table.insert(tb, shapes_at, { lab = ACV.shape_name(ACV.shape), shapepick = true, on = ACV.tool == 'shape', gap = true })
-    tw = width()
+  -- 31 окт: формы всегда кнопками; не влезают рядом с именем — панель второй строкой над холстом (поле ниже на строку);
+  -- и там не влезают — одна кнопка формы со списком
+  local two = w - 2 * pad - tw < U.measure('W') * 12
+  -- раскладка кнопок построчно (перенос по ширине холста): b.bx, b.row
+  local nrow = 0
+  if two then
+    local bx, row = x + pad, 1
+    for _, b in ipairs(tb) do
+      local need = b.w + 2 + (b.gap and pad or 0)
+      if bx + need > x + w - pad and bx > x + pad then row = row + 1; bx = x + pad end
+      if b.gap and bx > x + pad then bx = bx + pad end
+      b.bx, b.row = bx, row
+      bx = bx + b.w + 2
+    end
+    nrow = row
+  else
+    local bx = x + w - pad - tw
+    for _, b in ipairs(tb) do if b.gap then bx = bx + pad end; b.bx, b.row = bx, 0; bx = bx + b.w + 2 end
   end
+  if nrow > 0 then gy = gy + nrow * rh; gh = gh - nrow * rh; ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr } end
   local head = ('%s   %s%s'):format(act.name or 'curve', span.label or '',
     ACV.anchor and ('   v %d..%d'):format(math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row)) or '')
-  local showtb = w - 2 * pad - tw >= U.measure('W') * 12
-  U.text(x + pad, y + 1, ctx.fit(head, w - 2 * pad - (showtb and tw + pad or 0)), focused and U.AMBER or U.CYAN)
+  local showtb = gh >= 10
+  U.text(x + pad, y + 1, ctx.fit(head, w - 2 * pad - (two and 0 or tw + pad)), focused and U.AMBER or U.CYAN)
   if showtb then
-    local bx = x + w - pad - tw
     for _, b in ipairs(tb) do
-      if b.gap then bx = bx + pad end
-      local hot = mx >= bx and mx < bx + b.w and my >= y and my < y + rh - 1
-      if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, y, b.w, rh - 1, 1) end
-      U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, y, b.w, rh - 1, 0)
-      U.text(bx + pad, y, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
+      local bx, ty = b.bx, y + b.row * rh
+      local hot = mx >= bx and mx < bx + b.w and my >= ty and my < ty + rh - 1
+      if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, ty, b.w, rh - 1, 1) end
+      U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, ty, b.w, rh - 1, 0)
+      U.text(bx + pad, ty, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
       if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick, tbshapeset = b.shape, tbcyc = b.cyc, tbhum = b.hum } end
-      bx = bx + b.w + 2
     end
   end
   -- поле
@@ -551,7 +564,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     gfx.a = 1
   end
   -- легенда: имя и значение в строке курсора; активная янтарём
-  local lx, ly = lay.side and (gx + gw + pad) or (x + pad), lay.side and gy or (y + rh + 1)
+  local lx, ly = lay.side and (gx + gw + pad) or (x + pad), lay.side and gy or (y + rh + 1 + nrow * rh)
   local lw = lay.side and lay.lw or (w - 2 * pad)
   for i, cv in ipairs(curves) do
     local on = i == ACV.cur
