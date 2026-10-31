@@ -81,7 +81,7 @@ function D.init(u, peaks_fn, matrix)
   D.SEP   = U.mix(U.BG, U.TEXT, 0.38)           -- границы модулей: тусклые (3 окт; фокус — ярче)
   D.SEPW  = 2                                   -- толщина границ модулей (3 окт: жирнее), линии внутри модулей — 1 px
   D.FOCUS = U.mix(U.TEXT, { 1, 1, 1 }, 0.55)    -- светлый ободок модуля с фокусом (просьба 1 окт: без розового)
-  D.FOCUS_INS = { 1.0, 0.15, 0.1 }              -- та же рамка в INSERT (красная, толще)
+  D.FOCUS_INS = { 1.0, 0.22, 0.16 }              -- та же рамка в INSERT (красная, толще)
   -- 15 окт: цвет режима — рамка поля и слово режима: NORMAL белый, INSERT красный, VISUAL янтарный, ввод команды голубой
   local function cp(c) return { c[1], c[2], c[3] } end   -- копия: своя запись в D.KEEP, не весь янтарь цветной в mono
   D.MODE_COL = { normal = { 1, 1, 1 }, insert = D.FOCUS_INS, visual = cp(U.AMBER), vline = nil, cmd = cp(U.CYAN), search = nil }
@@ -12720,7 +12720,8 @@ function D.frame(L, snap, rows, state, info)
         local fr = ((ins or insany) and rects.tracker) or tf
         -- 31 окт: NORMAL — белой рамки поля строк нет (верх модуля уже в рамке фокуса; без полосы эффектов она шла
         -- белой чертой над строками); цветная — только в других режимах
-        if info.vmode ~= 'normal' or ins or insany then set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0) end
+        -- 31 окт: INSERT — чистый красный, не смягчённый под тему (терялся на тёмной панели)
+        if info.vmode ~= 'normal' or ins or insany then set((ins or insany) and D.FOCUS_INS or (D.MODE_COL[info.vmode] or D.MODE_COL.normal)); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0) end
         if ins or insany then gfx.rect(fr[1] + 1, fr[2] + 1, fr[3] - 2, fr[4] - 2, 0) end
         D.ins_frame = (ins or insany) and fr or nil
       end
