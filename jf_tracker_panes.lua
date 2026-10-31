@@ -42,6 +42,7 @@ PN.PANELS = {
   { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
   { id = 'reform',     label = 'reform',     key = 'R', hint = 'reform', side = 'right' },   -- 19 окт: reform выделенных нот (идея — Reform для Renoise)
   { id = 'humanizer',  label = 'humanizer',  key = 'H', hint = 'humanizer', side = 'right' },
+  { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
   { id = 'help',       label = 'help',       key = '?', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
@@ -945,6 +946,7 @@ PN.ABOUT = {
   perf = 'Where the time goes: each part of the frame in ms (rows, headers, DSP, panes ...), the garbage made per frame. For finding slow spots.',
   actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
   reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
+  lfogen = 'The curve generator: an LFO, a podkat (a ramp before every note) or an audio follower written into the envelope at the tracker cursor - as points or as an automation item.',
   humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',
   renderer = 'The bouncer: render notes or a pattern of an instrument to audio and put it back as a sample in the lib.',
   help = 'The keys of the module you came from, as a list: the last used ones on top, the pressed key lights up. \\ ? opens the whole help.',

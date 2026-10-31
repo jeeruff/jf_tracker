@@ -16892,6 +16892,20 @@ ctx.acv_vel_put = function(act, sp, op, lo, hi)
   ctx.acv_cc = nil
   vim.msg = ('%s: %s, %d note(s)'):format(act.name, op.tool or 'put', n)
 end
+-- 31 окт: щелчок по полю генератора кривых (панель lfogen)
+ctx.lfo_drag_set = function(d) lfo_drag = d end
+ctx.lfo_field_click = function(h)
+  if not (h and h.field) then return end
+  LG.sel = h.field
+  local f = LG.FIELDS[h.field]
+  if f.button then ctx.lfo_make(f.key)
+  elseif h.opt then LG.set_opt(LG.sel, h.opt)
+  elseif h.slider then
+    ctx.lfo_drag_set({ field = LG.sel, x = h.x, w = h.w })
+    LG.set_frac(LG.sel, (gfx.mouse_x - h.x) / math.max(1, h.w))
+  elseif f.key == 'src' and LG.type == 'follow' and LG.fsrc == 'env' then ctx.lfo_pick_env()
+  elseif f.enum or f.toggle or f.key == 'src' then LG.adjust(LG.sel, 1) end
+end
 ctx.acv_do = function(op, sp, curves)
   local ACV = ctx.ACV
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
@@ -22715,6 +22729,12 @@ local function frame()
     end,
     sf_ghost = ctx.sf_ghost,   -- 20 окт: призрак Shift+F (file_peaks — выше, был дублем)
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
+    -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
+    -- уводил вкладку на params)
+    lfogen_draw = function(Lx, x, y, w, h, foc)
+      local tgt = ctx.lfo_target()
+      return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
+    end,
     hum_draw = function(Lx, x, y, w, h, foc)
       ctx.hum_load()
       -- 21 окт: трек курсора без аудио в лейнах — MIDI: панель гасит то, чего у MIDI-нот нет
@@ -22955,25 +22975,17 @@ local function frame()
         return nil
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' }, { 'shape', 'lfo' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' }, { 'shape', 'lfo' } })
+        pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
-        if mod_pane == 'lfo' then
-          local tgt = ctx.lfo_target()
-          local hv = LG.draw(U, Lx, x, y, w, h, focused, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
-          lfo_hover = lfo_hover or hv
-          return nil
-        end
         return left(x, y, w, h)
       end
       if mod_pane == 'mod' then   -- 18 окт: матрица модуляции — во всю ширину (без колонки формы)
         pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })
         return left(x, y + Lx.rh + 2, w, h - Lx.rh - 2)
       end
-      local tgt = ctx.lfo_target()
-      lfo_hover = LG.draw(U, Lx, x + w - lw, y, lw, h, focused and mod_pane == 'lfo', ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
-      U.set(U.LINE); gfx.rect(x + w - lw - Lx.pad, y, 1, h, 1)
+      -- 31 окт: генератор кривых — панель lfogen (Ctrl+W g G), вкладка — во всю ширину
       pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })   -- 9 окт: curve — кривая целиком; 18 окт: mod
-      return left(x, y + Lx.rh + 2, w - lw - 2 * Lx.pad, h - Lx.rh - 2)
+      return left(x, y + Lx.rh + 2, w, h - Lx.rh - 2)
     end,
     -- 12 окт: вкладка modulation — нативная матрица REAPER (LFO / ACS / link) во всю ширину
     mmx_draw = function(Lx, x, y, w, h)
@@ -25384,6 +25396,10 @@ local function frame()
       ctx.dsp_autoitem(d.k, d.pi)
       ctx.dsp_env_focus = nil
       click = { t = now2, zone = 'acvnew' }
+    elseif hover.lfogen then   -- 31 окт: панель lfogen
+      ctx.set_focus('lfogen')
+      ctx.lfo_field_click(hover.lfogen)
+      click = { t = now2, zone = 'lfogen' }
     elseif lfo_hover and state.top and state.toptab == 'automation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
@@ -25429,17 +25445,6 @@ local function frame()
           if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
           else A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') } end
         end
-      end
-      if lfo_hover.field then
-        LG.sel = lfo_hover.field
-        local f = LG.FIELDS[lfo_hover.field]
-        if f.button then ctx.lfo_make(f.key)
-        elseif lfo_hover.opt then LG.set_opt(LG.sel, lfo_hover.opt)
-        elseif lfo_hover.slider then
-          lfo_drag = { field = LG.sel, x = lfo_hover.x, w = lfo_hover.w }
-          LG.set_frac(LG.sel, (gfx.mouse_x - lfo_hover.x) / math.max(1, lfo_hover.w))
-        elseif f.key == 'src' and LG.type == 'follow' and LG.fsrc == 'env' then ctx.lfo_pick_env()
-        elseif f.enum or f.toggle or f.key == 'src' then LG.adjust(LG.sel, 1) end
       end
       click = { t = now2, zone = 'lfo' }
     elseif hover.mm and hover.mm.strip then
@@ -27974,8 +27979,8 @@ local function frame()
     SL.vol_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and lfo_hover and lfo_hover.field and state.top and state.toptab == 'automation' then
-    LG.sel = lfo_hover.field
+  if gfx.mouse_wheel ~= 0 and hover.lfogen and hover.lfogen.field then   -- 31 окт: панель lfogen
+    LG.sel = hover.lfogen.field
     LG.adjust(LG.sel, (gfx.mouse_wheel > 0 and 1 or -1) * ((gfx.mouse_cap & 8 == 8) and 0.1 or 1))
     gfx.mouse_wheel = 0
   end
@@ -29289,6 +29294,13 @@ local function frame()
         elseif r == 'render' then ctx.rd_render()
         elseif r == 'leave' then ctx.set_focus('tracker')
         elseif not r then return vim.key(c) end
+      elseif state.focus == 'lfogen' then   -- 31 окт: панель генератора кривых
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local r = LG.key(c, ctx.mods().shift and 0.1 or 1)   -- Shift — мелкий шаг
+        if r == 'leave' then ctx.set_focus('tracker')
+        elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
+        elseif r == 'pick' then ctx.lfo_pick_env()
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if vim.piano and c >= 48 and c <= 57 and vim.plays_note(c) then return vim.key(c) end   -- 22 окт: KEYS — цифры играют ноты, число не набирается
@@ -29532,12 +29544,6 @@ local function frame()
           elseif r == 'save' then mm_save()
           elseif not r then return vim.key(c) end
         elseif state.toptab == 'automation' and c == 67 and mod_pane ~= 'curve' then mod_pane = 'curve'; vim.msg = 'curve: the canvas - h l row, j k value, v range, s t q r f n shapes, Tab curve, P params, L curves'   -- 15 окт: C — холст
-        elseif state.toptab == 'automation' and mod_pane == 'lfo' then
-          local r = LG.key(c, ctx.mods().shift and 0.1 or 1)   -- Shift — мелкий шаг (6 окт)
-          if r == 'leave' then mod_pane = 'params'
-          elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
-          elseif r == 'pick' then ctx.lfo_pick_env()
-          elseif not r then return vim.key(c) end
         elseif state.toptab == 'automation' and c == 77 and mod_pane ~= 'mod' then mod_pane = 'mod'; vim.msg = 'mod: the modulation of the track (LFO / audio follower / link) - a add, x remove, Enter toggle, o w windows; P params, C curve, L shape'   -- 18 окт: M — модуляция
         elseif state.toptab == 'automation' and mod_pane == 'mod' and c ~= 80 and c ~= 76 and c ~= 67 then
           local col = cur_col(); local mods = col and col.mods or {}
@@ -29549,7 +29555,7 @@ local function frame()
           elseif not r then return vim.key(c) end
         elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and c ~= 76 and ctx.acv_key(c) then   -- 15 окт: холст (L P — страницы, как в подсказке)
         elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
-        elseif state.toptab == 'automation' and c == 76 then mod_pane = 'lfo'; vim.msg = 'shape: j k field, h l value, g auto-item, p write points, L back'
+        elseif state.toptab == 'automation' and c == 76 then ctx.pane_focus('lfogen'); vim.msg = 'lfogen: j k field, h l value, g auto-item, p write points, Esc back'   -- 31 окт: генератор — своя панель
         elseif state.toptab == 'automation' then
           if c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
         elseif state.toptab == 'modulation' then
