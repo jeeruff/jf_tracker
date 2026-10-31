@@ -222,7 +222,8 @@ local state = {
     return 'column'
   end)(),
   itemcol = flag('itemcol', true),               -- заливка и кайма item его цветом (3 окт)
-  itemalpha = tonumber(reaper.GetExtState(EXT, 'itemalpha')) or 5,   -- прозрачность заливки item, %
+  itemalpha = tonumber(reaper.GetExtState(EXT, 'itemalpha')) or 5,
+  dotbright = tonumber(reaper.GetExtState(EXT, 'dotbright')) or 100,   -- 31 окт: яркость пустых точек трекера, %   -- прозрачность заливки item, %
   dsp = flag('dsp', false),
   khelp = flag('khelp', false),
   endstop = flag('endstop', true),
@@ -13075,6 +13076,7 @@ ctx = {
       flag('itemcol', 'item colours', 'item fill and border in the item / track colour; off: neutral grey'),
       { key = 'itemalpha', label = 'item fill opacity', kind = 'num', min = 0, max = 60, step = 1, fmt = '%d %%', desc = 'how strongly the item colour fills its cells (0 = border only)', get = function() return state.itemalpha or 5 end, set = function(v) state.itemalpha = v end },
       flag('itemnames', 'item names', 'item name on the second row under the note (number on the note row)'),
+      { key = 'dotbright', label = 'dot brightness', kind = 'num', min = 0, max = 200, step = 10, fmt = '%d %%', desc = 'how bright the empty dots of the tracker grid are: 0 - none, 100 - as the theme has them, 200 - twice as bright', get = function() return state.dotbright or 100 end, set = function(v) state.dotbright = v; reaper.SetExtState(EXT, 'dotbright', tostring(v), true) end },
       flag('dotcolor', 'dot colours', 'empty dots of a field in its colour (volume yellow, delay blue, commands and slice lilac, pan green), dimmed'),
       { sep = true, title = 'sound and samples' },
       flag('slice1', 'slices: 1 = whole, q = slice 1', 'a sliced sample: q 2 w 3 ... play slices 1 2 3 4 ... and the key 1 the whole sample (off: q is the whole sample, 2 is slice 1); layout frow - always: 1 = slice 1, ` - the whole sample'),
@@ -13106,7 +13108,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'og-mode', { 'ogmode', 'ogfont', 'ogch1', 'ogch2', 'ogch3', 'ogch4' } },
-      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
+      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
@@ -22675,6 +22677,7 @@ local function frame()
   draw.hints_on = state.hints              -- 23 окт: колонка хоткеев в меню — только с hints
   draw.itemnames = state.itemnames
   draw.dotcolor = state.dotcolor   -- 18 окт
+  draw.dotbright = state.dotbright   -- 31 окт
   regions = model.regions(state.lpb)
   seq = ctx.sequence()
   ctx.chord_publish()                     -- 8 окт: линия аккордов для jf_tracker_chordfollow (только при правке)

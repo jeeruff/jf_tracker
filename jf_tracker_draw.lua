@@ -9004,6 +9004,12 @@ function D.frame(L, snap, rows, state, info)
   -- 15 окт: яркость точек и номера строки — по акценту (такт / сильные доли паттерна метронома ярко,
   -- как номер; деления доли — ступенями тише); база восстанавливается после строк
   local empty0, under0 = D.EMPTY, D.EMPTY_UNDER
+  D.empty_base = { empty0, under0 }   -- 31 окт: исходные — в конце кадра вернуть их, не затемнённые (иначе копится)
+  if D.dotbright and D.dotbright ~= 100 then   -- 31 окт: опция dot brightness — точки ближе к фону / к тексту
+    local kb = D.dotbright / 100
+    local function sc(c) if kb <= 1 then return U.mix(U.BG, c, kb) end; return U.mix(c, U.TEXT, math.min(1, (kb - 1) * 0.6)) end
+    empty0, under0 = sc(empty0), sc(under0)
+  end
   local ACC_F = { [0] = 1, 0.8, 0.5, 0.3, 0.15, 0 }
   -- 19 окт: волна пэда drumrs5k под MIDI-нотой кита: строка → { голова-волна, номер строки в ней }; конец — следующая
   -- нота подколонки (one-shot) или и OFF (obey note-offs); голова выше окна тоже звучит
@@ -9298,7 +9304,7 @@ function D.frame(L, snap, rows, state, info)
       D.clip = clip_k
     end
   end
-  D.EMPTY, D.EMPTY_UNDER = empty0, under0
+  D.EMPTY, D.EMPTY_UNDER = D.empty_base[1], D.empty_base[2]
   -- 15 окт: поле трекера (строки и шапка подколонок) — для рамки фокуса; модлайн — режим крупно в его
   -- левом нижнем углу на подложке (курсор в нижних строках — в левом верхнем, чтобы не закрыть его)
   D.trk_field = { tx0, L.body_y - L.rh - 1, W - tx0, L.body_h + L.rh + 1 + (D.SBW or 3) + 2 }
