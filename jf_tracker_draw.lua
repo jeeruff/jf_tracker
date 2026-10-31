@@ -716,9 +716,9 @@ function D.layout(snap, state, nregions)
   L.body_y = L.sess_y + L.sess_h + (L.toppos == 'clips' and L.top_h or 0) + L.jr_h
   -- строка подсказок под каждым модулем (опция hints, 2 окт): своё место, не поверх
   L.hint_h = state.hints and (L.rh + 1) or 0
-  -- горизонтальный скролл-бар треков под телом трекера (3 окт): место всегда,
-  -- чтобы тело не прыгало, когда треки перестают помещаться
-  L.hsb_h = 8
+  -- горизонтальный скролл-бар треков (3 окт): 31 окт — без своего места (8 px пустоты, когда треки помещаются),
+  -- тонкой полосой поверх низа последней строки
+  L.hsb_h = 0
   -- пианинка (4 окт): в INSERT (5 окт, без m) — полоса клавиш под скролл-баром, над статусом
   -- полоса под трекером (5 окт): транспорт всегда, клавиатура слева — по m
   -- 15 окт: у символов кнопок пусто сверху — кнопки ниже на tp_cut, строки 3-4 и низ полосы выше на столько же
@@ -12685,15 +12685,15 @@ function D.frame(L, snap, rows, state, info)
   do
     local x0 = tx0 + L.label_w
     local w = W - x0 - L.pad - 2                         -- 22 окт: на 2 px от края — рамка INSERT на него не ложится
-    local h = math.min(L.hsb_h - 2, D.SBW or 3)          -- 8 окт: толщина, как у всех скроллбаров
-    local y = L.hsb_y + math.floor((L.hsb_h - h) / 2)
+    local h = D.SBW or 3                                 -- 8 окт: толщина, как у всех скроллбаров
+    local y = L.body_y + L.body_h - h - 1                -- 31 окт: поверх низа последней строки
     hover.hsb = nil
     if w > 20 and L.hs_n > 0 and (L.hs_full or 0) < L.hs_n then   -- 22 окт: все треки на экране — полосы нет (ползунок во всю ширину ничего не двигал)
       local n = L.hs_n
       local tw = math.max(12, math.floor(w * math.min(1, math.max(1, L.hs_full) / n)))
       local tx = x0 + math.floor((w - tw) * (n > L.hs_full and (L.hs_before / math.max(1, n - L.hs_full)) or 0))
       tx = math.min(tx, x0 + w - tw)
-      local inbar = mx >= x0 and mx < x0 + w and my >= L.hsb_y and my < L.hsb_y + L.hsb_h
+      local inbar = mx >= x0 and mx < x0 + w and my >= y - 3 and my < y + h + 2
       local onthumb = inbar and mx >= tx and mx < tx + tw
       set((onthumb or D.hsb_drag) and U.AMBER or (n > L.hs_full and U.GREY or U.LINE)); gfx.rect(tx, y, tw, h, 1)
       if inbar then hover.hsb = { thumb = onthumb, x0 = x0, w = w, n = n, page = math.max(1, L.hs_full), dir = mx < tx and -1 or 1 } end
