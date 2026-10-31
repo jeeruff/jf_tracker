@@ -238,6 +238,7 @@ end
 
 function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
+  if O.block_hot and O.block_hot.wheel then O.block_hot.wheel(d); return end   -- 31 окт: блок со своей прокруткой (темы, шрифты)
   -- 20 окт: колонки выше окна — колесо мимо строки листает их
   if O.masonry_on and (O.mover or 0) > 0 and not O.hover then
     O.mscroll = math.max(0, math.min(O.mover, (O.mscroll or 0) - d * 3 * (O.rh or 16)))
@@ -510,6 +511,7 @@ end
 -- 15 окт: раскладка кирпичами: разделы (заголовок sep с title … до следующего) — рамками в колонки;
 -- → { place = { {i, x, y, w} }, frames = { {x, y, w, h, title, i0, i1} } } или nil (не влезает / поиск / хоткеи)
 function O.masonry_plan(L, bx, y0, bw, ch)
+  O.side_ok = false
   if O.compact or O.query ~= '' then return nil end
   local rh, pad = L.rh, L.pad
   local secs, cur = {}, nil
@@ -524,11 +526,14 @@ function O.masonry_plan(L, bx, y0, bw, ch)
   end
   -- 15 окт: раздел-блок (темы и шрифты) — не колонкой: в узкой колонке карточки тем по одной
   -- в ряд, блок выше экрана; он занимает всю ширину справа от колонок опций
-  local list, wide = {}, nil
+  -- 31 окт: блок side (шрифты) — под колонками опций на всю оставшуюся высоту (слева много места); не влез — его
+  -- содержимое рисует широкий блок (O.side_ok = false)
+  local list, wide, side = {}, nil, nil
   for _, sc in ipairs(secs) do
     if #sc.rows > 0 then
       local it = O.items[sc.rows[1]]
-      if it.blockrow and not wide then wide = { sc = sc, blk = it.of } else list[#list + 1] = sc end
+      if it.blockrow and it.of.side then side = side or { sc = sc, blk = it.of }
+      elseif it.blockrow and not wide then wide = { sc = sc, blk = it.of } else list[#list + 1] = sc end
     end
   end
   if #list == 0 then return nil end
@@ -606,6 +611,15 @@ function O.masonry_plan(L, bx, y0, bw, ch)
       local fy = y0 + e.y
       frames[#frames + 1] = { x = x, y = fy, w = fw, h = fh(#e.rows), title = e.sc.title, i0 = e.rows[1], i1 = e.rows[#e.rows] }
       for k, i in ipairs(e.rows) do place[#place + 1] = { i = i, x = x + pad, y = fy + k * rh + 2, w = colw - 2 * pad } end
+    end
+  end
+  if side and wide and over == 0 then
+    local bot = 0
+    for _, col in ipairs(cols) do local e = col[#col]; if e then bot = math.max(bot, e.y + fh(#e.rows) + 6) end end
+    local r = side.sc.rows
+    if ch - bot >= 8 * rh then
+      frames[#frames + 1] = { x = bx + pad, y = y0 + bot, w = #cols * (fw + gap) - gap, h = ch - bot, title = side.sc.title, i0 = r[1], i1 = r[#r], block = side.blk }
+      O.side_ok = true
     end
   end
   if wide then

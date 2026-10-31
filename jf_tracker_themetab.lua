@@ -11,7 +11,7 @@
 -- font(), set_font(key), own_font(), install_fonts(), reload_themes().
 -- Превью шрифтов рисуются один раз в картинку 799 (смена шрифта на кадр дорога).
 
-local TT = { sec = 1, i = { 1, 1 }, scroll = 0, rects = {}, hot = nil, btn_hot = nil, fkey = nil }
+local TT = { sec = 1, i = { 1, 1 }, scroll = 0, rects = {}, hotp = {}, btnp = {}, scr = {}, fkey = nil }
 local U, ctx
 local IMG = 799                   -- 10 окт: было 90 — это картинки спектрограмм (90..97), они затирали друг друга
 
@@ -101,12 +101,19 @@ local BTNS = { { 'o', 'own font' }, { 'i', 'install bundled fonts' }, { 'd', 'do
 
 -- emb (14 окт): вкладки theme нет — блок внутри списка опций; emb.scroll — сдвиг (px) от верха
 -- блока, прокрутку ведёт список, кнопки — в конце содержимого. → высота блока, sy0, sy1 выбранного
-function TT.draw(x, y, w, h, emb)
+-- part (31 окт): 'themes' — только темы и кнопки, 'fonts' — размер, шрифты, шрифт слова режима (свой блок слева, где
+-- много места), 'all' / nil — всё одним блоком. У каждой части своя прокрутка и своё «под мышью»
+function TT.draw(x, y, w, h, emb, part)
+  part = part or 'all'
+  local showT, showF = part ~= 'fonts', part ~= 'themes'
   local L, text, ms = ctx.L(), ctx.text, ctx.measure
   local rh, pad = L.rh, L.pad
   local themes, fonts = ctx.themes(), ctx.fonts()
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  TT.rects, TT.hot, TT.btn_hot = {}, nil, nil
+  TT.rects = {}
+  TT.hotp, TT.btnp, TT.scr = TT.hotp or {}, TT.btnp or {}, TT.scr or {}
+  TT.hotp[part], TT.btnp[part] = nil, nil
+  TT.scroll = TT.scr[part] or 0
   -- раскладка: темы — карточками, шрифты — строками в 2-3 колонки
   local cw = ms('00') + 2 * pad + 3 * (ms('C-4 01 7F') + 2 * pad)
   local ch = 7 * rh + 2
@@ -119,12 +126,13 @@ function TT.draw(x, y, w, h, emb)
   font_img(fonts, pw, ph)
   local trows = math.ceil(#themes / tcols)
   local srow = rh + 4                                 -- 11 окт: строка размер / интервал под заголовком шрифтов
-  local fy0 = rh + trows * (ch + pad) + rh + srow     -- от верха контента: заголовок тем, сетка, заголовок шрифтов, настройки
+  local tH = showT and (rh + trows * (ch + pad)) or 0
+  local fy0 = (showT and (tH + rh) or 0) + srow     -- от верха контента: заголовок тем, сетка, заголовок шрифтов, настройки
   -- держать выбранное в окне
   local sy0, sy1
-  if TT.sec == 1 then local r = (TT.i[1] - 1) // tcols; sy0 = rh + r * (ch + pad); sy1 = sy0 + ch
-  else local r = (TT.i[2] - 1) // fcols; sy0 = fy0 + rh + r * ph; sy1 = sy0 + ph end
-  local bh = rh + 4                                    -- строка кнопок внизу
+  if TT.sec == 1 then if showT then local r = (TT.i[1] - 1) // tcols; sy0 = rh + r * (ch + pad); sy1 = sy0 + ch end
+  elseif showF then local r = (TT.i[2] - 1) // fcols; sy0 = fy0 + rh + r * ph; sy1 = sy0 + ph end
+  local bh = showT and (rh + 4) or 0                   -- строка кнопок внизу (у части fonts её нет)
   local vh = h - bh
   -- 13 окт: шрифт слова режима (NORMAL / INSERT) — третья секция, ячейки своим шрифтом
   local mfs = ctx.modefonts and ctx.modefonts() or {}
@@ -132,33 +140,42 @@ function TT.draw(x, y, w, h, emb)
   local mcols = math.max(1, math.floor((w + pad) / (pw + pad)))
   TT.mcols, TT.nm = mcols, #mfs
   local my0 = fy0 + rh + math.ceil(#fonts / fcols) * ph + pad
-  if TT.sec == 3 then local r = ((TT.i[3] or 1) - 1) // mcols; sy0 = my0 + rh + r * (mh + 2); sy1 = sy0 + mh end
-  local total = my0 + rh + math.ceil(#mfs / mcols) * (mh + 2)
+  if TT.sec == 3 and showF then local r = ((TT.i[3] or 1) - 1) // mcols; sy0 = my0 + rh + r * (mh + 2); sy1 = sy0 + mh end
+  local total = showF and (my0 + rh + math.ceil(#mfs / mcols) * (mh + 2)) or tH
   if emb then
     vh = h; TT.scroll = emb.scroll or 0
   else
-    if sy0 - TT.scroll < 0 then TT.scroll = sy0 - (TT.sec == 1 and rh or 0) end
-    if sy1 - TT.scroll > vh then TT.scroll = sy1 - vh end
+    if sy0 and sy0 - TT.scroll < 0 then TT.scroll = sy0 - (TT.sec == 1 and rh or 0) end
+    if sy1 and sy1 - TT.scroll > vh then TT.scroll = sy1 - vh end
     TT.scroll = math.max(0, math.min(TT.scroll, math.max(0, total - vh)))
+    TT.scr[part] = TT.scroll
   end
   local function vis(yy, hh) return yy >= y and yy + hh <= y + vh end
+  -- 31 окт: своя прокрутка и содержимое выше окна — полоса прокрутки справа (колесо листает)
+  if not emb and total > vh and vh > 0 then
+    local th = math.max(rh, math.floor(vh * vh / total))
+    local ty = y + math.floor((vh - th) * TT.scroll / math.max(1, total - vh))
+    C(U.LINE); gfx.rect(x + w - 3, y, 3, vh, 1)
+    C(U.GREY); gfx.rect(x + w - 3, ty, 3, th, 1)
+    w = w - 6
+  end
   local oy = y - TT.scroll
-  if vis(oy, rh) then text(x, oy, 'themes - h j k l, Enter applies', U.AMBER) end
+  if showT and vis(oy, rh) then text(x, oy, 'themes - h j k l, Enter applies', U.AMBER) end
   local cur_t = ctx.theme()
-  for i, th in ipairs(themes) do
+  for i, th in ipairs(showT and themes or {}) do
     local r, c = (i - 1) // tcols, (i - 1) % tcols
     local cx, cy = x + c * (cw + pad), oy + rh + r * (ch + pad)
     if vis(cy, ch) then
       card(L, text, ms, cx, cy, cw, ch, th.name, th.pal, th.name == cur_t)
       local sel = TT.sec == 1 and TT.i[1] == i
       if sel then C(U.AMBER); gfx.rect(cx - 2, cy - 2, cw + 4, ch + 4, 0); gfx.rect(cx - 1, cy - 1, cw + 2, ch + 2, 0) end
-      if mx >= cx and mx < cx + cw and my >= cy and my < cy + ch then TT.hot = { 1, i }; C(U.TEXT); gfx.rect(cx - 1, cy - 1, cw + 2, ch + 2, 0) end
+      if mx >= cx and mx < cx + cw and my >= cy and my < cy + ch then TT.hotp[part] = { 1, i }; C(U.TEXT); gfx.rect(cx - 1, cy - 1, cw + 2, ch + 2, 0) end
     end
   end
   local fy = oy + fy0
-  if vis(fy - srow, rh) then text(x, fy - srow, 'fonts - each in its own face', U.AMBER) end
+  if showF and vis(fy - srow, rh) then text(x, fy - srow, 'fonts - each in its own face', U.AMBER) end
   -- размер (font scale) и интервал строк — кнопками, + - и [ ] с клавиатуры
-  do
+  if showF then
     local sy = fy - srow + rh + 1
     if vis(sy, rh) then
       local bx = x
@@ -166,7 +183,7 @@ function TT.draw(x, y, w, h, emb)
         local bw = ms(lab) + 2 * pad
         if bx + bw > x + w then return end
         local hot = mx >= bx and mx < bx + bw and my >= sy and my < sy + rh
-        if hot then TT.btn_hot = what end
+        if hot then TT.btnp[part] = what end
         C(on and U.tint(U.AMBER, 0.3) or (hot and U.tint(U.AMBER, 0.15) or U.BG)); gfx.rect(bx, sy, bw, rh, 1)
         C(on and U.AMBER or U.LINE); gfx.rect(bx, sy, bw, rh, 0)
         text(bx + pad, sy, lab, (on or hot) and U.AMBER or U.TEXT)
@@ -182,7 +199,7 @@ function TT.draw(x, y, w, h, emb)
     end
   end
   local cur_f = ctx.font()
-  for i, f in ipairs(fonts) do
+  for i, f in ipairs(showF and fonts or {}) do
     local r, c = (i - 1) // fcols, (i - 1) % fcols
     local cx, cy = x + c * (pw + pad), fy + rh + r * ph
     if vis(cy, ph) then
@@ -190,10 +207,10 @@ function TT.draw(x, y, w, h, emb)
       if sel then C(U.AMBER, 0.30); gfx.rect(cx, cy, pw, ph, 1) end
       gfx.blit(IMG, 1, 0, 0, (i - 1) * ph, math.min(pw, w - (cx - x)), ph, cx, cy, math.min(pw, w - (cx - x)), ph)
       if f.key == cur_f then C(U.AMBER); gfx.rect(cx, cy, pw, ph, 0) end
-      if mx >= cx and mx < cx + pw and my >= cy and my < cy + ph then TT.hot = { 2, i }; C(U.TEXT); gfx.rect(cx, cy, pw, ph, 0) end
+      if mx >= cx and mx < cx + pw and my >= cy and my < cy + ph then TT.hotp[part] = { 2, i }; C(U.TEXT); gfx.rect(cx, cy, pw, ph, 0) end
     end
   end
-  do
+  if showF then
     local my1 = oy + my0
     if vis(my1, rh) then text(x, my1, 'mode word in the status (NORMAL / INSERT) - its own font', U.AMBER) end
     local curm = ctx.modefont_get and ctx.modefont_get() or 'off'
@@ -213,11 +230,15 @@ function TT.draw(x, y, w, h, emb)
           gfx.setfont(ctx.font_id and ctx.font_id() or 1)
           text(cx + pad + iw, cy + mh - rh - 1, ctx.fit(nm, pw - iw - 2 * pad), U.GREY)
         end
-        if mx >= cx and mx < cx + pw and my >= cy and my < cy + mh then TT.hot = { 3, i }; C(U.TEXT); gfx.rect(cx, cy, pw, mh, 0) end
+        if mx >= cx and mx < cx + pw and my >= cy and my < cy + mh then TT.hotp[part] = { 3, i }; C(U.TEXT); gfx.rect(cx, cy, pw, mh, 0) end
       end
     end
   end
   -- кнопки
+  if not showT then
+    if emb then TT.last_f = { total = total + 4, sy0 = sy0, sy1 = sy1 }; return TT.last_f.total, sy0, sy1 end
+    return
+  end
   local bx, by = x, y + h - rh - 2
   if emb then
     by = oy + total + 4
@@ -230,7 +251,7 @@ function TT.draw(x, y, w, h, emb)
     local bw = ms(lab) + 2 * pad
     if bx + bw > x + w then break end
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
-    if hot then TT.btn_hot = b[1] end
+    if hot then TT.btnp[part] = b[1] end
     C(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, rh, 1)
     C(U.LINE); gfx.rect(bx, by, bw, rh, 0)
     text(bx + pad, by, lab, hot and U.AMBER or U.TEXT)
@@ -259,9 +280,12 @@ local function act(k)
   elseif k == 'r' then ctx.reload_themes(); TT.fkey = nil end
 end
 
--- клавиши вкладки; true — съели
-function TT.key(c)
+-- клавиши вкладки; true — съели. part (31 окт): своя часть — темы (раздел 1) или шрифты (2, 3)
+function TT.key(c, part)
   local ch = c > 0 and c < 256 and string.char(c) or ''
+  local lo, hi = 1, 3
+  if part == 'themes' then hi = 1 elseif part == 'fonts' then lo = 2 end
+  if TT.sec < lo or TT.sec > hi then TT.sec = lo end
   local s = TT.sec
   TT.i[3] = TT.i[3] or 1
   local n = (s == 1 and TT.nt) or (s == 2 and TT.nf) or TT.nm or 1
@@ -270,11 +294,11 @@ function TT.key(c)
   if ch == 'l' or c == 1919379572 then TT.i[s] = math.min(n, i + 1)
   elseif ch == 'h' or c == 1818584692 then TT.i[s] = math.max(1, i - 1)
   elseif ch == 'j' or c == 1685026670 then
-    if i + cols <= n then TT.i[s] = i + cols elseif s < 3 then TT.sec = s + 1 else return 'down' end   -- 14 окт: из блока — в список опций
+    if i + cols <= n then TT.i[s] = i + cols elseif s < hi then TT.sec = s + 1 else return 'down' end   -- 14 окт: из блока — в список опций
   elseif ch == 'k' or c == 30064 then
-    if i - cols >= 1 then TT.i[s] = i - cols elseif s > 1 then TT.sec = s - 1 else return 'up' end
-  elseif ch == 'g' then TT.sec, TT.i[1] = 1, 1
-  elseif ch == 'G' then TT.sec, TT.i[2] = 2, TT.nf or 1
+    if i - cols >= 1 then TT.i[s] = i - cols elseif s > lo then TT.sec = s - 1 else return 'up' end
+  elseif ch == 'g' then TT.sec, TT.i[lo] = lo, 1
+  elseif ch == 'G' then if hi >= 2 then TT.sec, TT.i[2] = 2, TT.nf or 1 else TT.i[1] = TT.nt or 1 end
   elseif c == 13 or ch == ' ' then apply()
   elseif ch == 'o' or ch == 'i' or ch == 'd' or ch == 'r' then act(ch)
   elseif ch == '+' or ch == '=' or ch == '-' then
@@ -288,13 +312,15 @@ function TT.key(c)
   return true
 end
 
-function TT.click()
-  if TT.btn_hot then act(TT.btn_hot); return true end
-  if TT.hot then TT.sec, TT.i[TT.hot[1]] = TT.hot[1], TT.hot[2]; apply(); return true end
+function TT.click(part)
+  part = part or 'all'
+  local bh, hh = TT.btnp and TT.btnp[part], TT.hotp and TT.hotp[part]
+  if bh then act(bh); return true end
+  if hh then TT.sec, TT.i[hh[1]] = hh[1], hh[2]; apply(); return true end
   return false
 end
 
-function TT.wheel(d) TT.scroll = math.max(0, TT.scroll - d * (ctx.L().rh * 3)) end
+function TT.wheel(d, part) TT.scr = TT.scr or {}; part = part or 'all'; TT.scr[part] = math.max(0, (TT.scr[part] or 0) - d * (ctx.L().rh * 3)) end
 
 -- выбор = текущие тема и шрифт (при открытии вкладки)
 function TT.sync()

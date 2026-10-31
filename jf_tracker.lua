@@ -13168,9 +13168,10 @@ ctx = {
     ctx.theme_tab.sync()
     items[#items + 1] = { kind = 'block', label = 'themes and fonts',
       height = function() return (ctx.theme_tab.last and ctx.theme_tab.last.total) or 40 * L.rh end,
-      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil) end,   -- 15 окт: без scroll — своя прокрутка (рамка справа в раскладке кирпичами)
-      key = function(c) return ctx.theme_tab.key(c) end,
-      click = function() return ctx.theme_tab.click() end }
+      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, OPT.side_ok and 'themes' or 'all') end,   -- 15 окт: без scroll — своя прокрутка (рамка справа в раскладке кирпичами)
+      key = function(c) return ctx.theme_tab.key(c, OPT.side_ok and 'themes' or 'all') end,
+      wheel = function(d) ctx.theme_tab.wheel(d, OPT.side_ok and 'themes' or 'all') end,
+      click = function() return ctx.theme_tab.click(OPT.side_ok and 'themes' or 'all') end }
     items[#items + 1] = { gap = true, sep = true }
     -- 27 окт: твик темы (вкладка theme): ползунки поверх любой темы
     items[#items + 1] = { sep = true, title = 'theme tweak', group = 'theme' }
@@ -13183,6 +13184,15 @@ ctx = {
     end
     items[#items + 1] = { label = 'reset tweak', kind = 'action', value = 'reset', desc = 'hue 0, saturation 100, brightness 0, contrast 100, shadows 0, accents 100',
       fn = function() ctx.TW = { hue = 0, sat = 100, bri = 0, con = 100, sha = 0, acc = 100 }; for k, v in pairs(ctx.TW) do reaper.SetExtState(EXT, 'tw_' .. k, tostring(v), true) end; ctx.apply_theme(state.theme); vim.msg = 'theme tweak reset' end }
+    -- 31 окт: шрифты — свой блок слева под твиком (там много места), темы справа; места нет — шрифты под темами
+    items[#items + 1] = { gap = true, sep = true }
+    items[#items + 1] = { sep = true, title = 'fonts', group = 'theme' }
+    items[#items + 1] = { kind = 'block', label = 'fonts', side = true,
+      height = function() return 8 * L.rh end,
+      draw = function(x, y, w, h, scroll) if not OPT.side_ok then return 0 end; return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, 'fonts') end,
+      key = function(c) return ctx.theme_tab.key(c, 'fonts') end,
+      wheel = function(d) ctx.theme_tab.wheel(d, 'fonts') end,
+      click = function() return ctx.theme_tab.click('fonts') end }
     for _, it in ipairs(ctx.audio_items()) do items[#items + 1] = it end
     -- 27 окт (5): вкладка modules — у каждого модуля свой раздел со своими опциями (ctx.module_items)
     for _, it in ipairs(ctx.module_items()) do items[#items + 1] = it end
@@ -24379,7 +24389,7 @@ local function frame()
     for i, f in ipairs(L.flat) do
       if f.env and f.env.env == ctx.env_jump.env then
         vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil; vim.ensure_visible(); ctx.set_focus('tracker')
-        vim.msg = 'envelope ' .. ctx.env_jump.name .. ': in the tracker (a points / INSERT values)'; ctx.env_jump = nil; break
+        vim.msg = 'envelope ' .. (ctx.env_jump.name or '') .. ': in the tracker (a points / INSERT values)'; ctx.env_jump = nil; break
       end
     end
     if ctx.env_jump then ctx.env_jump.n = (ctx.env_jump.n or 0) + 1; if ctx.env_jump.n > 30 then vim.msg = 'envelope created; open envelopes (:env) to see it'; ctx.env_jump = nil end end
