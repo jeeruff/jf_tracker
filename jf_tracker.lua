@@ -18527,8 +18527,7 @@ local function hint_go(t)
   elseif t.kind == 'patbtn' then ctx.set_focus('patterns'); ctx.pat_btn(d.b)   -- 27 окт: ряд команд patterns
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
-  elseif t.kind == 'mxbtn' then
-    if d == 'view' then ctx.mx_view_menu() elseif d == 'more' then ctx.mx_more() elseif d == 'fold' then ctx.mx_zoom_cycle() elseif d == 'zoom' then ctx.mx_zoom() elseif d == 'ruler' then ctx.mx_ruler_toggle() elseif d == 'rglen-' or d == 'rglen+' then ctx.region_len_step(d == 'rglen+' and 1 or -1) elseif d == 'fill' then MX.fill = not MX.fill elseif d == 'sync' then ctx.sync_here() elseif d == 'add' then ctx.mx_add() elseif d == 'trim' then ctx.mx_trim() elseif d == 'loops' then ctx.mx_loops_toggle() elseif d == 'arrprev' then ctx.arr('prev') elseif d == 'arrnext' then ctx.arr('next') elseif d == 'arrname' then ctx.arr_rename_prompt() elseif d == 'arrnew' then ctx.arr('new') elseif d == 'arrdup' then ctx.arr('dup') elseif d == 'arrdel' then ctx.arr('del') end
+  elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
   elseif t.kind == 'rglen' then if d == 0 then ctx.region_len_menu() else ctx.region_len_step(d) end
@@ -18540,6 +18539,7 @@ local function hint_go(t)
   elseif t.kind == 'tlist' then ctx.tlist_do(d.ci, d.what)   -- 11 окт: track list по f
   elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
+  elseif t.kind == 'viewbtn' and d == 'foldfast' then ctx.foldfast_toggle()   -- 31 окт: хинт fold переключал вид на project
   elseif t.kind == 'viewbtn' then ctx.view_mode(d == 'reg' and 'pattern' or (d == 'sec' and 'section' or 'project'))
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
   elseif t.kind == 'fxcolbtn' then ctrl_action('fx', d.d)
