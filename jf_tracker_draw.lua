@@ -5205,10 +5205,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       TW[1] = math.max(TW[1], ms('mark') + L.pad)   -- 21 окт: на символ уже (подпись mark — без полного отступа)
       if pi then TW[pi] = math.max(TW[pi], ms('x1.10') + 2 * L.pad) end
       -- 31 окт: тоглы записи — pun pre slo qtz (ripple ушёл под roll), начинаются на 2 знака левее колонки после play
+      -- 31 окт (2): тоглы — сразу за x1.00 (rate без своей колонки), прижаты к правому краю кнопок; группа шире, только если не влезли
       need = ms('pun') + ms('pre') + ms('slo*') + ms('qtz') + 8 * L.pad
       local pre = -2
-      for i = 1, (pi or 2) do pre = pre + TW[i] + 2 end
-      need = pre + 2 - 2 * ms('x') + need
+      for i = 1, (pi or 2) - 1 do pre = pre + TW[i] + 2 end
+      need = math.min(pre + 2, math.floor((TW[1] + ms('mark')) / 2) + 2 * L.pad) + ms('x1.00') + 2 * L.pad + need
     end
     D.tp_play_i = pi
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
@@ -5315,7 +5316,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       cellb('markers', 'mark', colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
       -- 31 окт: rate — сразу за mark (mark не меняет ширину), до тоглов записи — им место под транспортом
       local rx0 = math.min(colx(pi3), colx(1) + math.floor((w1 + ms('mark')) / 2) + 2 * L.pad)
-      local w2c = colx(pi3) + (TW[pi3] or tbw) - rx0 - 2 * ms('x') - 2
+      -- 31 окт (2): тоглы записи — сразу за x1.00, прижаты к правому краю группы; rate — до них
+      local tgl = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate }, { 'qtz', 'qtz', c.qtz } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll; qtz — квантование входа
+      local tglw = 0
+      for _, t in ipairs(tgl) do tglw = tglw + ms(t[2]) + 2 * L.pad end
+      local tgx = math.max(rx0 + ms('x1.00') + 2 * L.pad, bx0 + btot - tglw)
+      local w2c = tgx - rx0 - 2
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
       local rhot = cell_hot(rx0, ry, w2c, L.rh)
@@ -5347,9 +5353,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         D.strip_cell.ratepop = { ssx, py2, ssw }
       end
       -- запись: с колонки после play до конца группы
-      local ax, a1 = colx(pi3 + 1) - 2 * ms('x'), bx0 + btot   -- 31 окт: чуть левее
-      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate }, { 'qtz', 'qtz', c.qtz } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll; qtz — квантование входа
-      for _, t in ipairs(full) do
+      local ax, a1 = tgx, bx0 + btot
+      for _, t in ipairs(tgl) do
         local w0 = ms(t[2]) + 2 * L.pad
         if ax + w0 > a1 + L.pad then break end
         cellb(t[1], t[2], ax, w0, t[3])

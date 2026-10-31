@@ -365,6 +365,7 @@ local state = {
   cmsens = tonumber(reaper.GetExtState(EXT, 'cmsens')) or 50,
   krdelay = tonumber(reaper.GetExtState(EXT, 'krdelay')) or 250, krrate = tonumber(reaper.GetExtState(EXT, 'krrate')) or 30,   -- 27 окт: свой автоповтор зажатой клавиши (0 — системный)
   human = tonumber(reaper.GetExtState(EXT, 'human')) or 0,
+  unhuman = reaper.GetExtState(EXT, 'unhuman') == '1',   -- 31 окт: сыгранное с MIDI-клавиатуры — ровно по строкам, одна velocity
   holdroll = reaper.GetExtState(EXT, 'holdroll') == '1' or nil,
   rollstep = reaper.GetExtState(EXT, 'rollstep') == '1' or nil,   -- 28 окт: roll + Ctrl+A / X — копия на шаг ниже с ±1   -- 28 окт: удержание ноты: hold — длина по времени (OFF), roll — курсор едет, без OFF
   libfolders = reaper.GetExtState(EXT, 'libfolders') == '1',
@@ -667,7 +668,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode', state.bsmode or 'pattern'); S('foldfast', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -7345,7 +7346,13 @@ ctx = {
       vim.msg = v > 0 and ('human %d%%: every inserted note varies a little (the ranges - humanizer pane, gH)'):format(v) or 'human off'
     end end
     local function mark(v) return (state.human or 0) == v and '  *' or '' end
+    local hs = ctx.hum_load()
     vim.open_hydra({ title = 'human - every inserted note a little different', items = {
+      { key = 'o', label = 'on / off' .. (hs.ins and (hs.v.amt or 0) > 0 and '  *' or ''), fn = function() ctx.human_toggle() end },   -- 31 окт: щелчок по кнопке — меню (было: вкл / выкл)
+      { key = 'u', label = 'unhuman: MIDI keyboard - notes on the rows (no delays), one velocity (the vel bar)' .. (state.unhuman and '  *' or ''), fn = function()
+        state.unhuman = not state.unhuman
+        vim.msg = state.unhuman and ('unhuman on: what you play lands on the rows with velocity %d (recording and INSERT)'):format(vim.vel or 100) or 'unhuman off: delays and velocity as played'
+      end },
       { key = '0', label = 'off' .. mark(0), fn = set(0) }, { key = '1', label = '25 %' .. mark(25), fn = set(25) },
       { key = '2', label = '50 %' .. mark(50), fn = set(50) }, { key = '4', label = '100 %' .. mark(100), fn = set(100) },
       { key = 'h', label = 'humanizer - ranges, dsp variation points (Ctrl+W g H)', fn = function() ctx.pane_focus('humanizer') end } } })
@@ -21374,10 +21381,72 @@ end
 -- записи с MIDI-входом — ноты входа на строке своего времени (projPos события), с аудио-входом — пик входа на строке
 -- плейхеда (максимум за строку). Только в памяти, в проект не пишется; стоп — сброс, дальше видны настоящие айтемы.
 -- fresh — новые события MIDI (из poll_midi_in), без него — кадровый опрос пиков
+-- 31 окт: unhuman (меню human) — сыгранное на MIDI-клавиатуре при записи встаёт ровно на строки (без задержек) и с одной
+-- velocity (vel полосы). Начало записи — снимок MIDI армированных треков (хэши), конец — новые / изменённые клипы:
+-- ноты, взятые за запись, — на ближайшую строку (длина та же), vel = vim.vel; одна правка undo
+ctx.unh_snap = function()
+  local s = { t0 = reaper.GetPlayPosition(), items = {}, tracks = {} }
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, i)
+    if reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 then
+      s.tracks[#s.tracks + 1] = tr
+      for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, k)
+        local tk = reaper.GetActiveTake(it)
+        s.items[it] = tk and reaper.TakeIsMIDI(tk) and select(2, reaper.MIDI_GetHash(tk, false, '')) or ''
+      end
+    end
+  end
+  return s
+end
+ctx.unh_apply = function(s)
+  local t1 = s.t1 or reaper.GetPlayPosition()
+  local lpb, vel, n = state.lpb, vim.vel or 100, 0
+  edit.run('unhuman: recorded notes on the rows, one velocity', function()
+    for _, tr in ipairs(s.tracks) do
+      if reaper.ValidatePtr(tr, 'MediaTrack*') then
+        for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+          local it = reaper.GetTrackMediaItem(tr, k)
+          local tk = reaper.GetActiveTake(it)
+          if tk and reaper.TakeIsMIDI(tk) and select(2, reaper.MIDI_GetHash(tk, false, '')) ~= s.items[it] then
+            local _, nn = reaper.MIDI_CountEvts(tk)
+            for j = 0, nn - 1 do
+              local _, sel, mu, a0, a1, ch, pi, ve = reaper.MIDI_GetNote(tk, j)
+              local t = reaper.MIDI_GetProjTimeFromPPQPos(tk, a0)
+              if t >= math.min(s.t0, t1) - 0.05 and t <= math.max(s.t0, t1) + 0.05 then
+                local r = math.floor(model.row_of_time(t, lpb) + 0.5)
+                local b0 = reaper.MIDI_GetPPQPosFromProjTime(tk, edit.row_time(r, lpb, 0))
+                reaper.MIDI_SetNote(tk, j, sel, mu, b0, math.max(b0 + 1, a1 + b0 - a0), ch, pi, vel, true)
+                n = n + 1
+              end
+            end
+            reaper.MIDI_Sort(tk)
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  if n > 0 then vim.msg = ('unhuman: %d recorded note(s) on the rows, velocity %d'):format(n, vel) end
+end
+ctx.human_toggle = function()
+  local hs = ctx.hum_load()
+  if hs.ins and (hs.v.amt or 0) > 0 then hs.ins = false
+  else hs.ins = true; if (hs.v.amt or 0) <= 0 then hs.v.amt = hs.amt_last or 50 end end
+  if (hs.v.amt or 0) > 0 then hs.amt_last = hs.v.amt end
+  ctx.hum_save()
+  vim.msg = hs.ins and ('human on %d%%: every inserted note varies (time / velocity / length; the ranges and DSP points - humanizer, gtH)'):format(hs.v.amt) or 'human off'
+end
 ctx.recg_tick = function(fresh)
-  if reaper.GetPlayState() & 4 ~= 4 then ctx.recg = nil; return end
+  if reaper.GetPlayState() & 4 ~= 4 then
+    if ctx.recg and ctx.recg.unh then ctx.recg.unh.t1 = ctx.recg.unh.t1 or ctx.recg.lastpos; ctx.unh_due = { s = ctx.recg.unh, t = reaper.time_precise() + 0.2 } end
+    ctx.recg = nil
+    if ctx.unh_due and reaper.time_precise() >= ctx.unh_due.t then local d = ctx.unh_due; ctx.unh_due = nil; ctx.unh_apply(d.s) end
+    return
+  end
   local g = ctx.recg
-  if not g then g = {}; ctx.recg = g end
+  if not g then g = {}; ctx.recg = g; if state.unhuman then g.unh = ctx.unh_snap() end end
+  g.lastpos = reaper.GetPlayPosition()
   local lpb = state.lpb
   for _, c in ipairs(snap and snap.cols or {}) do
     if c.track and not c.master and c.guid and reaper.ValidatePtr(c.track, 'MediaTrack*') and reaper.GetMediaTrackInfo_Value(c.track, 'I_RECARM') == 1 then   -- арм живой: снимок мог не пересобраться
@@ -21603,6 +21672,7 @@ local function poll_midi_in()
           vim.last_slice = k
           vim.msg = ('rec %s = slice %d'):format(model.note_name(d1), k)
         else
+          if state.unhuman then d2 = vim.vel or 100 end   -- 31 окт: unhuman — одна velocity
           edit.rec_note(col.track, lane_idx, state.lpb, midiin.row, d1, d2, math.max(1, vim.step))
           vim.msg = ('rec %s vel %d'):format(model.note_name(d1), d2)
         end
@@ -22115,16 +22185,7 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
-  elseif name == 'human' then   -- 21 окт: щелчок — вкл / выкл (каждая вставленная нота чуть другая); колесо — проценты меню
-    if delta ~= 0 then ctx.human_menu()
-    else
-      local hs = ctx.hum_load()
-      if hs.ins and (hs.v.amt or 0) > 0 then hs.ins = false
-      else hs.ins = true; if (hs.v.amt or 0) <= 0 then hs.v.amt = hs.amt_last or 50 end end
-      if (hs.v.amt or 0) > 0 then hs.amt_last = hs.v.amt end
-      ctx.hum_save()
-      vim.msg = hs.ins and ('human on %d%%: every inserted note varies (time / velocity / length; the ranges and DSP points - humanizer, gtH; wheel - percent)'):format(hs.v.amt) or 'human off'
-    end
+  elseif name == 'human' then ctx.human_menu()   -- 31 окт: щелчок — снова меню (вкл / выкл — o в нём, unhuman — u)
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
   elseif name == 'holdroll' then ctx.holdroll_toggle()
@@ -25080,7 +25141,7 @@ local function frame()
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
-  elseif hover.ctrl == 'human' then state.status = ('human %d%%: small random timing, pitch, volume of what you write - click: the amount'):format(state.human or 0)
+  elseif hover.ctrl == 'human' then state.status = ('human %d%%%s: small random timing, pitch, volume of what you write - click: menu (on / off, amount, u unhuman)'):format(state.human or 0, state.unhuman and ', unhuman' or '')
   elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - its menu: on / off, grid, strength, direction, note-offs'
   elseif hover.ctrl == 'ripple' then state.status = 'ripple editing (REAPER): off / per track / all tracks - click: the list; on - deleting a note pulls up what is below it'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
