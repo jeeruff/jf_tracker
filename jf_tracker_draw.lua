@@ -7468,7 +7468,7 @@ end
 -- снаружи у её начала (сочится то, что рядом), раз в секунду. Форма — от размера (постоянное зерно), не каждый кадр
 D.crk = nil
 local CRK_IMG = 85   -- 31 окт: картинка трещин (85 свободна — список номеров выше)
--- 31 окт (3): рамки трекера (опция frame, :frame): cracks — трещины по всей площади, edge — трещины вдоль края,
+-- 31 окт (3): рамки трекера (опция frame, :frame): cracks — трещины по всей площади,
 -- blood — неровная кровавая кайма, подтёки сверху, брызги; grunge — бурые пятна и царапины у края; lightning — молнии
 -- по краю (мерцают). Всё процедурно, в картинку 85, кадр — сложением (чёрное ничего не добавляет). red — INSERT
 local function crk_rng(a, b)
@@ -7563,21 +7563,6 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
       local r = rnd()
       local len = r < 0.12 and deep * (0.4 + rnd() * 0.6) or (r < 0.5 and reach * (0.15 + rnd() * 0.25) or reach * (0.4 + rnd() * 0.8))
       crack(px, py, ang + (rnd() - 0.5) * 0.8, len, src(ox, oy), r < 0.12 and 2 or 1.5, 1)
-    end
-  elseif style == 'edge' then
-    -- трещины вдоль края: идут параллельно стороне в полосе band, частые короткие отростки внутрь
-    local band = math.max(18, math.min(46, math.floor(math.min(w, h) * 0.06)))
-    for side = 1, 4 do
-      local n = math.floor((side % 2 == 1 and w or h) / 55) + 3
-      for i = 1, n do
-        local t = (i - 1 + rnd() * 0.8) / n
-        local px, py, ang, ox, oy
-        if side == 1 then px, py, ang, ox, oy = t * w, 4 + rnd() * band * 0.6, 0, t * w, -3
-        elseif side == 2 then px, py, ang, ox, oy = w - 4 - rnd() * band * 0.6, t * h, math.pi / 2, w + 3, t * h
-        elseif side == 3 then px, py, ang, ox, oy = w - t * w, h - 4 - rnd() * band * 0.6, math.pi, w - t * w, h + 3
-        else px, py, ang, ox, oy = 4 + rnd() * band * 0.6, h - t * h, -math.pi / 2, -3, h - t * h end
-        crack(px, py, ang + (rnd() - 0.5) * 0.4, (side % 2 == 1 and w or h) / n * (1.0 + rnd() * 0.6), src(ox, oy), 2.5, 1, band)
-      end
     end
   elseif style == 'blood' or style == 'grunge' then
     local blood = style == 'blood'
