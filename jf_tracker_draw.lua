@@ -8654,9 +8654,10 @@ function D.frame(L, snap, rows, state, info)
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
       local cc = oc or U.CYAN
       -- 31 окт: свой цвет (oc) — и выключенная слегка им подкрашена (видно, какая кнопка какой вид)
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, 0.25) or (oc and U.tint(oc, 0.08) or U.BG))); gfx.rect(x, y, w1, L.rh, 1)
-      set(hot and U.AMBER or (on and cc or (oc and U.mix(oc, U.LINE, 0.6) or U.LINE))); gfx.rect(x, y, w1, L.rh, 0)
-      text(x + 1, y, label, hot and U.AMBER or (on and cc or (oc and U.mix(oc, U.TEXT, 0.6) or U.TEXT)))
+      local cv = (oc and on) and U.mix(cc, U.BG, 0.2) or cc   -- 31 окт: включённая цветная — чуть тусклее
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, oc and 0.18 or 0.25) or (oc and U.tint(oc, 0.08) or U.BG))); gfx.rect(x, y, w1, L.rh, 1)
+      set(hot and U.AMBER or (on and cv or (oc and U.mix(oc, U.LINE, 0.6) or U.LINE))); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and cv or (oc and U.mix(oc, U.TEXT, 0.6) or U.TEXT)))
       if hot then hover[kind] = what end
       hint(kind, x, y, w1, L.rh, what)
       return x + w1 + 2
@@ -8665,12 +8666,15 @@ function D.frame(L, snap, rows, state, info)
     local x0 = bx
     -- 20 окт: project | pattern (было proj | region); узко — proj | pat; zp переключает
     -- 26 окт: + section (zs): project | sec | pattern — что видно, то и правит транспозиция
-    local wide = ms('project') + ms('sec') + ms('pattern') + 9 <= bw
     local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
-    -- 31 окт: порядок proj sec pat (от большого к малому), цвета — красный, жёлтый (секции везде жёлтые), зелёный
-    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn', U.RED)
-    x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn', U.AMBER)
-    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
+    -- 31 окт: порядок pat sec proj (от малого к большому): зелёный, жёлтый (секции везде жёлтые), красный;
+    -- выбранная — словом целиком, если влезает (остальные коротко)
+    local long = ({ pattern = 'pattern', section = 'section', project = 'project' })[vm]
+    local full = long and (ms(long) + 2 * ms('proj') + 9 <= bw)
+    local function lab(m, short) return (full and vm == m) and m or short end
+    x0 = small(x0, hy + 1, lab('pattern', 'pat'), 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
+    x0 = small(x0, hy + 1, lab('section', 'sec'), 'sec', vm == 'section', 'viewbtn', U.AMBER)
+    small(x0, hy + 1, lab('project', 'proj'), 'all', vm == 'project', 'viewbtn', U.RED)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
