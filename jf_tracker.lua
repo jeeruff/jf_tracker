@@ -21169,6 +21169,30 @@ ctx.recg_tick = function(fresh)
     end
   end
 end
+-- 31 окт: сторож библиотеки — трек LIB (сэмплы лежат на таймлайне песни) всегда заглушён: кто-то включил (unmute all
+-- REAPER, M, solo) — сразу снова mute, сообщение в статусе. 4 раза в секунду; прослушка сэмплов идёт не через LIB
+-- (CF_Preview на трек-цель), ей это не мешает. Потом сюда же — другие проверки целостности проекта
+ctx.lib_guard = function()
+  local now = reaper.time_precise()
+  if now - (ctx.lg_t or 0) < 0.25 then return end
+  ctx.lg_t = now
+  local tr = ctx.lg_tr
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then
+    tr = nil
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i)
+      local _, nm = reaper.GetTrackName(t)
+      if model.is_lib_name(nm) then tr = t; break end
+    end
+    ctx.lg_tr = tr
+    if not tr then return end
+  end
+  if reaper.GetMediaTrackInfo_Value(tr, 'B_MUTE') ~= 1 or reaper.GetMediaTrackInfo_Value(tr, 'I_SOLO') ~= 0 then
+    reaper.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1)
+    reaper.SetMediaTrackInfo_Value(tr, 'I_SOLO', 0)
+    vim.msg = 'LIB muted again - the library must not sound (its samples lie on the song timeline)'
+  end
+end
 local function poll_midi_in()
   if not reaper.MIDI_GetRecentInputEvent then return end
   -- собрать новые события (свежие сверху → разворачиваем)
@@ -22853,7 +22877,7 @@ local function frame()
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
-    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in); T('rec ghost', ctx.recg_tick)
+    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in); T('rec ghost', ctx.recg_tick); T('lib guard', ctx.lib_guard)
     T('poll_audio_in', poll_audio_in, reaper.time_precise()); T('settle_puts', settle_puts, reaper.time_precise()); T('mm_settle', mm_settle, reaper.time_precise()); T('learn_poll', learn_poll)
   end
 
