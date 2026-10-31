@@ -26812,6 +26812,18 @@ local function frame()
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
       elseif hover.dspbtn.what == 'xyaxis' then ctx.dsp_xy_pick(hover.dspbtn.f, hover.dspbtn.axis)   -- 31 окт
+      elseif hover.dspbtn.what == 'cfxs' then   -- 31 окт: соло модуля в контейнере (его цепь включается сама)
+        local t = dsp_target(); local f = hover.dspbtn.f
+        if t and t.track and f and f.kids then
+          local A = model.fxapi(t.track)
+          local real = {}
+          for _, kd in ipairs(f.kids) do if kd.i and not (kd.name or ''):find('jf_tracker_macro', 1, true) then real[#real + 1] = kd end end
+          local alone = true
+          for _, kd in ipairs(real) do if (kd.i == hover.dspbtn.ki) ~= kd.enabled then alone = false end end
+          edit.run(alone and 'fx solo off' or 'fx solo', function() for _, kd in ipairs(real) do A.SetEnabled(t.track, kd.i, alone or kd.i == hover.dspbtn.ki) end end)
+          model.invalidate()
+          vim.msg = alone and 'all modules of the container on' or 'solo: only this module plays (s again - all on)'
+        end
       elseif hover.dspbtn.what == 'cfxm' then   -- 31 окт: модуль внутри цепи — вкл / выкл
         local t = dsp_target(); if t and t.track and hover.dspbtn.ki then edit.fx_bypass(t.track, hover.dspbtn.ki); model.invalidate() end
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')

@@ -5915,7 +5915,11 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
       set(ccol); gfx.rect(x, y, 3, L.rh - 1, 1)   -- полоска цвета цепи и у её модулей
       text(x + 3 * L.pad, y, fit(kk.name or '?', nw - 4 * L.pad), kk.enabled and (fsel and U.TEXT or U.GREY) or U.DIM)
       if fhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', kid = kk } end
-      btn(bxs, 'm', 'cfxm', { ki = kk.i, on = not kk.enabled, col = U.RED })
+      local bxm = btn(bxs, 'm', 'cfxm', { ki = kk.i, on = not kk.enabled, col = U.RED })
+      -- 31 окт: s у модуля — только он звучит (его цепь включается сама, остальное в контейнере выкл.); ещё раз — всё вкл.
+      local alone = kk.enabled
+      if alone then for _, c2 in ipairs(chains) do for _, k2 in ipairs(c2.kds) do if k2 ~= kk and k2.enabled then alone = false end end end end
+      btn(bxm, 's', 'cfxs', { ki = kk.i, on = alone and nrows > 2, col = U.GREEN })
       y = y + L.rh + 1
     end
   end
