@@ -185,6 +185,7 @@ local state = {
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
   qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
+  ctxdim = flag('ctxdim', true),   -- 31 окт: вне контекста вида (паттерн / секция / проект) — тускло, не пусто
   dspmove = reaper.GetExtState(EXT, 'dspmove') ~= 'off',
   -- 31 окт: OG-mode — минимум для трека: 4 канала OG1..OG4 с инструментами (опции og ch1..4), без visor и map
   og_ch = { reaper.GetExtState(EXT, 'ogch1') ~= '' and reaper.GetExtState(EXT, 'ogch1') or 'slixer',
@@ -658,7 +659,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'clipsnap', 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'ctxdim', 'clipsnap', 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -12924,6 +12925,7 @@ ctx = {
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
+      flag('ctxdim', 'dim outside the view', 'rows outside the pattern / section of the view (or outside =START .. =END in project) are shown dim; off - they are blank', function() relayout() end),
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
       { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), asks first: keep your tracks visible or only the four; panes - only tracker, matrix, patterns, main, help, lib, browser, fx, dsp, automation, item; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
@@ -13137,7 +13139,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'og-mode', { 'ogmode', 'ogfont', 'ogch1', 'ogch2', 'ogch3', 'ogch4' } },
-      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotbright', 'dotcolor', 'sskeeplook' } },
+      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
@@ -23286,8 +23288,17 @@ local function frame()
   if view_clip then
     for _, r in ipairs(rows) do
       -- номер строки настоящий (рамки, линейка, клики считают от него), флаг clip гасит строку
-      if r.row < view_clip[1] or r.row >= view_clip[2] then r.clip = true; r.label = ''; r.bar = false; r.beat = false end
+      -- 31 окт: опция dim outside the view (вкл) — строки вне контекста видны тускло (плейхед с pre-roll в прошлом
+      -- паттерне был в пустоте); выкл — гаснут, как раньше
+      if r.row < view_clip[1] or r.row >= view_clip[2] then
+        if state.ctxdim then r.dim = true else r.clip = true; r.label = ''; r.bar = false; r.beat = false end
+      end
     end
+  elseif state.ctxdim then   -- проект: вне =START .. =END — тускло
+    local ms0, me0 = model.marker_pos(model.START_MARKER), model.marker_pos(model.END_MARKER)
+    local a0 = ms0 and model.row_of_time(ms0, state.lpb)
+    local b0 = me0 and model.row_of_time(me0, state.lpb)
+    for _, r in ipairs(rows) do if (a0 and r.row < a0 - 1e-6) or (b0 and r.row >= b0 - 1e-6) then r.dim = true end end
   end
 
   fps.n = fps.n + 1

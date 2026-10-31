@@ -7298,6 +7298,14 @@ function D.recg_draw(L, info, state)
     end
   end
 end
+-- 31 окт: строки вне контекста вида (r.dim) — под полупрозрачным фоном: видны, но тише
+function D.ctx_dim(L, rows, x0, W)
+  gfx.set(U.BG[1], U.BG[2], U.BG[3], 0.6)
+  for i, r in ipairs(rows or {}) do
+    if r.dim then gfx.rect(L.matrix_w or 0, L.body_y + (i - 1) * L.rh, W - (L.matrix_w or 0), L.rh, 1) end   -- от края трекера (матрица слева не трогается)
+  end
+  gfx.a = 1
+end
 -- 20 окт: правый край последней видимой колонки трека (мастер сложен — граница его полосы)
 function D.cols_edge(L)
   local e
@@ -9419,6 +9427,7 @@ function D.frame(L, snap, rows, state, info)
       text(wx, ty, fit(sg[1], room), U.TEXT); wx = wx + math.min(room, ms(sg[1])) + 2 * L.pad
     end
   end
+  D.ctx_dim(L, rows, tx0, W)     -- 31 окт: строки вне контекста вида — тускло
   D.mfold_draw(L, snap, hover)   -- 17 окт: сложенный мастер
   D.sf_draw(L, info, state)      -- 20 окт: Shift+F — призрак сэмпла на месте вставки
   D.recg_draw(L, info, state)    -- 31 окт: идёт запись — что пишется, сразу
