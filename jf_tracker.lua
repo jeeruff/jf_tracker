@@ -26576,6 +26576,10 @@ local function frame()
           local r = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = 'sel', geo = lfo_hover.geo, r_s = r }
           A.sel = nil
+        elseif A.tool == 'cur' and lfo_hover.geo and dbl and click.zone == 'lfo' then   -- 31 окт: двойной щелчок — точка здесь
+          local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
+          ctx.acv_do({ op = 'put', rows = { [r] = v }, tool = 'draw' })
+          vim.msg = ('point at row %g, %d%%'):format(r, math.floor(v * 100 + 0.5))
         elseif A.tool == 'cur' and lfo_hover.geo then   -- 31 окт: точка под мышью (±6 px) — тянуть сразу, вживую
           local sp2 = ctx.acv_span(); local act2 = ctx.acv_curves(sp2)[A.cur]
           local g = lfo_hover.geo
