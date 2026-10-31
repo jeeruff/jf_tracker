@@ -22692,6 +22692,12 @@ local function frame()
       if vim.cur.fi ~= lock_sync.fi and cur_tr and cur_tr ~= sel_tr then reaper.SetOnlyTrackSelected(cur_tr) end
       lock_sync.cp, lock_sync.tr = reaper.GetCursorPosition(), reaper.GetSelectedTrack(0, 0)
       lock_sync.row, lock_sync.fi = vim.cur.row, vim.cur.fi
+    elseif not is_playing and not (snap and snap.end_pos and curpos >= snap.end_pos - 1e-6)
+      and math.floor(model.row_of_time(curpos, state.lpb) + 1e-6) ~= vim.cur.row then
+      -- 31 окт: разошлись без движения сторон (старт, :reload, возврат курсора кодом) — курсор REAPER на строку
+      -- трекера: Space играл со старого места («курсор на 0, а играет 1.4»)
+      reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false)
+      lock_sync.cp, lock_sync.row = reaper.GetCursorPosition(), vim.cur.row
     end
   end
 
@@ -22801,6 +22807,12 @@ local function frame()
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
   local wf = gfx.getchar(65536)
   ctx.win_focus = not (wf >= 0 and (wf & 1) == 1 and (wf & 2) == 0)
+  -- 31 окт: и без lock курсор трекера сдвинулся (транспорт стоит) — edit-курсор REAPER туда же: Space в REAPER играет
+  -- с курсора трекера (было: со старого места — «курсор на 0, а играет 1.4»). Только при сдвиге трекера: щелчок в
+  -- arrange курсор REAPER ставит сам и не перебивается
+  if not state.lock and not state.viper and ctx.ecur_row ~= vim.cur.row then
+    if reaper.GetPlayState() & 1 == 0 then reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false); ctx.ecur_row = vim.cur.row end
+  end
   if not ctx.win_focus then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
