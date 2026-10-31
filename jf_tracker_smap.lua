@@ -844,6 +844,20 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
   end
   local function clipx(v) return math.max(x + 1, math.min(x + w - 2, v)) end
   local function clipy(v) return math.max(top, math.min(y + h - 2, v)) end
+  -- 31 окт: под мышью — ОДНА группа (ближайший центр среди тех, чья зона накрывает мышь): зоны большие и
+  -- пересекаются — по диагонали всплывала куча имён
+  local hot1, hd1
+  if inside then
+    for _, hb in ipairs(order) do
+      if hb.R and hb.rect then
+        local rc = hb.rect
+        if mx >= X(rc[1]) - 3 and mx < X(rc[3]) + 3 and my >= Y(rc[2]) - 3 and my < Y(rc[4]) + 3 then
+          local d = (mx - X(hb.cx)) ^ 2 + (my - Y(hb.cy)) ^ 2
+          if not hd1 or d < hd1 then hot1, hd1 = hb, d end
+        end
+      end
+    end
+  end
   for _, hb in ipairs(order) do
     if hb.R then
       -- 29 окт: зона группы — прямоугольник по её звёздам (как на карте), подпись над ядром: имя и число файлов
@@ -851,7 +865,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       local rc = hb.rect
       local bx0, by0, bx1, by1 = math.floor(X(rc[1])) - 3, math.floor(Y(rc[2])) - 3, math.floor(X(rc[3])) + 3, math.floor(Y(rc[4])) + 3
       local px0, py0 = math.floor(X(hb.cx)), math.floor(Y(hb.cy))
-      local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by1
+      local hot = hb == hot1
       local vis = bx1 > x and bx0 < x + w and by1 > top and by0 < y + h
       if vis then
         -- 31 окт: рамок зон нет совсем (просьба): прямоугольники по разбросу звёзд огромные и пересекаются —
@@ -859,7 +873,7 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
         local lab = (hb.name:gsub('^/', '')):upper()
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
-        if hot or free(lx, ly, lw, L.rh) then   -- 31 окт: имена поверх — да (просьба), без числа файлов
+        if hot or (SM.NAMES and free(lx, ly, lw, L.rh)) then   -- 31 окт: имена поверх (опция names), без числа файлов
           placed[#placed + 1] = { lx, ly, lw, L.rh }
           U.set(U.BG, 0.55); gfx.rect(lx - 2, ly, lw + 4, L.rh, 1); gfx.a = 1
           U.text(lx, ly, lab, hot and c or U.mix(c, U.TEXT, 0.25))
@@ -1385,6 +1399,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     for _, t in ipairs(SM.TYPES) do fx = fx + btn(fx, fy, t, V.types and V.types[t], 'mtype', t) + 2 end
     fx = fx + L.pad
     fx = fx + btn(fx, fy, SM.MASS and 'mass' or 'point', SM.MASS, 'mmass', true) + 2   -- 31 окт: точки по размеру файла / одинаковые
+    fx = fx + btn(fx, fy, 'names', SM.NAMES, 'mnames', true) + 2   -- 31 окт: имена групп на облаке вкл / выкл (под мышью — всегда)
     fy = fy + L.rh
     local sw = math.max(L.cw * 4, math.min(L.cw * 10, math.floor((w - 2 * L.pad) / 2) - U.measure('dimension ') - L.pad))
     local sx0 = x + L.pad
