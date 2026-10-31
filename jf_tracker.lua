@@ -19054,6 +19054,7 @@ function view_actions()
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
     { 'Quantize … (notes, OFFs, automation, item edges)', key = 'Q', fn = function() ctx.quant_menu() end },
+    { 'Bar / pattern edge here … (the tempo follows the cursor track: :bar :patstart :patend)', key = 'b', fn = function() ctx.edge_menu() end },   -- 31 окт
   }
 end
 
@@ -32824,6 +32825,119 @@ ctx.qtz_menu = function()
   }
   vim.open_hydra({ title = ('qtz: %s input quantize %s (Esc closes)'):format(col.name or '', q.on and 'on' or 'off'), items = items })
   state.popup_at = at
+end
+-- 31 окт: «здесь начинается такт / паттерн, здесь кончается паттерн» — темп под живую игру трека курсора (флейта):
+-- темп от опорной точки до цели меняется так, чтобы цель (такт / край паттерна) легла ровно в точку; дальше — прежний
+-- темп маркером. Айтемы трека курсора остаются на своём времени (игра как была), регионы и прочее едут с долями.
+-- Точка — строка курсора; в аудио трека курсора — ближайший stretch-маркер / начало айтема в пределах полустроки
+ctx.edge_point = function()
+  local col = cur_col()
+  local t = edit.row_time(vim.cur.row, state.lpb, 0)
+  local half = (edit.row_time(vim.cur.row + 1, state.lpb, 0) - t) / 2
+  local best, how = t, 'row'
+  local tr = col and col.track
+  if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, i)
+      local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local ln = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      if p < t + half and p + ln > t - half then
+        if math.abs(p - t) <= half and math.abs(p - t) < math.abs(best - t) + (how == 'row' and half or 0) then best, how = p, 'item start' end
+        local tk = reaper.GetActiveTake(it)
+        if tk and not reaper.TakeIsMIDI(tk) then
+          local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+          for k = 0, reaper.GetTakeNumStretchMarkers(tk) - 1 do
+            local _, pos = reaper.GetTakeStretchMarker(tk, k)
+            local sm = p + pos / math.max(1e-6, rate)
+            if math.abs(sm - t) <= half and (how == 'row' or math.abs(sm - t) < math.abs(best - t)) then best, how = sm, 'stretch marker' end
+          end
+        end
+      end
+    end
+  end
+  return best, how, tr
+end
+-- цель qt (доли) встаёт во время t; опора — последний маркер темпа до цели (или anchor_q, если он позже)
+ctx.tempo_fit = function(qt, t, anchor_q, what)
+  local tm = reaper.TimeMap2_QNToTime(0, qt)
+  local idx = reaper.FindTempoTimeSigMarker(0, tm - 1e-6)
+  local ta, qa, bpm0, ai = 0, 0, reaper.Master_GetTempo(), -1
+  if idx >= 0 then
+    local ok, tp, _, _, bpm = reaper.GetTempoTimeSigMarker(0, idx)
+    if ok then ta, qa, bpm0, ai = tp, reaper.TimeMap2_timeToQN(0, tp), bpm, idx end
+  end
+  if anchor_q and anchor_q > qa + 1e-6 and anchor_q < qt - 1e-6 then
+    ta, qa, ai = reaper.TimeMap2_QNToTime(0, anchor_q), anchor_q, nil
+    bpm0 = reaper.TimeMap2_GetDividedBpmAtTime and reaper.TimeMap2_GetDividedBpmAtTime(0, ta + 1e-6) or bpm0
+  end
+  if t <= ta + 0.01 or qt <= qa + 1e-6 then vim.msg = what .. ': the point is before its anchor (' .. ('%.3f'):format(ta) .. ' s)'; return false end
+  local bpm = (qt - qa) * 60 / (t - ta)
+  if bpm < 20 or bpm > 400 then vim.msg = ('%s: that needs %.1f BPM - too far, nothing changed'):format(what, bpm); return false end
+  local col = cur_col()
+  local keep = {}
+  local tr = col and col.track
+  if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, i)
+      keep[#keep + 1] = { it, reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') }
+    end
+  end
+  edit.run(what, function() edit.keep_markers_qn(function()
+    if ai and ai >= 0 then
+      local _, tp, _, _, _, num, den, lin = reaper.GetTempoTimeSigMarker(0, ai)
+      reaper.SetTempoTimeSigMarker(0, ai, tp, -1, -1, bpm, num, den, false)
+    else reaper.SetTempoTimeSigMarker(0, -1, ta, -1, -1, bpm, 0, 0, false) end
+    -- после цели — прежний темп (маркер ровно в цели; есть там уже — не трогаем)
+    local has = false
+    for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
+      local _, tp = reaper.GetTempoTimeSigMarker(0, i)
+      if math.abs(reaper.TimeMap2_timeToQN(0, tp) - qt) < 1e-4 then has = true end
+    end
+    if not has then reaper.SetTempoTimeSigMarker(0, -1, reaper.TimeMap2_QNToTime(0, qt), -1, -1, bpm0, 0, 0, false) end
+  end)
+    for _, k in ipairs(keep) do if reaper.ValidatePtr(k[1], 'MediaItem*') then reaper.SetMediaItemInfo_Value(k[1], 'D_POSITION', k[2]); reaper.SetMediaItemInfo_Value(k[1], 'D_LENGTH', k[3]) end end
+  end)
+  model.invalidate()
+  vim.msg = ('%s: %.2f BPM from %.2f s, then %.2f again (Cmd+Z undo)'):format(what, bpm, ta, bpm0)
+  return true
+end
+ctx.bar_here = function()
+  local t, how = ctx.edge_point()
+  local _, meas = reaper.TimeMap2_timeToBeats(0, t)
+  local m0 = reaper.TimeMap2_beatsToTime(0, 0, meas)
+  local m1 = reaper.TimeMap2_beatsToTime(0, 0, meas + 1)
+  local m = (t - m0 < m1 - t) and meas or meas + 1
+  local qt = reaper.TimeMap2_timeToQN(0, reaper.TimeMap2_beatsToTime(0, 0, m))
+  if ctx.tempo_fit(qt, t, nil, ('bar %d here (%s)'):format(m + 1, how)) then vim.cur.row = math.floor(model.row_of_time(t, state.lpb) + 0.5) end
+end
+ctx.pat_edge_here = function(which)
+  local t, how = ctx.edge_point()
+  local rg = alias.region_at(regions, t - 1e-6) or alias.region_at(regions, t)
+  if not rg then vim.msg = 'no pattern here'; return end
+  local q0, q1 = reaper.TimeMap2_timeToQN(0, rg.pos), reaper.TimeMap2_timeToQN(0, rg.rgnend)
+  if which == 'end' then
+    -- конец паттерна курсора (курсор у начала следующего — конец предыдущего)
+    if math.abs(t - rg.pos) < math.abs(t - rg.rgnend) then
+      local prv = alias.region_at(regions, rg.pos - 1e-3)
+      if prv then rg = prv; q0, q1 = reaper.TimeMap2_timeToQN(0, prv.pos), reaper.TimeMap2_timeToQN(0, prv.rgnend) end
+    end
+    ctx.tempo_fit(q1, t, q0, ('%s ends here (%s)'):format(rg.name or 'pattern', how))
+  else
+    -- начало: ближайшее начало паттерна (этого или следующего); опора — начало предыдущего
+    local nx = alias.region_at(regions, rg.rgnend + 1e-3)
+    local tgt = rg
+    if nx and math.abs(t - rg.rgnend) < math.abs(t - rg.pos) then tgt = nx end
+    local qs = reaper.TimeMap2_timeToQN(0, tgt.pos)
+    local prv = alias.region_at(regions, tgt.pos - 1e-3)
+    ctx.tempo_fit(qs, t, prv and reaper.TimeMap2_timeToQN(0, prv.pos) or nil, ('%s starts here (%s)'):format(tgt.name or 'pattern', how))
+  end
+end
+ctx.edge_menu = function()
+  vim.open_hydra({ title = 'here (the cursor; audio of the track - its stretch marker): the tempo follows the playing of this track', items = {
+    { key = 'b', label = 'a bar starts here', fn = ctx.bar_here },
+    { key = 'e', label = 'the pattern ends here', fn = function() ctx.pat_edge_here('end') end },
+    { key = 's', label = 'a pattern starts here', fn = function() ctx.pat_edge_here('start') end },
+  } })
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()
