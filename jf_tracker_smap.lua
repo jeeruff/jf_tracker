@@ -820,7 +820,11 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       end
     end
   end
-  SM.buffered(G, ('neb|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d|%.2f'):format(x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.ver, G.gal_grav or 0.5), x, y, w, h, U, paint)
+  -- 31 окт: пока идёт скан, G.ver растёт каждый кадр — облако (до сотни тысяч точек) перерисовывалось всё время
+  -- («nebula тупит»): новая версия в буфер — не чаще раза в 1.5 с
+  local now = reaper and reaper.time_precise and reaper.time_precise() or os.clock()
+  if G.neb_ver ~= G.ver and (not G.neb_ver or now - (G.neb_vt or 0) > 1.5) then G.neb_ver, G.neb_vt = G.ver, now end
+  SM.buffered(G, ('neb|%d|%d|%d|%d|%.4f|%.1f|%.1f|%.3f|%d|%.2f'):format(x, y, w, h, zoom, cx, cy, V.dim or 0.5, G.neb_ver or G.ver, G.gal_grav or 0.5), x, y, w, h, U, paint)
   -- секторы — рамки поверх облака: уголки, подпись в левом верхнем углу; крупные первыми, подписи без наложений
   local hv, hd
   local order = {}
@@ -843,10 +847,13 @@ function SM.draw_nebula2(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, insi
       local hot = inside and mx >= bx0 and mx < bx1 and my >= by0 and my < by1
       local vis = bx1 > x and bx0 < x + w and by1 > top and by0 < y + h
       if vis then
-        local cx0, cy0, cx1, cy1 = clipx(bx0), clipy(by0), clipx(bx1), clipy(by1)
-        U.set(hot and c or U.mix(U.TEXT, U.BG, 0.45))
-        gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
-        gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
+        -- 31 окт: рамка зоны — только под мышью: 150 рамок по разбросу звёзд расчерчивали всё поле
+        if hot then
+          local cx0, cy0, cx1, cy1 = clipx(bx0), clipy(by0), clipx(bx1), clipy(by1)
+          U.set(c)
+          gfx.rect(cx0, cy0, cx1 - cx0, 1, 1); gfx.rect(cx0, cy1, cx1 - cx0, 1, 1)
+          gfx.rect(cx0, cy0, 1, cy1 - cy0, 1); gfx.rect(cx1, cy0, 1, cy1 - cy0 + 1, 1)
+        end
         local lab = ('%s %d'):format((hb.name:gsub('^/', '')):upper(), hb.n)
         local lw = U.measure(lab)
         local lx, ly = clipx(px0 - math.floor(lw / 2)), clipy(py0 - math.floor(L.rh / 2))
