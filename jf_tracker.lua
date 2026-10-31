@@ -17358,7 +17358,7 @@ ctx.phr_list = function()
     if not r or r == 0 then break end
     local n = isr and nm:match('^ph:(.+)$')
     if n and not by[n] then
-      by[n] = { name = n, pos = p, rend = e, idx = idx, lenq = R.TimeMap2_timeToQN(0, e) - R.TimeMap2_timeToQN(0, p), n = 0 }
+      by[n] = { name = n, pos = p, rend = e, idx = idx, lenq = R.TimeMap2_timeToQN(0, e) - R.TimeMap2_timeToQN(0, p), n = 0, notes = {}, uses = {} }
       list[#list + 1] = by[n]
     end
     i = i + 1
@@ -17369,8 +17369,44 @@ ctx.phr_list = function()
       local tk = R.GetActiveTake(R.GetTrackMediaItem(tr, k))
       local tn = tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) or ''
       local n = tn:match('^ph:(.+)$')
-      if n and by[n] then by[n].n = by[n].n + 1 end
+      if n and by[n] then
+        by[n].n = by[n].n + 1
+        -- 31 окт (lf): где стоит — трек, строка, высота ноты-триггера
+        local it = R.GetTrackMediaItem(tr, k)
+        local _, tnm = R.GetTrackName(tr)
+        local _, _, _, _, _, _, pi = R.MIDI_GetNote(tk, 0)
+        local u = by[n].uses
+        u[#u + 1] = { track = tnm, row = math.floor(model.row_of_time(R.GetMediaItemInfo_Value(it, 'D_POSITION'), state.lpb) + 0.5), pitch = pi, pos = R.GetMediaItemInfo_Value(it, 'D_POSITION') }
+      end
     end
+  end
+  -- 31 окт (lf): что внутри — ноты MIDI и аудио айтемы источника строками (строка от начала фразы при текущем LPB)
+  for _, ph in ipairs(list) do
+    local qp = R.TimeMap2_timeToQN(0, ph.pos)
+    for ti = 0, R.CountTracks(0) - 1 do
+      local tr = R.GetTrack(0, ti)
+      for k = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, k)
+        local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local tk = R.GetActiveTake(it)
+        local _, cp = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_phrc', '', false)
+        if tk and p >= ph.pos - 1e-6 and p < ph.rend - 1e-6 and (cp or '') == '' and #ph.notes < 400 then
+          if R.TakeIsMIDI(tk) then
+            local _, nn = R.MIDI_CountEvts(tk)
+            for j = 0, nn - 1 do
+              local _, _, mu, sp, _, _, pi, ve = R.MIDI_GetNote(tk, j)
+              local q = R.TimeMap2_timeToQN(0, R.MIDI_GetProjTimeFromPPQPos(tk, sp))
+              if q < R.TimeMap2_timeToQN(0, ph.rend) - 1e-6 then ph.notes[#ph.notes + 1] = { row = math.floor((q - qp) * state.lpb + 1e-6), pitch = pi, vel = ve, muted = mu } end
+            end
+          else
+            local _, nm = R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)
+            ph.notes[#ph.notes + 1] = { row = math.floor((R.TimeMap2_timeToQN(0, p) - qp) * state.lpb + 1e-6), audio = nm }
+          end
+        end
+      end
+    end
+    table.sort(ph.notes, function(a, b) return a.row < b.row end)
+    table.sort(ph.uses, function(a, b) return a.pos < b.pos end)
   end
   table.sort(list, function(a, b) return a.name:lower() < b.name:lower() end)
   ctx.phr_cc = { sc = sc, list = list }
@@ -17479,6 +17515,14 @@ ctx.phr_do = function(op)
     ctx.phr_cc = nil; model.invalidate()
     vim.msg = ('phrase %s at row %d (%s): change the note - transposed, velocity - louder / quieter'):format(r.name, vim.cur.row, col.name or '')
   elseif op.op == 'edit' then ctx.phr_edit_toggle(r.name)
+  elseif op.op == 'use' then   -- 31 окт (lf): правая колонка — к этому триггеру в песне
+    local u = r.uses and r.uses[op.i]
+    if not u then return end
+    if state.phr_edit then ctx.phr_edit_toggle(state.phr_edit.name) end
+    vim.cur.row = u.row
+    for i, fl in ipairs(L and L.flat or {}) do if fl.col and fl.col.name == u.track and not fl.env and not fl.ml then vim.cur.fi = i; break end end
+    vim.ensure_visible(); ctx.set_focus('tracker')
+    vim.msg = ('phrase %s on %s, row %04d'):format(r.name, u.track, u.row)
   elseif op.op == 'goto' then
     vim.cur.row = math.max(0, math.floor(model.row_of_time(r.pos, state.lpb) + 0.5))
     vim.ensure_visible(); ctx.set_focus('tracker')
@@ -26358,6 +26402,9 @@ local function frame()
         ctx.PHP.sel = hover.phr.row
         local r = ctx.phr_list()[hover.phr.row]
         if dbl and same and click.zone == 'phr' and r then ctx.phr_do({ op = 'insert', name = r.name }) end
+      elseif hover.phr.use then   -- 31 окт (lf): щелчок по месту — к нему
+        local r = ctx.phr_list()[ctx.PHP.sel]
+        if r then ctx.phr_do({ op = 'use', name = r.name, i = hover.phr.use }) end
       end
       click = { t = now2, zone = 'phr' }
     elseif hover.lfogen then   -- 31 окт: панель lfogen
