@@ -16512,7 +16512,7 @@ ctx.acv_curves = function(sp)
   local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
   local tgt = ctx.lfo_target()
   local col = cur_col()
-  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0) .. ':' .. tostring(sp and sp.t1) .. ':' .. tostring(vim.cur.fi)
+  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0) .. ':' .. tostring(sp and sp.t1) .. ':' .. tostring(vim.cur.fi) .. ':' .. tostring(vim.cur.field)
   if ctx.acv_cc and ctx.acv_cc.key == key then return ctx.acv_cc.list end
   local list, seen = {}, {}
   local PAL = { U.CYAN, U.AMBER, U.RED, U.TEXT }
@@ -16550,6 +16550,25 @@ ctx.acv_curves = function(sp)
         local v
         for _, rr in ipairs(rows) do if rr <= r + 1e-6 then v = ml.ev[rr] and ml.ev[rr].v else break end end
         return v and v / 127 or rest
+      end }
+  end
+  -- 31 окт: курсор на vel колонки нот — громкости нот трека в отрезке кривой (MIDI vel / 127, аудио vol / 255);
+  -- мазки и трансформации правят громкость СУЩЕСТВУЮЩИХ нот (новых не создают)
+  if fl and fl.lane and fl.col and (vim.cur.field or 1) == 2 and sp and not list[1] then
+    local fi = vim.cur.fi
+    local hs = vim.heads_in(fi, fi, sp.r0, sp.r1 - 1)
+    table.sort(hs, function(a, b) return a.row0 < b.row0 end)
+    local pts = {}
+    for _, h in ipairs(hs) do
+      local v = tonumber(h.vol or '', 16)
+      if v then pts[#pts + 1] = { sp.time(h.row0), v / (h.kind == 'audio' and 255 or 127) } end
+    end
+    list[1] = { kind = 'vel', fi = fi, name = (fl.col.name or '') .. ' / vel', rgb = U.AMBER, write = true, points = pts, track = fl.col.track,
+      eval = function(t)
+        local r = sp.row_of(t)
+        local v
+        for _, p in ipairs(pts) do if sp.row_of(p[1]) <= r + 1e-6 then v = p[2] else break end end
+        return v or 0
       end }
   end
   if tgt and tgt.e then add(tgt.e, tgt.label or (tgt.e.name or 'envelope')) end
@@ -16840,6 +16859,39 @@ ctx.acv_humanize = function()
   ctx.acv_replace(pts, A.humanize(pts, 0.08, A.seed), { a = a, b = b }, 'humanize')
   vim.msg = ('humanize: %d point(s) +-8%%, rows %g..%g (again - another spread)'):format(#pts, a, b)
 end
+-- 31 окт: мазок / трансформация на кривой vel → громкости нот в строках мазка (мазок — линией между его точками;
+-- трансформация / humanize — значение строки ноты), одной отменой
+ctx.acv_vel_put = function(act, sp, op, lo, hi)
+  local keys = {}
+  for r, v in pairs(op.rows) do if v then keys[#keys + 1] = r end end
+  table.sort(keys)
+  if #keys == 0 then return end
+  local stroke = op.tool == 'draw' or op.tool == 'line' or op.tool == 'shape'
+  local function at(r)
+    if not stroke then
+      local best
+      for _, k in ipairs(keys) do if math.floor(k + 1e-9) == r then best = op.rows[k] end end
+      return best
+    end
+    if r < keys[1] - 1e-9 or r > keys[#keys] + 1 then return nil end
+    local k = 1
+    while k < #keys and keys[k + 1] <= r + 1e-9 do k = k + 1 end
+    local r1, r2 = keys[k], keys[k + 1]
+    if r <= keys[1] or not r2 then return op.rows[r1] end
+    return op.rows[r1] + (op.rows[r2] - op.rows[r1]) * (r - r1) / math.max(1e-9, r2 - r1)
+  end
+  local a, b = math.floor((op.a or lo) + 1e-9), math.ceil((op.b or (hi + 1)) - 1e-9)
+  local hs = vim.heads_in(act.fi, act.fi, a, b)
+  local n = 0
+  edit.run('canvas vel ' .. (op.tool or ''), function()
+    for _, h in ipairs(hs) do
+      local v = at(h.row0)
+      if v then edit.set_vol({ h }, state.lpb, math.max(0, math.min(1, v)) * (h.kind == 'audio' and 255 or 127)); n = n + 1 end
+    end
+  end)
+  ctx.acv_cc = nil
+  vim.msg = ('%s: %s, %d note(s)'):format(act.name, op.tool or 'put', n)
+end
 ctx.acv_do = function(op, sp, curves)
   local ACV = ctx.ACV
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
@@ -16889,6 +16941,7 @@ ctx.acv_do = function(op, sp, curves)
   if op.op == 'put' then   -- 30 окт: мазок мыши — строки → значения 0..1 / false (стереть)
     local lo, hi, n = math.huge, -math.huge, 0
     for r in pairs(op.rows) do lo = math.min(lo, r); hi = math.max(hi, r); n = n + 1 end
+    if act.kind == 'vel' then ctx.acv_vel_put(act, sp, op, lo, hi); return end
     local step = ACV.snap and ACV.grid or 1
     if act.kind == 'ml' then
       -- MIDI-лейн — значение на строку: доли строки (сетка мельче строки) — последнее в строке
@@ -16931,6 +16984,18 @@ ctx.acv_do = function(op, sp, curves)
     end
     ctx.acv_cc = nil
     vim.msg = ('%s: %s, rows %g..%g (%d)'):format(act.name, op.tool, lo, hi, n)   -- 31 окт: %g — сетка мельче строки даёт дробные строки
+    return
+  end
+  if act.kind == 'vel' and op.op ~= 'point' then   -- 31 окт: vel — клавиши холста правят ноты строки курсора
+    local hs = vim.heads_in(act.fi, act.fi, ACV.row, ACV.row)
+    if #hs == 0 then vim.msg = 'vel: no note on this row'; return end
+    local cur = act.eval(sp.time(ACV.row))
+    local v
+    if op.op == 'nudge' then v = cur + op.d elseif op.op == 'level' then v = op.v else vim.msg = 'vel: draw over the notes (d D c), j k - nudge, 0-9 - level'; return end
+    v = math.max(0, math.min(1, v))
+    edit.run('canvas vel', function() for _, h in ipairs(hs) do edit.set_vol({ h }, state.lpb, v * (h.kind == 'audio' and 255 or 127)) end end)
+    ctx.acv_cc = nil
+    vim.msg = ('vel: %d%% at row %d'):format(math.floor(v * 100 + 0.5), ACV.row)
     return
   end
   if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127
