@@ -10153,7 +10153,7 @@ function D.frame(L, snap, rows, state, info)
       local on_btn = false
       local pre_at   -- 24 окт: кнопки слева (опция dspleft) — пресет рисуется после них
       if pre and tw > L.cw * 14 then
-        ptw = math.min(math.floor(tw * 0.6), ms('< ' .. pre.name .. ' >') + L.pad)
+        ptw = math.min(math.floor(tw * 0.6), L.cw * 36 + L.pad)   -- 31 окт: строгая ширина — стрелки < > не прыгают от длины имени пресета
         pre_at = function(px)
         local aw = ms('<') + 2
         local parts = { { '<', 'pprev', px, aw }, { pre.name, 'preset', px + aw, ptw - 2 * aw }, { '>', 'pnext', px + ptw - aw, aw } }
