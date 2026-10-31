@@ -759,9 +759,9 @@ local function toggle_dock(apply_title)
     local _, ml, mt, mr, mb = reaper.JS_Window_GetRect(reaper.GetMainHwnd())
     if mt and mb and mt > mb and mb <= t + 1 and ml <= l and mr >= r then b = math.min(b, mt) end   -- только если REAPER сам во весь экран
     -- 27 окт было +1 px вверх (щель под меню без фокуса); 31 окт: этот пиксель уходил под строку меню — съедал
-    -- верхнюю линию модулей. Ровно рабочая область; 31 окт: и 6 px запаса сверху (3 было мало) — строка меню macOS (выезжает
+    -- верхнюю линию модулей. Ровно рабочая область; 31 окт: и 4 px запаса сверху (3 мало, 6 много) — строка меню macOS (выезжает
     -- поверх в полном экране) резала верхнюю строку вкладок. macOS: y снизу — меньше высота = ниже верх
-    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t - 6)
+    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t - 4)
   end
   local docked = gfx.dock(-1) & 1 == 1
   if apply_title then                              -- опция title / старт: только рамка плавающего окна
