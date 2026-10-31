@@ -22269,7 +22269,7 @@ function ctrl_action(name, delta)
     if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_exact('Record: Set record mode to normal') or 40252, 0)
     elseif p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'ripple' then ctx.ripple_menu()   -- 16 окт: ripple editing — три значения, выпадашкой
-  elseif name == 'qtz' then ctx.qtz_toggle()
+  elseif name == 'qtz' then ctx.qtz_menu()   -- 31 окт: выпадашка (сетка, сила, куда, концы нот); вкл / выкл — o в ней
   elseif name == 'preroll' then local p = ctx.cmd_exact('Pre-roll: toggle pre-roll on record') or ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'reclib' then state.reclib = true; vim.msg = 'rec -> lib: always on - a recorded take becomes a lib instrument'
   -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
@@ -25081,7 +25081,7 @@ local function frame()
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
   elseif hover.ctrl == 'human' then state.status = ('human %d%%: small random timing, pitch, volume of what you write - click: the amount'):format(state.human or 0)
-  elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - on / off'
+  elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - its menu: on / off, grid, strength, direction, note-offs'
   elseif hover.ctrl == 'ripple' then state.status = 'ripple editing (REAPER): off / per track / all tracks - click: the list; on - deleting a note pulls up what is below it'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
   elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'
@@ -32701,21 +32701,68 @@ ctx.qtz_on = function(tr)
   end
   return v
 end
+-- 31 окт: строка INQ чанка трека — вкл, куда (-1 назад, 0 ближайшая, 1 вперёд), концы нот, сетка (доли), сила %,
+-- свинг %, окно мин / макс %. Без строки — умолчание REAPER (1/8, 100 %)
+ctx.qtz_get = function(tr)
+  local ok, ch = reaper.GetTrackStateChunk(tr, '', false)
+  if not ok then return nil end
+  local v = {}
+  for x in (ch:match('\n%s*INQ ([^\n]*)') or '0 0 0 0.5 100 0 0 100'):gmatch('%S+') do v[#v + 1] = tonumber(x) or 0 end
+  return { on = v[1] == 1, pos = v[2] or 0, offs = v[3] == 1, grid = v[4] or 0.5, str = v[5] or 100, swing = v[6] or 0, rmin = v[7] or 0, rmax = v[8] or 100 }, ch
+end
+ctx.qtz_set = function(tr, q, ch, what)
+  local line = ('INQ %d %d %d %s %d %d %d %d'):format(q.on and 1 or 0, q.pos, q.offs and 1 or 0, ('%.6f'):format(q.grid), q.str, q.swing, q.rmin, q.rmax)
+  local n
+  ch, n = ch:gsub('(\n%s*)INQ [^\n]*', '%1' .. line, 1)
+  if n == 0 then ch = ch:gsub('(\n%s*REC [^\n]*)', '%1\n' .. line, 1) end
+  edit.run('input quantize: ' .. what, function() reaper.SetTrackStateChunk(tr, ch, false) end)
+  ctx.qtz_cache[tr] = q.on
+end
+ctx.qtz_grid_name = function(g)
+  local n = 4 / g
+  if math.abs(n - math.floor(n + 0.5)) < 1e-3 then return '1/' .. math.floor(n + 0.5) end
+  return ('%.3f beat'):format(g)
+end
 ctx.qtz_toggle = function()
   local col = cur_col()
   local tr = col and col.track
   if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'qtz: a track under the cursor'; return end
-  local ok, ch = reaper.GetTrackStateChunk(tr, '', false)
-  if not ok then return end
-  local on = not (ch:match('\n%s*INQ (%d)') == '1')
-  local grid = ('%.6f'):format(1 / math.max(1, state.lpb))
-  local line = ('INQ %d 0 0 %s 100 0 0 100'):format(on and 1 or 0, grid)
-  local n
-  ch, n = ch:gsub('(\n%s*)INQ [^\n]*', '%1' .. line, 1)
-  if n == 0 then ch = ch:gsub('(\n%s*REC [^\n]*)', '%1\n' .. line, 1) end
-  edit.run('input quantize ' .. (on and 'on' or 'off'), function() reaper.SetTrackStateChunk(tr, ch, false) end)
-  ctx.qtz_cache[tr] = on
-  vim.msg = on and ('qtz on: %s records its MIDI input quantized to the step (1/%d beat)'):format(col.name or '', state.lpb) or ('qtz off: %s records as played'):format(col.name or '')
+  local q, ch = ctx.qtz_get(tr)
+  if not q then return end
+  q.on = not q.on
+  if q.on and not ctx.qtz_cache.grid_set then q.grid = 1 / math.max(1, state.lpb) end   -- первое включение — шаг трекера
+  ctx.qtz_set(tr, q, ch, q.on and 'on' or 'off')
+  vim.msg = q.on and ('qtz on: %s records its MIDI input quantized to %s, %d%%'):format(col.name or '', ctx.qtz_grid_name(q.grid), q.str) or ('qtz off: %s records as played'):format(col.name or '')
+end
+-- 31 окт: выпадашка qtz (щелчок по кнопке) — всё квантование входа трека курсора; меню остаётся открытым до Esc
+ctx.qtz_menu = function()
+  local col = cur_col()
+  local tr = col and col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'qtz: a track under the cursor'; return end
+  local q = ctx.qtz_get(tr)
+  if not q then return end
+  local at = state.popup_at or { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+  local function chg(what, f) return function()
+    local q2, ch = ctx.qtz_get(tr)
+    f(q2); ctx.qtz_set(tr, q2, ch, what)
+    vim.msg = ('qtz %s: %s, %s, %d%%%s'):format(q2.on and 'on' or 'off', what, ctx.qtz_grid_name(q2.grid), q2.str, q2.offs and ', note-offs too' or '')
+    ctx.qtz_menu(); state.popup_at = at
+  end end
+  local function mark(c) return c and '* ' or '  ' end
+  local step = 1 / math.max(1, state.lpb)
+  local function grid(k, g, lab) return { key = k, label = mark(q.on and math.abs(q.grid - g) < 1e-4) .. 'grid ' .. lab, fn = chg('grid ' .. lab, function(x) x.grid = g; x.on = true; ctx.qtz_cache.grid_set = true end) } end
+  local function str(k, p) return { key = k, label = mark(q.str == p) .. ('strength %d%%'):format(p), fn = chg(('strength %d%%'):format(p), function(x) x.str = p end) } end
+  local function pos(k, p, lab) return { key = k, label = mark(q.pos == p) .. 'to the ' .. lab, fn = chg('to the ' .. lab, function(x) x.pos = p end) } end
+  local items = {
+    { key = 'o', label = mark(q.on) .. 'on / off', fn = chg(q.on and 'off' or 'on', function(x) x.on = not x.on end) },
+    grid('b', 1, '1/4 (beat)'), grid('e', 0.5, '1/8'), grid('x', 0.25, '1/16'), grid('t', 0.125, '1/32'),
+    grid('3', 1 / 3, '1/8 triplet'), grid('s', step, ('step (1/%d beat, LPB %d)'):format(state.lpb, state.lpb)),
+    str('1', 100), str('7', 75), str('5', 50), str('2', 25),
+    pos('n', 0, 'nearest step'), pos('<', -1, 'previous step'), pos('>', 1, 'next step'),
+    { key = 'f', label = mark(q.offs) .. 'note-offs quantized too', fn = chg('note-offs', function(x) x.offs = not x.offs end) },
+  }
+  vim.open_hydra({ title = ('qtz: %s input quantize %s (Esc closes)'):format(col.name or '', q.on and 'on' or 'off'), items = items })
+  state.popup_at = at
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()
