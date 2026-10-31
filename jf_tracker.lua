@@ -16654,7 +16654,7 @@ ctx.ctl_lane_start = function()
     if act then local ok, v = pcall(act.eval, sp.time(A.row)); if ok and v then v0 = math.max(0, math.min(1, v)) end end
     local vx = g.gx + (A.row - g.r0) / math.max(1, g.nr) * g.gw
     local vy = g.gy + g.gh - 2 - v0 * (g.gh - 4)
-    local SG = { acv = true, tool = A.tool, vx = vx, vy = vy }
+    local SG = { acv = true, tool = A.tool, vx = vx, vy = vy, vx0 = vx, vy0 = vy }
     local r, v = A.at(g, vx, vy)
     SG.r, SG.v, SG.r_s, SG.v_s = r, v, r, v
     if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
@@ -16751,7 +16751,7 @@ ctx.ctl_acv = function(SG)
   SG.vy = math.max(g.gy, math.min(g.gy + g.gh - 1, SG.vy + dy * k))
   A.vpt = { math.floor(SG.vx), math.floor(SG.vy) }
   local r, v = A.at(g, SG.vx, SG.vy)
-  if SG.tool == 'line' then A.stroke = { rows = A.span_rows(SG.r_s, SG.v_s, r, v, {}) }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
+  if SG.tool == 'line' then A.stroke = { rows = A.span_rows(SG.r_s, SG.v_s, r, v, {}), line = { SG.vx0, SG.vy0, SG.vx, SG.vy } }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
   elseif SG.tool == 'shape' then local rows, a, b = A.shape_stroke(SG.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }; SG.moved = SG.moved or dx ~= 0 or dy ~= 0
   elseif r ~= SG.r or math.abs(v - SG.v) > 1e-3 then
     A.span_rows(SG.r, SG.v, r, v, A.stroke.rows, SG.tool == 'erase')
@@ -25282,7 +25282,7 @@ local function frame()
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
         if A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
-          ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v }
+          ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v, mx0 = gfx.mouse_x, my0 = gfx.mouse_y }
           if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
           else A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') } end
         end
@@ -27228,7 +27228,7 @@ local function frame()
     local d, A = ctx.acv_mdrag, ctx.ACV
     if gfx.mouse_cap & 1 == 1 then
       local r, v = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
-      if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}) }
+      if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}), line = { d.mx0, d.my0, gfx.mouse_x, gfx.mouse_y } }   -- 31 окт: прямая от нажатия до мыши
       elseif d.tool == 'shape' then local rows, a, b = A.shape_stroke(d.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }
       elseif r ~= d.r or math.abs(v - d.v) > 1e-3 then
         A.span_rows(d.r, d.v, r, v, A.stroke.rows, d.tool == 'erase')

@@ -34,7 +34,7 @@ function ACV.shape_stroke(ra, rb, v)
   for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.grid, v, ACV.seed)) do out[p.row] = p.v end
   return out, a, b
 end
-ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { r0, v0, r1, v1 } }
+ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { x0, y0, x1, y1 } — пиксели: нажатие → мышь (инструмент line) }
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
 function ACV.at(g, mx, my)
   local row = g.r0 + (mx - g.gx) / math.max(1, g.gw) * g.nr
@@ -403,6 +403,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     local list = {}
     for r, v in pairs(ACV.stroke.rows or {}) do list[#list + 1] = r end
     table.sort(list)
+    local ln = ACV.stroke.line
     local px, py
     for _, r in ipairs(list) do
       local v = ACV.stroke.rows[r]
@@ -410,12 +411,22 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
         if v == false then U.set(U.RED, 0.5); gfx.rect(rx(r), gy, math.max(1, rx(r + 1) - rx(r)), gh, 1); gfx.a = 1; px = nil
         else
           local yy = vy(v)
-          U.set(U.AMBER)
+          U.set(U.AMBER, ln and 0.45 or 1)   -- под прямой line ступеньки тише: видно, что ляжет в клетки
           if px then gfx.line(px, py, rx(r), yy) end
           gfx.rect(rx(r) - 1, yy - 1, 3, 3, 1)
           px, py = rx(r), yy
         end
       end
+    end
+    gfx.a = 1
+    -- 31 окт: line — резинка от точки нажатия до мыши (в границах холста), концы кружками
+    if ln then
+      local function cx(xx) return math.max(gx, math.min(gx + gw - 1, xx)) end
+      local function cy(yy) return math.max(gy, math.min(gy + gh - 1, yy)) end
+      local x0, y0, x1, y1 = cx(ln[1]), cy(ln[2]), cx(ln[3]), cy(ln[4])
+      U.set(U.AMBER)
+      gfx.line(x0, y0, x1, y1, 1); gfx.line(x0, y0 + 1, x1, y1 + 1, 1)
+      gfx.circle(x0, y0, 3, 1, 1); gfx.circle(x1, y1, 3, 0, 1)
     end
   end
   if ACV.vpt then U.set(U.AMBER); gfx.circle(ACV.vpt[1], ACV.vpt[2], 4, 0, 1); gfx.circle(ACV.vpt[1], ACV.vpt[2], 1, 1, 1) end   -- 30 окт: палец (CONTROL)
