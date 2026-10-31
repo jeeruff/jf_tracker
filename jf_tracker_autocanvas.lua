@@ -68,6 +68,9 @@ end
 ACV.sel, ACV.xprev = nil, nil
 -- 31 окт: несколько кривых сразу (Shift+щелчок в списке) — дорожками друг под другом; ключ — огибающая или имя
 ACV.multi = {}
+-- 31 окт: список как lf — треки папками (ACV.tfold[guid] — свёрнут), внутри кривые; скрытые (x в списке) — ACV.hidden,
+-- zh — показать скрытые; кривые других треков — ACV.pinned (щелчок в дереве добавляет)
+ACV.tfold, ACV.hidden, ACV.pinned, ACV.showhidden = {}, {}, {}, false
 function ACV.mkey(cv) return cv and (cv.env or cv.name) or nil end
 -- точки активной кривой в строках [a, b): { row, v } (act.points — { время, 0..1 })
 function ACV.sel_points(act, span, a, b)
@@ -250,6 +253,7 @@ function ACV.key(c, st, mods)
   if ACV.zpend then
     ACV.zpend = nil
     if ch == 'p' then ACV.proj = not ACV.proj; return true end
+    if ch == 'h' then ACV.showhidden = not ACV.showhidden; ACV.tree_gen = (ACV.tree_gen or 0) + 1; return true end   -- 31 окт: zh — скрытые кривые
     if c == 27 then return true end
     return false
   end
@@ -621,6 +625,27 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     U.text(lx + pad, ly, '/ add', hot and U.AMBER or U.GREY)
     if hot then hover = { pane = 'curve', addp = true } end
     if lay.side then ly = ly + rh + 2 else lx = lx + aw + 2 end
+  end
+  if lay.side and span.tree then   -- 31 окт: дерево: трек — папка, внутри его кривые
+    for ri, r in ipairs(span.tree) do
+      if ri > lay.legend_rows - 1 then break end
+      local iy = ly + (ri - 1) * rh
+      local hot = mx >= lx and mx < lx + lw and my >= iy and my < iy + rh
+      if r.hdr then
+        U.text(lx, iy, ctx.fit((r.open and 'v ' or '> ') .. (r.name or '?'), lw - 2), hot and U.AMBER or U.CYAN)
+        if hot then hover = { pane = 'curve', tfold = r.guid } end
+      else
+        local on = r.i and r.i == ACV.cur
+        local lab = r.name or '?'
+        if r.i and cache.ys[r.i] then lab = ('%s %3d%%'):format(lab, math.floor((cache.ys[r.i][math.max(0, math.min(gw - 1, cx - gx))] or 0) * 100 + 0.5)) end
+        if on then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(lx, iy, lw, rh, 1)
+        elseif r.i and ACV.multi[ACV.mkey(curves[r.i])] then U.set(U.tint(U.CYAN, 0.2)); gfx.rect(lx, iy, lw, rh, 1) end
+        if r.i then U.set(curves[r.i].rgb or U.GREEN); gfx.rect(lx + pad + 1, iy + 2, 3, rh - 4, 1) end
+        U.text(lx + pad + 6, iy, ctx.fit(lab, lw - pad - 8), on and U.AMBER or (r.hidden and U.DIM or (r.i and U.TEXT or U.GREY)))
+        if hot then hover = r.i and { pane = 'curve', legend = r.i, lenv = r.env } or { pane = 'curve', lpin = r.env, lenv = r.env } end
+      end
+    end
+    curves = {}   -- обычный список ниже не рисуется
   end
   for i, cv in ipairs(curves) do
     local on = i == ACV.cur

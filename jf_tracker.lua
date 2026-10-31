@@ -16542,7 +16542,7 @@ ctx.acv_curves = function(sp)
   local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
   local tgt = ctx.lfo_target()
   local col = cur_col()
-  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0) .. ':' .. tostring(sp and sp.t1) .. ':' .. tostring(vim.cur.fi) .. ':' .. tostring(vim.cur.field)
+  local key = tostring(tgt and tgt.e and tgt.e.env) .. ':' .. tostring(col and col.guid) .. ':' .. sc .. ':' .. tostring(vim.inst) .. ':' .. tostring(IK.anchor) .. ':' .. tostring(sp and sp.t0) .. ':' .. tostring(sp and sp.t1) .. ':' .. tostring(vim.cur.fi) .. ':' .. tostring(vim.cur.field) .. ':' .. tostring(ctx.ACV.tree_gen or 0)
   if ctx.acv_cc and ctx.acv_cc.key == key then return ctx.acv_cc.list end
   local list, seen = {}, {}
   local PAL = { U.CYAN, U.AMBER, U.RED, U.TEXT }
@@ -16606,6 +16606,10 @@ ctx.acv_curves = function(sp)
       end }
   end
   if tgt and tgt.e then add(tgt.e, tgt.label or (tgt.e.name or 'envelope')) end
+  -- 31 окт: кривые других треков, добавленные из дерева списка
+  for _, c2 in ipairs(snap and snap.cols or {}) do
+    for _, e2 in ipairs(c2.envs or {}) do if ctx.ACV.pinned[e2.env] then add(e2, (c2.name or '') .. ' / ' .. (e2.name or 'env')) end end
+  end
   if col then
     for _, e in ipairs(col.envs or {}) do add(e, (col.name or '') .. ' / ' .. (e.name or 'env')) end
     -- 15 окт: модуляция параметров трека — кривые «LFO · param» / «ACS · param»: база — огибающая параметра
@@ -16666,14 +16670,51 @@ ctx.acv_curves = function(sp)
       if sl.ai and sl.ai.env then add({ env = sl.ai.env, name = sl.label or 'note mod', min = sl.ai.min or 0, max = sl.ai.max or 1, key = 'env_item_pitch' }, 'note mod / ' .. (sl.label or '?')) end
     end
   end
+  -- 31 окт: скрытые (x в списке) — не на холсте, пока не zh
+  if not ctx.ACV.showhidden then
+    local keep = {}
+    for _, cv in ipairs(list) do if not (cv.env and ctx.ACV.hidden[cv.env]) then keep[#keep + 1] = cv end end
+    list = keep
+  end
   ctx.acv_cc = { key = key, list = list }
   return list
 end
 -- страница curve: холст
+-- 31 окт: дерево списка кривых: трек (папка) → его огибающие; трек курсора раскрыт, остальные свёрнуты (щелчок)
+ctx.acv_tree = function(curves)
+  local A = ctx.ACV
+  local idx = {}
+  for i, cv in ipairs(curves) do if cv.env then idx[cv.env] = i end end
+  local rows, used = {}, {}
+  local cc = cur_col()
+  -- кривые без огибающей трека (vel, MIDI-лейн, LFO) — сверху, вне папок
+  for i, cv in ipairs(curves) do if not cv.env or not cv.track then rows[#rows + 1] = { i = i, name = cv.name } end end
+  for _, c in ipairs(snap and snap.cols or {}) do
+    if c.envs and #c.envs > 0 then
+      local open = A.tfold[c.guid]
+      if open == nil then open = cc and c.guid == cc.guid end
+      rows[#rows + 1] = { hdr = true, name = (c.name ~= '' and c.name or 'track') .. ' (' .. #c.envs .. ')', guid = c.guid, open = open }
+      if open then
+        for _, e in ipairs(c.envs) do
+          local hid = A.hidden[e.env]
+          if not hid or A.showhidden then rows[#rows + 1] = { i = idx[e.env], env = e.env, name = e.name or 'env', hidden = hid } end
+          used[e.env] = true
+        end
+      end
+    end
+  end
+  for i, cv in ipairs(curves) do if cv.env and cv.track and not used[cv.env] then
+    local inany = false
+    for _, c in ipairs(snap and snap.cols or {}) do if c.track == cv.track then inany = true end end
+    if not inany then rows[#rows + 1] = { i = i, env = cv.env, name = cv.name } end
+  end end
+  return rows
+end
 ctx.acv_draw = function(Lx, x, y, w, h)
   local ACV = ctx.ACV
   local sp = ctx.acv_span()
   local curves = ctx.acv_curves(sp)
+  sp.tree = ctx.acv_tree(curves)
   if ACV.want then   -- 31 окт: добавленный параметр — активный, когда его огибающая появилась в списке
     for i, cv in ipairs(curves) do if cv.env == ACV.want then ACV.cur = i; ACV.want = nil; break end end
   end
@@ -16694,6 +16735,14 @@ ctx.acv_draw = function(Lx, x, y, w, h)
 end
 -- клавиша холста: движение → курсор трекера; op → запись
 ctx.acv_key = function(c)
+  -- 31 окт: x над строкой списка кривых — убрать кривую из списка (скрыть; zh — показать скрытые), не удаляя огибающую
+  if c == 120 and lfo_hover and lfo_hover.lenv then
+    local A = ctx.ACV
+    A.hidden[lfo_hover.lenv] = true; A.pinned[lfo_hover.lenv] = nil; A.multi[lfo_hover.lenv] = nil
+    A.tree_gen = (A.tree_gen or 0) + 1; ctx.acv_cc = nil; A.cur = 1
+    vim.msg = 'curve hidden from the list (the envelope stays; zh - show hidden)'
+    return true
+  end
   local ACV = ctx.ACV
   local sp = ctx.acv_span()
   local curves = ctx.acv_curves(sp)
@@ -25903,6 +25952,17 @@ local function frame()
         else A.cur = lfo_hover.legend end
       end
       if lfo_hover.addp then ctx.acv_add_param() end
+      if lfo_hover.tfold then   -- 31 окт: папка трека в списке кривых
+        local A = ctx.ACV
+        local cur = A.tfold[lfo_hover.tfold]
+        if cur == nil then local cc = cur_col(); cur = cc and cc.guid == lfo_hover.tfold end
+        A.tfold[lfo_hover.tfold] = not cur
+      end
+      if lfo_hover.lpin then   -- 31 окт: кривая другого трека — на холст, активной
+        local A = ctx.ACV
+        A.pinned[lfo_hover.lpin] = true; A.hidden[lfo_hover.lpin] = nil; A.want = lfo_hover.lpin
+        A.tree_gen = (A.tree_gen or 0) + 1; ctx.acv_cc = nil
+      end
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
       if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', sel = 'sel (T): drag - select rows; diamonds: corners tilt, sides stretch, inside moves; Esc - off', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
