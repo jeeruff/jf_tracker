@@ -7446,6 +7446,66 @@ function D.mfold_draw(L, snap, hover)
   if mx >= x and mx < x + w and my >= y0 and my < y0 + h0 then hover.mfold_meter = gr end
   done()
 end
+-- 31 окт: эксперимент «трещины» — тонкие трещины от внутреннего края тела трекера внутрь; цвет каждой — пиксель
+-- снаружи у её начала (сочится то, что рядом), раз в секунду. Форма — от размера (постоянное зерно), не каждый кадр
+D.crk = nil
+function D.cracks(x, y, w, h)
+  if w < 60 or h < 60 then return end
+  local c = D.crk
+  local now = reaper.time_precise()
+  if not (c and c.x == x and c.y == y and c.w == w and c.h == h) then
+    c = { x = x, y = y, w = w, h = h, segs = {}, src = {}, t = 0 }
+    local seed = 1234567
+    local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
+    local reach = math.max(24, math.min(90, math.floor(math.min(w, h) * 0.12)))
+    local function grow(px, py, ang, len, k, d)
+      local s = 0
+      while s < len and #c.segs < 700 do
+        local st = 3 + rnd() * 4
+        ang = ang + (rnd() - 0.5) * 0.9
+        local nx, ny = px + math.cos(ang) * st, py + math.sin(ang) * st
+        if nx < x + 1 or nx > x + w - 2 or ny < y + 1 or ny > y + h - 2 then return end
+        s = s + st
+        c.segs[#c.segs + 1] = { px, py, nx, ny, k, (d + s / len) }
+        if rnd() < 0.12 and d < 0.5 then grow(nx, ny, ang + (rnd() < 0.5 and -1 or 1) * (0.6 + rnd() * 0.6), (len - s) * 0.6, k, d + 0.3) end
+        px, py = nx, ny
+      end
+    end
+    local n = math.max(8, math.floor((w + h) / 70))
+    for i = 1, n do
+      local e = rnd()
+      local px, py, ang, ox, oy
+      local per = 2 * (w + h)
+      local p = e * per
+      if p < w then px, py, ang, ox, oy = x + p, y + 1, math.pi / 2, x + p, y - 3
+      elseif p < w + h then px, py, ang, ox, oy = x + w - 2, y + (p - w), math.pi, x + w + 3, y + (p - w)
+      elseif p < 2 * w + h then px, py, ang, ox, oy = x + (p - w - h), y + h - 2, -math.pi / 2, x + (p - w - h), y + h + 3
+      else px, py, ang, ox, oy = x + 1, y + (p - 2 * w - h), 0, x - 3, y + (p - 2 * w - h) end
+      c.src[i] = { math.floor(ox), math.floor(oy), 0.6, 0.6, 0.6 }
+      grow(px, py, ang, reach * (0.4 + rnd() * 0.8), i, 0)
+    end
+    D.crk = c
+  end
+  if now - c.t > 1 then   -- цвета соседей: пиксель за краем (прошлый кадр)
+    c.t = now
+    local od = gfx.dest; gfx.dest = -1
+    for _, s in ipairs(c.src) do
+      gfx.x, gfx.y = s[1], s[2]
+      local r, g, b = gfx.getpixel()
+      if r and r + g + b > 0.25 then s[3], s[4], s[5] = r, g, b else s[3], s[4], s[5] = 0.55, 0.55, 0.6 end
+    end
+    gfx.dest = od
+  end
+  for _, sg in ipairs(c.segs) do
+    local s = c.src[sg[5]]
+    local a = 0.75 * (1 - math.min(1, sg[6]))
+    if a > 0.03 then
+      gfx.set(s[3], s[4], s[5], a); gfx.line(sg[1], sg[2], sg[3], sg[4], 1)
+      gfx.set(s[3], s[4], s[5], a * 0.25); gfx.line(sg[1] + 1, sg[2], sg[3] + 1, sg[4], 1)
+    end
+  end
+  gfx.a = 1
+end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -9563,6 +9623,7 @@ function D.frame(L, snap, rows, state, info)
     if e[6] then text(gx, e[2] + 2, e[6], e[4], U.BG) end
   end
   D.pat_lines = nil
+  if state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
