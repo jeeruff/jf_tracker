@@ -1865,6 +1865,12 @@ function V.key_impl(c)
   local E = ctx.edit
   local st = ctx.state
   local n = V.count or 1
+  -- 31 окт: Ctrl+Shift+A / X — крупный шаг: нота ±12 (октава), огибающая ±1/16, прочее (vol, команды, CC) ±16 (0x10)
+  if (c == 1 or c == 24) and V.mode ~= 'cmd' and V.mode ~= 'search' and ctx.mods and ctx.mods().shift and ctx.mods().ctrl then
+    local f = flat()[V.cur.fi]
+    local big = (f and f.env) and 4 or (((V.cur.field or 1) == 1 and not (f and f.ml)) and 12 or 16)
+    n = n * big; V.count = n
+  end
 
   -- открытые fzf-пикер и hydra — первыми (4 окт: меню нарезки s открывалось
   -- поверх слайсера, а t / 8 … забирал слайсер как ноты — «st не резал»)

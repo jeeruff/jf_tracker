@@ -29706,7 +29706,7 @@ local function frame()
         local up = c_raw + 64                                         -- VK буквы = её заглавный ASCII
         letter = st and st:byte(up) ~= 0 and st:byte(c_raw) == 0
       end
-      if letter then nm = 'ctrl+' .. string.char(c_raw + 96) else nm = 'ctrl+' .. nm end
+      if letter then nm = 'ctrl+' .. (m.shift and 'shift+' or '') .. string.char(c_raw + 96) else nm = 'ctrl+' .. nm end   -- 31 окт: Shift виден (Ctrl+Shift+A — крупный шаг)
     end
     if not nm then
       -- 6 окт: Cmd+буква на macOS приходит тем же кодом 1..26, что Ctrl+буква —
