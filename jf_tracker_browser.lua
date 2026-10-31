@@ -482,7 +482,11 @@ function B.hist_load()
     B.map_step = tonumber(f:read('*l') or '') or 0
     for line in f:lines() do
       local st, pth, nm = line:match('^(%d+)\t([^\t]*)\t(.*)$')
-      if pth and pth ~= '' then B.map_hist[#B.map_hist + 1] = { step = tonumber(st), path = pth, name = nm ~= '' and nm or pth:match('[^/]+$') } end
+      local nm2 = pth and (nm ~= '' and nm or pth:match('[^/]+$'))
+      -- 31 окт: без повторов (тот же файл или то же имя) — первый, самый свежий, остаётся
+      local dup = false
+      if pth and pth ~= '' then for _, e in ipairs(B.map_hist) do if e.path == pth or e.name == nm2 then dup = true; break end end end
+      if pth and pth ~= '' and not dup then B.map_hist[#B.map_hist + 1] = { step = tonumber(st), path = pth, name = nm2 } end
     end
     f:close()
   end
@@ -506,11 +510,13 @@ function B.map_play(path, name, keep)
   B.map_step = B.map_step + 1
   local kept = false
   if keep then   -- 27 окт (8): ещё раз из истории — строка на месте (не прыгает наверх), только свежесть
-    for _, e in ipairs(B.map_hist) do if e.path == path then e.step = B.map_step; kept = true; break end end
+    for _, e in ipairs(B.map_hist) do if e.path == path or e.name == (name or path:match('[^/]+$')) then e.step = B.map_step; kept = true; break end end
   end
   if not kept then
-    for i = #B.map_hist, 1, -1 do if B.map_hist[i].path == path then table.remove(B.map_hist, i) end end
-    table.insert(B.map_hist, 1, { path = path, name = name or path:match('[^/]+$') or path, step = B.map_step })
+    local nm = name or path:match('[^/]+$') or path
+    -- 31 окт: повтор (тот же файл или сэмпл с тем же именем из другой папки) — старая строка вон, новая наверх
+    for i = #B.map_hist, 1, -1 do if B.map_hist[i].path == path or B.map_hist[i].name == nm then table.remove(B.map_hist, i) end end
+    table.insert(B.map_hist, 1, { path = path, name = nm, step = B.map_step })
   end
   while #B.map_hist > 200 do B.map_hist[#B.map_hist] = nil end
   B.mapV.hist, B.mapV.step = B.map_hist, B.map_step
