@@ -8604,9 +8604,9 @@ function D.frame(L, snap, rows, state, info)
     -- 26 окт: + section (zs): project | sec | pattern — что видно, то и правит транспозиция
     local wide = ms('project') + ms('sec') + ms('pattern') + 9 <= bw
     local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
-    -- 31 окт: порядок pat proj sec, цвета по порядку — красный, жёлтый, зелёный
-    x0 = small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.RED)
-    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn', U.AMBER)
+    -- 31 окт: порядок proj pat sec, цвета по порядку — красный, жёлтый, зелёный
+    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn', U.RED)
+    x0 = small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.AMBER)
     small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn', U.GREEN)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
