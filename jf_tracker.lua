@@ -26583,6 +26583,17 @@ local function frame()
         elseif A.tool == 'cur' and lfo_hover.geo then   -- 31 окт: точка под мышью (±6 px) — тянуть сразу, вживую
           local sp2 = ctx.acv_span(); local act2 = ctx.acv_curves(sp2)[A.cur]
           local g = lfo_hover.geo
+          -- 31 окт: и точка MIDI-лейна (CC / PAT / PB): тянется по значению и строке, запись без отмены на кадр
+          if act2 and act2.kind == 'ml' and act2.f then
+            local best, bd
+            for _, p in ipairs(act2.points or {}) do
+              local px = g.gx + (sp2.row_of(p[1]) - g.r0) / math.max(1e-9, g.nr) * g.gw
+              local py = g.gy + 2 + (1 - p[2]) * math.max(1, g.gh - 4)
+              local dd = math.abs(px - gfx.mouse_x) + math.abs(py - gfx.mouse_y)
+              if dd <= 8 and (not bd or dd < bd) then best, bd = p, dd end
+            end
+            if best then ctx.acv_pdrag = { ml = act2.f, row = math.floor(sp2.row_of(best[1]) + 1e-6), geo = g, sp = sp2, name = act2.name } end
+          end
           if act2 and act2.kind == 'env' and act2.write ~= false and act2.e and act2.e.env then
             local best, bd
             for _, p in ipairs(act2.points or {}) do
@@ -28661,7 +28672,29 @@ local function frame()
   -- 31 окт: точка огибающей тянется вживую (значение и строка между соседями), одна отмена при отпускании
   if ctx.acv_pdrag then
     local d = ctx.acv_pdrag
-    if gfx.mouse_cap & 1 == 1 then
+    if d.ml and gfx.mouse_cap & 1 == 1 then
+      local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+      r = math.floor(r + 1e-6)
+      local vv = math.max(0, math.min(127, math.floor(v * 127 + 0.5)))
+      if r ~= d.row or vv ~= d.v then
+        local tr, ml = d.ml.col.track, d.ml.ml
+        local function at(row) local t0 = edit.row_time(row, state.lpb, 0); return ctx.ml_take(tr, t0), t0, edit.row_time(row + 1, state.lpb, 0) end
+        local tk, t0, t1 = at(d.row)
+        if tk then ctx.ml_clear(tk, ml, reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1)); reaper.MIDI_Sort(tk) end
+        tk, t0, t1 = at(r)
+        if tk then
+          local p0 = reaper.MIDI_GetPPQPosFromProjTime(tk, t0)
+          ctx.ml_clear(tk, ml, p0, reaper.MIDI_GetPPQPosFromProjTime(tk, t1)); ctx.ml_ins(tk, ml, p0, vv); reaper.MIDI_Sort(tk)
+          d.row = r
+        end
+        d.v, d.moved = vv, true
+        ctx.acv_cc = nil
+        state.status = ('%s: %d at row %d (release - written)'):format(d.name or 'point', vv, r)
+      end
+    elseif d.ml then
+      if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: move lane point'); model.invalidate() end
+      ctx.acv_pdrag = nil
+    elseif gfx.mouse_cap & 1 == 1 then
       local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
       local t = d.sp.time(math.floor(r)) + (d.sp.time(math.floor(r) + 1) - d.sp.time(math.floor(r))) * (r - math.floor(r))
       local _, tp = reaper.GetEnvelopePoint(d.env, d.idx - 1)
