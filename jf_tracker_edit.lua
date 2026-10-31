@@ -1605,6 +1605,25 @@ local function new_midi_item(track, lane_idx, t)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
   local t0 = R.TimeMap2_QNToTime(0, qms or qn)
   local t1 = R.TimeMap2_QNToTime(0, qme or (qn + 4))
+  -- 31 окт: опция pattern MIDI item — айтем на весь паттерн (регион под t), не заходя на соседей своего лейна
+  if E.pat_item and E.pat_item() then
+    local _, ri = R.GetLastMarkerAndCurRegion(0, t)
+    local ok, isr, rp, re = false, false, 0, 0
+    if ri and ri >= 0 then ok, isr, rp, re = R.EnumProjectMarkers(ri) end
+    if ok and isr and rp <= t + 1e-9 and re > t then
+      local a, b = rp, re
+      for i = 0, R.CountTrackMediaItems(track) - 1 do
+        local o = R.GetTrackMediaItem(track, i)
+        if not lane_idx or R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') ~= 2 or R.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane_idx then
+          local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+          local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+          if oe <= t + 1e-9 and oe > a then a = oe end
+          if op > t + 1e-9 and op < b then b = op end
+        end
+      end
+      if b > a + 1e-6 then t0, t1 = a, b end
+    end
+  end
   local it = R.CreateNewMIDIItemInProj(track, t0, t1, false)
   if lane_idx and R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2 then
     R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane_idx)

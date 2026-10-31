@@ -8786,7 +8786,9 @@ function D.frame(L, snap, rows, state, info)
               end
               -- цвет item (опция item colours) и прозрачность заливки (item fill opacity), 3 окт
               local rgb = state.itemcol ~= false and (it.rgb or c.col.rgb) or U.GREY
-              local col = it.sel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
+              local isel = it.sel and c.ci and c.ci == info.cur_ci   -- 31 окт: выделенный в REAPER — светлее только на треке курсора
+              local bare = it.midi and state.patitem ~= false       -- 31 окт: pattern MIDI item — MIDI без заливки и рамки
+              local col = isel and U.mix(rgb, U.TEXT, 0.3) or U.mix(rgb, U.BG, it.muted and 0.7 or 0.45)
               if D.mono then col = U.mix(col, U.TEXT, 0.35) end   -- mono: кайма светлее (была слишком тёмной)
               local cy0, cy1 = math.max(by0, y0), math.min(by1, y1)
               -- 12 окт: точка реза прицела вкладки item — полоска поперёк ноты, рисуется поверх волны (ниже)
@@ -8795,15 +8797,15 @@ function D.frame(L, snap, rows, state, info)
                 if ay > cy0 and ay < cy1 then D.aim_line = { x0, ay, w0 } end
               end
               local fa = state.textonly and 0 or (state.itemalpha or 5) / 100
-              set(rgb); gfx.a = it.sel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
-              gfx.rect(x0, cy0, w0, cy1 - cy0, 1)
+              set(rgb); gfx.a = isel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
+              if not bare then gfx.rect(x0, cy0, w0, cy1 - cy0, 1) end
               gfx.a = 1
               -- рамка (опция item frame, 3 окт): item — вокруг всего item, wave —
               -- только вокруг колонки волны (нет колонки — вокруг item), off — без
               local fr = state.textonly and 'off' or (state.itemframe or 'item')
               local fx0, fw0 = x0, w0
               if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
-              if fr ~= 'off' then
+              if fr ~= 'off' and not bare then
                 -- 16 окт: только верх и низ (начало / конец item); боковые кромки рядом с линией между треками
                 -- давали 3-4 линии подряд — между треками одна линия
                 set(col)

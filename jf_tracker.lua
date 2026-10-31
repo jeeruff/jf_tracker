@@ -257,7 +257,8 @@ local state = {
   phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
   bigcur = flag('bigcur', false),                 -- cursor zoom: строка курсора лупой ×2 (8 окт; 15 окт — и без fixed)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
-  ctlmap = flag('ctlmap', true), ctlx2 = flag('ctlx2', false),   -- 27 окт: CONTROL — оверлей (карта трекпада, плашка), шрифт x2
+  ctlmap = flag('ctlmap', true), ctlx2 = flag('ctlx2', false), patitem = flag('patitem', true),   -- 31 окт: patitem — новый MIDI-айтем на весь паттерн, MIDI без заливки
+    -- 27 окт: CONTROL — оверлей (карта трекпада, плашка), шрифт x2
   roundrack = flag('roundrack', false),          -- 26 окт: скруглённые скобки рэков DSP
   lanetop = flag('lanetop', false),              -- 28 окт: черта ветки DSP и над модулями
   offend = flag('offend', false),                -- OFF в конце строки (а не в начале), 8 окт
@@ -655,7 +656,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'clipsnap', 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'clipsnap', 'pancol', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'mxclips', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13051,6 +13052,7 @@ ctx = {
       { key = 'scopes', label = 'track scopes', kind = 'toggle', desc = 'track oscilloscopes + master analyzer (a small JSFX on every track)', get = function() return state.scopes end, set = function(v) ctx.toggle_scopes(v) end },
       { sep = true, title = 'notes and items' },
       { key = 'panecol', label = 'pane colours', kind = 'cycle', values = { 'off', 'colours', 'shades' }, desc = 'the tab titles, the frame line and the selected tab out of focus get a colour per pane - easier to tell the panes apart: colours - every pane its own hue; shades - lighter and darker shades of the theme accent; the focused pane stays amber', get = function() return state.panecol or 'colours' end, set = function(v) state.panecol = v end },
+      flag('patitem', 'pattern MIDI item', 'a new MIDI item spans the whole pattern (region; up to its neighbours), not one bar; MIDI items are drawn without fill and frame (the pattern lines show them), audio items keep theirs. Old items stay as they are'),
       flag('ctlmap', 'control overlay', 'CONTROL (Ctrl+Opt+mouse): the trackpad map (strips of the bank, an XY square) and the box with the name and value over the window; off - only the frame of the bank and the status line'),
       flag('ctlx2', 'control font x2', 'CONTROL: the overlay text (names, value) twice as big - readable from afar'),
       flag('focusbeacon', 'focus beacon', 'the focus frame flashes and shrinks onto the module when the keyboard focus moves there (Tab, Ctrl+W, a click)'),
@@ -13110,7 +13112,7 @@ ctx = {
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
-      { 'items and waves', { 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
+      { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'human', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
       { 'pm cards', { 'pmgrid', 'pmshape', 'pmthumb', 'pmicon' } },
@@ -15952,6 +15954,7 @@ MX.ruler = state.mxruler
 MX.stack = state.mxstack
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
 edit.human = state.human or 0                   -- 9 окт: human слайсов (опция)
+edit.pat_item = function() return state.patitem ~= false end   -- 31 окт: новый MIDI-айтем — на весь паттерн
 edit.mono = state.slicemono                     -- 9 окт: mono слайсера
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
