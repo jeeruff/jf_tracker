@@ -20292,9 +20292,11 @@ function ctx.slixer_view(track, fxi)
     v.sync, v.art = math.floor(reaper.gmem_read(B + 62) + 0.5), math.floor(reaper.gmem_read(B + 63) + 0.5)
     v.kmode = math.floor(reaper.gmem_read(B + 72) + 0.5)
     v.st_alg, v.st_size, v.st_ratio = reaper.gmem_read(B + 80), reaper.gmem_read(B + 81), reaper.gmem_read(B + 82)   -- 31 окт: стретч выбранного среза
+    v.thru = reaper.gmem_read(B + 73) > 0.5   -- 31 окт: нота играет дальше своего среза
+    v.stx = {}
     v.artused, v.notes, v.classes = {}, {}, {}
     for i = 0, 7 do v.artused[i + 1] = reaper.gmem_read(B + 64 + i) > 0.5 end
-    for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5) end
+    for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5); v.stx[i + 1] = reaper.gmem_read(B + 1700 + i) end
     local tick = reaper.gmem_read(B + 7)
     if tick ~= S.tick then S.tick, S.tick_t = tick, now end
     v.alive = now - S.tick_t < 1.5
@@ -33439,11 +33441,18 @@ ctx.slx_wave = function(col, pitch, row)
   for i, nt in ipairs(v.notes or {}) do if nt == pitch then k = i; break end end
   if not (k and v.starts[k] and v.ends[k] and v.ends[k] > v.starts[k]) then return nil end
   local a, b = v.starts[k] / v.frames, v.ends[k] / v.frames
+  -- 31 окт: как играет slixer — срез растянут (Stretch среза + общий: 0.5 = x1, скорость 8^(1-2s)); thru — нота
+  -- играет дальше среза до конца сэмпла (хвост тусклее), OFF её не обрывает
+  local sx = tonumber(v.stx and v.stx[k]) or 0.5
+  if sx <= 0 or sx > 1 then sx = 0.5 end
+  local fac = 8 ^ (2 * sx - 1)
+  local tail_f
+  if v.thru and b < 1 - 1e-6 then tail_f = (b - a) / (1 - a); b = 1 end
   local t0 = edit.row_time(row, state.lpb, 0)
-  local rows_f = model.row_of_time(t0 + (v.ends[k] - v.starts[k]) / v.sr, state.lpb) - row
+  local rows_f = model.row_of_time(t0 + (v.frames * (b - a)) / v.sr * fac, state.lpb) - row
   if rows_f <= 0 then return nil end
   local P, memo = v.peaks, {}
-  return { rows_f = rows_f, start_f = 0, obey = true, choke = 0,
+  return { rows_f = rows_f, start_f = 0, obey = not v.thru, choke = 0, tail_f = tail_f,
     kpk = function(n)
       local p = memo[n]
       if p then return p end

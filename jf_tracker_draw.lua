@@ -2196,6 +2196,9 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   end
   if not pk or pk.n == 0 then return end
   local scale = pk.n / total
+  -- 31 окт: slixer thru — после конца своего среза нота играет дальше: хвост волны тусклее
+  local tailq = head.tail_f and math.floor(head.tail_f * total + 0.5) or nil
+  local tailc = tailq and U.mix(base_col, U.BG, 0.6) or nil
   for py = 0, L.rh - 1 do
     local q = i * L.rh + py - off          -- пиксель от начала item
     if q >= total then break end
@@ -2209,6 +2212,7 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     if column and mode == 'spec' and pk.spec and not inv then
       local c = spec_colour(pk.spec[idx]); set(muted and U.mix(c, U.BG, 0.5) or c)
     end
+    if tailq and not (column and mode == 'spec') then set(q >= tailq and tailc or base_col) end
     do
       local xa, xb = cx + mn * hw, cx + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
