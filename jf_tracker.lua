@@ -32564,29 +32564,43 @@ ctx.fit_height = function()
   local slim = ctx.zh_t and now - ctx.zh_t < 8 and ctx.zh_mode == 'fit'
   ctx.zh_t, ctx.zh_mode = now, slim and 'slim' or 'fit'
   if slim then
-    local qs = {}
+    -- 31 окт: slim — самый крупный шаг, при котором не складывается ни одна нота: разные по времени ноты лейна
+    -- попадают на разные строки (аккорд — одна строка); задержки внутри строки не важны
+    local lanes = {}
     local ra, rb = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
     for _, col in ipairs(snap and snap.cols or {}) do
       for _, ln in ipairs(col.lanes or {}) do
+        local qs = {}
         for _, sub in ipairs(ln.subs or {}) do
           for r, c in pairs(sub) do
-            if type(r) == 'number' and r >= ra and r < rb and type(c) == 'table' and (c.kind == 'midi' or c.kind == 'audio' or c.kind == 'off') then
-              qs[#qs + 1] = (r + (c.delay or 0) / 256) / state.lpb
+            if type(r) == 'number' and r >= ra and r < rb and type(c) == 'table' then
+              if c.kind == 'midi' or c.kind == 'audio' then qs[#qs + 1] = (r + (c.delay or 0) / 256) / state.lpb end
+              for _, h in ipairs(c.fold or {}) do qs[#qs + 1] = (r + (h.delay or 0) / 256) / state.lpb end
             end
           end
         end
+        table.sort(qs)
+        lanes[#lanes + 1] = qs
       end
     end
     for _, v in ipairs(LPBS) do
       local ok = true
-      for _, qq in ipairs(qs) do local x = qq * v; if math.abs(x - math.floor(x + 0.5)) > 0.03 then ok = false; break end end
+      for _, qs in ipairs(lanes) do
+        local prevq, prevr
+        for _, qq in ipairs(qs) do
+          local rr = math.floor(qq * v + 1e-6)
+          if prevq and qq - prevq > 1e-4 and rr == prevr then ok = false; break end
+          prevq, prevr = qq, rr
+        end
+        if not ok then break end
+      end
       if ok then best = v; break end
     end
     best = best or LPBS[#LPBS]
     set_lpb(best)
     state.row0 = math.max(0, math.floor(model.row_of_time(t0, state.lpb) + 1e-6))
     relayout()
-    vim.msg = ('zh slim: LPB %d - the coarsest step where every note of the %s sits on a row (zh - fit again)'):format(best, vm)
+    vim.msg = ('zh slim: LPB %d - the coarsest step where no note of the %s is folded (zh - fit again)'):format(best, vm)
     return
   end
   for _, v in ipairs(LPBS) do if q * v <= L.nrows and (not best or v > best) then best = v end end
