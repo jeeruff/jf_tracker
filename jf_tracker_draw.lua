@@ -7468,60 +7468,90 @@ end
 -- снаружи у её начала (сочится то, что рядом), раз в секунду. Форма — от размера (постоянное зерно), не каждый кадр
 D.crk = nil
 local CRK_IMG = 85   -- 31 окт: картинка трещин (85 свободна — список номеров выше)
--- 31 окт: veins — вместо трещин в INSERT красные вены: плавнее, ветвистее, толще у края, тёмно-красные
-function D.cracks(x, y, w, h, veins, ex)
+-- 31 окт (3): трещины как трещины — прямые отрезки с резкими изломами, ответвления под острым углом, толщина сходит
+-- на нет; в точках удара — паутина (лучи + кольца), как на стекле. red — INSERT: те же трещины красными
+function D.cracks(x, y, w, h, red, ex)
   if w < 60 or h < 60 then return end
   local c = D.crk
   local now = reaper.time_precise()
   local dirty = false
-  ex = math.max(0, math.min(w, math.floor(ex or w)))   -- пустая область справа от треков (x от левого края тела)
-  if not (c and c.x == x and c.y == y and c.w == w and c.h == h and c.veins == veins and c.ex == ex) then
-    c = { x = x, y = y, w = w, h = h, segs = {}, src = {}, t = 0, veins = veins, ex = ex }
-    local sa, sb = 0x9E3779B9, 0x243F6A88   -- xorshift: ровнее LCG (трещины кучковались справа)
+  ex = math.max(0, math.min(w, math.floor(ex or w)))
+  if not (c and c.x == x and c.y == y and c.w == w and c.h == h and c.ex == ex) then
+    c = { x = x, y = y, w = w, h = h, segs = {}, src = {}, t = 0, ex = ex }
+    local sa, sb = 0x9E3779B9, 0x243F6A88
     local function rnd()
       sa = sa ~ ((sa << 13) & 0xFFFFFFFF); sa = sa ~ (sa >> 17); sa = sa ~ ((sa << 5) & 0xFFFFFFFF); sa = sa & 0xFFFFFFFF
       sb = (sb + 0x6D2B79F5) & 0xFFFFFFFF
       return ((sa ~ sb) & 0xFFFFFF) / 0x1000000
     end
-    local reach = math.max(24, math.min(110, math.floor(math.min(w, h) * 0.14)))
-    local deep = math.floor(math.min(w, h) * 0.75)
-    local MAX = 12000   -- края — последними и в случайном порядке: лимит прореживает их равномерно
-    -- рост: изгиб «гуляет» (кривизна сама случайно блуждает), ветки — реже к концу; wd — толщина
-    local function grow(px, py, ang, len, k, d, wd)
-      local s, curv = 0, (rnd() - 0.5) * 0.25
+    local reach = math.max(40, math.min(160, math.floor(math.min(w, h) * 0.2)))
+    local deep = math.floor(math.min(w, h) * 0.8)
+    local MAX = 6000
+    local function inside(px, py) return px >= 1 and px <= w - 2 and py >= 1 and py <= h - 2 end
+    -- трещина: прямые куски 8..28 px, чуть дрожат, иногда резкий излом; ветка — под острым углом, тоньше; wd — толщина у начала
+    local function crack(px, py, ang, len, k, wd, depth)
+      local s = 0
       while s < len and #c.segs < MAX do
-        local st = 2.5 + rnd() * 4
-        curv = math.max(-0.35, math.min(0.35, curv + (rnd() - 0.5) * (veins and 0.08 or 0.16)))
-        ang = ang + curv + (rnd() - 0.5) * (veins and 0.25 or 0.55)
+        local st = 8 + rnd() * 20
+        if rnd() < 0.18 then ang = ang + (rnd() < 0.5 and -1 or 1) * (0.35 + rnd() * 0.5) else ang = ang + (rnd() - 0.5) * 0.18 end
+        -- кусок — из 2..3 мелких зубцов (край трещины не идеально прямой)
         local nx, ny = px + math.cos(ang) * st, py + math.sin(ang) * st
-        if nx < 1 or nx > w - 2 or ny < 1 or ny > h - 2 then return end
+        local mx2, my2 = (px + nx) / 2 + (rnd() - 0.5) * 2.5, (py + ny) / 2 + (rnd() - 0.5) * 2.5
+        if not inside(nx, ny) then return end
+        local f0, f1 = s / len, (s + st) / len
+        c.segs[#c.segs + 1] = { px, py, mx2, my2, k, f0, wd * (1 - f0) }
+        c.segs[#c.segs + 1] = { mx2, my2, nx, ny, k, f1, wd * (1 - f1) }
         s = s + st
-        c.segs[#c.segs + 1] = { px, py, nx, ny, k, d + (1 - d) * s / len, (wd > 1 and s < len * 0.5) and wd or 1 }
-        if rnd() < (veins and 0.16 or 0.11) and d < 0.65 then grow(nx, ny, ang + (rnd() < 0.5 and -1 or 1) * (0.4 + rnd() * 0.8), (len - s) * (0.3 + rnd() * 0.5), k, d + 0.22, 1) end
+        if depth < 3 and rnd() < 0.22 then
+          crack(nx, ny, ang + (rnd() < 0.5 and -1 or 1) * (0.35 + rnd() * 0.45), (len - s) * (0.35 + rnd() * 0.45), k, math.max(1, wd * 0.6), depth + 1)
+        end
         px, py = nx, ny
       end
     end
     local function src(ox, oy) c.src[#c.src + 1] = { math.floor(x + ox), math.floor(y + oy), 0.6, 0.6, 0.6 }; return #c.src end
-    -- 1) углы — очаги пучком, толще; верхний левый — самый густой
-    local corners = { { 1, 1, math.pi / 4, -3, -3, 14 }, { w - 2, 1, 3 * math.pi / 4, w + 3, -3, 8 }, { 1, h - 2, -math.pi / 4, -3, h + 3, 8 }, { w - 2, h - 2, -3 * math.pi / 4, w + 3, h + 3, 8 } }
-    for _, cn in ipairs(corners) do
-      local k = src(cn[4], cn[5])
-      for _ = 1, cn[6] do grow(cn[1], cn[2], cn[3] + (rnd() - 0.5) * 1.5, reach * (0.5 + rnd() * 1.3), k, 0, 2) end
-    end
-    -- 2) пустота справа от треков и случайные места — очаги «удара»: звезда из 3..6 трещин
-    local function star(cx, cy, k, m, ln)
-      for _ = 1, m do grow(cx, cy, rnd() * 2 * math.pi, ln * (0.4 + rnd()), k, 0.15, 1) end
-    end
-    if w - ex > 80 then
-      for _ = 1, math.max(3, math.floor((w - ex) * h / 60000)) do
-        local cx, cy = ex + 20 + rnd() * (w - ex - 40), 20 + rnd() * (h - 40)
-        star(cx, cy, src(w + 3, cy), 3 + math.floor(rnd() * 4), reach * 0.9)
+    -- удар: лучи из точки + 2..3 кольца-перемычки между соседними лучами (паутина стекла)
+    local function impact(cx, cy, k, nray, ln, wd)
+      local rays = {}
+      local a0 = rnd() * 2 * math.pi
+      for r = 1, nray do
+        local a = a0 + (r - 1) * 2 * math.pi / nray + (rnd() - 0.5) * 0.5
+        rays[r] = { a = a, l = ln * (0.5 + rnd() * 0.9) }
+        crack(cx, cy, a, rays[r].l, k, wd, 1)
+      end
+      for ring = 1, 2 + math.floor(rnd() * 2) do
+        local rr = ln * (0.15 + 0.22 * ring) * (0.8 + rnd() * 0.4)
+        for r = 1, nray do
+          if rnd() < 0.75 then
+            local A, B = rays[r], rays[r % nray + 1]
+            if A.l > rr and B.l > rr then
+              local x1, y1 = cx + math.cos(A.a) * rr, cy + math.sin(A.a) * rr
+              local x2, y2 = cx + math.cos(B.a) * rr * (0.85 + rnd() * 0.3), cy + math.sin(B.a) * rr * (0.85 + rnd() * 0.3)
+              local mx2, my2 = (x1 + x2) / 2 + (rnd() - 0.5) * 4, (y1 + y2) / 2 + (rnd() - 0.5) * 4
+              if inside(x1, y1) and inside(x2, y2) and #c.segs < MAX - 2 then
+                local f = 0.3 + 0.15 * ring
+                c.segs[#c.segs + 1] = { x1, y1, mx2, my2, k, f, 1 }
+                c.segs[#c.segs + 1] = { mx2, my2, x2, y2, k, f, 1 }
+              end
+            end
+          end
+        end
       end
     end
-    for _ = 1, 6 do local cx, cy = 20 + rnd() * (w - 40), 20 + rnd() * (h - 40); star(cx, cy, src(cx < w / 2 and -3 or w + 3, cy), 3, reach * 0.5) end
-    -- 3) от краёв (последними: лимит сегментов не съедает углы и очаги): много, разной длины (мелкие чаще), некоторые глубоко
-    local n = math.max(30, math.floor((w + h) / 11))
-    for _ = 1, n do
+    -- 1) углы: удар в углу (верхний левый — сильнее)
+    impact(2, 2, src(-3, -3), 9, reach * 1.6, 2.5)
+    impact(w - 3, 2, src(w + 3, -3), 6, reach * 1.0, 2)
+    impact(2, h - 3, src(-3, h + 3), 6, reach * 1.0, 2)
+    impact(w - 3, h - 3, src(w + 3, h + 3), 7, reach * 1.2, 2)
+    -- 2) пустота справа от треков — пара ударов; ещё один-два где придётся
+    if w - ex > 120 then
+      for _ = 1, math.max(1, math.min(3, math.floor((w - ex) * h / 250000))) do
+        local cx, cy = ex + 40 + rnd() * (w - ex - 80), 40 + rnd() * (h - 80)
+        impact(cx, cy, src(w + 3, cy), 6 + math.floor(rnd() * 4), reach * 0.9, 1.5)
+      end
+    end
+    for _ = 1, 2 do local cx, cy = 40 + rnd() * (w - 80), 40 + rnd() * (h - 80); impact(cx, cy, src(cx < w / 2 and -3 or w + 3, cy), 5, reach * 0.5, 1) end
+    -- 3) от краёв: реже, но заметнее; мелкие сколы чаще, некоторые — глубоко
+    for _ = 1, math.max(12, math.floor((w + h) / 45)) do
       local p = rnd() * 2 * (w + h)
       local px, py, ang, ox, oy
       if p < w then px, py, ang, ox, oy = p, 1, math.pi / 2, p, -3
@@ -7529,21 +7559,21 @@ function D.cracks(x, y, w, h, veins, ex)
       elseif p < 2 * w + h then px, py, ang, ox, oy = p - w - h, h - 2, -math.pi / 2, p - w - h, h + 3
       else px, py, ang, ox, oy = 1, p - 2 * w - h, 0, -3, p - 2 * w - h end
       local r = rnd()
-      local len = r < 0.10 and deep * (0.4 + rnd() * 0.6) or (r < 0.55 and reach * (0.15 + rnd() * 0.3) or reach * (0.4 + rnd() * 0.9))
-      grow(px, py, ang + (rnd() - 0.5) * 0.9, len, src(ox, oy), 0, 1)
+      local len = r < 0.12 and deep * (0.4 + rnd() * 0.6) or (r < 0.5 and reach * (0.15 + rnd() * 0.25) or reach * (0.4 + rnd() * 0.8))
+      crack(px, py, ang + (rnd() - 0.5) * 0.8, len, src(ox, oy), r < 0.12 and 2 or 1.5, 1)
     end
     D.crk = c
     dirty = true
   end
-  if now - c.t > 2 then   -- цвета соседей: пиксель за краем (прошлый кадр); перерисовка — только если цвета заметно сменились
+  if c.red ~= red then c.red = red; dirty = true end
+  if now - c.t > 2 then   -- цвета соседей: пиксель за краем (прошлый кадр); перерисовка — только при заметной смене
     c.t = now
     local od = gfx.dest; gfx.dest = -1
     for _, s in ipairs(c.src) do
       gfx.x, gfx.y = s[1], s[2]
       local r, g, b = gfx.getpixel()
       local nr, ng, nb
-      if veins then local v = 0.55 + 0.35 * ((s[1] * 7 + s[2] * 13) % 10) / 10; nr, ng, nb = v, 0.04, 0.06   -- вены: красные, разной глубины
-      elseif r and r + g + b > 0.25 then nr, ng, nb = r, g, b else nr, ng, nb = 0.55, 0.55, 0.6 end
+      if r and r + g + b > 0.25 then nr, ng, nb = r, g, b else nr, ng, nb = 0.6, 0.6, 0.65 end
       if math.abs(nr - s[3]) + math.abs(ng - s[4]) + math.abs(nb - s[5]) > 0.2 then dirty = true end   -- мелкая смена (метры) — не перерисовывать
       s[3], s[4], s[5] = nr, ng, nb
     end
@@ -7556,12 +7586,13 @@ function D.cracks(x, y, w, h, veins, ex)
     gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, h, 1)
     for _, sg in ipairs(c.segs) do
       local s = c.src[sg[5]]
-      local a = 0.8 * (1 - math.min(1, sg[6]))
-      if a > 0.03 then
-        gfx.set(s[3], s[4], s[5], a); gfx.line(sg[1], sg[2], sg[3], sg[4], 1)
-        gfx.set(s[3], s[4], s[5], a * 0.3); gfx.line(sg[1] + 1, sg[2], sg[3] + 1, sg[4], 1)
-        if sg[7] > 1 or (veins and sg[6] < 0.35) then gfx.set(s[3], s[4], s[5], a * 0.8); gfx.line(sg[1], sg[2] + 1, sg[3], sg[4] + 1, 1) end   -- толще: углы, ствол вены
-      end
+      local cr, cg, cb = s[3], s[4], s[5]
+      if red then local v = 0.75 + 0.25 * ((s[1] + s[2]) % 4) / 4; cr, cg, cb = v, 0.07, 0.06 end
+      local a = 0.9 * (1 - 0.55 * math.min(1, sg[6]))
+      local wd = sg[7] or 1
+      gfx.set(cr, cg, cb, a); gfx.line(sg[1], sg[2], sg[3], sg[4], 1)
+      if wd > 1.3 then gfx.set(cr, cg, cb, a * math.min(1, wd - 1)); gfx.line(sg[1] + 1, sg[2], sg[3] + 1, sg[4], 1) end
+      if wd > 2.2 then gfx.set(cr, cg, cb, a * 0.6); gfx.line(sg[1], sg[2] + 1, sg[3], sg[4] + 1, 1) end
     end
     gfx.dest = od
   end
@@ -9718,8 +9749,7 @@ function D.frame(L, snap, rows, state, info)
   end
   do local ins = info.vmode == 'insert'
     local ex = (L.total_w or W) - tx0
-    if state.veins and ins then D.cracks(tx0, L.body_y, W - tx0, L.body_h, true, ex)   -- 31 окт: INSERT — красные вены
-    elseif state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h, false, ex) end end   -- 31 окт: эксперимент
+    if state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins, ex) end end   -- 31 окт: INSERT — трещины красные   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
