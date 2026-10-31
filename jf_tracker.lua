@@ -29697,7 +29697,17 @@ local function frame()
     local NAMES = { [27] = 'esc', [13] = 'enter', [32] = 'space', [8] = 'bs', [9] = 'tab', [keys.up] = 'up', [keys.down] = 'down',
                     [keys.left] = 'left', [keys.right] = 'right', [6579564] = 'del', [1752132965] = 'home', [6647396] = 'end' }
     -- 31 окт: Ctrl+H / I / M приходят кодами 8 / 9 / 13 — с зажатым Ctrl это ctrl+буква, не bs / tab / enter
-    local nm = (m.ctrl and c_raw >= 1 and c_raw <= 26) and ('ctrl+' .. string.char(c_raw + 96)) or NAMES[c_raw]
+    local nm = NAMES[c_raw]
+    if m.ctrl and c_raw >= 1 and c_raw <= 26 then
+      -- 8 / 9 / 13 — и Backspace / Tab / Enter, и Ctrl+H / I / M: какая клавиша зажата — по виртуальному коду (js); без js — имя клавиши
+      local letter = not nm
+      if nm and reaper.JS_VKeys_GetState then
+        local st = reaper.JS_VKeys_GetState(0)
+        local up = c_raw + 64                                         -- VK буквы = её заглавный ASCII
+        letter = st and st:byte(up) ~= 0 and st:byte(c_raw) == 0
+      end
+      if letter then nm = 'ctrl+' .. string.char(c_raw + 96) else nm = 'ctrl+' .. nm end
+    end
     if not nm then
       -- 6 окт: Cmd+буква на macOS приходит тем же кодом 1..26, что Ctrl+буква —
       -- ctrl пишем, только если Ctrl зажат (или Cmd не зажат)

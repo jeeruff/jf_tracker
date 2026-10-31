@@ -11823,6 +11823,11 @@ function D.frame(L, snap, rows, state, info)
         local acc = pins and U.RED or (psel and ((is_sel and sel.param == pi and D.CURCELL ~= U.TEXT and D.CURCELL) or U.AMBER) or U.TEXT)   -- 28 окт: выбранный (не под мышью) — цветом курсора: в mono тот же, что у курсора нот (D.CURCELL не серится), иначе опция cursor accent
         -- 22 окт: 5..8 положений — столбик кнопок по строке на положение, имя параметра вертикально слева
         local tallh = spos and spos[pi] and spos[pi][3] or 1
+        -- 31 окт: курсор DSP (выбранный параметр) — подложка и метка слева: цвет курсора бывает тем же белым, что у всех
+        if is_sel and sel.param == pi and not pins then
+          set(U.tint(U.AMBER, 0.22)); gfx.rect(bxc + L.pad - 2, py, pw + 3, tallh * L.rh, 1)
+          set(U.AMBER); gfx.rect(bxc + L.pad - 2, py, 2, tallh * L.rh, 1)
+        end
         -- 24 окт: параметр под курсором трекера (огибающая / команда ноты) — контрастная рамка
         local hl = info.cur_param_hl
         if hl and ((hl.pi and hl.pi == p.i and hl.fx == (p.fx or f.i)) or (hl.role and D.hl_role(f, p, hl.role))) then
