@@ -27671,7 +27671,17 @@ local function frame()
       elseif vim.mode ~= 'insert' and ctx.env_mode(hover.env) ~= 'steps' then
         -- NORMAL / VISUAL: клик только ставит курсор на строку огибающей (2 окт);
         -- точку от мыши пишет только INSERT (12 окт: вид «шаги» — фейдеры, мышь пишет всегда)
-        if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
+        -- 31 окт: протяжка — выделение блока (VISUAL от строки нажатия), как на нотах
+        if hover.fi then
+          if not env_drag.sel then
+            env_drag.sel = { fi = hover.fi, row = hover.row.row }
+            if vim.mode == 'visual' or vim.mode == 'vline' then vim.mode = 'normal' end
+          elseif env_drag.sel.row ~= hover.row.row or env_drag.sel.fi ~= hover.fi then
+            if vim.mode ~= 'visual' then vim.mode = 'visual'; vim.vbox = nil end
+            vim.anchor = { fi = env_drag.sel.fi, row = env_drag.sel.row }
+          end
+          vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1
+        end
       else
         local key = tostring(hover.env.env) .. ':' .. hover.row.row .. ':' .. math.floor(hover.envx * 255)
         if env_drag.key ~= key then
@@ -27680,7 +27690,7 @@ local function frame()
           if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
         end
       end
-    else env_drag.key = nil end
+    else env_drag.key = nil; env_drag.sel = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
