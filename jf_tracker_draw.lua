@@ -3604,24 +3604,59 @@ function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
   end
   return true
 end
--- 31 окт: модуль ровно с двумя параметрами — XY-пэд внизу блока (X — первый, Y — второй), тянуть мышью
-function D.xy2(L, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag)
+-- 31 окт: маленький модуль (1..3 параметра, без своего вида, XY выключен) — колонкой под предыдущим маленьким, если
+-- влезает по высоте; между ними стрелка v (сигнал идёт вниз). → bx, by, bh
+function D.stack_place(L, info, f, ncol, bx, boxy, bh0)
+  f._small = nil
+  local np = 0
+  for _, p in ipairs(f.params or {}) do if not p.mfader then np = np + 1 end end
+  local xy = info.dsp_xy and info.dsp_xy[tostring(f.fguid or f.i)]
+  local small = np >= 1 and np <= 3 and ncol == 1 and not f.view and not f.container and not f.kit and not f.rs5k
+    and not f.wave and not f.xy and not f.pages and not f.inner and not f.nmacro and not (xy and xy.on)
+  if not small then D.stk = nil; return bx, boxy, bh0 end
+  f._small = true
+  local h = (np + 2) * L.rh + 6
+  local s = D.stk
+  if s and s.y + h <= boxy + bh0 then
+    -- стрелка v в промежутке над модулем
+    text(s.x + math.floor((s.w - ms('v')) / 2), s.y - L.rh, 'v', U.GREY)
+    return s.x, s.y, h
+  end
+  D.stk = { x = bx, y = boxy + h + L.rh, w = 0 }
+  return bx, boxy, h
+end
+-- 31 окт: XY модуля (zx вкл / выкл): оси — параметры из info.dsp_xy[guid] (x, y) или первые два; заголовок x: / y: —
+-- щелчок открывает список параметров; Cmd+щелчок по параметру — X, следующий — Y
+function D.xy2(L, info, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag)
+  local key = tostring(f.fguid or f.i)
+  local xy = info.dsp_xy and info.dsp_xy[key]
+  if not (xy and xy.on) then return end
   local ix = {}
   for pi, p in ipairs(f.params or {}) do if not p.mfader then ix[#ix + 1] = pi end end
-  if #ix ~= 2 then return end
-  local side = math.min(pw, bh - (L.rh + 1) - 4 * L.rh - 6)
+  local qx, qy = xy.x or ix[1], xy.y or ix[2]
+  if not (qx and qy) then return end
+  local side = math.min(pw, bh - (L.rh + 1) - (#ix + 2) * L.rh - 6)
   if side < L.rh * 3 then return end
   local px0, py0 = bx + L.pad + math.floor((pw - side) / 2), by + bh - side - 3
-  local nx = vals[ix[1]] and vals[ix[1]].n or 0.5
-  local ny = vals[ix[2]] and vals[ix[2]].n or 0.5
+  -- строка осей над пэдом: x: имя  y: имя (щелчок — выбрать параметр)
+  local ly = py0 - L.rh
+  local hw = math.floor(side / 2)
+  for a, q in ipairs({ qx, qy }) do
+    local lx = px0 + (a - 1) * hw
+    local lab = (a == 1 and 'x: ' or 'y: ') .. ((f.params[q] and f.params[q].name) or '?')
+    local hot = not drag and mx >= lx and mx < lx + hw and my >= ly and my < ly + L.rh
+    text(lx, ly, fit(lab, hw - 2), hot and U.AMBER or U.GREY)
+    if hot then hover.dspbtn = { fx = k, f = f, what = 'xyaxis', axis = a == 1 and 'x' or 'y' } end
+  end
+  local nx = vals[qx] and vals[qx].n or 0.5
+  local ny = vals[qy] and vals[qy].n or 0.5
   set(U.PANEL); gfx.rect(px0, py0, side, side, 1)
   set(U.LINE); gfx.rect(px0, py0, side, side, 0)
   set(U.DIM); gfx.rect(px0 + math.floor(side / 2), py0, 1, side, 1); gfx.rect(px0, py0 + math.floor(side / 2), side, 1, 1)
   local hot = not drag and mx >= px0 and mx < px0 + side and my >= py0 and my < py0 + side
   local dx, dy = px0 + math.floor(nx * (side - 1) + 0.5), py0 + math.floor((1 - ny) * (side - 1) + 0.5)
   set(hot and U.AMBER or U.CYAN); gfx.circle(dx, dy, math.max(3, math.floor(L.rh / 3)), 1, 1)
-  text(px0 + 2, py0 + side - L.rh, fit('x ' .. (f.params[ix[1]].name or '') .. '  y ' .. (f.params[ix[2]].name or ''), side - 4), U.DIM)
-  if hot then hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = ix[1], qy = ix[2] } end
+  if hot then hover.dspxy = { fx = k, f = f, x = px0, y = py0, s = side, qx = qx, qy = qy } end
 end
 local function mslider(L, col, x, yy, w, sl, val, fmtx, hover, enabled)
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -9903,6 +9938,7 @@ function D.frame(L, snap, rows, state, info)
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     D.dsp_selk = sel.fx   -- 28 окт: мини-роутер — выбранный узел
     D.pmark('dsp: layout')
+    D.stk = nil   -- 31 окт: колонка маленьких модулей (сверху вниз)
     for k, f in ipairs(fxs) do
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
       do
@@ -9962,6 +9998,7 @@ function D.frame(L, snap, rows, state, info)
       end
       local by = boxy
       local bh = bh0
+      bx, by, bh = D.stack_place(L, info, f, ncol, bx, boxy, bh0)   -- 31 окт: маленькие — колонкой, стрелка v
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
       local room = math.huge   -- 22 окт: модуль целиком, не поджимается к краю (прокрутка плавная)
@@ -10064,8 +10101,8 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: B → on / off (понятнее; ширина — по «off», кнопка не прыгает)
       -- 31 окт: on / off — не кнопкой справа, а кружком перед именем (яркий — включён, тёмный — выключен); onw = −3 убирает её место
       local onw = -3
-      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { '∆', 'delta', bx + bw - 2 * kb - onw - 7 }, { 'e', 'open', bx + bw - 3 * kb - onw - 8 },
-                    { '+', 'lastp', bx + bw - 4 * kb - onw - 11 }, { 'f', 'mfoldin', bx + bw - 5 * kb - onw - 14 } }   -- 28 окт: f — сложить в заголовок (zf)
+      local bxs = { { 'x', 'del', bx + bw - kb - 1 }, { '_', 'mfoldin', bx + bw - 2 * kb - onw - 7 }, { '∆', 'delta', bx + bw - 3 * kb - onw - 8 },
+                    { 'e', 'open', bx + bw - 4 * kb - onw - 11 }, { '+', 'lastp', bx + bw - 5 * kb - onw - 14 } }   -- 31 окт: _ — сложить (zf), сразу слева от x
       local dlt = info.fx_delta and info.fx_delta(f)
       local tw = bw - 2 * L.pad - 5 * kb - onw - 15
       -- узкий блок (6 окт): имени меньше 8 знаков — остаются B и x, O и Δ — клавишами
@@ -11574,7 +11611,7 @@ function D.frame(L, snap, rows, state, info)
         local qx, qy = f.params[f.xy_x], f.params[f.xy_y]
         if D.slr and qx and qy then D.slr[#D.slr + 1] = { g = 'dspxy:' .. tostring(k), dsp = true, xy = { qx.fx or f.i, qx.i, qy.fx or f.i, qy.i }, name = f.name or 'XY', x = px0, y = py0, w = side, h = side } end   -- 14 окт: CONTROL — XY
       end
-      if not f.xy and not f.view and not f.container and not f.kit and not f.rs5k and not f.wave then D.xy2(L, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag) end   -- 31 окт
+      if not f.xy and not f.view and not f.container and not f.kit and not f.rs5k and not f.wave then D.xy2(L, info, f, k, vals, bx, by, bw, bh, pw, hover, mx, my, drag) end   -- 31 окт: zx
       if f.wave then
         -- сэмплер (RS5K): волна файла с зоной start..end, ручки тянутся мышью,
         -- бросок файла из браузера — новый сэмпл
@@ -11966,6 +12003,7 @@ function D.frame(L, snap, rows, state, info)
       if mw > 0 then bx, bw = bx - mw, bw + mw end   -- 22 окт: назад после фейдеров макросов
       -- 24 окт: опция offdim — у выключенного (off) модуля параметры приглушены пеленой фона
       if info.offdim and not (f.enabled and not f.poff) and bh > L.rh + 2 then set(U.BG, D.OFFDIM or 0.4); gfx.rect(bx + 1, by + L.rh + 1, bw - 2, bh - L.rh - 2, 1); gfx.a = 1 end
+      if f._small and D.stk then D.stk.y = by + bh + L.rh; D.stk.w = bw end
       bx = bx + bw + L.pad
       end
       ::next_block::

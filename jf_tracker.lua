@@ -17293,6 +17293,30 @@ ctx.kit_new_menu = function(f, ks, kkey)
   vim.open_hydra({ title = 'new kit: a random sample of the same class (kick, snare, hat ...) for every pad', items = items })
   state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
 end
+-- 31 окт: XY модуля DSP: state.dsp_xy[guid] = { on, x, y } (индексы параметров f.params); zx — вкл / выкл
+ctx.dsp_xy_get = function(f)
+  state.dsp_xy = state.dsp_xy or {}
+  local key = tostring(f.fguid or f.i)
+  state.dsp_xy[key] = state.dsp_xy[key] or {}
+  return state.dsp_xy[key]
+end
+ctx.dsp_xy_toggle = function(k)
+  local t = dsp_target(); local f = t and t.fx and t.fx[k]
+  if not f then return end
+  local xy = ctx.dsp_xy_get(f)
+  xy.on = not xy.on or nil
+  vim.msg = xy.on and ((f.name or 'fx') .. ': XY on - x: / y: over the pad pick the parameters (or Cmd+click a parameter: X, then Y); zx - off') or ((f.name or 'fx') .. ': XY off')
+end
+ctx.dsp_xy_set = function(f, axis, pi)
+  local xy = ctx.dsp_xy_get(f)
+  xy.on = true; xy[axis] = pi
+  vim.msg = ('%s XY: %s = %s'):format(f.name or 'fx', axis, (f.params[pi] and f.params[pi].name) or '?')
+end
+ctx.dsp_xy_pick = function(f, axis)
+  local items = {}
+  for pi, p in ipairs(f.params or {}) do if not p.mfader then items[#items + 1] = { label = p.name or tostring(pi), pi = pi } end end
+  vim.open_picker(('%s: the %s axis of the XY pad'):format(f.name or 'fx', axis), items, function(it) ctx.dsp_xy_set(f, axis, it.pi) end)
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end
@@ -23061,7 +23085,7 @@ local function frame()
     palette_draw = ctx.palette_draw,   -- 19 окт: панель patterns
     patlist_draw = ctx.patlist_draw, chain_draw = ctx.chain_draw,
     _kit_oct = (function() draw.kit_octave = vim.octave end)(),   -- 19 окт: окно пэдов идёт за октавой клавиатуры ([ ])
-    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
+    dsp_fold = model.dsp_fold, dsp_mfold = state.dsp_mfold, dsp_xy = state.dsp_xy, dsptabs = state.dsptabs, dsptrackslim = state.dsptrackslim,
     track_snaps = function(col) return ctx.snaps_info(col) end,
     cont_snaps = function(col, f) local c = col and f and ctx.cont_col(col, f); return c and ctx.snaps_info(c), c end,
     cvars = function(col, f) return ctx.cvar_info(col, f) end,   -- 29 окт: слоты вариантов контейнера   -- 28 окт: XY контейнера
@@ -26528,6 +26552,7 @@ local function frame()
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
+      elseif hover.dspbtn.what == 'xyaxis' then ctx.dsp_xy_pick(hover.dspbtn.f, hover.dspbtn.axis)   -- 31 окт
       elseif hover.dspbtn.what == 'cfxm' then   -- 31 окт: модуль внутри цепи — вкл / выкл
         local t = dsp_target(); if t and t.track and hover.dspbtn.ki then edit.fx_bypass(t.track, hover.dspbtn.ki); model.invalidate() end
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
@@ -26792,10 +26817,17 @@ local function frame()
       local pk = DK.picked(dsp_sel) or {}
       vim.msg = ('%d modules picked - x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick'):format(#pk)
       click = { t = now2, zone = 'dsppick' }
+    elseif hover.dsp and hover.dsp.param and ctx.mods().cmd and not ctx.mods().ctrl then   -- 31 окт: Cmd+щелчок по параметру — ось XY: X, следующий — Y
+      ctx.set_focus('dsp'); dsp_sel.fx = hover.dsp.fx
+      local xy = ctx.dsp_xy_get(hover.dsp.f)
+      local ax = (xy.cmd_next == 'y') and 'y' or 'x'
+      ctx.dsp_xy_set(hover.dsp.f, ax, hover.dsp.param); xy.cmd_next = ax == 'x' and 'y' or 'x'
+      click = { t = now2, zone = 'dspxyset' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
       if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
       dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
+
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
       if hover.dsp.param and col and dbl and click.zone == 'dsp' and click.param == hover.dsp.param and click.fx == hover.dsp.fx then
@@ -29953,6 +29985,7 @@ local function frame()
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'w' then ctx.pane_wide('dsp')   -- 22 окт: полосой во всю ширину снизу; 24 окт: zw (wide), общая для панелей
+          elseif ch == 'x' then ctx.dsp_xy_toggle(dsp_sel.fx)   -- 31 окт: zx — XY модуля вкл / выкл
           elseif ch == 'X' then ctx.dsp_tall()   -- 26 окт: zX — DSP в 1.5 раза выше канонического, ещё раз — назад (было zx); zw — шире
           elseif ch == 'e' then local t0 = dsp_target(); ctx.inst_window(t0 and t0.col)   -- 26 окт: ze и в DSP — окно инструмента трека
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
