@@ -2329,13 +2329,30 @@ function DCS.text(tx, tyy, str, col)
 end
 -- поле инструмента: номер на строке ноты; пустое — точки. Рисуется ПОСЛЕ
 -- волны (4 окт: волна фоном закрашивала зелёный номер)
+-- 31 окт: имя фразы тейка (ph:NAME) или false; кэш по тейку (слабые ключи), сброс по счётчику правок проекта
+D.ph_cache = setmetatable({}, { __mode = 'k' })
+function D.phrase_of(take)
+  local sc = reaper.GetProjectStateChangeCount(0)
+  if D.ph_sc ~= sc then D.ph_sc = sc; D.ph_cache = setmetatable({}, { __mode = 'k' }) end
+  local v = D.ph_cache[take]
+  if v == nil then
+    local _, nm = reaper.GetSetMediaItemTakeInfo_String(take, 'P_NAME', '', false)
+    v = (nm or ''):match('^ph:(.+)$') or false
+    D.ph_cache[take] = v
+  end
+  return v
+end
 function DCS.inst()
   local L, cell, x, ty = DCS.L, DCS.cell, DCS.x, DCS.ty
   local text, c = DCS.text, DCS.c
   if not (L.x_inst and not DCS.name_row) then return end
   local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
-  if not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
-  if n then text(x + L.x_inst, ty, D.DEC2[n % 100], c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
+  -- 31 окт: нота-триггер фразы (тейк ph:NAME) — вместо инструмента знак фразы " и первая буква её имени
+  local ph = cell and cell.kind == 'midi' and cell.take and D.phrase_of(cell.take)
+  if ph then text(x + L.x_inst, ty, '"' .. ph:sub(1, 1), c('inst', cell.muted and U.AMBER or U.AMBER))
+  elseif not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
+  if ph then
+  elseif n then text(x + L.x_inst, ty, D.DEC2[n % 100], c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
   else text(x + L.x_inst, ty, '..', c('inst', (cell and cell.kind == 'cont' and cell.of.kind == 'audio') and D.EMPTY_UNDER or D.EMPTY)) end
   if L.x_slc then
     local sk = cell and ((cell.kind == 'audio' and cell.slice) or (cell.kind == 'midi' and D.midi_slice and D.midi_slice(cell.item, cell.pitch)))   -- 19 окт: пэд кита — Sxx
