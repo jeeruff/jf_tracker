@@ -21097,6 +21097,9 @@ local function poll_midi_in()
   if #fresh == 0 then return end
   if not midiin.seq then midiin.seq = fresh[1].seq; return end   -- старт: старое не пишем
   midiin.seq = fresh[1].seq
+  -- 31 окт: игра с MIDI-клавиатуры — активность, как клавиши: без этого при стоящем транспорте трекер уходил в простой
+  -- (4-8 кадров / с) и вспышки слайсов, метры, пианинка «тупили»
+  do local now = reaper.time_precise(); idle.active_t = now; idle.input_t = now end
   if reaper.GetPlayState() & 4 == 4 then ctx.recg_tick(fresh) end   -- 31 окт: запись — ноты входа видны сразу
   -- 19 окт: индикатор входа в шапке — трек, чей вход MIDI (устройство / канал) принял событие, вспыхивает жёлтым
   do
