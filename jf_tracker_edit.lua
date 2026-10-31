@@ -4779,10 +4779,12 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             local dp = p1 - p0
             -- 27 окт: keepend — что за концом паттерна (следующий паттерн), на месте; нота, что уходит за конец, держит свой конец
             local plim = (keepend and fin > limit + EPS) and P(limit) or math.huge
+            -- 31 окт: ноты за концом клипа (их не видно) — на месте: иначе удаление строки вытаскивало их в клип («из ниоткуда»)
+            local pvis = P(fin)
             local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
             for k = nn - 1, 0, -1 do
               local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
-              if a0 >= plim - 1 then   -- в следующем паттерне — на месте
+              if a0 >= plim - 1 or a0 >= pvis - 1 or a0 < P(pos) - 1 then   -- в следующем паттерне / вне клипа — на месте
               elseif a0 >= p0 - 1 and a0 < p1 - 1 then R.MIDI_DeleteNote(tk, k)
               else
                 local b0 = a0 >= p1 - 1 and a0 - dp or a0
@@ -4794,7 +4796,7 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
               function(a1) return (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and a1 - dp or p0)) end)
             for k = ncc - 1, 0, -1 do
               local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
-              if a0 >= plim then   -- следующий паттерн
+              if a0 >= plim or a0 >= pvis then   -- следующий паттерн / за клипом
               elseif a0 >= p0 and a0 < p1 then R.MIDI_DeleteCC(tk, k)
               elseif a0 >= p1 then R.MIDI_SetCC(tk, k, sel, mu, a0 - dp, cm, ch, m1, m2, true) end
             end
@@ -4852,8 +4854,11 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
   if dt <= 0 then return end
   run(('insert time %.3fs'):format(dt), function()
     for _, tr in ipairs(tracks) do
-      for i = R.CountTrackMediaItems(tr) - 1, 0, -1 do
-        local it = R.GetTrackMediaItem(tr, i)
+      local list = {}   -- 31 окт: список заранее (сдвиг пересортировывает трек — клип обрабатывался дважды)
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do list[#list + 1] = R.GetTrackMediaItem(tr, i) end
+      for li = #list, 1, -1 do
+        local it = list[li]
+        if not R.ValidatePtr(it, 'MediaItem*') then goto ti_next end
         local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
         local fin = pos + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
         local tk = R.GetActiveTake(it)
@@ -4873,7 +4878,7 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
           local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
           -- 21 окт: клип через границу паттерна — ноты, что уже за границей (следующий паттерн), не трогать, конец клипа — как был
           local nfin = fin > limit + EPS and fin or math.min(fin + dt, limit)
-          local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), P(limit)
+          local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), math.min(P(limit), P(fin) + 1)   -- 31 окт: ноты за концом клипа — не трогать
           rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < plim - 1) and a0 + dp or nil end; return a0 end,
             function(a1) if a1 <= p0 or a1 >= plim then return a1 end; return math.min(a1 + dp, plim) end)   -- 28 окт: метки 0R — с нотами
           local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
@@ -4914,6 +4919,7 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
             end
           end
         end
+        ::ti_next::
       end
       env_shift(tr, t0, nil, dt, limit, 'ins')
     end
