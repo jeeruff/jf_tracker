@@ -1220,9 +1220,71 @@ function MX.key(c, regions, snap)
   return true
 end
 
--- 31 окт: панель arranger — всё про порядок песни в одном месте (было внизу матрицы и в patterns):
+-- 31 окт: панель arranger (seq = бывший chain) — всё про порядок песни в одном месте (было внизу матрицы и в patterns):
 -- chain (паттерны текстом), секции → плейлист песни, аранжировка (наборы лейнов). → hover (кнопки — те же id, что в матрице)
-function MX.arr_draw(L, x, y, w, h, focused)
+
+-- 31 окт: схема всей песни внизу arranger — секции, паттерны, по треку полоска айтемов, курсор воспроизведения;
+-- щелчок по паттерну — к нему (матрица и трекер). Ряды — строки трекера (r0 / r1), как у регионов
+function MX.song_draw(L, x, y, w, h, snap, regions, ph_row, hover)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local ra, rb
+  for _, rg in ipairs(regions or {}) do
+    if not rg.gap and not rg.lib and not rg.session then ra = ra and math.min(ra, rg.r0) or rg.r0; rb = rb and math.max(rb, rg.r1) or rg.r1 end
+  end
+  U.text(x + L.pad, y + 1, ctx.fit('song', w - 2 * L.pad), U.GREY)
+  y = y + L.rh + 1; h = h - L.rh - 1
+  if not ra or rb <= ra then U.text(x + L.pad, y + 1, ctx.fit('no patterns yet', w - 2 * L.pad), U.DIM); return end
+  local x0, x1 = x + L.pad, x + w - L.pad
+  local function px(r) return x0 + math.floor((r - ra) / (rb - ra) * (x1 - x0) + 0.5) end
+  -- секции
+  for _, s in ipairs((regions and regions.sections) or (ctx.all_sections and ctx.all_sections()) or {}) do
+    local a, b = px(math.max(ra, s.r0 or ra)), px(math.min(rb, s.r1 or rb))
+    if b > a then
+      local c = (s.color and s.color ~= 0 and ctx.region_rgb and ctx.region_rgb(s.color)) or U.CYAN
+      U.set(U.tint(c, 0.35)); gfx.rect(a, y, b - a, L.rh, 1)
+      U.set(c); gfx.rect(a, y, 1, L.rh, 1)
+      if b - a > U.measure('mm') then U.text(a + 2, y + 1, ctx.fit(s.name or '', b - a - 3), U.TEXT) end
+    end
+  end
+  y = y + L.rh + 1
+  -- паттерны
+  for ri, rg in ipairs(regions) do
+    if not rg.gap and not rg.lib and not rg.session then
+      local a, b = px(rg.r0), px(rg.r1)
+      local hot = mx >= a and mx < b and my >= y and my < y + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(a, y, math.max(1, b - a - 1), L.rh, 1)
+      U.set(hot and U.AMBER or U.LINE); gfx.rect(a, y, math.max(1, b - a - 1), L.rh, 0)
+      local nm = rg.name ~= '' and (rg.name:match('^(%S+)') or rg.name) or ''
+      if b - a > U.measure(nm) + 3 then U.text(a + 2, y + 1, nm, hot and U.AMBER or U.TEXT) end
+      if hot then hover.songpat = ri end
+    end
+  end
+  y = y + L.rh + 2
+  -- треки: полоска на трек, айтемы цветом трека; высота — сколько влезает (не меньше 2 px)
+  local cols = (snap and snap.cols) or {}
+  local nt = 0
+  for _, col in ipairs(cols) do if not col.master then nt = nt + 1 end end
+  local th = nt > 0 and math.max(2, math.min(L.rh, math.floor((h - 2 * L.rh - 3) / nt))) or 0
+  local ty = y
+  for _, col in ipairs(cols) do
+    if not col.master and ty + th <= y + h - 2 * L.rh - 3 then
+      local c = col.rgb or U.GREY
+      U.set(U.mix(U.BG, U.PANEL, 0.5)); gfx.rect(x0, ty, x1 - x0, th - 1, 1)
+      for _, ln in ipairs(col.lanes or {}) do
+        for _, it in ipairs(ln.items or {}) do
+          if it.r1 > ra and it.r0 < rb then
+            local a, b = px(math.max(ra, it.r0)), px(math.min(rb, it.r1))
+            U.set(c); gfx.rect(a, ty, math.max(1, b - a), th - 1, 1)
+          end
+        end
+      end
+      ty = ty + th
+    end
+  end
+  -- курсор воспроизведения
+  if ph_row and ph_row >= ra and ph_row <= rb then U.set(U.GREEN); gfx.rect(px(ph_row), y - 2 * L.rh - 3, 1, ty - y + 2 * L.rh + 3, 1) end
+end
+function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
   local hover = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
   MX.spl_focus = focused or nil   -- строка секций слушает клавиши, пока панель в фокусе
@@ -1277,6 +1339,12 @@ function MX.arr_draw(L, x, y, w, h, focused)
       bx = btn(bx, y, 'clear', 'arrclear')
       btn(bx, y, 'del', 'arrdel')
     end
+    y = y + L.rh + 4
+  end
+  -- 31 окт: схема всей песни — в остатке панели
+  if regions and y + 4 * L.rh <= ybot then
+    U.set(U.LINE); gfx.rect(x, y, w - 4, 1, 1)
+    MX.song_draw(L, x, y + 3, w, ybot - y - 3, snap, regions, ph_row, hover)
   end
   return hover
 end

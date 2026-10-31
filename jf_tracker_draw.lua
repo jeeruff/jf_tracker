@@ -7071,7 +7071,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           hover.patpane = inside and hv or nil
         end
       elseif id == 'arranger' then   -- 31 окт: chain, плейлист секций, аранжировки
-        if MX and MX.arr_draw then local hv = MX.arr_draw(L, ct.x + 2, ct.y + 2, ct.w - 4, ct.h - 4, foc == 'arranger'); hover.arrpane = inside and hv or nil end
+        if MX and MX.arr_draw then local hv = MX.arr_draw(L, ct.x + 2, ct.y + 2, ct.w - 4, ct.h - 4, foc == 'arranger', snap, info.regions, info.ph_row); hover.arrpane = inside and hv or nil end
       elseif id == 'matrix' then
         if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()
@@ -8707,7 +8707,7 @@ function D.frame(L, snap, rows, state, info)
       -- x2 /2 справа от длины — и в низкой шапке (20 окт: markers ушли в ряд 1)
       local rx = bx + bw
       rx = rx - (ms('/2') + 2); btn(rx, y4, '/2', 'rgbtn', 'half')
-      rx = rx - 2 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')
+      rx = rx - 4 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')   -- 31 окт: зазор 4 — рамки не слипаются
       rx = rx - 2
       local aw = ms('<') + 2
       local s2 = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))

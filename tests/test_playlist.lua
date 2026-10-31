@@ -41,7 +41,7 @@ local c = PL.complete('a', { 'A1', 'A2', 'B1', 'arp', 'A1' })
 eq('complete: matches', #c, 3); eq('complete: sorted', c[1], 'A1'); eq('complete: arp', c[3], 'arp')
 local l = PL.decode(PL.encode({ { name = 'main', text = 'A1 B1x2' }, { name = 'short', text = 'A1:8' } }))
 eq('store: two', #l, 2); eq('store: name', l[2].name, 'short'); eq('store: text', l[1].text, 'A1 B1x2')
-eq('free name', PL.free_name({ { name = 'playlist 1' } }), 'playlist 2')
+eq('free name', PL.free_name({ { name = 'seq 1' } }), 'seq 2')   -- 31 окт: seq (был playlist)
 
 -- 19 окт: chain как ячейки
 do

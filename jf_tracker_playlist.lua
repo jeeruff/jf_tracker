@@ -86,7 +86,7 @@ end
 
 -- свободное имя: playlist 1, playlist 2 …
 function PL.free_name(lists, base)
-  base = base or 'playlist'
+  base = base or 'seq'
   local used = {}
   for _, l in ipairs(lists or {}) do used[l.name] = true end
   local i = 1
