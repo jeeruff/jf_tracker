@@ -3354,6 +3354,10 @@ function V.key_impl(c)
     elseif c == ctrl('a') then ctx.env_nudge(env, V.cur.row, n / 64)
     elseif c == ctrl('x') then ctx.env_nudge(env, V.cur.row, -n / 64)
     else for r = V.cur.row, V.cur.row + n - 1 do ctx.env_del(env, r) end end
+    -- 31 окт: Ctrl+Opt+A / X и на огибающей — курсор на шаг step вниз (лесенка), как на лейнах и командах
+    if (c == ctrl('a') or c == ctrl('x')) and ctx.mods and ctx.mods().alt then
+      V.cur.row = V.cur.row + ((type(V.step) == 'number' and V.step > 0) and V.step or 1)
+    end
     finish_edit()
   elseif ch == 'x' and (flat()[V.cur.fi] or {}).ml then
     for r = V.cur.row, V.cur.row + n - 1 do ctx.ml_del(flat()[V.cur.fi], r) end; finish_edit()   -- MIDI-лейн: события строк
