@@ -11981,6 +11981,7 @@ ctx = {
       vim.open_picker('og channel ' .. k .. ': track template', its, function(it) setv('tpl:' .. it.data) end)
     end }
     vim.open_hydra({ title = 'og channel ' .. k, items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }   -- у строки опции
   end,
   og_toggle = function()
     local PN = draw.panes
@@ -24282,7 +24283,7 @@ local function frame()
   if ctx.NPM then ctx.npm_draw() end   -- 30 окт: свойства MIDI-ноты
   local nr = ctx.NP and ctx.np_rect
   if pop and nr and not (anchor and anchor.box) then anchor = { x = nr[1] + nr[3] + 4, y = nr[5] or nr[2], right = nr[1] - 4 } end
-  draw.popup(L, pop, anchor)
+  draw.popup(L, pop, anchor); ctx.pop_last = { pop, anchor }
   -- 10 окт: «Automation envelope (in the tracker)» — курсор на колонку огибающей, когда она появилась
   if ctx.env_jump and L and L.flat then
     for i, f in ipairs(L.flat) do
@@ -24427,7 +24428,7 @@ local function frame()
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
-  if OPT.active then OPT.draw(L, gfx.w, gfx.h) end
+  if OPT.active then OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end end   -- 31 окт: выпадашка из опций — поверх окна опций
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if ctx.LOGOPOP then ctx.logo_draw() end
   if ctx.SP and ctx.SP.on then ctx.SP.hints = state.hints; ctx.SP.draw(U, draw, L, gfx.w, gfx.h - L.status_h) end

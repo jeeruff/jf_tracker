@@ -291,8 +291,8 @@ function O.click(mx, my)
     if it.masked and it.masked() then it.unmask(); return end
     -- cycle (3 окт): значения кнопками в ряд — клик по кнопке ставит его;
     -- кнопки не влезли — клик по строке шагает по кругу, как раньше
-    if it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
-    elseif it.kind == 'cycle' and it.pick then it.pick()   -- 10 окт: щелчок по строке font / theme — выпадашка
+    if it.kind == 'cycle' and it.pick then it.pick()   -- 10 окт: щелчок по строке font / theme — выпадашка (31 окт: раньше кнопок — устаревшая кнопка перебивала)
+    elseif it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
     elseif it.kind == 'cycle' then O.adjust(it, 1)
     elseif it.kind == 'num' and it.min and it.max and r then
       if mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
