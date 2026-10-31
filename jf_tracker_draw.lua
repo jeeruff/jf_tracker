@@ -8586,12 +8586,13 @@ function D.frame(L, snap, rows, state, info)
   do
     local rg = info.cur_region_full
     local bx, bw = tx0 + 3, L.label_w - 4              -- 9 окт: зазор от границы модуля (2 px) — левая рамка кнопок видна
-    local function small(x, y, label, what, on, kind)
+    local function small(x, y, label, what, on, kind, oc)   -- oc — свой цвет включённой (31 окт: proj sec pat)
       local w1 = ms(label) + 2
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
-      set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
-      text(x + 1, y, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      local cc = oc or U.CYAN
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
+      set(hot and U.AMBER or (on and cc or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and cc or U.TEXT))
       if hot then hover[kind] = what end
       hint(kind, x, y, w1, L.rh, what)
       return x + w1 + 2
@@ -8602,9 +8603,10 @@ function D.frame(L, snap, rows, state, info)
     -- 26 окт: + section (zs): project | sec | pattern — что видно, то и правит транспозиция
     local wide = ms('project') + ms('sec') + ms('pattern') + 9 <= bw
     local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
-    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn')
-    x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn')
-    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn')
+    -- 31 окт: цвета вида — проект красный, секция жёлтая, паттерн зелёный
+    x0 = small(x0, hy + 1, wide and 'project' or 'proj', 'all', vm == 'project', 'viewbtn', U.RED)
+    x0 = small(x0, hy + 1, 'sec', 'sec', vm == 'section', 'viewbtn', U.AMBER)
+    small(x0, hy + 1, wide and 'pattern' or 'pat', 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
