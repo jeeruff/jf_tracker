@@ -9635,12 +9635,37 @@ function D.frame(L, snap, rows, state, info)
   end
   D.pmark('draw: ai handles, tint, cursor')
   for _, e in ipairs(D.pat_lines or {}) do   -- 31 окт: граница паттерна — 4 px через весь трекер, цветом паттерна; имена: над линией — что кончается, под ней — что начинается
-    set(e[4]); gfx.rect(e[1], e[2] - 2, e[3], 4, 1)
+    -- 31 окт (2): серая линия разделения остаётся; над ней 1 px — цвет кончающегося паттерна, под ней 1 px — начинающегося
+    set(e[7] or e[4]); gfx.rect(e[1], e[2] - 3, e[3], 1, 1)
+    set(e[4]); gfx.rect(e[1], e[2] + 2, e[3], 1, 1)
     local gx = L.matrix_w + L.pad
     if e[5] then local s5 = e[5]; text(gx, e[2] - 2 - L.th, s5, e[7] or U.GREY, U.BG) end
     if e[6] then text(gx, e[2] + 2, e[6], e[4], U.BG) end
   end
   D.pat_lines = nil
+  -- 31 окт: курсор перешёл в другой паттерн — его имя вспыхивает крупно у курсора (как цифра step), цветом паттерна
+  do
+    local vc = info.vcur
+    if vc and info.ruler and info.ruler.regions then
+      local cur
+      for _, rg in ipairs(info.ruler.regions) do if vc.row >= rg.r0 - 1e-6 and vc.row < rg.r1 - 1e-6 then cur = rg end end
+      local key = cur and (cur.idx or cur.name) or false
+      local now = reaper.time_precise()
+      if key ~= D.pf_key then
+        if D.pf_key ~= nil and cur then D.pf = { t = now, name = (cur.name ~= '' and cur.name) or ('#' .. tostring(cur.idx)), rgb = cur.rgb } end
+        D.pf_key = key
+      end
+      local fl = D.pf and now - D.pf.t
+      if fl and fl < 0.9 then
+        local k = fl < 0.15 and 4 or (fl < 0.3 and 3 or 2)
+        local px = tx0 + (L.label_w or 0) + L.pad
+        local py = L.body_y + (vc.row - (state.row0 or 0)) * L.rh - (k - 1) * math.floor(L.rh / 2)
+        py = math.max(L.body_y, math.min(L.body_y + L.body_h - k * L.rh, py))
+        set(U.PANEL); gfx.rect(px - 3, py - 2, D.big_measure(D.pf.name, k) + 6, k * L.rh + 4, 1)
+        D.big_text(px, py, D.pf.name, D.pf.rgb or U.AMBER, k)
+      elseif fl then D.pf = nil end
+    end
+  end
   if state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil
