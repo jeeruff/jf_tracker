@@ -9199,7 +9199,7 @@ function D.frame(L, snap, rows, state, info)
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
     if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
-    elseif patb[r.row] then set((eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5)); gfx.rect(tx0, y, W - tx0, 2, 1) end
+    elseif patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5) } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)
@@ -9528,6 +9528,8 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
+  for _, e in ipairs(D.pat_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 2, e[3], 4, 1) end   -- 31 окт: граница паттерна — 4 px через весь трекер, цветом паттерна
+  D.pat_lines = nil
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 2, 1) end   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
