@@ -7708,6 +7708,54 @@ function D.cracks(x, y, w, h, red, ex, style)
   gfx.blit(CRK_IMG, 1, 0, 0, 0, w, h, x, y, w, h)
   gfx.mode = om or 0; gfx.a = 1
 end
+-- 31 окт: визуализатор sand — под каждым треком слой песка; звук трека (пик) подбрасывает песчинки, чем громче —
+-- тем выше, гравитация возвращает их на слой. Частицы — не больше 1600, каждая — 1..2 px
+local SAND_COL = { { 0.80, 0.68, 0.50 }, { 0.72, 0.58, 0.40 }, { 0.88, 0.78, 0.60 }, { 0.62, 0.48, 0.32 }, { 0.90, 0.55, 0.25 } }
+function D.sand(L, x0, y0, w, h)
+  local st = D.sandst
+  if not st then st = { p = {}, t = reaper.time_precise(), lvl = {}, seed = 12345 }; D.sandst = st end
+  local now = reaper.time_precise()
+  local dt = math.min(0.05, now - st.t); st.t = now
+  local function rnd() st.seed = (st.seed * 1103515245 + 12345) % 2147483648; return st.seed / 2147483648 end
+  local floor = y0 + h - 3
+  local G = 1400
+  -- слой: волнистая полоса у низа (по колонкам трека — чуть выше там, где громче)
+  for _, c in ipairs(L.cols or {}) do
+    local tr = c.col and c.col.track
+    if tr and c.x and c.w and c.w > 4 and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      local pk = math.max(reaper.Track_GetPeakInfo(tr, 0) or 0, reaper.Track_GetPeakInfo(tr, 1) or 0)
+      local lv = pk > 0 and math.max(0, math.min(1, (20 * math.log(pk, 10) + 48) / 48)) or 0
+      local key = c.col.guid or tostring(tr)
+      st.lvl[key] = math.max(lv, (st.lvl[key] or 0) - dt * 2)
+      local lvl = st.lvl[key]
+      -- подкинуть: число песчинок и скорость — от уровня (апекс ~ уровень × 0.8 высоты)
+      if lv > 0.05 and #st.p < 1600 then
+        local n = math.floor(lv * lv * c.w * 0.5 * dt * 60 + rnd())
+        local apex = lv ^ 1.5 * h * 0.8
+        for _ = 1, n do
+          local v = math.sqrt(2 * G * apex * (0.4 + rnd() * 0.8))
+          st.p[#st.p + 1] = { x = c.x + rnd() * c.w, y = floor - 2, vx = (rnd() - 0.5) * 50, vy = -v, col = SAND_COL[1 + math.floor(rnd() * #SAND_COL)], s = rnd() < 0.2 and 2 or 1 }
+        end
+      end
+      -- слой песка: 3..6 px, выше при звуке
+      local bh = 3 + math.floor(lvl * 4)
+      gfx.set(0.55, 0.43, 0.28, 0.9); gfx.rect(c.x + 1, floor - bh + 3, c.w - 1, bh, 1)
+      gfx.set(0.80, 0.66, 0.46, 0.8); gfx.rect(c.x + 1, floor - bh + 3, c.w - 1, 1, 1)
+    end
+  end
+  -- полёт
+  local keep = {}
+  for _, p in ipairs(st.p) do
+    p.vy = p.vy + G * dt
+    p.x, p.y = p.x + p.vx * dt, p.y + p.vy * dt
+    if p.y < floor and p.x > x0 and p.x < x0 + w then
+      keep[#keep + 1] = p
+      if p.y > y0 then gfx.set(p.col[1], p.col[2], p.col[3], 0.95); gfx.rect(math.floor(p.x), math.floor(p.y), p.s, p.s, 1) end
+    end
+  end
+  st.p = keep
+  gfx.a = 1
+end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -9857,7 +9905,8 @@ function D.frame(L, snap, rows, state, info)
   do local ins = info.vmode == 'insert'
     local ex = (L.total_w or W) - tx0
     local fs = (state.framefx and state.framefx ~= '' and state.framefx ~= 'off') and state.framefx or (state.cracks and 'cracks') or nil
-    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood' and fs ~= 'grunge', ex, fs) end end   -- 31 окт: рамка; INSERT — красная   -- 31 окт: эксперимент
+    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood' and fs ~= 'grunge', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
+  if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
