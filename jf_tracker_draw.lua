@@ -7638,9 +7638,62 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
     end
   end
 end
+-- 31 окт: рамка vhs — как пауза кассеты: тёмная виньетка по краю, редкие строки развёртки, полоса трекинга (шум и
+-- сдвинутые обрывки строк) ползёт вниз и иногда дёргается, PLAY и счётчик в углах; рисуется каждый кадр (дёшево)
+function D.vhs(x, y, w, h, red)
+  local now = reaper.time_precise()
+  local st = D.vhsst or { seed = 99, band = 0, jump = 0 }
+  D.vhsst = st
+  local function rnd() st.seed = (st.seed * 1103515245 + 12345) % 2147483648; return st.seed / 2147483648 end
+  local dt = math.min(0.1, now - (st.t or now)); st.t = now
+  -- виньетка: несколько полупрозрачных рамок к краю
+  for k = 0, 9 do gfx.set(0, 0, 0, 0.09); gfx.rect(x + k, y + k, w - 2 * k, h - 2 * k, 0) end
+  -- развёртка: тонкие тёмные строки через 3 px
+  gfx.set(0, 0, 0, 0.10)
+  for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
+  -- полоса трекинга: ползёт вниз, иногда рывок
+  st.band = st.band + dt * h * 0.12
+  if rnd() < dt * 0.6 then st.jump = 0.25 + rnd() * 0.4 end
+  st.jump = math.max(0, st.jump - dt)
+  if st.band > h + 40 then st.band = -40 end
+  local by = y + math.floor(st.band)
+  local bh = 14 + math.floor((st.jump > 0 and 18 or 6) * rnd())
+  local tint = red and { 1, 0.25, 0.25 } or { 0.85, 0.88, 1 }
+  for yy = math.max(y, by), math.min(y + h - 1, by + bh) do
+    local k = 1 - math.abs((yy - by) / bh * 2 - 1)   -- гуще в середине полосы
+    -- обрывки строки: светлые штрихи шума
+    local xx = x
+    while xx < x + w do
+      local ln = 4 + rnd() * 60
+      if rnd() < 0.45 * k + 0.05 then gfx.set(tint[1], tint[2], tint[3], (0.15 + rnd() * 0.45) * k); gfx.rect(math.floor(xx), yy, math.floor(ln), 1, 1) end
+      xx = xx + ln + rnd() * 30
+    end
+  end
+  -- сдвиг строк при рывке: кусок изображения уезжает вбок (копия кадра со смещением)
+  if st.jump > 0 then
+    local sy = math.max(y, by - 6)
+    local sh = math.min(bh + 12, y + h - sy)
+    if sh > 0 then
+      local off = math.floor((rnd() - 0.5) * 24 * st.jump * 4)
+      gfx.a = 0.6
+      gfx.blit(-1, 1, 0, x, sy, w, sh, x + off, sy, w, sh)
+      gfx.a = 1
+    end
+  end
+  -- PLAY и счётчик
+  local blink = math.floor(now * 1.5) % 2 == 0
+  gfx.set(tint[1], tint[2], tint[3], 0.85)
+  gfx.x, gfx.y = x + 14, y + 12; gfx.drawstr(blink and 'PLAY' or 'PLAY')
+  local pp = reaper.GetPlayState() & 1 == 1 and reaper.GetPlayPosition() or reaper.GetCursorPosition()
+  local s2 = math.floor(pp)
+  local lab = ('SP %d:%02d:%02d'):format(s2 // 3600, (s2 // 60) % 60, s2 % 60)
+  gfx.x, gfx.y = x + 14, y + h - 12 - gfx.texth; gfx.drawstr(lab)
+  gfx.a = 1
+end
 function D.cracks(x, y, w, h, red, ex, style)
   if w < 60 or h < 60 then return end
   style = style or 'cracks'
+  if style == 'vhs' then return D.vhs(x, y, w, h, red) end
   local c = D.crk
   local now = reaper.time_precise()
   local dirty = false
@@ -10029,12 +10082,6 @@ function D.frame(L, snap, rows, state, info)
       elseif fl and fl >= 0.6 then D.pf = nil end
     end
   end
-  do local ins = info.vmode == 'insert'
-    local ex = (L.total_w or W) - tx0
-    local fs = (state.framefx and state.framefx ~= '' and state.framefx ~= 'off') and state.framefx or (state.cracks and 'cracks') or nil
-    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
-  if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
-  if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
@@ -10274,6 +10321,13 @@ function D.frame(L, snap, rows, state, info)
   if tx0 > 0 and not L.pn then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
   if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
 
+  -- 31 окт: рамка и визуализаторы — поверх всего модуля трекера (номера строк, линейка, метры)
+  do local ins = info.vmode == 'insert'
+    local ex = (L.total_w or W) - tx0
+    local fs = (state.framefx and state.framefx ~= '' and state.framefx ~= 'off') and state.framefx or (state.cracks and 'cracks') or nil
+    if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
+  if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
+  if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   D.pmark('draw: matrix / performance')
   -- 21 окт: что видно в трекере (строки тела, треки) — матрица подсвечивает эту зону светло-серым
   do
