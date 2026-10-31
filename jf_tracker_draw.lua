@@ -6973,13 +6973,13 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local bx, by, bw, bh = ct.x, ct.y, ct.w, ct.h
         if D.ctrl_buf_w ~= bw or D.ctrl_buf_h ~= bh then gfx.setimgdim(99, bw, bh); D.ctrl_buf_w, D.ctrl_buf_h = bw, bh end
         local dest0, mx0, my0, hint0, cw0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, L.ctrl_w, D.clip
-        gfx.dest = 99; gfx.mouse_x, gfx.mouse_y = mx0 - bx, my0 - by; D.clip = nil
+        gfx.dest = 99; gfx.mouse_x, gfx.mouse_y = mx0 - bx, my0 - by; D.clip = nil; U.mouse_off = { bx, by }   -- 31 окт: сдвиг буфера — для геометрии мыши
         if hint0 then D.hint = function(kind, x, y, w, h, data) return hint0(kind, x + bx, y + by, w, h, data) end end
         L.ctrl_w = bw
         set(U.PANEL); gfx.rect(0, 0, bw, bh, 1)
         local hv = {}
         local ok, err = pcall(draw_ctrl, L, info, bh, hv)
-        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, L.ctrl_w, D.clip = mx0, my0, hint0, dest0, cw0, clip0
+        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, L.ctrl_w, D.clip = mx0, my0, hint0, dest0, cw0, clip0; U.mouse_off = nil
         if not ok then error(err, 0) end
         gfx.blit(99, 1, 0, 0, 0, bw, bh, bx, by, bw, bh)
         for _, r in pairs(D.ctrl_rect or {}) do if not r.shifted then r[1] = r[1] + bx; r[2] = r[2] + by; r.shifted = true end end
@@ -6996,10 +6996,10 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = bh, 0, bw, 0, 0, true, true, id
         local dest0, mx0, my0, hint0, clip0 = gfx.dest, gfx.mouse_x, gfx.mouse_y, D.hint, D.clip
         local dy = ct.y - cy0 + 2                           -- содержимое на 2 px ниже рамки
-        gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil
+        gfx.dest = 1020; gfx.mouse_x, gfx.mouse_y = mx0 - ct.x, my0 - dy; D.clip = nil; U.mouse_off = { ct.x, dy }
         if hint0 then D.hint = function(kind, x, y, w, h, data) if y >= cy0 then return hint0(kind, x + ct.x, y + dy, w, h, data) end end end
         local ok, th = xpcall(draw_topbar, debug.traceback, L, info)
-        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0
+        gfx.mouse_x, gfx.mouse_y, D.hint, gfx.dest, D.clip = mx0, my0, hint0, dest0, clip0; U.mouse_off = nil
         L.top_h, L.top_x0, L.win_w, L.inst_w, L.slices_w, L.ctrl_alone, L.top_first, info.toptab = table.unpack(sv, 1, 8)
         if ok then
           gfx.blit(1020, 1, 0, 0, cy0 - 2, bw, ct.h, ct.x, ct.y, bw, ct.h)   -- 2 px запаса сверху (кнопки не на рамке), тело короче — низ цел

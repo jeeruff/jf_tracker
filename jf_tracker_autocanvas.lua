@@ -271,6 +271,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   -- заголовок: активная кривая, отрезок, сетка
   -- 30 окт: панель инструментов справа в строке заголовка (буквами): cur draw line erase | snap | [ сетка ]
   local mx, my = gfx.mouse_x, gfx.mouse_y
+  local ox, oy = U.mouse_off and U.mouse_off[1] or 0, U.mouse_off and U.mouse_off[2] or 0
   local hover
   local tb = {}
   for _, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1] } end
@@ -473,7 +474,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   if not hover and mx >= gx and mx < gx + gw and my >= gy and my < gy + gh then
     local row = r0 + (mx - gx) / gw * nr
     hover = { pane = 'curve', curve_t = span.t0 + (span.t1 - span.t0) * (mx - gx) / math.max(1, gw - 1), row = math.floor(row),
-      geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr } }   -- 30 окт: геометрия — для мазка мыши
+      geo = { gx = gx + ox, gy = gy + oy, gw = gw, gh = gh, r0 = r0, nr = nr, ox = ox, oy = oy } }   -- 30 окт: геометрия — для мазка мыши
+    -- 31 окт: в координатах окна — холст рисуется в буфер вкладки (U.mouse_off), а мазок читает мышь окна
   end
   return hover
 end

@@ -16742,11 +16742,20 @@ ctx.ctl_acv = function(SG)
   local A = ctx.ACV
   local g = A.geo
   if not g then return end
-  -- относительные сдвиги мыши (экран); курсор мыши — обратно в точку старта, чтобы трекпада хватало
+  -- относительные сдвиги мыши (экран). 31 окт: курсор назад к старту — только у края экрана (как жест треков):
+  -- перенос каждый кадр глушил движение (macOS после переноса курсора теряет события) — от мазка оставалась мелочь
   local sx, sy = reaper.GetMousePosition()
   local dx, dy = sx - SG.sx, sy - SG.sy
-  if reaper.JS_Mouse_SetPosition and (dx ~= 0 or dy ~= 0) then reaper.JS_Mouse_SetPosition(SG.sx, SG.sy) else SG.sx, SG.sy = sx, sy end
-  local k = gfx.mouse_cap & 8 == 8 and 0.25 or 1
+  SG.sx, SG.sy = sx, sy
+  if reaper.JS_Mouse_SetPosition then
+    local l, t, r, b = reaper.my_getViewport(0, 0, 0, 0, sx, sy, sx, sy, true)
+    t, b = math.min(t, b), math.max(t, b)
+    if sx < l + 24 or sx > r - 24 or sy < t + 24 or sy > b - 24 then
+      SG.sx, SG.sy = (l + r) // 2, (t + b) // 2; reaper.JS_Mouse_SetPosition(SG.sx, SG.sy)
+    end
+  end
+  -- экран в точках, холст в пикселях буфера: на Retina точка = 2 пикселя
+  local k = (gfx.ext_retina and gfx.ext_retina > 1 and gfx.ext_retina or 1) * (gfx.mouse_cap & 8 == 8 and 0.25 or 1)
   SG.vx = math.max(g.gx, math.min(g.gx + g.gw - 1, SG.vx + dx * k))
   SG.vy = math.max(g.gy, math.min(g.gy + g.gh - 1, SG.vy + dy * k))
   A.vpt = { math.floor(SG.vx), math.floor(SG.vy) }
@@ -16867,7 +16876,7 @@ ctx.acv_do = function(op, sp, curves)
       end
     end
     ctx.acv_cc = nil
-    vim.msg = ('%s: %s, rows %d..%d (%d)'):format(act.name, op.tool, lo, hi, n)
+    vim.msg = ('%s: %s, rows %g..%g (%d)'):format(act.name, op.tool, lo, hi, n)   -- 31 окт: %g — сетка мельче строки даёт дробные строки
     return
   end
   if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127
@@ -27228,7 +27237,7 @@ local function frame()
     local d, A = ctx.acv_mdrag, ctx.ACV
     if gfx.mouse_cap & 1 == 1 then
       local r, v = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
-      if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}), line = { d.mx0, d.my0, gfx.mouse_x, gfx.mouse_y } }   -- 31 окт: прямая от нажатия до мыши
+      if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}), line = { d.mx0 - (d.geo.ox or 0), d.my0 - (d.geo.oy or 0), gfx.mouse_x - (d.geo.ox or 0), gfx.mouse_y - (d.geo.oy or 0) } }   -- в буфер холста   -- 31 окт: прямая от нажатия до мыши
       elseif d.tool == 'shape' then local rows, a, b = A.shape_stroke(d.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }
       elseif r ~= d.r or math.abs(v - d.v) > 1e-3 then
         A.span_rows(d.r, d.v, r, v, A.stroke.rows, d.tool == 'erase')
@@ -27237,7 +27246,7 @@ local function frame()
     else
       local rows = A.stroke and A.stroke.rows
       local sa, sb = A.stroke and A.stroke.a, A.stroke and A.stroke.b
-      ctx.acv_mdrag = nil
+      ctx.acv_mdrag = nil; A.stroke = nil   -- до записи: ошибка в ней не оставит превью висеть
       if rows and next(rows) then ctx.acv_do({ op = 'put', rows = rows, tool = d.tool, a = sa, b = sb }) end
       A.stroke = nil
     end
