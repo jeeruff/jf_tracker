@@ -23871,6 +23871,7 @@ local function frame()
   -- 17 окт: под большими видами (F1, pm) не рисовать — лезла поверх справки
   local big_on = state.khelp_big or state.pm_big
   draw.len_in_fx = nil   -- 31 окт: без полосы эффектов длина и x2 /2 — снова в шапке (флаг не залипает)
+  draw.name_in_fx = state.fxrow and (L.fxrow_h or 0) > 0 or nil   -- и имя паттерна
   if state.fxrow and not big_on and (L.fxrow_h or 0) > 0 and snap and L.cols then
     local y0 = L.fxrow_y
     U.set(U.PANEL); gfx.rect(L.matrix_w + 2, y0, L.win_w - L.matrix_w - 4, L.fxrow_h, 1)
