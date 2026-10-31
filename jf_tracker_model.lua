@@ -619,7 +619,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
         local s1 = lane.subs[1]
         if not s1[r] then
           s1[r] = { kind = 'off', explicit = true, alloff = true, delay = d,
-            of = { kind = 'midi', stub = true, item = it, take = take, ppq = ppq, row0 = r, rows = 1, pitch = 60, note = '---', vol = '00', delay = 0, fx = {}, muted = true } }
+            of = { kind = 'midi', stub = true, item = it, take = take, ppq = ppq, row0 = r, rows = 1, pitch = 60, note = '---', vol = '00', delay = 0, ch = 0, fx = {}, muted = true } }
           if lane.last_row == nil or r > lane.last_row then lane.last_row = r end
         end
       end

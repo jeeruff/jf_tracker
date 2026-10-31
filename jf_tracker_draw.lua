@@ -7043,7 +7043,25 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local pcol = pm and function(pid) return D.pane_col(pid, pm, state.shadehue) end or nil
         set(fon and D.FOCUS or (pcol and U.mix(pcol(id), U.PANEL, 0.55)) or D.SEP); gfx.rect(c.x, lyl, c.w, 1, 1)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
-        for _, t in ipairs(c.tabs) do
+        -- 31 окт: подписи не влезают (обрезки «f», «manua») — активная целиком и «>» со списком всех вкладок стопки
+        local cramped = false
+        for _, t in ipairs(c.tabs) do if ms(D.ic(t.id, PN.BY[t.id].label)) > t.w - 2 * L.pad then cramped = true; break end end
+        local tabs = c.tabs
+        if cramped and #c.tabs > 1 then
+          local t0 = c.tabs[1]
+          for _, t in ipairs(c.tabs) do if t.id == id then t0 = t end end
+          local x0 = c.tabs[1].x
+          local lw = math.min(ms(D.ic(t0.id, PN.BY[t0.id].label)) + 2 * L.pad, c.w - ms('>') - 4 * L.pad)
+          tabs = { { id = t0.id, x = x0, y = t0.y, w = lw, h = t0.h } }
+          local mx0 = x0 + lw + L.pad
+          local mw = ms('>') + 2 * L.pad
+          local mhot = mx >= mx0 and mx < mx0 + mw and my >= t0.y and my < t0.y + t0.h
+          set(mhot and D.CURROW or U.PANEL); gfx.rect(mx0, tyt, mw, tth - 1, 1)
+          set(U.LINE); gfx.rect(mx0, tyt, mw, 1, 1); gfx.rect(mx0, tyt, 1, tth, 1); gfx.rect(mx0 + mw - 1, tyt, 1, tth, 1)
+          text(mx0 + L.pad, tyt + 1, '>', mhot and U.AMBER or U.GREY)
+          if mhot then local ids = {}; for _, t in ipairs(c.tabs) do ids[#ids + 1] = t.id end; hover.ptabmore = ids end
+        end
+        for _, t in ipairs(tabs) do
           local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
           if lbl ~= '' then
             local on = t.id == id

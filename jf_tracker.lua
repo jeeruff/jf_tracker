@@ -24878,7 +24878,7 @@ local function frame()
     state.status = string.format('%s  %s vol %s  offs %.3fs  len %.3fs  rate %.3f  %s',
       cell.name, cell.note, cell.vol, cell.offs, cell.len, cell.rate, table.concat(cell.fx or {}, ' '))
   elseif cell and cell.kind == 'midi' then
-    state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
+    state.status = string.format('MIDI %s vel %s ch %d%s', cell.note or '?', cell.vol or '', (cell.ch or 0) + 1, cell.muted and '  muted' or '')
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
   elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here, drag: change the value from it (Shift - finer); INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspab then state.status = hover.dspab.f.name .. ': A / B morph - drag between the two snapshots (:fxa, :fxb store them, :morph N)'
@@ -25329,6 +25329,16 @@ local function frame()
       if wd.what == 'pb' then ctx.wheel_send('pb', 0) end
       ctx.wheel_drag = nil
     end
+  end
+  if U.click and hover.ptabmore then   -- 31 окт: «>» тесной стопки вкладок — список всех
+    local items = {}
+    for k, pid in ipairs(hover.ptabmore) do
+      local lab = (draw.panes.BY[pid] and draw.panes.BY[pid].label) or pid
+      items[#items + 1] = { key = tostring(k % 10), label = lab, fn = function() ctx.pane_focus(pid) end }
+    end
+    vim.open_hydra({ title = 'tabs', items = items })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    U.click = false
   end
   if U.click and hover.ptab and hover.ptab.id and hover.ptab.id ~= 'tracker' and not ctx.tab_drag then
     ctx.tab_drag = { id = hover.ptab.id, x0 = gfx.mouse_x, y0 = gfx.mouse_y }   -- 10 окт: перенос вкладки мышью (порог 8 px)
