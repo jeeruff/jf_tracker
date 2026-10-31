@@ -9495,13 +9495,12 @@ function D.frame(L, snap, rows, state, info)
         -- выделение на лейне огибающей (6 окт): Shift+j/k, мышь — лёгкое
         -- высветление фона, линия и точки под ним видны
         if vc and vc.fi == ev.fi and vc.row == r.row then
-          set(info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE)   -- 28 окт: полый курсор (огибающая) — цветом курсора
-          if not ((vc.field or 1) == 2 and not ev.G) then gfx.rect(ev.x, y, ev.w, L.rh, 0) end
+          -- 28 окт: полый курсор (огибающая) — цветом курсора; 31 окт: 2 px и поверх всего (линии паттерна / секции) — в конце кадра
+          if not ((vc.field or 1) == 2 and not ev.G) then D.envcur = D.envcur or {}; D.envcur[#D.envcur + 1] = { ev.x, y, ev.w, L.rh, info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE } end
         end
         -- курсор поля формы — под значением точки (строка ниже курсора)
         if vc and vc.fi == ev.fi and vc.row == r.row - 1 and (vc.field or 1) == 2 and not ev.G then
-          set(info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE)
-          gfx.rect(ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, 0)
+          D.envcur = D.envcur or {}; D.envcur[#D.envcur + 1] = { ev.x + L.env_bx + L.env_bar_w + L.pad - 1, y, L.env_shape_w + 2, L.rh, info.focus == 'tracker' and (D.CUR_ACC or U.AMBER) or U.LINE }
         end
         draw_env_cell(EG, env_vals[ev][i], env_vals[ev][i - 1], ev.x, y, ty, ev.e, env_vals[ev][i + 1], (D.envvals and D.envvals[(c.col.guid or '') .. '/' .. (ev.e.name or '')]) or ((c.master or EG.env3) and 'vals') or nil)   -- 13 окт: у мастера по умолчанию — числа
         do   -- 30 окт: JOG — новые значения шагов огибающей: столбик и точка янтарём до записи
@@ -9696,6 +9695,8 @@ function D.frame(L, snap, rows, state, info)
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
+  for _, e in ipairs(D.envcur or {}) do set(e[5]); gfx.rect(e[1], e[2], e[3], e[4], 0); gfx.rect(e[1] + 1, e[2] + 1, e[3] - 2, e[4] - 2, 0) end   -- 31 окт: рамка курсора огибающей — 2 px, поверх линий
+  D.envcur = nil
   if D.aim_line then   -- 12 окт: полоска реза прицела — янтарь, как линия прицела во вкладке item, с мягким ореолом
     local a = D.aim_line
     set(U.AMBER, 0.25); gfx.rect(a[1] + 2, a[2] - 2, a[3] - 4, 5, 1)
