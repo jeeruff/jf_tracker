@@ -1462,6 +1462,7 @@ local function run_cmd(line)
   elseif cmd == 'spset' then if ctx.sp_set_value then ctx.sp_set_value(arg) end   -- 15 окт: ввод значения свойства сэмпла (клик по числу)
   elseif cmd == 'arcforget' then if ctx.arc_forget then ctx.arc_forget() end   -- 15 окт: arc — забыть назначения эффекта
   elseif cmd == 'mackey' then if ctx.mac_key then ctx.mac_key(arg) end   -- 15 окт: :mackey имя x — макрос на регистр @x
+  elseif cmd == 'og' then if ctx.og_toggle then ctx.og_toggle() end   -- 31 окт: OG-mode
   elseif cmd == 'phedit' then if ctx.phr_edit_toggle then ctx.phr_edit_toggle(arg ~= '' and arg or nil) end   -- 31 окт: правка фразы / назад
   elseif cmd == 'phrename' then   -- 31 окт: :phrename OLD NEW (панель phrases, r)
     local a, b = (arg or ''):match('^(%S+)%s+(%S+)')
