@@ -2912,6 +2912,12 @@ function V.key_impl(c)
         if c == ('t'):byte() then if ctx.tab_menu then ctx.tab_menu(k) end elseif ctx.project_menu then ctx.project_menu(k) end
         return
       end
+      if (c == ('q'):byte() or c == ('Q'):byte()) and not V.op then
+        -- 31 окт: gq — меню квантования (ноты, OFF, автоматизация, края), gQ — квантование входа (кнопка qtz)
+        V.count = nil; finish_move()
+        if c == ('q'):byte() then if ctx.quant_menu then ctx.quant_menu() end elseif ctx.qtz_menu then ctx.qtz_menu() end
+        return
+      end
       if c == ('m'):byte() and not V.op then
         -- 13 окт: gm — меню метронома (вкл / выкл, скорость, акценты, пре-ролл)
         V.count = nil; finish_move(); if ctx.metro_menu then ctx.metro_menu() end; return
@@ -4205,7 +4211,7 @@ local PENDING_HINT = {
   d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c automation column | C the cursor field in the whole track | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p up to the pause | P all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
-  g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
+  g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
   z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',

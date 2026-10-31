@@ -60,6 +60,8 @@ KH.PAGES = {
     { k = 'Ctrl+M', d = 'metronome on / off - anywhere (as in FL Studio)' },
     -- 15 окт: опция keys: renoise выключена (закомментирована в опциях)
     { k = 'gm', d = 'metronome menu: m on / off, speed, accents, pre-roll (:metro toggles too)' },
+    { k = 'gq', d = 'quantize menu: notes, OFFs, automation, item edges (= \\ Q)' },
+    { k = 'gQ', d = 'input quantize of the cursor track: on / off, grid, strength, direction, note-offs (= the qtz button)' },
     { k = 'Ctrl - +', d = 'step down / up by one, in any mode (as in Renoise); - + alone - LPB (NORMAL; INSERT on the note field with qwerty) - with frow - = are notes while the keyboard plays and in INSERT; Cmd - + - font size' },
     { k = 'help button (main module)', t = {}, d = 'this help follows the focused module; Tab here: search all pages, left / right: pages' },
   } },
