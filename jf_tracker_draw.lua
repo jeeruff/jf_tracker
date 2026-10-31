@@ -8634,8 +8634,9 @@ function D.frame(L, snap, rows, state, info)
     -- 20 окт: строка 3 — номер и имя паттерна курсора (и секция) в его цвете; клик — выпадашка команд паттерна
     -- (очередь, alias, clone, /2 x2, длина …); als cln — в ней. Вертикальная шапка справа от мастера — отменена
     local ny = hy + 1 + 3 * L.rh
+    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then ny = hy + (L.header_rows - 2) * L.rh + 2 end   -- 31 окт: имя — прямо над длиной (zoom mark — выше)
     -- 20 окт (2): строка эффектов есть — имя паттерна в ней, под размером и кнопками (main, вместо подписи fx)
-    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 and not (state.fxrow and (L.fxrow_h or 0) > 0) then
+    if ny > hy + 1 + 3 * L.rh - 1 and ny + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 and not (state.fxrow and (L.fxrow_h or 0) > 0) then
       local rg = info.cur_region_full
       local nhot = mx >= bx and mx < bx + bw and my >= ny and my < ny + L.rh
       if rg then
@@ -8673,7 +8674,7 @@ function D.frame(L, snap, rows, state, info)
       -- 31 окт: без полосы эффектов в строке 4 — имя паттерна (выше), тогда autozoom … mk строкой над длиной
       local named = not (state.fxrow and (L.fxrow_h or 0) > 0) and yz + L.rh <= hy + (L.header_rows - 2) * L.rh + 2
       if named then
-        local yr = y4 - L.rh
+        local yr = yz   -- 31 окт: zoom mark — в строке 4, имя паттерна — под ними, над длиной
         btn(bx, yr, (ms('autozoom') + ms('mark') + 6 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom)
         btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
       else
