@@ -244,7 +244,9 @@ function MX.width(L, nregions, ncols)
   -- 20 окт: самый мелкий зум (слот не выше двух строк) — stack в одну строку колонками: строка на паттерн, метка шире
   local st = MX.stack and not MX.fold and math.floor(L.rh * MX.vz + 0.5) >= 2 * L.rh + 1
   MX.st_on = st
-  L.mx_ruler_w = ((MX.ruler and not MX.fold) and (st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) or 0) + MX.sec_w
+  -- 31 окт: без линейки — своя микроколонка 8 px под скобку выделения / лупа (была на полосе секций — при крупном
+  -- шрифте наезжала на имя секции и номера)
+  L.mx_ruler_w = ((MX.ruler and not MX.fold) and (st and 10 or (U.measure('999.9') + 2 * L.pad + 4)) or ((not MX.fold) and 8 or 0)) + MX.sec_w
   L.mx_idx_w = L.mx_ruler_w + L.pad + 2 * (L.mx_arrow_w + 3) + U.measure('000') + L.pad   -- 12 окт: код до 3 знаков (A12)
   L.mx_dur_w = (MX.fold or st) and 0 or (U.measure('999') + L.pad)           -- колонка длины региона в шагах (18 окт: плотнее)
   -- размер такта в начале региона (5 окт); 9 окт: у всех один — колонки нет (:sig остаётся)
@@ -899,7 +901,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       if first and t < first.rg.pos then return top, false end
       if last then return last.y + rh, false end
     end
-    local bx = RW > 0 and math.max(2, RW - 13) or 1
+    local bx = RW > 0 and math.max(2, RW - ((MX.ruler and not MX.fold) and 13 or 7)) or 1   -- 31 окт: без линейки — в своей микроколонке
     local function bracket(t0, t1, col)
       local y0, in0 = y_of(t0)
       local y1, in1 = y_of(t1)
