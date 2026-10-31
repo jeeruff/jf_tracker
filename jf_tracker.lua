@@ -17722,6 +17722,57 @@ ctx.dsp_xy_pick = function(f, axis)
   for pi, p in ipairs(f.params or {}) do if not p.mfader then items[#items + 1] = { label = p.name or tostring(pi), pi = pi } end end
   vim.open_picker(('%s: the %s axis of the XY pad'):format(f.name or 'fx', axis), items, function(it) ctx.dsp_xy_set(f, axis, it.pi) end)
 end
+-- 31 окт: Enter на ячейке огибающей / MIDI-лейна — что вставить: значение в строку, форма на паттерн, холст
+ctx.lane_menu = function()
+  local fl = L and L.flat and L.flat[vim.cur.fi]
+  if not fl then return false end
+  local ml = fl.ml and fl.ml.kind ~= 'tx' and fl.ml.kind ~= 'vis' and fl.ml.kind ~= 'cmd' and fl.ml.kind ~= 'chd' and fl.ml
+  if not (fl.env or ml) then return false end
+  local row = vim.cur.row
+  local function put(map, label)   -- map[row] = 0..1
+    if ml then
+      local m2 = {}
+      for r, v in pairs(map) do m2[r] = v and v * 127 end
+      ctx.ml_write(fl, m2, label)
+    else
+      edit.run(label, function() for r, v in pairs(map) do ctx.env_set(fl.env, r, v) end end)
+      model.invalidate()
+    end
+  end
+  local r0, r1 = ctx.region_rows()
+  r0, r1 = r0 or row, r1 or row
+  local function fill(fn, label)
+    local map, n = {}, math.max(1, r1 - row)
+    for r = row, r1 do map[r] = math.max(0, math.min(1, fn((r - row) / n))) end
+    put(map, label); vim.msg = ('%s: %s, rows %04d..%04d'):format(fl.ml and fl.ml.name or (fl.env.name or 'env'), label, row, r1)
+  end
+  local items = {}
+  for k, v in ipairs({ { '0', 0 }, { '1', 0.25 }, { '2', 0.5 }, { '3', 0.75 }, { '4', 1 } }) do
+    items[#items + 1] = { key = v[1], label = ('value %d%% here'):format(math.floor(v[2] * 100)), fn = function() put({ [row] = v[2] }, 'value'); vim.cur.row = row + 1 end }
+  end
+  if ml and ml.kind == 'pb' then items[#items + 1] = { key = 'c', label = 'centre (no bend) here', fn = function() put({ [row] = 64 / 127 }, 'value') end } end
+  local shapes = {
+    { 'u', 'ramp up to the pattern end', function(x) return x end },
+    { 'n', 'ramp down to the pattern end', function(x) return 1 - x end },
+    { 's', 'sine, 1 cycle per bar', function(x, r) return 0.5 + 0.5 * math.sin(((r or 0) - row) / math.max(1, state.lpb * 4) * 2 * math.pi) end },
+    { 't', 'triangle, 1 cycle per beat', function(x, r) local p = (((r or 0) - row) / math.max(1, state.lpb)) % 1; return p < 0.5 and 2 * p or 2 - 2 * p end },
+    { 'q', 'square, every beat', function(x, r) return (((r or 0) - row) // math.max(1, state.lpb)) % 2 == 0 and 1 or 0 end },
+    { 'z', 'random every row', function() return math.random() end },
+  }
+  for _, sh in ipairs(shapes) do
+    items[#items + 1] = { key = sh[1], label = sh[2] .. ' (from here)', fn = function()
+      local map, n = {}, math.max(1, r1 - row)
+      for r = row, r1 do map[r] = math.max(0, math.min(1, sh[3]((r - row) / n, r))) end
+      put(map, sh[1] == 'z' and 'random' or 'shape')
+      vim.msg = ('%s: %s, rows %04d..%04d'):format(fl.ml and fl.ml.name or (fl.env.name or 'env'), sh[2], row, r1)
+    end }
+  end
+  items[#items + 1] = { key = 'x', label = 'clear this row', fn = function() if ml then ctx.ml_del(fl, row) else ctx.env_del(fl.env, row) end end }
+  items[#items + 1] = { key = 'v', label = 'open on the curve canvas (draw it)', fn = function() ctx.curve_open() end }
+  local _ = fill
+  vim.open_hydra({ title = (fl.ml and fl.ml.name or (fl.env.name or 'envelope')) .. ' - insert', items = items })
+  return true
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end

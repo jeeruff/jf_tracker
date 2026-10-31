@@ -2375,6 +2375,7 @@ function V.key_impl(c)
       local ml = mlf.ml
       local hx = (c < 256) and string.char(c):upper() or ''
       if c == BS or c == DEL then ctx.ml_del(mlf, V.cur.row); V.hexbuf = nil; return end
+      if c == 13 and not V.hexbuf and ctx.lane_menu and ctx.lane_menu() then return end   -- 31 окт: Enter — что вставить
       if ml.kind == 'cc' or ml.kind == 'pc' then
         local v, raw = num_key(c)
         if v == 'wait' then return end
@@ -3438,7 +3439,7 @@ function V.key_impl(c)
   if ch == 'i' then V.mode = 'insert'; V.count = nil; return
   elseif c == 13 then V.count = nil; finish_move()
     -- 31 окт: Enter на огибающей / MIDI-лейне (PB CC PC AT) — её кривая на холсте automation → curve
-    if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.curve_open and ctx.curve_open() then return end   -- и в KEYS
+    if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.lane_menu and ctx.lane_menu() then return end   -- 31 окт: выпадашка (холст — в ней)
     V.smart(); return   -- 12 окт: Enter — смарт-панель значений поля (была gs / Ctrl+Enter)
   elseif ch == 'I' and not env_of(V.cur.fi) then
     -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
