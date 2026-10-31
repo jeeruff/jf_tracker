@@ -206,11 +206,12 @@ function D.set_font(state)
   -- 10 окт: свой шрифт — любое установленное семейство по имени (:font Имя [px])
   if state.ttf == 'custom' and (state.ttfcustom or '') ~= '' then tf = { face = state.ttfcustom, px = tonumber(state.ttfpx) or 14 } end
   D.ttf = tf and true or false
+  D.bold = state.fontbold and true or false   -- 31 окт: жирный: у TTF — флаг b, у битмапа — второй проход со сдвигом 1 px
   if tf then
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
     D.ttf_face, D.ttf_size, D.ttf_px = tf.face, math.floor(tf.px * fs + 0.5), tf.px
-    gfx.setfont(1, D.ttf_face, D.ttf_size)
+    gfx.setfont(1, D.ttf_face, D.ttf_size, D.bold and string.byte('b') or 0)
     D.font_id = 1
     D.SCALE = 1
   else
@@ -357,6 +358,7 @@ local function txt_img(str, col, bg)
     gfx.setfont(D.font_id)
   else
     gfx.x, gfx.y = 0, 0; gfx.drawstr(str)
+    if D.bold and not D.ttf then gfx.x, gfx.y = 1, 0; gfx.drawstr(str) end   -- 31 окт: жирный битмап — второй проход (запас +2 px справа уже есть)
   end
   gfx.dest = old
   e = { id = id, w = w, h = hi, clear = clear }
@@ -1140,6 +1142,7 @@ local function text(x, y, s, col, bg)
     end
     if bg then set(bg); gfx.rect(x, y, gfx.measurestr(s) + 1, gfx.texth, 1) end
     set(col); gfx.x, gfx.y = math.floor(x), math.floor(y); gfx.drawstr(s)
+    if D.bold and not D.ttf then gfx.x, gfx.y = math.floor(x) + 1, math.floor(y); gfx.drawstr(s) end   -- 31 окт: жирный битмап
     return
   end
   local e = txt_img(s, col, bg)

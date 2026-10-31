@@ -171,6 +171,7 @@ local state = {
   poolsort = tostring(ext('poolsort', 'track')),
   libtrack = reaper.GetExtState(EXT, 'libtrack') == '1',   -- 11 окт: lib по трекам (кнопка track)
   fontspace = tonumber(ext('fontspace', 2)) or 2,
+  fontbold = reaper.GetExtState(EXT, 'fontbold') == '1',   -- 31 окт: жирный шрифт (вкладка theme, b)
   toptab = ext('toptab', 'master'),
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
@@ -1147,7 +1148,7 @@ ctx = {
     local t = sets[name or '']
     if not t then vim.msg = 'no screenset ' .. tostring(name); return end
     -- 27 окт: опция screensets keep the look (по умолчанию вкл) — тема, шрифт, подстройка темы, цвета панелей не меняются
-    local KEEP = { theme = true, ttf = true, ttfcustom = true, ttfpx = true, fontscale = true, fontspace = true, panecol = true, shadehue = true, modefont = true }
+    local KEEP = { theme = true, ttf = true, ttfcustom = true, ttfpx = true, fontscale = true, fontspace = true, fontbold = true, panecol = true, shadehue = true, modefont = true }
     local keep = reaper.GetExtState(EXT, 'sskeeplook') ~= '0'
     for _, it in ipairs(ctx.option_items()) do
       local v = t['o_' .. (it.key or '')]
@@ -15940,6 +15941,8 @@ ctx.tt_api = {
   set_scale = function(v) ctx.set_scale(v); vim.msg = 'font size x' .. v end,
   space = function() return tonumber(state.fontspace) or 2 end,
   set_space = function(n) n = math.max(0, math.min(12, n)); ctx.set_space(n); ctx.relayout(); vim.msg = 'line spacing ' .. n end,
+  bold = function() return state.fontbold and true or false end,
+  set_bold = function(on) state.fontbold = on and true or false; reaper.SetExtState(EXT, 'fontbold', on and '1' or '0', true); draw.set_font(state); ctx.relayout(); vim.msg = 'bold font ' .. (on and 'on' or 'off') end,
   fonts = function()
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
