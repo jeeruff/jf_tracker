@@ -11955,12 +11955,23 @@ function D.frame(L, snap, rows, state, info)
           else
             local segw = math.max(2, math.floor((ww - (p.nsteps - 1)) / p.nsteps))
             -- 22 окт: до 4 положений — щелчок по квадрату ставит его (без выпадашки), под мышью — янтарный
-            local direct = p.nsteps <= 4
+            -- 31 окт: есть подписи и в клетку влезают 2+ знака — кнопки с короткой подписью (sin tri saw), щелчок ставит
+            local short = labs and #labs == p.nsteps and segw >= ms('mm') + 2
+            local direct = p.nsteps <= 4 or short
             for kk = 0, p.nsteps - 1 do
               local sx = wx0 + kk * (segw + 1)
               local hot = direct and not drag and mx >= sx and mx < sx + segw + 1 and my >= py and my < py + L.rh
               if hot then step_sv = kk / math.max(1, p.nsteps - 1) end
-              set(hot and U.AMBER or (kk == cur and (acc == U.TEXT and D.SL_DIM or acc) or U.DIM)); gfx.rect(sx, py + 4, segw, L.rh - 8, (kk == cur or hot) and 1 or 0)
+              if short then
+                local on = kk == cur
+                set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(sx, py + 1, segw, L.rh - 2, 1)
+                set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(sx, py + 1, segw, L.rh - 2, 0)
+                local lb = (D.FP and D.FP.abbr and D.FP.abbr(labs[kk + 1] or '', 3) or labs[kk + 1] or ''):gsub('%s+', '')
+                lb = fit(lb, segw - 2)
+                text(sx + math.max(1, math.floor((segw - ms(lb)) / 2)), py, lb, hot and U.AMBER or (on and U.CYAN or U.GREY))
+              else
+                set(hot and U.AMBER or (kk == cur and (acc == U.TEXT and D.SL_DIM or acc) or U.DIM)); gfx.rect(sx, py + 4, segw, L.rh - 8, (kk == cur or hot) and 1 or 0)
+              end
             end
             if direct then step_direct = true end
           end

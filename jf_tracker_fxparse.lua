@@ -125,6 +125,7 @@ FP.ABBR = {
   minimum = 'min', maximum = 'max', start = 'st', ['end'] = 'end', note = 'nt', voices = 'vox', sample = 'smp',
   crossfade = 'xf', length = 'len', mode = 'md', type = 'typ', time = 't', rate = 'rt', delay = 'dly',
   reverb = 'rvb', chorus = 'chr', distortion = 'dist', compressor = 'comp', ring = 'rng', noise = 'nz',
+  sine = 'sin', triangle = 'tri', tri = 'tri', square = 'sqr', sawtooth = 'saw', saw = 'saw', random = 'rnd', ramp = 'rmp', pulse = 'pls',   -- 31 окт: формы LFO — кнопки ступеней
   global = 'gl', portamento = 'porta', pitchbend = 'pb', bend = 'bnd', round = 'rnd', robin = 'rb',
 }
 
