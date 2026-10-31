@@ -5789,7 +5789,7 @@ local function br_col(c)
   if not (c.enabled and not c.poff) then return U.DIM end
   return (D.sel_i and c.i == D.sel_i) and U.AMBER or U.tint(U.AMBER, 0.45)
 end
-local function brg(L) return math.max(6, 2 * L.pad) end   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
+local function brg(L) return math.max(3, L.pad) end   -- 31 окт: [ ] ближе к контейнеру (было 2 pad)   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
@@ -9938,7 +9938,7 @@ function D.frame(L, snap, rows, state, info)
     -- 15 окт: стандарт размерности DSP — все блоки (вкладки track / take / route, блок трека, FX, заглушки,
     -- роутер) в одной полосе: верх под шапкой, низ над полосой прокрутки цепочки — рамки встают вровень
     local sbh = (D.SBW or 3) + 4
-    local boxy, boxh = dy + L.rh + 3, DH - L.rh - 6 - (L.hint_h or 0) - sbh
+    local boxy, boxh = dy + L.rh + 5, DH - L.rh - 10 - (L.hint_h or 0) - sbh   -- 31 окт: от линий сверху и снизу по 2 px (модули, блок трека)
     D.DSP_BOX = { y = boxy, h = boxh }
     local mby, mbh = boxy, boxh
     -- 11 окт: track fx / take fx / fx routing — колонкой в начале модуля, подписи
