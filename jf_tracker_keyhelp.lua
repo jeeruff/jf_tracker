@@ -387,7 +387,7 @@ KH.PAGES = {
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },
     { k = 'Enter', d = 'the phrase at the tracker cursor, on the cursor track: one trigger note C-4 (another note transposes it, velocity scales it, its length cuts it)' },
-    { k = 'e', d = 'to its source in the library (the tracker cursor goes there): edit it - every instance follows' },
+    { k = 'e', d = 'edit the phrase in the tracker: only its track and its pattern (the source in the library), PHRASE in the mode word; everything the tracker does edits the source - every instance follows; e again (:phedit) - back to the song, the view and the cursor come back' },
     { k = 'n', d = 'a new phrase from the V block (else the pattern of the cursor) on the cursor track (= :phrase)' },
     { k = 'r', d = 'rename (the source and every trigger)' },
     { k = 'x x', d = 'delete: the source, its items and every trigger' },

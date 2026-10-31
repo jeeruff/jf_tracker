@@ -17112,6 +17112,45 @@ ctx.phr_rename = function(a, b)
   ctx.phr_cc = nil; model.invalidate()
   vim.msg = ('phrase %s -> %s'):format(a, b)
 end
+-- 31 окт: правка фразы тем же трекером (решение: не второй движок) — трекер показывает только трек источника и
+-- паттерн ph:NAME, курсор в нём; всё, что умеет трекер, правит источник, вхождения следуют (PH.sync). e в панели /
+-- :phedit — назад: вид, курсор и треки возвращаются
+ctx.phr_edit_toggle = function(name)
+  local R = reaper
+  if state.phr_edit then
+    local bk = state.phr_edit
+    state.phr_edit = nil; state.mxonly = nil
+    state.view_reg, state.view_secmode = bk.view_reg, bk.view_secmode
+    vim.cur.row, vim.cur.fi, state.row0 = bk.row, bk.fi, bk.row0
+    relayout()
+    vim.msg = 'phrase ' .. bk.name .. ': back to the song (every instance has the edit)'
+    if not name or name == bk.name then return end
+  end
+  local r = ctx.phr_find(name)
+  if not r then vim.msg = 'phrase ' .. tostring(name) .. ': not found'; return end
+  local only = {}
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    for k = 0, R.CountTrackMediaItems(tr) - 1 do
+      local p = R.GetMediaItemInfo_Value(R.GetTrackMediaItem(tr, k), 'D_POSITION')
+      if p >= r.pos - 1e-6 and p < r.rend - 1e-6 then
+        for _, c in ipairs(snap and snap.cols or {}) do if c.track == tr then only[c.guid] = true end end
+        break
+      end
+    end
+  end
+  if not next(only) then   -- пустой источник — трек курсора (туда и писать)
+    local c = cur_col(); if c then only[c.guid] = true end
+  end
+  state.phr_edit = { name = r.name, only = only, view_reg = state.view_reg, view_secmode = state.view_secmode, row = vim.cur.row, fi = vim.cur.fi, row0 = state.row0 }
+  state.view_reg, state.view_secmode = true, nil
+  vim.cur.row = math.max(0, math.floor(model.row_of_time(r.pos, state.lpb) + 0.5))
+  state.row0 = math.max(0, vim.cur.row - 1)
+  for i, f in ipairs(L and L.flat or {}) do if f.col and only[f.col.guid] and not f.env then vim.cur.fi = i; break end end
+  ctx.set_focus('tracker')
+  relayout()
+  vim.msg = ('PHRASE %s: the tracker edits its source - every instance follows; e in the phrases pane (:phedit) - back to the song'):format(r.name)
+end
 ctx.phr_do = function(op)
   local R = reaper
   if op.op == 'new' then ctx.phrase_make(''); ctx.phr_cc = nil; return end
@@ -17133,6 +17172,7 @@ ctx.phr_do = function(op)
     end)
     ctx.phr_cc = nil; model.invalidate()
     vim.msg = ('phrase %s at row %d (%s): change the note - transposed, velocity - louder / quieter'):format(r.name, vim.cur.row, col.name or '')
+  elseif op.op == 'edit' then ctx.phr_edit_toggle(r.name)
   elseif op.op == 'goto' then
     vim.cur.row = math.max(0, math.floor(model.row_of_time(r.pos, state.lpb) + 0.5))
     vim.ensure_visible(); ctx.set_focus('tracker')
@@ -22419,6 +22459,7 @@ local function frame()
       for i, f2 in ipairs(L.flat) do if f2.col and only[f2.col.guid] and not f2.env then vim.cur.fi = i; break end end
     end
   elseif state.viper then pcall(ctx.viper_tick)
+  elseif state.phr_edit then state.mxonly = state.phr_edit.only   -- 31 окт: правка фразы — только её трек
   else state.mxonly = nil end
   if (MX.anchor or next(MX.picks)) and #seq > 0 and snap then
     local r0, r1, c0, c1 = MX.block()
@@ -22740,6 +22781,7 @@ local function frame()
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свой режим клавиатуры: patternkb (ноты — паттерны) в трекере
   if state.viper then left = 'VIPER ' .. left end   -- 29 окт
+  if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
   end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
@@ -23096,7 +23138,7 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
-    phr_draw = function(Lx, x, y, w, h, foc) return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
+    phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = ctx.lfo_target()
       return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
