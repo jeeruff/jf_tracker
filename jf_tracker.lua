@@ -489,7 +489,7 @@ local idle = { n = 0, active_t = 0, input_t = 0, mkey = '' }   -- простой
 local fps_buf = { w = 0, h = 0, last = 0 }  -- буфер кадров для опции fps (1021)
 local view_cache = {}         -- живые виды модулей DSP за кадр (gmem чужих пространств)
 local lfo_hover = nil         -- наведение на панель LFO во вкладке modulation
-local mod_pane = 'params'     -- 'params' | 'lfo' (shape) | 'curve' | 'ai' | 'mod': страница вкладки automation (18 окт: матрица модуляции — снова страницей, вкладки modulation нет)
+local mod_pane = 'curve'      -- 31 окт: по умолчанию — холст curve; 'params' | 'lfo' (shape) | 'curve' | 'ai' | 'mod': страница вкладки automation (18 окт: матрица модуляции — снова страницей, вкладки modulation нет)
 local lfo_src_env = nil       -- огибающая-источник генератора follow (запись из снимка)
 local lfo_drag = nil          -- протяжка слайдера генератора кривых
 local mm_drag = nil           -- слайдер полосы матрицы модуляции
@@ -1066,7 +1066,7 @@ ctx = {
     items[#items + 1] = { key = 'e', label = 'automation …', sub = function() return { title = 'automation (cursor on an envelope column)', items = {
       { key = 'r', label = 'ramp to a value … (:ramp FF 2b)', fn = function() vim.open_prompt('ramp ', '') end },
       { key = 'f', label = 'fade in / out … (:fade)', fn = function() vim.open_prompt('fade ', '') end },
-      { key = 'c', label = 'curve (LFO / premod / follow) - modulation tab', fn = function() state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'; ctx.set_focus('top') end },
+      { key = 'c', label = 'curve generator (LFO / podkat / follow) - lfogen', fn = function() ctx.pane_focus('lfogen') end },
       { key = 'p', label = 'pick a parameter to automate (fzf)', fn = function() ctx.automation_picker() end },
     } } end }
     return { title = 'insert', items = items }
@@ -2095,9 +2095,8 @@ ctx = {
     state.trackenvs[col.guid] = true
     ctx.env_jump = { env = env, name = pname }; model.invalidate()
     LG.type = 'follow'
-    state.top = true; state.toptab = 'automation'; mod_pane = 'lfo'
-    if state.panes_ui and ctx.pane_focus then ctx.pane_focus('automation') else ctx.set_focus('top') end
-    vim.msg = ('follow: %s - its envelope is the cursor column; automation tab, type follow: pick the source (src: a track audio or an envelope), p - write the points'):format(pname or 'param')
+    ctx.pane_focus('lfogen')   -- 31 окт: генератор — своя панель
+    vim.msg = ('follow: %s - its envelope is the cursor column; lfogen, type follow: pick the source (src: a track audio or an envelope), p - write the points'):format(pname or 'param')
   end,
   premod_do = function(col, c, f, p, what)
     if not c.selkey then vim.msg = 'premod: pick a parameter in DSP first'; return end
