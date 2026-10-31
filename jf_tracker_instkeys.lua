@@ -90,9 +90,9 @@ function IK.key(c, cur, n, nslots, ninst)
     if c == 27 then return true end
     local r0, r1 = IK.range(cur)
     r1 = IK.clip(r0, r1, n, nslots, ninst)
-    if op == 'd' and ch == 'd' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); IK.anchor = nil
+    if op == 'd' and ch == 'd' and IK.nmarks() > 0 then ctx.inst_cut_ask(marked_desc()); IK.clear_marks(); IK.anchor = nil
     elseif op == 'y' and ch == 'y' and IK.nmarks() > 0 and ctx.inst_yank_list then local l = marked_desc(); table.sort(l); ctx.inst_yank_list(l); IK.anchor = nil
-    elseif op == 'd' and ch == 'd' then if r0 <= r1 then ctx.inst_cut(r0, r1) end; IK.anchor = nil
+    elseif op == 'd' and ch == 'd' then if r0 <= r1 then ctx.inst_cut_ask(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and ch == 'y' then if r0 <= r1 then ctx.inst_yank(r0, r1) end; IK.anchor = nil
     elseif op == 'y' and (ch == 'p' or ch == 'P') then
       if r0 <= r1 then ctx.inst_yank(r0, r1, true); ctx.inst_put(ch == 'P') end
@@ -122,11 +122,11 @@ function IK.key(c, cur, n, nslots, ninst)
     end
   end
   if (ch == '[' or ch == ']') and ctx.lib_random then ctx.lib_random(ch == '[' and -1 or 1); return true end
-  if ch == 'x' and IK.nmarks() > 0 then for _, i in ipairs(marked_desc()) do ctx.inst_cut(i, i) end; IK.clear_marks(); return true end
+  if ch == 'x' and IK.nmarks() > 0 then ctx.inst_cut_ask(marked_desc()); IK.clear_marks(); return true end
   if ch == 'x' then
     local r0, r1 = IK.range(cur)
     r1 = IK.clip(r0, r1, n, nslots, ninst)
-    if r0 <= r1 then ctx.inst_cut(r0, r1) end
+    if r0 <= r1 then ctx.inst_cut_ask(r0, r1) end
     IK.anchor = nil
     return true
   end
@@ -134,7 +134,7 @@ function IK.key(c, cur, n, nslots, ninst)
   if IK.anchor and (ch == 'd' or ch == 'y') then
     local r0, r1 = IK.range(cur)
     r1 = IK.clip(r0, r1, n, nslots, ninst)
-    if r0 <= r1 then if ch == 'y' then ctx.inst_yank(r0, r1) else ctx.inst_cut(r0, r1) end end
+    if r0 <= r1 then if ch == 'y' then ctx.inst_yank(r0, r1) else ctx.inst_cut_ask(r0, r1) end end
     IK.anchor = nil
     return true
   end

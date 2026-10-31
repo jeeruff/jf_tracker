@@ -12,6 +12,7 @@ local cur = 2
 IK.init({
   msg = function() end,
   inst_cut = function(a, b) log[#log + 1] = ('cut:%d-%d'):format(a, b) end,
+  inst_cut_ask = function(a, b) if type(a) == 'table' then for _, i in ipairs(a) do log[#log + 1] = ('cut:%d-%d'):format(i, i) end else log[#log + 1] = ('cut:%d-%d'):format(a, b) end end,
   inst_yank = function(a, b, q) log[#log + 1] = ('yank:%d-%d%s'):format(a, b, q and ':q' or '') end,
   inst_put = function(before) log[#log + 1] = 'put:' .. (before and 'P' or 'p') end,
   inst_select = function(i) cur = i; log[#log + 1] = 'sel:' .. i end,

@@ -12817,6 +12817,41 @@ ctx = {
     vim.msg = ('yank %d marked instrument(s) - p / P puts copies'):format(#reg)
   end,
   rename_inst = function() ctx.rename_inst_prompt() end,
+  -- 31 окт: инструмент уже стоит в песне (ноты / айтемы на треках до =END) — спросить перед удалением (они уйдут вместе
+  -- с ним); плагин-инструмент — если на его треке есть MIDI в песне
+  inst_cut_ask = function(i0, i1)   -- i0 — номер или список номеров (отмеченные m), удаляются по убыванию
+    local list = type(i0) == 'table' and i0 or nil
+    local col = cur_col(); local pool = col and col.pool or {}
+    local endp = model.marker_pos(model.END_MARKER) or math.huge
+    local uses, tracks = 0, {}
+    local nlib = #pool + draw.empty_slots(#pool)
+    local function cut() if list then for _, i in ipairs(list) do ctx.inst_cut(i, i) end else ctx.inst_cut(i0, i1) end end
+    if list then i0, i1 = math.huge, -1; for _, i in ipairs(list) do i0 = math.min(i0, i); i1 = math.max(i1, i) end end
+    for i = i0, math.min(i1, nlib) do
+      for _, it in ipairs(ctx.inst_items(i)) do
+        if reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetMediaItemInfo_Value(it, 'D_POSITION') < endp - 1e-6 then
+          local tr = reaper.GetMediaItem_Track(it)
+          local _, tn = reaper.GetTrackName(tr)
+          if not model.is_lib_name(tn) then uses = uses + 1; tracks[tn] = true end
+        end
+      end
+    end
+    if i1 > nlib and col and col.track then
+      for k = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+        local it = reaper.GetTrackMediaItem(col.track, k)
+        local tk = reaper.GetActiveTake(it)
+        if tk and reaper.TakeIsMIDI(tk) and reaper.GetMediaItemInfo_Value(it, 'D_POSITION') < endp - 1e-6 then uses = uses + 1; tracks[col.name or '?'] = true end
+      end
+    end
+    if uses == 0 then return cut() end
+    local tl = {}
+    for t in pairs(tracks) do tl[#tl + 1] = t end
+    table.sort(tl)
+    OPT.ask.open('delete the instrument?', ('it is used in the song: %d item(s) on %s - they go with it'):format(uses, table.concat(tl, ', ')), {
+      { key = 'k', label = 'keep it', fn = function() vim.msg = 'instrument kept' end },
+      { key = 'd', label = 'delete it and its notes', fn = cut },
+    })
+  end,
   inst_cut = function(i0, i1)
     local col = cur_col(); local pool = col and col.pool or {}
     -- 25 окт: номера после сэмплов — плагины-инструменты: dd убирает плагин с его трека (u — назад), как любой инструмент lib
