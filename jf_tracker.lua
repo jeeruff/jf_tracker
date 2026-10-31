@@ -24594,7 +24594,7 @@ local function frame()
   elseif cell and cell.kind == 'midi' then
     state.status = string.format('MIDI %s vel %s ch %d%s', cell.note, cell.vol, cell.ch + 1, cell.muted and '  muted' or '')
   elseif hover.header_env then state.status = (hover.header_env.e.name or 'envelope') .. ' - click: menu (delete whole curve / clear points)'
-  elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here; INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
+  elseif hover.env then state.status = ('%s %s  %.0f%%  -  click: cursor here, drag: change the value from it (Shift - finer); INSERT: click / drag writes a point; rclick: delete point'):format(hover.col and hover.col.name or '', hover.env.name, (hover.envv and hover.envv.v or 0) * 100)
   elseif hover.dspab then state.status = hover.dspab.f.name .. ': A / B morph - drag between the two snapshots (:fxa, :fxb store them, :morph N)'
   elseif hover.dspmeter then
     local db = draw.meter_db and draw.meter_db[hover.dspmeter] or -150
@@ -28024,6 +28024,28 @@ local function frame()
           end
           vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1
         end
+      elseif vim.mode ~= 'insert' then
+        -- 31 окт: вид «шаги» вне INSERT — щелчок не ставит значение от x (у края было 0): только курсор;
+        -- протяжка — относительно, от значения строки (200 px — весь диапазон, Shift — вчетверо точнее)
+        local e = hover.env
+        if not env_drag.rel then
+          local _, raw = reaper.Envelope_Evaluate(e.env, edit.swing_time(hover.row.row, state.lpb), 0, 0)
+          local v0 = (e.max and e.min and e.max > e.min) and math.max(0, math.min(1, (raw - e.min) / (e.max - e.min))) or hover.envx
+          env_drag.rel = { x0 = gfx.mouse_x, v0 = v0 }
+          if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
+        else
+          local d = gfx.mouse_x - env_drag.rel.x0
+          if env_drag.rel.moved or math.abs(d) > 3 then
+            env_drag.rel.moved = true
+            local v = math.max(0, math.min(1, env_drag.rel.v0 + d / 200 * (ctx.mods().shift and 0.25 or 1)))
+            local key = tostring(e.env) .. ':' .. hover.row.row .. ':' .. math.floor(v * 255)
+            if env_drag.key ~= key then
+              env_drag.key = key
+              ctx.env_set(e, hover.row.row, v)
+              if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
+            end
+          end
+        end
       else
         local key = tostring(hover.env.env) .. ':' .. hover.row.row .. ':' .. math.floor(hover.envx * 255)
         if env_drag.key ~= key then
@@ -28032,7 +28054,7 @@ local function frame()
           if hover.fi then vim.cur.fi, vim.cur.row, vim.cur.field = hover.fi, hover.row.row, 1 end
         end
       end
-    else env_drag.key = nil; env_drag.sel = nil end
+    else env_drag.key = nil; env_drag.sel = nil; env_drag.rel = nil end
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
