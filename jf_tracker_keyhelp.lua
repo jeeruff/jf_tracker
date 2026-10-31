@@ -282,7 +282,7 @@ KH.PAGES = {
     { k = 'F4', d = 'the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)' },
     { k = 'F5 F6', d = 'scopes / master; the same key again - back to the tracker' },
     { k = 'help', d = 'this panel: the help button of the main module - the whole help' },
-    { k = 'Cmd+ Cmd-', d = 'bitmap scale x1 / x1.5 / x2 / x3 (font size with a font)' },
+    { k = 'Cmd+ Cmd-', d = 'bitmap scale x1 / x2 / x3; a vector font also has x1.5' },
   } },
   insert = { title = 'tracker INSERT (keyboard)', e = {
     { k = '1 f1 2 f2 3 4 f4 ...', d = 'piano (layout frow, default): digits 1..0 white keys C..E, F1 F2 F4 F5 F6 F8 F9 black (17 keys; - = F10 F11 F12 free); [ ] octave, { } velocity; F-key shortcuts are off while the keyboard plays; the letters stay Vim - in INSERT too (w x dd p ... act as in NORMAL, then INSERT again), digits are notes, not a count' },

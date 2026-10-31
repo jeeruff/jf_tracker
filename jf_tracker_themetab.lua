@@ -175,7 +175,7 @@ function TT.draw(x, y, w, h, emb)
       local function lab(t) if bx + ms(t) + pad <= x + w then text(bx, sy, t, U.GREY); bx = bx + ms(t) + pad end end
       local sc = ctx.scale()
       lab('size (- +)')
-      for _, v in ipairs(SCALES) do btn(tostring(v), sc == v, { 'scale', v }) end
+      for _, v in ipairs(ctx.scales and ctx.scales() or SCALES) do btn(tostring(v), sc == v, { 'scale', v }) end   -- 31 окт: у битмапа без 1.5
       bx = bx + 3 * pad
       lab('line spacing ([ ])')
       btn('-', false, { 'space', -1 }); lab(tostring(ctx.space())); btn('+', false, { 'space', 1 })
@@ -279,9 +279,10 @@ function TT.key(c)
   elseif ch == 'o' or ch == 'i' or ch == 'd' or ch == 'r' then act(ch)
   elseif ch == '+' or ch == '=' or ch == '-' then
     local sc, j = ctx.scale(), 1
-    for k2, v in ipairs(SCALES) do if v == sc then j = k2 end end
-    j = math.max(1, math.min(#SCALES, j + (ch == '-' and -1 or 1)))
-    act({ 'scale', SCALES[j] })
+    local SC = ctx.scales and ctx.scales() or SCALES
+    for k2, v in ipairs(SC) do if v == sc then j = k2 end end
+    j = math.max(1, math.min(#SC, j + (ch == '-' and -1 or 1)))
+    act({ 'scale', SC[j] })
   elseif ch == '[' or ch == ']' then act({ 'space', ch == ']' and 1 or -1 })
   else return false end
   return true

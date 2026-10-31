@@ -216,8 +216,9 @@ function D.set_font(state)
     D.font_id = 0
     -- только целые x1..x4 (дробный пробовали 1 окт — кривой; Ctrl +/- шаг 1)
     -- x1.5 (5 окт) — единственный дробный масштаб; остальные целые; x4 — только PT-mode
+    -- 31 окт: x1.5 у битмапа убран (штрихи 1-2-1-2 px — неровные буквы): сохранённое 1.5 рисуется как x2; у TTF 1.5 есть
     local fs = tonumber(state.fontscale) or 2
-    if fs ~= 1.5 then fs = math.floor(fs) end
+    if fs == 1.5 then fs = 2 else fs = math.floor(fs) end
     D.SCALE = math.max(1, math.min(state.ptmode and 4 or D.SCALE_MAX, fs))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))

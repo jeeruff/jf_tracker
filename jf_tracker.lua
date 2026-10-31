@@ -12908,7 +12908,7 @@ ctx = {
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
       { key = 'kcfont', label = 'keycast font', kind = 'cycle', dropdown = true, values = (function() local v = { 'bitmap' }; for _, f in ipairs(ctx.MODEFONTS) do if f ~= 'off' then v[#v + 1] = f end end; return v end)(), desc = 'the font of the keycast (kcast): bitmap - the tracker font; any mode font (decorative); click - the list', get = function() return draw.kcfont or 'bitmap' end, set = function(v) ctx.kcfont_set(v) end, pick = function() ctx.kcfont_pick() end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
-      { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 1.5, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode)', get = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end, set = function(v) ctx.set_scale(v) end },
+      { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
@@ -15924,7 +15924,9 @@ ctx.tt_api = {
   theme = function() return state.theme or 'reaper' end,
   apply_theme = function(n) ctx.apply_theme(n); vim.msg = 'theme: ' .. n end,
   -- 11 окт: настройки шрифта под списком шрифтов (были в опциях look)
-  scale = function() local f = tonumber(state.fontscale) or 2; return f == 1.5 and 1.5 or math.floor(f) end,
+  scale = function() local f = tonumber(state.fontscale) or 2; if f == 1.5 then return (state.ttf or 'off') == 'off' and 2 or 1.5 end; return math.floor(f) end,
+  -- 31 окт: шаги размера — у битмапа без 1.5 (неровные штрихи), у векторного шрифта с ним
+  scales = function() return (state.ttf or 'off') == 'off' and { 1, 2, 3 } or { 1, 1.5, 2, 3 } end,
   set_scale = function(v) ctx.set_scale(v); vim.msg = 'font size x' .. v end,
   space = function() return tonumber(state.fontspace) or 2 end,
   set_space = function(n) n = math.max(0, math.min(12, n)); ctx.set_space(n); ctx.relayout(); vim.msg = 'line spacing ' .. n end,
@@ -29880,8 +29882,8 @@ local function frame()
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local d = (c == 45 or c == 95 or c == 31) and -1 or 1
     -- шаги x1 → x1.5 → x2 → x3 (5 окт)
-    local STEPS = { 1, 1.5, 2, 3 }
-    local cur, i = tonumber(state.fontscale) or 2, 1
+    local STEPS = ctx.tt_api.scales()   -- 31 окт: у битмапа без 1.5
+    local cur, i = ctx.tt_api.scale(), 1
     for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
     ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
     vim.msg = ('bitmap x%s'):format(tostring(state.fontscale):gsub('%.0$', ''))
