@@ -137,6 +137,8 @@ function SX.natural_w(rows, ms, pad)
   end
   return mw
 end
+-- 31 окт: курсор пульта — элемент, по которому щёлкнули (команды slixer — не параметры, у DSP-курсора их нет)
+function SX.key_of(it) return (it.name or '') .. '|' .. (it.lab or '') .. '|' .. tostring(it.field or it.code or '') end
 -- рисование кнопок; hover → { it = …, x, y, w }
 function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
   local hv
@@ -153,6 +155,9 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
       local on = it.on
       set(on and U.tint(U.AMBER, 0.55) or (hot and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(x, y, w, h, 1)
       set(hot and U.AMBER or (on and U.AMBER or U.LINE)); gfx.rect(x, y, w, h, 0)
+      if SX.cur and SX.cur == SX.key_of(it) then   -- 31 окт: курсор пульта — двойная рамка и метка слева
+        set(U.AMBER); gfx.rect(x - 1, y - 1, w + 2, h + 2, 0); gfx.rect(x - 2, y, 2, h, 1)
+      end
       local tc = on and U.BG or (hot and U.AMBER or U.TEXT)
       local tx = x + L.pad
       text(tx, ty, it.lab, tc)

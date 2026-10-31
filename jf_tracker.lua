@@ -27098,6 +27098,15 @@ local function frame()
       click = { t = now2, zone = 'dspadsr' }
     elseif hover.slx and not B.drag then   -- 25 окт: кнопка пульта slixer
       ctx.set_focus('dsp'); dsp_sel.fx = hover.slx.fx
+      -- 31 окт: щелчок по элементу пульта — курсор на нём: параметр плагина — DSP-курсор на этот параметр,
+      -- команда slixer (STRETCH, detect …) — курсор пульта (параметра у неё нет)
+      do
+        local it = hover.slx.it
+        local pf = hover.slx.f
+        local pi0
+        if it.src == 'p' and it.name and pf and pf.params then for i2, p2 in ipairs(pf.params) do if p2.name == it.name or p2.full == it.name then pi0 = i2; break end end end
+        if pi0 then dsp_sel.param = pi0; draw.SX.cur = nil else dsp_sel.param = nil; draw.SX.cur = draw.SX.key_of(it) end
+      end
       if hover.slx.trk and hover.slx.it.slider then ctx.slx_vdrag = { h = hover.slx }; ctx.slx_vdrag_tick()   -- 27 окт: слайдер sens — щелчок / протяжка по дорожке
       else ctx.slx_do(hover.slx) end
       click = { t = now2, zone = 'slx' }
@@ -27162,7 +27171,7 @@ local function frame()
     elseif hover.dsp then
       ctx.set_focus('dsp')
       if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
-      dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
+      dsp_sel.fx = hover.dsp.fx; if hover.dsp.param then dsp_sel.param = hover.dsp.param; draw.SX.cur = nil end; DK.pslider = hover.dsp.param and true or nil   -- щелчок по параметру — h l значение
 
       if not hover.dsp.param then dsp_drag = { fx = hover.dsp.fx, f = hover.dsp.f, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end
       local col = dsp_target()
@@ -30418,6 +30427,7 @@ local function frame()
           if OPTP[cp] and not DK.pending and f and f.view == 'slixer' and cp ~= 8710 and cp ~= 730 then return end   -- 27 окт: у slixer Opt+H L — его кнопки (thru …), папок пресетов нет
           if OPTP[cp] and not DK.pending and f then ctx.dsp_preset(dsp_sel.fx, OPTP[cp]); return end
         end
+        if draw.SX.cur and (c == 106 or c == 107 or c == 104 or c == 108 or c == 1685026670 or c == 30064) then draw.SX.cur = nil end   -- 31 окт: клавиши двигают DSP-курсор — курсор пульта снят
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())
         if r == 'leave' then ctx.set_focus('tracker')
         elseif not r and (c == 117 or c == 18) then   -- 24 окт: u / Ctrl+R в DSP — undo / redo, как везде (было: ничего)
