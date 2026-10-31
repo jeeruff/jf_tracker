@@ -16563,16 +16563,20 @@ ctx.acv_curves = function(sp)
   end
   -- 31 окт: курсор на vel колонки нот — громкости нот трека в отрезке кривой (MIDI vel / 127, аудио vol / 255);
   -- мазки и трансформации правят громкость СУЩЕСТВУЮЩИХ нот (новых не создают)
-  if fl and fl.lane and fl.col and (vim.cur.field or 1) == 2 and sp and not list[1] then
+  -- 31 окт: и delay (поле 3) — сдвиг ноты в строке 0..FF: та же кривая по нотам, холст рисует ещё хвост к реальному времени
+  local nfld = vim.cur.field or 1
+  if fl and fl.lane and fl.col and (nfld == 2 or nfld == 3) and sp and not list[1] then
     local fi = vim.cur.fi
     local hs = vim.heads_in(fi, fi, sp.r0, sp.r1 - 1)
     table.sort(hs, function(a, b) return a.row0 < b.row0 end)
     local pts = {}
     for _, h in ipairs(hs) do
-      local v = tonumber(h.vol or '', 16)
-      if v then pts[#pts + 1] = { sp.time(h.row0), v / (h.kind == 'audio' and 255 or 127) } end
+      local v
+      if nfld == 3 then v = (tonumber(h.delay) or 0) / 255
+      else v = tonumber(h.vol or '', 16); v = v and v / (h.kind == 'audio' and 255 or 127) end
+      if v then pts[#pts + 1] = { sp.time(h.row0), v } end
     end
-    list[1] = { kind = 'vel', fi = fi, name = (fl.col.name or '') .. ' / vel', rgb = U.AMBER, write = true, points = pts, track = fl.col.track,
+    list[1] = { kind = 'vel', fld = nfld, fi = fi, name = (fl.col.name or '') .. (nfld == 3 and ' / delay' or ' / vel'), rgb = nfld == 3 and U.CYAN or U.AMBER, write = true, points = pts, track = fl.col.track,
       eval = function(t)
         local r = sp.row_of(t)
         local v
@@ -16873,6 +16877,11 @@ ctx.acv_humanize = function()
 end
 -- 31 окт: мазок / трансформация на кривой vel → громкости нот в строках мазка (мазок — линией между его точками;
 -- трансформация / humanize — значение строки ноты), одной отменой
+-- 31 окт: значение 0..1 в поле ноты кривой: vel (поле 2) или delay (поле 3, 0..FF)
+ctx.acv_nset = function(act, h, v)
+  if act.fld == 3 then edit.set_delay({ h }, state.lpb, v * 255)
+  else edit.set_vol({ h }, state.lpb, v * (h.kind == 'audio' and 255 or 127)) end
+end
 ctx.acv_vel_put = function(act, sp, op, lo, hi)
   local keys = {}
   for r, v in pairs(op.rows) do if v then keys[#keys + 1] = r end end
@@ -16898,7 +16907,7 @@ ctx.acv_vel_put = function(act, sp, op, lo, hi)
   edit.run('canvas vel ' .. (op.tool or ''), function()
     for _, h in ipairs(hs) do
       local v = at(h.row0)
-      if v then edit.set_vol({ h }, state.lpb, math.max(0, math.min(1, v)) * (h.kind == 'audio' and 255 or 127)); n = n + 1 end
+      if v then ctx.acv_nset(act, h, math.max(0, math.min(1, v))); n = n + 1 end
     end
   end)
   ctx.acv_cc = nil
@@ -17087,9 +17096,9 @@ ctx.acv_do = function(op, sp, curves)
     local v
     if op.op == 'nudge' then v = cur + op.d elseif op.op == 'level' then v = op.v else vim.msg = 'vel: draw over the notes (d D c), j k - nudge, 0-9 - level'; return end
     v = math.max(0, math.min(1, v))
-    edit.run('canvas vel', function() for _, h in ipairs(hs) do edit.set_vol({ h }, state.lpb, v * (h.kind == 'audio' and 255 or 127)) end end)
+    edit.run('canvas ' .. act.name, function() for _, h in ipairs(hs) do ctx.acv_nset(act, h, v) end end)
     ctx.acv_cc = nil
-    vim.msg = ('vel: %d%% at row %d'):format(math.floor(v * 100 + 0.5), ACV.row)
+    vim.msg = ('%s: %d%% at row %d'):format(act.name, math.floor(v * 100 + 0.5), ACV.row)
     return
   end
   if act.kind == 'ml' and op.op ~= 'point' then   -- 30 окт: MIDI-лейн — значения строк 0..127

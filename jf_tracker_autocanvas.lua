@@ -513,6 +513,17 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     if ok and lv then U.set(U.GREEN); gfx.circle(rx(span.play_row), vy(lv), 3, 1, 1) end
   end
   trace(ACV.cur, act.rgb or U.GREEN, 1)
+  -- 31 окт: delay нот — хвост от начала строки до реального времени ноты и риска там (грув виден по времени)
+  if act.kind == 'vel' and act.fld == 3 then
+    for _, p in ipairs(act.points or {}) do
+      local row = span.row_of and span.row_of(p[1]) or r0
+      if row >= r0 and row < r1 and p[2] > 0 then
+        local x0, x1, yy = rx(row), rx(row + p[2] * 255 / 256), vy(p[2])
+        U.set(act.rgb or U.CYAN, 0.35); gfx.rect(x1, gy, 1, gh, 1); gfx.a = 1
+        U.set(act.rgb or U.CYAN); gfx.rect(x0, yy, math.max(1, x1 - x0), 1, 1)
+      end
+    end
+  end
   -- точки активной
   U.set(act.rgb or U.GREEN)
   for _, p in ipairs(act.points or {}) do
