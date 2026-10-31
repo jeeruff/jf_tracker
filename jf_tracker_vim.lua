@@ -3202,6 +3202,7 @@ function V.key_impl(c)
         local f = flat()[V.cur.fi]
         local cell = f and f.sub and f.sub[V.cur.row]
         local h = cell and (cell.kind == 'off' or cell.kind == 'cont') and cell.of
+        if cell and cell.clipend then V.msg = '=== is the end of the clip (pattern): the note plays to here - nothing to delete'; V.count = nil; finish_move(); return end
         if h and (h.kind == 'midi' or h.kind == 'audio') then
           local endr = (h.row0 or 0) + math.max(1, h.rows or 1)
           local nx

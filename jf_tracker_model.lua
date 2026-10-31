@@ -602,7 +602,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
         if M.OFF_END and d1 == 0 and r1 > r0 then r1 = r1 - 1 end
         -- 31 окт: нота дотянута до конца клипа (паттерна) — это не OFF, а конец паттерна: без OFF (как в трекерах —
         -- звучит до конца паттерна); иначе dw на таком OFF ничего не мог (дальше клипа ноту не продлить)
-        if inside and b >= qn1 - 1e-6 then tail = nil end
+        if inside and b >= qn1 - 1e-6 then tail.clipend = true; tail.explicit = nil end   -- 31 окт: показ === (тихо), не OFF
         if r1 <= r0 then place(lane, r0, r0, head) else place(lane, r0, r1, head, nil, tail) end
       end
     end
