@@ -1091,15 +1091,25 @@ function V.note_off_scope(scope)
   local heads = {}
   for i, f in ipairs(F) do
     if not f.env and ((scope == 'all') or (scope == 'track' and cur and f.ci == cur.ci) or (scope == 'sub' and i == V.cur.fi)) then
-      for _, h in ipairs(V.covering(i, V.cur.row)) do heads[#heads + 1] = h end
+      for _, h in ipairs(V.covering(i, V.cur.row)) do if not h.stub then heads[#heads + 1] = h end end   -- 31 окт: OFF без ноты — не нота
     end
+  end
+  if #heads == 0 and scope == 'sub' and cur and cur.sub and cur.sub[V.cur.row] and cur.sub[V.cur.row].of and cur.sub[V.cur.row].of.stub then
+    V.msg = 'OFF is already here'; return 0
   end
   if #heads == 0 and scope == 'sub' and cur and cur.sub then   -- 21 окт: тонкая нота выше — дотянуть её до этого OFF
     local h = V.head_above(cur.sub, V.cur.row)
     -- 31 окт: только нота этого паттерна — нота из прошлого паттерна дотянуться не может (её клип кончился), OFF молча
     -- пропадал («note off: 1», а на экране ничего); тогда — all notes off
     local pr0 = ctx.region_rows and ctx.region_rows()
-    if h and not (pr0 and (h.row0 or -1) < pr0) then heads[1] = h end
+    -- 31 окт: выше — OFF без ноты (all notes off): ` ниже переносит его сюда, как OFF ноты
+    if h and h.stub and not (pr0 and (h.row0 or -1) < pr0) and ctx.edit.all_off_del then
+      ctx.edit.all_off_del(h)
+      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+      V.msg = ('OFF moved to row %04d (all notes off)'):format(V.cur.row)
+      return 1
+    end
+    if h and not h.stub and not (pr0 and (h.row0 or -1) < pr0) then heads[1] = h end
   end
   -- 31 окт: ничего не звучит (подколонка) — OFF всё равно ставится: all notes off на трек
   if #heads == 0 and scope == 'sub' and cur and cur.col and not cur.ml and ctx.edit.all_off then
