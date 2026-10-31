@@ -12568,8 +12568,12 @@ function D.frame(L, snap, rows, state, info)
       local insany = info.vmode == 'insert'
       local tf = ((info.focus == 'tracker' and not info.mixfocus) or insany) and D.trk_field
       if tf then
-        set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(tf[1], tf[2], tf[3], tf[4], 0)
-        if ins or insany then gfx.rect(tf[1] + 1, tf[2] + 1, tf[3] - 2, tf[4] - 2, 0) end
+        -- 31 окт: INSERT — рамка по всему модулю трекера (шапки, полоса эффектов, строки): поле строк часть сторон
+        -- теряло (верх закрывала полоса эффектов, правый край уходил под соседнюю панель)
+        local fr = ((ins or insany) and rects.tracker) or tf
+        set(D.MODE_COL[info.vmode] or D.MODE_COL.normal); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0)
+        if ins or insany then gfx.rect(fr[1] + 1, fr[2] + 1, fr[3] - 2, fr[4] - 2, 0) end
+        D.ins_frame = (ins or insany) and fr or nil
       end
       -- 15 окт: опция focus beacon — фокус перешёл в модуль: рамка вспыхивает и стягивается к нему за 0.4 с
       local now = reaper.time_precise()

@@ -24132,6 +24132,8 @@ local function frame()
   -- наложения в буфер вовсе: они идут в пустышку 797 (1×1, всё отсекается), логика их (наведение, клики) работает,
   -- а на экран идёт буфер прошлого полного кадра — с его наложениями, нарисованными один раз
   -- (переключение на пустышку 797 — выше, сразу после тела кадра)
+  -- 31 окт: рамка INSERT — ещё раз поверх полосы эффектов и оверлеев (иначе верх перекрывался)
+  if draw.ins_frame then local fr = draw.ins_frame; U.set(draw.MODE_COL and draw.MODE_COL.insert or U.RED); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0); gfx.rect(fr[1] + 1, fr[2] + 1, fr[3] - 2, fr[4] - 2, 0) end
   draw.pmark('post: hints, ghosts, popups')
   draw.pane_badge_tracker(L, state.pane_mode)
   HN.draw(U, L)
