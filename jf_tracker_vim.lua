@@ -1096,7 +1096,10 @@ function V.note_off_scope(scope)
   end
   if #heads == 0 and scope == 'sub' and cur and cur.sub then   -- 21 окт: тонкая нота выше — дотянуть её до этого OFF
     local h = V.head_above(cur.sub, V.cur.row)
-    if h then heads[1] = h end
+    -- 31 окт: только нота этого паттерна — нота из прошлого паттерна дотянуться не может (её клип кончился), OFF молча
+    -- пропадал («note off: 1», а на экране ничего); тогда — all notes off
+    local pr0 = ctx.region_rows and ctx.region_rows()
+    if h and not (pr0 and (h.row0 or -1) < pr0) then heads[1] = h end
   end
   -- 31 окт: ничего не звучит (подколонка) — OFF всё равно ставится: all notes off на трек
   if #heads == 0 and scope == 'sub' and cur and cur.col and not cur.ml and ctx.edit.all_off then
