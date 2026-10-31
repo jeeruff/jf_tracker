@@ -4785,7 +4785,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
     -- 15 окт: listen — третьей строкой, под цифрой (слева — вертикальная подпись step на весь блок)
     -- 16 окт: как oct / vel — listen под цифрой шага (с начала блока), insert step sel line — под колонкой LPB / pitch
     -- 31 окт: listen — ячейкой ширины шага: insert ровно под pitch (столбец LPB / pitch)
-    local row4 = { { '_listen', 'listen', U.GREY, w = stepw } }   -- подпись строки, не кнопка
+    local row4 = { { '_listen', 'listen:', U.DIM, w = stepw } }   -- 31 окт: подпись — с двоеточием, тусклее кнопок   -- подпись строки, не кнопка
     for _, it in ipairs(lsn) do row4[#row4 + 1] = it end
     table.insert(g[#g], row4)
   else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
@@ -5093,7 +5093,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- 16 окт: подпись длиннее двух строк (step) — выше, в верхний отступ полосы (до 3 px), не в строку listen
           local vh = (it.vlab_rows or 2) * L.rh
           local up = math.max(0, math.min(3, ms(it.vlab) - vh))
-          D.vtext(cx, cy - up, vh + up + 2, it.vlab, U.GREY, U.PANEL)   -- +2 — зазор до строки listen
+          D.vtext(cx, cy - up, vh + up + 2, it.vlab, U.DIM, U.PANEL)   -- 31 окт: подпись step тусклее кнопок   -- +2 — зазор до строки listen
           -- 19 окт: step сменился — цифра вспыхивает крупнее (×4 → ×2 за полсекунды), янтарём
           local fl = it[1] == 'step' and D.step_flash and reaper.time_precise() - D.step_flash
           if fl and fl < 0.5 and D.stepflash_on then
