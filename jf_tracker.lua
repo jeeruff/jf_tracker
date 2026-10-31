@@ -32417,7 +32417,37 @@ ctx.sf_ghost = function()
 end
 -- 31 окт: zw / кнопка W — все треки одной ширины (ручные уровни сброшены), самая широкая, при которой влезают все;
 -- autozoom выключается (он держит трек курсора широким)
+-- 31 окт: второе zw подряд — slim: у каждого трека столько колонок команд, сколько занято (самая длинная строка
+-- команд его нот), трек без событий — компактно (нота + волна); третье — снова поровну
+ctx.fit_slim = function()
+  state.autozoom = nil
+  state.wlevel = state.wlevel or {}
+  local maxfx = L and L.MAXFX or 4
+  local nslim = 0
+  for _, col in ipairs(snap and snap.cols or {}) do
+    if not col.master then
+      local used, any = 0, false
+      for _, ln in ipairs(col.lanes or {}) do
+        for _, sub in ipairs(ln.subs or {}) do
+          for _, c in pairs(sub) do
+            if type(c) == 'table' then
+              if c.kind == 'midi' or c.kind == 'audio' then any = true; used = math.max(used, #(c.fx or {})) end
+              if c.fx and c.kind == 'cont' then used = math.max(used, #c.fx) end
+            end
+          end
+        end
+      end
+      state.wlevel[col.guid] = any and (3 + math.min(maxfx, used)) or 1
+      nslim = nslim + 1
+    end
+  end
+  relayout()
+  vim.msg = ('zw slim: %d tracks - only the command columns in use, empty tracks compact (zw - even again)'):format(nslim)
+end
 ctx.fit_width = function()
+  local now = reaper.time_precise()
+  if ctx.zw_t and now - ctx.zw_t < 8 and ctx.zw_mode == 'even' then ctx.zw_t, ctx.zw_mode = now, 'slim'; return ctx.fit_slim() end
+  ctx.zw_t, ctx.zw_mode = now, 'even'
   state.autozoom = nil; reaper.SetExtState(EXT, 'autozoom', '0', true)
   state.wlevel = {}; state.wzlevel = nil; state.hscroll = 0
   relayout()
@@ -32442,6 +32472,37 @@ ctx.fit_height = function()
   local q = reaper.TimeMap2_timeToQN(0, t1) - reaper.TimeMap2_timeToQN(0, t0)
   if q <= 0 or not L then return end
   local best
+  -- 31 окт: второе zh подряд — slim: самый крупный шаг (меньший LPB), при котором все ноты вида стоят на строках
+  -- (ничего не складывается); третье — снова «влезть по высоте»
+  local now = reaper.time_precise()
+  local slim = ctx.zh_t and now - ctx.zh_t < 8 and ctx.zh_mode == 'fit'
+  ctx.zh_t, ctx.zh_mode = now, slim and 'slim' or 'fit'
+  if slim then
+    local qs = {}
+    local ra, rb = model.row_of_time(t0, state.lpb), model.row_of_time(t1, state.lpb)
+    for _, col in ipairs(snap and snap.cols or {}) do
+      for _, ln in ipairs(col.lanes or {}) do
+        for _, sub in ipairs(ln.subs or {}) do
+          for r, c in pairs(sub) do
+            if type(r) == 'number' and r >= ra and r < rb and type(c) == 'table' and (c.kind == 'midi' or c.kind == 'audio' or c.kind == 'off') then
+              qs[#qs + 1] = (r + (c.delay or 0) / 256) / state.lpb
+            end
+          end
+        end
+      end
+    end
+    for _, v in ipairs(LPBS) do
+      local ok = true
+      for _, qq in ipairs(qs) do local x = qq * v; if math.abs(x - math.floor(x + 0.5)) > 0.03 then ok = false; break end end
+      if ok then best = v; break end
+    end
+    best = best or LPBS[#LPBS]
+    set_lpb(best)
+    state.row0 = math.max(0, math.floor(model.row_of_time(t0, state.lpb) + 1e-6))
+    relayout()
+    vim.msg = ('zh slim: LPB %d - the coarsest step where every note of the %s sits on a row (zh - fit again)'):format(best, vm)
+    return
+  end
   for _, v in ipairs(LPBS) do if q * v <= L.nrows and (not best or v > best) then best = v end end
   best = best or LPBS[1]
   set_lpb(best)
