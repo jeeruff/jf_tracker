@@ -5190,10 +5190,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if c.tpfull then   -- 19 окт: mark под <<, rate под play, тоглы записи — правее play
       TW[1] = math.max(TW[1], ms('mark') + L.pad)   -- 21 окт: на символ уже (подпись mark — без полного отступа)
       if pi then TW[pi] = math.max(TW[pi], ms('x1.10') + 2 * L.pad) end
-      need = ms('pun') + ms('pre') + ms('slo*') + ms('rip*') + 8 * L.pad
+      -- 31 окт: тоглы записи — pun pre slo qtz (ripple ушёл под roll), начинаются на 2 знака левее колонки после play
+      need = ms('pun') + ms('pre') + ms('slo*') + ms('qtz') + 8 * L.pad
       local pre = -2
       for i = 1, (pi or 2) do pre = pre + TW[i] + 2 end
-      need = pre + 2 + need
+      need = pre + 2 - 2 * ms('x') + need
     end
     D.tp_play_i = pi
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
