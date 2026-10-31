@@ -2493,7 +2493,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
       else text(x + L.x_fx[i], ty, '....', c(3 + i, D.EMPTY)) end
     end
   elseif k == 'off' then
-    text(x + L.x_note, ty, D.OFF_TXT or 'OFF', c(1, D.CONT))   -- 8 окт: опция note OFF glyph — «|» вместо OFF
+    -- 31 окт: опция IT OFF — свободный OFF (all notes off, без ноты) как ^^^ (note cut Impulse Tracker), конец ноты — OFF
+    text(x + L.x_note, ty, (D.OFF_IT and cell.of and cell.of.stub) and '^^^' or (D.OFF_TXT or 'OFF'), c(1, D.CONT))   -- 8 окт: опция note OFF glyph — «|» вместо OFF
     if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
     if L.narrow or L.notes_only then
     elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.CONT))
@@ -7396,6 +7397,7 @@ function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or 'OFF'
+  D.OFF_IT = state.offit and true or nil
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
