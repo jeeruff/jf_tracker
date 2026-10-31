@@ -52,7 +52,7 @@ function SX.items(v, P)
       { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM, tip = 'note layout: chromatic, piano (white keys), or by class' },
       { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity', tip = 'vel: ignore incoming velocity (fixed level)' },
       { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16, tip = 'MIDI channel it listens to (omni - all)' },
-      { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 24) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'the note of slice 1' },
+      { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 48) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'the note of slice 1 (default C3 = 48)' },
     },
     {
       { kind = 'zone', lab = 'ARP' },
