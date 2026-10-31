@@ -8670,8 +8670,10 @@ function D.frame(L, snap, rows, state, info)
     -- 31 окт: порядок pat sec proj (от малого к большому): зелёный, жёлтый (секции везде жёлтые), красный;
     -- выбранная — словом целиком, если влезает (остальные коротко)
     local long = ({ pattern = 'pattern', section = 'section', project = 'project' })[vm]
-    local full = long and (ms(long) + 2 * ms('proj') + 9 <= bw)
-    local function lab(m, short) return (full and vm == m) and m or short end
+    local function lab(m, short) return (vm == m) and m or short end
+    -- 31 окт: место — по настоящим подписям (было с запасом на два «proj» — project не влезал, хотя место было)
+    local full = long and (ms(lab('pattern', 'pat')) + ms(lab('section', 'sec')) + ms(lab('project', 'proj')) + 3 * 2 + 2 * 2 <= bw)
+    if not full then lab = function(_, short) return short end end
     x0 = small(x0, hy + 1, lab('pattern', 'pat'), 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
     x0 = small(x0, hy + 1, lab('section', 'sec'), 'sec', vm == 'section', 'viewbtn', U.AMBER)
     small(x0, hy + 1, lab('project', 'proj'), 'all', vm == 'project', 'viewbtn', U.RED)
