@@ -7056,7 +7056,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local stack = #c.tabs >= 1                        -- 10 окт: вкладки везде — и у одиночной панели (|lib|), как у стека |rec|item|
         -- 31 окт: подписи не влезают (обрезки «f», «manua») — активная целиком и «>» со списком всех вкладок стопки
         local cramped = false
-        for _, t in ipairs(c.tabs) do if ms(D.ic(t.id, PN.BY[t.id].label)) > t.w - 2 * L.pad then cramped = true; break end end
+        for _, t in ipairs(c.tabs) do if ms(D.ic(t.id, PN.BY[t.id].label)) > t.w - 2 then cramped = true; break end end   -- 31 окт: по настоящей ширине вкладки (вкладки встык — запас был лишним, > стояла везде)
         local tabs = c.tabs
         if cramped and #c.tabs > 1 then
           local t0 = c.tabs[1]
@@ -7073,7 +7073,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           if mhot then local ids = {}; for _, t in ipairs(c.tabs) do ids[#ids + 1] = t.id end; hover.ptabmore = ids end
         end
         for _, t in ipairs(tabs) do
-          local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - 2 * L.pad)
+          local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - L.pad - 2)
           if lbl ~= '' then
             local on = t.id == id
             local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
