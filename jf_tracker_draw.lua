@@ -10864,6 +10864,7 @@ function D.frame(L, snap, rows, state, info)
       -- 27 окт: rounded racks — и модули со скруглёнными углами; край модуля — 2 px и контрастнее линий внутри (иерархия границ)
       -- 27 окт: D.mod_box без локали (у этой функции предел 200 локалей в Lua 5.4 — проверка tools/maxlocals.py / luac5.4)
       set(in_rng and U.tint(U.CYAN, 0.22) or U.BG); D.mod_box(bx, by, bw, bh, true)   -- 19 окт: выбранный — рамкой и заголовком, без заливки (она гасила цвета внутри)
+      if not in_rng then set(U.mix(U.BG, U.TEXT, 0.07)); gfx.rect(bx + 1, by + 1, bw - 2, L.rh, 1) end   -- 31 окт: шапка модуля чуть светлее тела — выделяется
       local ins_here = is_sel and info.dsp_ins   -- 22 окт: INSERT параметра — рамка модуля красная, двойная
       -- 24 окт: выбранный — янтарь в 2 px, остальные — рамка тише (выбранный модуль терялся среди рамок рэка)
       set(ins_here and U.RED or ((info.dsp_learn == k) and U.CYAN or ((f.enabled and not f.poff) and (is_sel and U.AMBER or U.mix(U.LINE, U.TEXT, 0.35)) or U.DIM))); D.mod_box(bx, by, bw, bh, false)
