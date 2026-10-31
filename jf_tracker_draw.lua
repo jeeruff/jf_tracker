@@ -3616,6 +3616,8 @@ function D.slx_stretch_col(L, f, k, x, y, w, hover, mx, my, drag, text, ms, set)
   local lay = D.SX.layout({ items }, x, y + L.rh, w, L.rh, ms, L.pad)
   local hb = D.SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
   if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h, trk = hb.trk } end
+  -- 31 окт: метки f-прыжков и на кнопках / ползунках STRETCH (были только у рядов пульта)
+  for _, b in ipairs(lay) do if b.it.kind ~= 'zone' then hint('slx', b.x, b.y, b.w, L.rh - 1, { fx = k, f = f, it = b.it, x = b.x, y = b.y, w = b.w, h = L.rh - 1 }) end end
 end
 function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
   local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
