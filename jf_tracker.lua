@@ -272,7 +272,16 @@ local state = {
   dsptrackslim = flag('dsptrackslim', false),    -- 22 окт: блок трека в DSP узкой вертикальной колонкой
   dsptrack = flag('dsptrack', false),             -- блок трека слева в DSP (R I M S, vol, pan, in, out); по умолчанию выкл (6 окт)
   synchdr = flag('synchdr', false),               -- колонка трека сворачивается по высоте трека REAPER (6 окт)
-  quick = (reaper.GetExtState(EXT, 'quick') ~= '' and reaper.GetExtState(EXT, 'quick')) or nil,   -- быстрые опции: набор (6 окт)
+  -- 31 окт: кнопки ln нет — line number (rowjumps) в быстрых опциях, один раз дописывается в сохранённый набор
+  quick = (function()
+    local q = reaper.GetExtState(EXT, 'quick')
+    if q == '' then return nil end
+    if not q:find('rowjumps', 1, true) and reaper.GetExtState(EXT, 'mig_rowjumps') ~= '1' then
+      q = q:gsub('^([^|]*)', '%1,rowjumps', 1)
+      reaper.SetExtState(EXT, 'mig_rowjumps', '1', true)
+    end
+    return q
+  end)(),   -- быстрые опции: набор (6 окт)
   debug = flag('debug', false),                    -- отладка: лог в jf_tracker_debug.log (6 окт)               -- точки automation item на лейне трекера (6 окт)
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
@@ -4750,7 +4759,7 @@ ctx = {
   -- быстрые опции (6 окт): набор настраивается ПКМ по имени опции в окне
   -- Options (точка перед именем — «есть в быстрых»). Три колонки «a,b|c|d»;
   -- ключ опции → id встроенной клетки, где она есть; иначе клетка общая
-  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,q_hints,pianokeys,q_listen,debug,measure,title|dsp_big,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,waveonly,textonly,q_colors,q_envs,q_meters,q_dsp|whichkey,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade,ptmode',
+  QUICK_DEFAULT = 'q_mx,q_ruler,jumps,rowjumps,q_hints,pianokeys,q_listen,debug,measure,title|dsp_big,dbmarks,q_scopes,q_input,q_captions,q_names,q_wave,waveonly,textonly,q_colors,q_envs,q_meters,q_dsp|whichkey,q_preview,q_keys,oneclick,autofocus,autoinst,armsel,perf,follow,lock,fixed,xfade,ptmode',
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
@@ -23867,21 +23876,9 @@ local function frame()
       local mx0, my0 = gfx.mouse_x, gfx.mouse_y
       -- 20 окт (3): ln — номера-прыжки строк вкл / выкл: над их колонкой (её нет — справа в строке);
       -- имя — с полосы регионов линейки (цветная черта продолжается в линейку вниз)
-      local lnw = U.measure('ln') + 4
-      local lnx
-      if not L.ruler_right and (L.rg_w or 0) > 0 and (L.jl_w or 0) >= lnw + 2 then
-        lnx = L.matrix_w + 1 + math.floor((L.jl_w - lnw) / 2)
+      -- 31 окт: кнопки ln нет — номера строк быстрой опцией (line number)
+      if not L.ruler_right and (L.rg_w or 0) > 0 and (L.jl_w or 0) > 0 then
         bx = L.matrix_w + L.jl_w + 3; bw = L.label_w - L.jl_w - 4
-      else
-        bw = bw - lnw - 2; lnx = bx + bw + 2
-      end
-      do
-        local on = state.rowjumps
-        local lh = mx0 >= lnx and mx0 < lnx + lnw and my0 >= y0 and my0 < y0 + L.rh
-        U.set(lh and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(lnx, y0 + 1, lnw, L.rh, 1)
-        U.set(lh and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(lnx, y0 + 1, lnw, L.rh, 0)
-        U.text(lnx + 2, y0 + 1, 'ln', lh and U.AMBER or (on and U.CYAN or U.TEXT))
-        if lh then hover.viewbtn = 'rowjumps' end
       end
       local nhot = mx0 >= bx and mx0 < bx + bw and my0 >= y0 and my0 < y0 + L.rh
       if rgf then
