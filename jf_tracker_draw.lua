@@ -3598,6 +3598,17 @@ end
 
 -- ползунок настройки модуляции: имя, полоса, значение; протяжка — ctx.mdrag
 -- 31 окт: 8 слотов быстрой загрузки slixer плитками в полосе sx0..sx1 на высоте qy (мини-волна, имя поверх)
+-- 31 окт: колонка STRETCH пульта slixer (после LEVEL): заголовок янтарём, кнопки алгоритма и слайдеры потоком в ширину колонки
+function D.slx_stretch_col(L, f, k, x, y, w, hover, mx, my, drag, text, ms, set)
+  local st = D.slx_st and D.slx_st[f.i]
+  if not st then return end
+  text(x, y, 'STRETCH', U.AMBER)
+  local items = {}
+  for _, it in ipairs(st) do if it.kind ~= 'zone' then items[#items + 1] = it end end
+  local lay = D.SX.layout({ items }, x, y + L.rh, w, L.rh, ms, L.pad)
+  local hb = D.SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
+  if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h, trk = hb.trk } end
+end
 function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
   local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
   if qw < L.cw * 3 then return false end
@@ -9888,7 +9899,8 @@ function D.frame(L, snap, rows, state, info)
         return math.min(5 + lst, 2 + extra + lst) + nsl
       end
       if f.bands and f.kids and #f.kids > 0 then return 1 end   -- 23 окт: ÷N — список полос + кроссовер; эффекты полосы — модулями за ним
-      if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end   -- ReaEQ: график на 2 колонки / только параметры
+      if f.view == 'eq' then return info.eqgraph and 2 or (f.cols or 1) end
+      if f.view == 'slixer' and D.slx_st and D.slx_st[f.i] and f.groups then return (f.cols or 1) + 1 end   -- 31 окт: + колонка STRETCH   -- ReaEQ: график на 2 колонки / только параметры
       if f.auto then
         local rows_fit = math.max(1, math.floor((bh0 - L.rh - 2 - ((f.pages and f.page and (info.dsptabs or 'bottom') ~= 'right') and (L.rh + 1) or 0)) / L.rh))   -- 22 окт: минус строка вкладок
         local _, nc = D.param_flow(f.params, f.heads, rows_fit, 0)   -- 22 окт: с высотой столбиков кнопок и заголовками секций (zP развёрнуто)
@@ -10379,7 +10391,8 @@ function D.frame(L, snap, rows, state, info)
         -- 25 окт: пульт slixer 1 в 1 с окном: ряды кнопок, обзор, волна (пэдов нет, 26 окт); параметры — под ними
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
         local P = function(name) return info.slx_param and info.slx_param(f.i, name) end
-        local rows, low = D.SX.items(v0, P)
+        local rows, low, stl = D.SX.items(v0, P)
+        D.slx_st = D.slx_st or {}; D.slx_st[f.i] = stl   -- 31 окт: STRETCH — колонкой после LEVEL (ncol_of + сдвиг ARP)
         local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad - (f.slx_hdrw or 0), L.rh, ms, L.pad)   -- 31 окт: справа — кнопки шапки
         local _, nb2 = D.SX.layout(low or {}, 0, 0, bw - 2 * L.pad, L.rh, ms, L.pad)   -- 26 окт: MIDI · ARP под волной
         if not (low and #low > 0) then nb2 = 0 end
@@ -11441,7 +11454,7 @@ function D.frame(L, snap, rows, state, info)
         local v = G.v
         local x0, y0, w0 = bx + L.pad, by + L.rh + 1, bw - 2 * L.pad
         local hb = D.SX.draw_buttons(U, L, G.lay, text, ms, set, mx, my, drag)
-        if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h } end
+        if hb then hover.slx = { fx = k, f = f, it = hb.it, x = hb.x, y = hb.y, w = hb.w, h = hb.h, trk = hb.trk } end
         -- 31 окт: слоты быстрой загрузки — строкой в самом низу модуля (как было в окне плагина)
         if info.slx_slots then D.slx_slots(L, info, f, k, x0, x0 + w0, by + bh - L.rh - 2, hover, mx, my, drag) end
         local wy = y0 + (G.nbr - (G.nb2 or 0)) * L.rh
@@ -11805,6 +11818,10 @@ function D.frame(L, snap, rows, state, info)
         if spos then if spos[pi][1] >= ncol then break end
         elseif not cl and pi > nfit * (ncol - pcol0) then break end
         local colk = spos and spos[pi][1] or (pcol0 + math.floor((pi - 1) / nfit))
+        if grp and not spos and f.view == 'slixer' and D.slx_st and D.slx_st[f.i] and math.floor((pi - 1) / nfit) >= 3 then   -- 31 окт: ARP / TIME — за STRETCH
+          colk = colk + 1
+          if colk >= ncol then break end
+        end
         local py = by + L.rh + 1 + aw_off + (spos and spos[pi][2] or ((pi - 1) % nfit)) * L.rh
         if grp and (pi - 1) % nfit == 0 then
           local gt = f.groups[math.floor((pi - 1) / nfit) + 1]
@@ -12044,6 +12061,9 @@ function D.frame(L, snap, rows, state, info)
         -- 14 окт: CONTROL (Opt+Cmd с 26 окт) — параметры колонки устройства одной группой
         if D.slr then D.slr[#D.slr + 1] = { g = 'dsp:' .. tostring(k) .. ':' .. bxc, dsp = true, fx = p.fx or f.i, p = p.i, name = p.name .. (p.mk or ''), own = f.name, pn = p.name .. (p.mk or ''), x = bxc + L.pad, y = py, w = pw, h = L.rh } end
         ::next_param::
+      end
+      if grp and f.view == 'slixer' and D.slx_st and D.slx_st[f.i] and pcol0 + 3 < ncol then   -- 31 окт: колонка STRETCH после LEVEL
+        D.slx_stretch_col(L, f, k, bx + (pcol0 + 3) * bw1 + L.pad, by + L.rh + 1 + wtop, pw, hover, mx, my, drag, text, ms, set)
       end
       -- 24 окт: контейнер — под ручками макросов что на каком: «M1 Serum cutoff +50»
       f._ybot, f._nomac = nil, nil

@@ -20045,7 +20045,8 @@ function ctx.slx_do(h)
     local v = ctx.slx_param(fi, it.name)
     if it.kind == 'tog' then setp(it.name, (v or 0) > 0.5 and 0 or 1) end
   elseif it.src == 'op' then
-    if it.code == 7 then ctx.slx_cmd(7, it.arg)
+    if it.code == 13 and it.kind == 'tog' then ctx.slx_cmd(13, it.field, it.arg or 0)   -- 31 окт: STRETCH — алгоритм кнопкой
+    elseif it.code == 7 then ctx.slx_cmd(7, it.arg)
     elseif it.kind == 'tog' then ctx.slx_cmd(it.code, it.on and 0 or 1)
     else ctx.slx_cmd(it.code, it.arg or 0) end
   elseif it.src == 'press' then
@@ -20061,6 +20062,13 @@ function ctx.slx_vdrag_tick()
   if gfx.mouse_cap & 1 == 0 then ctx.slx_vdrag = nil; return end
   local h = D0.h
   local f = h.f; local fi = f.fx or f.i
+  if h.it.src == 'op' and h.it.code == 13 then   -- 31 окт: слайдеры STRETCH — заказ 13 (не чаще 20 раз в секунду)
+    local fr = math.max(0, math.min(1, (gfx.mouse_x - h.trk.x) / math.max(1, h.trk.w)))
+    local now = reaper.time_precise()
+    if fr ~= D0.last_fr and now - (D0.t13 or 0) >= 0.05 then D0.t13, D0.last_fr = now, fr; ctx.slx_cmd(13, h.it.field, fr) end
+    state.status = ('slixer: %s %d %%'):format(h.it.lab, math.floor(fr * 100 + 0.5))
+    return
+  end
   local _, pi, lo, hi, tr = ctx.slx_param(fi, h.it.name)
   if not pi then return end
   lo, hi = h.it.lo or lo, h.it.hi or hi
@@ -20077,6 +20085,10 @@ function ctx.slx_vdrag_tick()
   end
 end
 function ctx.slx_wheel(h, d)   -- колесо: число на кнопке val — шаг; над волной — зум к мыши
+  if h.it and h.it.kind == 'val' and h.it.src == 'op' and h.it.code == 13 then   -- 31 окт: слайдеры STRETCH
+    ctx.slx_cmd(13, h.it.field, math.max(0, math.min(1, (h.it.raw or 0.5) + d * (h.it.step or 0.05))))
+    return
+  end
   if h.it and h.it.kind == 'val' then
     local f = h.f; local fi = f.fx or f.i
     local v, pi, lo, hi, tr = ctx.slx_param(fi, h.it.name)
