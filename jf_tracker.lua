@@ -16646,7 +16646,7 @@ end
 ctx.ctl_lane_start = function()
   -- 30 окт: фокус на холсте curve, инструмент draw / line / erase — палец по трекпаду рисует мазок от курсора холста
   local A = ctx.ACV
-  if state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and A and A.tool ~= 'cur' and A.geo then
+  if state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and A and A.tool ~= 'cur' and A.tool ~= 'sel' and A.geo then
     local g = A.geo
     local sp = ctx.acv_span()
     local act = ctx.acv_curves(sp)[A.cur]
@@ -16805,6 +16805,28 @@ ctx.ctl_lane_write = function(SG)
   if fl.env and fl.env.env then ctx.env_set(fl.env, SG.row, SG.v); model.invalidate()
   elseif fl.ml then ctx.ml_set(fl, SG.row, math.max(0, math.min(127, math.floor(SG.v * 127 + 0.5)))) end
 end
+-- 31 окт: выделение холста → новые точки (трансформация / humanize) — одной записью (op put), одна отмена
+ctx.acv_replace = function(old, new, box, what)
+  local A = ctx.ACV
+  local sp = ctx.acv_span(); local curves = ctx.acv_curves(sp)
+  local act = curves[A.cur]
+  if not act then return end
+  local map, a, b = A.replace_rows(old, new, box, act.kind == 'ml')
+  ctx.acv_do({ op = 'put', rows = map, a = a, b = b, tool = what }, sp, curves)
+end
+ctx.acv_humanize = function()
+  local A = ctx.ACV
+  local sp = ctx.acv_span(); local curves = ctx.acv_curves(sp)
+  local act = curves[A.cur]
+  if not act then return end
+  local a, b
+  if A.sel then a, b = A.sel.a, A.sel.b else a, b = A.range({ r0 = sp.r0, r1 = sp.r1 }, true) end
+  local pts = A.sel_points(act, sp, a, b)
+  if #pts == 0 then vim.msg = 'humanize: no points here - select with sel (T) or put the cursor on a cell with points'; return end
+  A.seed = A.seed + 1
+  ctx.acv_replace(pts, A.humanize(pts, 0.08, A.seed), { a = a, b = b }, 'humanize')
+  vim.msg = ('humanize: %d point(s) +-8%%, rows %g..%g (again - another spread)'):format(#pts, a, b)
+end
 ctx.acv_do = function(op, sp, curves)
   local ACV = ctx.ACV
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
@@ -16860,7 +16882,24 @@ ctx.acv_do = function(op, sp, curves)
       local map, keys = {}, {}
       for r in pairs(op.rows) do keys[#keys + 1] = r end
       table.sort(keys)
-      for _, r in ipairs(keys) do local v = op.rows[r]; map[math.floor(r + 1e-9)] = v and v * 127 or false end
+      if op.tool == 'draw' or op.tool == 'line' or op.tool == 'shape' then
+        -- 31 окт: мазок переписывает КАЖДУЮ строку своего отрезка (значение — по линии между точками мазка),
+        -- иначе старые значения между точками формы оставались (квадраты сквозь синус)
+        local ra = math.floor((op.a or lo) + 1e-9)
+        local rb = op.b and (math.ceil(op.b - 1e-9) - 1) or math.floor(hi + 1e-9)
+        local k = 1
+        for r = ra, rb do
+          while k < #keys and keys[k + 1] <= r + 1e-9 do k = k + 1 end
+          local r1, r2 = keys[k], keys[k + 1]
+          local v
+          if r <= keys[1] then v = op.rows[keys[1]]
+          elseif not r2 then v = op.rows[r1]
+          else local f = (r - r1) / math.max(1e-9, r2 - r1); v = op.rows[r1] + (op.rows[r2] - op.rows[r1]) * f end
+          map[r] = v * 127
+        end
+      else
+        for _, r in ipairs(keys) do local v = op.rows[r]; map[math.floor(r + 1e-9)] = v and v * 127 or false end
+      end
       ctx.ml_write(act.f, map, act.f.ml.name .. ' ' .. op.tool)
     elseif act.kind == 'lfo' or act.kind == 'acs' then vim.msg = 'canvas: this curve is a modulation - draw on its envelope (Tab)'; return
     else
@@ -16897,7 +16936,7 @@ ctx.acv_do = function(op, sp, curves)
       local level = cur / 127
       if level < 0.02 then level = 1 end
       if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end
-      for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do if p.row < b then map[p.row] = p.v * 127 end end
+      for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.cycle, level, ACV.seed)) do if p.row < b then map[p.row] = p.v * 127 end end
       ACV.anchor = nil
       what = ('%s on rows %d..%d'):format(op.shape, a, b - 1)
     else return end
@@ -16929,10 +16968,10 @@ ctx.acv_do = function(op, sp, curves)
     if op.shape == 'rnd' then ACV.seed = ACV.seed + 1 end
     local raw = function(v) return (e.min or 0) + math.max(0, math.min(1, v)) * ((e.max or 1) - (e.min or 0)) end
     local pts = {}
-    for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.grid, level, ACV.seed)) do pts[#pts + 1] = { t = t2e(sp.time(p.row)), v = raw(p.v), shape = p.shape } end
+    for _, p in ipairs(ACV.shape_points(op.shape, a, b, ACV.cycle, level, ACV.seed)) do pts[#pts + 1] = { t = t2e(sp.time(p.row)), v = raw(p.v), shape = p.shape } end
     edit.env_put_points(e, t2e(sp.time(a)), t2e(sp.time(b)), pts)
     ACV.anchor = nil
-    vim.msg = ('%s: %s on rows %d..%d, grid %s, %d point(s)'):format(act.name, op.shape, a, b - 1, ACV.grid_label(ACV.grid, state.lpb), #pts)
+    vim.msg = ('%s: %s on rows %d..%d, cycle %s, %d point(s)'):format(act.name, op.shape, a, b - 1, ACV.grid_label(ACV.cycle, state.lpb), #pts)
   elseif op.op == 'point' then
     local best
     for _, p in ipairs(act.points or {}) do
@@ -25273,12 +25312,18 @@ local function frame()
       if lfo_hover.legend then ctx.ACV.cur = lfo_hover.legend end   -- 15 окт: щелчок по легенде — активная кривая
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
-      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
+      if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', sel = 'sel (T): drag - select rows; diamonds: corners tilt, sides stretch, inside moves; Esc - off', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end
       if lfo_hover.tbshapeset then A.shape = lfo_hover.tbshapeset; A.tool = 'shape'; vim.msg = 'shape ' .. A.shape_name(A.shape) .. ': drag over the canvas - the span, up / down - the height (c - the tool)' end
       if lfo_hover.tbshape then   -- 30 окт: форма для shape
         local items = {}
         for _, x in ipairs(A.SHAPE_LIST) do items[#items + 1] = { key = x[1], label = x[3] .. (A.shape == x[2] and '  *' or ''), fn = function() A.shape = x[2]; A.tool = 'shape'; vim.msg = 'shape: ' .. x[3] .. ' - drag over the canvas: the span, the height - up / down' end } end
         vim.open_hydra({ title = 'canvas shape (as in Ableton: per grid cell)', items = items })
+      end
+      if lfo_hover.tbhum then ctx.acv_humanize() end
+      if lfo_hover.tbcyc then   -- 31 окт: цикл формы
+        local items = {}
+        for i, g in ipairs(A.CYCLES) do items[#items + 1] = { key = tostring(i), label = A.grid_label(g, state.lpb) .. (math.abs(A.cycle - g) < 1e-9 and '  *' or ''), fn = function() A.cycle = g end } end
+        vim.open_hydra({ title = 'shape cycle (Opt while dragging a shape - up / down, freely)', items = items })
       end
       if lfo_hover.tbsnap then A.snap = not A.snap; vim.msg = 'snap (S): ' .. (A.snap and 'the stroke goes by grid cells' or 'off - by rows') end
       if lfo_hover.tbgrid == -1 or lfo_hover.tbgrid == 1 then ctx.acv_key(lfo_hover.tbgrid < 0 and 91 or 93)
@@ -25291,7 +25336,16 @@ local function frame()
       end
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
-        if A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
+        if A.tool == 'sel' and lfo_hover.geo and lfo_hover.xh and A.sel then   -- 31 окт: ручка рамки — трансформация
+          local sp2 = ctx.acv_span(); local act2 = ctx.acv_curves(sp2)[A.cur]
+          local pts = A.sel_points(act2, sp2, A.sel.a, A.sel.b)
+          local box = A.box_of(pts, A.sel.a, A.sel.b)
+          if box then ctx.acv_xdrag = { h = lfo_hover.xh, geo = lfo_hover.geo, pts = pts, box = box, mx0 = gfx.mouse_x, my0 = gfx.mouse_y } end
+        elseif A.tool == 'sel' and lfo_hover.geo then   -- 31 окт: рамка строк
+          local r = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
+          ctx.acv_mdrag = { tool = 'sel', geo = lfo_hover.geo, r_s = r }
+          A.sel = nil
+        elseif A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v, mx0 = gfx.mouse_x, my0 = gfx.mouse_y }
           if A.tool == 'shape' then local rows, a, b = A.shape_stroke(r, r, v); A.stroke = { rows = rows, a = a, b = b }
@@ -27235,10 +27289,45 @@ local function frame()
       state.hscroll = L.hs_list[b + 1] or state.hscroll
     else draw.hsb_drag = nil end
   end
-  if ctx.acv_mdrag then   -- 30 окт: мазок мыши по холсту curve (draw / line / erase)
+  if ctx.acv_xdrag then   -- 31 окт: трансформация выделения холста ручкой рамки
+    local d, A = ctx.acv_xdrag, ctx.ACV
+    local g = d.geo
+    local dr = (gfx.mouse_x - d.mx0) / math.max(1, g.gw) * g.nr
+    local dv = -(gfx.mouse_y - d.my0) / math.max(1, g.gh - 4)
+    if A.snap and (d.h == 'move' or d.h == 'l' or d.h == 'r') then dr = math.floor(dr / A.grid + 0.5) * A.grid end
+    if d.h == 'l' or d.h == 'r' then dv = 0 elseif d.h ~= 'move' then dr = 0 end
+    if gfx.mouse_cap & 1 == 1 then
+      A.xprev = A.xform(d.pts, d.box, d.h, dr, dv)
+      state.status = ('transform %s: %+g rows  %+d%%'):format(d.h, dr, math.floor(dv * 100 + 0.5))
+    else
+      ctx.acv_xdrag = nil; A.xprev = nil
+      if math.abs(dr) > 1e-9 or math.abs(dv) > 1e-4 then
+        ctx.acv_replace(d.pts, A.xform(d.pts, d.box, d.h, dr, dv), d.box, 'transform')
+        if d.h == 'move' or d.h == 'l' then A.sel.a = math.max(0, A.sel.a + dr) end
+        if d.h == 'move' or d.h == 'r' then A.sel.b = math.max(A.sel.a + 0.125, A.sel.b + dr) end
+      end
+    end
+  end
+  if ctx.acv_mdrag and ctx.acv_mdrag.tool == 'sel' then   -- 31 окт: рамка строк
+    local d, A = ctx.acv_mdrag, ctx.ACV
+    local r = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+    local st = A.snap and A.grid or 1
+    A.sel = { a = math.min(d.r_s, r), b = math.max(d.r_s, r) + st }
+    if gfx.mouse_cap & 1 ~= 1 then
+      ctx.acv_mdrag = nil
+      vim.msg = ('sel: rows %g..%g - drag a diamond (corners tilt, sides stretch, inside moves), hum - humanize, Esc - off'):format(A.sel.a, A.sel.b)
+    end
+  elseif ctx.acv_mdrag then   -- 30 окт: мазок мыши по холсту curve (draw / line / erase)
     local d, A = ctx.acv_mdrag, ctx.ACV
     if gfx.mouse_cap & 1 == 1 then
       local r, v = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+      -- 31 окт: shape + Opt — вверх / вниз меняет цикл (частоту) плавно, высота замирает
+      if d.tool == 'shape' and gfx.mouse_cap & 16 == 16 then
+        if not d.oy then d.oy, d.cyc0, d.vlock = gfx.mouse_y, A.cycle, v end
+        A.cycle = math.max(0.25, math.min(state.lpb * 16, d.cyc0 * 2 ^ ((gfx.mouse_y - d.oy) / 60)))
+        v = d.vlock
+        state.status = ('shape cycle: %.2f rows (Opt: up - faster, down - slower)'):format(A.cycle)
+      elseif d.oy then d.oy = nil end
       if d.tool == 'line' then A.stroke = { rows = A.span_rows(d.r_s, d.v_s, r, v, {}), line = { d.mx0 - (d.geo.ox or 0), d.my0 - (d.geo.oy or 0), gfx.mouse_x - (d.geo.ox or 0), gfx.mouse_y - (d.geo.oy or 0) } }   -- в буфер холста   -- 31 окт: прямая от нажатия до мыши
       elseif d.tool == 'shape' then local rows, a, b = A.shape_stroke(d.r_s, r, v); A.stroke = { rows = rows, a = a, b = b }
       elseif r ~= d.r or math.abs(v - d.v) > 1e-3 then

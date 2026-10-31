@@ -139,5 +139,30 @@ sr = ACV.shape_stroke(0, 4, 0.5)
 eq('saw- starts at the height', sr[0] == 0.5 and sr[4] == 0.5, true)
 ACV.grid = 4
 ACV.tool, ACV.snap = 'cur', true
+-- 31 окт: трансформация выделения, humanize, замена строк, цикл формы
+do
+  local pts = { { row = 0, v = 0.2 }, { row = 4, v = 0.6 }, { row = 8, v = 1.0 } }
+  local box = ACV.box_of(pts, 0, 8)
+  near('box lo', box.lo, 0.2); near('box hi', box.hi, 1.0)
+  local mv = ACV.xform(pts, box, 'move', 2, -0.1)
+  near('move row', mv[2].row, 6); near('move v', mv[2].v, 0.5)
+  local rr = ACV.xform(pts, box, 'r', 8, 0)
+  near('stretch right x2', rr[3].row, 16); near('stretch keeps the left', rr[1].row, 0)
+  local ll = ACV.xform(pts, box, 'l', 4, 0)
+  near('stretch left keeps the right', ll[3].row, 8); near('stretch left half', ll[1].row, 4)
+  local tt = ACV.xform(pts, box, 't', 0, -0.4)
+  near('top down: low stays', tt[1].v, 0.2); near('top down: top', tt[3].v, 0.6); near('top down: middle', tt[2].v, 0.4)
+  local tl = ACV.xform(pts, box, 'tl', 0, -0.4)
+  near('tilt top-left: the right end stays', tl[3].v, 1.0)
+  local hm = ACV.humanize(pts, 0.1, 3)
+  eq('humanize keeps the count', #hm, 3); eq('humanize moves values', hm[2].v ~= 0.6 and math.abs(hm[2].v - 0.6) <= 0.1 + 1e-9, true)
+  local map, a2, b2 = ACV.replace_rows(pts, mv, box, true)
+  eq('ml: old row cleared', map[0], false); near('ml: new row', map[6], 0.5); near('range end', b2, 10 + 1 / 64)
+  eq('T - sel tool', ACV.key(('T'):byte(), st) and ACV.tool, 'sel'); ACV.tool = 'cur'
+  ACV.cycle, ACV.shape, ACV.snap = 8, 'sin', false
+  local sr2 = ACV.shape_stroke(0, 15, 1)
+  local nrow = 0; for _ in pairs(sr2) do nrow = nrow + 1 end
+  eq('shape cycle 8 rows: 2 cycles x 8 points', nrow, 16); ACV.cycle = 4
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

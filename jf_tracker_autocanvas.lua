@@ -18,7 +18,11 @@ local ACV = { row = 0, anchor = nil, grid = 4, cur = 1, seed = 1 }
 -- 30 окт: инструменты мыши — cur (щелчок ставит курсор), draw (карандаш, d), line (прямая, D), erase (E);
 -- snap (S) — мазок по клеткам сетки, иначе по строкам. Мазок — превью ACV.stroke, запись при отпускании (main)
 ACV.tool, ACV.snap = 'cur', true
-ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'shape', 'shape' }, { 'erase', 'erase' } }
+ACV.TOOLS = { { 'cur', 'cur' }, { 'draw', 'draw' }, { 'line', 'line' }, { 'shape', 'shape' }, { 'erase', 'erase' }, { 'sel', 'sel' } }
+-- 31 окт: цикл формы — в строках, независимо от сетки (сетка 1/8 строки давала синус в 1 строку — мелочь);
+-- Opt при мазке shape — вверх / вниз меняет частоту; кнопка ~N в заголовке — список
+ACV.cycle = 4
+ACV.CYCLES = { 0.5, 1, 2, 4, 8, 16, 32, 64 }
 -- 30 окт: инструмент shape (c) — как рисование формами в Ableton: протяжка задаёт отрезок, форма повторяется в каждой
 -- клетке сетки, высота — вертикалью мыши; форма — кнопкой рядом (список)
 ACV.shape = 'sin'
@@ -31,7 +35,7 @@ function ACV.shape_stroke(ra, rb, v)
   local st = ACV.snap and ACV.grid or 1
   local a, b = math.min(ra, rb), math.max(ra, rb) + math.max(st, 1)
   local out = {}
-  for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.grid, v, ACV.seed)) do out[p.row] = p.v end
+  for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.cycle, v, ACV.seed)) do out[p.row] = p.v end
   return out, a, b
 end
 ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { x0, y0, x1, y1 } — пиксели: нажатие → мышь (инструмент line) }
@@ -57,6 +61,68 @@ function ACV.span_rows(ra, va, rb, vb, out, erase)
   end
   return out
 end
+
+-- 31 окт: выделение и трансформация (sel, T), как transform-рамка автоматизации в Ableton: ACV.sel = { a, b } —
+-- строки; рамка — от min до max значений точек в них; ромбы: углы — наклон верха / низа, середины сторон —
+-- растяжка по времени (l r) и по значению (t b), внутри — сдвиг. Превью ACV.xprev, запись при отпускании
+ACV.sel, ACV.xprev = nil, nil
+-- точки активной кривой в строках [a, b): { row, v } (act.points — { время, 0..1 })
+function ACV.sel_points(act, span, a, b)
+  local out = {}
+  for _, p in ipairs(act and act.points or {}) do
+    local r = span.row_of(p[1])
+    if r >= a - 1e-6 and r < b - 1e-6 then out[#out + 1] = { row = r, v = p[2] } end
+  end
+  return out
+end
+function ACV.box_of(pts, a, b)
+  local lo, hi = math.huge, -math.huge
+  for _, p in ipairs(pts) do lo = math.min(lo, p.v); hi = math.max(hi, p.v) end
+  if lo > hi then return nil end
+  return { a = a, b = b, lo = lo, hi = hi }
+end
+-- точки после ручки h (move l r t b tl tr bl br) со сдвигом dr строк / dv значения
+function ACV.xform(pts, box, h, dr, dv)
+  local a, b, lo, hi = box.a, box.b, box.lo, box.hi
+  local w, hh = math.max(1e-9, b - a), hi - lo
+  local out = {}
+  for _, p in ipairs(pts) do
+    local r, v = p.row, p.v
+    if h == 'move' then r, v = r + dr, v + dv
+    elseif h == 'l' then local na = math.min(b - 0.125, a + dr); r = b - (b - r) * (b - na) / w
+    elseif h == 'r' then local nb = math.max(a + 0.125, b + dr); r = a + (r - a) * (nb - a) / w
+    else
+      local f = (r - a) / w
+      local dt, db = 0, 0
+      if h == 't' then dt = dv elseif h == 'b' then db = dv
+      elseif h == 'tl' then dt = dv * (1 - f) elseif h == 'tr' then dt = dv * f
+      elseif h == 'bl' then db = dv * (1 - f) elseif h == 'br' then db = dv * f end
+      if hh < 1e-6 then v = v + dt + db                            -- ровная линия: верх = низ, просто сдвиг
+      else local nlo, nhi = lo + db, hi + dt; v = nlo + (v - lo) / hh * (nhi - nlo) end
+    end
+    out[#out + 1] = { row = math.max(0, r), v = clamp01(v) }
+  end
+  return out
+end
+-- humanize: значения ± amt (0..1) случайно, seed — другой разброс на каждый щелчок
+function ACV.humanize(pts, amt, seed)
+  local out = {}
+  for k, p in ipairs(pts) do out[k] = { row = p.row, v = clamp01(p.v + (ACV.rnd(k, seed or 1) * 2 - 1) * amt) } end
+  return out
+end
+-- старые точки → новые: строки для op put (MIDI-лейн — целые строки: старые стереть, новые поверх) и отрезок
+-- замены a..b (огибающая: точки в нём удаляются, новые вставляются)
+function ACV.replace_rows(old, new, box, ml)
+  local map = {}
+  local a, b = box.a, box.b
+  if ml then for _, p in ipairs(old) do map[math.floor(p.row + 1e-9)] = false end end
+  for _, p in ipairs(new) do
+    local r = ml and math.floor(p.row + 1e-9) or p.row
+    map[r] = p.v
+    a = math.min(a, r); b = math.max(b, r + 1 / 64)
+  end
+  return map, a, b
+end
 local U, ctx, LG
 
 function ACV.init(u, c, lg) U, ctx, LG = u, c, lg end
@@ -71,6 +137,7 @@ local function rnd(k, seed)
   local x = math.sin((k + 1) * 12.9898 + seed * 78.233) * 43758.5453
   return x - math.floor(x)
 end
+ACV.rnd = rnd   -- 31 окт: для humanize выше по файлу
 
 -- подпись сетки: доля такта (lpb строк на долю, 4 доли) или строки
 function ACV.grid_label(grid, lpb)
@@ -97,7 +164,7 @@ end
 -- уровень = верх формы (как shape01 в aiedit: от 0 до level)
 function ACV.shape_points(shape, r0, r1, grid, level, seed)
   local out = {}
-  local g = math.max(1, grid or 1)
+  local g = math.max(0.125, grid or 1)
   level = clamp01(level or 1)
   local function add(row, v, shp) if row >= r0 - 1e-9 and row < r1 - 1e-9 then out[#out + 1] = { row = row, v = clamp01(v), shape = shp or 0 } end end
   local k = 0
@@ -190,8 +257,10 @@ function ACV.key(c, st, mods)
   if ch == 'E' then ACV.tool = ACV.tool == 'erase' and 'cur' or 'erase'; return true end
   if ch == 'c' then ACV.tool = ACV.tool == 'shape' and 'cur' or 'shape'; return true end
   if ch == 'S' then ACV.snap = not ACV.snap; return true end
+  if ch == 'T' then ACV.tool = ACV.tool == 'sel' and 'cur' or 'sel'; return true end   -- 31 окт: transform
   if c == 27 then
     if ACV.anchor then ACV.anchor = nil; return true end
+    if ACV.sel then ACV.sel = nil; return true end
     return { op = 'leave' }
   elseif ch == 'h' or c == 1818584692 then ACV.row = ACV.row - 1; clamp_row(); return true
   elseif ch == 'l' or c == 1919379572 then ACV.row = ACV.row + 1; clamp_row(); return true
@@ -279,6 +348,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local shapes_at = #tb + 1
   for i, x in ipairs(ACV.SHAPE_LIST) do tb[#tb + 1] = { lab = x[3], shape = x[2], on = ACV.tool == 'shape' and ACV.shape == x[2], gap = i == 1 } end
   local shapes_n = #ACV.SHAPE_LIST
+  tb[#tb + 1] = { lab = '~' .. ACV.grid_label(ACV.cycle, span.lpb), cyc = true }   -- 31 окт: цикл формы
+  tb[#tb + 1] = { lab = 'hum', hum = true, gap = true }                                -- 31 окт: humanize выделения / клетки
   tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap, gap = true }
   tb[#tb + 1] = { lab = '[', grid = -1, gap = true }
   tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
@@ -302,7 +373,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       if b.on then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(bx, y, b.w, rh - 1, 1) end
       U.set(hot and U.AMBER or (b.on and U.AMBER or U.LINE)); gfx.rect(bx, y, b.w, rh - 1, 0)
       U.text(bx + pad, y, b.lab, (hot or b.on) and U.AMBER or (b.grid == 0 and U.TEXT or U.GREY))
-      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick, tbshapeset = b.shape } end
+      if hot then hover = { pane = 'curve', tbtool = b.tool, tbsnap = b.snap, tbgrid = b.grid, tbshape = b.shapepick, tbshapeset = b.shape, tbcyc = b.cyc, tbhum = b.hum } end
       bx = bx + b.w + 2
     end
   end
@@ -430,6 +501,37 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       gfx.circle(x0, y0, 3, 1, 1); gfx.circle(x1, y1, 3, 0, 1)
     end
   end
+  -- 31 окт: выделение (sel): рамка по точкам, ромбы на углах и серединах сторон; превью трансформации янтарём
+  local xh_at
+  if ACV.sel and act.points then
+    local pts = ACV.sel_points(act, span, ACV.sel.a, ACV.sel.b)
+    local box = ACV.box_of(pts, ACV.sel.a, ACV.sel.b) or { a = ACV.sel.a, b = ACV.sel.b, lo = 0, hi = 1 }
+    local bx0, bx1 = math.max(gx, rx(box.a)), math.min(gx + gw - 1, rx(box.b))
+    local by0, by1 = vy(box.hi), vy(box.lo)
+    if by1 - by0 < 6 then by0 = by0 - 3; by1 = by1 + 3 end
+    U.set(U.AMBER, 0.12); gfx.rect(rx(ACV.sel.a), gy, math.max(1, rx(ACV.sel.b) - rx(ACV.sel.a)), gh, 1); gfx.a = 1
+    if ACV.xprev then
+      U.set(U.AMBER)
+      local px, py
+      for _, p in ipairs(ACV.xprev) do
+        local xx, yy = rx(p.row), vy(p.v)
+        if px then gfx.line(px, py, xx, yy) end
+        gfx.rect(xx - 1, yy - 1, 3, 3, 1); px, py = xx, yy
+      end
+    end
+    if ACV.tool == 'sel' and not ACV.xprev then
+      U.set(U.AMBER); gfx.rect(bx0, by0, math.max(1, bx1 - bx0), math.max(1, by1 - by0), 0)
+      local cxm, cym = (bx0 + bx1) // 2, (by0 + by1) // 2
+      local hs = { tl = { bx0, by0 }, tr = { bx1, by0 }, bl = { bx0, by1 }, br = { bx1, by1 }, t = { cxm, by0 }, b = { cxm, by1 }, l = { bx0, cym }, r = { bx1, cym } }
+      local dr = math.max(3, math.floor(rh / 3))
+      for k, p in pairs(hs) do
+        local hot = math.abs(mx - p[1]) <= dr + 2 and math.abs(my - p[2]) <= dr + 2
+        if hot then xh_at = k end
+        U.diamond(p[1], p[2], dr, hot and U.AMBER or U.TEXT, hot)
+      end
+      if not xh_at and mx > bx0 and mx < bx1 and my > by0 and my < by1 then xh_at = 'move' end
+    end
+  end
   if ACV.vpt then U.set(U.AMBER); gfx.circle(ACV.vpt[1], ACV.vpt[2], 4, 0, 1); gfx.circle(ACV.vpt[1], ACV.vpt[2], 1, 1, 1) end   -- 30 окт: палец (CONTROL)
   -- курсор холста: строка янтарём, кружок на активной кривой; плейхед зелёным
   local cx = rx(ACV.row)
@@ -474,7 +576,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   if not hover and mx >= gx and mx < gx + gw and my >= gy and my < gy + gh then
     local row = r0 + (mx - gx) / gw * nr
     hover = { pane = 'curve', curve_t = span.t0 + (span.t1 - span.t0) * (mx - gx) / math.max(1, gw - 1), row = math.floor(row),
-      geo = { gx = gx + ox, gy = gy + oy, gw = gw, gh = gh, r0 = r0, nr = nr, ox = ox, oy = oy } }   -- 30 окт: геометрия — для мазка мыши
+      geo = { gx = gx + ox, gy = gy + oy, gw = gw, gh = gh, r0 = r0, nr = nr, ox = ox, oy = oy }, xh = xh_at }   -- 30 окт: геометрия — для мазка мыши
     -- 31 окт: в координатах окна — холст рисуется в буфер вкладки (U.mouse_off), а мазок читает мышь окна
   end
   return hover
