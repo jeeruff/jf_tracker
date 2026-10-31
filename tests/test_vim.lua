@@ -322,6 +322,7 @@ V.cur.row = 1
 keysin('q');       eq('q → C-4 (upper row = piano)', last(), 'ins:trA@1:60:1')
 keysin(']q');      eq('] octave up', last(), 'ins:trA@2:72:1')
 keysin('`');       eq('` → note off (kick was overwritten → nothing covers)', last(), 'off:@3'); eq('off advances', V.cur.row, 4)
+do local pv = V.piano; V.piano = false; V.cur.row = 3; keysin('`'); eq('` in INSERT without the keyboard - still a note-off (31 окт)', V.cur.row, 4); V.piano = pv end
 keysin('3');       eq('3 in KEYS → D#5 (black key)', last(), 'ins:trA@4:75:1'); eq('advances', V.cur.row, 5)
 ctrl_down = true; V.key(49); eq('10 окт: Ctrl+1 = step 1', V.step, 1)
 V.key(51); eq('17 окт: Ctrl+3 in INSERT with the keyboard = the step (Ctrl+digit is always the step)', V.step, 3); ctrl_down = false; V.step = 1

@@ -1099,6 +1099,7 @@ function V.note_off_scope(scope)
   end
   ctx.edit.note_off(heads, lpb(), V.cur.row)          -- пусто — note_off ничего не делает
   V.msg = ('note off (%s): %d'):format(scope == 'all' and 'all tracks' or (scope == 'track' and 'track' or 'subcolumn'), #heads)
+  if #heads == 0 then V.msg = 'note off: nothing sounds here - OFF ends a note playing above this row' end   -- 31 окт
   return #heads
 end
 -- 13 окт: край ноты под курсором на строку (Option+Shift: J / K — конец позже / раньше,
@@ -2514,6 +2515,13 @@ function V.key_impl(c)
       if V.fx_back then V.cur.sub = nil; V.fx_back = nil end   -- 12 окт: брошенный код — курсор обратно на код
       if not V.piano then return as_normal(c) end
       keys_control(c); return
+    end
+    -- 31 окт: note-off — не нота: работает и при выключенной клавиатуре (без неё ` уходил в NORMAL — педаль / весь сэмпл)
+    if not V.piano and (c == ('`'):byte() or c == ('~'):byte()) then
+      local mods2 = ctx.mods and ctx.mods() or {}
+      local tilde = c == ('~'):byte() or mods2.shift
+      V.note_off_scope(tilde and (mods2.ctrl and 'track' or 'all') or 'sub')
+      V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
     end
     if not V.piano then return as_normal(c) end      -- поле ноты без клавиатуры: ноты не пишутся
     if keys_control(c) then return end
