@@ -9992,6 +9992,17 @@ function D.frame(L, snap, rows, state, info)
         bxs[#bxs + 1] = { '[]', 'cnew', bxs[#bxs][3] - cwb - 2, cwb }
         tw = tw - cwb - 2
       end
+      -- 31 окт: slixer — кнопки шапки (gui f + e ∆ x) строкой ниже, в правом краю ряда кнопок пульта: в шапке только
+      -- кружок, имя, in / out, пресет и слоты (шапка читалась плохо); пульт под них уже на f.slx_hdrw
+      f.slx_bry = by   -- поле, не local: лимит 200 локалей функции
+      f.slx_hdrw = nil
+      if f.view == 'slixer' and not f.container and #bxs > 1 then
+        f.slx_bry = by + L.rh + 1
+        local minx = math.huge
+        for _, b in ipairs(bxs) do minx = math.min(minx, b[3] - 1) end
+        f.slx_hdrw = bx + bw - minx + L.pad
+        tw = bw - 2 * L.pad
+      end
 
       -- пресет (4 окт): «< имя >» справа от имени эффекта; клик по имени —
       -- список, < > — предыдущий / следующий
@@ -10059,7 +10070,7 @@ function D.frame(L, snap, rows, state, info)
       if f.view == 'slixer' and info.slx_slots and tw > 0 then
         local sx0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + 2 * L.pad + (iol and (iow + L.pad) or 0) + ((info.dspleft and ptw > 0) and (ptw + L.pad) or 0)
         local sx1 = math.huge
-        for _, bb in ipairs(bxs) do sx1 = math.min(sx1, bb[3]) end
+        if f.slx_bry == by then for _, bb in ipairs(bxs) do sx1 = math.min(sx1, bb[3]) end else sx1 = bx + bw - L.pad end
         if ptw > 0 and not info.dspleft then sx1 = bx + 2 * L.pad + tw end
         sx1 = sx1 - 2 * L.pad
         local qw = math.min(L.cw * 9, math.floor((sx1 - sx0 - 7 * 2) / 8))
@@ -10093,25 +10104,25 @@ function D.frame(L, snap, rows, state, info)
         for _, b in ipairs(bxs) do
           local kx = b[3] - 1   -- 27 окт: на пиксель внутрь — не ложиться на рамку модуля (2 px)
           local kb = b[4] or kb   -- 24 окт: [] шире буквы
-          local hot = not drag and mx >= kx and mx < kx + kb and my >= by + 2 and my < by + L.rh
+          local hot = not drag and mx >= kx and mx < kx + kb and my >= f.slx_bry + 2 and my < f.slx_bry + L.rh
           local lit = (b[2] == 'bypass' and not f.enabled) or (b[2] == 'delta' and dlt) or (b[2] == 'gui' and gui_on)
           -- 11 окт: включённая дельта мигает (слышна только разница — легко забыть)
           -- 20 окт: мигает ярко — сплошной янтарь и тёмная буква / обычный «горит» (было: тусклая подложка гасла — не видно)
           local flash = b[2] == 'delta' and dlt and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0
-          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (flash and U.AMBER or (lit and U.tint(U.AMBER, 0.25) or U.BG))); gfx.rect(kx, by + 2, kb, L.rh - 2, 1)
-          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, by + 2, kb, L.rh - 2, 0)
+          set(hot and U.tint(b[2] == 'del' and U.RED or U.AMBER, 0.35) or (flash and U.AMBER or (lit and U.tint(U.AMBER, 0.25) or U.BG))); gfx.rect(kx, f.slx_bry + 2, kb, L.rh - 2, 1)
+          set(hot and (b[2] == 'del' and U.RED or U.AMBER) or ((lit or flash) and U.AMBER or U.LINE)); gfx.rect(kx, f.slx_bry + 2, kb, L.rh - 2, 0)
           local bc = hot and (b[2] == 'del' and U.RED or U.AMBER) or (flash and U.BG or (lit and U.AMBER or U.TEXT))
           if b[2] == 'delta' then
             -- 11 окт: дельта — буквой ∆, но шрифтом Menlo: в ProFont и Δ, и ∆ нарисованы «домиком»; слот 5 — только её (20 окт: kcast 8, тема 9)
             local th = math.max(8, math.min(L.rh + 2, math.floor(TH() * 1.45)))   -- 20 окт: крупнее (∆ Menlo мелкий — не видно)
             if D.menlo_th ~= th then gfx.setfont(5, 'Menlo', th); D.menlo_th = th else gfx.setfont(5) end   -- шрифт с именем — один раз на размер
             local gw2 = gfx.measurestr('∆')
-            set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = by + 1 + math.floor((L.rh - 1 - gfx.texth) / 2)
+            set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = f.slx_bry + 1 + math.floor((L.rh - 1 - gfx.texth) / 2)
             gfx.drawstr('∆')
             gfx.setfont(D.font_id or 1)
-          else text(kx + L.pad, by + 1, b[1], bc) end
+          else text(kx + L.pad, f.slx_bry + 1, b[1], bc) end
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
-          hint('dspbtn', kx, by + 2, kb, L.rh - 2, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
+          hint('dspbtn', kx, f.slx_bry + 2, kb, L.rh - 2, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
       end
       if not drag and not on_btn and mx >= bx and mx < bx + bw and my >= by and my < by + L.rh then hover.dsp = { fx = k, f = f } end
@@ -10219,7 +10230,7 @@ function D.frame(L, snap, rows, state, info)
         local v0 = info.dsp_view and info.dsp_view('slixer', f.i)
         local P = function(name) return info.slx_param and info.slx_param(f.i, name) end
         local rows, low = D.SX.items(v0, P)
-        local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad, L.rh, ms, L.pad)
+        local lay, nbr = D.SX.layout(rows, bx + L.pad, by + L.rh + 1, bw - 2 * L.pad - (f.slx_hdrw or 0), L.rh, ms, L.pad)   -- 31 окт: справа — кнопки шапки
         local _, nb2 = D.SX.layout(low or {}, 0, 0, bw - 2 * L.pad, L.rh, ms, L.pad)   -- 26 окт: MIDI · ARP под волной
         if not (low and #low > 0) then nb2 = 0 end
         nbr = nbr + nb2
