@@ -28047,7 +28047,7 @@ local function frame()
             .. (kd0.band and '' or (kd0.chain and ' (its end)' or (kd0.par and ': = a parallel chain' or ': | serial, after its sampler and fx'))) .. '  (Opt - copy)'))
           or hover.dsp_gin and ('move ' .. dsp_drag.f.name .. ' into ' .. (hover.dsp_gin.c.name or 'the container') .. ' at ' .. (hover.dsp_gin.pos + 1) .. ((hover.dsp_gin.par or 0) > 0 and ', parallel (=, lower half)' or ', serial (|, upper half)'))
           or hover.dsp_into and ('move ' .. dsp_drag.f.name .. ' into the container, ' .. (hover.dsp_into_par == 1 and 'parallel (bottom half)' or 'serial (top half)'))
-          or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ' (amber line)'))
+          or (g and ('move ' .. dsp_drag.f.name .. ' → slot ' .. (g + 1) .. ((dsp_drag.f.inner and dsp_drag.f.inner.wrap) and ' - out of the container, serial (|)' or '') .. ' (amber line)'))
           or (tc and ('move ' .. dsp_drag.f.name .. ' → ' .. (tc.name or 'track') .. ' (instrument - first slot, effect - end of the chain)'))
           or ('move ' .. dsp_drag.f.name .. ' - drop between blocks, into a container or onto a track / mixer strip')
       end
@@ -28106,6 +28106,14 @@ local function frame()
       -- 23 окт: щель — в позициях верхнего уровня (модули полос ÷N в списке не считаются): s — место источника там же
       local tlist = {}
       do local col0 = dsp_target(); for _, e in ipairs(col0 and col0.fx or {}) do if not e.inner then tlist[#tlist + 1] = e end end end
+      -- 31 окт: модуль из контейнера в щель верхнего уровня — вынести туда (последовательно, |), а не отказ
+      if g and dd.f.inner and dd.f.inner.wrap then
+        local col0 = dsp_target()
+        local dest = tlist[g + 1] and tlist[g + 1].i or (col0 and reaper.TrackFX_GetCount(col0.track)) or 0
+        if col0 then edit.fx_copy(col0.track, dd.f.i, col0.track, dest, true, 'move fx out: ' .. (dd.f.name or '')) end
+        vim.msg = dd.f.name .. ' moved out of ' .. (dd.f.inner.parent.name or 'the container') .. ' -> slot ' .. (g + 1) .. ' (serial)'
+        g = nil
+      end
       if g and dd.f.inner then vim.msg = dd.f.name .. ' is inside ' .. (dd.f.inner.parent.name or 'the container') .. (dd.f.inner.wrap and ' - drop it onto another container or a track (moving out: its menu, Move out)' or ' - drop it onto a band row, or onto a track'); g = nil end
       if g then for i, e in ipairs(tlist) do if e == dd.f then s = i end end end
       if dd.active and g and g ~= s and g ~= s - 1 then
