@@ -26695,7 +26695,7 @@ local function frame()
           local r = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = 'sel', geo = lfo_hover.geo, r_s = r }
           A.sel = nil
-        elseif A.tool == 'cur' and lfo_hover.geo and dbl and click.zone == 'lfo' then   -- 31 окт: двойной щелчок — точка здесь
+        elseif A.tool == 'cur' and lfo_hover.geo and dbl and click.zone == 'lfo' and click.mx and math.abs(click.mx - gfx.mouse_x) + math.abs(click.my - gfx.mouse_y) < 8 then   -- 31 окт: двойной щелчок на том же месте — точка здесь
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_do({ op = 'put', rows = { [r] = v }, tool = 'draw' })
           vim.msg = ('point at row %g, %d%%'):format(r, math.floor(v * 100 + 0.5))
@@ -26736,7 +26736,7 @@ local function frame()
           else A.stroke = { rows = A.span_rows(r, v, r, v, {}, A.tool == 'erase') } end
         end
       end
-      click = { t = now2, zone = 'lfo' }
+      click = { t = now2, zone = 'lfo', mx = gfx.mouse_x, my = gfx.mouse_y }
     elseif hover.mm and hover.mm.strip then
       -- полоса матрицы: форма LFO / тумблер группы / слайдер
       ctx.set_focus('top')
@@ -28793,7 +28793,11 @@ local function frame()
   -- 31 окт: точка огибающей тянется вживую (значение и строка между соседями), одна отмена при отпускании
   if ctx.acv_pdrag then
     local d = ctx.acv_pdrag
-    if d.ml and gfx.mouse_cap & 1 == 1 then
+    -- 31 окт: щелчок без движения точку не трогает — тянется только после сдвига мыши на 3 px
+    d.mx0, d.my0 = d.mx0 or gfx.mouse_x, d.my0 or gfx.mouse_y
+    if not d.go and gfx.mouse_cap & 1 == 1 and math.abs(gfx.mouse_x - d.mx0) + math.abs(gfx.mouse_y - d.my0) > 3 then d.go = true end
+    if not d.go and gfx.mouse_cap & 1 == 1 then
+    elseif d.ml and gfx.mouse_cap & 1 == 1 then
       local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
       r = math.floor(r + 1e-6)
       local vv = math.max(0, math.min(127, math.floor(v * 127 + 0.5)))
