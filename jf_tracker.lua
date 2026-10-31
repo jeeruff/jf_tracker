@@ -16969,6 +16969,92 @@ ctx.select_all = function()
     vim.msg = 'Cmd+A: select all is not in this module yet (tracker, curve canvas)'
   end
 end
+-- 31 окт: :phrase NAME — блок (V; все его треки) или паттерн курсора (все треки) → фраза (PLAN_PHRASES.md шаг 2):
+-- айтемы режутся по краям блока, середины уезжают в библиотеку (регион ph:NAME за =END, с начала такта), на месте
+-- блока — MIDI-триггер на треке курсора с тейком ph:NAME и одной нотой C-4 на всю длину; PH.sync (в edit.run)
+-- кладёт копии обратно — звучит как было, но теперь это одна нота
+ctx.phrase_make = function(name)
+  name = (name or ''):gsub('^%s+', ''):gsub('%s+$', '')
+  if name == '' then
+    local used, i = {}, 0
+    while true do local r, isr, _, _, nm = reaper.EnumProjectMarkers3(0, i); if not r or r == 0 then break end; if isr then used[nm] = true end; i = i + 1 end
+    local k = 1; while used['ph:p' .. k] do k = k + 1 end
+    name = 'p' .. k
+  end
+  local F = L and L.flat or {}
+  local f0, f1, r0, r1
+  if vim.mode == 'visual' or vim.mode == 'vline' then f0, f1, r0, r1 = vim.visual_range(); vim.mode = 'normal'
+  else r0, r1 = ctx.region_rows(); f0, f1 = 1, #F end
+  if not (r0 and r1 and r1 >= r0) then vim.msg = 'phrase: no rows'; return end
+  local tracks, seen = {}, {}
+  for fi = math.min(f0, f1), math.max(f0, f1) do
+    local c = F[fi] and F[fi].col
+    if c and c.track and not c.master and not seen[c.track] then seen[c.track] = true; tracks[#tracks + 1] = c.track end
+  end
+  local cc = F[vim.cur.fi] and F[vim.cur.fi].col
+  local anchor = (cc and cc.track and seen[cc.track] and cc.track) or tracks[1]
+  if not anchor then vim.msg = 'phrase: no track'; return end
+  local t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1 + 1, state.lpb, 0)
+  local R = reaper
+  local q0, q1 = R.TimeMap2_timeToQN(0, t0), R.TimeMap2_timeToQN(0, t1)
+  local moved = 0
+  edit.run('phrase ' .. name, function()
+    -- место в библиотеке: за последним регионом после =END, с начала такта
+    -- и за айтемами после =END вне регионов (иначе чужой хвост попадал в источник фразы)
+    local tail = edit.lib_tail()
+    local endm = model.marker_pos and model.marker_pos(model.END_MARKER)
+    if endm then
+      for ti = 0, R.CountTracks(0) - 1 do
+        local tr = R.GetTrack(0, ti)
+        for k = 0, R.CountTrackMediaItems(tr) - 1 do
+          local it = R.GetTrackMediaItem(tr, k)
+          local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+          if p >= endm - 1e-6 then tail = math.max(tail, p + R.GetMediaItemInfo_Value(it, 'D_LENGTH')) end
+        end
+      end
+    end
+    local sq = R.TimeMap2_timeToQN(0, tail)
+    local _, qs, qe = R.TimeMap_QNToMeasures(0, sq)
+    if qs and qe and sq > qs + 1e-6 then sq = qe end
+    local function tm(q) return R.TimeMap2_QNToTime(0, q) end
+    R.AddProjectMarker2(0, true, tm(sq), tm(sq + (q1 - q0)), 'ph:' .. name, -1, 0)
+    for _, tr in ipairs(tracks) do
+      local list = {}
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, i)
+        local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local e = p + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        local tk = R.GetActiveTake(it)
+        local tn = tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) or ''   -- select(2): and режет второе значение
+        local _, cp = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_phrc', '', false)
+        if p < t1 - 1e-6 and e > t0 + 1e-6 and (cp or '') == '' and not (tn or ''):match('^ph:') then list[#list + 1] = it end
+      end
+      for _, it in ipairs(list) do
+        local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        if p < t0 - 1e-6 then it = R.SplitMediaItem(it, t0) end
+        if it then
+          local e = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+          if e > t1 + 1e-6 then R.SplitMediaItem(it, t1) end
+          local pq = R.TimeMap2_timeToQN(0, R.GetMediaItemInfo_Value(it, 'D_POSITION'))
+          local eq = R.TimeMap2_timeToQN(0, R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH'))
+          R.SetMediaItemInfo_Value(it, 'D_POSITION', tm(sq + pq - q0))
+          R.SetMediaItemInfo_Value(it, 'D_LENGTH', tm(sq + eq - q0) - tm(sq + pq - q0))
+          moved = moved + 1
+        end
+      end
+    end
+    -- триггер: MIDI-айтем ph:NAME, одна нота C-4 на всю длину
+    local trg = R.CreateNewMIDIItemInProj(anchor, t0, t1)
+    local tk = trg and R.GetActiveTake(trg)
+    if tk then
+      R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', 'ph:' .. name, true)
+      local pe = R.MIDI_GetPPQPosFromProjTime(tk, t1)
+      R.MIDI_InsertNote(tk, false, false, 0, pe, 0, 60, 100, false)
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('phrase ph:%s: %d item(s) into the library, a C-4 trigger in their place (other notes transpose, velocity scales)'):format(name, moved)
+end
 ctx.curve_open = function()
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return false end
