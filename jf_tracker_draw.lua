@@ -1814,7 +1814,7 @@ function D.track_list(L, state, snap, info, hover, x, y, w, h, foc)
         lbl = l and ('¥ L%d %s  %+gms %+gdB%s'):format(rw.lk, src and src.name or '?', l.offs or 0, l.vol or 0, fl) or '¥ ?'
         colr = (l and l.mute) and U.DIM or U.TEXT
       elseif rw.k == 'm' then lbl = ((TL.open[rw.key] and '- ') or '+ ') .. (D.mu() .. ' midi clips  %d'):format(rw.n); colr = U.GREY
-      elseif rw.k == 'mc' then lbl = D.mu() .. ' ' .. ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.CYAN
+      elseif rw.k == 'mc' then lbl = ((rw.mc.label or '') ~= '' and rw.mc.label or 'clip') .. ('  %04d'):format(rw.mc.row or 0); colr = U.GREY   -- 31 окт: без µ (MIDI ясен по папке), серым
       elseif rw.k == 'i' or rw.k == 'c' then
         if e and e.rgb then rawset_col(e.rgb); gfx.rect(ix - 5, ry + 2, 2, L.rh - 4, 1) end
         local mk = rw.k == 'i' and (rw.nk > 0 and ((TL.open[rw.key] and '- ') or '+ ') or '  ') or ''
