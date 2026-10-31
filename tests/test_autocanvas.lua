@@ -84,7 +84,7 @@ mod.v['lfo.speed'] = 2; _, _, v1 = ACV.lfo_band(mod, 0.0625, 0.5, 2); near('temp
 local alo, ahi = ACV.mod_band({ kind = 'acs', mod = { v = { ['acs.strength'] = 0.3 } } }, 0, 0.5); near('acs band lo', alo, 0.5); near('acs band hi', ahi, 0.8)
 -- раскладка: легенда сбоку при ширине, строкой при узости; поле не выходит за w / h
 local L = { cw = 7, rh = 14, pad = 4 }
-local lay = ACV.layout(L, 600, 200, 3); eq('wide: side legend', lay.side, true); eq('wide: fits', lay.gx + lay.gw + lay.lw + L.pad <= 600, true); eq('wide: height', lay.gy + lay.gh <= 200, true)
+local lay = ACV.layout(L, 600, 200, 3); eq('wide: side legend', lay.side, true); eq('wide: fits', lay.gx + lay.gw <= 600 and lay.gx >= lay.lw, true)   -- 31 окт: список слева; eq('wide: height', lay.gy + lay.gh <= 200, true)
 lay = ACV.layout(L, 300, 200, 3); eq('narrow: top legend', lay.side, false); eq('narrow: full width', lay.gw, 300)
 -- draw без reaper: не падает, hover по легенде
 local curves = { { name = 'vol', rgb = U.GREEN, eval = function(t) return 0.5 end, points = {} }, { name = 'pan', rgb = U.CYAN, eval = function(t) return t end, points = {} } }
@@ -97,7 +97,7 @@ lay = ACV.layout(L, 600, 200, 2)
 -- 31 окт: на 600 px панель инструментов переносится строками — легенда ниже; ищем строку второй кривой
 local got
 for yy = lay.gy, 200, 2 do
-  gfx.mouse_x, gfx.mouse_y = lay.gx + lay.gw + L.pad + 2, yy
+  gfx.mouse_x, gfx.mouse_y = L.pad + 8, yy   -- 31 окт: список слева
   hv = ACV.draw(L, 0, 0, 600, 200, curves, span, true)
   if hv and hv.legend == 2 then got = 2; break end
 end

@@ -3282,7 +3282,10 @@ function V.key_impl(c)
   -- NORMAL команды
   local ch = (c < 256) and string.char(c) or ''
   if ch == 'i' then V.mode = 'insert'; V.count = nil; return
-  elseif c == 13 then V.count = nil; finish_move(); V.smart(); return   -- 12 окт: Enter — смарт-панель значений поля (была gs / Ctrl+Enter)
+  elseif c == 13 then V.count = nil; finish_move()
+    -- 31 окт: Enter на огибающей / MIDI-лейне (PB CC PC AT) — её кривая на холсте automation → curve
+    if V.mode == 'normal' and ctx.curve_open and ctx.curve_open() then return end
+    V.smart(); return   -- 12 окт: Enter — смарт-панель значений поля (была gs / Ctrl+Enter)
   elseif ch == 'I' and not env_of(V.cur.fi) then
     -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
     -- (было «вставить время» — пустая строка со сдвигом; это Insert и :instime)

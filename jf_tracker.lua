@@ -757,8 +757,9 @@ local function toggle_dock(apply_title)
     -- главного окна REAPER, иначе шапка трекера уезжает под шторку
     local _, ml, mt, mr, mb = reaper.JS_Window_GetRect(reaper.GetMainHwnd())
     if mt and mb and mt > mb and mb <= t + 1 and ml <= l and mr >= r then b = math.min(b, mt) end   -- только если REAPER сам во весь экран
-    -- 27 окт: без рамки — на 1 px выше рабочей области: иначе под строкой меню оставалась щель, пока окно не в фокусе
-    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t + (on and 1 or 0))
+    -- 27 окт было +1 px вверх (щель под меню без фокуса); 31 окт: этот пиксель уходил под строку меню — съедал
+    -- верхнюю линию модулей. Ровно рабочая область
+    reaper.JS_Window_SetPosition(hwnd, l, t, r - l, b - t)
   end
   local docked = gfx.dock(-1) & 1 == 1
   if apply_title then                              -- опция title / старт: только рамка плавающего окна
@@ -16640,6 +16641,9 @@ ctx.acv_draw = function(Lx, x, y, w, h)
   local ACV = ctx.ACV
   local sp = ctx.acv_span()
   local curves = ctx.acv_curves(sp)
+  if ACV.want then   -- 31 окт: добавленный параметр — активный, когда его огибающая появилась в списке
+    for i, cv in ipairs(curves) do if cv.env == ACV.want then ACV.cur = i; ACV.want = nil; break end end
+  end
   -- курсор холста следует за курсором трекера (один курсор, две картинки)
   if ctx.acv_row_seen ~= vim.cur.row then ctx.acv_row_seen = vim.cur.row; ACV.row = vim.cur.row end
   -- 24 окт: параметр DSP без огибающей — пустой холст: щелчок — огибающая и automation item (item под курсором, иначе такт)
@@ -16894,6 +16898,51 @@ ctx.acv_vel_put = function(act, sp, op, lo, hi)
 end
 -- 31 окт: щелчок по полю генератора кривых (панель lfogen)
 ctx.lfo_drag_set = function(d) lfo_drag = d end
+-- 31 окт: Enter на огибающей / MIDI-лейне трекера — вкладка automation, холст curve, эта кривая активная, фокус на холсте
+-- 31 окт: «/ add» холста — нечёткий поиск по всем параметрам трека курсора (огибающие трека и все FX);
+-- выбранный — огибающая создаётся (видимая), кривая — в список, в дорожки и активная
+ctx.acv_add_param = function()
+  local col = cur_col(); if not (col and col.track) then vim.msg = 'add: no track'; return end
+  local tr, PP = col.track, MMX.PP
+  local items = {}
+  for _, r in ipairs(PP.build(tr, model.fx_addresses)) do
+    local env = PP.env_of(tr, r, false)
+    items[#items + 1] = { label = (env and '● ' or '  ') .. r.label, data = r }
+  end
+  vim.open_picker('add to the canvas - ' .. (col.name or '') .. ' (● has an envelope)', items, function(it)
+    local r, env = it.data, nil
+    if r.kind == 'fx' then
+      edit.run('canvas: add ' .. r.label, function()
+        env = reaper.GetFXEnvelope(tr, r.fx, r.param, true)
+        if env then reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true); reaper.GetSetEnvelopeInfo_String(env, 'ACTIVE', '1', true); reaper.TrackList_AdjustWindows(false) end
+      end)
+    else
+      env = PP.env_of(tr, r, false)
+      if not env then PP.toggle_env(tr, r); env = PP.env_of(tr, r, false) end
+    end
+    if not env then vim.msg = 'add: no envelope for ' .. r.label; return end
+    local A = ctx.ACV
+    A.multi[env] = true; A.want = env
+    model.invalidate(); ctx.acv_cc = nil
+    vim.msg = 'canvas: ' .. r.label .. ' added (stacked; Shift+click in the list - out of the lanes)'
+  end)
+end
+ctx.curve_open = function()
+  local fl = L and L.flat and L.flat[vim.cur.fi]
+  if not fl then return false end
+  local lane = fl.env or (fl.ml and fl.ml.kind ~= 'tx' and fl.ml.kind ~= 'vis' and fl.ml.kind ~= 'cmd' and fl.ml.kind ~= 'chd' and fl.ml)
+  if not lane then return false end
+  ctx.pane_focus('automation')
+  mod_pane = 'curve'
+  ctx.acv_cc = nil
+  local A = ctx.ACV
+  A.row = vim.cur.row; ctx.acv_row_seen = vim.cur.row
+  local curves = ctx.acv_curves(ctx.acv_span())
+  A.cur = 1
+  for i, cv in ipairs(curves) do if (fl.env and cv.env == fl.env.env) then A.cur = i; break end end
+  vim.msg = ('curve: %s - d draw, D line, c shape, T transform, j k value, Esc back'):format(curves[A.cur] and curves[A.cur].name or '?')
+  return true
+end
 ctx.lfo_field_click = function(h)
   if not (h and h.field) then return end
   LG.sel = h.field
@@ -16911,6 +16960,7 @@ ctx.acv_do = function(op, sp, curves)
   sp = sp or ctx.acv_span(); curves = curves or ctx.acv_curves(sp)
   local act = curves[ACV.cur]
   if op.op == 'leave' then ctx.set_focus('tracker'); return end
+  if op.op == 'addp' then ctx.acv_add_param(); return end
   if not act then vim.msg = 'canvas: no curve - Opt+A on a knob, or the cursor on an envelope lane'; return end
   if op.op == 'mod' then
     -- m / e: LFO / ACS параметра активной кривой (модуляционная — её параметр; огибающая FX — найти её параметр)
@@ -25403,7 +25453,16 @@ local function frame()
     elseif lfo_hover and state.top and state.toptab == 'automation' then
       ctx.set_focus('top'); mod_pane = lfo_hover.pane or 'lfo'
       if lfo_hover.pp then MMX.PP.click(cur_col(), lfo_hover.pp, dbl) end
-      if lfo_hover.legend then ctx.ACV.cur = lfo_hover.legend end   -- 15 окт: щелчок по легенде — активная кривая
+      if lfo_hover.legend then   -- 15 окт: щелчок по легенде — активная кривая; 31 окт: Shift — в дорожки / из дорожек
+        local A = ctx.ACV
+        if gfx.mouse_cap & 8 == 8 then
+          local cv = ctx.acv_curves(ctx.acv_span())[lfo_hover.legend]
+          local k = A.mkey(cv)
+          if k then A.multi[k] = not A.multi[k] or nil end
+          vim.msg = 'curves: Shift+click - stacked lanes on the canvas (a click on a lane - it is edited)'
+        else A.cur = lfo_hover.legend end
+      end
+      if lfo_hover.addp then ctx.acv_add_param() end
       -- 30 окт: панель инструментов холста
       local A = ctx.ACV
       if lfo_hover.tbtool then A.tool = lfo_hover.tbtool; vim.msg = ({ cur = 'cur: a click puts the cursor', draw = 'draw (d): drag - free drawing, written on release', line = 'line (D): drag from a point to a point', sel = 'sel (T): drag - select rows; diamonds: corners tilt, sides stretch, inside moves; Esc - off', shape = 'shape (c): drag - the span, up / down - the height; the shape - the button next to it', erase = 'erase (E): drag - the points go' })[A.tool] end

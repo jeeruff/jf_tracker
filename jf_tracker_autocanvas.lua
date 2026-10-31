@@ -66,6 +66,9 @@ end
 -- строки; рамка — от min до max значений точек в них; ромбы: углы — наклон верха / низа, середины сторон —
 -- растяжка по времени (l r) и по значению (t b), внутри — сдвиг. Превью ACV.xprev, запись при отпускании
 ACV.sel, ACV.xprev = nil, nil
+-- 31 окт: несколько кривых сразу (Shift+щелчок в списке) — дорожками друг под другом; ключ — огибающая или имя
+ACV.multi = {}
+function ACV.mkey(cv) return cv and (cv.env or cv.name) or nil end
 -- точки активной кривой в строках [a, b): { row, v } (act.points — { время, 0..1 })
 function ACV.sel_points(act, span, a, b)
   local out = {}
@@ -258,6 +261,7 @@ function ACV.key(c, st, mods)
   if ch == 'c' then ACV.tool = ACV.tool == 'shape' and 'cur' or 'shape'; return true end
   if ch == 'S' then ACV.snap = not ACV.snap; return true end
   if ch == 'T' then ACV.tool = ACV.tool == 'sel' and 'cur' or 'sel'; return true end   -- 31 окт: transform
+  if ch == '/' then return { op = 'addp' } end   -- 31 окт: параметр трека в список (нечёткий поиск)
   if c == 27 then
     if ACV.anchor then ACV.anchor = nil; return true end
     if ACV.sel then ACV.sel = nil; return true end
@@ -310,10 +314,11 @@ end
 function ACV.layout(L, w, h, n)
   local cw, rh = L.cw, L.rh
   local side = w >= cw * 60
-  local lw = side and math.min(math.floor(w * 0.18), cw * 18) or 0   -- 31 окт: уже (было 0.3 / 28 знаков) — рисунку шире
+  -- 31 окт: список кривых — слева, пошире (параметры читаются); + строка «/ add» — поиск параметра трека
+  local lw = side and math.min(math.floor(w * 0.24), cw * 34) or 0
   local top = rh + 2                                              -- строка заголовка (сетка, отрезок)
   if not side then top = top + rh end                             -- легенда — второй строкой
-  local gx, gy, gw, gh = 0, top, w - lw - (side and L.pad or 0), h - top - 2
+  local gx, gy, gw, gh = side and (lw + L.pad) or 0, top, w - lw - (side and L.pad or 0), h - top - 2
   return { side = side, lw = lw, gx = gx, gy = gy, gw = gw, gh = gh, legend_rows = math.max(1, math.floor(gh / rh)) }
 end
 
@@ -445,7 +450,38 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     end
     gfx.a = 1
   end
-  for i, cv in ipairs(curves) do if i ~= ACV.cur then trace(i, U.mix(cv.rgb or U.GREEN, U.BG, 0.5), 1) end end
+  -- 31 окт: выбрано несколько — поле делится на дорожки (сверху вниз по списку); правится активная (её дорожка),
+  -- щелчок по чужой дорожке — она активная
+  local fy0, fh0 = gy, gh
+  local stack, lane_hover
+  for i, cv in ipairs(curves) do if i == ACV.cur or ACV.multi[ACV.mkey(cv)] then stack = stack or {}; stack[#stack + 1] = i end end
+  if stack and #stack < 2 then stack = nil end
+  if stack then
+    local lh = math.floor(fh0 / #stack)
+    local ay, ah = fy0, fh0
+    for k, i in ipairs(stack) do
+      local ly0, lh0 = fy0 + (k - 1) * lh, lh - 2
+      if k > 1 then U.set(U.LINE); gfx.rect(gx, ly0 - 1, gw, 1, 1) end
+      if i == ACV.cur then ay, ah = ly0, lh0
+      else
+        gy, gh = ly0, lh0
+        local cv = curves[i]
+        trace(i, cv.rgb or U.GREEN, 1)
+        U.set(cv.rgb or U.GREEN)
+        for _, p in ipairs(cv.points or {}) do
+          local row = span.row_of and span.row_of(p[1]) or r0
+          if row >= r0 and row <= r1 then gfx.rect(rx(row) - 1, vy(p[2]) - 1, 3, 3, 1) end
+        end
+        U.text(gx + 3, gy + 1, ctx.fit(cv.name or '?', gw - 6), U.GREY)
+        if mx >= gx and mx < gx + gw and my >= gy and my < gy + gh then lane_hover = i end
+      end
+    end
+    gy, gh = ay, ah
+    ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr }
+    U.text(gx + 3, gy + 1, ctx.fit(act.name or '?', gw - 6), U.AMBER)
+  else
+    for i, cv in ipairs(curves) do if i ~= ACV.cur then trace(i, U.mix(cv.rgb or U.GREEN, U.BG, 0.5), 1) end end
+  end
   -- полоса модуляции активной LFO / ACS кривой — вокруг её базы
   if (act.kind == 'lfo' or act.kind == 'acs') and act.mod then
     U.set(act.rgb or U.CYAN, 0.18)
@@ -564,8 +600,17 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     gfx.a = 1
   end
   -- легенда: имя и значение в строке курсора; активная янтарём
-  local lx, ly = lay.side and (gx + gw + pad) or (x + pad), lay.side and gy or (y + rh + 1 + nrow * rh)
-  local lw = lay.side and lay.lw or (w - 2 * pad)
+  local lx, ly = x + pad, lay.side and fy0 or (y + rh + 1 + nrow * rh)
+  local lw = lay.side and (lay.lw - pad) or (w - 2 * pad)
+  -- 31 окт: «/ add» — нечёткий поиск по всем параметрам трека: выбранный — в список (огибающая создаётся)
+  do
+    local aw = lay.side and lw or (U.measure('/ add') + 2 * pad)
+    local hot = mx >= lx and mx < lx + aw and my >= ly and my < ly + rh
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(lx, ly, aw, rh - 1, 0)
+    U.text(lx + pad, ly, '/ add', hot and U.AMBER or U.GREY)
+    if hot then hover = { pane = 'curve', addp = true } end
+    if lay.side then ly = ly + rh + 2 else lx = lx + aw + 2 end
+  end
   for i, cv in ipairs(curves) do
     local on = i == ACV.cur
     local val = cache.ys[i] and cache.ys[i][math.max(0, math.min(gw - 1, cx - gx))] or 0
@@ -573,7 +618,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     local lab = ('%s %3d%%'):format(cv.name or '?', math.floor(val * 100 + 0.5))
     local ix, iy, iw
     if lay.side then
-      if i > lay.legend_rows then break end
+      if i > lay.legend_rows - 1 then break end
       ix, iy, iw = lx, ly + (i - 1) * rh, lw
     else
       iw = U.measure(lab) + 2 * pad + 6
@@ -582,10 +627,12 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     end
     local hot = mx >= ix and mx < ix + iw and my >= iy and my < iy + rh
     if hot then hover = { pane = 'curve', legend = i } end
-    if on then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(ix, iy, iw, rh, 1) end
+    if on then U.set(U.tint(U.AMBER, 0.25)); gfx.rect(ix, iy, iw, rh, 1)
+    elseif ACV.multi[ACV.mkey(cv)] then U.set(U.tint(U.CYAN, 0.2)); gfx.rect(ix, iy, iw, rh, 1) end   -- 31 окт: в дорожках
     U.set(cv.rgb or U.GREEN); gfx.rect(ix + 1, iy + 2, 3, rh - 4, 1)
     U.text(ix + 6, iy, ctx.fit(lab, iw - 8), on and U.AMBER or (cv.write == false and U.GREY or U.TEXT))
   end
+  if not hover and lane_hover then hover = { pane = 'curve', legend = lane_hover } end   -- 31 окт: чужая дорожка — сделать активной
   if not hover and mx >= gx and mx < gx + gw and my >= gy and my < gy + gh then
     local row = r0 + (mx - gx) / gw * nr
     hover = { pane = 'curve', curve_t = span.t0 + (span.t1 - span.t0) * (mx - gx) / math.max(1, gw - 1), row = math.floor(row),
