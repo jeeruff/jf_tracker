@@ -10022,14 +10022,14 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: число эффектов — без jf_tracker_macro (ручки макросов — не эффект: «2 fx» при одном Surge)
       local nfx = 0
       if f.container then for _, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then nfx = nfx + 1 end end end
-      local full = '  ' .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)   -- 31 окт: два знака — место кружка on / off
+      local full = '   ' .. inp .. (f.container and ('[' .. f.name .. '] ' .. nfx .. ' fx') or f.name)   -- 31 окт: три знака — место кружка on / off (не на рамке)
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, (f.enabled and not f.poff) and (f.container and U.AMBER or U.TEXT) or U.GREY)
       do   -- 31 окт: кружок on / off перед именем: щелчок — включить / выключить (bypass)
         local on = f.enabled and not f.poff
-        local cr = math.max(3, math.floor(L.rh / 3))
-        local ccx, ccy = bx + L.pad + math.floor(ms('  ') / 2), by + 1 + math.floor(L.rh / 2)
+        local cr = math.max(3, math.min(math.floor(L.rh / 3), math.floor(ms(' ') / 2) + 1))
+        local ccx, ccy = bx + L.pad + math.floor(ms('   ') / 2), by + 1 + math.floor((L.rh - 1) / 2)
         local hot = not drag and math.abs(mx - ccx) <= cr + 3 and my >= by + 1 and my < by + L.rh
         set(on and (hot and U.AMBER or U.GREEN) or (hot and U.AMBER or U.DIM)); gfx.circle(ccx, ccy, cr, 1, 1)
         if not on then set(U.GREY); gfx.circle(ccx, ccy, cr, 0, 1) end

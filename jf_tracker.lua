@@ -2646,7 +2646,21 @@ ctx = {
     local p = f and f.params[pi]
     if p and p.kind == 'toggle' then ctx.dsp_value(k, pi, 1) elseif f then edit.fx_bypass(col.track, f.i) end
   end,
-  dsp_bypass = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_bypass(col.track, f.i) end end,
+  -- 31 окт: модуль во ВЫКЛЮЧЕННОМ контейнере (poff) — включение включает и контейнеры над ним (иначе не звучит,
+  -- кружок on / off «всегда тёмный»); свой выключен — переключить его
+  dsp_bypass = function(k)
+    local col, f = ctx.dsp_fx(k)
+    if not f then return end
+    local turn_on = not f.enabled or f.poff
+    if not f.enabled or not f.poff then edit.fx_bypass(col.track, f.i) end
+    if turn_on and f.poff then
+      local p = f.inner and f.inner.parent
+      while p do
+        if not p.enabled and p.i then edit.fx_bypass(col.track, p.i) end
+        p = p.inner and p.inner.parent
+      end
+    end
+  end,
   dsp_show = function(k) local col, f = ctx.dsp_fx(k); if f then edit.fx_show(col.track, f.i) end end,
   -- браузер эффектов: добавить выбранный FX на трек курсора (pos — место в цепочке)
   -- своё избранное и недавние браузера эффектов (persistent ExtState, метки)
