@@ -11537,7 +11537,7 @@ function D.frame(L, snap, rows, state, info)
         local ax, aw2, ah = x0, w0, zr * L.rh
         local side = false
         if zr == 0 and not G.noparams and f.groups and f.rows then
-          local px = bx + #f.groups * bw1 + L.pad
+          local px = bx + (#f.groups + ((D.slx_st and D.slx_st[f.i]) and 1 or 0)) * bw1 + L.pad   -- 31 окт: + колонка STRETCH (прицел ложился на ARP / TIME)
           local pw2 = bx + bw - L.pad - px
           if pw2 >= L.cw * 24 then side = true; ax, aw2, ah, aim_y = px, pw2, (f.rows + 1) * L.rh - 2, by + L.rh + 1 + wtop end
         end
