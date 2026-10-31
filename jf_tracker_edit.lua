@@ -4879,27 +4879,28 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
           -- 21 окт: клип через границу паттерна — ноты, что уже за границей (следующий паттерн), не трогать, конец клипа — как был
           local nfin = fin > limit + EPS and fin or math.min(fin + dt, limit)
           local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), math.min(P(limit), P(fin) + 1)   -- 31 окт: ноты за концом клипа — не трогать
-          rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < plim - 1) and a0 + dp or nil end; return a0 end,
-            function(a1) if a1 <= p0 or a1 >= plim then return a1 end; return math.min(a1 + dp, plim) end)   -- 28 окт: метки 0R — с нотами
+          local mlim = math.min(P(limit), P(nfin) + 1)   -- 31 окт: клип растёт на dt — граница сдвига по НОВОМУ концу (нота у конца клипа пропадала)
+          rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < mlim - 1) and a0 + dp or nil end; return a0 end,
+            function(a1) if a1 <= p0 or a1 >= plim then return a1 end; return math.min(a1 + dp, mlim) end)   -- 28 окт: метки 0R — с нотами
           local _, nn, ncc, ntx = R.MIDI_CountEvts(tk)
           for k = nn - 1, 0, -1 do
             local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
             if a0 >= plim - 1 then   -- в следующем паттерне — на месте
             elseif a0 >= p0 - 1 then
-              if a0 + dp >= plim - 1 then R.MIDI_DeleteNote(tk, k)
-              else R.MIDI_SetNote(tk, k, sel, mu, a0 + dp, math.min(a1 + dp, plim), ch, pi, ve, true) end
-            elseif a1 > p0 then R.MIDI_SetNote(tk, k, sel, mu, a0, math.min(a1 + dp, plim), ch, pi, ve, true) end
+              if a0 + dp >= mlim - 1 then R.MIDI_DeleteNote(tk, k)
+              else R.MIDI_SetNote(tk, k, sel, mu, a0 + dp, math.min(a1 + dp, mlim), ch, pi, ve, true) end
+            elseif a1 > p0 then R.MIDI_SetNote(tk, k, sel, mu, a0, math.min(a1 + dp, mlim), ch, pi, ve, true) end
           end
           for k = ncc - 1, 0, -1 do
             local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
             if a0 >= p0 and a0 < plim then
-              if a0 + dp >= plim then R.MIDI_DeleteCC(tk, k) else R.MIDI_SetCC(tk, k, sel, mu, a0 + dp, cm, ch, m1, m2, true) end
+              if a0 + dp >= mlim then R.MIDI_DeleteCC(tk, k) else R.MIDI_SetCC(tk, k, sel, mu, a0 + dp, cm, ch, m1, m2, true) end
             end
           end
           for k = ntx - 1, 0, -1 do
             local _, sel, mu, a0, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
             if a0 >= p0 and a0 < plim then
-              if a0 + dp >= plim then R.MIDI_DeleteTextSysexEvt(tk, k) else R.MIDI_SetTextSysexEvt(tk, k, sel, mu, a0 + dp, ty, msg, true) end
+              if a0 + dp >= mlim then R.MIDI_DeleteTextSysexEvt(tk, k) else R.MIDI_SetTextSysexEvt(tk, k, sel, mu, a0 + dp, ty, msg, true) end
             end
           end
           R.MIDI_Sort(tk)
