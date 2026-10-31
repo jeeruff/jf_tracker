@@ -26696,8 +26696,9 @@ local function frame()
         local k = hover.matrix.ri .. ':' .. hover.matrix.ci
         if not next(MX.picks) and not MX.anchor then MX.picks[MX.cur.ri .. ':' .. MX.cur.ci] = { ri = MX.cur.ri, ci = MX.cur.ci } end
         MX.picks[k] = (not MX.picks[k]) and { ri = hover.matrix.ri, ci = hover.matrix.ci } or nil
-      elseif gfx.mouse_cap & 8 == 8 and not MX.anchor then
-        -- 21 окт: Shift+щелчок (блока ещё нет) — весь канал: все паттерны песни на этом треке
+      elseif gfx.mouse_cap & 8 == 8 and not MX.anchor and hover.matrix.ri == MX.cur.ri and hover.matrix.ci == MX.cur.ci then
+        -- 21 окт: Shift+щелчок по клетке курсора (блока ещё нет) — весь канал: все паттерны песни на этом треке;
+        -- 31 окт: по другой клетке — блок от клетки курсора (D1 → Shift A1 = A1..D1, а не весь канал)
         local first, last
         for i, rg in ipairs(seq) do if not rg.gap then first = first or i; last = i end end
         MX.picks = {}
@@ -26705,7 +26706,7 @@ local function frame()
           MX.anchor = { ri = first, ci = hover.matrix.ci }
           MX.goto_cell(seq, snap, last, hover.matrix.ci)
           ctx.mx_to_visual()
-          vim.msg = ('channel %s: every pattern selected (Shift+click another cell - a block from here)'):format((snap.cols[hover.matrix.ci] or {}).name or '')
+          vim.msg = ('channel %s: every pattern selected (Shift+click another cell - a block from here; Shift+click the cursor cell - the whole channel)'):format((snap.cols[hover.matrix.ci] or {}).name or '')
           click = { t = now2, zone = 'matrix', row = hover.matrix.ri }
           goto mx_click_done
         end
