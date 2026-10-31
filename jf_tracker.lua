@@ -3666,7 +3666,7 @@ ctx = {
     if not env then vim.msg = 'no envelope for ' .. r.label; return end
     reaper.SetCursorContext(2, env)
     model.invalidate()
-    mod_pane = 'lfo'
+    ctx.pane_focus('lfogen')   -- 31 окт: генератор — своя панель
     vim.msg = 'curves → ' .. r.label .. ' (g: automation item, p: points)'
   end,
   -- trim ПКМ: вкладка modulation, панель params на этом треке
