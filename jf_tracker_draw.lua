@@ -5119,7 +5119,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           end
           local r = math.max(0.25, math.min(2, it.slider.rate))
           local px = cx + math.floor((r - 0.25) / 1.75 * (sw2 - 1) + 0.5)
-          U.diamond(px, yy, math.max(3, math.floor((L.rh - 6) / 2)), (hot or math.abs(r - 1) > 1e-3) and U.AMBER or U.TEXT, hot)   -- 13 окт: ромбик
+          U.diamond(px, yy, U.knob_r(L.rh), (hot or math.abs(r - 1) > 1e-3) and U.AMBER or U.TEXT, hot)   -- 13 окт: ромбик
         elseif it.slider then                                 -- 9 окт: слайдер свинга −100..100 %, от центра
           local sw2 = 8 * L.cw
           local mid = cx + math.floor(sw2 / 2)
@@ -5130,7 +5130,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local px = mid + math.floor(v * (sw2 / 2 - 1) + 0.5)
           local sc = hot and U.AMBER or (math.abs(v) > 1e-6 and U.CYAN or U.TEXT)
           set(sc, 0.6); gfx.rect(math.min(mid, px), yy - 1, math.max(1, math.abs(px - mid)), 3, 1)
-          U.diamond(px, yy, math.max(3, math.floor((L.rh - 6) / 2)), sc, hot)   -- 13 окт: ромбик
+          U.diamond(px, yy, U.knob_r(L.rh), sc, hot)   -- 13 окт: ромбик
         end
         hint('ctrl', cx, cy, iw, L.rh, it[1])
         D.strip_cell[it[1]] = { cx, cy, iw }          -- всплывашка у своей ячейки (:sig, 5 окт)
@@ -5295,7 +5295,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local rhot = cell_hot(rx0, ry, w2c, L.rh)
       text(rx0, ry, rl, rhot and U.AMBER or (math.abs(rv - 1) > 1e-3 and U.AMBER or U.GREY))
       -- слайдер — только в своей колонке (ромбик не на соседей); не влезает — одно значение (тянуть / колесо)
-      local dr = math.max(3, math.floor((L.rh - 6) / 2)) + 2
+      local dr = U.knob_r(L.rh) + 2
       local sx2 = rx0 + ms(rl) + L.pad + dr
       local sw2 = rx0 + w2c - dr - sx2
       local r = math.max(0.25, math.min(2, rv))
@@ -12045,7 +12045,7 @@ function D.frame(L, snap, rows, state, info)
           elseif info.param_bipolar and info.param_bipolar(f, p) then
             -- 22 окт: ноль посередине (pan, pitch, детюн) — ромбик от центра, как пан в шапке трека
             local ispan = (p.name or ''):lower():match('pan') ~= nil
-            local dr = math.max(3, math.floor((L.rh - 6) / 2))   -- 22 окт: ромб на краю не наезжает на значение
+            local dr = U.knob_r(L.rh)   -- 22 окт: ромб на краю не наезжает на значение
             U.dslider(wx0 + dr, cy, math.max(4, ww - 2 * dr), v.n, true, cc or (acc == U.TEXT and D.SL_DIM or acc), psel, L.rh, ispan)
           else
           set(U.DIM); gfx.rect(wx0, cy - 1, ww, 2, 1)                       -- дорожка

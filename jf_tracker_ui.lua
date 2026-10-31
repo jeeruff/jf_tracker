@@ -113,10 +113,12 @@ U.set = set
 -- 18 окт: стороны панорамы — L бордовый, R зелёный
 U.PAN_L = function() return U.RED end   -- 19 окт: красный темы (был бордовый — тускло)
 U.PAN_R = function() return U.GREEN end
+-- 31 окт: радиус ромбика ручки по высоте строки — на 15 % меньше прежнего (rh − 6) / 2; одна мера для всех ромбиков-ручек
+function U.knob_r(rh) return math.max(3, math.floor(((rh or 12) - 6) / 2 * 0.85 + 0.5)) end
 function U.dslider(sx, cy, sw, fr, centered, col, hot, rh, lr)
   fr = math.max(0, math.min(1, fr or 0))
   local px = sx + math.floor(fr * (sw - 1) + 0.5)
-  local r = math.max(3, math.floor(((rh or 12) - 6) / 2))
+  local r = U.knob_r(rh)
   -- lr (панорама): левая половина дорожки — цвет L, правая — R; заливка и ручка — цвет стороны ручки
   if lr and centered then
     local mid = sx + math.floor(sw / 2)
