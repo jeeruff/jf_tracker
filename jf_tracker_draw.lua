@@ -8670,31 +8670,25 @@ function D.frame(L, snap, rows, state, info)
     if ya >= hy + 1 + 3 * L.rh - 1 then
       -- 31 окт: сразу под autoarm (ряд 4) — autozoom, ниже markers полностью (каждый своей строкой)
       local yz = hy + 1 + 3 * L.rh
-      -- 31 окт: без полосы эффектов — имя паттерна здесь же, строкой над длиной (az mk тогда в одну строку)
-      local need = info.cur_region and not D.name_in_fx
-      local nfree = math.floor((y4 - yz) / L.rh + 0.01)
-      local full = not need or nfree >= 3
-      btn(bx, yz, (full and ms('autozoom') + 2 <= bw) and 'autozoom' or 'az', 'viewbtn', 'autozoom', state.autozoom)
-      if full and yz + L.rh <= y4 - L.rh then btn(bx, yz + L.rh, (ms('markers') + 2 <= bw) and 'markers' or 'mk', 'viewbtn', 'markers')
-      else btn(bx + bw - ms('mk') - 2, yz, 'mk', 'viewbtn', 'markers') end
-      if need and nfree >= 2 then
-        local rg = info.cur_region
-        local ny = y4 - L.rh
-        local c = (rg.color and rg.color ~= 0 and info.region_rgb and info.region_rgb(rg.color)) or U.GREEN
-        local hot = mx >= bx and mx < bx + bw and my >= ny and my < ny + L.rh
-        set(hot and U.tint(U.AMBER, 0.3) or U.tint(c, 0.3)); gfx.rect(bx, ny + 1, bw, L.rh - 1, 1)
-        set(c); gfx.rect(bx, ny + 1, 3, L.rh - 1, 1)
-        text(bx + 5, ny, fit(tostring(rg.idx or '') .. ((rg.name or '') ~= '' and (' ' .. rg.name) or ''), bw - 7), hot and U.AMBER or U.TEXT)
-        if hot then hover.rghead = true end
+      -- 31 окт: без полосы эффектов в строке 4 — имя паттерна (выше), тогда autozoom … mk строкой над длиной
+      local named = not (state.fxrow and (L.fxrow_h or 0) > 0) and yz + L.rh <= hy + (L.header_rows - 2) * L.rh + 2
+      if named then
+        local yr = y4 - L.rh
+        btn(bx, yr, (ms('autozoom') + ms('mark') + 6 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom)
+        btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
+      else
+        btn(bx, yz, (ms('autozoom') + 2 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom)
+        if yz + L.rh <= y4 - L.rh then btn(bx, yz + L.rh, (ms('markers') + 2 <= bw) and 'markers' or 'mark', 'viewbtn', 'markers')
+        else btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers') end   -- 31 окт: короче — zoom / mark (не az mk)
       end
     else
       -- 20 окт: низкая шапка — az mk в конце ряда 1 (за param), x2 /2 остаются на своём месте у длины
       local xr = D.cn_r1x or bx
       local yr = hy + 1 + L.rh
-      if xr + ms('mk') + 2 <= bx + bw then
-        local mw = ms('mk') + 2
-        btn(bx + bw - mw, yr, 'mk', 'viewbtn', 'markers')
-        if xr + ms('az') + 2 <= bx + bw - mw - 2 then btn(bx + bw - mw - 2 - (ms('az') + 2), yr, 'az', 'viewbtn', 'autozoom', state.autozoom) end
+      if xr + ms('mark') + 2 <= bx + bw then
+        local mw = ms('mark') + 2
+        btn(bx + bw - mw, yr, 'mark', 'viewbtn', 'markers')
+        if xr + ms('zoom') + 2 <= bx + bw - mw - 2 then btn(bx + bw - mw - 2 - (ms('zoom') + 2), yr, 'zoom', 'viewbtn', 'autozoom', state.autozoom) end
       end
     end
     D.rglen_at = nil
