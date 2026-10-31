@@ -3197,6 +3197,30 @@ function V.key_impl(c)
           V.count = nil; finish_edit(); return
         end
       end
+      -- 31 окт: dw на пустой строке, а следующее событие подколонки — OFF: удалить этот OFF (свободный — CC 123;
+      -- OFF ноты — нота звучит дальше, до следующего события / конца клипа), а не ноту целиком
+      if p == 'd' and c == ('w'):byte() and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
+        local f = flat()[V.cur.fi]
+        local nr = f and not f.env and not f.ml and next_ev(V.cur.fi, V.cur.row - 1, 1)
+        local cell = nr and f.sub and f.sub[nr]
+        if cell and cell.kind == 'off' and cell.of then
+          if cell.clipend then V.msg = '=== is the end of the clip (pattern) - nothing to delete'; V.count = nil; finish_move(); return end
+          if cell.of.stub then
+            ctx.edit.all_off_del(cell.of)
+            V.msg = ('free OFF at row %04d deleted'):format(nr)
+            V.count = nil; finish_edit(); return
+          end
+          local h = cell.of
+          local nx
+          for r2, cl in pairs(f.sub) do if type(r2) == 'number' and r2 > nr and (cl.kind == 'midi' or cl.kind == 'audio' or (cl.kind == 'off' and cl.of ~= h)) and (not nx or r2 < nx) then nx = r2 end end
+          if not nx and ctx.region_rows then local _, r1 = ctx.region_rows(); if r1 then nx = r1 + 1 end end
+          if nx then
+            ctx.edit.note_off({ h }, lpb(), nx - (ctx.edit.OFF_END and 1 or 0))
+            V.msg = ('OFF at row %04d removed: the note sounds on to row %04d'):format(nr, nx)
+            V.count = nil; finish_edit(); return
+          end
+        end
+      end
       -- 21 окт: опция treat OFF as event — dw изнутри ноты / на её OFF: удалить этот OFF (нота до следующего события / конца паттерна)
       if p == 'd' and c == ('w'):byte() and ctx.state.offevent then
         local f = flat()[V.cur.fi]

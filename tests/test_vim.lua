@@ -1200,5 +1200,15 @@ do   -- 31 окт: INSERT, колонка команд — gg / G прыгают
   eq('…and stays in INSERT', V.mode, 'insert')
   V.mode, V.cur.row, V.cur.field, V.hexbuf = sv[1], sv[2], sv[3], nil
 end
+do   -- 31 окт: dw на пустой строке перед свободным OFF — удаляет этот OFF (не ноту)
+  local got
+  E.all_off_del = function(h) got = 'alloffdel@' .. h.row0 end
+  local sub = snap.cols[1].lanes[1].subs[1]
+  for r = 20, 31 do sub[r] = nil end
+  sub[24] = { kind = 'off', explicit = true, of = { kind = 'midi', stub = true, row0 = 24, rows = 1, pitch = 60 } }
+  V.mode = 'normal'; V.cur = { fi = 1, row = 22, field = 1 }
+  keysin('dw'); eq('dw before a free OFF deletes that OFF (31 окт)', got, 'alloffdel@24')
+  sub[24] = nil
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
