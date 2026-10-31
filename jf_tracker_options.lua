@@ -943,7 +943,8 @@ function O.draw(L, W, H)
             local h2 = mx >= x and mx < x + sw and my >= y and my < y + rh
             if h2 then O.hbtn = { i = i, k = k } end
             local c = v == 'grey' and U.GREY or ctx.hex_rgb(v) or U.GREY
-            U.set(c); gfx.rect(x + 1, y + 2, sw - 2, sw - 2, 1)
+            if v == 'grey' then U.set(c) else gfx.set(c[1], c[2], c[3], 1) end   -- 31 окт: настоящий цвет — мимо фильтра темы (в красной теме все были красными)
+            gfx.rect(x + 1, y + 2, sw - 2, sw - 2, 1)
             U.set(on2 and U.AMBER or (h2 and U.TEXT or U.LINE)); gfx.rect(x, y + 1, sw, sw, 0)
             if on2 then gfx.rect(x - 1, y, sw + 2, sw + 2, 0) end
             x = x + sw + 3
