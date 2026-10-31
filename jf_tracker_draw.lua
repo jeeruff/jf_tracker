@@ -8637,9 +8637,9 @@ function D.frame(L, snap, rows, state, info)
     -- 20 окт: строка 3 — номер и имя паттерна курсора (и секция) в его цвете; клик — выпадашка команд паттерна
     -- (очередь, alias, clone, /2 x2, длина …); als cln — в ней. Вертикальная шапка справа от мастера — отменена
     local ny = hy + 1 + 3 * L.rh
-    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then ny = hy + (L.header_rows - 2) * L.rh + 2 end   -- 31 окт: имя — прямо над длиной (zoom mark — выше)
+    if ny + L.rh <= hy + (L.header_rows - 2) * L.rh + 2 then ny = hy + (L.header_rows - 1) * L.rh + 2 end   -- 31 окт: имя — нижней строкой, над телом (длина — над ним, zoom mark — выше)
     -- 20 окт (2): строка эффектов есть — имя паттерна в ней, под размером и кнопками (main, вместо подписи fx)
-    if ny > hy + 1 + 3 * L.rh - 1 and ny + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 and not (state.fxrow and (L.fxrow_h or 0) > 0) then
+    if ny > hy + 1 + 3 * L.rh - 1 and ny + L.rh <= hy + L.header_rows * L.rh + 2 and not (state.fxrow and (L.fxrow_h or 0) > 0) then
       local rg = info.cur_region_full
       local nhot = mx >= bx and mx < bx + bw and my >= ny and my < ny + L.rh
       if rg then
@@ -8696,6 +8696,8 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     D.rglen_at = nil
+    -- 31 окт: имя паттерна внизу шапки (нет полосы эффектов) — длина строкой выше
+    if not (state.fxrow and (L.fxrow_h or 0) > 0) and hy + 1 + 4 * L.rh <= y4 - L.rh then y4 = y4 - L.rh end
     if info.cur_region and not D.len_in_fx then   -- 31 окт: длина и x2 /2 — над именем паттерна в полосе эффектов
       local rg = info.cur_region
       -- x2 /2 справа от длины — и в низкой шапке (20 окт: markers ушли в ряд 1)
