@@ -142,7 +142,7 @@ local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
--- 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
+-- 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 796   -- 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
@@ -7467,42 +7467,47 @@ end
 -- 31 окт: эксперимент «трещины» — тонкие трещины от внутреннего края тела трекера внутрь; цвет каждой — пиксель
 -- снаружи у её начала (сочится то, что рядом), раз в секунду. Форма — от размера (постоянное зерно), не каждый кадр
 D.crk = nil
-function D.cracks(x, y, w, h)
+local CRK_IMG = 85   -- 31 окт: картинка трещин (85 свободна — список номеров выше)
+-- 31 окт: veins — вместо трещин в INSERT красные вены: плавнее, ветвистее, толще у края, тёмно-красные
+function D.cracks(x, y, w, h, veins)
   if w < 60 or h < 60 then return end
   local c = D.crk
   local now = reaper.time_precise()
-  if not (c and c.x == x and c.y == y and c.w == w and c.h == h) then
-    c = { x = x, y = y, w = w, h = h, segs = {}, src = {}, t = 0 }
+  local dirty = false
+  if not (c and c.x == x and c.y == y and c.w == w and c.h == h and c.veins == veins) then
+    c = { x = x, y = y, w = w, h = h, segs = {}, src = {}, t = 0, veins = veins }
     local seed = 1234567
     local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
-    local reach = math.max(24, math.min(90, math.floor(math.min(w, h) * 0.12)))
+    local reach = math.max(24, math.min(110, math.floor(math.min(w, h) * 0.14)))
+    local deep = math.floor(math.min(w, h) * 0.75)
     local function grow(px, py, ang, len, k, d)
       local s = 0
-      while s < len and #c.segs < 700 do
+      while s < len and #c.segs < 6000 do
         local st = 3 + rnd() * 4
-        ang = ang + (rnd() - 0.5) * 0.9
+        ang = ang + (rnd() - 0.5) * (veins and 0.35 or 0.8)
         local nx, ny = px + math.cos(ang) * st, py + math.sin(ang) * st
-        if nx < x + 1 or nx > x + w - 2 or ny < y + 1 or ny > y + h - 2 then return end
+        if nx < 1 or nx > w - 2 or ny < 1 or ny > h - 2 then return end
         s = s + st
-        c.segs[#c.segs + 1] = { px, py, nx, ny, k, (d + s / len) }
-        if rnd() < 0.12 and d < 0.5 then grow(nx, ny, ang + (rnd() < 0.5 and -1 or 1) * (0.6 + rnd() * 0.6), (len - s) * 0.6, k, d + 0.3) end
+        c.segs[#c.segs + 1] = { px, py, nx, ny, k, d + (1 - d) * s / len }
+        if rnd() < (veins and 0.16 or 0.10) and d < 0.6 then grow(nx, ny, ang + (rnd() < 0.5 and -1 or 1) * (0.5 + rnd() * 0.7), (len - s) * (0.4 + rnd() * 0.4), k, d + 0.25) end
         px, py = nx, ny
       end
     end
-    local n = math.max(8, math.floor((w + h) / 70))
+    local n = math.max(20, math.floor((w + h) / 18))   -- 31 окт (2): много больше
     for i = 1, n do
-      local e = rnd()
+      local p = rnd() * 2 * (w + h)
       local px, py, ang, ox, oy
-      local per = 2 * (w + h)
-      local p = e * per
-      if p < w then px, py, ang, ox, oy = x + p, y + 1, math.pi / 2, x + p, y - 3
-      elseif p < w + h then px, py, ang, ox, oy = x + w - 2, y + (p - w), math.pi, x + w + 3, y + (p - w)
-      elseif p < 2 * w + h then px, py, ang, ox, oy = x + (p - w - h), y + h - 2, -math.pi / 2, x + (p - w - h), y + h + 3
-      else px, py, ang, ox, oy = x + 1, y + (p - 2 * w - h), 0, x - 3, y + (p - 2 * w - h) end
-      c.src[i] = { math.floor(ox), math.floor(oy), 0.6, 0.6, 0.6 }
-      grow(px, py, ang, reach * (0.4 + rnd() * 0.8), i, 0)
+      if p < w then px, py, ang, ox, oy = p, 1, math.pi / 2, p, -3
+      elseif p < w + h then px, py, ang, ox, oy = w - 2, p - w, math.pi, w + 3, p - w
+      elseif p < 2 * w + h then px, py, ang, ox, oy = p - w - h, h - 2, -math.pi / 2, p - w - h, h + 3
+      else px, py, ang, ox, oy = 1, p - 2 * w - h, 0, -3, p - 2 * w - h end
+      c.src[i] = { math.floor(x + ox), math.floor(y + oy), 0.6, 0.6, 0.6 }
+      -- некоторые — глубоко в трекер
+      local len = rnd() < 0.12 and deep * (0.4 + rnd() * 0.6) or reach * (0.3 + rnd() * 0.9)
+      grow(px, py, ang, len, i, 0)
     end
     D.crk = c
+    dirty = true
   end
   if now - c.t > 1 then   -- цвета соседей: пиксель за краем (прошлый кадр)
     c.t = now
@@ -7510,19 +7515,32 @@ function D.cracks(x, y, w, h)
     for _, s in ipairs(c.src) do
       gfx.x, gfx.y = s[1], s[2]
       local r, g, b = gfx.getpixel()
-      if r and r + g + b > 0.25 then s[3], s[4], s[5] = r, g, b else s[3], s[4], s[5] = 0.55, 0.55, 0.6 end
+      if veins then local v = 0.55 + 0.35 * ((s[1] * 7 + s[2] * 13) % 10) / 10; s[3], s[4], s[5] = v, 0.04, 0.06   -- вены: красные, разной глубины
+      elseif r and r + g + b > 0.25 then s[3], s[4], s[5] = r, g, b else s[3], s[4], s[5] = 0.55, 0.55, 0.6 end
+    end
+    gfx.dest = od
+    dirty = true
+  end
+  if dirty then   -- в картинку: чёрный фон, трещины; кадр — сложением (чёрное ничего не добавляет)
+    local od = gfx.dest
+    gfx.setimgdim(CRK_IMG, -1, -1); gfx.setimgdim(CRK_IMG, w, h)
+    gfx.dest = CRK_IMG
+    gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, h, 1)
+    for _, sg in ipairs(c.segs) do
+      local s = c.src[sg[5]]
+      local a = 0.8 * (1 - math.min(1, sg[6]))
+      if a > 0.03 then
+        gfx.set(s[3], s[4], s[5], a); gfx.line(sg[1], sg[2], sg[3], sg[4], 1)
+        gfx.set(s[3], s[4], s[5], a * 0.3); gfx.line(sg[1] + 1, sg[2], sg[3] + 1, sg[4], 1)
+        if veins and sg[6] < 0.35 then gfx.set(s[3], s[4], s[5], a * 0.8); gfx.line(sg[1], sg[2] + 1, sg[3], sg[4] + 1, 1) end   -- ствол вены толще
+      end
     end
     gfx.dest = od
   end
-  for _, sg in ipairs(c.segs) do
-    local s = c.src[sg[5]]
-    local a = 0.75 * (1 - math.min(1, sg[6]))
-    if a > 0.03 then
-      gfx.set(s[3], s[4], s[5], a); gfx.line(sg[1], sg[2], sg[3], sg[4], 1)
-      gfx.set(s[3], s[4], s[5], a * 0.25); gfx.line(sg[1] + 1, sg[2], sg[3] + 1, sg[4], 1)
-    end
-  end
-  gfx.a = 1
+  local om = gfx.mode
+  gfx.mode = 1; gfx.a = 1
+  gfx.blit(CRK_IMG, 1, 0, 0, 0, w, h, x, y, w, h)
+  gfx.mode = om or 0; gfx.a = 1
 end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
@@ -9671,7 +9689,9 @@ function D.frame(L, snap, rows, state, info)
       elseif fl and fl >= 0.6 then D.pf = nil end
     end
   end
-  if state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: эксперимент
+  do local ins = info.vmode == 'insert'
+    if state.veins and ins then D.cracks(tx0, L.body_y, W - tx0, L.body_h, true)   -- 31 окт: INSERT — красные вены
+    elseif state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h, false) end end   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
