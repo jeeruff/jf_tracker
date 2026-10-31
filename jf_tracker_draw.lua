@@ -591,7 +591,8 @@ function D.layout(snap, state, nregions)
   L.env_cw = L.env_bx + L.cw + L.pad + L.env_hex_w + L.pad
   L.GE = setmetatable({ env_bar_w = L.cw, env_compact = true }, { __index = L })
   -- 24 окт: узкая колонка по умолчанию — 3 знака значения (вид values) и тонкая ручка automation item слева
-  L.G3 = setmetatable({ env_bx = 4, env_bar_w = ms('000'), env_compact = true, env3 = true }, { __index = L })
+  L.G3 = setmetatable({ env_bx = 4, env_bar_w = ms(state.envfmt == 'hex' and '00' or '000'),   -- 31 окт: в ширину колонки (hex — 2 знака)
+    env_compact = true, env3 = true }, { __index = L })
   L.env3_w = 4 + ms(state.envfmt == 'hex' and '00' or '000') + 2 * L.pad   -- 31 окт: hex — два знака, без пустого запаса
   -- ширина браузера: перетащенная мышью (state.side_px) или по кнопке <>
   L.side_w = state.side and (state.side_px or (L.cw * (state.sidenarrow and 20 or 36) + 2 * L.pad)) or 0
@@ -2711,6 +2712,7 @@ function D.pins_draw(L, info, x, y, w, h, mx, my, hover)
 end
 local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
   if not ev then return end
+  if vals == 'curve' then vals = nil end   -- 31 окт: выбранная кривая (ze c) — кривая, не числа
   if vals == 'steps' then
     -- 12 окт: шаги (ze s) — фейдер на строку, как степпер 303: дорожка во всю полосу,
     -- заливка до значения строки; число — у строк с точкой
@@ -2718,8 +2720,9 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
     local h = math.max(2, L.rh - 3)
     set(U.tint(U.CYAN, 0.12)); gfx.rect(x + L.env_bx, y + 1, bw, h, 1)
     set(U.CYAN); gfx.rect(x + L.env_bx, y + 1, math.max(1, math.floor(ev.v * bw + 0.5)), h, 1)
-    if ev.pt then
-      text(x + L.env_bx + bw + L.pad, ty, D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)), U.TEXT)
+    if ev.pt then   -- 31 окт: точка — риской на самом фейдере (число справа вылезало на соседний трек)
+      local px = x + L.env_bx + math.max(0, math.min(bw - 2, math.floor(ev.v * bw + 0.5) - 1))
+      set(U.TEXT); gfx.rect(px, y, 2, h + 2, 1)
     end
     return
   end
@@ -2758,7 +2761,8 @@ local function draw_env_cell(L, ev, prev, x, y, ty, e, nxt, vals)
     local tempo = e and e.name and e.name:lower():find('tempo', 1, true) and e.max and e.min
     local vt = tempo and ('%d'):format(math.floor(e.min + ev.v * (e.max - e.min) + 0.5))
       or (D.envfmt == 'hex' and string.format('%02X', math.floor(ev.v * 255 + 0.5)) or tostring(math.floor(ev.v * 127 + 0.5)))
-    text(tx, ty, vt, U.TEXT)
+    if not L.env3 then text(tx, ty, vt, U.TEXT) end   -- 31 окт: узкая колонка — только кривая (число вылезало за колонку)
+  elseif L.env3 then
   elseif prev and prev.pt and prev.ramp then text(tx, ty, prev.ramp, U.CYAN)   -- 25 окт: темп — ^ подъём, v спад
   elseif not L.env_compact and prev and prev.pt and prev.shape and prev.shape ~= 0 then
     -- форма сегмента точки строкой выше — под её значением, только если не lin
