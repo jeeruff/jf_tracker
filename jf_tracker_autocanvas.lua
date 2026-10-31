@@ -310,7 +310,7 @@ end
 function ACV.layout(L, w, h, n)
   local cw, rh = L.cw, L.rh
   local side = w >= cw * 60
-  local lw = side and math.min(math.floor(w * 0.3), cw * 28) or 0
+  local lw = side and math.min(math.floor(w * 0.18), cw * 18) or 0   -- 31 окт: уже (было 0.3 / 28 знаков) — рисунку шире
   local top = rh + 2                                              -- строка заголовка (сетка, отрезок)
   if not side then top = top + rh end                             -- легенда — второй строкой
   local gx, gy, gw, gh = 0, top, w - lw - (side and L.pad or 0), h - top - 2
