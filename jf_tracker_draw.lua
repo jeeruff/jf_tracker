@@ -171,6 +171,7 @@ end
 -- пользователя); D.TTF_LIST — порядок в опции font: пиксельные, потом векторные
 D.TTF_FACES = {
   bigblue = { face = 'BigBlueTermPlus Nerd Font Mono', px = 12, d = 'BigBlueTerm+, pixel DOS, by VileR (int10h.org), bundled' },   -- DOS 8×12 (Departure и Gohu не прижились, 5 окт)
+  -- 31 окт: bb437 убран из списка (почти копия bigblue); запись оставлена — сохранённый выбор работает
   bb437 = { face = 'BigBlueTerm437 Nerd Font Mono', px = 12, d = 'BigBlueTerm 437, pixel IBM PC code page, by VileR (int10h.org), bundled' },
   departure = { face = 'DepartureMono Nerd Font Mono', px = 11, d = 'Departure Mono, pixel, by Helena Zhang & Tobias Fried, bundled' },
   gohu11 = { face = 'GohuFont 11 Nerd Font Mono', px = 11, d = 'Gohu 11, pixel X11 terminal, by Hugo Chargois, bundled' },
@@ -198,7 +199,7 @@ D.TTF_FACES = {
   proto = { face = '0xProto Nerd Font Mono', px = 14, d = '0xProto' },
   monaspace = { face = 'MonaspiceNe Nerd Font Mono', px = 14, d = 'Monaspace Neon' },
 }
-D.TTF_LIST = { 'bigblue', 'bb437', 'departure', 'gohu11', 'gohu14', 'terminess', 'proggy', 'profont', '3270', 'shure', 'monocraft',
+D.TTF_LIST = { 'bigblue', 'departure', 'gohu11', 'gohu14', 'terminess', 'proggy', 'profont', '3270', 'shure', 'monocraft',
   'iosevka', 'iosevkaslab', 'jetbrains', 'hack', 'fira', 'inconsolata', 'commit', 'plex', 'cascadia', 'geist', 'victor', 'space', 'ubuntu', 'mononoki', 'proto', 'monaspace' }
 function D.set_font(state)
   local tf = D.TTF_FACES[state.ttf or 'off']
