@@ -414,7 +414,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     local mx0 = rx(mk.row)
     if mk.kind == 'sec' then
       U.set(U.CYAN); gfx.rect(mx0, gy, 2, gh, 1)
-      if mk.name ~= '' then U.text(mx0 + 3, gy + 1, ctx.fit(mk.name, math.max(0, gx + gw - mx0 - 4)), U.CYAN) end
+      if mk.name ~= '' then U.text(mx0 + 3, gy + rh + 1, ctx.fit(mk.name, math.max(0, gx + gw - mx0 - 4)), U.CYAN) end   -- 31 окт: второй строкой — первая у имени кривой (наслаивались)
     else
       U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(mx0, gy, 1, gh, 1)
       if gw / math.max(1, #(span.marks or {})) > 30 and mk.name ~= '' then U.text(mx0 + 2, gy + gh - rh, ctx.fit(mk.name, 40), U.GREY) end

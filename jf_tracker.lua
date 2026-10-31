@@ -16720,6 +16720,27 @@ ctx.acv_span = function()
   return sp
 end
 -- кривые холста: цель генератора (первая), огибающие трека курсора, огибающие слотов note mod
+-- 31 окт: огибающая параметра плагина → панель DSP, курсор на этот параметр (трек курсора — трек огибающей)
+ctx.acv_to_dsp = function(env)
+  local ptr, fxi, pi = reaper.Envelope_GetParentTrack(env)
+  if not (ptr and fxi and fxi >= 0) then vim.msg = 'curve: not a plugin parameter (volume / pan - in the mixer)'; return end
+  local cf = L and L.flat and L.flat[vim.cur.fi]
+  if not (cf and cf.col and cf.col.track == ptr) then
+    for i, fl in ipairs(L and L.flat or {}) do if fl.col and fl.col.track == ptr then vim.cur.fi = i; break end end
+  end
+  local col
+  for _, c in ipairs(snap and snap.cols or {}) do if c.track == ptr then col = c; break end end
+  local k, kp
+  for kk, f in ipairs(col and col.fx or {}) do
+    for pp, p in ipairs(f.params or {}) do if (p.fx or f.i) == fxi and p.i == pi then k, kp = kk, pp; break end end
+    if k then break end
+  end
+  ctx.pane_focus('dsp')
+  if k then
+    dsp_sel.fx, dsp_sel.param = k, kp; DK.pslider = true
+    vim.msg = ('curve -> DSP: %s / %s (h l - value, Esc - back)'):format(col.fx[k].name or '?', col.fx[k].params[kp].name or '?')
+  else vim.msg = 'curve -> DSP: the parameter is not among the shown ones of this plugin' end
+end
 ctx.acv_curves = function(sp)
   local sc = sp and sp.sc or reaper.GetProjectStateChangeCount(0)
   local tgt = ctx.lfo_target()
@@ -26272,7 +26293,16 @@ local function frame()
           local k = A.mkey(cv)
           if k then A.multi[k] = not A.multi[k] or nil end
           vim.msg = 'curves: Shift+click - stacked lanes on the canvas (a click on a lane - it is edited)'
-        else A.cur = lfo_hover.legend end
+        else
+          -- 31 окт: двойной щелчок по кривой в списке — в DSP, курсор на её параметр
+          local now3, lc = reaper.time_precise(), ctx.acv_lclick
+          if lc and lc.i == lfo_hover.legend and now3 - lc.t < 0.4 then
+            ctx.acv_lclick = nil
+            local cv = ctx.acv_curves(ctx.acv_span())[lfo_hover.legend]
+            if cv and cv.env then ctx.acv_to_dsp(cv.env) end
+          else ctx.acv_lclick = { t = now3, i = lfo_hover.legend } end
+          A.cur = lfo_hover.legend
+        end
       end
       if lfo_hover.addp then ctx.acv_add_param() end
       if lfo_hover.tfold then   -- 31 окт: папка трека в списке кривых
