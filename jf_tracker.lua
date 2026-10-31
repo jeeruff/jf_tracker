@@ -26523,6 +26523,25 @@ local function frame()
           local r = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = 'sel', geo = lfo_hover.geo, r_s = r }
           A.sel = nil
+        elseif A.tool == 'cur' and lfo_hover.geo then   -- 31 окт: точка под мышью (±6 px) — тянуть сразу, вживую
+          local sp2 = ctx.acv_span(); local act2 = ctx.acv_curves(sp2)[A.cur]
+          local g = lfo_hover.geo
+          if act2 and act2.kind == 'env' and act2.write ~= false and act2.e and act2.e.env then
+            local best, bd
+            for _, p in ipairs(act2.points or {}) do
+              local px = g.gx + (sp2.row_of(p[1]) - g.r0) / math.max(1e-9, g.nr) * g.gw
+              local py = g.gy + 2 + (1 - p[2]) * math.max(1, g.gh - 4)
+              local dd = math.abs(px - gfx.mouse_x) + math.abs(py - gfx.mouse_y)
+              if dd <= 8 and (not bd or dd < bd) then best, bd = p, dd end
+            end
+            if best then
+              local env = act2.e.env
+              for i = 0, reaper.CountEnvelopePoints(env) - 1 do
+                local _, t = reaper.GetEnvelopePoint(env, i)
+                if math.abs(t - best[1]) < 1e-7 then ctx.acv_pdrag = { env = env, e = act2.e, idx = i, t0 = t, geo = g, sp = sp2, name = act2.name }; break end
+              end
+            end
+          end
         elseif A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v, mx0 = gfx.mouse_x, my0 = gfx.mouse_y }
@@ -28580,6 +28599,26 @@ local function frame()
         if d.h == 'move' or d.h == 'l' then A.sel.a = math.max(0, A.sel.a + dr) end
         if d.h == 'move' or d.h == 'r' then A.sel.b = math.max(A.sel.a + 0.125, A.sel.b + dr) end
       end
+    end
+  end
+  -- 31 окт: точка огибающей тянется вживую (значение и строка между соседями), одна отмена при отпускании
+  if ctx.acv_pdrag then
+    local d = ctx.acv_pdrag
+    if gfx.mouse_cap & 1 == 1 then
+      local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+      local t = d.sp.time(math.floor(r)) + (d.sp.time(math.floor(r) + 1) - d.sp.time(math.floor(r))) * (r - math.floor(r))
+      local _, tp = reaper.GetEnvelopePoint(d.env, d.idx - 1)
+      local okn, tn = reaper.GetEnvelopePoint(d.env, d.idx + 1)
+      if d.idx > 0 and tp then t = math.max(t, tp + 1e-4) end
+      if okn and tn then t = math.min(t, tn - 1e-4) end
+      local raw = (d.e.min or 0) + v * ((d.e.max or 1) - (d.e.min or 0))
+      reaper.SetEnvelopePoint(d.env, d.idx, t, raw, nil, nil, nil, true)
+      d.moved = true
+      ctx.acv_cc = nil
+      state.status = ('%s: %d%% at row %.2f (release - written)'):format(d.name or 'point', math.floor(v * 100 + 0.5), r)
+    else
+      if d.moved then reaper.Envelope_SortPoints(d.env); reaper.Undo_OnStateChange2(0, 'jf_tracker: move envelope point'); model.invalidate() end
+      ctx.acv_pdrag = nil
     end
   end
   if ctx.acv_mdrag and ctx.acv_mdrag.tool == 'sel' then   -- 31 окт: рамка строк
