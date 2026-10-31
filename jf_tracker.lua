@@ -19662,6 +19662,14 @@ end
 -- 27 окт: GUI ПЛАГИНА ПОВЕРХ БЛОКА DSP: родное окно плагина без рамки ставится ровно на прямоугольник модуля и ездит
 -- с ним (прокрутка, раскладка); блок ушёл с экрана / DSP скрыт — окно закрыто, вернулся — открыто. Только позиция окна
 -- (JS_Window_SetPosition / SetStyle), без сообщений окнам. Кнопка gui в шапке модуля
+-- 31 окт: окно плагина — назад в родной размер и с рамкой перед закрытием (REAPER запомнит его таким)
+function ctx.fxgui_restore(guid, hwnd)
+  local sz = ctx.fxgui_size and ctx.fxgui_size[guid]
+  if not (hwnd and sz and reaper.JS_Window_SetPosition) then return end
+  if reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'CAPTION,SYSMENU') end
+  reaper.JS_Window_SetPosition(hwnd, sz[1], sz[2], sz[3], sz[4])
+  ctx.fxgui_size[guid] = nil
+end
 function ctx.fxgui_toggle(f)
   -- 27 окт: GUID есть в модели только у контейнеров — у обычных эффектов берётся из REAPER (иначе :gui молча выходил)
   if f and not f.fguid then local t = dsp_target(); if t and t.col and t.col.track then f.fguid = reaper.TrackFX_GetFXGUID(t.col.track, f.fx or f.i) end end
@@ -19671,7 +19679,11 @@ function ctx.fxgui_toggle(f)
   draw.fxgui[f.fguid] = on or nil
   if not on then
     local t = dsp_target()
-    if t and t.col and t.col.track then reaper.TrackFX_Show(t.col.track, f.fx or f.i, 2) end
+    if t and t.col and t.col.track then
+      local hw = reaper.TrackFX_GetFloatingWindow(t.col.track, f.fx or f.i)
+      if hw then ctx.fxgui_restore(f.fguid, hw) end
+      reaper.TrackFX_Show(t.col.track, f.fx or f.i, 2)
+    end
     ctx.fxgui_open = ctx.fxgui_open or {}; ctx.fxgui_open[f.fguid] = nil
   end
   vim.msg = on and ('gui: the window of %s sits over its block (gui again - back to the tracker view)'):format(f.name or 'the fx') or 'gui: tracker view'
@@ -19708,6 +19720,13 @@ function ctx.fxgui_tick()
         local sx1, sy1 = gfx.clienttoscreen(r.x + r.w, r.y + r.h)
         local key = ('%d %d %d %d'):format(sx0, sy0, sx1, sy1)
         if not o or o.hwnd ~= hwnd then
+          -- 31 окт: родной размер окна — запомнить до подгонки: REAPER помнит последний размер окна плагина, и двойной
+          -- щелчок потом открывал его маленьким
+          ctx.fxgui_size = ctx.fxgui_size or {}
+          if not ctx.fxgui_size[guid] and reaper.JS_Window_GetRect then
+            local okr, l, tt, rr, bb = reaper.JS_Window_GetRect(hwnd)
+            if okr then ctx.fxgui_size[guid] = { l, tt, rr - l, math.abs(bb - tt) } end
+          end
           if reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'POPUP') end
           o = { hwnd = hwnd }; O[guid] = o
         end
@@ -19717,7 +19736,7 @@ function ctx.fxgui_tick()
         end
       end
     elseif o then
-      if tr and r and reaper.TrackFX_GetFXGUID(tr, r.fi) == guid then reaper.TrackFX_Show(tr, r.fi, 2) end
+      if tr and r and reaper.TrackFX_GetFXGUID(tr, r.fi) == guid then ctx.fxgui_restore(guid, o.hwnd); reaper.TrackFX_Show(tr, r.fi, 2) end
       O[guid] = nil
     end
   end
