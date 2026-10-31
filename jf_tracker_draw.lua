@@ -10153,10 +10153,10 @@ function D.frame(L, snap, rows, state, info)
       local on_btn = false
       local pre_at   -- 24 окт: кнопки слева (опция dspleft) — пресет рисуется после них
       if pre and tw > L.cw * 14 then
-        ptw = math.min(math.floor(tw * 0.6), L.cw * 36 + L.pad)   -- 31 окт: строгая ширина — стрелки < > не прыгают от длины имени пресета
+        ptw = math.min(math.floor(tw * 0.6), ms('<>' .. pre.name) + 3 * L.pad)   -- 31 окт: стрелки < > вместе перед именем — не прыгают, пустоты нет
         pre_at = function(px)
         local aw = ms('<') + 2
-        local parts = { { '<', 'pprev', px, aw }, { pre.name, 'preset', px + aw, ptw - 2 * aw }, { '>', 'pnext', px + ptw - aw, aw } }
+        local parts = { { '<', 'pprev', px, aw }, { '>', 'pnext', px + aw, aw }, { pre.name, 'preset', px + 2 * aw + 2, ptw - 2 * aw - 2 } }
         for _, pp in ipairs(parts) do
           local hot = not drag and mx >= pp[3] and mx < pp[3] + pp[4] and my >= by + 1 and my < by + L.rh
           if hot then set(U.tint(U.AMBER, 0.3)); gfx.rect(pp[3], by + 1, pp[4], L.rh - 1, 1); hover.dspbtn = { fx = k, f = f, what = pp[2] }; on_btn = true end
