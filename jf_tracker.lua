@@ -4617,6 +4617,14 @@ ctx = {
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
   env_set = function(e, row, v)
     local t = edit.swing_time(row, state.lpb)                 -- свинг и для точек (6 окт)
+    -- 31 окт: карта темпа — значение ячейки = BPM (hex D7 = 215; в формате midi — 0..127), маркером темпа
+    if (e.name or '') == 'Tempo map' then
+      local bpm = math.floor(v * ((ctx.envfmt and ctx.envfmt() or 'midi') == 'hex' and 255 or 127) + 0.5)
+      if bpm < 1 then vim.msg = 'tempo: 0 BPM - nothing changed'; return end
+      edit.tempo_set(edit.row_time(row, state.lpb, 0), bpm, (edit.row_time(row + 1, state.lpb, 0) - t) / 2)
+      vim.msg = ('tempo %d BPM at row %04d (a tempo marker)'):format(bpm, row)
+      model.invalidate(); return
+    end
     edit.env_set(e, t, v, (edit.row_time(row + 1, state.lpb, 0) - t) / 2, ctx.env_mode(e) == 'steps' and 1 or nil)   -- шаги — квадратные точки
   end,
   -- 24 окт: VISUAL на колонке огибающей, Enter — кривые (reform для автоматизации): клетки с превью — тусклая

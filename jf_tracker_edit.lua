@@ -2996,6 +2996,19 @@ local function env_point_at(env, t, tol)
   return nil
 end
 
+-- 31 окт: Tempo map — маркерами темпа (точка огибающей темпа ничего не меняла: D7 в колонке темпа «не работал»);
+-- маркер в t (в пределах tol) — правится, нет — новый; регионы остаются на своих долях
+function E.tempo_set(t, bpm, tol)
+  bpm = math.max(1, math.min(960, bpm))
+  run(('tempo %.1f'):format(bpm), function() E.keep_markers_qn(function()
+    for i = 0, R.CountTempoTimeSigMarkers(0) - 1 do
+      local ok, tp, _, _, _, num, den, lin = R.GetTempoTimeSigMarker(0, i)
+      if ok and math.abs(tp - t) <= (tol or 0.001) then R.SetTempoTimeSigMarker(0, i, tp, -1, -1, bpm, num, den, lin); return end
+    end
+    R.SetTempoTimeSigMarker(0, -1, t, -1, -1, bpm, 0, 0, false)
+  end) end)
+  R.UpdateTimeline()
+end
 function E.env_set(e, t, v, tol, shape)
   v = math.max(0, math.min(1, v))
   local raw = e.min + v * (e.max - e.min)
