@@ -277,7 +277,7 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
       if ms(lb) + 4 < room then text(sx + 3, wy - 1, lb, U.AMBER) end   -- 28 окт: номер среза чуть выше
       local n = v.notes and v.notes[i]
       if n and n >= 0 then
-        local nm = NN[n % 12 + 1] .. math.floor(n / 12)
+        local nm = NN[n % 12 + 1] .. (math.floor(n / 12) - 1)   -- 31 окт: как в трекере (60 = C-4), было на октаву выше
         if ms(nm) + 4 < room then text(sx + 3, wy + wh - th - 3, nm, U.GREY) end   -- 26 окт: выше — низ букв не срезается
       end
     end
