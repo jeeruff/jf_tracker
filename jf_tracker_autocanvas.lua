@@ -325,6 +325,46 @@ function ACV.key(c, st, mods)
   return false
 end
 
+-- 31 окт: линейка холста как в трекере — такты (такт.доля) и шаги (номера строк); ACV.ruler: 'bars' — такты сверху,
+-- шаги снизу (умолчание), 'steps' — наоборот, 'off'. Подписи не теснятся (не ближе своей ширины), сверху — правее
+-- имени кривой, снизу — мимо имён паттернов
+ACV.ruler = 'bars'
+function ACV.ruler_draw(span, act, gx, gy, gw, gh, r0, r1, rx, rh, bar, g)
+  if ACV.ruler == 'off' then return end
+  local base = (ctx.state and ctx.state.rowbase) or 1
+  local top_y, bot_y = gy + 1, gy + gh - rh
+  local name_end = gx + 6 + U.measure(act and act.name or '') + U.measure('  ')
+  local bars_top = ACV.ruler ~= 'steps'
+  local col = U.mix(U.GREY, U.BG, 0.25)
+  -- такты
+  local lastx = -1e9
+  local by = bars_top and top_y or bot_y
+  for row = r0, r1 - 1 do
+    if (row - r0) % bar == 0 then
+      local t = span.time and span.time(row)
+      local _, meas = t and reaper.TimeMap2_timeToBeats(0, t)
+      local lab = tostring(math.floor((meas or 0) + 1)) .. '.1'
+      local x = rx(row) + 3
+      if x > lastx and x + U.measure(lab) < gx + gw and (not bars_top or x > name_end) then U.text(x, by, lab, col); lastx = x + U.measure(lab) + U.measure(' ') end
+    end
+  end
+  -- шаги (клетки сетки)
+  lastx = -1e9
+  local sy = bars_top and bot_y or top_y
+  local marks = {}
+  for _, mk in ipairs(span.marks or {}) do if mk.kind ~= 'sec' then marks[#marks + 1] = rx(mk.row) end end
+  for row = r0, r1 - 1 do
+    if (row - r0) % math.max(1, g) == 0 then
+      local lab = ('%04d'):format(row + base)
+      local x = rx(row) + 3
+      local clash = false
+      if bars_top then for _, m in ipairs(marks) do if x < m + 5 + U.measure('AAA ') and x + U.measure(lab) > m then clash = true; break end end
+      elseif x <= name_end then clash = true end
+      if not clash and x > lastx and x + U.measure(lab) < gx + gw then U.text(x, sy, lab, U.mix(col, U.BG, 0.3)); lastx = x + U.measure(lab) + U.measure(' ') end
+    end
+  end
+end
+
 -- раскладка: легенда справа столбиком при ширине, иначе строкой сверху
 function ACV.layout(L, w, h, n)
   local cw, rh = L.cw, L.rh
@@ -424,8 +464,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   for _, mk in ipairs(span.marks or {}) do
     local mx0 = rx(mk.row)
     if mk.kind == 'sec' then
-      U.set(U.CYAN); gfx.rect(mx0, gy, 2, gh, 1)
-      if mk.name ~= '' then U.text(mx0 + 6, gy + rh + 1, ctx.fit(mk.name, math.max(0, gx + gw - mx0 - 7)), U.CYAN) end   -- 31 окт: второй строкой — первая у имени кривой (наслаивались)
+      U.set(U.AMBER); gfx.rect(mx0, gy, 2, gh, 1)   -- 31 окт: секции — всегда жёлтые
+      if mk.name ~= '' then U.text(mx0 + 6, gy + rh + 1, ctx.fit(mk.name, math.max(0, gx + gw - mx0 - 7)), U.AMBER) end   -- 31 окт: второй строкой — первая у имени кривой (наслаивались)
     else
       U.set(U.mix(U.LINE, U.TEXT, 0.35)); gfx.rect(mx0, gy, 1, gh, 1)
       if gw / math.max(1, #(span.marks or {})) > 30 and mk.name ~= '' then U.text(mx0 + 5, gy + gh - rh, ctx.fit(mk.name, 40), U.GREY) end   -- 31 окт: на 3 px правее черты
@@ -433,6 +473,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   end
   U.set(U.mix(U.LINE, U.BG, 0.65))
   for _, f in ipairs({ 0.25, 0.5, 0.75 }) do gfx.rect(gx, vy(f), gw, 1, 1) end
+  ACV.ruler_draw(span, act, gx, gy, gw, gh, r0, r1, rx, rh, bar, g)
   -- диапазон v
   if ACV.anchor then
     local a, b = ACV.range(span)

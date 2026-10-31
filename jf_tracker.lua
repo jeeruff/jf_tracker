@@ -11142,6 +11142,8 @@ ctx = {
     local out = { { sep = true, title = 'slixer', group = 'modules' } }
     out[#out + 1] = { key = 'mod_slixer_ovbelow', label = 'scroll under the sample', kind = 'toggle', desc = 'DSP, slixer: the overview strip (the scroll of the zoomed wave) under the sample instead of over it',
       get = function() return state.slx_ovbelow == true end, set = function(v) state.slx_ovbelow = v or nil; reaper.SetExtState(EXT, 'mod_slixer_ovbelow', v and '1' or '0', true) end }
+    out[#out + 1] = { sep = true, title = 'automation', group = 'modules' }   -- 31 окт
+    out[#out + 1] = { key = 'acvruler', label = 'curve ruler', kind = 'cycle', values = { 'bars', 'steps', 'off' }, desc = 'automation canvas: bars - bar numbers on top, steps (row numbers as in the tracker) at the bottom; steps - the other way round; off - none', get = function() return ctx.ACV.ruler or 'bars' end, set = function(v) ctx.ACV.ruler = v; reaper.SetExtState(EXT, 'acvruler', v, true) end }
     out[#out + 1] = { sep = true, title = 'map', group = 'modules' }
     out[#out + 1] = { key = 'mod_map_view', label = 'view', kind = 'cycle', values = { 'graph', 'cards', 'nebula', 'spore' },
       desc = 'the map pane: graph - groups as rings with their files around (like Obsidian); cards - a grid of sectors; nebula - one galaxy of every file, groups as rectangular sectors (a click - the system of that group)',
@@ -16706,6 +16708,7 @@ ctx.XF = dofile(DIR .. '/jf_tracker_xform.lua')   -- 15 окт: модифика
 ctx.mac_keys_load()
 ctx.ACV = dofile(DIR .. '/jf_tracker_autocanvas.lua')
 ctx.ACV.init(U, ctx, LG)
+ctx.ACV.ruler = ({ bars = 'bars', steps = 'steps', off = 'off' })[reaper.GetExtState(EXT, 'acvruler')] or 'bars'   -- 31 окт: линейка холста curve
 -- отрезок холста: как у генератора (time selection → регион курсора → такт), в строках и секундах
 ctx.acv_span = function()
   local t0, t1, label = ctx.lfo_span()
