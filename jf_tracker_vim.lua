@@ -1111,6 +1111,28 @@ function V.note_off_scope(scope)
     end
     if h and not h.stub and not (pr0 and (h.row0 or -1) < pr0) then heads[1] = h end
   end
+  -- 31 окт: свободный OFF один на промежуток между нотами: уже есть в этом паттерне выше / ниже (без ноты между) —
+  -- он переезжает сюда, второй не ставится
+  if #heads == 0 and scope == 'sub' and cur and cur.sub and ctx.edit.all_off_del then
+    local pr0, pr1 = ctx.region_rows and ctx.region_rows()
+    pr0, pr1 = pr0 or V.cur.row - 4096, pr1 or V.cur.row + 4096
+    local found
+    for _, dir in ipairs({ -1, 1 }) do
+      local r = V.cur.row + dir
+      while not found and r >= pr0 and r <= pr1 do
+        local c = cur.sub[r]
+        if c and c.of and c.of.stub then found = c.of
+        elseif c and (c.kind == 'midi' or c.kind == 'audio') then break end
+        r = r + dir
+      end
+    end
+    if found then
+      ctx.edit.all_off_del(found)
+      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+      V.msg = ('OFF moved to row %04d'):format(V.cur.row)
+      return 1
+    end
+  end
   -- 31 окт: ничего не звучит (подколонка) — OFF всё равно ставится: all notes off на трек
   if #heads == 0 and scope == 'sub' and cur and cur.col and not cur.ml and ctx.edit.all_off then
     ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
