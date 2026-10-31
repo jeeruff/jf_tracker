@@ -4093,7 +4093,7 @@ local function draw_ctrl(L, info, H, hover)
       local QL = { q_mx = 'matrix', q_ruler = 'ruler', q_hints = 'hints', q_listen = 'listen', debug = 'debug', q_scopes = 'scopes',
         q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
         q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
-        autofocus = 'autofocus', perf = 'performance', follow = 'follow', lock = 'lock', fixed = 'fixed', q_endstop = 'end stop' }
+        autofocus = 'autofocus', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
       local cols = {}
       for part in ((c.quick or '') .. '|'):gmatch('([^|]*)|') do
         local col = {}

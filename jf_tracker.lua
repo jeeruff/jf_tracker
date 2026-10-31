@@ -23469,7 +23469,9 @@ local function frame()
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
   end
   local ph_row = playpos_view and model.row_of_time(playpos_view, state.lpb) or nil   -- вид: с упреждением
-  if is_playing and state.follow and ph_row then
+  if is_playing and state.follow and ph_row and state.fixed and L and L.nrows then
+    state.row0 = math.floor(ph_row) - math.floor(L.nrows / 2)   -- 31 окт: fixed + follow — плейхед стоит в середине, строки едут под ним
+  elseif is_playing and state.follow and ph_row then
     local r = math.floor(ph_row)
     if r < state.row0 or r > state.row0 + math.floor(L.nrows * 2 / 3) then
       state.row0 = math.max(0, r - math.floor(L.nrows / 3))
