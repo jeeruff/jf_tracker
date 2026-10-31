@@ -130,6 +130,12 @@ function DK.key(c, sel, n, np, mods)
     if c >= 32 and c < 127 then DK.ins.buf = DK.ins.buf .. string.char(c); return true end
     return true
   end
+  -- 31 окт: выбран параметр (слайдер / щелчок) — цифра или . сразу набирает значение (как i), не счётчик
+  if DK.pslider and not DK.pads and not DK.digits_play and np > 0 and (ch:match('^%d$') or ch == '.' or ch == '-') and not mods.cmd and not mods.ctrl then
+    DK.ins = { buf = ch }; DK.num = nil
+    ctx.msg('-- INSERT parameter --  ' .. ch .. '_  Enter - set, Esc - cancel')
+    return true
+  end
   if ch == 'i' and not DK.pads and np > 0 then
     DK.ins = { buf = '' }; DK.pslider = true; DK.num = nil
     ctx.msg('-- INSERT parameter --  type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter - set, Esc - cancel')
@@ -218,7 +224,11 @@ function DK.key(c, sel, n, np, mods)
   elseif ch == '-' or c == 24 then ctx.dsp_value(sel.fx, sel.param, -1, mods.shift)
   elseif c == 13 and ctx.pad_rack and ctx.pad_rack(sel.fx) then
     DK.pads = true; ctx.msg('pads: h l j k move, x cut, yy yp p, M mute, S solo, Enter listen, r router, Esc back')   -- 19 окт
-  elseif c == 13 then ctx.dsp_enter(sel.fx, sel.param)
+  elseif c == 13 and DK.pslider and np > 0 then   -- 31 окт: Enter на параметре — набор значения (модуль не выключает; выкл — b)
+    local p = ctx.dsp_param_kind and ctx.dsp_param_kind(sel.fx, sel.param)
+    if p == 'toggle' then ctx.dsp_enter(sel.fx, sel.param)
+    else DK.ins = { buf = '' }; ctx.msg('-- INSERT parameter --  type a number or a value name, Enter - set, Esc - cancel') end
+  elseif c == 13 then ctx.dsp_enter(sel.fx, sel.param)   -- toggle-параметр — переключить; модуль не выключает (b)
   elseif ch == 'b' then ctx.dsp_bypass(sel.fx)
   elseif ch == 'e' then ctx.dsp_show(sel.fx)   -- 24 окт: e — editor (окно плагина, как в Cubase; было o)
   elseif ch == 'x' or c == 8 or c == 6579564 then ctx.dsp_delete(sel.fx, sel.fx)

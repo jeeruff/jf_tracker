@@ -2684,10 +2684,11 @@ ctx = {
     local _, shown = A.GetFormattedParamValue(col.track, id, p.i, '')
     vim.msg = ('%s = %s (u - undo)'):format(p.name or 'param', shown or buf)
   end,
+  dsp_param_kind = function(k, pi) local _, f = ctx.dsp_fx(k); local p = f and f.params and f.params[pi]; return p and p.kind end,   -- 31 окт
   dsp_enter = function(k, pi)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
-    if p and p.kind == 'toggle' then ctx.dsp_value(k, pi, 1) elseif f then edit.fx_bypass(col.track, f.i) end
+    if p and p.kind == 'toggle' then ctx.dsp_value(k, pi, 1) end   -- 31 окт: Enter больше не выключает модуль (это b)
   end,
   -- 31 окт: переключает сам модуль; включение модуля в ВЫКЛЮЧЕННОМ контейнере (poff) включает и контейнеры над ним (иначе не звучит)
   dsp_bypass = function(k)
