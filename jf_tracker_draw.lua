@@ -5316,11 +5316,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       cellb('markers', 'mark', colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
       -- 31 окт: rate — сразу за mark (mark не меняет ширину), до тоглов записи — им место под транспортом
       local rx0 = math.min(colx(pi3), colx(1) + math.floor((w1 + ms('mark')) / 2) + 2 * L.pad)
-      -- 31 окт (2): тоглы записи — сразу за x1.00, прижаты к правому краю группы; rate — до них
+      -- 31 окт (2): тоглы записи — сразу за x1.00; rate — до них
       local tgl = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate }, { 'qtz', 'qtz', c.qtz } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll; qtz — квантование входа
-      local tglw = 0
-      for _, t in ipairs(tgl) do tglw = tglw + ms(t[2]) + 2 * L.pad end
-      local tgx = math.max(rx0 + ms('x1.00') + 2 * L.pad, bx0 + btot - tglw)
+      local tgx = rx0 + ms('x1.00') + 2 * L.pad   -- 31 окт (3): вплотную за x1.00 (было: прижаты вправо — между ними 2 пустых знака)
       local w2c = tgx - rx0 - 2
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)

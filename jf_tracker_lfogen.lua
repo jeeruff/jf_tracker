@@ -389,19 +389,34 @@ function LG.draw(U, L, x, y, w, h, focused, fit, target, span)
   local py = fy + #LG.FIELDS * L.rh + 4
   local ph = y + h - py
   if LG.type == 'lfo' and ph >= 3 * L.rh / 2 and w > 16 then
-    U.set(U.PANEL); gfx.rect(x, py, w, ph, 1)
-    U.set(U.LINE); gfx.rect(x, py, w, ph, 0)
+    -- 31 окт: рамка на 5 px от краёв, линия плавная (синус — по пикселям) и толщиной 2 px, со сглаживанием
+    local fx0, fy0, fw, fh = x + 5, py + 5, w - 10, ph - 10
+    U.set(U.PANEL); gfx.rect(fx0, fy0, fw, fh, 1)
+    U.set(U.LINE); gfx.rect(fx0, fy0, fw, fh, 0)
     local n = (span and span > 0) and span or (LG.period * 2)
     local pts = LG.points(0, n)
-    local function px(row) return x + 1 + math.floor(row / n * (w - 3)) end
-    local function pyv(v) return py + ph - 2 - math.floor(v * (ph - 4)) end
+    local ix, iw, iy, ih = fx0 + 4, fw - 8, fy0 + 5, fh - 10
+    local function px(row) return ix + row / n * iw end
+    local function pyv(v) return iy + ih - v * ih end
+    local function seg(x1, y1, x2, y2) gfx.line(x1, y1, x2, y2, 1); gfx.line(x1, y1 + 1, x2, y2 + 1, 1) end
     U.set(U.CYAN)
-    for k, p in ipairs(pts) do
-      local nx = pts[k + 1]
-      local x1, y1 = px(p.row), pyv(p.v)
-      local x2 = nx and px(nx.row) or (x + w - 2)
-      if p.shape == 1 or not nx then gfx.line(x1, y1, x2, y1); if nx then gfx.line(x2, y1, x2, pyv(nx.v)) end
-      else gfx.line(x1, y1, x2, pyv(nx.v)) end
+    if LG.shape == 'sin' then
+      local per, ph0 = math.max(1, LG.period), LG.phase * math.max(1, LG.period)
+      local lx, ly
+      for xx = 0, iw, 2 do
+        local row = xx / iw * n
+        local yy = pyv(math.max(0, math.min(1, LG.center + LG.wave('sin', (row - ph0) / per) * LG.depth / 2)))
+        if lx then seg(lx, ly, ix + xx, yy) end
+        lx, ly = ix + xx, yy
+      end
+    else
+      for k, p in ipairs(pts) do
+        local nx = pts[k + 1]
+        local x1, y1 = px(p.row), pyv(p.v)
+        local x2 = nx and px(nx.row) or (ix + iw)
+        if p.shape == 1 or not nx then seg(x1, y1, x2, y1); if nx then seg(x2, y1, x2, pyv(nx.v)) end
+        else seg(x1, y1, x2, pyv(nx.v)) end
+      end
     end
     if mx >= x and mx < x + w and my >= py and my < py + ph then hover = { preview = true } end
   end
