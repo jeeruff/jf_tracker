@@ -3636,24 +3636,27 @@ function D.slx_slots(L, info, f, k, sx0, sx1, qy, hover, mx, my, drag)
   return true
 end
 -- 31 окт: маленький модуль (1..3 параметра, без своего вида, XY выключен) — колонкой под предыдущим маленьким, если
--- влезает по высоте; между ними стрелка v (сигнал идёт вниз). → bx, by, bh
+-- влезает по высоте; между ними | (последовательно) или = (параллельно, в контейнере). 31 окт: и внутри контейнера —
+-- колонкой складываются соседи одного контейнера (полосы сплиттера — нет). → bx, by, bh
 function D.stack_place(L, info, f, ncol, bx, boxy, bh0)
   f._small = nil
   local np = 0
   for _, p in ipairs(f.params or {}) do if not p.mfader then np = np + 1 end end
   local xy = info.dsp_xy and info.dsp_xy[tostring(f.fguid or f.i)]
   local small = np >= 1 and np <= 3 and ncol == 1 and not f.view and not f.container and not f.kit and not f.rs5k
-    and not f.wave and not f.xy and not f.pages and not f.inner and not f.nmacro and not (xy and xy.on)
+    and not f.wave and not f.xy and not f.pages and not (f.inner and not f.inner.wrap) and not f.nmacro and not (xy and xy.on)
   if not small then D.stk = nil; return bx, boxy, bh0 end
   f._small = true
   local h = (np + 2) * L.rh + 6
   local s = D.stk
-  if s and s.y + h <= boxy + bh0 then
-    -- стрелка v в промежутке над модулем
-    text(s.x + math.floor((s.w - ms('v')) / 2), s.y - L.rh, 'v', U.GREY)
+  local parent = f.inner and f.inner.parent or false
+  if s and s.parent == parent and s.y + h <= boxy + bh0 then
+    -- знак в промежутке над модулем: = параллельно предыдущему, | — последовательно
+    local sg = (f.inner and (f.inner.par or 0) > 0) and '=' or '|'
+    text(s.x + math.floor((s.w - ms(sg)) / 2), s.y - L.rh, sg, U.GREY)
     return s.x, s.y, h
   end
-  D.stk = { x = bx, y = boxy + h + L.rh, w = 0 }
+  D.stk = { x = bx, y = boxy + h + L.rh, w = 0, parent = parent }
   return bx, boxy, h
 end
 -- 31 окт: XY модуля (zx вкл / выкл): оси — параметры из info.dsp_xy[guid] (x, y) или первые два; заголовок x: / y: —
@@ -10094,7 +10097,7 @@ function D.frame(L, snap, rows, state, info)
       end
       local by = boxy
       local bh = bh0
-      bx, by, bh = D.stack_place(L, info, f, ncol, bx, boxy, bh0)   -- 31 окт: маленькие — колонкой, стрелка v
+      bx, by, bh = D.stack_place(L, info, f, ncol, bx, boxy, bh0)   -- 31 окт: маленькие — колонкой, между ними | или =
       -- автомодуль (4 окт): колонок столько, сколько параметров влезает по
       -- строкам (≤ 3) — без пустой колонки справа; места больше — больше параметров
       local room = math.huge   -- 22 окт: модуль целиком, не поджимается к краю (прокрутка плавная)
