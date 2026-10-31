@@ -24897,6 +24897,7 @@ local function frame()
       if qi then d = qi.label .. ': ' .. (qi.desc or '') end
     end
     state.status = d or ('click / wheel: ' .. hover.ctrl)
+  elseif hover.envmark then state.status = (hover.envmark.name or '') .. ': automation in this row - click: show / hide the envelope columns of the track'
   elseif hover.btn and hover.btn.what == 'auto' then
     local names = {}
     for _, e in ipairs(hover.btn.col.envs or {}) do names[#names + 1] = e.name end
@@ -26741,6 +26742,7 @@ local function frame()
     elseif hover.fxcolbtn then
       ctx.fx_cols_step(hover.fxcolbtn.col, hover.fxcolbtn.d)
       click = { t = now2, zone = 'fxcolbtn' }
+    elseif hover.envmark then ctx.toggle_track_envs(hover.envmark); click = { t = now2, zone = 'envmark' }   -- 31 окт: «~» в строке — огибающие трека
     elseif hover.envpm then
       if hover.envpm.d > 0 then ctx.automation_picker(hover.envpm.col) else ctx.env_hide(hover.envpm.e) end
       click = { t = now2, zone = 'envpm' }

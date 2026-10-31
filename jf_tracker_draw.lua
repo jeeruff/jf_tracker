@@ -9212,6 +9212,8 @@ function D.frame(L, snap, rows, state, info)
                 if not (cell and cell.fold) then text(x + G2.x_fold, ty, '~', D.ENVMARK or U.AMBER)
                 elseif G2.fold_wide then text(x + G2.x_fold + ms('+'), ty, '~', D.ENVMARK or U.AMBER)
                 elseif L.fold2_tall then text(x + G2.x_fold, ty + L.th, '~', D.ENVMARK or U.AMBER) end
+                -- 31 окт: щелчок по «~» — колонки огибающих этого трека (раньше — только Shift+щелчок по ~ в шапке)
+                if gfx.mouse_x >= x + G2.x_fold - 1 and gfx.mouse_x < x + G2.x_fold + 2 * ms('~') + 2 and gfx.mouse_y >= y and gfx.mouse_y < y + L.rh then hover.envmark = c.col end
               end
               -- 20 окт: метка-прыжок и на каждой ноте (её поле ноты)
               if cell and (cell.kind == 'audio' or cell.kind == 'midi') then hint('note', x + ((f.G or L).x_note or 0), y, math.max(ms('aa'), (f.G or L).w_note or 0), L.rh, { fi = fi, row = r.row }) end
