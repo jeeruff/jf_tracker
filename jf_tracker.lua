@@ -17445,6 +17445,23 @@ ctx.phr_do = function(op)
     if not (col and col.track) then vim.msg = 'phrase: no track at the cursor'; return end
     local t = edit.row_time(vim.cur.row, state.lpb, 0)
     local t1 = R.TimeMap2_QNToTime(0, R.TimeMap2_timeToQN(0, t) + r.lenq)
+    -- 31 окт: на этой строке трека уже есть триггер фразы — второй не ставить (Enter + двойной щелчок давали два
+    -- триггера, у каждого свои копии: всё звучало и было видно дважды); другая фраза — заменить её
+    for k = 0, R.CountTrackMediaItems(col.track) - 1 do
+      local it = R.GetTrackMediaItem(col.track, k)
+      local tk = R.GetActiveTake(it)
+      local nm = tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) or ''
+      if nm:match('^ph:') and math.abs(R.GetMediaItemInfo_Value(it, 'D_POSITION') - t) < 1e-6 then
+        if nm == 'ph:' .. r.name then vim.msg = ('phrase %s is already at row %d'):format(r.name, vim.cur.row); return end
+        edit.run('phrase ' .. r.name .. ' instead of ' .. nm:sub(4), function()
+          R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', 'ph:' .. r.name, true)
+          R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t)
+        end)
+        ctx.phr_cc = nil; model.invalidate()
+        vim.msg = ('phrase %s instead of %s at row %d'):format(r.name, nm:sub(4), vim.cur.row)
+        return
+      end
+    end
     edit.run('phrase ' .. r.name .. ' at the cursor', function()
       local it = R.CreateNewMIDIItemInProj(col.track, t, t1)
       local tk = it and R.GetActiveTake(it)
