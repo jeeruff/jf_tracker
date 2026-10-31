@@ -23880,6 +23880,8 @@ local function frame()
       if not L.ruler_right and (L.rg_w or 0) > 0 and (L.jl_w or 0) > 0 then
         bx = L.matrix_w + L.jl_w + 3; bw = L.label_w - L.jl_w - 4
       end
+      -- 31 окт: имя паттерна — нижней строкой полосы эффектов, вплотную к линейке: цветная черта продолжается в неё
+      local y0 = y0 + math.max(0, L.fxrow_h - L.rh - 1)
       local nhot = mx0 >= bx and mx0 < bx + bw and my0 >= y0 and my0 < y0 + L.rh
       if rgf then
         local c = rgf.rgb or U.LINE
