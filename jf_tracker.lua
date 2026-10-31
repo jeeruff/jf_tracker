@@ -880,6 +880,12 @@ local function dsp_target()
   -- (иначе каждая новая колонка перестраивала панель, 8 fps)
   local col = (sel_drag and sel_drag.active and sel_drag.col) or cur_col()
   if not col then return nil end
+  -- 31 окт: мышь над нотой со значком fx — DSP пассивно показывает take FX этой ноты (вид не переключается)
+  local pk = ctx and ctx.dsp_peek
+  if pk and pk.col and reaper.ValidatePtr(pk.tk, 'MediaItem_Take*') then
+    if dspt_cache.snap ~= snap or dspt_cache.take ~= pk.tk then dspt_cache = { snap = snap, take = pk.tk, fx = model.take_fx(pk.tk) } end
+    return { track = pk.tk, fx = dspt_cache.fx, name = 'take fx (hover)', take = true, col = pk.col, peek = true }
+  end
   if state.dsp_take then
     local e = (col.pool or {})[vim.inst]
     local tk = e and e.take
@@ -23953,6 +23959,13 @@ local function frame()
     end or nil,
   })
   ctx.hover_prev = hover   -- 21 окт: для проверок в начале следующего кадра (rate_pop)
+  do   -- 31 окт: нота с take FX под мышью — пассивный показ в DSP (до следующего кадра; ушла мышь — снова трек)
+    local hc = hover.cell
+    local tk = hc and hc.tfx and (hc.take or (hc.item and reaper.ValidatePtr(hc.item, 'MediaItem*') and reaper.GetActiveTake(hc.item)))
+    local was = ctx.dsp_peek
+    ctx.dsp_peek = (tk and not state.dsp_take and state.focus ~= 'dsp') and { tk = tk, col = hover.col } or nil   -- клавиши в DSP — по тому, что выбрано, не по мыши
+    if ctx.dsp_peek and not (was and was.tk == tk) then state.status = 'take fx of this note - shown in DSP while the mouse is here (cursor on the note, Opt+T o - keep it there; in DSP dd - delete a module)' end
+  end
   -- 19 окт: панель patterns — её hover там же, где палитра в матрице (щелчки и статус — одним кодом)
   if hover.patpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.patpane) do hover.matrix[k] = v end end
   if hover.arrpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.arrpane) do hover.matrix[k] = v end end   -- 31 окт: панель arranger — те же кнопки

@@ -491,7 +491,7 @@ function D.layout(snap, state, nregions)
   L.GKc = setmetatable({}, { __mode = 'k' })
   -- 20 окт: лейн с take FX у нот — после ноты значок fx (зелёная рамка, как кнопка FX item в REAPER): поля правее
   -- сдвинуты на его ширину; у остальных лейнов места не резервируется
-  L.w_tfx = ms('fx') + 4
+  L.w_tfx = ms('φ') + 2   -- 31 окт: знак take FX — одна буква φ (было «fx» в рамке у каждой ноты — пестрило)
   L.GTc = setmetatable({}, { __mode = 'k' })
   function L.tfxG(G)
     G = G or L
@@ -2422,9 +2422,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   -- 19 окт (2): линии поверх текста читались как зачёркивание — вместо них знак «o» сбоку ячейки (как колонка Orca)
   -- 20 окт: take FX у ноты — значок fx после ноты (своё место: L.x_tfx есть только у таких лейнов)
   if cell and cell.tfx and L.x_tfx and (cell.kind == 'audio' or cell.kind == 'midi') then
-    local bx, bw = x + L.x_tfx, L.w_tfx
-    set(U.GREEN); gfx.rect(bx, y + 1, bw, L.rh - 2, 0)
-    text(bx + 2, ty, 'fx', U.GREEN)
+    text(x + L.x_tfx + 1, ty, 'φ', U.GREEN)
   end
   if cell and cell.fold and L.x_fold then
     -- 27 окт: в строке сложены ещё ноты — «+» перед нотой (как папка в lf), раскрыть — zu или LPB (+ / Opt+Shift+J)
