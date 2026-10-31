@@ -552,6 +552,9 @@ function O.masonry_plan(L, bx, y0, bw, ch)
     local cols, ci, yy = { {} }, 1, 0
     for _, sc in ipairs(list) do
       local fr = nil
+      -- 31 окт: раздел, что целиком влезает в колонку, не рвётся — переходит в следующую колонку весь
+      local tot = fh(#sc.rows)
+      if yy > 0 and yy + tot > hmax and tot <= hmax then ci = ci + 1; yy = 0; cols[ci] = {}; if ci > maxc then return nil end end
       for _, a in ipairs(sc.atoms) do
         if fh(#a) > hmax then return nil end
         local n = fr and #fr.rows or 0
@@ -590,6 +593,9 @@ function O.masonry_plan(L, bx, y0, bw, ch)
     over = hi - ch
   end
   if not wide and over == 0 then
+    -- 31 окт: колонки не ниже самого длинного раздела (если он влезает в окно) — разделы модулей одной рамкой
+    for _, sc in ipairs(list) do local t = fh(#sc.rows); if t <= ch and t > lo and pack(math.max(hi, t), maxc) then lo = t end end
+    if lo > hi then hi = lo end
     for _ = 1, 20 do local mid = math.floor((lo + hi) / 2); if pack(mid, maxc) then hi = mid else lo = mid + 1 end; if lo >= hi then break end end
   end
   local cols = pack(hi, maxc)

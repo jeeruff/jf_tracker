@@ -56,14 +56,17 @@ eq('reading order kept', order_ok, true)
 -- колонки ровные: высота — наименьшая, при которой влезает
 local plan2 = O.masonry_plan(L, 0, 0, 2000, 200 * 16)
 eq('tall window still balances (same columns)', plan2 and plan2.ncols, plan.ncols)
--- 15 окт: раздел выше колонки — продолжается рамкой в следующей колонке (раньше — весь экран списком)
+-- 31 окт: раздел, что влезает в колонку, — одной рамкой (было: колонки ровнялись по высоте и резали разделы
+-- модулей на рамки по 2 строки с той же подписью)
 local plan3 = O.masonry_plan(L, 0, 0, 2000, 32 * 16)
-eq('tall section splits into columns', plan3 ~= nil, true)
+eq('plan for a middle window', plan3 ~= nil, true)
 if plan3 then
   local seen = {}
-  for _, f in ipairs(plan3.frames) do seen[f.title] = (seen[f.title] or 0) + 1 end
-  eq('section 2 continues in a second frame', (seen.sect2 or 0) > 1, true)
-  eq('split: every option placed', #plan3.place, want)
+  for _, f in ipairs(plan3.frames) do if f.title ~= '' then seen[f.title] = (seen[f.title] or 0) + 1 end end
+  local whole = true
+  for _, c in pairs(seen) do if c > 1 then whole = false end end
+  eq('sections that fit stay in one frame', whole, true)
+  eq('middle window: every option placed', #plan3.place, want)
 end
 -- узкое окно / мало высоты — список со скроллом
 local small = O.masonry_plan(L, 0, 0, 500, 10 * 16)   -- 20 окт: не влезло — колонки с прокруткой, не список
