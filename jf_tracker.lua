@@ -26425,6 +26425,10 @@ local function frame()
       elseif vim.picker and vim.picker.trim == hover.btn.col.guid then vim.picker = nil
       else ctx.automation_picker(hover.btn.col, true) end
       click = { t = now2, zone = 'btn' }
+    elseif hover.btn and hover.btn.what == 'automode' then   -- 31 окт: режим автоматизации трека по кругу (Shift — назад)
+      local tr = hover.btn.col and hover.btn.col.track
+      if tr then MMX.PP.cycle_mode(tr, gfx.mouse_cap & 8 == 8 and -1 or 1) end
+      click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'routeview' then
       state.routeview = not state.routeview or nil
       vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'

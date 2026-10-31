@@ -1237,6 +1237,23 @@ function D.gr_hdr(L, x, y, w, gr)
   set(U.RED); gfx.rect(x + w - fw, y - 1, fw, 3, 1)
 end
 -- микшер: столбик сверху вниз от 0 dB у правого края коробки фейдера (та же шкала, что фейдер)
+-- 31 окт: режим автоматизации трека тремя буквами цветом (шапка трека, имя в полосе микшера); touch / latch / write
+-- мигают — пишут прямо сейчас. Справа до xr, → ширина; щелчок — следующий режим (Shift — предыдущий)
+D.AMODE = { [0] = { 'trm', 'DIM' }, [1] = { 'rea', 'GREEN' }, [2] = { 'tch', 'AMBER' }, [3] = { 'wri', 'RED' }, [4] = { 'lat', 'MAGENTA' }, [5] = { 'lpv', 'CYAN' } }
+function D.amode_tag(L, xr, y, col, hover, mx, my)
+  local tr = col and col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return 0 end
+  local m = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_AUTOMODE'))
+  local e = D.AMODE[m] or D.AMODE[0]
+  local w = U.measure('www') + 4
+  local x = xr - w
+  local c = U[e[2]] or U.mix(U.RED, U.CYAN, 0.5)
+  if m >= 2 and m <= 4 and math.floor(reaper.time_precise() * 3) % 2 == 0 then c = U.mix(c, U.BG, 0.65) end   -- мигает
+  local hot = mx >= x and mx < x + w and my >= y and my < y + L.rh
+  if hot then set(D.CURROW); gfx.rect(x, y + 1, w, L.rh - 2, 1); hover.btn = { col = col, what = 'automode' } end
+  text(x + 2, y, e[1], hot and U.AMBER or c)
+  return w
+end
 function D.gr_mix(x, ypos, gr)
   if not gr or gr < 0.1 then return end
   local y0, y1 = ypos(0), ypos(-math.min(60, gr))
@@ -7306,7 +7323,11 @@ function D.frame(L, snap, rows, state, info)
           D.bign[bk] = s
         end
         D.big_text(c.x + L.pad + indent, hy - HX + 1, s, ncol, k)
-      else text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent), ncol) end
+      else
+        local amw = 0
+        if not c.folded and c.w - 2 * L.pad - indent > ms('www') + 4 + 3 * L.cw then amw = D.amode_tag(L, c.x + c.w - L.pad, hy - HX + 1 + math.floor(HX / 2), col, hover, mx, my) end   -- 31 окт
+        text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent - (amw > 0 and amw + 2 or 0)), ncol)
+      end
     else
       text(c.x + L.pad, hy - HX + 1 + math.floor(HX / 2), fit('∑ master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
       -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
@@ -7704,7 +7725,8 @@ function D.frame(L, snap, rows, state, info)
             H = H - L.rh
             local ny = y1 + H
             if state.mixnames == 'top' then ny = y1; y1 = y1 + L.rh end
-            text(c.x + L.pad, ny, fit(nm, c.w - 2 * L.pad), ncol)
+            local amw = (c.w - 2 * L.pad > ms('www') + 4 + 3 * L.cw) and D.amode_tag(L, c.x + c.w - L.pad, ny, col, hover, mx, my) or 0   -- 31 окт
+            text(c.x + L.pad, ny, fit(nm, c.w - 2 * L.pad - (amw > 0 and amw + 2 or 0)), ncol)
           end
           if state.hdrin ~= false and not c.master then H = H - L.rh; mixin_y = y1 + H end   -- вход — над именем, под эффектами
           -- 9 окт: мастер — кнопка routing внизу полосы (аппаратные выходы, окно)
