@@ -1249,7 +1249,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local hv, hd
   if V.style == 'nebula' then
     hv = SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  elseif V.style == 'sand' then
+  elseif V.style == 'spore' then   -- 31 окт: был sand
     hv = SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'cloud' then
     hv = SM.draw_cloud(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
@@ -1391,7 +1391,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
     local bw = 0
-    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'sand', 'cloud', 'ξ' }) do   -- 28 окт: cloud   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
+    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'spore', 'cloud', 'ξ' }) do   -- 28 окт: cloud   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
       local tw = U.measure(nm) + 2 * L.pad
       local on = nm == cur
       local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh
