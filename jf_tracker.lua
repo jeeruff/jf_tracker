@@ -17781,6 +17781,20 @@ ctx.acv_do = function(op, sp, curves)
     local a, b = ACV.row, ACV.row + 1
     if ACV.anchor then a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }); ACV.anchor = nil end
     local n = edit.env_del_range(e, t2e(sp.time(a)), t2e(sp.time(b)))
+    -- 31 окт: на строке точки нет — x / BS удаляют следующую точку (нет — предыдущую), а не молчат «0 points»
+    if n == 0 and not (b > a + 1) then
+      local nx, pv
+      for _, p in ipairs(act.points or {}) do
+        local r = math.floor(sp.row_of(p[1]) + 1e-6)
+        if r > ACV.row and (not nx or r < nx) then nx = r end
+        if r < ACV.row and (not pv or r > pv) then pv = r end
+      end
+      local r = nx or pv
+      if r then
+        n = edit.env_del_range(e, t2e(sp.time(r)), t2e(sp.time(r + 1)))
+        ACV.row = r; a, b = r, r + 1
+      end
+    end
     vim.msg = ('%s: %d point(s) removed (rows %d..%d)'):format(act.name, n, a, b - 1)
   elseif op.op == 'fill' then
     local a, b = ACV.range({ r0 = sp.r0, r1 = sp.r1 }, true)
