@@ -7790,6 +7790,106 @@ function D.sand(L, x0, y0, w, h)
   end
   gfx.a = 1
 end
+-- 31 окт: визуализатор blood — лужа по низу трекера с волнами (поверхность — уравнение волны, кровь сохраняется):
+-- пик трека выбивает капли из левой части колонки (нота), капли вытягиваются по скорости и дрожат, падая — круги
+-- по луже, волны бегут и в соседние каналы. Капель — до 500
+function D.blood(L, x0, y0, w, h)
+  local st = D.bloodst
+  w = math.floor(w)
+  if not st or st.w ~= w then
+    st = { d = {}, t = reaper.time_precise(), lvl = {}, seed = 777, w = w, hg = {}, vl = {} }
+    for k = 0, w - 1 do st.hg[k] = 9; st.vl[k] = 0 end
+    D.bloodst = st
+  end
+  local hg, vl = st.hg, st.vl
+  local now = reaper.time_precise()
+  local dt = math.min(0.05, now - st.t); st.t = now
+  local function rnd() st.seed = (st.seed * 1103515245 + 12345) % 2147483648; return st.seed / 2147483648 end
+  local base = y0 + h - 1
+  local G, M = 2400, 0.9
+  for _, c in ipairs(L.cols or {}) do
+    local tr = c.col and c.col.track
+    if tr and c.x and c.w and c.w > 4 and reaper.ValidatePtr(tr, 'MediaTrack*') then
+      local pk = math.max(reaper.Track_GetPeakInfo(tr, 0) or 0, reaper.Track_GetPeakInfo(tr, 1) or 0)
+      local lv = pk > 0 and math.max(0, math.min(1, (20 * math.log(pk, 10) + 48) / 48)) or 0
+      local key = c.col.guid or tostring(tr)
+      local prev = st.lvl[key] or 0
+      st.lvl[key] = lv
+      local hit = math.max(0, lv - prev) * 3 + lv * 0.25
+      local cx = c.x + c.w * 0.22 - x0
+      local k0 = math.floor(cx)
+      if hit > 0.05 and k0 >= 0 and k0 < w then
+        vl[k0] = vl[k0] - hit * 70 * dt * 30   -- удар вдавливает поверхность — расходятся волны
+        if #st.d < 500 then
+          local n = math.floor(hit * c.w * 0.08 * dt * 60 + rnd())
+          local apex = math.min(1, hit) ^ 1.2 * h * 0.3
+          for _ = 1, n do
+            local px = math.floor(cx + (rnd() + rnd() - 1) * c.w * 0.12)
+            if px >= 0 and px < w and hg[px] > 2 + M then
+              hg[px] = hg[px] - M
+              local v = math.sqrt(2 * G * apex * (0.3 + rnd() * 0.9))
+              local a = (rnd() - 0.5) * 1.3
+              st.d[#st.d + 1] = { x = x0 + px, y = base - hg[px], vx = math.sin(a) * v * 0.8, vy = -math.cos(a) * v, r = 1.2 + rnd() * 2.6, ph = rnd() * 6.28, sh = 0.5 + rnd() * 0.4 }
+            end
+          end
+        end
+      end
+    end
+  end
+  -- капли: полёт; упала в лужу — объём в лужу и толчок вниз (круги)
+  local keep = {}
+  for _, d in ipairs(st.d) do
+    d.vy = d.vy + G * dt
+    d.px, d.py = d.x, d.y
+    d.x, d.y = d.x + d.vx * dt, d.y + d.vy * dt
+    local k = math.floor(d.x - x0)
+    if k < 0 then k = 0; d.vx = -d.vx * 0.3 elseif k >= w then k = w - 1; d.vx = -d.vx * 0.3 end
+    if d.vy > 0 and d.y >= base - hg[k] then
+      hg[k] = hg[k] + M; vl[k] = vl[k] + d.vy * 0.015
+    else keep[#keep + 1] = d end
+  end
+  st.d = keep
+  -- волна: ускорение к среднему соседей, затухание; объём сохраняется (перенос — симметричный)
+  local steps = 2
+  local sum0 = 0
+  for k = 0, w - 1 do sum0 = sum0 + hg[k] end
+  for _ = 1, steps do
+    for k = 0, w - 1 do
+      local l, r = hg[k - 1] or hg[k], hg[k + 1] or hg[k]
+      vl[k] = (vl[k] + ((l + r) / 2 - hg[k]) * 900 * dt / steps) * (1 - 2.2 * dt / steps)
+    end
+    local mean0 = 0
+    for k = 0, w - 1 do hg[k] = hg[k] + vl[k] * dt / steps; mean0 = mean0 + vl[k] end
+    mean0 = mean0 * dt / steps / w
+    for k = 0, w - 1 do hg[k] = math.max(0, hg[k] - mean0) end
+  end
+  -- объём точно как до волны (обрезка у дна добавляла кровь — лужа росла втрое)
+  local sum1 = 0
+  for k = 0, w - 1 do sum1 = sum1 + hg[k] end
+  if sum1 > 0 then local q = sum0 / sum1; for k = 0, w - 1 do hg[k] = hg[k] * q end end
+  -- лужа: столбики полосами одной высоты, верх — блик
+  local k = 0
+  while k < w do
+    local hh = math.floor(math.min(h * 0.5, hg[k]) + 0.5)
+    local k2 = k + 1
+    while k2 < w and k2 - k < 6 and math.floor(math.min(h * 0.5, hg[k2]) + 0.5) == hh do k2 = k2 + 1 end
+    if hh > 0 then
+      gfx.set(0.42, 0.01, 0.03, 0.95); gfx.rect(x0 + k, base - hh + 1, k2 - k, hh, 1)
+      gfx.set(0.85, 0.12, 0.12, 0.9); gfx.rect(x0 + k, base - hh + 1, k2 - k, 1, 1)
+    end
+    k = k2
+  end
+  -- капли: вытянуты по скорости (хвост), радиус дрожит («неевклидово»), блик
+  for _, d in ipairs(st.d) do
+    if d.y > y0 then
+      local r = d.r * (1 + 0.25 * math.sin(now * 17 + d.ph))
+      gfx.set(0.55, 0.02, 0.04, 0.85); gfx.line(d.px or d.x, d.py or d.y, d.x, d.y, 1)
+      gfx.set(0.6 + 0.2 * d.sh, 0.02, 0.04, 0.95); gfx.circle(d.x, d.y, r, 1, 1)
+      if r > 2 then gfx.set(1, 0.45, 0.4, 0.6); gfx.rect(math.floor(d.x - r * 0.4), math.floor(d.y - r * 0.5), 1, 1, 1) end
+    end
+  end
+  gfx.a = 1
+end
 function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -9940,7 +10040,8 @@ function D.frame(L, snap, rows, state, info)
     local ex = (L.total_w or W) - tx0
     local fs = (state.framefx and state.framefx ~= '' and state.framefx ~= 'off') and state.framefx or (state.cracks and 'cracks') or nil
     if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood' and fs ~= 'grunge', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
-  if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand   -- 31 окт: эксперимент
+  if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
+  if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
