@@ -504,11 +504,11 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     local mk = FB.is_marked(r.it)
     if mk then   -- 31 окт: отмечен — подложка и номер в очереди добавления
       local no = 0; for q, x in ipairs(FB.mark_order) do if x == r.it then no = q end end
-      if not sel then U.set(U.tint(U.CYAN, 0.22)); gfx.rect(x + 1, ry, w - 3, L.rh, 1) end
+      if not sel then U.set(U.tint(U.CYAN, 0.3)); gfx.rect(x + 1, ry, w - 3, L.rh, 1) end   -- ярче, текст бирюзовый (как активная папка)
       name = no .. ' ' .. name
     end
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
-    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.DIM or U.TEXT))
+    U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.DIM or (mk and U.CYAN or U.TEXT)))
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
     if FB.hint then FB.hint('fxbrow', x + 1, ry, w - 3, L.rh, idx) end
