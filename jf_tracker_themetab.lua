@@ -125,7 +125,12 @@ function TT.draw(x, y, w, h, emb, part)
   TT.tcols, TT.fcols, TT.nt, TT.nf = tcols, fcols, #themes, #fonts
   font_img(fonts, pw, ph)
   local trows = math.ceil(#themes / tcols)
-  local srow = rh + 4                                 -- 11 окт: строка размер / интервал под заголовком шрифтов
+  -- 31 окт: размер и интервал не влезают в одну строку (крупный шрифт, узкий блок) — интервал второй строкой
+  local SC0 = ctx.scales and ctx.scales() or SCALES
+  local need = ms('size (- +)') + pad + 3 * pad + ms('line spacing ([ ])') + pad + 2 * (ms('-') + 2 * pad + 2) + ms('00') + pad
+  for _, v in ipairs(SC0) do need = need + ms(tostring(v)) + 2 * pad + 2 end
+  local wrap2 = need > w - 6
+  local srow = (wrap2 and 2 or 1) * (rh + 2) + 2       -- 11 окт: строка размер / интервал под заголовком шрифтов
   local tH = showT and (rh + trows * (ch + pad)) or 0
   local fy0 = (showT and (tH + rh) or 0) + srow     -- от верха контента: заголовок тем, сетка, заголовок шрифтов, настройки
   -- держать выбранное в окне
@@ -194,6 +199,7 @@ function TT.draw(x, y, w, h, emb, part)
       lab('size (- +)')
       for _, v in ipairs(ctx.scales and ctx.scales() or SCALES) do btn(tostring(v), sc == v, { 'scale', v }) end   -- 31 окт: у битмапа без 1.5
       bx = bx + 3 * pad
+      if wrap2 then bx = x; sy = sy + rh + 2 end
       lab('line spacing ([ ])')
       btn('-', false, { 'space', -1 }); lab(tostring(ctx.space())); btn('+', false, { 'space', 1 })
     end
