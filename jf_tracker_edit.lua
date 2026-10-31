@@ -3230,6 +3230,30 @@ local function copy_fx(src, si, dst, di, move)
   elseif dt then R.TrackFX_CopyToTake(src, si, dst, di, move)
   else R.TrackFX_CopyToTrack(src, si, dst, di, move) end
 end
+-- 31 окт: эффект из контейнера наружу на место di верхнего уровня — перенос, а не копия: REAPER CopyToTrack(move) из
+-- контейнера оставлял оригинал. После копии оригинал ищется по GUID в контейнере и удаляется
+function E.fx_out_to(track, addr, di, label)
+  local A = FA(track)
+  local guid = R.TrackFX_GetFXGUID(track, addr)
+  E.run(label or 'move fx out', function()
+    copy_fx(track, addr, track, di, true)
+    if not guid then return end
+    local n = 0
+    local function scan(c)
+      local okc, cnt = A.GetNamedConfigParm(track, c, 'container_count')
+      for j = 0, (okc and tonumber(cnt) or 0) - 1 do
+        local ok2, id = A.GetNamedConfigParm(track, c, 'container_item.' .. j)
+        id = ok2 and tonumber(id)
+        if id then
+          if R.TrackFX_GetFXGUID(track, id) == guid then A.Delete(track, id); return true end
+          if scan(id) then return true end
+        end
+      end
+    end
+    for i = 0, R.TrackFX_GetCount(track) - 1 do if scan(i) then break end end
+  end)
+  if model then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+end
 -- 11 окт: перенос / копия эффекта на другой объект одним undo (бросок блока DSP на трек)
 function E.fx_copy(src, si, dst, di, move, label)
   E.run(label or (move and 'move fx' or 'copy fx'), function() copy_fx(src, si, dst, di, move) end)

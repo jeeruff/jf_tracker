@@ -184,6 +184,7 @@ local state = {
   rowbase = reaper.GetExtState(EXT, 'rowbase') == '0' and 0 or 1,
   qscope = (function() local v = reaper.GetExtState(EXT, 'qscope'); return (v == 'bar' or v == 'track') and v or 'pattern' end)(),   -- 29 окт: область квантайза
   outnotes = flag('outnotes', false),   -- 29 окт: ноты за краями MIDI-клипа — тускло
+  dspmove = reaper.GetExtState(EXT, 'dspmove') ~= 'off',   -- 31 окт: перетаскивание модуля — перенос (Opt — копия)
   dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
   jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
@@ -12778,6 +12779,7 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
+      { key = 'dspmove', label = 'drag moves fx', kind = 'toggle', desc = 'DSP: dragging a module moves it, Opt - copy (default; REAPER copies out of a container); off - dragging copies, Opt moves', get = function() return state.dspmove end, set = function(v) state.dspmove = v; reaper.SetExtState(EXT, 'dspmove', v and 'on' or 'off', true) end },
       { key = 'dspauto', label = 'dsp follows cursor', kind = 'toggle', desc = 'the bottom tabs follow the tracker cursor: a track with an instrument plugin - dsp; an envelope lane drawn as a graph (narrow) - dsp on its effect; a lane with numbers - nothing (Enter / double click - its curve); off - the tabs stay where you put them', get = function() return state.dspauto end, set = function(v) state.dspauto = v; reaper.SetExtState(EXT, 'dspauto', v and 'on' or 'off', true) end },
       { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
@@ -12963,7 +12965,7 @@ ctx = {
     local SECT = {
       { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -28159,8 +28161,11 @@ local function frame()
       if g and dd.f.inner and dd.f.inner.wrap then
         local col0 = dsp_target()
         local dest = tlist[g + 1] and tlist[g + 1].i or (col0 and reaper.TrackFX_GetCount(col0.track)) or 0
-        if col0 then edit.fx_copy(col0.track, dd.f.i, col0.track, dest, true, 'move fx out: ' .. (dd.f.name or '')) end
-        vim.msg = dd.f.name .. ' moved out of ' .. (dd.f.inner.parent.name or 'the container') .. ' -> slot ' .. (g + 1) .. ' (serial)'
+        local copy = ctx.mods().alt
+        if not state.dspmove then copy = not copy end   -- 31 окт: опция drag moves fx (по умолчанию вкл): Opt — копия
+        if col0 and copy then edit.fx_copy(col0.track, dd.f.i, col0.track, dest, false, 'copy fx out: ' .. (dd.f.name or ''))
+        elseif col0 then edit.fx_out_to(col0.track, dd.f.i, dest, 'move fx out: ' .. (dd.f.name or '')) end
+        vim.msg = dd.f.name .. (copy and ' copied out of ' or ' moved out of ') .. (dd.f.inner.parent.name or 'the container') .. ' -> slot ' .. (g + 1) .. ' (serial)'
         g = nil
       end
       if g and dd.f.inner then vim.msg = dd.f.name .. ' is inside ' .. (dd.f.inner.parent.name or 'the container') .. (dd.f.inner.wrap and ' - drop it onto another container or a track (moving out: its menu, Move out)' or ' - drop it onto a band row, or onto a track'); g = nil end
