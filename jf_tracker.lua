@@ -11983,17 +11983,26 @@ ctx = {
     vim.open_hydra({ title = 'og channel ' .. k, items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }   -- у строки опции
   end,
-  og_toggle = function()
+  og_toggle = function(keep)
     local PN = draw.panes
     if state.og then
       local bk = state.og_back or {}
-      state.og, state.og_back, state.mxonly = nil, nil, nil
+      state.og, state.og_back, state.mxonly, state.og_keep = nil, nil, nil, nil
       if bk.panes and PN.decode then local m = PN.decode(bk.panes); if m then m.v = (state.panes and state.panes.v or 0) + 1; state.panes = m end end
       if bk.fontscale ~= nil then state.fontscale = bk.fontscale; draw.set_font(state) end
       relayout(); model.invalidate()
       vim.msg = 'OG-mode off: layout back'
       return
     end
+    -- 31 окт: OG-mode — как скринсет + шаблон: сначала вопрос — свои каналы оставить видимыми или только track1..4
+    if keep == nil then
+      vim.open_hydra({ title = 'OG-mode: your tracks', items = {
+        { key = 'k', label = 'keep my tracks visible too (track1..4 added after them)', fn = function() ctx.og_toggle(true) end },
+        { key = 'o', label = 'only the four channels track1..4', fn = function() ctx.og_toggle(false) end },
+      } })
+      return
+    end
+    state.og_keep = keep
     state.og_back = { panes = state.panes and PN.encode(state.panes) or nil, fontscale = state.fontscale }
     local have = {}
     for i = 0, reaper.CountTracks(0) - 1 do local _, nm = reaper.GetTrackName(reaper.GetTrack(0, i)); have[nm] = reaper.GetTrack(0, i) end
@@ -12023,8 +12032,10 @@ ctx = {
         end
       end
     end)
+    -- 31 окт: панели — только нужные для трека: трекер, матрица, паттерны, main, help, lib, browser, fx, dsp, automation, item
     if state.panes and PN.hide then
-      for _, id in ipairs({ 'visor', 'map' }) do if PN.visible(state.panes, id) then PN.hide(state.panes, id) end end
+      local KEEP = { tracker = true, matrix = true, patterns = true, ctrl = true, help = true, inst = true, browser = true, fxb = true, dsp = true, automation = true, sample = true }
+      for _, p in ipairs(PN.PANELS) do if not KEEP[p.id] and PN.visible(state.panes, p.id) then PN.hide(state.panes, p.id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
     if state.ogfont then state.fontscale = math.min(4, (tonumber(state.fontscale) or 2) * 2); draw.set_font(state) end   -- 31 окт: вдвое крупнее текущего (2 и так по умолчанию)
@@ -12884,7 +12895,7 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
-      { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), only they are shown, visor and map hidden; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
+      { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), asks first: keep your tracks visible or only the four; panes - only tracker, matrix, patterns, main, help, lib, browser, fx, dsp, automation, item; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
       { key = 'ogfont', label = 'og-mode font x2', kind = 'toggle', desc = 'OG-mode with the bitmap font twice as big', get = function() return state.ogfont end, set = function(v)
         state.ogfont = v; reaper.SetExtState(EXT, 'ogfont', v and '1' or '0', true)
         if state.og and state.og_back then   -- сразу, если OG-mode уже включён
@@ -22706,7 +22717,7 @@ local function frame()
     end
   elseif state.viper then pcall(ctx.viper_tick)
   elseif state.phr_edit then state.mxonly = state.phr_edit.only   -- 31 окт: правка фразы — только её трек
-  elseif state.og and snap then   -- 31 окт: OG-mode — только OG1..OG4
+  elseif state.og and snap and not state.og_keep then   -- 31 окт: OG-mode — только track1..4 (если не «оставить свои»)
     local only = {}
     for _, c in ipairs(snap.cols) do local n = c.name or ''; if n:match('^OG[1-4]$') or n:match('^track[1-4]$') then only[c.guid] = true end end
     state.mxonly = next(only) and only or nil
