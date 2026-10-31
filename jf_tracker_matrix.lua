@@ -59,7 +59,7 @@ MX.zoom = 'schematic'       -- 'schematic' | 'detail'; `:mxzoom`, в матри�
 
 -- 13 окт: параметры вида (detail, fill, ruler, s/e, bpm, loops) — в одной кнопке view (= z в матрице)
 local BTNS = { { 'menu', 'menu' },   -- 12 окт: menu — patternize и прочее; 18 окт: cell (sel) — в меню view
-  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'add', '+' } }   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
+  { 'view', 'view' }, { 'sync', 'sync' }, { 'trim', 'trim' }, { 'pads', 'patternkb' }, { 'timesel', 'timesel' }, { 'follow', 'follow' }, { 'space', 'space: cue' }, { 'add', '+' } }   -- 31 окт: space — Space в матрице: cue (в очередь, в такт) / play (плей-стоп)   -- 17 окт: pads — паттерны на клавишах (MPC; 18 окт: зовётся patternkb), playlist — текстом, vismetro — метроном в клетках
 MX.bpm = true                -- 13 окт: колонка BPM (темп в начале региона)
 local FOLD_BTNS = { { 'fold', 'zoom' } }        -- свёрнутая: одна кнопка — развернуть (7 окт: fold зовётся zoom, clips из матрицы убраны)
 -- кнопки, которые видны (5 окт): sync — только без autosync (он и так
@@ -345,8 +345,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   local bx, by = x0, y0
   for _, b in ipairs(list) do
     local label = b[2]
+    if b[1] == 'space' then label = MX.spacemode == 'play' and 'space: play' or 'space: cue' end
     if ctx.ic and b[1] ~= 'more' then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
+    if b[1] == 'space' then bw = math.max(U.measure('space: play'), U.measure('space: cue')) + 2 * L.pad end   -- строгая ширина
     if x1 and bx > x0 and bx + bw > x1 then bx, by = x0, by + L.rh + 2 end
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
@@ -1003,6 +1005,7 @@ function MX.goto_cell(regions, snap, ri, ci)
 end
 
 function MX.space(regions)
+  if MX.spacemode == 'play' then ctx.play_stop(); return end   -- 31 окт: как в трекере — плей / стоп
   local rg = regions[MX.cur.ri]
   if rg then ctx.region_space(rg) end
 end

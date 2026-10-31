@@ -31153,6 +31153,9 @@ ctx.mx_btn_do = function(b)
   elseif b == 'trim' then ctx.mx_trim()
   elseif b == 'pads' then ctx.pads_cmd('')
   elseif b == 'timesel' then ctx.tsel_menu()
+  elseif b == 'space' then   -- 31 окт: Space в матрице — cue (слот в очередь, в такт) / play (плей-стоп, как в трекере)
+    MX.spacemode = MX.spacemode == 'play' and 'cue' or 'play'; reaper.SetExtState(EXT, 'mxspace', MX.spacemode, true)
+    vim.msg = MX.spacemode == 'play' and 'matrix Space: play / stop (as in the tracker)' or 'matrix Space: cue - the slot starts when the playing one ends'
   elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
     MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
     vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
@@ -31890,6 +31893,7 @@ ctx.raw_undo = function()
 end
 -- 19 окт: matrix follow (по умолчанию вкл): курсор матрицы — слот и трек курсора трекера (когда фокус не в матрице)
 MX.follow = reaper.GetExtState(EXT, 'mxfollow') ~= '0'
+MX.spacemode = reaper.GetExtState(EXT, 'mxspace') == 'play' and 'play' or 'cue'   -- 31 окт: Space в матрице
 -- 20 окт: мастер сложен (fold / auto) — peek раскрывает его, пока курсор на нём: клик по сложенному,
 -- Opt+W (∑), l с последнего поля. Курсор ушёл с мастера — сложить снова (ctx.master_peek_tick)
 -- 20 окт: autozoom (кнопка в уголке над номерами строк) — подбор общей ширины в relayout; выкл — уровень Cmd+колеса

@@ -360,7 +360,7 @@ KH.PAGES = {
     { k = 'Ctrl+h j k l', m = 'move like hjkl', g = 'move', d = 'move like h j k l' },
     { k = 'Ctrl+Up Down', m = 'duplicate slot above / below', g = 'slot', d = 'duplicate the slot above / below, muted tracks left empty in the copy (Paketti)' },
     { k = 'M', m = 'mute cell', g = 'block', d = 'mute / unmute cell (Shift+m)' },
-    { k = 'Space', m = 'play or queue slot', d = 'play from slot, or queue it while playing' },
+    { k = 'Space', m = 'play or queue slot', d = 'button space: cue - play from the slot, or queue it while playing (it starts when the playing one ends); space: play - play / stop, as in the tracker' },
     { k = 'F', m = 'sel: only selected tracks', g = 'view', d = 'sel: the tracker shows only the tracks of the selected cells (button sel; Cmd+click a cell adds it, Esc clears)' },
     { k = '+ N+', m = 'new region at end', g = 'slot', d = 'new region at the end (N+: N regions, one undo); n names it' },
     { k = 'v HJKL', m = 'block select', g = 'block', d = 'block select; in block: y copy, d x cut, M mute', t = { 'v', 'H', 'J', 'K', 'L' } },
