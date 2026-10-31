@@ -2646,13 +2646,12 @@ ctx = {
     local p = f and f.params[pi]
     if p and p.kind == 'toggle' then ctx.dsp_value(k, pi, 1) elseif f then edit.fx_bypass(col.track, f.i) end
   end,
-  -- 31 окт: модуль во ВЫКЛЮЧЕННОМ контейнере (poff) — включение включает и контейнеры над ним (иначе не звучит,
-  -- кружок on / off «всегда тёмный»); свой выключен — переключить его
+  -- 31 окт: переключает сам модуль; включение модуля в ВЫКЛЮЧЕННОМ контейнере (poff) включает и контейнеры над ним (иначе не звучит)
   dsp_bypass = function(k)
     local col, f = ctx.dsp_fx(k)
     if not f then return end
-    local turn_on = not f.enabled or f.poff
-    if not f.enabled or not f.poff then edit.fx_bypass(col.track, f.i) end
+    local turn_on = not f.enabled
+    edit.fx_bypass(col.track, f.i)
     if turn_on and f.poff then
       local p = f.inner and f.inner.parent
       while p do

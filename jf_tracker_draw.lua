@@ -10026,13 +10026,13 @@ function D.frame(L, snap, rows, state, info)
       if iol and tw < ms(full) + iow + L.pad + L.cw * 6 then iol, iow = nil, 0 end   -- тесно — имя важнее
       local nmtxt = fit(full, tw - (iol and (iow + L.pad) or 0))
       text(bx + L.pad, by + 1, nmtxt, (f.enabled and not f.poff) and (f.container and U.AMBER or U.TEXT) or U.GREY)
-      do   -- 31 окт: кружок on / off перед именем: щелчок — включить / выключить (bypass)
-        local on = f.enabled and not f.poff
-        local cr = math.max(3, math.min(math.floor(L.rh / 3), math.floor(ms(' ') / 2) + 1))
-        local ccx, ccy = bx + L.pad + math.floor(ms('   ') / 2), by + 1 + math.floor((L.rh - 1) / 2)
+      do   -- 31 окт: кружок on / off перед именем: состояние САМОГО модуля — ярко-зелёный вкл, тёмный выкл; щелчок — переключить
+        local on = f.enabled
+        local cr = math.max(3, math.floor(L.rh / 3))
+        local ccx, ccy = bx + L.pad + cr + 3, by + 1 + math.floor((L.rh - 1) / 2)
         local hot = not drag and math.abs(mx - ccx) <= cr + 3 and my >= by + 1 and my < by + L.rh
-        set(on and (hot and U.AMBER or U.GREEN) or (hot and U.AMBER or U.DIM)); gfx.circle(ccx, ccy, cr, 1, 1)
-        if not on then set(U.GREY); gfx.circle(ccx, ccy, cr, 0, 1) end
+        set(on and U.GREEN or U.LINE); gfx.circle(ccx, ccy, cr, 1, 1)
+        if hot then set(U.AMBER); gfx.circle(ccx, ccy, cr + 1, 0, 1) end   -- наведение — обводка, цвет состояния не меняется
         if hot then hover.dspbtn = { fx = k, f = f, what = 'bypass' }; on_btn = true end
         hint('dspbtn', ccx - cr - 2, by + 1, 2 * cr + 4, L.rh - 1, { fx = k, what = 'bypass' })
       end
