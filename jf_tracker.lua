@@ -892,6 +892,15 @@ local function dsp_target()
     -- 11 окт: T o — take самой ноты под курсором (пока не выбран другой инструмент)
     local nt = ctx.dsp_note_tk
     if nt and nt.inst == vim.inst and reaper.ValidatePtr(nt.tk, 'MediaItem_Take*') then tk, e = nt.tk, { name = nt.name } end
+    -- 31 окт: инструмент — плагин (take нет): take ноты под курсором трекера (было — молча цепочка трека)
+    if not (tk and reaper.ValidatePtr(tk, 'MediaItem_Take*')) then
+      local f = L.flat and L.flat[vim.cur.fi]
+      local cell = f and f.sub and f.sub[vim.cur.row]
+      if cell and cell.kind == 'cont' then cell = cell.of end
+      local it = cell and cell.item
+      local t2 = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
+      if t2 then tk, e = t2, { name = 'take fx of the note' } end
+    end
     if tk and reaper.ValidatePtr(tk, 'MediaItem_Take*') then
       if dspt_cache.snap ~= snap or dspt_cache.take ~= tk then dspt_cache = { snap = snap, take = tk, fx = model.take_fx(tk) } end
       return { track = tk, fx = dspt_cache.fx, name = e.name or 'take', take = true, col = col }
