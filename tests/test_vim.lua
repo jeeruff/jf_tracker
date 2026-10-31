@@ -651,12 +651,12 @@ reset()
 L.flat[#L.flat + 1] = { ci = 1, col = snap.cols[1], env = { name = 'Vol', prows = { 3, 9, 20 } }, sub = {} }
 local efi3 = #L.flat
 V.cur = { fi = efi3, row = 0, field = 1 }
-keysin('w'); eq('w from env → ov 2 (track-wide)', V.cur.row, 2)
-keysin('w'); eq('w → env point 3', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 3)
-keysin('w'); eq('w → snare 8 (note column)', V.cur.fi * 100 + V.cur.row, 108)
+-- 31 окт: w / b в колонке огибающей — только её точки; с ноты — следующая нота трека (точки огибающих мимо)
+keysin('w'); eq('w from env → its point 3 (stays in the column)', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 3)
 keysin('w'); eq('w → env point 9', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 9)
-keysin('b'); eq('b → snare 8', V.cur.row, 8)
 keysin('b'); eq('b → env point 3', V.cur.fi * 100 + V.cur.row, efi3 * 100 + 3)
+V.cur = { fi = 1, row = 4, field = 1 }; keysin('w'); eq('w from a note → the next note, not an envelope point', V.cur.fi * 100 + V.cur.row, 108)
+V.cur = { fi = efi3, row = 3, field = 1 }
 keysin('e'); eq('e → next point', V.cur.row, 9)
 keysin('dd'); eq('dd on an envelope deletes its row points (10 окт: трек — td)', last(), 'envdelr:Vol@9-9')
 V.cur.row = 3; keysin('yy'); eq('yy on env → yank points', last(), 'envpts:Vol@3-3')

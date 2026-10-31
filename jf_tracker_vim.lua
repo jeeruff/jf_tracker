@@ -703,6 +703,40 @@ function motion(c, n, op)
     -- движение w / b — по всем колонкам трека, точки огибающих тоже (6 окт)
     local fi, r = cur.fi, cur.row
     local dir = c == ('w'):byte() and 1 or -1
+    -- 31 окт: в своей колонке: огибающая / лейн — следующая точка этой колонки; команда — следующая команда этой
+    -- подколонки; нота и её поля (inst vol del) — следующая нота колонки. Поле курсора не меняется
+    local f = flat()[fi]
+    local fld = cur.field or 1
+    if f and not f.folded then
+      local last = ctx.snap().last_row or 0
+      local function step(row)
+        if f.env or f.ml then return next_head(fi, row, dir, false) end
+        if fld >= 4 and V.fx_cell then
+          local i = fld - 3
+          local rr = row + dir
+          while rr >= 0 and rr <= last + 1 do
+            local fc = V.fx_cell(fi, rr)
+            if fc and fc.fx and fc.fx[i] then return rr end
+            rr = rr + dir
+          end
+          return nil
+        end
+        return nil, 'note'
+      end
+      if f.env or f.ml or fld >= 4 then
+        local moved = false
+        for _ = 1, n do local nr = step(r); if not nr then break end; r = nr; moved = true end
+        if not moved then V.msg = dir > 0 and 'nothing further in this column' or 'nothing above in this column' end
+        return { fi = fi, row = r, field = fld, linewise = true }
+      end
+      -- нота и её поля — следующая нота трека (любая его подколонка), без точек огибающих и событий лейнов
+      for _ = 1, n do
+        local nfi, nr = next_track(fi, r, dir, true)
+        if not nfi then break end
+        fi, r = nfi, nr
+      end
+      return { fi = fi, row = r, field = fld, linewise = true }
+    end
     for _ = 1, n do
       local nfi, nr = next_track(fi, r, dir)
       if not nfi then break end
