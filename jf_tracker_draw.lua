@@ -8754,10 +8754,13 @@ function D.frame(L, snap, rows, state, info)
       local named = not (state.fxrow and (L.fxrow_h or 0) > 0) and yz + L.rh <= hy + (L.header_rows - 2) * L.rh + 2
       if named then
         local yr = yz   -- 31 окт: zoom mark — в строке 4, имя паттерна — под ними, над длиной
-        btn(bx, yr, (ms('autozoom') + ms('mark') + 6 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom)
+        local azl = (ms('autozoom') + ms('mark') + ms('WH') + 10 <= bw) and 'autozoom' or 'zoom'
+        local xw = bx + btn(bx, yr, azl, 'viewbtn', 'autozoom', state.autozoom) + 2   -- 31 окт: W H — справа от autozoom
+        if xw + ms('WH') + 6 <= bx + bw - ms('mark') - 2 then xw = xw + btn(xw, yr, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yr, 'H', 'viewbtn', 'fith') end
         btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
       else
-        btn(bx, yz, (ms('autozoom') + 2 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom)
+        local xw = bx + btn(bx, yz, (ms('autozoom') + ms('WH') + 8 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
+        if xw + ms('WH') + 6 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yz, 'H', 'viewbtn', 'fith') end   -- 31 окт: W H — справа от autozoom
         if yz + L.rh <= y4 - L.rh then btn(bx, yz + L.rh, (ms('markers') + 2 <= bw) and 'markers' or 'mark', 'viewbtn', 'markers')
         else btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers') end   -- 31 окт: короче — zoom / mark (не az mk)
       end

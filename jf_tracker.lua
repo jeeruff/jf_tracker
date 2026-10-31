@@ -18546,6 +18546,8 @@ local function hint_go(t)
   elseif t.kind == 'tlhdr' then ctx.tlist_column(d)
   elseif t.kind == 'viewbtn' and d == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
   elseif t.kind == 'viewbtn' and d == 'mixer' then ctx.toggle_mixer()
+  elseif t.kind == 'viewbtn' and d == 'fitw' then ctx.fit_width()
+  elseif t.kind == 'viewbtn' and d == 'fith' then ctx.fit_height()
   elseif t.kind == 'viewbtn' and d == 'foldfast' then ctx.foldfast_toggle()   -- 31 окт: хинт fold переключал вид на project
   elseif t.kind == 'viewbtn' then ctx.view_mode(d == 'reg' and 'pattern' or (d == 'sec' and 'section' or 'project'))
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
@@ -24764,6 +24766,8 @@ local function frame()
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
+  elseif hover.viewbtn == 'fitw' then state.status = 'W (zw): all tracks the same width, the widest at which all fit'
+  elseif hover.viewbtn == 'fith' then state.status = 'H (zh): the ' .. ctx.view_cur() .. ' fits the screen by height (LPB)'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
   elseif hover.viewbtn == 'foldfast' then state.status = 'fast+ ' .. (state.foldfast and 'on' or 'off') .. ': notes shorter than a row (fast rolls, flams) do not get their own extra column - they show as a + next to the note of their row; off - each gets a column. Not the folding of tracks (za / zM). Click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
@@ -26580,6 +26584,8 @@ local function frame()
     elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'mixer' then ctx.toggle_mixer()   -- 31 окт: кнопка mixer в уголке
+    elseif hover.viewbtn == 'fitw' then ctx.fit_width()
+    elseif hover.viewbtn == 'fith' then ctx.fit_height()
     elseif hover.viewbtn == 'foldfast' then ctx.foldfast_toggle()      -- 19 окт: fold быстрых нот
     elseif hover.tlist_hdr then ctx.tlist_column(hover.tlist_hdr); click = { t = now2, zone = 'tlist' }   -- 11 окт: tracks — весь столбец
     elseif hover.tlist and hover.tlist.what == 'cell' then
@@ -32226,6 +32232,41 @@ ctx.sf_ghost = function()
   local t0 = edit.row_time(t.row, state.lpb, 0)
   local rows = math.max(1, math.floor((reaper.TimeMap2_timeToQN(0, t0 + len) - reaper.TimeMap2_timeToQN(0, t0)) * state.lpb + 0.5))
   return { fi = t.fi, row = t.row, rows = rows, path = p, name = p:match('[^/]+$') or p }
+end
+-- 31 окт: zw / кнопка W — все треки одной ширины (ручные уровни сброшены), самая широкая, при которой влезают все;
+-- autozoom выключается (он держит трек курсора широким)
+ctx.fit_width = function()
+  state.autozoom = nil; reaper.SetExtState(EXT, 'autozoom', '0', true)
+  state.wlevel = {}; state.wzlevel = nil; state.hscroll = 0
+  relayout()
+  if L.cols_cut or L.hs_cut then
+    local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+    for lv = full, 0, -1 do
+      state.wzlevel = lv; relayout()
+      if not (L.cols_cut or L.hs_cut) then break end
+    end
+  end
+  reaper.SetExtState(EXT, 'wzlevel', tostring(state.wzlevel or ''), true)
+  vim.msg = 'zw: all tracks the same width' .. ((L.cols_cut or L.hs_cut) and ' - still not all fit (scroll sideways)' or ', all fit')
+end
+-- 31 окт: zh / кнопка H — то, что показывает вид (паттерн / секция / проект), целиком по высоте: самый мелкий LPB,
+-- при котором влезает; верх вида — на начало
+ctx.fit_height = function()
+  local t0, t1
+  local vm = ctx.view_cur()
+  if vm == 'section' then local sc = ctx.section_at(edit.row_time(vim.cur.row, state.lpb, 0)); if sc then t0, t1 = sc.pos, sc.rgnend end
+  elseif vm == 'pattern' then local _, _, rg = ctx.region_rows(); if rg then t0, t1 = rg.pos, rg.rgnend end end
+  if not t0 then t0 = model.marker_pos(model.START_MARKER) or 0; t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0) end
+  local q = reaper.TimeMap2_timeToQN(0, t1) - reaper.TimeMap2_timeToQN(0, t0)
+  if q <= 0 or not L then return end
+  local best
+  for _, v in ipairs(LPBS) do if q * v <= L.nrows and (not best or v > best) then best = v end end
+  best = best or LPBS[1]
+  set_lpb(best)
+  state.row0 = math.max(0, math.floor(model.row_of_time(t0, state.lpb) + 1e-6))
+  if vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows then vim.cur.row = state.row0 end
+  relayout()
+  vim.msg = ('zh: the %s fits - LPB %d (%d rows)'):format(vm, best, math.floor(q * best + 0.5))
 end
 ctx.autozoom_toggle = function()
   state.autozoom = not state.autozoom or nil
