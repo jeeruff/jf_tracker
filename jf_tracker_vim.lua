@@ -1089,10 +1089,24 @@ function V.note_off_scope(scope)
   local F = flat()
   local cur = F[V.cur.fi]
   local heads = {}
+  local busy, quiet = {}, {}   -- 31 окт: ~ / Ctrl+~ — треки, где на строке ничего не звучит, получают свободный OFF
   for i, f in ipairs(F) do
     if not f.env and ((scope == 'all') or (scope == 'track' and cur and f.ci == cur.ci) or (scope == 'sub' and i == V.cur.fi)) then
-      for _, h in ipairs(V.covering(i, V.cur.row)) do if not h.stub then heads[#heads + 1] = h end end   -- 31 окт: OFF без ноты — не нота
+      for _, h in ipairs(V.covering(i, V.cur.row)) do if not h.stub then heads[#heads + 1] = h; busy[f.ci] = true end end   -- 31 окт: OFF без ноты — не нота
+      if f.col and f.col.track and not f.ml and not f.col.master and not quiet[f.ci] then quiet[f.ci] = f end
     end
+  end
+  if scope ~= 'sub' and ctx.edit.all_off then
+    local n = 0
+    for ci, f in pairs(quiet) do
+      local here = f.sub and f.sub[V.cur.row]
+      if not busy[ci] and not (here and here.of and here.of.stub) then
+        ctx.edit.all_off(f.col.track, f.lane and f.lane.idx or nil, lpb(), V.cur.row); n = n + 1
+      end
+    end
+    if #heads > 0 then ctx.edit.note_off(heads, lpb(), V.cur.row) end
+    V.msg = ('OFF on %s: %d note(s) end here, %d free OFF'):format(scope == 'all' and 'all tracks' or 'the track', #heads, n)
+    return #heads + n
   end
   if #heads == 0 and scope == 'sub' and cur and cur.sub and cur.sub[V.cur.row] and cur.sub[V.cur.row].of and cur.sub[V.cur.row].of.stub then
     V.msg = 'OFF is already here'; return 0
