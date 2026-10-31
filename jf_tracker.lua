@@ -11951,6 +11951,37 @@ ctx = {
   -- Повтор — всё как было (state.pt_saved)
   -- 31 окт: OG-mode (:og) — 4 канала OG1..OG4 (нет — создаются с инструментами og_ch), видны только они;
   -- visor и map скрыты; font x2 — опция; выкл — раскладка и шрифт назад
+  -- 31 окт: инструмент канала OG: подпись и выбор (jf-инструменты, любой плагин fzf, шаблон трека)
+  og_label = function(v)
+    v = v or 'empty'
+    if v:match('^fx:') then return (v:sub(4):gsub('^[%w]+i?: ', '')) end
+    if v:match('^tpl:') then return 'tpl ' .. (v:match('([^/]+)%.RTrackTemplate$') or v:sub(5)) end
+    return v
+  end,
+  og_pick = function(k)
+    local function setv(v) state.og_ch[k] = v; reaper.SetExtState(EXT, 'ogch' .. k, v, true); vim.msg = ('og channel %d: %s'):format(k, ctx.og_label(v)) end
+    local items = {}
+    for i, v in ipairs({ 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }) do items[#items + 1] = { key = tostring(i), label = v, fn = function() setv(v) end } end
+    items[#items + 1] = { key = 'p', label = 'any plugin... (fzf)', fn = function()
+      if #FB.list == 0 then FB.list = ctx.fx_list() end
+      local its = {}
+      for _, it in ipairs(FB.list) do its[#its + 1] = { label = it.label, data = it.data or it.label } end
+      vim.open_picker('og channel ' .. k .. ': plugin', its, function(it) setv('fx:' .. it.data) end)
+    end }
+    items[#items + 1] = { key = 't', label = 'track template... (fzf)', fn = function()
+      local its = {}
+      local function walk(dir, rel)
+        local i = 0
+        while true do local f = reaper.EnumerateFiles(dir, i); if not f then break end; if f:match('%.RTrackTemplate$') then its[#its + 1] = { label = rel .. f:gsub('%.RTrackTemplate$', ''), data = dir .. '/' .. f } end; i = i + 1 end
+        i = 0
+        while true do local d = reaper.EnumerateSubdirectories(dir, i); if not d then break end; walk(dir .. '/' .. d, rel .. d .. '/'); i = i + 1 end
+      end
+      walk(reaper.GetResourcePath() .. '/TrackTemplates', '')
+      if #its == 0 then vim.msg = 'no track templates in TrackTemplates'; return end
+      vim.open_picker('og channel ' .. k .. ': track template', its, function(it) setv('tpl:' .. it.data) end)
+    end }
+    vim.open_hydra({ title = 'og channel ' .. k, items = items })
+  end,
   og_toggle = function()
     local PN = draw.panes
     if state.og then
@@ -11968,18 +11999,25 @@ ctx = {
     local made = 0
     edit.run('OG-mode channels', function()
       for k = 1, 4 do
-        local nm = 'OG' .. k
-        if not have[nm] then
+        local nm = 'track' .. k   -- 31 окт: каналы — track1..track4 (были OG1..OG4: старые тоже узнаются)
+        if not have[nm] and not have['OG' .. k] then
           local n = reaper.CountTracks(0)
           reaper.InsertTrackAtIndex(n, true)
           local tr = reaper.GetTrack(0, n)
           reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', nm, true)
           local kind = state.og_ch[k] or 'empty'
-          if kind == 'slixer' then reaper.TrackFX_AddByName(tr, 'JS:jf_slixer', false, -1)
+          if kind:match('^tpl:') then   -- 31 окт: шаблон трека — его трек(и), первый переименован в OGk
+            reaper.DeleteTrack(tr)
+            local n0 = reaper.CountTracks(0)
+            reaper.Main_openProject(kind:sub(5))
+            tr = reaper.GetTrack(0, n0)
+            if tr then reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', nm, true) end
+          elseif kind:match('^fx:') then reaper.TrackFX_AddByName(tr, kind:sub(4), false, -1)
+          elseif kind == 'slixer' then reaper.TrackFX_AddByName(tr, 'JS:jf_slixer', false, -1)
           elseif kind == 'grain' then reaper.TrackFX_AddByName(tr, 'JS:jf_grgrain', false, -1)
           elseif kind == 'surge' then if reaper.TrackFX_AddByName(tr, 'VST3i:Surge XT', false, -1) < 0 then reaper.TrackFX_AddByName(tr, 'Surge XT', false, -1) end
           elseif kind == 'drumrs5k' then edit.drum_pads(tr, nil, {}, 36, 'kit') end
-          reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', 0)
+          if tr then reaper.SetMediaTrackInfo_Value(tr, 'I_RECARM', 0) end
           made = made + 1
         end
       end
@@ -11992,9 +12030,9 @@ ctx = {
     state.og = true
     model.invalidate(); relayout()
     snap = model.snapshot(state.lpb)
-    for ci, c in ipairs(snap.cols) do if c.name == 'OG1' then state.hscroll = ci; break end end
+    for ci, c in ipairs(snap.cols) do if c.name == 'track1' or c.name == 'OG1' then state.hscroll = ci; break end end
     ctx.set_focus('tracker')
-    vim.msg = ('OG-mode: OG1..OG4 (%d new) - %s; :og again - back'):format(made, table.concat(state.og_ch, ' / '))
+    vim.msg = ('OG-mode: track1..track4 (%d new); :og again - back'):format(made)
   end,
   pt_toggle = function()
     local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions' }
@@ -12845,12 +12883,12 @@ ctx = {
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
-      { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels OG1..OG4 (made if missing, with the instruments below), only they are shown, visor and map hidden; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
+      { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), only they are shown, visor and map hidden; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
       { key = 'ogfont', label = 'og-mode font x2', kind = 'toggle', desc = 'OG-mode with the bitmap font twice as big', get = function() return state.ogfont end, set = function(v) state.ogfont = v; reaper.SetExtState(EXT, 'ogfont', v and '1' or '0', true) end },
-      { key = 'ogch1', label = 'og channel 1', kind = 'cycle', values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of OG1 when OG-mode makes it', get = function() return state.og_ch[1] end, set = function(v) state.og_ch[1] = v; reaper.SetExtState(EXT, 'ogch1', v, true) end },
-      { key = 'ogch2', label = 'og channel 2', kind = 'cycle', values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of OG2 when OG-mode makes it', get = function() return state.og_ch[2] end, set = function(v) state.og_ch[2] = v; reaper.SetExtState(EXT, 'ogch2', v, true) end },
-      { key = 'ogch3', label = 'og channel 3', kind = 'cycle', values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of OG3 when OG-mode makes it', get = function() return state.og_ch[3] end, set = function(v) state.og_ch[3] = v; reaper.SetExtState(EXT, 'ogch3', v, true) end },
-      { key = 'ogch4', label = 'og channel 4', kind = 'cycle', values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of OG4 when OG-mode makes it', get = function() return state.og_ch[4] end, set = function(v) state.og_ch[4] = v; reaper.SetExtState(EXT, 'ogch4', v, true) end },
+      { key = 'ogch1', label = 'og channel 1', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track1 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[1]) end, set = function(v) state.og_ch[1] = v; reaper.SetExtState(EXT, 'ogch1', v, true) end, pick = function() ctx.og_pick(1) end },
+      { key = 'ogch2', label = 'og channel 2', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track2 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[2]) end, set = function(v) state.og_ch[2] = v; reaper.SetExtState(EXT, 'ogch2', v, true) end, pick = function() ctx.og_pick(2) end },
+      { key = 'ogch3', label = 'og channel 3', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track3 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[3]) end, set = function(v) state.og_ch[3] = v; reaper.SetExtState(EXT, 'ogch3', v, true) end, pick = function() ctx.og_pick(3) end },
+      { key = 'ogch4', label = 'og channel 4', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track4 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[4]) end, set = function(v) state.og_ch[4] = v; reaper.SetExtState(EXT, 'ogch4', v, true) end, pick = function() ctx.og_pick(4) end },
       { key = 'dspmove', label = 'drag moves fx', kind = 'toggle', desc = 'DSP: dragging a module moves it, Opt - copy (default; REAPER copies out of a container); off - dragging copies, Opt moves', get = function() return state.dspmove end, set = function(v) state.dspmove = v; reaper.SetExtState(EXT, 'dspmove', v and 'on' or 'off', true) end },
       { key = 'dspauto', label = 'dsp follows cursor', kind = 'toggle', desc = 'the bottom tabs follow the tracker cursor: a track with an instrument plugin - dsp; an envelope lane drawn as a graph (narrow) - dsp on its effect; a lane with numbers - nothing (Enter / double click - its curve); off - the tabs stay where you put them', get = function() return state.dspauto end, set = function(v) state.dspauto = v; reaper.SetExtState(EXT, 'dspauto', v and 'on' or 'off', true) end },
       { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
@@ -22663,7 +22701,7 @@ local function frame()
   elseif state.phr_edit then state.mxonly = state.phr_edit.only   -- 31 окт: правка фразы — только её трек
   elseif state.og and snap then   -- 31 окт: OG-mode — только OG1..OG4
     local only = {}
-    for _, c in ipairs(snap.cols) do if (c.name or ''):match('^OG[1-4]$') then only[c.guid] = true end end
+    for _, c in ipairs(snap.cols) do local n = c.name or ''; if n:match('^OG[1-4]$') or n:match('^track[1-4]$') then only[c.guid] = true end end
     state.mxonly = next(only) and only or nil
   else state.mxonly = nil end
   if (MX.anchor or next(MX.picks)) and #seq > 0 and snap then
