@@ -18,7 +18,9 @@ function KR.step(c, from_q, env)
       local st = reaper.JS_VKeys_GetState(r.t0 - 0.5)
       if st and st:byte(r.vk) ~= 0 then r.up_t = nil; return true end
       r.up_t = r.up_t or now
-      if now - r.up_t < 0.5 or (r.evt and now - r.evt < 0.5) then return true end
+      -- 31 окт: окно 0.5 с без подтверждения — повтор жив, но НЕ стреляет ('wait'): один Ctrl+A в долгом кадре давал
+      -- ещё 7 повторов, пока отпускание не дошло
+      if now - r.up_t < 0.5 or (r.evt and now - r.evt < 0.5) then return 'wait' end
       why = 'state up 0.5s, no os repeat'
     end
     if env.log then env.log(('stop c=%d vk=%d after %.2fs n=%d (%s)'):format(r.c, r.vk, now - r.t0, r.n or 0, why)) end
@@ -60,7 +62,7 @@ function KR.step(c, from_q, env)
       for i = #q, 1, -1 do if q[i] == R.c then table.remove(q, i) end end
       return c
     end
-    if now >= R.nxt then
+    if now >= R.nxt and held(R) == true then
       local step = 1 / math.max(1, env.rate or 30)
       R.nxt = R.nxt + step
       if now >= R.nxt then R.nxt = now + step end   -- без догонялок: медленный кадр не копит шаги

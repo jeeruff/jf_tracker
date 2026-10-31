@@ -6,7 +6,7 @@ local fails, checks = 0, 0
 local function eq(n, a, b) checks = checks + 1; if a ~= b then fails = fails + 1; print('FAIL ' .. n .. ': ' .. tostring(a) .. ' vs ' .. tostring(b)) end end
 
 -- сценарий: нажатия { {t0, t1} } клавиши vk / кода c; кадр — каждые dt (можно функцию от t: медленные кадры)
-local function run(presses, c, vk, dt, T, osrep)
+local function run(presses, c, vk, dt, T, osrep, lost)
   KR.krep, KR.krep_stop = nil, nil
   local now = 0
   local buf = {}               -- буфер gfx: символы, что ещё не прочитаны
@@ -22,8 +22,8 @@ local function run(presses, c, vk, dt, T, osrep)
   local function vkstr(on) local t = {}; for i = 1, 255 do t[i] = (on and i == vk) and '\1' or '\0' end; return table.concat(t) end
   local R = {
     time_precise = function() return now end,
-    JS_VKeys_GetState = function() return vkstr(state_at(now)) end,
-    JS_VKeys_GetUp = function(cut) for _, p in ipairs(presses) do if p[2] > cut and p[2] <= now then return vkstr(true) end end; return vkstr(false) end,
+    JS_VKeys_GetState = function() return vkstr(not lost and state_at(now)) end,   -- lost: macOS не сообщила ни состояние, ни отпускание
+    JS_VKeys_GetUp = function(cut) if lost then return vkstr(false) end; for _, p in ipairs(presses) do if p[2] > cut and p[2] <= now then return vkstr(true) end end; return vkstr(false) end,
     JS_VKeys_GetDown = function(cut) for _, p in ipairs(presses) do if p[1] > cut and p[1] <= now then return vkstr(true) end end; return vkstr(false) end,
   }
   local keyq = {}
@@ -81,5 +81,10 @@ do
     local _, a = run({ { 0.1, 0.1 + hold } }, J, VKJ, slow, 3.5, true)
     eq(('slow frames, hold %.1fs: nothing after release'):format(hold), a, 0)
   end
+end
+-- 31 окт: один Ctrl+A (c 1, vk 65) в долгом кадре, отпускание не дошло — без подтверждения нажатия повторов нет
+do
+  local m = run({ { 0.1, 0.15 } }, 1, 65, function(t) return t < 0.2 and 0.3 or 0.03 end, 2, false, true)
+  eq('Ctrl+A once, release lost: one action', m, 1)
 end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
