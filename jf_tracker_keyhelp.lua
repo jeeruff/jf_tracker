@@ -322,7 +322,7 @@ KH.PAGES = {
     { k = 'chain row', t = {}, d = 'the patterns pane (gt / T): the cubes of every pattern (A1 .. grey - not made yet) and the chain row under them; a click on a cube - hear it, a double click - it joins the chain; h j k l Enter Space n C there' },
     { k = 'playlist row', t = {}, d = 'over the arrangement: the section names of the song on top, the playlist (song order) under them; a click on a section above - it goes to the end of the playlist; s - keys there: h l pick, Enter adds (3 Enter - three times), x drops the last one, Space plays, Esc back; a click on a playlist word - play from it, > - play all, x - clear' },
     { k = 'f a1', m = 'hints: jump to pattern', d = 'hints: every pattern cube is labelled by its own code - f then a1, bc ... jumps to that pattern in the tracker' },
-    { k = 'C', m = 'chain: type the order', d = 'chain: type the pattern order (A1 A1 B1x2 C1:16 D1-8, Tab completes); a click on the chain text - the same' },
+    { k = 'C', m = 'chain: type the order', d = 'chain: opens the arranger pane and types the pattern order (A1 A1 B1x2 C1:16 D1-8, Tab completes)' },
     { k = 'amber corners', t = {}, d = 'a note crosses the pattern edge: bottom right - it runs into the next pattern, top left - it came from the previous one; deleting a pattern trims such audio notes, no tails left' },
     { k = 's', m = 'section menu', d = 'section menu of the cursor slot: new (from selected slots / time selection), duplicate, linked, launch, show, loop, rename, remove' },
     { k = 'S', m = 'song: section row', d = 'song: the section row above the playlist (h l, Enter, 3 Enter, x, Space, Esc; any other key - back to the matrix)' },
@@ -383,6 +383,14 @@ KH.PAGES = {
     { k = '0', d = 'the row back to its default' },
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },
+  } },
+  arranger = { title = 'arranger - the order of the song (Ctrl+W g C; C in the matrix)', e = {
+    { k = 'C', d = 'chain: type the pattern order (A1 A1 B1x2 C1:16 D1-8, Tab completes); a click on the chain text - the same' },
+    { k = 'h l  Enter', d = 'a section of the sections row; Enter adds it to the song playlist (3 Enter - three times)' },
+    { k = 'x', d = 'the last section off the playlist' },
+    { k = 'Space', d = 'play the playlist' },
+    { k = '< >', d = 'the previous / next arrangement (a named set of the lanes that play)' },
+    { k = 'Esc', d = 'back to the tracker' },
   } },
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },
@@ -908,6 +916,7 @@ KH.PAGES = {
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
   -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
+  arranger = { { 'C', 'chain' }, { 'h l', 'section' }, { 'Enter', 'add' }, { 'x', 'last off' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
   phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },

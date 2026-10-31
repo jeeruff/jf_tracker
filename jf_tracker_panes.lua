@@ -26,6 +26,7 @@ local PN = {}
 PN.PANELS = {
   { id = 'tracker',    label = 'tracker',    key = 't', hint = 'tracker', fixed = true },
   { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт вечер: снова своя панель — кубики + chain (из матрицы убраны)   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
+  { id = 'arranger',   label = 'arranger',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
@@ -947,6 +948,7 @@ PN.ABOUT = {
   perf = 'Where the time goes: each part of the frame in ms (rows, headers, DSP, panes ...), the garbage made per frame. For finding slow spots.',
   actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
   reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
+  arranger = 'The order of the song in one place: the chain (patterns as text: A1 A1 B1x2 …), the sections row and the song playlist made of them, the arrangements (named sets of the lanes that play).',
   phrases = 'The phrases of the project: a piece of a track saved as one note. Enter puts it at the cursor (the note transposes it, velocity scales it), e edits its source - every instance follows.',
   lfogen = 'The curve generator: an LFO, a podkat (a ramp before every note) or an audio follower written into the envelope at the tracker cursor - as points or as an automation item.',
   humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',

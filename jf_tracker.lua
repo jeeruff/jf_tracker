@@ -23937,6 +23937,7 @@ local function frame()
   ctx.hover_prev = hover   -- 21 окт: для проверок в начале следующего кадра (rate_pop)
   -- 19 окт: панель patterns — её hover там же, где палитра в матрице (щелчки и статус — одним кодом)
   if hover.patpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.patpane) do hover.matrix[k] = v end end
+  if hover.arrpane then hover.matrix = hover.matrix or {}; for k, v in pairs(hover.arrpane) do hover.matrix[k] = v end end   -- 31 окт: панель arranger — те же кнопки
   -- 19 окт: list рэка — колесо над значением меняет параметр пэда, щелчок — пэд выбран, параметр — в DSP
   if hover.kitcell and hover.kitcell.pi then
     if gfx.mouse_wheel ~= 0 then ctx.dsp_value(hover.kitcell.k, hover.kitcell.pi, gfx.mouse_wheel > 0 and 1 or -1, ctx.mods().shift); gfx.mouse_wheel = 0 end
@@ -26669,7 +26670,7 @@ local function frame()
       MX.hs = math.max(0, (MX.hs or 0) + hover.matrix.edge)
       click = { t = now2, zone = 'mxedge' }
     elseif hover.matrix and hover.matrix.btn then
-      ctx.set_focus('matrix')
+      ctx.set_focus(hover.arrpane and 'arranger' or 'matrix')
       ctx.mx_btn_do(hover.matrix.btn)
       click = { t = now2, zone = 'mxbtn' }
     elseif hover.matrix and hover.matrix.name then
@@ -30027,16 +30028,16 @@ local function frame()
         if ch == 's' then ctx.pat_split_menu(); return end
         if ch == 'r' then ctx.pat_rename(); return end
         if ch == 'm' then ctx.pat_menu(); return end
-        if ch == 'C' then ctx.pl_edit(); return end   -- 19 окт вечер: chain — набрать (как в матрице)
+        if ch == 'C' then ctx.arranger_open(true); return end   -- 19 окт вечер: chain — набрать; 31 окт: в панели arranger
         return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if MX.spl_focus and ctx.spl_kb(c) then return end   -- 19 окт: строка секций плейлиста с клавиатуры
-        if c == ('C'):byte() and not MX.pending then ctx.pl_edit(); return end   -- 19 окт: C — набрать chain
+        if c == ('C'):byte() and not MX.pending then ctx.arranger_open(true); return end   -- 19 окт: C — набрать chain; 31 окт: панель arranger
         if c == ('s'):byte() and not MX.pending then ctx.mx_sec_menu(); return end   -- 21 окт: s — подменю секций
         if c == ('S'):byte() and not MX.pending then   -- 19 окт: строка секций над плейлистом; 21 окт: S (song) — s отдан подменю секций
-          MX.spl_focus = true; vim.msg = 'playlist: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, Esc - back'; return
+          ctx.arranger_open(); vim.msg = 'arranger: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, C - chain, Esc - back'; return
         end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
@@ -30155,6 +30156,16 @@ local function frame()
         elseif r == 'render' then ctx.rd_render()
         elseif r == 'leave' then ctx.set_focus('tracker')
         elseif not r then return vim.key(c) end
+      elseif state.focus == 'arranger' then   -- 31 окт: панель arranger — секции с клавиатуры, C — chain, < > — аранжировка
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local ch = (c > 0 and c < 256) and string.char(c) or ''
+        if c == 27 then ctx.set_focus('tracker'); return end
+        if ch == 'C' or ch == 'c' then ctx.pl_edit(); return end
+        if ch == '<' or ch == ',' then ctx.arr('prev'); return end
+        if ch == '>' or ch == '.' then ctx.arr('next'); return end
+        MX.spl_focus = true
+        if ctx.spl_kb(c) then return end
+        return vim.key(c)
       elseif state.focus == 'phrases' then   -- 31 окт: панель фраз
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local r = ctx.PHP.key(ctx.phr_list(), c)
@@ -32176,6 +32187,13 @@ ctx.plist_toggle = function()
   MX.plist = not MX.plist
   if MX.plist then ctx.pl_load(); if #ctx.PL.lists == 0 then vim.msg = 'chain: :ch A1 A1 B1x2 C1:16 D1-8 B2+8 … (Tab completes names) - or click the text line' end end
 end
+-- 31 окт: панель arranger — показать и в фокус; chain — сразу набирать
+ctx.arranger_open = function(chain)
+  local PN, m = draw.panes, state.panes
+  if m and not PN.visible(m, 'arranger') then ctx.pane_do(function() return PN.show(m, 'arranger') end) end
+  ctx.pane_focus('arranger')
+  if chain then ctx.pl_edit() end
+end
 ctx.pl_edit = function()
   local l = ctx.pl_cur()
   vim.cmd_from = vim.mode; vim.mode = 'cmd'; vim.cmdline = 'pl ' .. (l and l.text or '')
@@ -33485,7 +33503,7 @@ ctx.spl_draw = function(Lx, x, y, w)
   for _, s2 in ipairs(regions.sections or {}) do col[s2.name:gsub('%s+', '_')] = s2.color end
   local bx = x
   local tail = (U.measure('>') + 2 * Lx.pad) + (U.measure('x') + 2 * Lx.pad) + 6
-  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: click a section above (S - keys) - the song order', w - tail), U.DIM) end
+  if #words == 0 then U.text(bx, y + 1, ctx.fit('playlist: click a section above (h l Enter) - the song order', w - tail), U.DIM) end
   for k, wd in ipairs(words) do
     local lab = wd:gsub('_', ' ')
     local bw = U.measure(lab) + 2 * Lx.pad

@@ -7067,11 +7067,11 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'perf' and info.perf_pane then info.perf_pane(L, ct.x, ct.y, ct.w, ct.h)   -- 18 окт: своя панель
       elseif id == 'patterns' then   -- 19 окт: палитра паттернов — своя панель (клетки — под треками матрицы)
         if info.patlist_draw then   -- 19 окт вечер: кубики на всю панель, строка chain — внизу
-          local chy = ct.y + ct.h - L.rh - 2
-          local _, hv = info.patlist_draw(L, ct.x + 2, ct.y + 2, ct.w - 6, chy - ct.y - 4)
-          if info.chain_draw then local _, chv = info.chain_draw(L, ct.x, chy, ct.w - 4); for k, v in pairs(chv) do hv[k] = v end end
+          local _, hv = info.patlist_draw(L, ct.x + 2, ct.y + 2, ct.w - 6, ct.h - 4)   -- 31 окт: chain — в панели arranger
           hover.patpane = inside and hv or nil
         end
+      elseif id == 'arranger' then   -- 31 окт: chain, плейлист секций, аранжировки
+        if MX and MX.arr_draw then local hv = MX.arr_draw(L, ct.x + 2, ct.y + 2, ct.w - 4, ct.h - 4, foc == 'arranger'); hover.arrpane = inside and hv or nil end
       elseif id == 'matrix' then
         if MX then
           hover.matrix = pn_buffered(ct.x, ct.y, ct.w, ct.h, function()

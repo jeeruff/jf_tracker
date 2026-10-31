@@ -392,95 +392,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local vx = L.mx_label_w + (#snap.cols - MX.hs) * L.mx_cell_w + 2
     if vx + MX.vis_w <= W - 4 then ctx.vtext(vx + (MX.vis_w - L.th) / 2, ny, MX.name_h - 2, 'visor', U.CYAN, U.PANEL) end
   end
-  -- аранжировка (9 окт): пустой угол над слотами, левее имён треков —
-  -- имя и управление: < имя >, new dup del; строки — сколько влезает
-  do
-    -- 18 окт: внизу матрицы во всю ширину (была в углу над слотами) — слоты кончаются над ним
-    local nrow = 4
-    local ah = nrow * (L.rh + 1) + 3
-    local ax0, ax1, ay = L.pad, W - L.pad - 4, ybot - ah + 2
-    -- 19 окт: под аранжировкой — плейлист песни (секции по порядку)
-    local plh = 0
-    if ctx.spl_draw and ybot - ah - 2 * L.rh - 4 > hy + 6 * L.rh then   -- 19 окт: плейлист — над аранжировкой, над ним — секции
-      local phv = ctx.spl_draw(L, ax0, ybot - ah - L.rh, ax1 - ax0)
-      for k, v in pairs(phv) do hover[k] = v end
-      local shv = ctx.spl_src_draw(L, ax0, ybot - ah - 2 * L.rh - 2, ax1 - ax0)
-      for k, v in pairs(shv) do hover[k] = v end
-      plh = 2 * L.rh + 4
-    end
-    if ybot - ah > hy + 6 * L.rh then
-      U.set(U.LINE); gfx.rect(0, ybot - ah - plh, W - 4, 1, 1)
-      ybot = ybot - ah - plh
-    else nrow = 0 end
-    local an, ac, anum = nil, 0, 0
-    if ctx.arr_name then an, ac, anum = ctx.arr_name() end
-    local function btn(bx, by, label, id, on)
-      local bw = U.measure(label) + 2 * L.pad
-      if bx + bw > ax1 then return bx end
-      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
-      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
-      U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
-      U.text(bx + L.pad, by + 1, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
-      if hot then hover.btn = id end
-      if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, id) end
-      return bx + bw + L.pad
-    end
-    if nrow >= 1 and ax1 - ax0 >= 8 * L.cw then
-      local rows = {}
-      -- 11 окт: регион курсора — как в уголке трекера (кнопка markers: region over the matrix)
-      local rgv = false   -- 21 окт: строка региона курсора внизу блока убрана совсем (пользователь); регион — в матрице и линейке
-      if nrow >= (rgv and 4 or 3) then rows[#rows + 1] = 'title' end
-      rows[#rows + 1] = 'name'
-      if nrow >= 2 then rows[#rows + 1] = 'ops' end
-      if rgv and nrow >= 3 then rows[#rows + 1] = 'region' end
-      for _, r in ipairs(rows) do
-        if r == 'title' then
-          local nol = anum > 0 and ctx.arr_has_lanes and not ctx.arr_has_lanes()
-          U.text(ax0, ay + 1, ctx.fit(anum > 0 and (('arrangement %d/%d'):format(ac, anum) .. (nol and ' - no lanes' or '')) or 'arrangement', ax1 - ax0), nol and U.AMBER or U.GREY)
-        elseif r == 'name' then
-          local bx = btn(ax0, ay, '<', 'arrprev')
-          local nw = ax1 - bx - (U.measure('>') + 3 * L.pad)
-          local lab = ctx.fit(an or 'none - new makes one', math.max(0, nw - 2 * L.pad))
-          local hot = mx >= bx and mx < bx + nw and my >= ay and my < ay + L.rh
-          U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, ay, nw, L.rh, 1)
-          U.set(U.LINE); gfx.rect(bx, ay, nw, L.rh, 0)
-          U.text(bx + L.pad, ay + 1, lab, hot and U.AMBER or (an and U.CYAN or U.GREY))
-          if hot then hover.btn = 'arrname' end
-          if ctx.hint then ctx.hint('mxbtn', bx, ay, nw, L.rh, 'arrname') end
-          btn(bx + nw + L.pad, ay, '>', 'arrnext')
-        elseif r == 'region' then
-          local rg, rl = info.cur_region_full, info.cur_region
-          if not rg then U.text(ax0 + 5, ay + 1, ctx.fit('no region', ax1 - ax0 - 7), U.DIM); goto rg_row_done end
-          do
-          local c = rg.rgb or U.LINE
-          U.set(U.tint(c, 0.30)); gfx.rect(ax0, ay, ax1 - ax0, L.rh, 1)
-          U.set(c); gfx.rect(ax0, ay, 3, L.rh, 1)
-          local len = rl and tostring(math.max(0, math.floor((rl.r1 - rl.r0) + 0.5))) or ''
-          local aw = U.measure('<') + 2
-          local lw = U.measure(len) + 2 * aw + 2 * L.pad
-          U.text(ax0 + 5, ay + 1, ctx.fit(tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or ''), ax1 - ax0 - lw - 7), U.TEXT)
-          if rl then
-            local lx = ax1 - lw
-            local hl = mx >= lx and mx < lx + aw + L.pad and my >= ay and my < ay + L.rh
-            local hr = mx >= ax1 - aw - L.pad and mx < ax1 and my >= ay and my < ay + L.rh
-            U.text(lx + L.pad, ay + 1, '<', hl and U.AMBER or U.GREY)
-            U.text(lx + L.pad + aw, ay + 1, len, U.TEXT)
-            U.text(ax1 - aw, ay + 1, '>', hr and U.AMBER or U.GREY)
-            if hl then hover.btn = 'rglen-' elseif hr then hover.btn = 'rglen+' end
-            if ctx.hint then ctx.hint('mxbtn', lx, ay, aw + L.pad, L.rh, 'rglen-'); ctx.hint('mxbtn', ax1 - aw - L.pad, ay, aw + L.pad, L.rh, 'rglen+') end
-          end
-          end
-          ::rg_row_done::
-        else
-          local bx = btn(ax0, ay, 'new', 'arrnew')
-          bx = btn(bx, ay, 'dup', 'arrdup')
-          bx = btn(bx, ay, 'clear', 'arrclear')         -- 10 окт: пустой лист (новые пустые лейны)
-          bx = btn(bx, ay, 'del', 'arrdel')
-        end
-        ay = ay + L.rh + 1
-      end
-    end
-  end
+  -- 31 окт: аранжировка, плейлист секций и chain — своя панель arranger (MX.arr_draw), из матрицы убраны
   local top = hy + L.mx_head_h
   local rh = L.mx_row_h or L.rh
   local RW = L.mx_ruler_w or 0
@@ -1306,6 +1218,67 @@ function MX.key(c, regions, snap)
   elseif ch == ' ' then MX.space(regions)
   else return false end
   return true
+end
+
+-- 31 окт: панель arranger — всё про порядок песни в одном месте (было внизу матрицы и в patterns):
+-- chain (паттерны текстом), секции → плейлист песни, аранжировка (наборы лейнов). → hover (кнопки — те же id, что в матрице)
+function MX.arr_draw(L, x, y, w, h, focused)
+  local hover = {}
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  MX.spl_focus = focused or nil   -- строка секций слушает клавиши, пока панель в фокусе
+  local x1 = x + w - L.pad
+  local ybot = y + h
+  U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
+  local function label(t) U.text(x + L.pad, y + 1, ctx.fit(t, w - 2 * L.pad), U.GREY); y = y + L.rh + 1 end
+  local function merge(hv) for k, v in pairs(hv or {}) do hover[k] = v end end
+  -- chain
+  if ctx.chain_draw and y + L.rh <= ybot then
+    local _, chv = ctx.chain_draw(L, x, y, w - 4)
+    merge(chv); y = y + L.rh + 4
+  end
+  -- секции → плейлист песни
+  if ctx.spl_draw and y + 3 * L.rh <= ybot then
+    label('song: sections (click - add)' .. (focused and '  h l Enter x Space' or ''))
+    merge(ctx.spl_src_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 2
+    merge(ctx.spl_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 4
+  end
+  -- аранжировка: заголовок, < имя >, new dup clear del
+  if y + 3 * L.rh <= ybot and w >= 8 * L.cw then
+    U.set(U.LINE); gfx.rect(x, y, w - 4, 1, 1); y = y + 3
+    local an, ac, anum = nil, 0, 0
+    if ctx.arr_name then an, ac, anum = ctx.arr_name() end
+    local nol = anum > 0 and ctx.arr_has_lanes and not ctx.arr_has_lanes()
+    U.text(x + L.pad, y + 1, ctx.fit(anum > 0 and (('arrangement %d/%d'):format(ac, anum) .. (nol and ' - no lanes' or '')) or 'arrangement', w - 2 * L.pad), nol and U.AMBER or U.GREY)
+    y = y + L.rh + 1
+    local function btn(bx, by, lab, id)
+      local bw = U.measure(lab) + 2 * L.pad
+      if bx + bw > x1 then return bx end
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
+      U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
+      U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
+      U.text(bx + L.pad, by + 1, lab, hot and U.AMBER or U.TEXT)
+      if hot then hover.btn = id end
+      if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, id) end
+      return bx + bw + L.pad
+    end
+    local bx = btn(x + L.pad, y, '<', 'arrprev')
+    local nw = x1 - bx - (U.measure('>') + 3 * L.pad)
+    local hot = mx >= bx and mx < bx + nw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, nw, L.rh, 1)
+    U.set(U.LINE); gfx.rect(bx, y, nw, L.rh, 0)
+    U.text(bx + L.pad, y + 1, ctx.fit(an or 'none - new makes one', math.max(0, nw - 2 * L.pad)), hot and U.AMBER or (an and U.CYAN or U.GREY))
+    if hot then hover.btn = 'arrname' end
+    if ctx.hint then ctx.hint('mxbtn', bx, y, nw, L.rh, 'arrname') end
+    btn(bx + nw + L.pad, y, '>', 'arrnext')
+    y = y + L.rh + 1
+    if y + L.rh <= ybot then
+      bx = btn(x + L.pad, y, 'new', 'arrnew')
+      bx = btn(bx, y, 'dup', 'arrdup')
+      bx = btn(bx, y, 'clear', 'arrclear')
+      btn(bx, y, 'del', 'arrdel')
+    end
+  end
+  return hover
 end
 
 return MX
