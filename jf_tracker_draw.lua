@@ -7708,52 +7708,86 @@ function D.cracks(x, y, w, h, red, ex, style)
   gfx.blit(CRK_IMG, 1, 0, 0, 0, w, h, x, y, w, h)
   gfx.mode = om or 0; gfx.a = 1
 end
--- 31 окт: визуализатор sand — под каждым треком слой песка; звук трека (пик) подбрасывает песчинки, чем громче —
--- тем выше, гравитация возвращает их на слой. Частицы — не больше 1600, каждая — 1..2 px
+-- 31 окт: визуализатор sand — общая куча песка по низу трекера (карта высот по пикселям, песок сохраняется):
+-- пик трека выбивает песчинки из левой части его колонки (там нота), они летят (тяжёлые — невысоко) и падают
+-- куда долетят — в соседние каналы тоже; куча осыпается (склон не круче 1.5 px на px). Частиц — до 1600
 local SAND_COL = { { 0.80, 0.68, 0.50 }, { 0.72, 0.58, 0.40 }, { 0.88, 0.78, 0.60 }, { 0.62, 0.48, 0.32 }, { 0.90, 0.55, 0.25 } }
 function D.sand(L, x0, y0, w, h)
   local st = D.sandst
-  if not st then st = { p = {}, t = reaper.time_precise(), lvl = {}, seed = 12345 }; D.sandst = st end
+  w = math.floor(w)
+  if not st or st.w ~= w then
+    st = { p = {}, t = reaper.time_precise(), lvl = {}, seed = 12345, w = w, hm = {} }
+    for k = 0, w - 1 do st.hm[k] = 7 end   -- ровный слой 7 px
+    D.sandst = st
+  end
+  local hm = st.hm
   local now = reaper.time_precise()
   local dt = math.min(0.05, now - st.t); st.t = now
   local function rnd() st.seed = (st.seed * 1103515245 + 12345) % 2147483648; return st.seed / 2147483648 end
-  local floor = y0 + h - 3
-  local G = 1400
-  -- слой: волнистая полоса у низа (по колонкам трека — чуть выше там, где громче)
+  local base = y0 + h - 1
+  local G, M = 3200, 0.6   -- тяжёлый песок; M — сколько px высоты в одной песчинке
   for _, c in ipairs(L.cols or {}) do
     local tr = c.col and c.col.track
     if tr and c.x and c.w and c.w > 4 and reaper.ValidatePtr(tr, 'MediaTrack*') then
       local pk = math.max(reaper.Track_GetPeakInfo(tr, 0) or 0, reaper.Track_GetPeakInfo(tr, 1) or 0)
       local lv = pk > 0 and math.max(0, math.min(1, (20 * math.log(pk, 10) + 48) / 48)) or 0
       local key = c.col.guid or tostring(tr)
-      st.lvl[key] = math.max(lv, (st.lvl[key] or 0) - dt * 2)
-      local lvl = st.lvl[key]
-      -- подкинуть: число песчинок и скорость — от уровня (апекс ~ уровень × 0.8 высоты)
-      if lv > 0.05 and #st.p < 1600 then
-        local n = math.floor(lv * lv * c.w * 0.5 * dt * 60 + rnd())
-        local apex = lv ^ 1.5 * h * 0.8
+      local prev = st.lvl[key] or 0
+      st.lvl[key] = lv
+      -- удар — рост уровня (атака) даёт выброс сильнее, ровный звук — слабее
+      local hit = math.max(0, lv - prev) * 3 + lv * 0.35
+      if hit > 0.04 and #st.p < 1600 then
+        local n = math.floor(hit * c.w * 0.35 * dt * 60 + rnd())
+        local apex = math.min(1, hit) ^ 1.3 * h * 0.18   -- в 5 раз ниже прежнего
+        local cx = c.x + c.w * 0.22                       -- левая часть колонки — там нота
         for _ = 1, n do
-          local v = math.sqrt(2 * G * apex * (0.4 + rnd() * 0.8))
-          st.p[#st.p + 1] = { x = c.x + rnd() * c.w, y = floor - 2, vx = (rnd() - 0.5) * 50, vy = -v, col = SAND_COL[1 + math.floor(rnd() * #SAND_COL)], s = rnd() < 0.2 and 2 or 1 }
+          local px = math.floor(cx + (rnd() + rnd() + rnd() - 1.5) * c.w * 0.18 - x0)
+          if px >= 0 and px < w and (hm[px] or 0) > 1 + M then
+            hm[px] = hm[px] - M
+            local v = math.sqrt(2 * G * apex * (0.3 + rnd() * 0.9))
+            local a = (rnd() - 0.5) * 1.1   -- разлёт в стороны: долетают и до соседних каналов
+            st.p[#st.p + 1] = { x = x0 + px, y = base - hm[px], vx = math.sin(a) * v * 0.7, vy = -math.cos(a) * v, col = SAND_COL[1 + math.floor(rnd() * #SAND_COL)], s = rnd() < 0.25 and 2 or 1 }
+          end
         end
       end
-      -- слой песка: 3..6 px, выше при звуке
-      local bh = 3 + math.floor(lvl * 4)
-      gfx.set(0.55, 0.43, 0.28, 0.9); gfx.rect(c.x + 1, floor - bh + 3, c.w - 1, bh, 1)
-      gfx.set(0.80, 0.66, 0.46, 0.8); gfx.rect(c.x + 1, floor - bh + 3, c.w - 1, 1, 1)
     end
   end
-  -- полёт
+  -- полёт; упала на кучу — стала кучей
   local keep = {}
   for _, p in ipairs(st.p) do
     p.vy = p.vy + G * dt
     p.x, p.y = p.x + p.vx * dt, p.y + p.vy * dt
-    if p.y < floor and p.x > x0 and p.x < x0 + w then
-      keep[#keep + 1] = p
-      if p.y > y0 then gfx.set(p.col[1], p.col[2], p.col[3], 0.95); gfx.rect(math.floor(p.x), math.floor(p.y), p.s, p.s, 1) end
-    end
+    local k = math.floor(p.x - x0)
+    if k < 0 then k = 0; p.vx = -p.vx * 0.3 elseif k >= w then k = w - 1; p.vx = -p.vx * 0.3 end
+    if p.vy > 0 and p.y >= base - (hm[k] or 0) then hm[k] = (hm[k] or 0) + M
+    else keep[#keep + 1] = p end
   end
   st.p = keep
+  -- осыпание: склон круче 1.5 — излишек вниз, пару проходов в разные стороны
+  for pass = 1, 2 do
+    local a, b, d = 0, w - 2, 1
+    if pass == 2 then a, b, d = w - 2, 0, -1 end
+    for k = a, b, d do
+      local diff = hm[k] - hm[k + 1]
+      if diff > 1.5 then local m = (diff - 1.5) * 0.5; hm[k] = hm[k] - m; hm[k + 1] = hm[k + 1] + m
+      elseif diff < -1.5 then local m = (-diff - 1.5) * 0.5; hm[k] = hm[k] + m; hm[k + 1] = hm[k + 1] - m end
+    end
+  end
+  -- рисовать кучу: столбики по 2 px (полосами одной высоты), верх светлее; потом летящие песчинки
+  local k = 0
+  while k < w do
+    local hh = math.floor(math.min(h * 0.5, hm[k]) + 0.5)
+    local k2 = k + 1
+    while k2 < w and k2 - k < 6 and math.floor(math.min(h * 0.5, hm[k2]) + 0.5) == hh do k2 = k2 + 1 end
+    if hh > 0 then
+      gfx.set(0.55, 0.43, 0.28, 0.92); gfx.rect(x0 + k, base - hh + 1, k2 - k, hh, 1)
+      gfx.set(0.82, 0.68, 0.48, 0.9); gfx.rect(x0 + k, base - hh + 1, k2 - k, 1, 1)
+    end
+    k = k2
+  end
+  for _, p in ipairs(st.p) do
+    if p.y > y0 then gfx.set(p.col[1], p.col[2], p.col[3], 0.95); gfx.rect(math.floor(p.x), math.floor(p.y), p.s, p.s, 1) end
+  end
   gfx.a = 1
 end
 function D.frame(L, snap, rows, state, info)
