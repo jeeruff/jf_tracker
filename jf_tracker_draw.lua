@@ -8590,9 +8590,10 @@ function D.frame(L, snap, rows, state, info)
       local w1 = ms(label) + 2
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
       local cc = oc or U.CYAN
-      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
-      set(hot and U.AMBER or (on and cc or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
-      text(x + 1, y, label, hot and U.AMBER or (on and cc or U.TEXT))
+      -- 31 окт: свой цвет (oc) — и выключенная слегка им подкрашена (видно, какая кнопка какой вид)
+      set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(cc, 0.25) or (oc and U.tint(oc, 0.08) or U.BG))); gfx.rect(x, y, w1, L.rh, 1)
+      set(hot and U.AMBER or (on and cc or (oc and U.mix(oc, U.LINE, 0.6) or U.LINE))); gfx.rect(x, y, w1, L.rh, 0)
+      text(x + 1, y, label, hot and U.AMBER or (on and cc or (oc and U.mix(oc, U.TEXT, 0.6) or U.TEXT)))
       if hot then hover[kind] = what end
       hint(kind, x, y, w1, L.rh, what)
       return x + w1 + 2
