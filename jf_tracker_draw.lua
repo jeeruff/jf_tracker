@@ -5727,8 +5727,16 @@ function D.macro_list() end   -- 25 окт: макросы контейнера 
 -- (Wet цепи), | / = и имя, m, s
 local function tr0_of(info) return info.pool_col and info.pool_col.track end
 function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
+  -- 31 окт: цепь = поток контейнера: начинается первым модулем или модулем с parallel (=), за ним — его
+  -- последовательные (|); строка на цепь, а не на модуль (было перепутано)
   local chains = {}
-  for ki, kd in ipairs(f.kids or {}) do if not (kd.name or ''):find('jf_tracker_macro', 1, true) then chains[#chains + 1] = { ki = ki, kd = kd } end end
+  for ki, kd in ipairs(f.kids or {}) do
+    if not (kd.name or ''):find('jf_tracker_macro', 1, true) then
+      if #chains == 0 or (kd.parallel or 0) > 0 then chains[#chains + 1] = { ki = ki, kd = kd, kis = {}, kds = {} } end
+      local c = chains[#chains]
+      c.kis[#c.kis + 1] = ki; c.kds[#c.kds + 1] = kd
+    end
+  end
   if #chains == 0 or y + L.rh > ymax then return end
   -- 28 окт: заголовок — переключатели CHAINS | ROUTE | XY (одно на всю высоту); не chains — вернуть низ строки и вкладку
   set(U.LINE); gfx.rect(x0, y + L.rh - 2, w0, 1, 1)
@@ -5776,7 +5784,11 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   -- имя (щелчок — курсор DSP на её модуль, выбранная — подложкой), Mix — поле с заливкой (Wet цепи: тянуть
   -- по горизонтали, щелчок — сразу туда), m (выкл.), s (только она)
   local non = 0
-  for _, c in ipairs(chains) do if c.kd.enabled then non = non + 1 end end
+  for _, c in ipairs(chains) do
+    c.on = false
+    for _, kd in ipairs(c.kds) do if kd.enabled then c.on = true end end
+    if c.on then non = non + 1 end
+  end
   local sw = ms('s') + 2 * L.pad
   local vbw = ms('100%') + 2 * L.pad
   local bxs = x + w - 2 * sw - 2
@@ -5786,21 +5798,25 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
   y = y + L.rh
   -- 28 окт: список цепей — в своём окошке (тёмный фон, рамка): видно, что это список
   local wy0 = y - 1
-  local wy1 = math.min(ymax, y + #chains * (L.rh + 1) + 1)
+  local nrows = 0; for _, c in ipairs(chains) do nrows = nrows + 1 + #c.kds end   -- 31 окт: и модули цепей
+  local wy1 = math.min(ymax, y + nrows * (L.rh + 1) + 1)
   set(U.BG); gfx.rect(x - 2, wy0, w + 4, wy1 - wy0, 1)
-  for _, c in ipairs(chains) do
+  for ci, c in ipairs(chains) do
     if y + L.rh > ymax then break end
     local kd = c.kd
-    local selk = D.sel_i == kd.i
+    local selk = false
+    for _, kk in ipairs(c.kds) do if D.sel_i == kk.i then selk = true end end
     local nhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
     set(selk and U.tint(U.CYAN, 0.35) or (nhot and U.tint(U.CYAN, 0.15) or U.tint(U.CYAN, 0.08))); gfx.rect(x, y, nw, L.rh - 1, 1)
     if D.ckb and D.ckb.k == k and D.ckb.ki == c.ki then set(D.CUR_ACC or U.AMBER); gfx.rect(x - 1, y - 1, w + 2, L.rh + 1, 0) end   -- 29 окт: курсор клавиатуры CHAINS
     -- 28 окт: ветка — полоска её цвета слева (тот же цвет, что черта под модулем)
-    local lane = kd.entry and kd.entry.inner and kd.entry.inner.lane
-    if lane then set(kd.enabled and ((D.chain_col and D.chain_col(f, lane)) or lane_col(lane)) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1) end
-    local glyph = (kd.parallel or 0) > 0 and '= ' or '| '
-    text(x + L.pad + (lane and 2 or 0), y, fit(glyph .. (kd.name or '?'), nw - 2 * L.pad - (lane and 2 or 0)), selk and U.TEXT or (kd.enabled and U.TEXT or U.GREY))
-    if nhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', ki = c.ki, kid = kd } end
+    -- цвет цепи (тот же, что черта под её модулями): номер потока
+    local lane = (kd.entry and kd.entry.inner and kd.entry.inner.lane) or ci
+    set(c.on and ((D.chain_col and D.chain_col(f, lane)) or lane_col(lane)) or U.DIM); gfx.rect(x, y, 3, L.rh - 1, 1)
+    local nms = {}
+    for _, kk in ipairs(c.kds) do nms[#nms + 1] = kk.name or '?' end
+    text(x + L.pad + 2, y, fit(('chain %d  %d fx'):format(ci, #c.kds), nw - 2 * L.pad - 2), selk and U.TEXT or (c.on and U.TEXT or U.GREY))   -- модули — строками ниже
+    if nhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', ki = c.ki, kid = kd, kis = c.kis } end
     if D.hint then D.hint('dspbtn', x, y, nw, L.rh - 1, { fx = k, what = 'cjump' }) end
     local v = kd.wet_i and info.fxp_get and info.fxp_get(kd.i, kd.wet_i) or nil
     if v then
@@ -5813,9 +5829,20 @@ function D.cont_chains(L, info, f, x0, y, w0, ymax, k, drag, mx, my, hover)
       if shot then hover.cslide = { fx = kd.i, idx = kd.wet_i, x = vbx, w = vbw, name = (kd.name or 'chain') .. ' mix' } end
       if D.hint then D.hint('dspbtn', vbx, y, vbw, L.rh, { fx = k, what = 'cslide' }) end
     end
-    local bx2 = btn(bxs, 'm', 'cmute', { ki = c.ki, on = not kd.enabled, col = U.RED })
-    btn(bx2, 's', 'csolo', { ki = c.ki, on = kd.enabled and non == 1 and #chains > 1, col = U.GREEN })
+    local bx2 = btn(bxs, 'm', 'cmute', { ki = c.ki, on = not c.on, col = U.RED })
+    btn(bx2, 's', 'csolo', { ki = c.ki, on = c.on and non == 1 and #chains > 1, col = U.GREEN })
     y = y + L.rh + 1
+    -- 31 окт: модули цепи — строками с отступом: щелчок — курсор DSP на модуль (двойной — DSP), m — выкл. модуль
+    for _, kk in ipairs(c.kds) do
+      if y + L.rh > ymax then break end
+      local fhot = not drag and mx >= x and mx < x + nw and my >= y and my < y + L.rh
+      local fsel = D.sel_i == kk.i
+      if fsel or fhot then set(U.tint(U.CYAN, fsel and 0.3 or 0.12)); gfx.rect(x + 2 * L.pad, y, nw - 2 * L.pad, L.rh - 1, 1) end
+      text(x + 3 * L.pad, y, fit(kk.name or '?', nw - 4 * L.pad), kk.enabled and (fsel and U.TEXT or U.GREY) or U.DIM)
+      if fhot then hover.dspbtn = { fx = k, f = f, what = 'cjump', kid = kk } end
+      btn(bxs, 'm', 'cfxm', { ki = kk.i, on = not kk.enabled, col = U.RED })
+      y = y + L.rh + 1
+    end
   end
   set(U.LINE); gfx.rect(x - 2, wy0, w + 4, math.max(2, y - wy0 + 1), 0)
   y = y + 3
@@ -9901,7 +9928,7 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 31 окт: опция fold small — модуль с 1..3 параметрами (без своего вида) — узкий: кружок on / off и x сверху,
       -- имя вертикально, параметры — вертикальными слайдерами (тянуть вверх / вниз), значение под каждым
-      if info.dspslim and not f.container and not f.kit and not f.view and not f.rs5k and not f.pages and not f.inner and f.params then
+      if info.dspslim and not f.container and not f.kit and not f.view and not f.rs5k and not f.pages and not (f.inner and not f.inner.wrap) and f.params then   -- и внутри контейнера
         local np = 0
         for _, p in ipairs(f.params) do if not p.mfader then np = np + 1 end end
         if np >= 1 and np <= 3 then
@@ -9913,7 +9940,7 @@ function D.frame(L, snap, rows, state, info)
           if bx + fw <= cx0 or bx >= cx1 then bx = bx + fw + L.pad; goto next_block end
           nshown = nshown + 1
           local is_sel = sel.fx == k
-          blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k }
+          blocks[#blocks + 1] = { x = bx, w = fw, y = boxy, h = bh0, k = k, inner = f.inner }   -- скобка цепи под модулем
           set(U.BG); gfx.rect(bx, boxy, fw, bh0, 1)
           set(is_sel and U.AMBER or (f.enabled and U.LINE or U.DIM)); gfx.rect(bx, boxy, fw, bh0, 0)
           local on_btn = false

@@ -15347,21 +15347,32 @@ ctx.cont_macros = function(f, what)
     vim.msg = ('%s: macros M1..M%d (XY on M1 / M2; M on a parameter inside - assign)'):format(f.name or 'container', n)
   else vim.msg = 'macros: could not add (REAPER 7 containers)' end
 end
+-- 31 окт: цепь — поток: первый модуль (ki) и его последовательные до следующего parallel; m / s — по всем модулям цепи
 ctx.chain_ms = function(f, ki, solo)
   local col = dsp_target(); local tr = col and col.track
   local kid = f and f.kids and f.kids[ki]
   if not (tr and kid and kid.i) then return end
   local A = model.fxapi(tr)
   local function real(kd) return kd.i and not (kd.name or ''):find('jf_tracker_macro', 1, true) end
-  if not solo then edit.fx_bypass(tr, kid.i); vim.msg = (kid.name or 'chain') .. (kid.enabled and ': off' or ': on')
+  local inch = {}
+  for j = ki, #f.kids do
+    local kd = f.kids[j]
+    if j > ki and (kd.parallel or 0) > 0 then break end
+    if real(kd) then inch[j] = true end
+  end
+  local on = false
+  for j in pairs(inch) do if f.kids[j].enabled then on = true end end
+  if not solo then
+    edit.run('chain ' .. (on and 'off' or 'on'), function() for j in pairs(inch) do A.SetEnabled(tr, f.kids[j].i, not on) end end)
+    vim.msg = 'chain of ' .. (kid.name or '?') .. (on and ': off' or ': on')
   else
     local others = false
-    for j, kd in ipairs(f.kids) do if j ~= ki and real(kd) and kd.enabled then others = true end end
-    local unsolo = not others and kid.enabled
+    for j, kd in ipairs(f.kids) do if not inch[j] and real(kd) and kd.enabled then others = true end end
+    local unsolo = not others and on
     edit.run(unsolo and 'chains: solo off' or ('chain solo ' .. (kid.name or '')), function()
-      for j, kd in ipairs(f.kids) do if real(kd) then A.SetEnabled(tr, kd.i, unsolo or j == ki) end end
+      for j, kd in ipairs(f.kids) do if real(kd) then A.SetEnabled(tr, kd.i, unsolo or inch[j] or false) end end
     end)
-    vim.msg = unsolo and 'chains: all on' or ((kid.name or 'chain') .. ' solo (s again - all on)')
+    vim.msg = unsolo and 'chains: all on' or ('chain of ' .. (kid.name or '?') .. ' solo (s again - all on)')
   end
   model.invalidate()
 end
@@ -26488,6 +26499,8 @@ local function frame()
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_macfold = state.dsp_macfold or {}; state.dsp_macfold[nm] = (not state.dsp_macfold[nm]) or nil
       elseif hover.dspbtn.what == 'macadd' or hover.dspbtn.what == 'macplus' or hover.dspbtn.what == 'macminus' then ctx.cont_macros(hover.dspbtn.f, hover.dspbtn.what)   -- 24 окт
+      elseif hover.dspbtn.what == 'cfxm' then   -- 31 окт: модуль внутри цепи — вкл / выкл
+        local t = dsp_target(); if t and t.track and hover.dspbtn.ki then edit.fx_bypass(t.track, hover.dspbtn.ki); model.invalidate() end
       elseif hover.dspbtn.what == 'cmute' or hover.dspbtn.what == 'csolo' then ctx.chain_ms(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.what == 'csolo')
       elseif hover.dspbtn.what == 'cadd' then   -- 24 окт: «+» в конце рэка — эффект в конец контейнера
         local col, f0 = dsp_target(), hover.dspbtn.f
@@ -26544,7 +26557,12 @@ local function frame()
         draw.ckb = { k = hover.dspbtn.fx, ki = hover.dspbtn.ki }; draw.rkb = nil   -- 29 окт: клавиатура CHAINS (Esc — выход)
         local col = dsp_target()
         for kk, g in ipairs(col and col.fx or {}) do if g.i == hover.dspbtn.kid.i then dsp_sel.fx = kk; dsp_sel.param = 1; break end end
-        vim.msg = (hover.dspbtn.kid.name or 'chain') .. ' (the module of this chain)'
+        vim.msg = (hover.dspbtn.kid.name or 'chain') .. ' (the first module of this chain; double click - DSP)'
+        if dbl and click.zone == 'dspbtn' then   -- 31 окт: двойной щелчок по цепи — DSP на её модуле
+          local m = state.panes
+          if m and draw.panes and state.panes_ui then draw.panes.set_active(m, 'dsp'); relayout() end
+          ctx.set_focus('dsp')
+        end
       elseif hover.dspbtn.what == 'xyfold' then   -- 24 окт: вкладка xy — XY-пэд на макросах 1 и 2
         local nm = hover.dspbtn.f.fxname or hover.dspbtn.f.name
         state.dsp_xyopen = state.dsp_xyopen or {}
