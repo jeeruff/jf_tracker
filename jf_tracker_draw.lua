@@ -8895,6 +8895,7 @@ function D.frame(L, snap, rows, state, info)
         set(c); gfx.rect(bx, ny, 3, L.rh, 1)
         local t = tostring(rg.idx) .. (rg.name ~= '' and (' ' .. rg.name) or '') .. ((rg.sec and rg.sec ~= '') and (' / ' .. rg.sec) or '')
         text(bx + 5, ny, fit(t, bw - 7), nhot and U.AMBER or U.TEXT)
+        D.rghead = { x = bx + 5, y = ny, t = t, rgb = c }   -- 31 окт: здесь вспыхивает индекс при переходе в другой паттерн
       else
         text(bx + 5, ny, fit('no pattern', bw - 7), U.DIM)
       end
@@ -9305,7 +9306,8 @@ function D.frame(L, snap, rows, state, info)
     if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
     if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
     if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
-    elseif patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5), patb[r.row].prv, patb[r.row].nxt, eg and eg.prv } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
+    end
+    if patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5), patb[r.row].prv, patb[r.row].nxt, eg and eg.prv } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
     -- кромки: строка курсора — янтарная, edit-курсор — зелёная; опция
     -- curline (3 окт): top / bottom / off. Начинаются за разделителем матрицы;
     -- метки у номера строки нет (3 окт, просьба)
@@ -9652,18 +9654,19 @@ function D.frame(L, snap, rows, state, info)
       local key = cur and (cur.idx or cur.name) or false
       local now = reaper.time_precise()
       if key ~= D.pf_key then
-        if D.pf_key ~= nil and cur then D.pf = { t = now, name = (cur.name ~= '' and cur.name) or ('#' .. tostring(cur.idx)), rgb = cur.rgb } end
+        if D.pf_key ~= nil and cur then D.pf = { t = now } end
         D.pf_key = key
       end
+      -- 31 окт (2): вспыхивает сам индекс паттерна в шапке (2 B1 / intr) — крупнее и обратно, не посреди трекера
       local fl = D.pf and now - D.pf.t
-      if fl and fl < 0.9 then
-        local k = fl < 0.15 and 4 or (fl < 0.3 and 3 or 2)
-        local px = tx0 + (L.label_w or 0) + L.pad
-        local py = L.body_y + (vc.row - (state.row0 or 0)) * L.rh - (k - 1) * math.floor(L.rh / 2)
-        py = math.max(L.body_y, math.min(L.body_y + L.body_h - k * L.rh, py))
-        set(U.PANEL); gfx.rect(px - 3, py - 2, D.big_measure(D.pf.name, k) + 6, k * L.rh + 4, 1)
-        D.big_text(px, py, D.pf.name, D.pf.rgb or U.AMBER, k)
-      elseif fl then D.pf = nil end
+      local hd = D.rghead
+      if fl and fl < 0.6 and hd then
+        local k = fl < 0.2 and 3 or 2
+        local t = hd.t:match('^(%S+%s*%S*)') or hd.t
+        set(U.PANEL); gfx.rect(hd.x - 3, hd.y - 2, D.big_measure(t, k) + 6, k * L.rh + 4, 1)
+        set(hd.rgb); gfx.rect(hd.x - 3, hd.y - 2, D.big_measure(t, k) + 6, k * L.rh + 4, 0)
+        D.big_text(hd.x, hd.y, t, hd.rgb or U.AMBER, k)
+      elseif fl and fl >= 0.6 then D.pf = nil end
     end
   end
   if state.cracks then D.cracks(tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: эксперимент
