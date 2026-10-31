@@ -1217,14 +1217,9 @@ end
 local HUE = { kick = 1, snare = 2, hat = 3, clap = 4, tom = 5, cymbal = 6, perc = 7, bass = 8, loop = 9, fx = 10, vox = 11, synth = 12 }
 SM.EDGES_MAX = 4000                            -- рёбра файл—хаб — пока файлов не больше (иначе сплошная заливка)
 -- 28 окт: высота полосы опций — строки фильтров (перенос по ширине) + типы + ползунки
+-- 31 окт: фильтры — столбиком в левом верхнем углу вида (просьба), в полосе — только типы и ползунки
 function SM.opts_h(U, L, w)
-  local rows, fx = 1, 0
-  for _, f in ipairs(SM.FILTERS) do
-    local tw = U.measure(f.label) + 2 * L.pad + 2
-    if fx + tw > w - 2 * L.pad and fx > 0 then rows, fx = rows + 1, 0 end
-    fx = fx + tw
-  end
-  return (rows + 2) * L.rh + 3
+  return 2 * L.rh + 3
 end
 function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   V.hist_by = {}
@@ -1242,7 +1237,8 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local inside = mx >= x and mx < x + w and my >= y and my < y + h
   if G.building then
-    U.text(x + L.pad, y + 2, fit(('map: scanning... %d files in %d folders'):format(#G.nodes, G.ndirs or 0), w - 2 * L.pad), U.AMBER)
+    -- 31 окт: чтение индекса с диска — не скан папок (после :reload выглядело как «пересчитывает заново»)
+    U.text(x + L.pad, y + 2, fit(G.rd and ('map: reading the index... %d files'):format(#G.nodes) or ('map: scanning the folders... %d files in %d folders'):format(#G.nodes, G.ndirs or 0), w - 2 * L.pad), U.AMBER)
     return nil
   end
   if #G.nodes == 0 then U.text(x + L.pad, y + 2, fit('map: no sound files here', w - 2 * L.pad), U.DIM); return nil end
@@ -1366,13 +1362,22 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
       if hot then hv = { [key] = val } end
       return tw
     end
-    local fy, fx = oy0 + 1, x + L.pad
-    for _, f in ipairs(SM.FILTERS) do
-      local tw = U.measure(f.label) + 2 * L.pad
-      if fx + tw > x + w - L.pad and fx > x + L.pad then fy, fx = fy + L.rh, x + L.pad end
-      fx = fx + btn(fx, fy, f.label, SM.FON[f.key], 'mfilter', f.key) + 2
+    -- фильтры — столбиком в левом верхнем углу вида, под вкладками видов; ширина — по самой длинной подписи
+    local fw = 0
+    for _, f in ipairs(SM.FILTERS) do fw = math.max(fw, U.measure(f.label) + 2 * L.pad) end
+    local vy0 = y + L.rh + 4
+    if vy0 + #SM.FILTERS * L.rh < y + h then
+      U.set(U.PANEL); gfx.rect(x + L.pad - 2, vy0 - 2, fw + 4, #SM.FILTERS * L.rh + 3, 1)
+      for i, f in ipairs(SM.FILTERS) do
+        local by, on = vy0 + (i - 1) * L.rh, SM.FON[f.key]
+        local hot = mx >= x + L.pad and mx < x + L.pad + fw and my >= by and my < by + L.rh
+        U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.AMBER, 0.15) or U.PANEL)); gfx.rect(x + L.pad, by, fw, L.rh - 1, 1)
+        U.set(on and U.AMBER or U.LINE); gfx.rect(x + L.pad, by, fw, L.rh - 1, 0)
+        U.text(x + 2 * L.pad, by, f.label, on and U.AMBER or (hot and U.TEXT or U.GREY))
+        if hot then hv = { mfilter = f.key } end
+      end
     end
-    fy, fx = fy + L.rh, x + L.pad
+    local fy, fx = oy0 + 1, x + L.pad
     for _, t in ipairs(SM.TYPES) do fx = fx + btn(fx, fy, t, V.types and V.types[t], 'mtype', t) + 2 end
     fy = fy + L.rh
     local sw = math.max(L.cw * 4, math.min(L.cw * 10, math.floor((w - 2 * L.pad) / 2) - U.measure('dimension ') - L.pad))
