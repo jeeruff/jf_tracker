@@ -282,6 +282,25 @@ function FB.results()
   return res
 end
 
+-- 31 окт: мультивыделение — отмеченные эффекты (порядок отметки): Space / v, Cmd+щелчок, Shift+щелчок — диапазон;
+-- Enter / a добавляет все по порядку
+FB.marked, FB.mark_order = {}, {}
+local function mkey(it) return it and (it.label .. '|' .. (it.preset or '')) or nil end
+function FB.is_marked(it) return it and FB.marked[mkey(it)] ~= nil end
+function FB.toggle_mark(it)
+  local k = mkey(it); if not k then return end
+  if FB.marked[k] then
+    FB.marked[k] = nil
+    for i, x in ipairs(FB.mark_order) do if x == it then table.remove(FB.mark_order, i); break end end
+  else FB.marked[k] = true; FB.mark_order[#FB.mark_order + 1] = it end
+end
+function FB.mark_range(a, b)
+  local res = FB.results()
+  if a > b then a, b = b, a end
+  for i = a, b do local r = res[i]; if r and r.it and not r.hdr and not FB.is_marked(r.it) then FB.toggle_mark(r.it) end end
+end
+function FB.clear_marks() FB.marked, FB.mark_order = {}, {} end
+function FB.marked_list() return FB.mark_order end
 function FB.selected()
   local r = FB.results()[FB.cur]
   return r and r.it
@@ -324,6 +343,9 @@ function FB.key(c, mods)
     if (ch == 'h' or c == 1818584692) and FB.tree_on then FB.col = 1; return true end
     if (ch == 'l' or c == 1919379572) and FB.tree_on then FB.col = 2; return true end
     if ch == '*' then FB.toggle_fav(FB.selected()); return true end
+    if (ch == 'v' or c == 32) and not tree then   -- 31 окт: отметить / снять и вниз
+      FB.toggle_mark(FB.selected()); FB.cur = math.min(math.max(1, n), FB.cur + 1); skip_hdr(1); return 'mark'
+    end
     if ch == 'x' then   -- 28 окт: исключить из поиска (в дереве — папку, в списке — плагин); ещё раз — вернуть
       local nd = tree and rows[FB.tree_cur] and rows[FB.tree_cur].node or nil
       local what, nm, on = FB.toggle_excl(not tree and FB.selected() or nil, nd)
@@ -336,7 +358,10 @@ function FB.key(c, mods)
       if tree then local r = rows[FB.tree_cur]; if r and r.node then FB.node = r.node; FB.cur = 1; FB.scroll = 0; FB.col = 2; skip_hdr(1) end; return true end
       return 'add'
     end
-    if c == 27 then if FB.query ~= '' then FB.query = ''; FB.cur = 1; FB.scroll = 0; return true end; return 'leave' end
+    if c == 27 then
+      if #FB.mark_order > 0 then FB.clear_marks(); return 'mark' end   -- 31 окт: сначала снять отметки
+      if FB.query ~= '' then FB.query = ''; FB.cur = 1; FB.scroll = 0; return true end; return 'leave'
+    end
     return false
   end
   if c == 13 then FB.typing = false; return 'add' end   -- поиск: Enter — добавить найденное (и из набора)
@@ -476,6 +501,12 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
     if FB.is_fav(r.it) and not r.it.preset then name = '* ' .. name end          -- избранное видно в любой папке
     local exl = FB.excl['p:' .. r.it.label]
     if exl then name = 'x ' .. name end                       -- 28 окт: исключён из поиска
+    local mk = FB.is_marked(r.it)
+    if mk then   -- 31 окт: отмечен — подложка и номер в очереди добавления
+      local no = 0; for q, x in ipairs(FB.mark_order) do if x == r.it then no = q end end
+      if not sel then U.set(U.tint(U.CYAN, 0.22)); gfx.rect(x + 1, ry, w - 3, L.rh, 1) end
+      name = no .. ' ' .. name
+    end
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
     U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.DIM or U.TEXT))
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end

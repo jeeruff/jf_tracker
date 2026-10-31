@@ -2715,6 +2715,15 @@ ctx = {
     for l in (reaper.GetExtState(EXT, 'fxrecent') or ''):gmatch('[^\n]+') do FB.recent[#FB.recent + 1] = l end
   end,
   fxb_add = function(it, pos)
+    -- 31 окт: отмеченные — все по порядку, одной отменой
+    local ml = not it and not pos and FB.marked_list() or {}
+    if #ml > 0 and not ctx.fxb_insert and not ctx.fxb_pad then
+      local list = { table.unpack(ml) }
+      FB.clear_marks()
+      edit.run('add ' .. #list .. ' fx', function() for _, x in ipairs(list) do ctx.fxb_add(x) end end)
+      vim.msg = ('+ %d fx: %s'):format(#list, table.concat((function() local t = {}; for _, x in ipairs(list) do t[#t + 1] = FB.short(x.label) end; return t end)(), ', '))
+      return
+    end
     it = it or FB.selected()
     local ins = ctx.fxb_insert; ctx.fxb_insert = nil
     -- 19 окт: слот пэда drumrs5k (b в меню слота) — эффект в пэд, не на трек
@@ -26095,8 +26104,12 @@ local function frame()
         if it then FB.toggle_fav(it); ctx.fxb_save(); vim.msg = (FB.is_fav(it) and '* favourite: ' or 'not a favourite: ') .. FB.short(it.label) end
       elseif type(hover.fxb) == 'table' then
         local same = FB.cur == hover.fxb.row
+        local prev = FB.cur
         FB.cur = hover.fxb.row
-        if dbl and same and click.zone == 'fxb' then ctx.fxb_add()
+        local m = ctx.mods()
+        if m.cmd then FB.toggle_mark(FB.selected()); vim.msg = ('fx: %d marked - Enter / a adds them in order, Esc - unmark'):format(#FB.marked_list())   -- 31 окт
+        elseif m.shift then FB.mark_range(prev, FB.cur); vim.msg = ('fx: %d marked - Enter / a adds them in order, Esc - unmark'):format(#FB.marked_list())
+        elseif dbl and same and click.zone == 'fxb' then ctx.fxb_add()
         else local it = FB.selected(); if it then fxb_drag = { it = it, x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false } end end
       end
       click = { t = now2, zone = 'fxb' }
@@ -29443,6 +29456,7 @@ local function frame()
         local r = FB.key(c, ctx.mods())
         if r == 'add' then ctx.fxb_add()
         elseif r == 'excl' then vim.msg = FB.last_excl; ctx.fxb_save()   -- 28 окт: x — исключить из поиска
+        elseif r == 'mark' then local n = #FB.marked_list(); vim.msg = n > 0 and ('fx: %d marked - Enter / a adds them in order, Esc - unmark'):format(n) or 'fx: no marks'   -- 31 окт
         elseif r == 'addsel' then ctx.fxb_add_sel()   -- 22 окт
         elseif r == 'addnew' then ctx.fxb_add_new()
         elseif r == 'gt' then ctx.tab_menu()        -- 21 окт: gt / gT — к модулям и вкладкам проектов и из fx list
