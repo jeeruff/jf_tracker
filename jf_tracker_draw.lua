@@ -55,7 +55,7 @@ function D.init(u, peaks_fn, matrix)
   D.PEAK  = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
   D.PEAKM = U.mix(D.PEAK, U.BG, 0.55)
   -- 16 окт: волна фоном — от фона к тексту (видна всегда, тише цифр); было от цвета пиков темы — на заливке item пропадала
-  D.PEAKB, D.PEAKMB = U.mix(U.BG, U.TEXT, 0.30), U.mix(U.BG, U.TEXT, 0.15)   -- волна фоном (3 окт)
+  D.PEAKB, D.PEAKMB = U.mix(U.BG, { 0, 0, 0 }, 0.45), U.mix(U.BG, { 0, 0, 0 }, 0.25)   -- волна фоном (3 окт); 31 окт: темнее фона — точки и текст на ней видны (светлая терялась на подсвеченном треке)
   D.BAR   = U.mix(U.BG, U.TEXT, 0.62)
   D.BEAT  = U.DIM
   -- плейхед (8 окт): цвет курсора воспроизведения темы REAPER (playcursor_color),

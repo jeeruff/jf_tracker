@@ -20322,8 +20322,9 @@ function ctx.slixer_view(track, fxi)
       S.pkv = pkv
       local n = math.floor(reaper.gmem_read(B + 5))
       local mx, mn = {}, {}
-      for i = 0, n - 1 do mx[i + 1] = reaper.gmem_read(B + 300 + i * 2); mn[i + 1] = reaper.gmem_read(B + 301 + i * 2) end
-      S.peaks = { n = n, max = mx, min = mn }
+      local ct = {}   -- 31 окт: спектральный центроид точки (+4100), -1 тишина
+      for i = 0, n - 1 do mx[i + 1] = reaper.gmem_read(B + 300 + i * 2); mn[i + 1] = reaper.gmem_read(B + 301 + i * 2); ct[i + 1] = reaper.gmem_read(B + 4100 + i) end
+      S.peaks = { n = n, max = mx, min = mn, ctr = ct }
     end
     v.peaks = S.peaks
     -- 25 окт: состояния пульта (окно 1 в 1): auto, keys, sync, артикулятор, занятые слоты, ноты и классы срезов
@@ -20335,7 +20336,7 @@ function ctx.slixer_view(track, fxi)
     v.stx = {}
     v.artused, v.notes, v.classes = {}, {}, {}
     for i = 0, 7 do v.artused[i + 1] = reaper.gmem_read(B + 64 + i) > 0.5 end
-    for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5); v.stx[i + 1] = reaper.gmem_read(B + 1700 + i) end
+    for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5); v.stx[i + 1] = reaper.gmem_read(B + 4000 + i) end   -- 31 окт: +4000 (было +1700 — пики зума)
     local tick = reaper.gmem_read(B + 7)
     if tick ~= S.tick then S.tick, S.tick_t = tick, now end
     v.alive = now - S.tick_t < 1.5

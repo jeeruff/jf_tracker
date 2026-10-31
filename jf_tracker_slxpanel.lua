@@ -25,10 +25,13 @@ function SX.items(v, P)
   local km = v and v.kmode or 1
   local KM = { 'chrom', 'piano', 'class' }
   local sy = v and v.sync or 0
+  if v then v.wavecol = math.floor((pv('Waveform colours') or 0) + 0.5) end   -- 31 окт: draw_wave красит по нему
   local SY = { 'off', 'pitch', 'str' }
   local rows = {
     {
       -- 26 окт: подписи SLICE нет — и так ясно (кнопки нарезки первые)
+      -- 31 окт: setup — как в окне плагина: цвет волны (peaks / brightness / spectral …) — пульт и колонка трекера
+      { kind = 'menu', lab = 'setup', src = 'p', name = 'Waveform colours', items = { 'peaks', 'brightness by frequency', 'line', 'array', 'spectral colours' }, tip = 'setup: waveform colours - plain peaks, dark low / bright high, or spectral hues (the tracker wave column follows)' },
       { kind = 'act', lab = 'detect', key = 'd', what = 'detect', tip = 'find transients and cut there; moving sens re-runs it' },
       { kind = 'menu', lab = ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 't', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' }, tip = 'slicing mode: transients (sens), equal parts, or pitch changes' },
       { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1, slider = true, raw = pv('Transient sensitivity') or 0.5, tip = 'transient sensitivity: more - more slices (detect re-runs when you let go)' },
@@ -193,6 +196,19 @@ end
 -- волна как слайсер трекера: полоса-обзор + основная; zst = { f0, fn } (окно зума в кадрах, на модуль)
 -- 26 окт: пэдов нет — срез на волне сам интерактивный: под мышью светлее, у границы — ручка
 -- (hv.edge = номер среза, чью начальную границу тянуть); dr = { edge, frame } — граница в протяжке
+-- 31 окт: цвет точки волны по спектральному центроиду (экспорт slixer +4100): 1 — тёмные низы / светлые верха,
+-- 4 — оттенок (низ янтарь, середина зелень, верх голубой); иначе / тишина — nil (серый)
+function SX.wave_rgb(mode, ctr)
+  if not ctr or ctr < 0 then return nil end
+  if mode == 1 then
+    local t = math.min(1, ctr * 1.25)
+    return 0.26 + 0.74 * t * t, 0.30 + 0.70 * t * t, 0.34 + 0.66 * t
+  elseif mode == 4 then
+    if ctr < 0.35 then local t = ctr / 0.35; return 1, 0.35 + 0.50 * t, 0.12
+    elseif ctr < 0.6 then local t = (ctr - 0.35) / 0.25; return 1 - 0.65 * t, 0.90, 0.15 + 0.30 * t
+    else local t = math.min(1, (ctr - 0.6) / 0.4); return 0.35 - 0.15 * t, 0.90 - 0.25 * t, 0.45 + 0.55 * t end
+  end
+end
 function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, drag, dr, wave_y)
   local hv
   local fr = v and v.frames or 0
@@ -267,7 +283,11 @@ function SX.draw_wave(U, L, v, x, y, w, ovh, wh, text, ms, set, mx, my, zst, dra
     if hit then
       local t = math.abs(fc - hit.s0) / math.max(1, math.abs(hit.p - hit.s0)) * hit.ats
       gfx.set(1, 0.86 - 0.70 * t, 0.22 - 0.16 * t, 1)
-    else set(U.GREY) end
+    else
+      local r, g, b2
+      if pk and pk.ctr and (v.wavecol == 1 or v.wavecol == 4) then r, g, b2 = SX.wave_rgb(v.wavecol, pk.ctr[math.max(1, math.min(pk.n, math.floor(fc / fr * pk.n) + 1))]) end
+      if r then gfx.set(r, g, b2, 1) else set(U.GREY) end
+    end
     gfx.line(x + px, cy - math.min(1, a) * hh, x + px, cy - math.max(-1, b) * hh)
   end
   local th = L.th or (L.rh - 2)
