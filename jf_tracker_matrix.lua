@@ -351,7 +351,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if ctx.ic and b[1] ~= 'more' then label = ctx.ic(b[1], label) end
     local bw = U.measure(label) + 2 * L.pad
     if b[1] == 'space' then bw = math.max(U.measure('space: play'), U.measure('space: cue')) + 2 * L.pad end   -- строгая ширина
-    if x1 and bx > x0 and bx + bw > x1 then bx, by = x0, by + L.rh + 2 end
+    if x1 and bx > x0 and bx + bw > x1 then bx, by = x0, by + L.rh end   -- 31 окт: ряды встык
     local hot = mx >= bx and mx < bx + bw and my >= by and my < by + L.rh
     U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, by, bw, L.rh, 1)
     U.set(U.LINE); gfx.rect(bx, by, bw, L.rh, 0)
@@ -359,7 +359,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if hot then hover.btn = b[1] end
     MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, by + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
     if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, b[1]) end
-    bx = bx + bw + L.pad
+    bx = bx + bw + 1   -- 31 окт: кнопки встык (был зазор в pad)
   end
   return by + L.rh - y0
   end
