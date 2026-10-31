@@ -1640,6 +1640,21 @@ function E.all_off(track, lane_idx, lpb, row)
     if not it then it, tk = new_midi_item(track, lane_idx, t) end
     if not tk then return end
     local ppq = R.MIDI_GetPPQPosFromProjTime(tk, t)
+    -- 31 окт: один свободный OFF на промежуток между нотами клипа: прочие CC 123 этого промежутка — вон
+    -- (по любому пути: `, ~, меню — OFF переезжает, а не копится)
+    local lo, hi = -math.huge, math.huge
+    local _, nn, ncc = R.MIDI_CountEvts(tk)
+    for k = 0, nn - 1 do
+      local _, _, _, sp, ep = R.MIDI_GetNote(tk, k)
+      for _, e in ipairs({ sp, ep }) do
+        if e <= ppq and e > lo then lo = e end
+        if e > ppq and e < hi then hi = e end
+      end
+    end
+    for k = ncc - 1, 0, -1 do
+      local _, _, _, cp, cm, _, m2 = R.MIDI_GetCC(tk, k)
+      if cm == 0xB0 and m2 == 123 and cp > lo and cp < hi then R.MIDI_DeleteCC(tk, k) end
+    end
     R.MIDI_InsertCC(tk, false, false, ppq, 0xB0, 0, 123, 0)
     R.MIDI_Sort(tk)
   end)
