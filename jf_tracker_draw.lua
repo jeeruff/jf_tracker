@@ -10386,8 +10386,8 @@ function D.frame(L, snap, rows, state, info)
         if info.slx_slots then nb2 = nb2 + 1 end   -- 31 окт: строка слотов быстрой загрузки — в самом низу модуля
         nbr = nbr + nb2
         local need = f.rows and (f.rows + (f.groups and 1 or 0)) or 0
-        local wr = math.min(16, nfit - need - nbr - 1 - 1)   -- 26 окт: до 16 строк — волна + прицел
-        if wr < 3 then need = 0; wr = math.min(16, nfit - nbr - 1 - 1) end
+        local wr = math.min(10, nfit - need - nbr - 1 - 1)   -- 26 окт: волна + прицел; 31 окт: до 10 строк (было 16) — место параметрам
+        if wr < 3 then need = 0; wr = math.min(10, nfit - nbr - 1 - 1) end
         if wr >= 2 then
           f.slx_geo = { lay = lay, nbr = nbr, nb2 = nb2, low = low, wr = wr, v = v0, noparams = need == 0 }
           wtop_wh = wr * L.rh
@@ -11449,7 +11449,7 @@ function D.frame(L, snap, rows, state, info)
         local zst = D.slx_zoom[f.i]
         local ovh = L.rh - 3
         -- 26 окт: прицел (снайперский зум края, как в слайсере) — под волной, ~40 % высоты при 6+ строках
-        local zr = G.wr >= 6 and math.floor(G.wr * 0.42) or 0
+        local zr = G.wr >= 6 and math.floor(G.wr * 0.34) or 0   -- 31 окт: прицел меньше (было 0.42)
         if zr > 0 then zr = zr + 1 end   -- 27 окт: прицел на строку выше, волна на строку ниже
         local wh = (G.wr - zr) * L.rh - (zr > 0 and 2 or 0)
         local dr = D.slx_drag and D.slx_drag.fi == f.i and D.slx_drag or nil
