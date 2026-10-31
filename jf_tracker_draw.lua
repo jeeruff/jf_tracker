@@ -8702,7 +8702,8 @@ function D.frame(L, snap, rows, state, info)
       if ay + L.rh <= hy + (L.header_rows - 1) * L.rh + 2 then
         local xf = small(bx, ay, ms('autoarm all') + 4 <= bw and 'autoarm all' or (ms('autoarm') + 4 <= bw and 'autoarm' or 'arm'), all and 'off' or 'on', all, 'mautoarm')   -- 22 окт: autoarm all — флаг всем трекам
         -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
-        local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)
+        -- 31 окт: подпись fast+ (было fold — путалось со сворачиванием треков za / zM)
+        local fl = (xf + ms('fast+') + 2 <= bx + bw) and 'fast+' or ((xf + ms('f+') + 2 <= bx + bw) and 'f+' or nil)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
       else
         local xa = D.cn_r1x

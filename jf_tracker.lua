@@ -24765,7 +24765,7 @@ local function frame()
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
-  elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': a fast note (shorter than a row) with no free column folds into its row - a + at the right of the note column, no new lane; zoom in (+, LPB) - it gets its own row; click - ' .. (state.foldfast and 'off' or 'on')
+  elseif hover.viewbtn == 'foldfast' then state.status = 'fast+ ' .. (state.foldfast and 'on' or 'off') .. ': notes shorter than a row (fast rolls, flams) do not get their own extra column - they show as a + next to the note of their row; off - each gets a column. Not the folding of tracks (za / zM). Click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
