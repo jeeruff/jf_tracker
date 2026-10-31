@@ -5328,8 +5328,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         D.strip_cell.ratepop = { ssx, py2, ssw }
       end
       -- запись: с колонки после play до конца группы
-      local ax, a1 = colx(pi3 + 1), bx0 + btot
-      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll
+      local ax, a1 = colx(pi3 + 1) - 2 * ms('x'), bx0 + btot   -- 31 окт: чуть левее
+      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate }, { 'qtz', 'qtz', c.qtz } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll; qtz — квантование входа
       for _, t in ipairs(full) do
         local w0 = ms(t[2]) + 2 * L.pad
         if ax + w0 > a1 + L.pad then break end

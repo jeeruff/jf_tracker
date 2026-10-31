@@ -22085,6 +22085,7 @@ function ctrl_action(name, delta)
     if p and reaper.GetToggleCommandState(p) == 1 then reaper.Main_OnCommand(ctx.cmd_exact('Record: Set record mode to normal') or 40252, 0)
     elseif p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'ripple' then ctx.ripple_menu()   -- 16 окт: ripple editing — три значения, выпадашкой
+  elseif name == 'qtz' then ctx.qtz_toggle()
   elseif name == 'preroll' then local p = ctx.cmd_exact('Pre-roll: toggle pre-roll on record') or ctx.cmd_by_text('pre-roll on record'); if p then reaper.Main_OnCommand(p, 0) end
   elseif name == 'reclib' then state.reclib = true; vim.msg = 'rec -> lib: always on - a recorded take becomes a lib instrument'
   -- размер (5 окт): клик — меню размеров (длиннее такт — вопрос про доли), колесо — сразу ±1 доля
@@ -23684,7 +23685,7 @@ local function frame()
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
       bigbpm = state.bigbpm, bigstatus = state.bigstatus,
-      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, bpm_edit = state.bpm_edit,
+      playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, qtz = ctx.qtz_on(cur_col() and cur_col().track), bpm_edit = state.bpm_edit,
       slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, holdroll = state.holdroll, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
@@ -24886,6 +24887,7 @@ local function frame()
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
+  elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - on / off'
   elseif hover.ctrl == 'ripple' then state.status = 'ripple editing (REAPER): off / per track / all tracks - click: the list; on - deleting a note pulls up what is below it'
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
   elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'
@@ -32314,6 +32316,35 @@ ctx.fit_height = function()
   if vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows then vim.cur.row = state.row0 end
   relayout()
   vim.msg = ('zh: the %s fits - LPB %d (%d rows)'):format(vm, best, math.floor(q * best + 0.5))
+end
+-- 31 окт: qtz — квантование входа (record input quantize REAPER) трека курсора: строка INQ чанка трека, сетка —
+-- шаг трекера (1 / LPB доли). Состояние — кэш по треку (чанк не читается каждый кадр)
+ctx.qtz_cache = {}
+ctx.qtz_on = function(tr)
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return false end
+  local v = ctx.qtz_cache[tr]
+  if v == nil then
+    local ok, ch = reaper.GetTrackStateChunk(tr, '', false)
+    v = ok and (ch:match('\n%s*INQ (%d)') == '1') or false
+    ctx.qtz_cache[tr] = v
+  end
+  return v
+end
+ctx.qtz_toggle = function()
+  local col = cur_col()
+  local tr = col and col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'qtz: a track under the cursor'; return end
+  local ok, ch = reaper.GetTrackStateChunk(tr, '', false)
+  if not ok then return end
+  local on = not (ch:match('\n%s*INQ (%d)') == '1')
+  local grid = ('%.6f'):format(1 / math.max(1, state.lpb))
+  local line = ('INQ %d 0 0 %s 100 0 0 100'):format(on and 1 or 0, grid)
+  local n
+  ch, n = ch:gsub('(\n%s*)INQ [^\n]*', '%1' .. line, 1)
+  if n == 0 then ch = ch:gsub('(\n%s*REC [^\n]*)', '%1\n' .. line, 1) end
+  edit.run('input quantize ' .. (on and 'on' or 'off'), function() reaper.SetTrackStateChunk(tr, ch, false) end)
+  ctx.qtz_cache[tr] = on
+  vim.msg = on and ('qtz on: %s records its MIDI input quantized to the step (1/%d beat)'):format(col.name or '', state.lpb) or ('qtz off: %s records as played'):format(col.name or '')
 end
 ctx.autozoom_toggle = function()
   state.autozoom = not state.autozoom or nil
