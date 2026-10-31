@@ -142,7 +142,7 @@ local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
--- 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
+-- 83 / 84 кинескоп VHS, 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 796   -- 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
@@ -7638,57 +7638,91 @@ local function crk_build(c, style, w, h, ex, x, y, seed)
     end
   end
 end
--- 31 окт: рамка vhs — как пауза кассеты: тёмная виньетка по краю, редкие строки развёртки, полоса трекинга (шум и
--- сдвинутые обрывки строк) ползёт вниз и иногда дёргается, PLAY и счётчик в углах; рисуется каждый кадр (дёшево)
+-- 31 окт: рамка vhs — кассета на старом телевизоре. Полоса трекинга по модели VHS: строки внутри полосы сдвинуты
+-- вбок на dx(y) = A·g(y)·(sin(0.35y + 9t) + шум), g — гаусс от центра полосы; в ней же белые штрихи шума (их
+-- плотность тоже по g); у низа кадра — head switching: нижние 6 строк дёргаются каждый кадр. Кинескоп: кадр
+-- выгнут бочкой (полосами по 3 px через картинки 83 / 84), углы тёмные и скруглённые, строки развёртки, виньетка
+local VHS_A, VHS_B = 84, 83
 function D.vhs(x, y, w, h, red)
   local now = reaper.time_precise()
-  local st = D.vhsst or { seed = 99, band = 0, jump = 0 }
+  local SRC = gfx.dest   -- 31 окт: кадр рисуется в буфер (1021), не в окно — копировать из него
+  local st = D.vhsst or { seed = 99, band = 0.3, jump = 0 }
   D.vhsst = st
   local function rnd() st.seed = (st.seed * 1103515245 + 12345) % 2147483648; return st.seed / 2147483648 end
   local dt = math.min(0.1, now - (st.t or now)); st.t = now
-  -- виньетка: несколько полупрозрачных рамок к краю
-  for k = 0, 9 do gfx.set(0, 0, 0, 0.09); gfx.rect(x + k, y + k, w - 2 * k, h - 2 * k, 0) end
-  -- развёртка: тонкие тёмные строки через 3 px
-  gfx.set(0, 0, 0, 0.10)
-  for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
-  -- полоса трекинга: ползёт вниз, иногда рывок
-  st.band = st.band + dt * h * 0.12
-  if rnd() < dt * 0.6 then st.jump = 0.25 + rnd() * 0.4 end
-  st.jump = math.max(0, st.jump - dt)
-  if st.band > h + 40 then st.band = -40 end
-  local by = y + math.floor(st.band)
-  local bh = 14 + math.floor((st.jump > 0 and 18 or 6) * rnd())
+  x, y, w, h = math.floor(x), math.floor(y), math.floor(w), math.floor(h)
   local tint = red and { 1, 0.25, 0.25 } or { 0.85, 0.88, 1 }
-  for yy = math.max(y, by), math.min(y + h - 1, by + bh) do
-    local k = 1 - math.abs((yy - by) / bh * 2 - 1)   -- гуще в середине полосы
-    -- обрывки строки: светлые штрихи шума
+  -- полоса: центр плывёт вниз, ширина дышит; иногда рывок (шире и сильнее)
+  st.band = st.band + dt * 0.05
+  if st.band > 1.15 then st.band = -0.15 end
+  if rnd() < dt * 0.5 then st.jump = 0.3 + rnd() * 0.5 end
+  st.jump = math.max(0, st.jump - dt)
+  local cy = y + st.band * h
+  local sig = 8 + 4 * math.sin(now * 0.7) + (st.jump > 0 and 10 or 0)
+  local A = 5 + (st.jump > 0 and 22 * st.jump or 0)
+  local y0, y1 = math.max(y, math.floor(cy - 3 * sig)), math.min(y + h - 1, math.floor(cy + 3 * sig))
+  for yy = y0, y1, 2 do
+    local g = math.exp(-((yy - cy) / sig) ^ 2)
+    local dx = math.floor(A * g * (math.sin(yy * 0.35 + now * 9) + (rnd() - 0.5) * 1.2) + 0.5)
+    if dx ~= 0 then gfx.a = 1; gfx.blit(SRC, 1, 0, x, yy, w, 2, x + dx, yy, w, 2) end
+    -- шум: штрихи, гуще в центре
     local xx = x
     while xx < x + w do
-      local ln = 4 + rnd() * 60
-      if rnd() < 0.45 * k + 0.05 then gfx.set(tint[1], tint[2], tint[3], (0.15 + rnd() * 0.45) * k); gfx.rect(math.floor(xx), yy, math.floor(ln), 1, 1) end
-      xx = xx + ln + rnd() * 30
+      local ln = 2 + rnd() * 40
+      if rnd() < 0.5 * g then gfx.set(tint[1], tint[2], tint[3], (0.25 + rnd() * 0.6) * g); gfx.rect(math.floor(xx), yy, math.floor(ln), 1, 1) end
+      xx = xx + ln + rnd() * 25
     end
   end
-  -- сдвиг строк при рывке: кусок изображения уезжает вбок (копия кадра со смещением)
-  if st.jump > 0 then
-    local sy = math.max(y, by - 6)
-    local sh = math.min(bh + 12, y + h - sy)
-    if sh > 0 then
-      local off = math.floor((rnd() - 0.5) * 24 * st.jump * 4)
-      gfx.a = 0.6
-      gfx.blit(-1, 1, 0, x, sy, w, sh, x + off, sy, w, sh)
-      gfx.a = 1
-    end
+  -- head switching у низа: нижние строки рвёт вбок
+  for k = 1, 6 do
+    local yy = y + h - 1 - k
+    local dx = math.floor((rnd() - 0.3) * 14)
+    gfx.a = 1; gfx.blit(SRC, 1, 0, x, yy, w, 1, x + dx, yy, w, 1)
+    if rnd() < 0.5 then gfx.set(tint[1], tint[2], tint[3], 0.3); gfx.rect(x + math.floor(rnd() * w), yy, math.floor(10 + rnd() * 80), 1, 1) end
   end
-  -- 31 окт: PLAY — только когда играет, вдвое крупнее; справа внизу — настоящие часы и дата, как на кассете
+  -- надписи: PLAY (только при игре) слева вверху, часы и дата справа вверху
   local col = { tint[1], tint[2], tint[3] }
-  if reaper.GetPlayState() & 1 == 1 then D.big_text(x + 14, y + 10, 'PLAY', col, 2) end
+  if reaper.GetPlayState() & 1 == 1 then D.big_text(x + 18, y + 14, 'PLAY', col, 2) end
   local t1 = os.date('%I:%M:%S %p'):gsub('^0', ' ')
   local t2 = os.date('%b. %d %Y'):upper()
-  local w1, w2 = D.big_measure(t1, 2), D.big_measure(t2, 2)
   local lh = 2 * gfx.texth + 4
-  D.big_text(x + w - 14 - w1, y + h - 12 - 2 * lh, t1, col, 2)
-  D.big_text(x + w - 14 - w2, y + h - 12 - lh, t2, col, 2)
+  D.big_text(x + w - 18 - D.big_measure(t1, 2), y + 14, t1, col, 2)
+  D.big_text(x + w - 18 - D.big_measure(t2, 2), y + 14 + lh, t2, col, 2)
+  -- кинескоп: бочка — сначала строки сжимаются к краям по вертикали кадра (ширина строки ~ 1 − k·d²), потом столбцы
+  local kx, ky, S = 0.045, 0.035, 3
+  gfx.setimgdim(VHS_A, -1, -1); gfx.setimgdim(VHS_A, w, h)
+  gfx.setimgdim(VHS_B, -1, -1); gfx.setimgdim(VHS_B, w, h)
+  local od = gfx.dest
+  gfx.dest = VHS_A; gfx.a = 1; gfx.mode = 0
+  gfx.blit(SRC, 1, 0, x, y, w, h, 0, 0, w, h)
+  gfx.dest = VHS_B; gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, h, 1)
+  for yy = 0, h - 1, S do
+    local d = (yy + S / 2 - h / 2) / (h / 2)
+    local q = 1 - kx * d * d
+    local nw = math.floor(w * q + 0.5)
+    gfx.blit(VHS_A, 1, 0, 0, yy, w, S, math.floor((w - nw) / 2), yy, nw, S)
+  end
+  gfx.dest = od
+  gfx.set(0, 0, 0, 1); gfx.rect(x, y, w, h, 1)
+  for xx = 0, w - 1, S do
+    local d = (xx + S / 2 - w / 2) / (w / 2)
+    local q = 1 - ky * d * d
+    local nh = math.floor(h * q + 0.5)
+    gfx.blit(VHS_B, 1, 0, xx, 0, S, h, x + xx, y + math.floor((h - nh) / 2), S, nh)
+  end
+  -- развёртка, виньетка, тёмные скруглённые углы
+  gfx.set(0, 0, 0, 0.12)
+  for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
+  for k = 0, 14 do gfx.set(0, 0, 0, 0.07); gfx.rect(x + k, y + k, w - 2 * k, h - 2 * k, 0) end
+  local R = math.floor(math.min(w, h) * 0.06)
+  gfx.set(0, 0, 0, 1)
+  for k = 0, R do
+    local e = R - math.floor(math.sqrt(R * R - (R - k) * (R - k)) + 0.5)
+    if e > 0 then
+      gfx.rect(x, y + k, e, 1, 1); gfx.rect(x + w - e, y + k, e, 1, 1)
+      gfx.rect(x, y + h - 1 - k, e, 1, 1); gfx.rect(x + w - e, y + h - 1 - k, e, 1, 1)
+    end
+  end
   gfx.a = 1
 end
 function D.cracks(x, y, w, h, red, ex, style)
