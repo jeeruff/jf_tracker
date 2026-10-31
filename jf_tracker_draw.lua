@@ -4769,7 +4769,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   -- к цифре), справа две ровные колонки: LPB / pitch и legato / human (общая ширина колонки — res)
   local stxt = ({ auto = 'a', next = 'n' })[c.step] or tostring(c.step or 0)   -- 15 окт: режимы шага буквой — ширина как у числа
   local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2)) + L.th + L.pad   -- + вертикальная подпись step (15 окт)
-  local col2, col3 = 'pitch resample', 'human 100%'
+  local col2, col3 = 'pitch resample', 'legato'   -- 31 окт: human — всегда словом (процент — в статусе), колонка не шире legato
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
@@ -4777,16 +4777,15 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
                 { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
                   { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = 'ripple*' },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
-                  { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
+                  { 'human', 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
   if c.tpfull then
     -- 15 окт: listen — третьей строкой, под цифрой (слева — вертикальная подпись step на весь блок)
     -- 16 окт: как oct / vel — listen под цифрой шага (с начала блока), insert step sel line — под колонкой LPB / pitch
-    local row4 = { { '_listen', 'listen', U.GREY } }   -- подпись строки, не кнопка
-    local pad4 = stepw - ms('listen') - (2 * L.pad + 6)
-    if pad4 > 0 then row4[#row4 + 1] = { '_', '', w = pad4 } end
+    -- 31 окт: listen — ячейкой ширины шага: insert ровно под pitch (столбец LPB / pitch)
+    local row4 = { { '_listen', 'listen', U.GREY, w = stepw } }   -- подпись строки, не кнопка
     for _, it in ipairs(lsn) do row4[#row4 + 1] = it end
     table.insert(g[#g], row4)
   else g[#g + 1] = { boxed = true, { { 'listen', 'listen', U.GREY } }, lsn } end
@@ -5295,8 +5294,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local pi3 = D.tp_play_i or 2
       local w1 = TW[1] or tbw
       cellb('markers', 'mark', colx(1), w1, false, not any)   -- 16 окт: mark (не mk)
-      local rx0 = colx(pi3)
-      local w2c = TW[pi3] or tbw
+      -- 31 окт: rate — сразу за mark (mark не меняет ширину), до тоглов записи — им место под транспортом
+      local rx0 = math.min(colx(pi3), colx(1) + math.floor((w1 + ms('mark')) / 2) + 2 * L.pad)
+      local w2c = colx(pi3) + (TW[pi3] or tbw) - rx0 - 2 * ms('x') - 2
       local rv = c.rate or 1
       local rl = ('x%.2f'):format(rv)
       local rhot = cell_hot(rx0, ry, w2c, L.rh)
