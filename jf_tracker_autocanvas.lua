@@ -40,11 +40,11 @@ function ACV.shape_stroke(ra, rb, v)
 end
 ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { x0, y0, x1, y1 } — пиксели: нажатие → мышь (инструмент line) }
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
-function ACV.at(g, mx, my)
+function ACV.at(g, mx, my, smooth)
   local row = g.r0 + (mx - g.gx) / math.max(1, g.gw) * g.nr
   row = math.max(g.r0, math.min(g.r0 + g.nr - 1e-6, row))
   -- 30 окт: сетка бывает мельче строки (1/2 … 1/8) — точки между строками; без snap — целые строки
-  if ACV.snap then local st = ACV.grid; row = g.r0 + math.floor((row - g.r0) / st + 1e-9) * st else row = math.floor(row) end
+  if ACV.snap then local st = ACV.grid; row = g.r0 + math.floor((row - g.r0) / st + 1e-9) * st elseif not smooth then row = math.floor(row) end   -- 31 окт: smooth — без snap точка тянется плавно, не по строкам
   local v = 1 - (my - g.gy - 2) / math.max(1, g.gh - 4)
   return row, clamp01(v)
 end
@@ -409,17 +409,18 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local ox, oy = U.mouse_off and U.mouse_off[1] or 0, U.mouse_off and U.mouse_off[2] or 0
   local hover
   local tb = {}
-  for _, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1] } end
+  -- 31 окт: snap и сетка — первыми (слева), потом инструменты и формы
+  tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap }
+  tb[#tb + 1] = { lab = '[', grid = -1 }
+  tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
+  tb[#tb + 1] = { lab = ']', grid = 1 }
+  for i, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1], gap = i == 1 } end
   -- 30 окт: формы — все кнопками в ряд (выбор формы = инструмент shape); не влезает — одна кнопка со списком
   local shapes_at = #tb + 1
   for i, x in ipairs(ACV.SHAPE_LIST) do tb[#tb + 1] = { lab = x[3], shape = x[2], on = ACV.tool == 'shape' and ACV.shape == x[2], gap = i == 1 } end
   local shapes_n = #ACV.SHAPE_LIST
   tb[#tb + 1] = { lab = '~' .. ACV.grid_label(ACV.cycle, span.lpb), cyc = true }   -- 31 окт: цикл формы
   tb[#tb + 1] = { lab = 'hum', hum = true, gap = true }                                -- 31 окт: humanize выделения / клетки
-  tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap, gap = true }
-  tb[#tb + 1] = { lab = '[', grid = -1, gap = true }
-  tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
-  tb[#tb + 1] = { lab = ']', grid = 1 }
   local function width() local t = 0; for _, b in ipairs(tb) do b.w = U.measure(b.lab) + 2 * pad; t = t + b.w + 2 + (b.gap and pad or 0) end; return t end
   local tw = width()
   -- 31 окт: формы всегда кнопками; не влезают рядом с именем — панель второй строкой над холстом (поле ниже на строку);

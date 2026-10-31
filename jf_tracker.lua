@@ -17197,6 +17197,29 @@ ctx.acv_replace = function(old, new, box, what)
   local map, a, b = A.replace_rows(old, new, box, act.kind == 'ml')
   ctx.acv_do({ op = 'put', rows = map, a = a, b = b, tool = what }, sp, curves)
 end
+-- 31 окт: ПКМ по холсту автоматизации — быстрый выбор: инструменты, формы на выделение / клетку, правка точек
+ctx.acv_menu = function()
+  local A = ctx.ACV
+  local function run(op) ctx.acv_do(op) end
+  local items = {
+    { key = 'c', label = 'cur - click / drag points' .. (A.tool == 'cur' and '  *' or ''), fn = function() A.tool = 'cur' end },
+    { key = 'i', label = 'draw - pencil' .. (A.tool == 'draw' and '  *' or ''), fn = function() A.tool = 'draw' end },
+    { key = 'l', label = 'line' .. (A.tool == 'line' and '  *' or ''), fn = function() A.tool = 'line' end },
+    { key = 'e', label = 'erase' .. (A.tool == 'erase' and '  *' or ''), fn = function() A.tool = 'erase' end },
+    { key = 't', label = 'select rows (transform)' .. (A.tool == 'sel' and '  *' or ''), fn = function() A.tool = 'sel' end },
+    { key = 'S', label = 'snap ' .. (A.snap and 'off' or 'on'), fn = function() A.snap = not A.snap end },
+    { key = 'd', label = 'delete the points of the selection / cursor row', fn = function() run({ op = 'del' }) end },
+    { key = 'y', label = 'copy the points', fn = function() run({ op = 'yank' }) end },
+    { key = 'p', label = 'paste at the cursor', fn = function() run({ op = 'paste' }) end },
+    { key = 'h', label = 'humanize', fn = function() ctx.acv_humanize() end },
+  }
+  for _, x in ipairs(A.SHAPE_LIST or {}) do
+    local key = ({ sin = 's', tri = 'r', ['ramp+'] = 'u', ['ramp-'] = 'n', sqr = 'q', rnd = 'z', exp = 'x', log = 'g' })[x[2]]
+    if key then items[#items + 1] = { key = key, label = 'fill: ' .. x[3], fn = function() run({ op = 'fill', shape = x[2] }) end } end
+  end
+  vim.open_hydra({ title = 'canvas', items = items })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y }
+end
 ctx.acv_humanize = function()
   local A = ctx.ACV
   local sp = ctx.acv_span(); local curves = ctx.acv_curves(sp)
@@ -28377,6 +28400,8 @@ local function frame()
     if U.rclick then ctx.env_del(hover.env, hover.row.row) end
   elseif U.rclick and (hover.ctrl == 'inst' or hover.ctrl == 'step' or hover.ctrl == 'lpb' or hover.ctrl == 'vel' or hover.ctrl == 'pitch') then
     ctx.ins_menu()                                        -- 9 окт: меню вставки нот (блок step / inst)
+  elseif U.rclick and lfo_hover and lfo_hover.pane == 'curve' and lfo_hover.curve_t and state.toptab == 'automation' then   -- 31 окт: меню холста
+    ctx.acv_menu(); U.rclick = false
   elseif U.rclick and hover.matrix and hover.matrix.patrow then   -- 27 окт: меню паттернов — ПКМ (вне выбора — только этот)
     local p = (ctx.pat_rows or {})[hover.matrix.patrow]
     if p and not MX.pl_multi[p.name] then MX.pl_multi = {} end
@@ -28718,7 +28743,7 @@ local function frame()
       if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: move lane point'); model.invalidate() end
       ctx.acv_pdrag = nil
     elseif gfx.mouse_cap & 1 == 1 then
-      local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
+      local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y, true)   -- 31 окт: snap выкл — плавно, вкл — по сетке
       local t = d.sp.time(math.floor(r)) + (d.sp.time(math.floor(r) + 1) - d.sp.time(math.floor(r))) * (r - math.floor(r))
       local _, tp = reaper.GetEnvelopePoint(d.env, d.idx - 1)
       local okn, tn = reaper.GetEnvelopePoint(d.env, d.idx + 1)
@@ -28728,7 +28753,7 @@ local function frame()
       reaper.SetEnvelopePoint(d.env, d.idx, t, raw, nil, nil, nil, true)
       d.moved = true
       ctx.acv_cc = nil
-      state.status = ('%s: %d%% at row %.2f (release - written)'):format(d.name or 'point', math.floor(v * 100 + 0.5), r)
+      state.status = ('%s: %d%% at row %.2f%s (release - written)'):format(d.name or 'point', math.floor(v * 100 + 0.5), r, ctx.ACV.snap and ' snap' or '')
     else
       if d.moved then reaper.Envelope_SortPoints(d.env); reaper.Undo_OnStateChange2(0, 'jf_tracker: move envelope point'); model.invalidate() end
       ctx.acv_pdrag = nil
