@@ -498,11 +498,12 @@ function D.layout(snap, state, nregions)
     if not G.x_inst or G.notes_only or G.narrow or G.wave_only then return G end
     local k = L.GTc[G]
     if k then return k end
-    local s0, d = G.x_note + (G.w_note or L.w_note), L.w_tfx + L.pad
+    -- 31 окт: знак φ — слева от ноты, в один символ (было после ноты): всё от ноты вправо на его ширину
+    local s0, d = G.x_note, L.w_tfx
     local function sh(v) if v and v >= s0 then return v + d end return v end
     local fx2 = {}
     for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
-    k = setmetatable({ x_tfx = s0 + L.pad, x_inst = sh(G.x_inst), x_slc = G.x_slc and sh(G.x_slc) or G.x_slc, x_vol = sh(G.x_vol),
+    k = setmetatable({ x_tfx = s0 - 1, x_note = sh(G.x_note), x_inst = sh(G.x_inst), x_slc = G.x_slc and sh(G.x_slc) or G.x_slc, x_vol = sh(G.x_vol),
       x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del), x_fold = G.x_fold and sh(G.x_fold) or G.x_fold,
       sub_w = G.sub_w + d }, { __index = G })
     L.GTc[G] = k
@@ -2420,9 +2421,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if D.cur_box then D.cur_box(); D.cur_box = nil end
   -- 19 окт: fold — сложенные быстрые ноты строки: линия в своё время внутри строки (белая — нота; под командами — цвет команд)
   -- 19 окт (2): линии поверх текста читались как зачёркивание — вместо них знак «o» сбоку ячейки (как колонка Orca)
-  -- 20 окт: take FX у ноты — значок fx после ноты (своё место: L.x_tfx есть только у таких лейнов)
+  -- 20 окт: take FX у ноты — значок (31 окт: φ слева от ноты) (своё место: L.x_tfx есть только у таких лейнов)
   if cell and cell.tfx and L.x_tfx and (cell.kind == 'audio' or cell.kind == 'midi') then
-    text(x + L.x_tfx + 1, ty, 'φ', U.GREEN)
+    text(x + L.x_tfx, ty, 'φ', U.GREEN)
   end
   if cell and cell.fold and L.x_fold then
     -- 27 окт: в строке сложены ещё ноты — «+» перед нотой (как папка в lf), раскрыть — zu или LPB (+ / Opt+Shift+J)
