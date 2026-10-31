@@ -25532,7 +25532,13 @@ local function frame()
         end
         SG = { none = true }
         -- 22 окт: семья слайдера — DSP / микшер / один трек (громкость, пан, ширина и параметры шапки)
-        local function fam(r) local g = r.g or ''; if g:match('^trs:') or g:match('^hdr:') then return 'col:' .. g:match(':(.*)$') end; return g:match('^(%a+)') or g end
+        local function fam(r)
+          local g = r.g or ''
+          if g:match('^trs:') or g:match('^hdr:') then return 'col:' .. g:match(':(.*)$') end
+          local mk = g:match('^dsp%a*:([^:]+)')   -- 31 окт: DSP — один модуль (его параметры и макросы), не соседние модули
+          if mk then return 'dsp:' .. mk end
+          return g:match('^(%a+)') or g
+        end
         -- 22 окт: фокус-радиус — до ближайшего дальше 4 строк, а мышь над треком: только слайдеры этого трека
         local hc = hover.col
         if best and bd > (4 * L.rh) ^ 2 and hc and hc.guid then
@@ -25670,13 +25676,9 @@ local function frame()
           end
           state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Ctrl+Opt go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
-          local mapw = vert and gfx.w or math.min(math.floor(gfx.w / (OZ.z == 2 and 2.5 or 3.5)), L.cw * 34 * OZ.z)   -- 27 окт: шире — имена вдвое крупнее
-          local maph = vert and math.min(math.floor(gfx.h / (OZ.z == 2 and 2.5 or 4)), 8 * OZ.rh) or gfx.h
           local how = vert and 'sideways: pick, up / down: value' or 'up / down: pick, sideways: value'
           if state.ctlmap ~= false then
-          local lift = vert and 2 * L.rh or 0   -- 30 окт: столбцы микшера — чуть выше низа окна (над статусом)
-          local mx0, my0 = gfx.w - mapw, gfx.h - maph - lift
-          U.set(U.BG, 0.88); gfx.rect(mx0, my0, mapw, maph, 1)
+          -- 31 окт: не у края экрана — выпадашкой прямо на месте банка (над ним), имена x2; значения — в строках
           -- 24 окт: общий хозяин (трек / эффект) — заголовком сверху, у слайдеров — только параметр (имя трека съедало его)
           local own = SG.list[1] and SG.list[1].own
           for _, r in ipairs(SG.list) do if r.own ~= own then own = nil; break end end
@@ -25688,12 +25690,29 @@ local function frame()
           local function nfit(t, w) t = t or ''; while t ~= '' and nms(t) > w do t = t:sub(1, -2) end; return t end
           local NRH = L.rh * NZ
           local BH = math.max(4, math.floor(L.rh * 0.6))
-          if own and not vert then
+          local ROWH = NRH + BH + 6
+          local mapw, maph
+          if vert then
+            mapw = math.min(gfx.w, math.max(x1 - x0 + 6, n * nms('mmmm')))
+            maph = math.min(math.floor(gfx.h / 2.5), 8 * OZ.rh)
+          else
+            local lw = nms('mmmmmmmmmm')
+            for _, r in ipairs(SG.list) do lw = math.max(lw, nms(lab(r))) end
+            mapw = math.min(gfx.w, math.max(x1 - x0 + 6, lw + nms('-00.0 dB') + 3 * L.pad))   -- строгая ширина: имена, не значения
+            maph = n * ROWH
+          end
+          local hdr = (own and not vert) and (OZ.rh + 4) or 0
+          local foot = 2 * OZ.rh + 2
+          local mx0 = math.max(0, math.min(gfx.w - mapw, x0 - 3))
+          local my0 = vert and (y0 - maph - foot - 4) or (y0 - 2 - hdr)
+          my0 = math.max(0, math.min(gfx.h - maph - hdr - foot, my0))
+          U.set(U.BG, 0.94); gfx.rect(mx0, my0, mapw, maph + hdr, 1)
+          U.set(U.AMBER); gfx.rect(mx0, my0, mapw, maph + hdr, 0)
+          if hdr > 0 then
             OZ.tx(mx0 + L.pad, my0 + 2, OZ.fit(own, mapw - 2 * L.pad), U.TEXT)
             U.set(U.LINE); gfx.rect(mx0 + L.pad, my0 + OZ.rh + 2, mapw - 2 * L.pad, 1, 1)
-            my0, maph = my0 + OZ.rh + 4, maph - OZ.rh - 4
+            my0 = my0 + hdr
           end
-          U.set(U.AMBER); if vert then gfx.rect(mx0, my0, mapw, 1, 1) else gfx.rect(mx0, my0, 1, maph, 1) end
           local step = (vert and mapw or maph) / n
           for i, r in ipairs(SG.list) do
             local a0, a1 = math.floor((i - 1) * step), math.floor(i * step)
@@ -25714,7 +25733,10 @@ local function frame()
               local cy = by0 + math.floor((by1 - by0) / 2)
               if by1 - by0 >= NRH + BH + 6 then
                 local ty = cy - math.floor((NRH + BH + 4) / 2)
-                draw.big_text(mx0 + L.pad, ty, nfit(lab(r), mapw - 2 * L.pad), on and U.AMBER or U.GREY, NZ)
+                local vt = t1 and ctx.cm_io.show(t1) or ''
+                local vw = nms(vt)
+                draw.big_text(mx0 + L.pad, ty, nfit(lab(r), mapw - 3 * L.pad - vw), on and U.AMBER or U.GREY, NZ)
+                draw.big_text(mx0 + mapw - L.pad - vw, ty, vt, on and U.AMBER or U.GREY, NZ)
                 U.set(U.DIM); gfx.rect(mx0 + L.pad, ty + NRH + 2, mapw - 2 * L.pad, BH, 1)
                 U.set(on and U.AMBER or U.CYAN); gfx.rect(mx0 + L.pad, ty + NRH + 2, math.max(1, math.floor((mapw - 2 * L.pad) * fr + 0.5)), BH, 1)
               elseif by1 - by0 >= OZ.rh + BH + 4 then   -- тесно — обычный размер имени
@@ -25728,9 +25750,9 @@ local function frame()
           end
           -- 16 окт: что выбрано — строкой в самой подсказке (снизу она закрывает статус): имя, значение, оси
           local desc = ('%s  %s'):format(own and (own .. ': ' .. (FULL[cur.pn or ''] or cur.pn or '')) or (cur.name or '?'), ts[1] and ctx.cm_io.show(ts[1]) or '')
-          local dy0 = vert and (my0 - 2 * OZ.rh - 2) or (gfx.h - 2 * OZ.rh - 2)
-          local dw = vert and mapw or math.max(mapw, math.min(gfx.w, OZ.ms(desc) + 2 * L.pad))
-          local dx0 = gfx.w - dw
+          local dy0 = my0 + maph   -- 31 окт: подпись — сразу под выпадашкой
+          local dw = math.max(mapw, math.min(gfx.w, OZ.ms(desc) + 2 * L.pad))
+          local dx0 = math.max(0, math.min(gfx.w - dw, mx0))
           U.set(U.BG, 0.94); gfx.rect(dx0, dy0, dw, 2 * OZ.rh + 2, 1)
           U.set(U.AMBER); gfx.rect(dx0, dy0, dw, 1, 1)
           OZ.tx(dx0 + L.pad, dy0 + 1, OZ.fit(desc, dw - 2 * L.pad), U.AMBER)
