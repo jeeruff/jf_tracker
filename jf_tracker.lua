@@ -23061,7 +23061,10 @@ local function frame()
     if not PV.playing() then ctx.sl_own = false end
   end
   -- fixed cursor: вид всегда ставит строку курсора в середину тела
-  if state.fixed and L and L.nrows then
+  -- 31 окт: пока левая кнопка зажата в теле трекера — вид стоит (щелчок ставил курсор на строку под мышью, вид
+  -- центрировался, под мышью была уже другая строка — и так каждый кадр: бесконечный скролл); отпустил — к курсору
+  local fx_hold = gfx.mouse_cap & 1 == 1 and L and L.body_y and gfx.mouse_y >= L.body_y and gfx.mouse_y < L.body_y + (L.body_h or 0)
+  if state.fixed and L and L.nrows and not fx_hold then
     state.row0 = vim.cur.row - math.floor(L.nrows / 2)
   end
   local ph_row = playpos_view and model.row_of_time(playpos_view, state.lpb) or nil   -- вид: с упреждением
