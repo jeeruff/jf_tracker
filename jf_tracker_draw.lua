@@ -5833,7 +5833,7 @@ local function br_col(c)
   if not (c.enabled and not c.poff) then return U.DIM end
   return (D.sel_i and c.i == D.sel_i) and U.AMBER or U.tint(U.AMBER, 0.45)
 end
-local function brg(L) return math.max(3, L.pad) end   -- 31 окт: [ ] ближе к контейнеру (было 2 pad)   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
+local function brg(L) return math.max(3, L.pad) + 4 end   -- 31 окт (2): скобки прилипли к модулям — 3 px видимого зазора (+ внешний пиксель рамки модуля)   -- 31 окт: [ ] ближе к контейнеру (было 2 pad)   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
   local st = D.lst
   if not (st and st.f == f and st.y == boxy) then return end
@@ -12852,7 +12852,7 @@ function D.frame(L, snap, rows, state, info)
       set(hot and U.AMBER or U.tint(U.AMBER, 0.35)); gfx.rect(bx + 2, boxy + 2, pw - 4, bh0 - 4, 0)
       text(bx + math.floor((pw - ms('+')) / 2), boxy + 4, '+', hot and U.AMBER or U.tint(U.AMBER, 0.7))
       local vh = bh0 - L.rh - 10
-      if vh > ms('drop fx here') then D.vtext(bx + math.floor((pw - (L.th or L.rh)) / 2), boxy + L.rh + 6, vh, 'drop fx here', hot and U.AMBER or U.tint(U.AMBER, 0.7), U.PANEL) end
+      local _ = vh   -- 31 окт: надпись drop fx here убрана (просьба), остаётся «+» в рамке
       if hot then hover.dspbtn = { fx = #fxs, what = 'chainadd' } end
       hint('dspbtn', bx, boxy, pw, bh0, { fx = #fxs, what = 'chainadd' })
       bx = bx + pw + L.pad
