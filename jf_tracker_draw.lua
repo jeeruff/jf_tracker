@@ -10223,10 +10223,10 @@ function D.frame(L, snap, rows, state, info)
             local th = math.max(8, math.min(L.rh + 2, math.floor(TH() * 1.45)))   -- 20 окт: крупнее (∆ Menlo мелкий — не видно)
             if D.menlo_th ~= th then gfx.setfont(5, 'Menlo', th); D.menlo_th = th else gfx.setfont(5) end   -- шрифт с именем — один раз на размер
             local gw2 = gfx.measurestr('∆')
-            set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = f.slx_bry + 1 + math.floor((L.rh - 1 - gfx.texth) / 2)
+            set(bc); gfx.x = kx + math.floor((kb - gw2) / 2); gfx.y = f.slx_bry + 3 + math.floor((L.rh - 1 - gfx.texth) / 2)   -- 31 окт: ∆ на 2 px ниже
             gfx.drawstr('∆')
             gfx.setfont(D.font_id or 1)
-          else text(kx + L.pad, f.slx_bry + 1, b[1], bc) end
+          else text(kx + L.pad, f.slx_bry + 1 - (b[1] == '_' and 3 or 0), b[1], bc) end   -- 31 окт: _ чуть выше
           if hot then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
           hint('dspbtn', kx, f.slx_bry + 2, kb, L.rh - 2, { fx = k, what = b[2] })   -- 11 окт: кнопки шапки эффекта — по f
         end
