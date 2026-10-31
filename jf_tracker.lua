@@ -24546,7 +24546,7 @@ local function frame()
     local txt = f.name .. '  ' .. (p.name or '') .. (p.mlabel and (': ' .. p.mlabel) or '')
     if f.wrap then txt = f.name .. '  ★ ' .. (p.pinfx and (p.pinfx .. ': ') or '') .. (p.pinname or p.name or '') .. '  (rclick - unpin)' end
     state.status = txt .. '  - drag: value, dblclick: default'
-  elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link)') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
+  elseif hover.dsp then state.status = hover.dsp.f.name .. (hover.dsp.param and ('  ' .. hover.dsp.f.params[hover.dsp.param].name .. ' - drag: value, dblclick: default, rclick: modulate (LFO / ACS / link), Opt+click: remove its automation') or '  (dblclick: window, rclick: menu)') .. (hover.dsp.f.container and '  [container: | serial = parallel + sum]' or '')
   elseif hover.mod then state.status = hover.mod.m.fxname .. ' / ' .. hover.mod.m.pname .. ': toggle ' .. hover.mod.what
   elseif hover.garden and hover.garden.ri then
     local rg = seq[hover.garden.ri]; local col = snap.cols[hover.garden.ci]
@@ -27132,6 +27132,13 @@ local function frame()
       local ax = (xy.cmd_next == 'y') and 'y' or 'x'
       ctx.dsp_xy_set(hover.dsp.f, ax, hover.dsp.param); xy.cmd_next = ax == 'x' and 'y' or 'x'
       click = { t = now2, zone = 'dspxyset' }
+    elseif hover.dsp and hover.dsp.param and ctx.mods().alt and not ctx.mods().cmd and not ctx.mods().ctrl and dsp_target() and not dsp_target().take
+      and hover.dsp.f.params[hover.dsp.param] and reaper.GetFXEnvelope(dsp_target().track, hover.dsp.f.params[hover.dsp.param].fx or hover.dsp.f.i, hover.dsp.f.params[hover.dsp.param].i, false) then
+      -- 31 окт: Opt+щелчок по параметру с автоматизацией — огибающая удалена (u — вернуть)
+      local p = hover.dsp.f.params[hover.dsp.param]
+      edit.env_remove(reaper.GetFXEnvelope(dsp_target().track, p.fx or hover.dsp.f.i, p.i, false))
+      vim.msg = p.name .. ': automation removed (u - undo)'
+      click = { t = now2, zone = 'dspenvdel' }
     elseif hover.dsp then
       ctx.set_focus('dsp')
       if not hover.dsp.param then DK.clear_pick() end   -- 22 окт: простой щелчок по модулю — выбор одного
