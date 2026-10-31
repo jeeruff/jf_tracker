@@ -4773,9 +4773,10 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
-                  { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = 'hold' },   -- 28 окт: Opt+`
+                  { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = 'ripple*' },   -- 28 окт: Opt+`
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
-                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 }, { '_', '', res = 'hold' },
+                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
+                  { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = 'ripple*' },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
                   { 'human', (c.human or 0) > 0 and ('human %d%%'):format(c.human) or 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
@@ -4797,7 +4798,8 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   local function tc(id, label, on) return { id, label, on and U.CYAN or U.GREY } end
   -- 16 окт: ripple — выпадашка (off / per track / all), голубой — вкл
   local rip = { 'ripple', ({ [0] = 'ripple', 'ripple trk', 'ripple all' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = 'ripple all' }
-  g[#g + 1] = { { tc('punch', 'punch', c.punch), tc('preroll', 'pre-roll', c.preroll), rip },
+  local _ = rip   -- 31 окт: ripple — под roll (в группе записи больше нет)
+  g[#g + 1] = { { tc('punch', 'punch', c.punch), tc('preroll', 'pre-roll', c.preroll) },
                 { tc('reclib', 'rec>lib', c.reclib),
                   { 'slow', c.slowrate and ('slow %s'):format(({ [0.5] = '1/2', [0.25] = '1/4' })[c.slowrate] or (math.abs(c.slowrate - 2 / 3) < 1e-3 and '2/3') or '1/3') or 'slow',
                     c.slowrec and U.RED or (c.slowrate and U.CYAN or U.GREY) } } }   -- 11 окт: slow rec (Shift+Space)
@@ -5327,11 +5329,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       end
       -- запись: с колонки после play до конца группы
       local ax, a1 = colx(pi3 + 1), bx0 + btot
-      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate },   -- 19 окт: короче (pun / slo)
-                     { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 } }   -- 16 окт: ripple (* — all tracks)
-      local tot = 0
-      for _, t in ipairs(full) do tot = tot + ms(t[2]) + 2 * L.pad end
-      if ax + tot > a1 then full[4][2] = (c.ripple or 0) == 2 and 'rip*' or 'rip' end   -- 16 окт: тесно — rip
+      local full = { { 'punch', 'pun', c.punch }, { 'preroll', 'pre', c.preroll }, { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec or c.slowrate } }   -- 19 окт: короче (pun / slo); 31 окт: ripple — под roll
       for _, t in ipairs(full) do
         local w0 = ms(t[2]) + 2 * L.pad
         if ax + w0 > a1 + L.pad then break end
