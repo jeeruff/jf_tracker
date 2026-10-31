@@ -52,8 +52,27 @@ function SX.items(v, P)
       { kind = 'menu', lab = KM[km + 1] or 'piano', key = 'p', on = km > 0, src = 'op', code = 9, items = KM, tip = 'note layout: chromatic, piano (white keys), or by class' },
       { kind = 'tog', lab = 'vel', key = 'v', on = (pv('VEL: ignore incoming velocity') or 0) > 0.5, src = 'p', name = 'VEL: ignore incoming velocity', tip = 'vel: ignore incoming velocity (fixed level)' },
       { kind = 'val', lab = 'ch', val = (function() local c = math.floor((pv('MIDI channel (0=omni)') or 0) + 0.5); return c == 0 and 'omni' or tostring(c) end)(), src = 'p', name = 'MIDI channel (0=omni)', step = 1, lo = 0, hi = 16, tip = 'MIDI channel it listens to (omni - all)' },
-      { kind = 'val', lab = 'bas', val = tostring(math.floor((pv('Base note') or 48) + 0.5)), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'the note of slice 1 (default C3 = 48)' },
+      { kind = 'val', lab = 'root', val = (function()   -- 31 окт: root note — нотой (C-3), не числом
+          local n = math.floor((pv('Base note') or 48) + 0.5)
+          return ({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[n % 12 + 1] .. (n // 12 - 1)
+        end)(), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'root note: the note of slice 1 (default C-3 = 48); slice 2 - a semitone up, and so on' },
     },
+    -- 31 окт: STRETCH выбранного среза (и выделенных) — алгоритм, зерно, растяжение (заказ 13 экземпляру)
+    (v and (v.st_alg or -1) >= 0) and (function()
+      local SA = { 'grain', 'cycle', 'tape', 'cloud', 'sync' }
+      local SR = { '1/2', '3/4', '1x', '1.5', '2x', '4x', '8x' }
+      local SRV = {}
+      for i, f in ipairs({ 0.5, 0.75, 1, 1.5, 2, 4, 8 }) do SRV[i] = (1 + math.log(f) / math.log(8)) / 2 end
+      local ri = 3
+      for i, x in ipairs(SRV) do if math.abs((v.st_ratio or 0.5) - x) < 0.01 then ri = i end end
+      return {
+        { kind = 'zone', lab = 'STRETCH' },
+        { kind = 'menu', lab = SA[math.floor(v.st_alg + 0.5) + 1] or 'grain', src = 'op', code = 13, field = 1, items = SA, tip = 'stretch algorithm of the selected slice(s)' },
+        { kind = 'menu', lab = 'x ' .. SR[ri], on = ri ~= 3, src = 'op', code = 13, field = 3, items = SR, vals = SRV, tip = 'stretch of the selected slice(s): slower / faster, the pitch stays' },
+        { kind = 'menu', lab = ('grain %d ms'):format(math.floor((0.02 + (v.st_size or 0.5) * 0.1) * 1000 + 0.5)), src = 'op', code = 13, field = 2,
+          items = { '20 ms', '40 ms', '70 ms', '100 ms', '120 ms' }, vals = { 0, 0.2, 0.5, 0.8, 1 }, tip = 'grain size: short - buzzy and tight, long - smooth' },
+      }
+    end)() or nil,
     {
       { kind = 'zone', lab = 'ARP' },
       { kind = 'tog', lab = 'arp', key = 'b', on = (pv('ARP: on') or 0) > 0.5, src = 'p', name = 'ARP: on' },

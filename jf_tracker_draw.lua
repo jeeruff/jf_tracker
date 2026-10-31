@@ -8668,11 +8668,11 @@ function D.frame(L, snap, rows, state, info)
     -- строка выше: autozoom слева, markers справа (не влезло слово — mk / az)
     local ya = y4 - L.rh
     if ya >= hy + 1 + 3 * L.rh - 1 then
-      local ml = (ms('autozoom') + ms('markers') + 8 <= bw) and 'markers' or 'mk'
-      local mw = ms(ml) + 2
-      btn(bx + bw - mw, ya, ml, 'viewbtn', 'markers')
-      local az = (ms('autozoom') + 2 + 2 <= bw - mw) and 'autozoom' or ((ms('az') + 4 <= bw - mw) and 'az' or nil)
-      if az then btn(bx, ya, az, 'viewbtn', 'autozoom', state.autozoom) end
+      -- 31 окт: сразу под autoarm (ряд 4) — autozoom, ниже markers полностью (каждый своей строкой)
+      local yz = hy + 1 + 3 * L.rh
+      btn(bx, yz, (ms('autozoom') + 2 <= bw) and 'autozoom' or 'az', 'viewbtn', 'autozoom', state.autozoom)
+      if yz + L.rh < ya + L.rh and yz + L.rh <= y4 - L.rh then btn(bx, yz + L.rh, (ms('markers') + 2 <= bw) and 'markers' or 'mk', 'viewbtn', 'markers')
+      else btn(bx + bw - ms('mk') - 2, yz, 'mk', 'viewbtn', 'markers') end
     else
       -- 20 окт: низкая шапка — az mk в конце ряда 1 (за param), x2 /2 остаются на своём месте у длины
       local xr = D.cn_r1x or bx

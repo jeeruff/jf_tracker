@@ -19908,7 +19908,7 @@ function ctx.slx_do(h)
     local items = {}
     for k2, lab in ipairs(it.items) do
       items[#items + 1] = { key = tostring(k2), label = lab, fn = function()
-        if it.src == 'p' then setp(it.name, k2 - 1) else ctx.slx_cmd(it.code, k2 - 1) end
+        if it.src == 'p' then setp(it.name, k2 - 1) elseif it.code == 13 then ctx.slx_cmd(13, it.field, it.vals and it.vals[k2] or (k2 - 1)) else ctx.slx_cmd(it.code, k2 - 1) end
       end }
     end
     vim.open_hydra({ title = 'slixer: ' .. (it.name or it.lab):lower(), items = items })   -- 27 окт: no caps
@@ -20009,6 +20009,7 @@ function ctx.slixer_view(track, fxi)
     v.auto, v.keys = reaper.gmem_read(B + 60) > 0.5, reaper.gmem_read(B + 61) > 0.5
     v.sync, v.art = math.floor(reaper.gmem_read(B + 62) + 0.5), math.floor(reaper.gmem_read(B + 63) + 0.5)
     v.kmode = math.floor(reaper.gmem_read(B + 72) + 0.5)
+    v.st_alg, v.st_size, v.st_ratio = reaper.gmem_read(B + 80), reaper.gmem_read(B + 81), reaper.gmem_read(B + 82)   -- 31 окт: стретч выбранного среза
     v.artused, v.notes, v.classes = {}, {}, {}
     for i = 0, 7 do v.artused[i + 1] = reaper.gmem_read(B + 64 + i) > 0.5 end
     for i = 0, math.min(v.nsl, 64) - 1 do v.notes[i + 1] = math.floor(reaper.gmem_read(B + 1400 + i) + 0.5); v.classes[i + 1] = math.floor(reaper.gmem_read(B + 1470 + i) + 0.5) end
