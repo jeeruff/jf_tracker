@@ -3150,8 +3150,11 @@ function V.key_impl(c)
         local r0, r1 = V.cur.row, V.cur.row + n - 1
         local _, pend = ctx.region_rows and ctx.region_rows()
         local last = pend or (r1 + 4096)
-        local gone = V.heads_in(V.cur.fi, V.cur.fi, r0, r1)
-        local below = V.heads_in(V.cur.fi, V.cur.fi, r1 + 1, last)
+        -- 1 ноя: только события, что НАЧИНАЮТСЯ в строках (heads_in отдаёт и длинную ноту сверху, что тянется через них —
+        -- её сдвигало / удаляло, ноты слипались в «+»)
+        local function starting(list, a, b) local o = {}; for _, h in ipairs(list) do local r = h.row0 or -1; if r >= a and r <= b then o[#o + 1] = h end end; return o end
+        local gone = starting(V.heads_in(V.cur.fi, V.cur.fi, r0, r1), r0, r1)
+        local below = starting(V.heads_in(V.cur.fi, V.cur.fi, r1 + 1, last), r1 + 1, last)
         local rows = {}
         for i, h in ipairs(below) do rows[i] = (h.row0 or 0) + (h.delay or 0) / 256 - n end
         local E = ctx.edit
