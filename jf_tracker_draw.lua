@@ -7768,6 +7768,30 @@ function D.vhs(x, y, w, h, red)
       xx = xx + ln + rnd() * 25
     end
   end
+  -- 1 ноя: «enhancer» аналоговой глитч-коробки (идея: r/videosynthesis, oopsyte): усилитель с обратной связью звенит
+  -- на краях — каждый контраст тянет за собой эхо-копии вправо (затухающие, сложением), полосой, что плывёт по кадру;
+  -- при рывке — синхра срывается: весь кадр волной вбок (каждые 4 строки)
+  do
+    st.ring = (st.ring or 0.5) + dt * 0.03
+    if st.ring > 1.2 then st.ring = -0.2 end
+    local ry0 = y + math.floor(st.ring * h) - math.floor(h * 0.18)
+    local ry1 = ry0 + math.floor(h * 0.36)
+    local om = gfx.mode
+    gfx.mode = 1
+    for yy = math.max(y, ry0), math.min(y + h - 3, ry1), 3 do
+      local g = 1 - math.abs((yy - (ry0 + ry1) / 2) / ((ry1 - ry0) / 2))
+      local dx = math.floor(5 + 4 * math.sin(yy * 0.13 + now * 4))
+      gfx.a = 0.22 * g; gfx.blit(SRC, 1, 0, x, yy, w - dx, 3, x + dx, yy, w - dx, 3)
+      gfx.a = 0.10 * g; gfx.blit(SRC, 1, 0, x, yy, w - 2 * dx, 3, x + 2 * dx, yy, w - 2 * dx, 3)
+    end
+    gfx.mode = om or 0; gfx.a = 1
+    if st.jump > 0.3 then
+      for yy = y, y + h - 4, 4 do
+        local dx = math.floor(st.jump * 18 * math.sin(yy * 0.045 + now * 7) + 0.5)
+        if dx ~= 0 then gfx.blit(SRC, 1, 0, x, yy, w, 4, x + dx, yy, w, 4) end
+      end
+    end
+  end
   -- 1 ноя: зажёванная плёнка — рваные блоки (кусок кадра уезжает вбок, по краю цветная кайма), прыжок кадра
   -- по вертикали, выпадения (белые полосы во всю ширину), снег по всему кадру
   if rnd() < dt * 6 then st.tears = st.tears or {}; st.tears[#st.tears + 1] = { y = rnd(), hh = 4 + rnd() * 50, dx = (rnd() - 0.5) * 160, life = 0.05 + rnd() * 0.25 } end
