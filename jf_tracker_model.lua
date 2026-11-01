@@ -248,10 +248,14 @@ local function place(lane, r0, r1, head, cont, tail, e1)
   for _, s in ipairs(lane.subs) do
     if sub_free(s, r0, r1, head.delay, e1) then sub = s; break end
   end
+  -- 1 ноя: видимые пустые подколонки (− + у трека, subs_min) — сначала в них, складывать в «+» только когда места нет
+  if not sub and M.SUBS_MIN and lane.key and #lane.subs < (M.SUBS_MIN[lane.key] or 1) then sub = {}; lane.subs[#lane.subs + 1] = sub end
   if not sub and M.FOLD and r1 == r0 and head.kind == 'midi' and lane.subs[1] then
     for _, s in ipairs(lane.subs) do
       local c = s[r0]
-      if c then c.fold = c.fold or {}; c.fold[#c.fold + 1] = head; head.rows = 1; head.folded = true; lane.has_fold = true; return s end   -- 20 окт: has_fold — колонка +N только этому лейну
+      -- 1 ноя: только в строку, где НАЧИНАЕТСЯ нота (не в продолжение длинной ноты и не в OFF): иначе нота пряталась
+      -- в «+» внутри длинной ноты и её нельзя было найти ни в одном лейне — тогда своя подколонка
+      if c and (c.kind == 'midi' or c.kind == 'audio') then c.fold = c.fold or {}; c.fold[#c.fold + 1] = head; head.rows = 1; head.folded = true; lane.has_fold = true; return s end   -- 20 окт: has_fold — колонка +N только этому лейну
     end
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
@@ -724,11 +728,11 @@ function M.build(lpb)
         end
         local hide = fixed and M.ARR_PLAYING_ONLY and nl > 1 and R.GetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. l) == 0
         if not hide then
-          local ln = { idx = l, name = lname, subs = { {} }, items = {} }
+          local ln = { idx = l, name = lname, subs = { {} }, items = {}, key = col.guid .. ':' .. tostring(l) }
           col.lanes[#col.lanes + 1] = ln; byidx[l] = ln
         end
       end
-      if #col.lanes == 0 then local ln = { idx = 0, name = '', subs = { {} }, items = {} }; col.lanes[1] = ln; byidx[0] = ln end
+      if #col.lanes == 0 then local ln = { idx = 0, name = '', subs = { {} }, items = {}, key = col.guid .. ':0' }; col.lanes[1] = ln; byidx[0] = ln end
       for ii = 0, R.CountTrackMediaItems(tr) - 1 do
         local it = R.GetTrackMediaItem(tr, ii)
         local lane_i = fixed and math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) or 0

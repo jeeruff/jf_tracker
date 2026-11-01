@@ -449,17 +449,21 @@ eq('accent thirds (lpb 6)', M.accent(2, 6, 0, 'ABBB'), 2)
 eq('accent thirds (lpb 12): 4', M.accent(4, 12, 0, 'ABBB'), 2); eq('accent lpb 12: 2', M.accent(2, 12, 0, 'ABBB'), 3)
 eq('accent lpb 4: 2', M.accent(2, 4, 0, 'ABBB'), 2)
 eq('accent lpb 1', M.accent(0, 1, 3, 'ABBB'), 1)
--- 19 окт: fold — однострочная нота без свободной колонки ложится в ячейку (лейн не растёт)
+-- 19 окт: fold — однострочная нота без свободной колонки ложится в ячейку (лейн не растёт);
+-- 1 ноя: только в строку, где начинается нота; в продолжение длинной ноты — своя подколонка (иначе её не найти)
 do
   local lane = { subs = {} }
-  M._place(lane, 0, 3, { kind = 'midi' })
+  local h1 = { kind = 'midi' }
+  M._place(lane, 0, 3, h1)
   M.FOLD = true
   local h2 = { kind = 'midi', delay = 128 }
-  M._place(lane, 1, 1, h2)
-  eq('fold: no new lane', #lane.subs, 1)
-  eq('fold: in the cell', lane.subs[1][1].fold and lane.subs[1][1].fold[1], h2)
-  M._place(lane, 2, 4, { kind = 'midi' })
-  eq('fold: a long note still gets a lane', #lane.subs, 2)
+  M._place(lane, 0, 0, h2)
+  eq('fold: no new lane (on the row where a note starts)', #lane.subs, 1)
+  eq('fold: in the head cell', lane.subs[1][0].fold and lane.subs[1][0].fold[1], h2)
+  local h3 = { kind = 'midi', delay = 64 }
+  M._place(lane, 1, 1, h3)
+  eq('fold: inside a long note - its own subcolumn', #lane.subs, 2)
+  eq('…visible there', lane.subs[2][1], h3)
   M.FOLD = false
 end
 print(('%d checks, %d failed'):format(checks, fails))

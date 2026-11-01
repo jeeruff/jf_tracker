@@ -33892,6 +33892,7 @@ ctx.foldfast_toggle = function()
   vim.msg = state.foldfast and 'fold on: a fast note with no free column folds into its row - an o at the side of the cell (O - several); + (LPB) shows them' or 'fold off: every note gets its row and column'
 end
 model.FOLD = state.foldfast
+model.SUBS_MIN = state.subs_min   -- 1 ноя: видимые пустые подколонки — модель кладёт ноты в них, а не в «+»
 model.ENVMARK = state.envmark
 ctx.rf_close = function(keep)
   local S = ctx.RFS
