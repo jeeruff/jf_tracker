@@ -25065,7 +25065,7 @@ local function frame()
   elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then
-    local KT = { kcls = ' - the class of the sample: by its name, ~ - by its sound (fingerprints)', kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
+    local KT = { ksim = ' - sim: show / hide < ξ > (similar samples) in the pad header', kcls = ' - the class of the sample: by its name, ~ - by its sound (fingerprints)', kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
@@ -27468,6 +27468,9 @@ local function frame()
       elseif hover.dspbtn.what == 'ksize' then ctx.drum_size_menu()   -- 19 окт: размер пэдов
       elseif hover.dspbtn.what == 'kmidi' then ctx.midi_out_menu(dsp_target())   -- 23 окт: MIDI out рэка
       elseif hover.dspbtn.what == 'knew' then ctx.kit_new_menu(hover.dspbtn.f, hover.dspbtn.ki, hover.dspbtn.kkey)   -- 31 окт
+      elseif hover.dspbtn.what == 'ksim' then   -- 1 ноя (2): < ξ > в шапке пэда — вкл / выкл
+        draw.padsim = not draw.padsim; reaper.SetExtState('jf_tracker', 'padsim', draw.padsim and '1' or '0', true)
+        vim.msg = 'pad: similar sample buttons ' .. (draw.padsim and 'on: < back, ξ random like it, > next like it ([ ] in pads)' or 'off ([ ] in pads still step)')
       elseif hover.dspbtn.what == 'kxi' or hover.dspbtn.what == 'kxprev' or hover.dspbtn.what == 'kxnext' then
         ctx.pad_similar(hover.dspbtn.f, hover.dspbtn.ki, ({ kxi = nil, kxprev = -1, kxnext = 1 })[hover.dspbtn.what])
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек
@@ -33344,6 +33347,7 @@ ctx.class_of = function(path)   -- кэш по пути (kNN в кадре до�
   return v or nil
 end
 draw.class_of = ctx.class_of
+draw.padsim = reaper.GetExtState('jf_tracker', 'padsim') == '1'   -- 1 ноя (2): < ξ > пэда видны
 -- 1 ноя: путь файла в индексе карты (копия в папке проекта — по имени)
 ctx.map_path_of = function(path)
   if not (path and B.mapG) then return path end

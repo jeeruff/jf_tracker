@@ -11813,17 +11813,20 @@ function D.frame(L, snap, rows, state, info)
             if kid.file and D.class_of then
               local cl = D.class_of(kid.file)
               local aw = ms('<') + 2 * L.pad
-              local items = { { '>', 'kxnext', aw }, { 'ξ', 'kxi', ms('ξ') + 2 * L.pad }, { '<', 'kxprev', aw } }
+              -- 1 ноя (2): sim — показать / спрятать < ξ > (место в шапке)
+              local items = { { 'sim', 'ksim', ms('sim') + 2 * L.pad } }
+              if D.padsim then for _, b in ipairs({ { '>', 'kxnext', aw }, { 'ξ', 'kxi', ms('ξ') + 2 * L.pad }, { '<', 'kxprev', aw } }) do items[#items + 1] = b end end
               if cl then table.insert(items, { cl, 'kcls', ms(cl) + 2 * L.pad }) end
               for _, b in ipairs(items) do
                 local bx3 = sx1 - b[3]
                 if bx3 < cx + L.pad + ms('S01 ') then break end
                 local hb = not drag and mx >= bx3 and mx < bx3 + b[3] and my >= hy and my < hy + L.rh
+                local lit = b[2] == 'ksim' and D.padsim
                 if b[2] ~= 'kcls' then
-                  set(hb and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx3, hy, b[3], L.rh - 1, 1)
+                  set(hb and U.tint(U.AMBER, 0.35) or (lit and U.tint(U.AMBER, 0.25) or U.BG)); gfx.rect(bx3, hy, b[3], L.rh - 1, 1)
                   set(hb and U.AMBER or U.LINE); gfx.rect(bx3, hy, b[3], L.rh - 1, 0)
                 end
-                text(bx3 + L.pad, hy, b[1], hb and U.AMBER or (b[2] == 'kcls' and U.GREY or U.TEXT))
+                text(bx3 + L.pad, hy, b[1], (hb or lit) and U.AMBER or ((b[2] == 'kcls' or b[2] == 'ksim') and U.GREY or U.TEXT))
                 if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid, ki = ks } end
                 sx1 = bx3 - 2
               end
