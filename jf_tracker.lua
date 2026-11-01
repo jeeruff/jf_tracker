@@ -13467,6 +13467,8 @@ ctx = {
       items[#items + 1] = { label = name, kind = 'action', value = 'load', desc = 'load the profile ' .. name .. ' (delete: :optdel ' .. name .. ')', fn = function() ctx.opt_load(name) end }
     end
     OPT.open(items, state.opt_tab)
+    OPT.pane = (state.panes_ui and state.panes and draw.panes) and true or false   -- 1 ноя: опции панелью
+    if OPT.pane then ctx.opt_show() end
   end,
   -- \ o (4 окт): опции гидрой — буква у каждой (первая свободная буква подписи,
   -- тема — t); переключатель — сразу, выбор — список значений, число — + / -
@@ -24334,6 +24336,7 @@ local function frame()
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
     hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,   -- 28 окт: панель hints
     console_draw = function(Lx, x, y, w, h, foc) return ctx.CON.draw(U, Lx, x, y, w, h, foc, ctx.fit) end,   -- 28 окт: консоль
+    opt_draw = function(Lx, x, y, w, h, foc) return ctx.opt_pane_draw(x, y, w, h, foc) end,
     manual_draw = function(Lx, x, y, w, h) if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end; return ctx.DOC.draw(Lx, x, y, w, h) end,   -- 29 окт: справка панелью
     slice_key = function(k) return ctx.slice_key(k) end, slice_note = function(k) return ctx.slice_note(k) end, ssel = function() return ctx.ssel end, mini_wave = SPROP.mini_wave,
     notes_draw = (state.panes_ui or (state.top and state.notes_open)) and function(Lx, x, y, w, h)
@@ -25267,7 +25270,7 @@ local function frame()
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
-  if OPT.active then OPT.dock = ctx.opt_dock(); OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end; if HN.active then HN.draw(U, L) end end   -- 31 окт: метки f поверх опций   -- 31 окт: выпадашка из опций — поверх окна опций
+  if OPT.active and not OPT.pane then OPT.dock = nil; OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end; if HN.active then HN.draw(U, L) end end   -- 31 окт: метки f поверх опций   -- 31 окт: выпадашка из опций — поверх окна опций
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if ctx.LOGOPOP then ctx.logo_draw() end
   if ctx.SP and ctx.SP.on then ctx.SP.hints = state.hints; ctx.SP.draw(U, draw, L, gfx.w, gfx.h - L.status_h) end
@@ -25883,7 +25886,7 @@ local function frame()
     if (U.click or U.rclick or mclick) and MX.SMART.p then
       -- 12 окт: средний щелчок по открытой панели — тоже выбор (открыл средним — выбрал средним)
       MX.SMART.click(gfx.mouse_x, gfx.mouse_y, U.rclick); U.click, U.rclick = false, false
-    elseif mclick and hover.row and hover.fi and not hover.row.clip and not OPT.active and not (vim.hydra or vim.picker) then
+    elseif mclick and hover.row and hover.fi and not hover.row.clip and not ctx.opt_m() and not (vim.hydra or vim.picker) then
       ctx.set_focus('tracker')
       if vim.mode ~= 'visual' and vim.mode ~= 'vline' then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row end
       if hover.field then vim.cur.field = hover.field; vim.cur.sub = hover.fsub end
@@ -25894,7 +25897,7 @@ local function frame()
   -- пикер мышью (10 окт): щелчок по строке — выбрать (как Enter), мимо или ПКМ —
   -- закрыть (как Esc), колесо над ним — выбор вверх / вниз
   if ctx.popup_wheel then gfx.mouse_wheel = vim.picker and ctx.popup_wheel or 0; ctx.popup_wheel = nil end   -- гидра колесом не листается: съедено
-  if vim.picker and not OPT.active then
+  if vim.picker and not ctx.opt_m() then
     local r = draw.popup_rect
     local inside = r and gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4]
     if U.click and draw.popup_group then vim.picker_pick(draw.popup_group[1], draw.popup_group[2]); if vim.picker then vim.picker.col = math.min(vim.picker.depth + 1, draw.popup_group[1] + 1) end; U.click = false   -- 16 окт: папка пикера — выбрать, фокус правее
@@ -25917,7 +25920,7 @@ local function frame()
     end
   end
   -- гидра / контекстное меню мышью (5 окт): клик по строке — её буква, мимо — закрыть
-  if (U.click or U.rclick) and vim.hydra and not OPT.active then
+  if (U.click or U.rclick) and vim.hydra and not ctx.opt_m() then
     if draw.popup_hot and U.click then vim.hydra_key(draw.popup_hot:byte())
     else
       local r = draw.popup_rect
@@ -25960,7 +25963,7 @@ local function frame()
   end
   if U.click and OPT.ask.active then OPT.ask.click(); U.click = false end
   -- скролл-бары списков (4 окт): ползунок тянется, клик мимо — страница
-  if U.click and not OPT.active then
+  if U.click and not ctx.opt_m() then
     for key, r in pairs(draw.vbars) do
       if r.hot then
         local mp = r.horiz and gfx.mouse_x or gfx.mouse_y
@@ -25988,7 +25991,7 @@ local function frame()
       local ok, e = pcall(ctx.os_drop, files, hover); if not ok then vim.msg = 'drop: ' .. tostring(e):match('[^\n]*$') end
     end
   end
-  if U.click and OPT.active then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false end
+  if U.click and ctx.opt_m() then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false; if OPT.pane and state.focus ~= 'options' and OPT.active then ctx.set_focus('options') end end
   if U.click and hover.mautoarm then ctx.autoarm_all(hover.mautoarm == 'on'); U.click = false end   -- 18 окт: autoarm — все треки (20 окт: = tA)
   if U.click and hover.mfold then
     U.click = false
@@ -26868,7 +26871,7 @@ local function frame()
       end
     end
   end
-  if U.rclick and OPT.active and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
+  if U.rclick and ctx.opt_m() and OPT.rclick and OPT.rclick() then U.rclick = false end   -- ПКМ по имени: в быстрые опции (6 окт)
   if U.click and ctx.SP and ctx.SP.on then   -- 18 окт: выбор размера
     local h = ctx.SP.hover
     if h and h.cell then ctx.SP.n, ctx.SP.d = h.cell.n, h.cell.d; ctx.sig_pick_apply()
@@ -29778,7 +29781,7 @@ local function frame()
   end
   -- колесо над матрицей (5 окт, без фокуса, как в REAPER): колесо — слоты,
   -- гориз. колесо / Shift — колонки, Cmd — плавный зум высоты, Option — ширины
-  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and hover.matrix and hover.matrix.inside and not OPT.active and not (vim.hydra or vim.picker) then
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and hover.matrix and hover.matrix.inside and not ctx.opt_m() and not (vim.hydra or vim.picker) then
     local wv, wh = gfx.mouse_wheel, gfx.mouse_hwheel or 0
     local m = ctx.mods()
     local zv, zh = ctx.zoom_axes(wv, wh)
@@ -29821,7 +29824,7 @@ local function frame()
     GD.key(gfx.mouse_wheel > 0 and 43 or 45, snap, seq)
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and OPT.active then OPT.wheel(gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0 end
+  if gfx.mouse_wheel ~= 0 and ctx.opt_m() then OPT.wheel(gfx.mouse_wheel > 0 and 1 or -1); gfx.mouse_wheel = 0 end
   if gfx.mouse_wheel ~= 0 and hover.rglen then
     ctx.region_len_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
@@ -29865,7 +29868,7 @@ local function frame()
   -- 21 окт: колесо листает модуль под мышью, а не весь трекер: зум / прокрутка трекера — только над ним
   local wo = (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and ctx.wheel_owner() or nil
   local w_trk = wo == nil or wo == 'tracker'
-  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and w_trk and not hover.dsp and not hover.browser and not hover.fxb and not OPT.active then
+  if (gfx.mouse_wheel ~= 0 or (gfx.mouse_hwheel or 0) ~= 0) and w_trk and not hover.dsp and not hover.browser and not hover.fxb and not ctx.opt_m() then
     local zv, zh = ctx.zoom_axes(gfx.mouse_wheel, gfx.mouse_hwheel or 0)
     if zv and gfx.mouse_cap & 8 == 8 then zh, zv = (zh ~= 0 and zh or zv), 0 end   -- 8 окт: Shift — колесо по ширине (выделенных треков)
     if zv then
@@ -30001,7 +30004,7 @@ local function frame()
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
-  if OPT.active and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker then
+  if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
     else OPT.key(c) end
     c = 0
@@ -30574,11 +30577,11 @@ local function frame()
   -- оператор, VISUAL) — стоп транспорта вместо смены режима
   if c == 27 and state.escstop and not ctx.mods().shift and (reaper.GetPlayState() & 1) == 1 and (reaper.GetPlayState() & 4) == 0
      and not vim.picker and not vim.hydra and not vim.pending and not vim.op and vim.mode ~= 'cmd' and vim.mode ~= 'search'
-     and vim.mode ~= 'visual' and vim.mode ~= 'vline' and not OPT.active and not (MX.SMART and MX.SMART.active()) then
+     and vim.mode ~= 'visual' and vim.mode ~= 'vline' and not ctx.opt_k() and not (MX.SMART and MX.SMART.active()) then
     ctx.stop_here()
     c = 0
   end
-  if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not OPT.active then
+  if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
     reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
     vim.msg = 'time selection removed'
     c = 0
@@ -30745,12 +30748,12 @@ local function frame()
     c = 0
   end
   if OPT.ask.active and c ~= 0 then OPT.ask.key(c); c = 0 end
-  if OPT.active and c ~= 0 and HN.active then   -- 31 окт: прыжок в окне опций — метки его строк / вкладок
+  if ctx.opt_k() and c ~= 0 and HN.active then   -- 31 окт: прыжок в окне опций — метки его строк / вкладок
     local r = HN.key(c)
     if type(r) == 'table' then pcall(hint_go, r) end
     c = 0
   end
-  if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
+  if ctx.opt_k() and c ~= 0 and not (OPT.pane and ctx.mods().cmd) then OPT.key(c); c = 0 end
   if draw.notepop and c ~= 0 then ctx.notepop_key(c); c = 0 end   -- 1 ноя: клавиатура ноты — h l полутон, j k октава, имя D5 / C#3, Enter, Esc
   if ctx.SP and ctx.SP.on and c ~= 0 then
     if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
@@ -31232,6 +31235,8 @@ local function frame()
         elseif r == 'ai' or r == 'points' then ctx.lfo_make(r)
         elseif r == 'pick' then ctx.lfo_pick_env()
         elseif not r then return vim.key(c) end
+      elseif state.focus == 'options' then   -- 1 ноя: панель options без открытых опций — Enter открывает, Esc — в трекер
+        if c == 13 then ctx.options() elseif c == 27 then ctx.set_focus('tracker') else return vim.key(c) end
       elseif state.focus == 'humanizer' then   -- 19 окт: панель humanizer
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if vim.piano and c >= 48 and c <= 57 and vim.plays_note(c) then return vim.key(c) end   -- 22 окт: KEYS — цифры играют ноты, число не набирается
@@ -31637,13 +31642,49 @@ end
 -- 21 окт: R — умный ввод из ретро-буфера MIDI REAPER (пишет всегда, пока трек взведён, и без транспорта): последняя
 -- сыгранная фраза — на трек курсора, первая нота — ровно на строку курсора (тишина до неё срезана). Действие 40211
 -- (взведённые и выделенные) — на время только этот трек выделен; выделение и курсор REAPER — как были
--- 1 ноя: опции — в нижней панели (где DSP), вытянутой вверх до середины окна: трекер сверху виден, что меняется;
--- нижней панели нет — окно по центру, как было
-ctx.opt_dock = function()
-  local c = L and L.pn and L.pn.by_panel and (L.pn.by_panel['dsp'] or L.pn.by_panel['mixer'] or L.pn.by_panel['notes'])
-  if not (c and c.w and c.h) or c.y < gfx.h * 0.25 then return nil end
-  local y0 = math.min(c.y, math.floor(gfx.h * 0.45))
-  return { x = c.x, y = y0, w = c.w, h = c.y + c.h - y0 }
+-- 1 ноя: опции — панель options (в стеке DSP, побольше): клавиши — только когда она в фокусе, мышь — только над ней;
+-- без панелей (опция panes выкл) — окно поверх, модально, как было
+ctx.opt_k = function() return OPT.active and (not OPT.pane or state.focus == 'options') end
+ctx.opt_m = function()
+  if not OPT.active then return false end
+  if not OPT.pane then return true end
+  local b = OPT.box
+  if not b or reaper.time_precise() - (OPT.pane_t or 0) > 0.3 then return false end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  return mx >= b[1] and mx < b[1] + b[3] and my >= b[2] and my < b[2] + b[4]
+end
+ctx.opt_leave = function() ctx.set_focus('tracker') end
+ctx.opt_show = function()
+  local PN, m = draw.panes, state.panes
+  if not PN.visible(m, 'options') then
+    if PN.visible(m, 'dsp') then ctx.pane_do(function() return PN.stack(m, 'options', 'dsp') end, 'options')
+    else ctx.pane_do(function() return PN.show(m, 'options', 'tracker', 0.45) end, 'options') end
+    -- побольше: лист растёт до ~55 % высоты окна (закрытие возвращает как было)
+    local c = L and L.pn and L.pn.by_panel and L.pn.by_panel['dsp']
+    if c and not OPT.grown and c.h < gfx.h * 0.5 then
+      local d = (gfx.h * 0.55 - c.h) / math.max(1, gfx.h)
+      if PN.resize(m, 'options', 'v', d) then OPT.grown = d end
+    end
+  end
+  ctx.pane_focus('options')
+end
+ctx.opt_hide = function()
+  local PN, m = draw.panes, state.panes
+  if OPT.grown then PN.resize(m, 'options', 'v', -OPT.grown); OPT.grown = nil end
+  OPT.active = false
+  ctx.pane_do(function() return PN.hide(m, 'options') end, 'options hidden')
+  ctx.set_focus('tracker')
+end
+ctx.opt_pane_draw = function(x, y, w, h, foc)
+  OPT.pane_t = reaper.time_precise()
+  if not (OPT.active and OPT.pane) then
+    OPT.box = nil
+    U.text(x + L.pad, y + 2, ctx.fit('options: Enter or a click - open', w - 2 * L.pad), foc and U.TEXT or U.GREY)
+    if U.click and gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= y and gfx.mouse_y < y + h then U.click = false; ctx.options() end
+    return
+  end
+  OPT.dock = { x = x, y = y, w = w, h = h }
+  OPT.draw(L, gfx.w, gfx.h)
 end
 -- 31 окт: Opt+Shift+R — то же, но сыгранное сразу становится новой фразой (pN), на месте — её триггер
 ctx.retro_phrase = function() ctx.retro_insert(true) end

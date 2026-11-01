@@ -7244,6 +7244,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.draw_instruments(L, info, ct.x, ct.y, ct.w, ct.h, hover)
       elseif id == 'clipboard' and info.clip_draw then
         info.clip_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'clipboard', hover)
+      elseif id == 'options' and info.opt_draw then info.opt_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'options')   -- 1 ноя: опции панелью
       elseif id == 'manual' and info.manual_draw then   -- 29 окт: справка панелью
         local mh = info.manual_draw(L, ct.x, ct.y, ct.w, ct.h)
         if inside and type(mh) == 'table' then for k2, v2 in pairs(mh) do hover[k2] = v2 end end

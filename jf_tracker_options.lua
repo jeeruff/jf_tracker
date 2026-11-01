@@ -96,6 +96,7 @@ end
 -- компактная панель (5 окт): свойства item у курсора — те же строки, без
 -- вкладок и поиска, у точки anchor = { x, y }; title — заголовок
 function O.open_panel(items, title, anchor)
+  O.pane = false   -- 1 ноя: компактная панель — поверх, модально (панель options покажет «открыть»)
   O.all, O.items, O.tabs, O.tab, O.query, O.typing = items, items, {}, nil, '', false
   O.compact = { title = title or '', x = anchor and anchor.x, y = anchor and anchor.y }
   O.page, O.active, O.sel, O.scroll, O.numbuf = 'list', true, 1, 0, nil
@@ -112,9 +113,13 @@ end
 function O.open_about(fn)
   local a = fn()
   O.logo, O.about, O.title = a.logo, a.text or {}, a.title
-  O.page, O.ascroll, O.active, O.ab_log = 'about', 0, true, nil   -- 17 окт: about открывается с начала (не в changelog)
+  O.page, O.ascroll, O.active, O.ab_log, O.pane = 'about', 0, true, nil, false   -- 17 окт: about открывается с начала (не в changelog)
 end
-function O.close() O.active = false; O.drag = nil end
+-- 1 ноя: опции панелью (O.pane) — «закрыть» (Esc, действия перед вводом команды) = фокус обратно в трекер, панель остаётся
+function O.close()
+  if O.pane and O.active and ctx.opt_leave then O.typing = false; O.drag = nil; ctx.opt_leave(); return end
+  O.active = false; O.drag = nil
+end
 
 local function val_text(it)
   if it.kind == 'action' then return it.value or '' end
@@ -244,7 +249,10 @@ function O.wheel(d)
   if O.page == 'about' then O.ascroll = math.max(0, O.ascroll - d); return end
   if O.block_hot and O.block_hot.wheel then O.block_hot.wheel(d); return end   -- 31 окт: блок со своей прокруткой (темы, шрифты)
   -- 20 окт: колонки выше окна — колесо мимо строки листает их
-  if O.masonry_on and (O.mover or 0) > 0 and not O.hover then
+  -- 1 ноя: колонки не влезли — колесо листает всегда, кроме как над значением (там — меняет его)
+  local vr = O.hover and O.vrect_last and O.vrect_last[O.hover]
+  local onval = vr and gfx.mouse_x >= vr[1] - 2 and gfx.mouse_x < vr[1] + vr[3] + 2
+  if O.masonry_on and (O.mover or 0) > 0 and not onval then
     O.mscroll = math.max(0, math.min(O.mover, (O.mscroll or 0) - d * 3 * (O.rh or 16)))
     return
   end
@@ -281,7 +289,8 @@ end
 function O.click(mx, my)
   if O.page == 'about' and O.log_hot then O.toggle_log(); return end   -- 17 окт: кнопка changelog
   if O.page == 'about' and O.link_hot then if ctx.open_url then ctx.open_url(O.link_hot) end; return end
-  if O.close_hot and O.page ~= 'about' then O.close(); return end
+  if O.close_hot and O.page ~= 'about' then if O.pane and ctx.opt_hide then ctx.opt_hide() else O.close() end; return end
+  if O.msb_hot then O.msb_drag = true; return end   -- 1 ноя: полоса прокрутки колонок — тащится
   if O.tab_hot then O.set_tab(O.tab_hot); return end
   if O.block_hot and O.block_hot.click and O.block_hot.click() then
     for i, it in ipairs(O.items) do if it.blockrow and it.of == O.block_hot then O.sel = i; break end end
@@ -303,7 +312,7 @@ function O.click(mx, my)
       if mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
     else O.adjust(it, 0) end
   end
-  if O.box and (mx < O.box[1] or mx > O.box[1] + O.box[3] or my < O.box[2] or my > O.box[2] + O.box[4]) then O.close() end
+  if not O.pane and O.box and (mx < O.box[1] or mx > O.box[1] + O.box[3] or my < O.box[2] or my > O.box[2] + O.box[4]) then O.close() end
 end
 
 -- отрисовка поверх всего: панель по центру окна
@@ -789,13 +798,22 @@ function O.draw(L, W, H)
   local masonry = O.masonry_plan(L, bx, by + rh + 4, bw - 8, nvis * rh)   -- 15 окт: разделы рамками в колонки (см. O.masonry_plan)
   if masonry and masonry.over > 0 and not O.compact and not O.big then O.big, O.big_tab = true, O.tab end   -- 31 окт: следующий кадр — на всё окно
   -- 31 окт: полоса прокрутки справа, когда всё не влезло (колесо / j k)
+  O.msb_hot = nil
   if masonry and masonry.over > 0 then
     local ty, th = by + rh + 4, nvis * rh
     local tot = th + masonry.over
     local kh = math.max(rh, math.floor(th * th / tot))
     local ky = ty + math.floor((th - kh) * (O.mscroll or 0) / math.max(1, masonry.over))
+    -- 1 ноя: полоса тащится мышью (была только картинкой)
+    if O.msb_drag then
+      if gfx.mouse_cap & 1 == 1 then
+        local f = math.max(0, math.min(1, (gfx.mouse_y - ty - kh / 2) / math.max(1, th - kh)))
+        O.mscroll = math.floor(f * masonry.over + 0.5)
+      else O.msb_drag = nil end
+    end
+    O.msb_hot = gfx.mouse_x >= bx + bw - 12 and gfx.mouse_x < bx + bw and gfx.mouse_y >= ty and gfx.mouse_y < ty + th
     U.set(U.LINE); gfx.rect(bx + bw - 6, ty, 3, th, 1)
-    U.set(U.AMBER); gfx.rect(bx + bw - 7, ky, 5, kh, 1)
+    U.set((O.msb_hot or O.msb_drag) and U.TEXT or U.AMBER); gfx.rect(bx + bw - 9, ky, 7, kh, 1)
   end
   if masonry then O.scroll = 0 end
   -- полоса прокрутки списка (5 окт): хоткеев сотни

@@ -64,7 +64,8 @@ PN.PANELS = {
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
   { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true },   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
   { id = 'hints',      label = 'hints',      key = 'I', hint = 'hints',   side = 'top' },
-  { id = 'manual',     label = 'manual',     key = 'Z', hint = 'help',    side = 'right' },   -- 29 окт: вся справка (была на всё окно)
+  { id = 'manual',     label = 'manual',     key = 'Z', hint = 'help',    side = 'right' },
+  { id = 'options',    label = 'options',    key = ',', hint = 'options', side = 'bottom' },   -- 1 ноя: окно Options — панелью (в стеке DSP): клавиши только в фокусе   -- 29 окт: вся справка (была на всё окно)
   { id = 'console',    label = 'console',    key = 'E', hint = 'console', side = 'bottom' },   -- 28 окт: Strudel-строки пишут ноты в паттерн (:console, \\ E)   -- 28 окт: что делает модуль под мышью / в фокусе (\\ h)
   { id = 'garden',     label = 'orca',       key = 'O', hint = 'orca',    side = 'top', tab = true, avail = 'dev' },
 }
