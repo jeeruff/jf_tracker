@@ -25337,7 +25337,7 @@ local function frame()
   elseif hover.tab then state.status = ({ scope = 'oscilloscopes / spectrum of all tracks', sample = 'item: the selected instrument item - slices, selection, properties, drag to track', modulation = 'modulate: native parameter modulation of the cursor track + curve generator (lfo / premod / follow) - L switches', midi = 'MIDI learn: knobs and pads of a controller drive the slicer', retro = 'retro sampler: 40 s ring buffers (jf_rec), put / to lib', master = 'master track: meters and fx chain' })[hover.tab] or ('tab: ' .. hover.tab)
   elseif hover.viewbtn == 'fxparams' then state.status = 'param: the parameters you show in the REAPER track controls (TCP) - under their fx in the effects row, thin sliders (drag, wheel, dblclick: default); click on the fx name - select it in DSP, dblclick - its window'
   elseif hover.hdrparam then state.status = (hover.hdrparam.name or 'parameter') .. ': drag / wheel - value, dblclick - default'
-  elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing); f jumps to any of them'
+  elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing, Option+click: remove); f jumps to any of them'
   elseif hover.viewbtn == 'fitw' then state.status = 'W (zw): all tracks the same width, the widest at which all fit'
   elseif hover.viewbtn == 'fith' then state.status = 'H (zh): the ' .. ctx.view_cur() .. ' fits the screen by height (LPB)'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
@@ -25379,6 +25379,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.btn == 'add' then state.status = 'new region after the last one, from the next bar (+, N+ for N regions, :add [bars] [name]); n names it'
   elseif hover.prevbtn then state.status = 'preview: play the item when selected - ' .. (state.poolprev and 'on' or 'off') .. ', mode ' .. (state.prevmode or 'full') .. ' - click: on / off, rclick: mode (full / hold / first second); Esc stops'
   elseif hover.poolfind then state.status = 'find in the lib (fzf) - also / when the lib has focus'
+  elseif hover.hdrsend then state.status = 'send ' .. tostring((hover.hdrsend.it or {}).name or '') .. ' - click: routing, Option+click: remove it'
   elseif hover.sendpop then state.status = ({ add = '+ send: pick a track (fzf)', routing = 'REAPER routing window', mute = 'mute this send', del = 'remove this send' })[hover.sendpop.what] or ''
   elseif hover.sendvol then state.status = 'send volume - drag'
   elseif hover.hdrin then state.status = hover.hdrin.what == 'smart' and 'smart input: pick the input from the track (jf_smart_set_input)' or 'track input - click: list (fzf), click again closes'
@@ -26681,7 +26682,15 @@ local function frame()
     -- 30 окт: трек — по GUID: клик выбирает эффект в DSP, модель пересобирается, колонка — уже другая таблица
     local dbl = lc and lc.kind == kind and h2.col and lc.guid == h2.col.guid and lc.k == h2.k and now3 - lc.t < 0.35
     ctx.hdr_last = { kind = kind, col = h2.col, guid = h2.col and h2.col.guid, k = h2.k, t = now3 }
-    ctx.hdr_pick(kind, h2.col, h2.k, dbl)   -- 8 окт: клик — выбрать эффект в DSP, двойной — нативное окно (и с param тоже)
+    if kind == 'send' and ctx.mods().alt and h2.col and h2.col.track then   -- 1 ноя: Option+щелчок по send — удалить его
+      local c = ctx.hdr_cache[h2.col.guid]; local sd = c and c.sends[h2.k]
+      if sd and sd.si then
+        edit.run('remove send ' .. (sd.name or ''), function() reaper.RemoveTrackSend(h2.col.track, 0, sd.si) end)
+        ctx.hdr_cache[h2.col.guid] = nil; model.invalidate()
+        vim.msg = 'send removed: ' .. (sd.name or '') .. ' (u - undo)'
+      end
+      U.click = false
+    else ctx.hdr_pick(kind, h2.col, h2.k, dbl) end   -- 8 окт: клик — выбрать эффект в DSP, двойной — нативное окно (и с param тоже)
     -- 9 окт: вставку можно протянуть на другой трек (как блоки DSP)
     if kind == 'fx' and h2.it and h2.it.i and h2.col then
       ctx.ins_drag = { col = h2.col, fxi = h2.it.i, name = h2.it.name or 'fx', x0 = gfx.mouse_x, y0 = gfx.mouse_y, active = false }
