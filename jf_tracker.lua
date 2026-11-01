@@ -3529,6 +3529,19 @@ ctx = {
   end,
   env_view = function()
     local f = L and L.flat and L.flat[vim.cur.fi]
+    -- 1 ноя: ze на MIDI-лейне (CC / PB / AT / PAT / PC) — его вид, как у огибающей; c — холст curve
+    if f and f.ml and f.col and (f.ml.kind == 'cc' or f.ml.kind == 'pb' or f.ml.kind == 'at' or f.ml.kind == 'pat' or f.ml.kind == 'pc') then
+      local k = (f.col.guid or '') .. '/ml:' .. (f.ml.name or '')
+      local cur = state.envvals[k] or 'bars'
+      local function set(m, what) return function() state.envvals[k] = m; vim.msg = (f.ml.name or 'lane') .. ': ' .. what end end
+      vim.open_hydra({ title = 'view of the lane ' .. (f.ml.name or ''), items = {
+        { key = 'b', label = (cur == 'bars' and '* ' or '') .. 'values and bars: the number and a line under it (held value as a line)', fn = set('bars', 'values and bars') },
+        { key = 'c', label = 'curve: the automation canvas (draw, shapes)', fn = function() ctx.curve_open() end },
+        { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (the held value fills the row)', fn = set('steps', 'steps') },
+        { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values only (as a command column)', fn = set('vals', 'values') },
+      } })
+      return
+    end
     if not (f and f.env and f.col) then
       ctx.inst_window(cur_col())
       return

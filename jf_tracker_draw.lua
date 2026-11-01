@@ -10083,7 +10083,8 @@ function D.frame(L, snap, rows, state, info)
           local cbg = foc and (info.focus == 'tracker' and D.CURCELL or U.LINE) or nil
           if cbg then set(cbg); gfx.rect(m.x, y, m.w, L.rh, 1) end
           local function ctext(tx2, ty2, str, col) text(tx2, ty2, str, cbg and U.BG or col) end
-          if (ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
+          local mview = (D.envvals and D.envvals[(c.col.guid or '') .. '/ml:' .. (ml.name or '')]) or 'bars'   -- 1 ноя: ze на лейне
+          if mview ~= 'vals' and (ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'at' or ml.kind == 'pat' or ml.kind == 'pb') then
             -- держится ли значение: последнее событие до строки
             local held
             for k = #ml.rows, 1, -1 do if ml.rows[k] <= r.row then held = ml.ev[ml.rows[k]].v; break end end
@@ -10093,7 +10094,8 @@ function D.frame(L, snap, rows, state, info)
               local d = math.floor((held - 64) / 64 * half + 0.5)
               if d ~= 0 then set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(d > 0 and cx0 or cx0 + d, y + L.rh - 4, math.abs(d), 3, 1) end
             elseif held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat') then
-              set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1)   -- 11 окт: ярче и толще — было еле видно
+              if mview == 'steps' then set(U.mix(U.CYAN, U.BG, e and 0.15 or 0.5)); gfx.rect(m.x + 1, y + 2, math.max(1, math.floor(held / 127 * (m.w - 2))), L.rh - 4, 1)   -- фейдер во всю строку
+              else set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1) end   -- 11 окт: ярче и толще — было еле видно
             end
           end
           -- 30 окт: JOG (CONTROL) — значения шагов прямо в клетках: столбик янтарём и новое число, до записи

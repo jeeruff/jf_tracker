@@ -2387,3 +2387,4 @@
 - [ ] 1 ноя: z в панели опций: zz — на всё окно, zx — выше (~3/4), z + буква — вкладка (t theme, m modules, h hotkeys, f fx commands, o options)
 - [ ] 1 ноя: automation → curve с курсором на ноте — кривые всех MIDI-лейнов трека (PAT, CC …) и его огибающих, Tab — между ними
 - [ ] 1 ноя: curve: amen / delay (и vel) — внутри папки amen, папки списка + / - (как в lf), строки лейнов кликабельны все
+- [ ] 1 ноя: ze на MIDI-лейне — b bars / s steps / v values / c curve
