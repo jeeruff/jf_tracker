@@ -23147,10 +23147,11 @@ local function frame()
     local mods = edit.take_modified()
     local others = 0
     for _, m in ipairs(mods) do others = others + #edit.items_with_iid(m.old) end
-    OPT.ask.open(('%d note(s) changed (stretch / offset)'):format(#mods), ('linked to %d other note(s) of the same item'):format(others), {
+    if state.ptmode then vim.msg = ('%d note(s) made unique (PT-mode: always only this one)'):format(#mods)   -- 1 ноя: в PT-mode не спрашивать — u
+    else OPT.ask.open(('%d note(s) changed (stretch / offset)'):format(#mods), ('linked to %d other note(s) of the same item'):format(others), {
       { key = 'u', label = 'only this one - it becomes unique', fn = function() vim.msg = ('%d note(s) made unique'):format(#mods) end },
       { key = 'a', label = ('apply to all %d linked'):format(others), fn = function() vim.msg = ('applied to %d linked note(s)'):format(edit.propagate(mods)) end },
-    })
+    }) end
   end
   if state.prev_hold and gfx.mouse_cap & 1 == 0 then PV.stop(); state.prev_hold = nil end   -- hold: кнопка отпущена
   -- 18 окт: протяжка по полоске выделения матрицы — выделение от слота нажатия до слота под мышью
