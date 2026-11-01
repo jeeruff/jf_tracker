@@ -31780,12 +31780,7 @@ ctx.opt_show = function()
   if not PN.visible(m, 'options') then
     if PN.visible(m, 'dsp') then ctx.pane_do(function() return PN.stack(m, 'options', 'dsp') end, 'options')
     else ctx.pane_do(function() return PN.show(m, 'options', 'tracker', 0.45) end, 'options') end
-    -- побольше: лист растёт до ~55 % высоты окна (закрытие возвращает как было)
-    local c = L and L.pn and L.pn.by_panel and L.pn.by_panel['dsp']
-    if c and not OPT.grown and c.h < gfx.h * 0.5 then
-      local d = (gfx.h * 0.55 - c.h) / math.max(1, gfx.h)
-      if PN.resize(m, 'options', 'v', d) then OPT.grown = d end
-    end
+    -- 1 ноя: размер панели не трогаем (рос стек DSP и оставался большим); выше — zx или ручкой
   end
   ctx.pane_focus('options')
 end
