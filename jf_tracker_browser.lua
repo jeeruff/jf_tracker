@@ -86,6 +86,7 @@ local function wanted(name, map)
   return B.all_files or (ext ~= nil and AUDIO[ext:lower()] == true)
 end
 
+B.split = not (R.GetExtState and R.GetExtState('jf_tracker', 'bsplit') == '0')   -- 1 ноя: две колонки (папки | файлы), по умолчанию вкл
 function B.init(c, root)
   ctx = c
   -- ~/samples, если есть; иначе домашняя папка (релиз 5 окт)
@@ -1078,7 +1079,7 @@ function B.set_all(list)
   end
   if B.cur > #B.entries then B.cur = math.max(1, #B.entries) end
   if B.cur < 1 then B.cur = 1 end
-  B.scroll = 0
+  B.scroll = 0; B.scroll_d, B.scroll_f = 0, 0
 end
 
 -- начать поиск в списке (/ или кнопка find)
@@ -1859,6 +1860,21 @@ end
 
 function B.refilter_soon() if R.time_precise then B.filter_due = R.time_precise() + 0.25 else B.set_all(B.all) end end
 -- клавиши в фокусе браузера; true — съедена
+-- 1 ноя: две колонки — диапазон строк колонки курсора (папки 1..nd, файлы nd+1..N); без колонок — весь список
+function B.col_range()
+  local nd = B.split_nd
+  if not nd then return 1, math.max(1, #B.entries) end
+  if B.cur <= nd then return 1, nd end
+  return nd + 1, #B.entries
+end
+-- Cmd+H / Cmd+L: в колонку папок / файлов (курсор — где был в ней); с крайней колонки — false (соседняя панель)
+function B.split_step(dir)
+  local nd = B.split_nd
+  if not nd then return false end
+  if dir == 'l' and B.cur > nd then B.cur_f = B.cur; B.cur = math.min(nd, B.cur_d or 1); return true end
+  if dir == 'r' and B.cur <= nd then B.cur_d = B.cur; B.cur = math.max(nd + 1, math.min(#B.entries, B.cur_f or (nd + 1))); return true end
+  return false
+end
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
   if B.filtering then
@@ -1916,10 +1932,10 @@ function B.key(c)
   elseif ch == 'w' then B.click('size')
   elseif ch == 'q' then B.click('hide')
   elseif c == 27 and B.filter ~= '' then B.filter = ''; B.set_all(B.all)
-  elseif ch == 'j' or c == 1685026670 then B.cur = math.max(1, math.min(#B.entries, B.cur + n))
-  elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - n)
-  elseif ch == 'g' then B.cur = 1
-  elseif ch == 'G' then B.cur = had_count and math.max(1, math.min(#B.entries, n)) or #B.entries   -- 3G — третья строка
+  elseif ch == 'j' or c == 1685026670 then local a, b = B.col_range(); B.cur = math.max(a, math.min(b, B.cur + n))
+  elseif ch == 'k' or c == 30064 then local a = B.col_range(); B.cur = math.max(a, B.cur - n)
+  elseif ch == 'g' then B.cur = (B.col_range())
+  elseif ch == 'G' then local a, b = B.col_range(); B.cur = had_count and math.max(a, math.min(b, a + n - 1)) or b   -- 3G — третья строка
   elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере (первым: пэд / отметки не перехватывают)
   elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
@@ -2211,17 +2227,26 @@ function B.draw(U, L, x, y, w, h)
     pv_x, pv_w = x + pw + cw0 + 1, w - pw - cw0 - 3
     x, w = x + pw, cw0 - 1
   end
+  -- 1 ноя: две колонки (опция browser split, ширина >= 40 знаков): папки слева, файлы справа; Cmd+H / Cmd+L — между ними
+  local nd = 0
+  for _, e in ipairs(B.entries) do if e.dir then nd = nd + 1 else break end end
+  local split = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and not cols and w >= L.cw * 40 and nd > 0 and nd < #B.entries
+  B.split_nd = split and nd or nil
   local nvis = math.floor(h / L.rh)
-  -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
-  if B.last_cur ~= B.cur then
-    B.last_cur = B.cur
-    if B.cur - 1 < B.scroll then B.scroll = B.cur - 1 end
-    if B.cur - 1 >= B.scroll + nvis then B.scroll = B.cur - nvis end
-  end
-  B.scroll = math.max(0, math.min(B.scroll, math.max(0, #B.entries - nvis)))
-  local vb = { x + w - 2, y, nvis }           -- тоненький скролл-бар — после строк (волны его не закрывают)
-  for i = 1, nvis do
-    local idx = B.scroll + i
+  local function draw_range(x, w, a, b, skey)
+    local sc = B[skey] or 0
+    -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом листается
+    if B['last_' .. skey] ~= B.cur and B.cur >= a and B.cur <= b then
+      B['last_' .. skey] = B.cur
+      local rel = B.cur - a
+      if rel < sc then sc = rel end
+      if rel >= sc + nvis then sc = rel - nvis + 1 end
+    end
+    sc = math.max(0, math.min(sc, math.max(0, b - a + 1 - nvis)))
+    B[skey] = sc
+    for i = 1, nvis do
+    local idx = a + sc + i - 1
+    if idx > b then break end
     local e = B.entries[idx]
     if not e then break end
     local ry = y + (i - 1) * L.rh
@@ -2263,8 +2288,20 @@ function B.draw(U, L, x, y, w, h)
     end
     if mx >= x and mx < x + w and my >= ry and my < ry + L.rh then hover = idx end
     if ctx.hint then ctx.hint('browser', x + 2, ry, w - 4, L.rh, idx) end
+    end
+    return sc
   end
-  if ctx.vbar then ctx.vbar('browser', vb[1], vb[2], 2, vb[3] * L.rh, B.scroll, vb[3], #B.entries) end
+  if split then
+    local lw = math.floor(w * 0.4)
+    local sd = draw_range(x, lw - 1, 1, nd, 'scroll_d')
+    U.set(U.LINE); gfx.rect(x + lw - 1, y, 1, h, 1)
+    local sf = draw_range(x + lw, w - lw, nd + 1, #B.entries, 'scroll_f')
+    if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, sf, nvis, #B.entries - nd) end
+    B.scroll = B.cur <= nd and sd or (nd + sf)
+  else
+    B.scroll = draw_range(x, w, 1, #B.entries, 'scroll')
+    if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end
+  end
   -- 27 окт: третья колонка — что под курсором: папка — её содержимое (щелчок — туда), файл — крупная волна и сведения
   if cols then
     local e = B.entries[B.cur]
