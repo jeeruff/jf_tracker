@@ -27927,7 +27927,7 @@ local function frame()
         IK.marks[i] = (not IK.marks[i]) or nil
         vim.msg = ('lib: %d marked - dd / x cut them, yy yank, u unmark (Cmd+click, m)'):format(IK.nmarks())
       end
-      if ctx.mods().shift and not hover.pool.empty then IK.anchor = IK.anchor or vim.inst else IK.anchor = nil end
+      if ctx.mods().shift and not hover.pool.empty then ctx.lib_shift_range(ctx.lib_anchor or vim.inst, hover.pool.i) else IK.anchor = nil; ctx.lib_anchor = nil end
       state.prev_by_mouse = true
       pool_select(hover.pool.i)
       state.prev_by_mouse = nil
@@ -33238,6 +33238,24 @@ ctx.pt64_offer = function()
     { key = 'y', label = 'make every pattern 64 rows (:pt 64)', fn = function() ctx.pt_64() end },
     { key = 'n', label = 'keep them as they are', fn = function() vim.msg = 'PT-mode: patterns kept (:pt 64 - later)' end },
   })
+end
+-- 1 ноя: Shift+щелчок в lib — что вижу, то и выделяю: все строки между выбранной и щёлкнутой в порядке экрана
+-- (сортировка по имени / длине …), а не по номерам; выделение — отметками (dd / x / yy работают по ним)
+ctx.lib_shift_range = function(from, to)
+  local order, pa, pb = {}, nil, nil
+  for _, row in ipairs((L and L.pool_rows) or {}) do
+    if row.i and not row.sub and not row.empty then
+      order[#order + 1] = row.i
+      if row.i == from then pa = #order end
+      if row.i == to then pb = #order end
+    end
+  end
+  if not (pa and pb) then IK.anchor = IK.anchor or from; return end   -- строки не видны — по номерам, как было
+  IK.anchor = nil
+  ctx.lib_anchor = from   -- следующий Shift+щелчок — от той же строки
+  IK.clear_marks()
+  for k = math.min(pa, pb), math.max(pa, pb) do IK.marks[order[k]] = true end
+  vim.msg = ('lib: %d selected as shown - dd / x cut, yy yank, u unmark'):format(IK.nmarks())
 end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
