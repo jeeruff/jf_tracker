@@ -25537,7 +25537,7 @@ local function frame()
   elseif hover.slxaim then state.status = 'slixer aim - the edge up close: drag - fine move, wheel - wider / closer'
   elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
   elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: a slice here (on an edge - remove it), drop a file: new sample'
-  elseif hover.mmfx then state.status = 'MFX - monitor FX (after the master, only to the speakers - not in renders): click - the chain window (zC); green - effects on, grey - none / bypassed'
+  elseif hover.mmfx then state.status = 'mfx - monitor FX (after the master, only to the speakers - not in renders): click - the chain window (zC); green - effects on, grey - none / bypassed'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
