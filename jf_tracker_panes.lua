@@ -698,12 +698,20 @@ function PN.drag_grip(model, lay, grip, dpx)
     if dpx < 0 then dpx = math.max(dpx, -room(k1, true)) else dpx = math.min(dpx, room(k2, false)) end
     if math.abs(dpx) < 0.5 then return false end
   end
-  local d = dpx / size
-  d = math.max(-(p.fr[i] - 0.05), math.min(p.fr[i + 1] - 0.05, d))
-  p.fr[i], p.fr[i + 1] = p.fr[i] + d, p.fr[i + 1] - d
+  -- 1 ноя: i — номер среди ЖИВЫХ детей (раскладка пропускает скрытые: микшер выкл), а доли — у всех детей:
+  -- ищем настоящие индексы листов у ручки (было: двигалась доля скрытого микшера — линия над DSP стояла)
+  local function real(kid) for k, v in ipairs(p.kids) do if v == kid then return k end end end
+  local ia, ib = real(grip.kid or p.kids[i]) or i, real(grip.next or p.kids[i + 1]) or (i + 1)
+  -- доли считаются от суммы долей ЖИВЫХ детей (раскладка делит по ним)
+  local fsum = 0
+  for k, v in ipairs(p.kids) do if not M or lay.nodes[v] then fsum = fsum + (p.fr[k] or 0) end end
+  if fsum <= 0 then fsum = 1 end
+  local d = dpx / size * fsum
+  d = math.max(-(p.fr[ia] - 0.05 * fsum), math.min(p.fr[ib] - 0.05 * fsum, d))
+  p.fr[ia], p.fr[ib] = p.fr[ia] + d, p.fr[ib] - d
   -- 22 окт: сосед по ручке — узел той же оси (трекер над микшером в одном узле): сдвиг получает только его
   -- лист у ручки, остальные внутри стоят на месте (было: делился по долям — тянешь низ микшера, едет его верх)
-  local px = d * size
+  local px = d / fsum * size
   local function keep(n, delta, last)
     if not n or is_leaf(n) or n.ax ~= grip.ax then return end
     local ids, sz, fs, tot = {}, {}, 0, 0
