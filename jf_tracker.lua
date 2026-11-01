@@ -19668,6 +19668,7 @@ function ctx.context_items(hover)
     if lf then
       add('Folder ' .. lf .. ': save it as the lib "' .. lf .. '"', function() ctx.kit_save(lf, lf) end, 'w')
       add('Folder ' .. lf .. ': load a lib into it …', function() ctx.kit_into_folder(lf) end, 'o')
+      add('Folder ' .. lf .. ': to drumrs5k (every sample a pad, the rack of the cursor track)', function() ctx.lib_folder_drum(lf) end, 'D')   -- 1 ноя (d — удалить инструмент)
     end
     add((state.libfolders and '!' or '') .. 'Folders: kicks, snares, hats … (3+ alike)', function() state.libfolders = not state.libfolders; vim.msg = 'lib folders ' .. (state.libfolders and 'on' or 'off') end, 'f')
     add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end, 'r')
@@ -33475,6 +33476,23 @@ ctx.mfx_open = function()
   reaper.Main_OnCommand(41882, 0)
   local n = reaper.TrackFX_GetRecCount(reaper.GetMasterTrack(0))
   vim.msg = ('monitor FX: %d effect(s) - after the master, only to the speakers (not in renders)'):format(n)
+end
+-- 1 ноя: папка lib → drumrs5k: каждый сэмпл папки — пэд (рэк трека курсора; нет — новый), по порядку lib
+ctx.lib_folder_drum = function(name)
+  local files = {}
+  for _, row in ipairs((L and L.pool_rows) or {}) do
+    if row.folder == name then
+      local col = cur_col()
+      for _, i in ipairs(row.members or {}) do
+        local e = col and col.pool and col.pool[i]
+        local f = e and e.item and ctx.item_file and ctx.item_file(e.item)
+        if f then files[#files + 1] = f end
+      end
+      break
+    end
+  end
+  if #files == 0 then vim.msg = 'folder ' .. tostring(name) .. ': no samples (lib folders on, the cursor on the folder)'; return end
+  ctx.drum_add_files(files)
 end
 ctx.fxcmd_dir = function() local d = reaper.GetResourcePath() .. '/Data/jf_tracker_fxcmds'; reaper.RecursiveCreateDirectory(d, 0); return d end
 ctx.fxcmd_export = function(name)
