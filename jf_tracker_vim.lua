@@ -3167,28 +3167,36 @@ function V.key_impl(c)
       end
       -- dW — весь item под курсором (не только нота MIDI); dt — весь трек
       -- курсора в регионе (вне региона — до =END). Просьба 2 окт.
-      -- 13 окт: dc — колонка огибающей курсора целиком: точки, automation items, сама колонка
-      if p == 'd' and c == ('c'):byte() then
-        local f = flat()[V.cur.fi]
-        if f and (f.env or f.ml) and ctx.env_remove then ctx.env_remove(f) ; V.count = nil; finish_edit()
-        else V.msg = 'dc: put the cursor on an automation column' end
-        return
-      end
-      -- 20 окт: dC — поле курсора (vol / delay / команда) очистить во всём треке (все подколонки, все регионы); ноты остаются
-      if p == 'd' and c == ('C'):byte() then
+      -- 1 ноя: dc — значения колонки (огибающая / MIDI-лейн: все точки и события, колонка остаётся; поле ноты — в паттерне курсора),
+      -- dC — колонка целиком (огибающая / лейн — сама колонка; поле ноты — во всём треке). Было: dc — колонка, dC — поле в треке
+      if p == 'd' and (c == ('c'):byte() or c == ('C'):byte()) then
+        local whole = c == ('C'):byte()
         local f, fld = flat()[V.cur.fi], V.cur.field or 1
-        if not f or f.env or f.ml or fld < 2 then V.msg = 'dC: put the cursor on vol, delay or a command field'
-        else
-          local fa, fb = V.cur.fi, V.cur.fi
-          local function same(g) return g and g.col == f.col and not g.env and not g.ml end
-          while same(flat()[fa - 1]) do fa = fa - 1 end
-          while same(flat()[fb + 1]) do fb = fb + 1 end
-          local hs = V.heads_in(fa, fb, 0, math.max(0, ctx.snap().last_row or 0) + 1)
-          ctx.edit.run('clear field in the track', function() for _, h in ipairs(hs) do V.field_set(h, fld, nil) end end)
-          V.msg = ('dC: the field cleared on %d note(s) of the track'):format(#hs)
-          V.count = nil; finish_edit(); return
+        if f and (f.env or f.ml) then
+          if whole then
+            if ctx.env_remove then ctx.env_remove(f); V.count = nil; finish_edit() else finish_move() end
+          else
+            local last = math.max(0, ctx.snap().last_row or 0) + 1
+            if apply('d', V.cur.fi, V.cur.fi, 0, last) then V.msg = 'dc: every value of the column deleted, the column stays (dC - the column too)'; finish_edit() else finish_move() end
+            V.count = nil
+          end
+          return
         end
-        V.count = nil; finish_move(); return
+        if not f or fld < 2 then V.msg = 'dc / dC: put the cursor on an automation column, vol, delay or a command field'; V.count = nil; finish_move(); return end
+        local fa, fb = V.cur.fi, V.cur.fi
+        local function same(g) return g and g.col == f.col and not g.env and not g.ml end
+        while same(flat()[fa - 1]) do fa = fa - 1 end
+        while same(flat()[fb + 1]) do fb = fb + 1 end
+        local r0, r1 = 0, math.max(0, ctx.snap().last_row or 0) + 1
+        if not whole then
+          local pr0, pr1 = ctx.region_rows and ctx.region_rows()
+          if not pr0 then V.msg = 'dc: no pattern here (dC - the whole track)'; V.count = nil; finish_move(); return end
+          r0, r1 = pr0, pr1
+        end
+        local hs = V.heads_in(fa, fb, r0, r1)
+        ctx.edit.run(whole and 'clear field in the track' or 'clear field in the pattern', function() for _, h in ipairs(hs) do V.field_set(h, fld, nil) end end)
+        V.msg = ('d%s: the field cleared on %d note(s) of the %s'):format(whole and 'C' or 'c', #hs, whole and 'track' or 'pattern')
+        V.count = nil; finish_edit(); return
       end
       -- 27 окт: dw на огибающей, MIDI-лейне (CC / PB / PC, cmd мастера) или в колонке команды — событие курсора (нет — следующее
       -- ниже); 3dw — три события подряд; курсор на месте: снова dw — следующее
@@ -3289,10 +3297,13 @@ function V.key_impl(c)
       if p == 'd' and (c == ('p'):byte() or c == ('P'):byte()) and ctx.region_rows then
         local f = flat()[V.cur.fi]
         local pr0, pr1 = ctx.region_rows()
-        if not f or f.env or not pr0 then V.msg = 'dp / dP: no pattern here'; finish_move(); V.count = nil; return end
+        if not f or not pr0 then V.msg = 'dp / dP: no pattern here'; finish_move(); V.count = nil; return end
+        -- колонка курсора: огибающая / MIDI-лейн — только она; ноты — подколонки нот этого лейна
         local fa, fb = V.cur.fi, V.cur.fi
-        while flat()[fa - 1] and flat()[fa - 1].col == f.col and flat()[fa - 1].lane == f.lane and not flat()[fa - 1].env do fa = fa - 1 end
-        while flat()[fb + 1] and flat()[fb + 1].col == f.col and flat()[fb + 1].lane == f.lane and not flat()[fb + 1].env do fb = fb + 1 end
+        if not (f.env or f.ml) then
+          while flat()[fa - 1] and flat()[fa - 1].col == f.col and flat()[fa - 1].lane == f.lane and not flat()[fa - 1].env and not flat()[fa - 1].ml do fa = fa - 1 end
+          while flat()[fb + 1] and flat()[fb + 1].col == f.col and flat()[fb + 1].lane == f.lane and not flat()[fb + 1].env and not flat()[fb + 1].ml do fb = fb + 1 end
+        end
         local up = c == ('p'):byte()
         local r0, r1 = up and pr0 or V.cur.row, up and V.cur.row or pr1
         if apply('d', fa, fb, r0, r1) then
@@ -4267,7 +4278,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c automation column | C the cursor field in the whole track | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c column values (field - pattern) | C the whole column (field - the whole track) | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
