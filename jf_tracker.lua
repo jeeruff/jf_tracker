@@ -31796,6 +31796,8 @@ ctx.focus_back_tick = function()
   local title = fg and reaper.JS_Window_GetTitle(fg) or ''
   local fx = title:match('^%u+i?: .* %- Track %d') or title:match('^FX: ') or title:match('^%u+i?: .* %- Master')
   if not fx then return end
+  -- 1 ноя: окна, открытые нарочно (monitor FX, цепь мастера — mfx / zm / zC), фокус не отдают трекеру
+  if title:find('Monitoring', 1, true) or title:find('Master', 1, true) or now < (ctx.fb_hold or 0) then return end
   ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
   if ctx.my_hwnd then reaper.JS_Window_SetFocus(ctx.my_hwnd) end
 end
@@ -33442,7 +33444,7 @@ end
 ctx.master_menu = function()
   local mt = reaper.GetMasterTrack(0)
   local function on(id) return reaper.GetToggleCommandState(id) == 1 and '  *' or '' end
-  local function act(id, msg) return function() reaper.Main_OnCommand(id, 0); vim.msg = msg end end
+  local function act(id, msg) return function() ctx.fb_hold = reaper.time_precise() + 3; reaper.Main_OnCommand(id, 0); vim.msg = msg end end
   local nfx, nmfx = reaper.TrackFX_GetCount(mt), reaper.TrackFX_GetRecCount(mt)
   vim.open_hydra({ title = 'master', items = {
     { key = 'f', label = ('fx chain of the master (%d)'):format(nfx), fn = act(40846, 'master fx chain') },
@@ -33460,6 +33462,7 @@ ctx.master_menu = function()
 end
 -- 1 ноя: цепь monitor FX — окно REAPER (zC, кнопка MFX мастера)
 ctx.mfx_open = function()
+  ctx.fb_hold = reaper.time_precise() + 3
   reaper.Main_OnCommand(41882, 0)
   local n = reaper.TrackFX_GetRecCount(reaper.GetMasterTrack(0))
   vim.msg = ('monitor FX: %d effect(s) - after the master, only to the speakers (not in renders)'):format(n)
