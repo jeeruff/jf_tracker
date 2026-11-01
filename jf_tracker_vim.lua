@@ -964,6 +964,18 @@ local function hex_entry(c, fld, heads)
   local ch = (c < 256) and string.char(c):upper() or ''
   local buf = V.hexbuf or ''
   local is_hex = ch:match('^[0-9A-F]$') ~= nil
+  -- 1 ноя: PT-mode — команда как в ProTracker: три hex-знака (C40, 940, D10, E93), перевод в наш код
+  if fld >= 4 and ctx.PTFX then
+    if not is_hex then return false end
+    buf = buf .. ch
+    if #buf < 3 then V.hexbuf = buf; V.msg = buf .. '_: ProTracker command (0 arp 1 2 slide 3 porta 4 vib 9 offset A vol slide B jump C vol D break E9 retrig F tempo)'; return false end
+    V.hexbuf = nil
+    local code, val = ctx.PTFX.to_ours(buf:sub(1, 1), tonumber(buf:sub(2), 16))
+    if not code then V.msg = buf .. ': ' .. tostring(val); return 'none' end
+    buf = code .. ('%02X'):format(val)
+    V.cur.sub = nil
+    goto pt_write
+  end
   if fld >= 4 and V.cur.sub ~= 'val' then
     -- 12 окт: левая половина — код. Буква — сразу код 0x (D = 0D), S и Z — приставки (SI, ZT),
     -- 0 — по привычке (0D). Код готов — курсор на значение, ждёт две цифры
@@ -1008,6 +1020,7 @@ local function hex_entry(c, fld, heads)
     local h = V.covering(V.cur.fi, V.cur.row)[1]
     if h and h.kind == 'audio' and h.item then ctx.edit.cont_vol(h.item, ctx.row_time(V.cur.row), tonumber(buf, 16), ctx.row_time(V.cur.row + 1)); return true end
   end
+  ::pt_write::
   if #heads == 0 then V.msg = 'no note in this row - type the note first (vol / delay / effects belong to a note)'; return 'none' end
   if fld == 2 and V.cur.sub == 'pan' then ctx.edit.set_pan(heads, tonumber(buf, 16))   -- 14 окт: колонка пана
   elseif fld == 2 then ctx.edit.set_vol(heads, lpb(), tonumber(buf, 16))

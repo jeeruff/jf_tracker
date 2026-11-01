@@ -2500,8 +2500,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
       elseif fx[i] then
         -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
         local col = D.FX_COL[fx[i]:sub(1, 2)] or (fx[i]:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER
-        text(x + L.x_fx[i], ty, fx[i], c(3 + i, muted and U.GREY or col))
-      else text(x + L.x_fx[i], ty, '....', c(3 + i, D.EMPTY)) end
+        text(x + L.x_fx[i], ty, D.PTFX and D.PTFX.show(fx[i]) or fx[i], c(3 + i, muted and U.GREY or col))   -- 1 ноя: PT-mode — как в ProTracker (C40, 940, D10)
+      else text(x + L.x_fx[i], ty, D.PTFX and '... ' or '....', c(3 + i, D.EMPTY)) end
     end
   elseif k == 'off' then
     -- 31 окт: опция IT OFF — свободный OFF (all notes off, без ноты) как ^^^ (note cut Impulse Tracker), конец ноты — OFF
@@ -2549,7 +2549,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
         local f = slot[i]
         if f then
           local col = head.muted and U.GREY or (D.FX_COL[f:sub(1, 2)] or (f:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER)
-          text(x + L.x_fx[i], ty, f, c(3 + i, D.fx_dim[i] and U.mix(U.BG, col, 0.38) or col))
+          text(x + L.x_fx[i], ty, D.PTFX and D.PTFX.show(f) or f, c(3 + i, D.fx_dim[i] and U.mix(U.BG, col, 0.38) or col))
         end
       end
       -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько

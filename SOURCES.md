@@ -35,3 +35,4 @@ Every new borrowing gets a row here (and a line in NOTICE / README Credits).
 How the check is done: every `.lua` file of jf_tracker against the source, comments and
 string contents removed, whitespace collapsed; equal lines of 30+ characters and equal
 function names are listed (`tools/srccheck.py <source files>`).
+- ProTracker 2.3D command letters for PT-mode (jf_tracker_ptfx.lua): the idea of the command set only, own code.

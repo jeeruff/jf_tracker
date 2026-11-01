@@ -97,6 +97,7 @@ MX.VZ.vtext = draw.vtext                                -- 13 окт: верти
 MX.VZ.WEB = reaper.GetResourcePath() .. '/reaper_www_root/isf'
 MX.ARC = dofile(DIR .. '/jf_tracker_arc.lua')          -- 15 окт: monome arc — 4 кольца = 4 параметра эффекта (панель grid)
 MX.MR = dofile(DIR .. '/jf_tracker_macros.lua')         -- вкладка macros (9 окт)
+MX.PTFX = dofile(DIR .. '/jf_tracker_ptfx.lua')   -- 1 ноя: команды ProTracker в PT-mode
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
@@ -12106,7 +12107,7 @@ ctx = {
   -- 31 окт: PT-mode = ProTracker, OG-mode слит в него (одна концепция: свобода в ограничениях): 4 канала track1..4
   -- (OG: создаются с инструментами og channel N, видны только они), 31 сэмпл, паттерн 64 строки, шрифт x2, панели — нужные
   pt_toggle = function()
-    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions' }
+    local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions', 'ttf', 'ttfcustom', 'ttfpx' }
     if state.ptmode then
       if state.og then ctx.og_toggle() end
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
@@ -12124,6 +12125,14 @@ ctx = {
       -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
       state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.captions = 1, 'off', 'off', false, 4, false
       state.fontscale = math.min(4, (tonumber(state.pt_saved.fontscale) or 2) * 2)   -- 31 окт: шрифт x2 от текущего
+      -- 1 ноя: шрифт Amiga — Topaz (a500, Trueschool), если установлен: 8 px ×2 = 16 px, пиксель в пиксель; нет — битмап x2
+      local home = os.getenv('HOME') or ''
+      for _, fp in ipairs({ home .. '/Library/Fonts/Topaz_a500_v1.0.ttf', '/Library/Fonts/Topaz_a500_v1.0.ttf', home .. '/Library/Fonts/TopazPlus_a500_v1.0.ttf' }) do
+        if reaper.file_exists(fp) then
+          state.ttf, state.ttfcustom, state.ttfpx = 'custom', fp:find('Plus') and 'TopazPlus a500a1000a2000' or 'Topaz a500a1000a2000', 16
+          break
+        end
+      end
       state.pt_fit = true                                    -- кадр уменьшит масштаб, если 4 канала не влезли
       if not state.scopes then ctx.toggle_scopes(true) end
       state.ptmode = true
@@ -22995,6 +23004,7 @@ local function frame()
   end
   edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
   model.PANCOL = state.pancol
+  draw.PTFX = state.ptmode and MX.PTFX or nil; ctx.PTFX = draw.PTFX
   if model.PTCODES ~= (state.ptmode and true or nil) then model.PTCODES = state.ptmode and true or nil; model.invalidate() end   -- 1 ноя: смещение — 09xx
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
   if edit.msg then vim.msg = edit.msg; edit.msg = nil end   -- 13 окт: сообщение правки (пустой слот и т.п.)
