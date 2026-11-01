@@ -13114,7 +13114,7 @@ function D.frame(L, snap, rows, state, info)
       local pw = math.max(3 * L.cw, (L.th or L.rh) + 4 * L.pad)
       local hot = mx >= bx and mx < bx + pw and my >= boxy and my < boxy + bh0
       -- 1 ноя: без рамки, «+» в 4 раза крупнее по центру поля
-      local pk = 4
+      local pk = 2   -- 1 ноя: вдвое меньше (было 4)
       local pw2 = D.big_measure('+', pk)
       if pw2 + 2 * L.pad > pw then pw = pw2 + 2 * L.pad end
       if hot then set(U.tint(U.AMBER, 0.12)); gfx.rect(bx, boxy, pw, bh0, 1) end
