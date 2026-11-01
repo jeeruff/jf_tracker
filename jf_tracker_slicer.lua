@@ -911,6 +911,10 @@ end
 -- 12 окт: прицел у ноты под курсором трекера (если она этого инструмента): base — место звука на строке
 -- курсора (секунды e), dt — сдвиг h l / H L / мышью; s режет только эту ноту в точке прицела
 -- 12 окт: точка реза с привязками: t-snap — ближайший транзиент, 0-cross — ближайший переход через ноль (±10 мс)
+-- 1 ноя: кнопки прицела (рисуются во втором ряду кнопок вкладки item) и их клавиши при активном прицеле
+S.BT = { { 'act_nbar', 'nbar', act = true }, { 'act_cut', 'cut', act = true }, { 'act_smk', 'smk', act = true }, { 'act_sq', 'squant', act = true },
+         { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
+S.BT_KEYS = { act_cut = 's', act_smk = 'S', act_sq = 'Q', cut0x = '0', cutsnap = 't', cutquant = 'q' }
 function S.cut_point(te)
   local st = ctx.state or {}
   local e = S.cross and S.cross.e
@@ -1076,17 +1080,28 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- jf_rec); есть всегда — и у файла браузера
   local bx = x
   local brow = 0                       -- 9 окт: кнопки не влезли (x2) — перенос на строку ниже, волна ниже
+  -- 1 ноя: кнопки прицела (nbar cut smk squant 0-cross t-snap quant) — во втором ряду справа (было: на прицеле)
+  local bt_w = 0
+  if not e.file and e.item then
+    for _, b in ipairs(S.BT) do
+      local kk = S.cross and S.BT_KEYS[b[1]]
+      bt_w = bt_w + ((kk and b.act) and (U.measure(kk) + L.pad) or 0) + U.measure(b[2]) + 2 * L.pad + 2
+    end
+    brow = 1
+  end
+  S.bt_y = (not e.file and e.item) and (y + 2 * rh) or nil   -- файл браузера — кнопки на прицеле, как было
+  local brow0 = 0
   if not e.file and e.item then
     local BTN = { { 'snap', 'snap' }, { 'trim', 'autotrim' }, { '2', 'eq2' }, { '4', 'eq4' }, { '8', 'eq8' }, { '16', 'eq16' }, { '32', 'eq32' }, { '64', 'eq64' },
                   { 'transients', 'trans' }, { '-', 'sens-' }, { '+', 'sens+' }, { 'clear', 'clear' }, { 'stretch', 'smkall' }, { 'playthru', 'pthru' }, { (ctx.slq_label and ctx.slq_label()) or 'q 0', 'slq' }, { 'mono', 'mono' }, { 'follow', 'follow' } }   -- 9 окт: scramble — во вкладке macros   -- quantize — Q (панель) и \\q у курсора (5 окт)
     for _, b in ipairs(BTN) do
       local bw = U.measure(b[1]) + 2 * L.pad   -- 24 окт: приписки клавиш убраны (просьба) — клавиша в статусе при наведении
-      local lim = brow == 0 and (x + hint_w) or (x + w)
+      local lim = brow0 == 0 and (x + hint_w) or (x + w - bt_w - L.pad)
       if bx + bw > lim then
-        if brow >= 1 then break end
-        brow, bx = brow + 1, x; lim = x + w
+        if brow0 >= 1 then break end
+        brow0, bx = brow0 + 1, x; lim = x + w - bt_w - L.pad
       end
-      local by = y + rh + brow * rh
+      local by = y + rh + brow0 * rh
       local hot = gfx.mouse_x >= bx and gfx.mouse_x < bx + bw and gfx.mouse_y >= by and gfx.mouse_y < by + rh
       local on = (b[2] == 'slq' and ctx.slq_rows and ctx.slq_rows() > 0) or (b[2] == 'snap' and S.snap) or (b[2] == 'pthru' and ctx.playthru_of and ctx.playthru_of(e)) or (b[2] == 'mono' and ctx.mono_on and ctx.mono_on()) or (b[2] == 'follow' and ctx.state and ctx.state.slicefollow)   -- playthru (6 окт): горит, когда включён
       U.set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
@@ -1101,8 +1116,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       bx = bx + bw + 2
     end
     if editing and #S.trans > 0 then
-      local st = ctx.fit(('sens %.2f'):format(S.sens), (brow == 0 and (x + hint_w) or (x + w)) - bx - L.pad)
-      U.text(bx + L.pad, y + rh + brow * rh + 1, st, U.GREY)
+      local st = ctx.fit(('sens %.2f'):format(S.sens), (brow0 == 0 and (x + hint_w) or (x + w - bt_w - L.pad)) - bx - L.pad)
+      U.text(bx + L.pad, y + rh + brow0 * rh + 1, st, U.GREY)
       bx = bx + U.measure(st) + 2 * L.pad
     end
   else
@@ -1811,19 +1826,19 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- 12 окт: строка под прицелом — слева подсказка, справа в линию spam / 0-cross / t-snap / quant
   do
     local fy = wy + wh + ((ZH > 0 and not ztop) and (ZH + 2) or 0) + (SBH > 0 and (SBH + 2) or 0) + 2   -- 16 окт: прицел наверху — его высота уже в wy (строка уезжала за модуль)
-    -- 17 окт: прицел наверху — его кнопки на нём (справа внизу), а не под слайсами
-    local by2 = (ztop and zy_top) and (zy_top + ZH - rh - 1) or fy
-    local KEYS = S.cross and { act_cut = 's', act_smk = 'S', act_sq = 'Q', cut0x = '0', cutsnap = 't', cutquant = 'q' } or nil   -- прицел активен — клавиши на кнопках
+    -- 1 ноя: кнопки прицела — во втором ряду кнопок справа, над полосой-обзором (место было пустое), прицел свободен
+    local by2 = S.bt_y or ((ztop and zy_top) and (zy_top + ZH - rh - 1) or fy)
+    local KEYS = S.cross and S.BT_KEYS or nil   -- прицел активен — клавиши на кнопках
     local st = ctx.state or {}
     local mx2, my2 = gfx.mouse_x, gfx.mouse_y
     local down = (gfx.mouse_cap & 1) == 1
     local press = down and not S.cb_prev
     S.cb_prev = down
     -- 16 окт: и действия прицела — cut (как s), smk (stretch-маркер на строку), squant (smart quantize, как Q)
-    local BT = { { 'act_cut', 'cut', act = true }, { 'act_smk', 'smk', act = true }, { 'act_sq', 'squant', act = true },
-                 { 'cut0x', '0-cross' }, { 'cutsnap', 't-snap' }, { 'cutquant', 'quant' } }
+    local BT = S.BT
     -- 16 окт: что делает каждая — в строку подсказки модуля и в статус окна (ctx.status_from_slicer)
     S.CUT_DESC = S.CUT_DESC or {
+      act_nbar = 'nbar: a new bar starts at the aim line - the tempo since the last tempo marker fits (as :bar), the items of the track keep their time',
       act_cut = 'cut (s): cut the note under the cursor at the aimed point - the sound after it becomes the next note',
       act_smk = 'smk (S): a stretch marker at the aimed point, snapped to the row start - the hit lands on the grid',
       act_sq = 'squant (Q): smart quantize - the hits of the sample move to the nearest rows with stretch markers, the sound stays whole',
@@ -1857,6 +1872,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         if need and not S.cross then S.msg = b[2] .. ': aim at a note first (the cursor on a note of this sample)'
         elseif b[1] == 'act_cut' then local te = S.cut_point(S.cross.t + S.cross.dt); ctx.cut_at(S.cross, te, st.cutsnap and st.cutquant); S.cross = nil
         elseif b[1] == 'act_smk' and ctx.smk_at then ctx.smk_at(S.cross, S.cut_point(S.cross.t + S.cross.dt))
+        elseif b[1] == 'act_nbar' and ctx.bar_at then ctx.bar_at(S.cross, S.cut_point(S.cross.t + S.cross.dt))
         elseif b[1] == 'act_sq' then S.smart_quantize() end
       elseif hot2 and press and ctx.state then
         st[b[1]] = not st[b[1]]

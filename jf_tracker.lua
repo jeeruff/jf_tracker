@@ -9389,6 +9389,11 @@ ctx = {
     model.invalidate()
   end,
   -- 12 окт: разрезать ноту в точке прицела (секунды e) — не по строке; правая часть без метки слайса
+  -- 1 ноя: nbar — с линии прицела начинается такт (темп с прошлого маркера подгоняется, как :bar)
+  bar_at = function(c, te)
+    if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
+    ctx.bar_here(ctx.AIM.proj_of(c.n, c.e, te), 'the aim line')
+  end,
   cut_at = function(c, te, quant)
     if not (c and reaper.ValidatePtr(c.item, 'MediaItem*')) then return end
     local t = ctx.AIM.proj_of(c.n, c.e, te)
@@ -33005,8 +33010,8 @@ ctx.tempo_fit = function(qt, t, anchor_q, what)
   vim.msg = ('%s: %.2f BPM from %.2f s, then %.2f again (Cmd+Z undo)'):format(what, bpm, ta, bpm0)
   return true
 end
-ctx.bar_here = function()
-  local t, how = ctx.edge_point()
+ctx.bar_here = function(t, how)   -- 1 ноя: t, how — точка снаружи (nbar прицела вкладки item), иначе курсор
+  if not t then t, how = ctx.edge_point() end
   local _, meas = reaper.TimeMap2_timeToBeats(0, t)
   local m0 = reaper.TimeMap2_beatsToTime(0, 0, meas)
   local m1 = reaper.TimeMap2_beatsToTime(0, 0, meas + 1)
