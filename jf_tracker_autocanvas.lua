@@ -439,14 +439,19 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     end
     nrow = row
   else
-    local bx = x + w - pad - tw
+    -- 1 ноя: кнопки — сразу за именем кривой и «/ add» (было прижато вправо: пустое место посередине)
+    local hw0 = U.measure(('%s   %s'):format(act.name or 'curve', span.label or '')) + 2 * pad
+    local aw0 = lay.side and (U.measure('/ add') + 2 * pad) or 0
+    local bx = math.min(x + w - pad - tw, math.max(gx, x + pad + hw0 + aw0 + 2 * pad))
+    ACV.addx = lay.side and math.min(bx - aw0 - pad, x + pad + hw0) or nil
     for _, b in ipairs(tb) do if b.gap then bx = bx + pad end; b.bx, b.row = bx, 0; bx = bx + b.w + 2 end
   end
+  if two then ACV.addx = nil end
   if nrow > 0 then gy = gy + nrow * rh; gh = gh - nrow * rh; ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr } end
   local head = ('%s   %s%s'):format(act.name or 'curve', span.label or '',
     ACV.anchor and ('   v %d..%d'):format(math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row)) or '')
   local showtb = gh >= 10
-  U.text(x + pad, y + 1, ctx.fit(head, w - 2 * pad - (two and 0 or tw + pad)), focused and U.AMBER or U.CYAN)
+  U.text(x + pad, y + 1, ctx.fit(head, two and (w - 2 * pad) or math.max(0, (ACV.addx or tb[1].bx) - x - 2 * pad)), focused and U.AMBER or U.CYAN)   -- 1 ноя: до «/ add» / кнопок
   if showtb then
     for _, b in ipairs(tb) do
       local bx, ty = b.bx, y + b.row * rh
@@ -691,12 +696,15 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local lw = lay.side and (lay.lw - pad) or (w - 2 * pad)
   -- 31 окт: «/ add» — нечёткий поиск по всем параметрам трека: выбранный — в список (огибающая создаётся)
   do
-    local aw = lay.side and lw or (U.measure('/ add') + 2 * pad)
-    local hot = mx >= lx and mx < lx + aw and my >= ly and my < ly + rh
-    U.set(hot and U.AMBER or U.LINE); gfx.rect(lx, ly, aw, rh - 1, 0)
-    U.text(lx + pad, ly, '/ add', hot and U.AMBER or U.GREY)
+    -- 1 ноя: в строке заголовка (ACV.addx), «/» янтарём — клавиша поиска
+    local up = lay.side and ACV.addx
+    local aw = (lay.side and not up) and lw or (U.measure('/ add') + 2 * pad)
+    local ax, ay = up and ACV.addx or lx, up and (y + 1) or ly
+    local hot = mx >= ax and mx < ax + aw and my >= ay and my < ay + rh
+    U.set(hot and U.AMBER or U.LINE); gfx.rect(ax, ay, aw, rh - 1, 0)
+    U.text(ax + pad, ay, '/', U.AMBER); U.text(ax + pad + U.measure('/ '), ay, 'add', hot and U.AMBER or U.GREY)
     if hot then hover = { pane = 'curve', addp = true } end
-    if lay.side then ly = ly + rh + 2 else lx = lx + aw + 2 end
+    if up then elseif lay.side then ly = ly + rh + 2 else lx = lx + aw + 2 end
   end
   if lay.side and span.tree then   -- 31 окт: дерево: трек — папка, внутри его кривые
     for ri, r in ipairs(span.tree) do
