@@ -604,6 +604,10 @@ function B.map_key(c)
     if ctx.msg then ctx.msg('map: ' .. B.map_src) end
   elseif ch == 'v' then B.mapV.style = ({ graph = 'cards', cards = 'nebula', nebula = 'spore', spore = 'graph' })[B.mapV.style or 'graph'] or 'graph'; B.mapV.sys = nil; R.SetExtState('jf_tracker', 'mapstyle', B.mapV.style, true); if ctx.msg then ctx.msg('map: ' .. B.mapV.style .. ' view') end
   elseif ch == 'r' then B.map_random()
+  elseif ch == 's' then   -- 1 ноя: меню звука сэмпла под мышью (иначе последнего из истории): похожие, светлее / темнее …
+    local n = B.map_hv and B.map_hv.node
+    local p = (n and n.path) or (B.map_hist and B.map_hist[B.mapV.hcur or 1] and B.map_hist[B.mapV.hcur or 1].path)
+    if p and ctx.sound_menu then ctx.sound_menu(p) elseif ctx.msg then ctx.msg('s: hover a sample (or play one) - its sound menu') end
   elseif c == 27 and B.mapV.sys then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
   elseif (ch == '+' or ch == '=') and B.mapV.style == 'cards' then B.SM.cardz = math.min(6, (B.SM.cardz or 1.5) * 1.25)   -- 27 окт (8): размер карточек
   elseif ch == '-' and B.mapV.style == 'cards' then B.SM.cardz = math.max(0.6, (B.SM.cardz or 1.5) / 1.25)

@@ -2317,3 +2317,4 @@
 - [ ] 1 ноя: :fprint (map открыта на папке сэмплов) — отпечатки в фоне, прогресс в статусе; :similar на строке браузера / аудио-ноте — сетка похожих той же категории, выбор — слушать, Enter — в lib; хэт и шейкер должны расходиться
 - [ ] 1 ноя: arranger — кнопка print jumps (ZB ZJ -> timeline) = :pj
 - [ ] 1 ноя: :similar brighter / darker / shorter / longer / sharper / softer / noisier / tonal / louder / quieter — шаг в сторону по одному признаку, та же категория
+- [ ] 1 ноя: map — s на сэмпле под мышью: меню звука (s похожие, b светлее, d темнее, t g a o n c u q); lib — Enter: то же меню, выбранный заменяет звук инструмента (swap), Enter Enter — вкладка item

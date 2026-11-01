@@ -33246,12 +33246,13 @@ end
 -- в ту сторону по одному признаку отпечатка, остальные — как можно ближе (небольшой шаг лучше большого)
 ctx.SIM_DIR = { brighter = { 'b', 1 }, darker = { 'b', -1 }, shorter = { 'dc', -1 }, longer = { 'dc', 1 },
   sharper = { 'at', -1 }, softer = { 'at', 1 }, noisier = { 'nz', 1 }, tonal = { 'nz', -1 }, louder = { 'l', 1 }, quieter = { 'l', -1 } }
-ctx.similar_cmd = function(arg)
+ctx.similar_cmd = function(arg, o)   -- o: { path = источник, on_pick = что делать с выбранным, what = подпись }
+  o = o or {}
   local dir = arg and arg ~= '' and ctx.SIM_DIR[arg:match('^%s*(%a+)') or ''] or nil
   if arg and arg:match('%a') and not dir then vim.msg = 'similar: brighter darker shorter longer sharper softer noisier tonal louder quieter'; return end
   local SM = B.SM
-  local path
-  if state.focus == 'browser' and B.preview_path then path = B.preview_path(B.entries[B.cur]) end
+  local path = o.path
+  if not path and state.focus == 'browser' and B.preview_path then path = B.preview_path(B.entries[B.cur]) end
   if not path then
     local f = L and L.flat[vim.cur.fi]
     local c = f and f.sub and f.sub[vim.cur.row]
@@ -33296,10 +33297,39 @@ ctx.similar_cmd = function(arg)
     local n = cands[i].n
     items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
   end
-  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - into the lib)'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. cat .. ')') or '', #items, nfp),
+  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - ' .. (o.what or 'into the lib') .. ')'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. cat .. ')') or '', #items, nfp),
     items = items, cols = 2, sel = 1,
     on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
-    on_pick = function(it) ctx.add_to_depot(it.v) end })
+    on_pick = o.on_pick or function(it) ctx.add_to_depot(it.v) end })
+end
+-- 1 ноя: меню звука — похожие и шаги по признакам отпечатка (map: s; lib: Enter). o — как у similar_cmd
+ctx.sound_menu = function(path, o, extra)
+  o = o or {}
+  local items = {}
+  for _, e in ipairs(extra or {}) do items[#items + 1] = e end
+  local D = { { 's', nil, 'similar - sounds like it' }, { 'b', 'brighter', 'brighter' }, { 'd', 'darker', 'darker' },
+    { 't', 'shorter', 'shorter (tighter decay)' }, { 'g', 'longer', 'longer decay' }, { 'a', 'sharper', 'sharper attack' },
+    { 'o', 'softer', 'softer attack' }, { 'n', 'noisier', 'noisier' }, { 'c', 'tonal', 'more tonal (clean)' },
+    { 'u', 'louder', 'louder' }, { 'q', 'quieter', 'quieter' } }
+  for _, d in ipairs(D) do items[#items + 1] = { key = d[1], label = d[3], fn = function() ctx.similar_cmd(d[2], { path = path, on_pick = o.on_pick, what = o.what }) end } end
+  vim.open_hydra({ title = 'sound of ' .. (path:match('[^/]+$') or path) .. (o.what and (' - pick: ' .. o.what) or ''), items = items })
+  if o.on_enter and vim.hydra then vim.hydra.on_enter = o.on_enter end
+end
+-- lib: Enter — меню сэмпла: Enter Enter — во вкладку item (как было), s b d … — похожие / шаги, выбранный заменяет звук инструмента
+ctx.lib_enter_menu = function()
+  local col = cur_col()
+  local e = col and col.pool and col.pool[vim.inst]
+  local root = e and (e.parent or e)
+  local path = root and root.item and ctx.item_file and ctx.item_file(root.item)
+  if not path then ctx.open_slicer(); return end
+  ctx.sound_menu(path, { what = 'swap the sound of ' .. (root.name or 'it'),
+    on_pick = function(it)
+      local n = edit.swap_source(root.item, it.v)
+      model.invalidate()
+      vim.msg = ('swap: %s now plays %s in %d note(s) (swap button / u - back)'):format(root.name or '?', it.v:match('[^/]+$') or it.v, n or 0)
+    end,
+    on_enter = function() ctx.open_slicer() end },
+    { { label = 'Enter  - open in the item tab (slicer)', fn = function() ctx.open_slicer() end } })
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()

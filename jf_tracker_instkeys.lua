@@ -169,7 +169,7 @@ function IK.key(c, cur, n, nslots, ninst)
   elseif ch == 'v' then IK.anchor = IK.anchor and nil or cur
   elseif ch == 'p' then ctx.inst_put(false)
   elseif ch == 'P' then ctx.inst_put(true)
-  elseif c == 13 then ctx.open_slicer()                         -- Enter — выбрать: сэмпл во вкладке item
+  elseif c == 13 then if ctx.lib_enter_menu then ctx.lib_enter_menu() else ctx.open_slicer() end   -- 1 ноя: Enter — меню звука (Enter Enter — во вкладку item, как было)
   elseif ch == 'L' then if ctx.inst_layer_pick then ctx.inst_layer_pick() end   -- 19 окт: слой ¥
   elseif ch == 's' then if ctx.slice_hydra then ctx.slice_hydra() end   -- s — сразу меню нарезки (5 окт)
   elseif ch == ' ' then ctx.inst_listen()

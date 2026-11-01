@@ -493,7 +493,7 @@ KH.PAGES = {
     { k = 'yp', d = 'duplicate the instrument (copy into the library)', t = { 'yp', 'yP' } },
     { k = 'v', d = 'range from here: j k extend, d / x cut, y yank, Esc' },
     { k = 'Opt+V', d = 'smart selection of the column under the cursor: to the end of the sub-beat, again - of the beat, the bar, the pattern (a level that adds nothing is skipped)' },
-    { k = 'Enter', d = 'open in the item tab (slicer)' },
+    { k = 'Enter', d = 'the sound menu of the sample: Enter again - open in the item tab (slicer); s similar, b brighter, d darker, t shorter, g longer, a sharper, o softer, n noisier, c tonal, u louder, q quieter - the pick swaps the sound of the instrument' },
     { k = 's', d = 'slice menu' },
     { k = '~~', t = {}, d = 'automation: the last row - automation items of the track as one instrument (j past the last slot); the slices list shows them, a note key / MIDI note inserts the selected one, rate by the key (C-4 = x1, octave up = x2); Opt+Enter on an automation item picks it' },
     { k = 'r', t = {}, d = 'slices list: slice mode - by key / random (any slice key inserts a random slice of the sample, never the same twice) / sequence (the next one); also l in the insert menu' },
@@ -522,6 +522,7 @@ KH.PAGES = {
     { k = 'r', d = 'reload the jf_pm index' },
   } },
   map = { title = 'map - the sample map', e = {
+    { k = 's', d = 'the sound menu of the sample under the mouse (else the last played): similar, brighter / darker, shorter / longer, sharper / softer, noisier / tonal, louder / quieter - same class, from the fingerprints (:fprint); Enter - into the lib' },
     { k = 'j k l h Enter', d = 'the mini lf on the left: folders of the browser folder (the map shows what the browser has open)' },
     { k = 'v', d = 'next view: graph (rings of groups) > cards (a grid of sectors) > nebula (one galaxy, groups as rectangular sectors; a click on a sector - its system, galaxy / Esc - back)' },
     { k = 'r', t = {}, d = 'ξ - a random file: from the group under the mouse, else from all; plays at once' },
