@@ -469,7 +469,7 @@ function D.layout(snap, state, nregions)
   -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
   -- 27 окт: вместо колонки +N справа — знак «+» перед нотой (как папка в lf); место только у лейнов со сложенным (L.foldG)
   L.fold_on = state.foldfast and true or false; L.x_fold = nil; L.w_fold = ms('+')
-  L.envmark = state.envmark and true or false   -- 27 окт: «~» строк с автоматизацией — в той же колонке
+  L.envmark = (state.envmark and not state.ptmode) and true or false   -- 1 ноя: в PT-mode «~» нет;  -- 27 окт: «~» строк с автоматизацией — в той же колонке
   L.sub_w = x
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
