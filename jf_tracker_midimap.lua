@@ -26,6 +26,7 @@ MM.TARGETS = {
   { id = 'vol', kind = 'value', label = 'volume', d = 'sample volume -60..+24 dB' },
   { id = 'inst', kind = 'value', label = 'instrument', d = 'select instrument (knob: whole list, encoder: step)' },
   { id = 'pads', kind = 'pads', label = 'slice pads', d = 'learned note = slice 1, next notes = next slices (preview)' },
+  { id = 'patterns', kind = 'pads', label = 'pattern pads', d = 'learned note = pattern 1 of the song, next notes = next patterns: they play as with patternkb (quant / sudden)' },
   { id = 'eq2', kind = 'trigger', label = 'equal 2', d = 'slice into 2 equal parts' },
   { id = 'eq4', kind = 'trigger', label = 'equal 4', d = 'slice into 4' },
   { id = 'eq8', kind = 'trigger', label = 'equal 8', d = 'slice into 8' },

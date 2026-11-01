@@ -21336,6 +21336,7 @@ local function mm_apply(a)
     local col = cur_col(); local n = #(col and col.pool or {})
     if n == 0 then return end
     if a.v then pool_select(1 + math.floor(a.v * (n - 1) + 0.5)) else pool_select(vim.inst + (a.d > 0 and 1 or -1)) end
+  elseif id == 'patterns' then ctx.pad_launch(a.k - 1)   -- 1 ноя: паттерны с MIDI-пэдов (выученная нота — первый)
   elseif id == 'pads' then
     local e, p, col = mm_entry(false)
     if not e or not col then return end
@@ -21598,6 +21599,18 @@ local function poll_midi_in()
       local a = MM.feed(b:byte(1), b:byte(2) or 0, b:byte(3) or 0, mm_dev(fresh[k].dev or 0))
       if a then local ok, err = pcall(mm_apply, a); if not ok then vim.msg = 'midi: ' .. tostring(err):match('[^\n]*$') end
       else table.insert(rest, 1, fresh[k]) end
+    end
+    fresh = rest
+    if #fresh == 0 then return end
+  end
+  -- 1 ноя: patternkb включён — ноты MIDI-входа тоже запускают паттерны: C1 (36, первый пэд у большинства контроллеров)
+  -- — первый паттерн, дальше по полутонам (своя нота — MIDI learn «pattern pads» во вкладке midi)
+  if ctx.PADS and ctx.PADS.on then
+    local rest = {}
+    for _, ev in ipairs(fresh) do
+      local st, nt, vl = ev.buf:byte(1) or 0, ev.buf:byte(2) or 0, ev.buf:byte(3) or 0
+      if (st & 0xF0) == 0x90 and vl > 0 and nt >= 36 then ctx.pad_launch(nt - 36)
+      elseif not ((st & 0xF0) == 0x80 or (st & 0xF0) == 0x90) then rest[#rest + 1] = ev end
     end
     fresh = rest
     if #fresh == 0 then return end
