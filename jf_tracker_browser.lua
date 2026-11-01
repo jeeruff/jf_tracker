@@ -1079,7 +1079,7 @@ function B.set_all(list)
   end
   if B.cur > #B.entries then B.cur = math.max(1, #B.entries) end
   if B.cur < 1 then B.cur = 1 end
-  B.scroll = 0; B.scroll_d, B.scroll_f = 0, 0
+  B.scroll = 0
 end
 
 -- начать поиск в списке (/ или кнопка find)
@@ -2196,27 +2196,25 @@ function B.draw(U, L, x, y, w, h)
     return hover
   end
   -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
-  local cols = B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90
+  -- 1 ноя: опция browser split — то же, без колонки родителя: список папки | превью того, что под курсором (как lf)
+  local two = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
+  local cols = (B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90) or two
   local pv_x, pv_w
   if cols then
     local pw, cw0 = math.floor(w * 0.22), math.floor(w * 0.36)
+    if two then pw, cw0 = 0, math.floor(w * 0.5) end
     B.pcol = nil
-    if B.path ~= '/' then
+    if B.path ~= '/' and pw > 0 then
       local parent = B.path:match('(.*)/[^/]+$') or ''
       if parent == '' then parent = '/' end
       B.pcol = { path = parent, list = list_dir(parent) }
       local hv = draw_col(U, L, B.pcol.list, x + 1, y, pw - 3, h, B.path:match('([^/]+)$'), 'pcol', mx, my)
       if hv then hover = hv end
     end
-    U.set(U.LINE); gfx.rect(x + pw - 1, y, 1, h, 1); gfx.rect(x + pw + cw0 - 1, y, 1, h, 1)
+    U.set(U.LINE); if pw > 0 then gfx.rect(x + pw - 1, y, 1, h, 1) end; gfx.rect(x + pw + cw0 - 1, y, 1, h, 1)
     pv_x, pv_w = x + pw + cw0 + 1, w - pw - cw0 - 3
     x, w = x + pw, cw0 - 1
   end
-  -- 1 ноя: две колонки (опция browser split, ширина >= 40 знаков): папки слева, файлы справа — только вид, j k идут сквозь
-  local nd = 0
-  for _, e in ipairs(B.entries) do if e.dir then nd = nd + 1 else break end end
-  local split = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and not cols and w >= L.cw * 40 and nd > 0 and nd < #B.entries
-  B.split_nd = split and nd or nil
   local nvis = math.floor(h / L.rh)
   local function draw_range(x, w, a, b, skey)
     local sc = B[skey] or 0
@@ -2276,17 +2274,8 @@ function B.draw(U, L, x, y, w, h)
     end
     return sc
   end
-  if split then
-    local lw = math.floor(w * 0.4)
-    local sd = draw_range(x, lw - 1, 1, nd, 'scroll_d')
-    U.set(U.LINE); gfx.rect(x + lw - 1, y, 1, h, 1)
-    local sf = draw_range(x + lw, w - lw, nd + 1, #B.entries, 'scroll_f')
-    if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, sf, nvis, #B.entries - nd) end
-    B.scroll = B.cur <= nd and sd or (nd + sf)
-  else
-    B.scroll = draw_range(x, w, 1, #B.entries, 'scroll')
-    if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end
-  end
+  B.scroll = draw_range(x, w, 1, #B.entries, 'scroll')
+  if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end
   -- 27 окт: третья колонка — что под курсором: папка — её содержимое (щелчок — туда), файл — крупная волна и сведения
   if cols then
     local e = B.entries[B.cur]
