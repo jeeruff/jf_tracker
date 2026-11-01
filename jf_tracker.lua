@@ -31939,6 +31939,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'plname' then vim.open_prompt('pl name ', (ctx.pl_cur() or {}).name or '')
   elseif b == 'plplay' then if ctx.pl_playing() then ctx.pl_cmd('stop') else ctx.pl_play() end
   elseif b == 'plwrite' then ctx.pl_write()
+  elseif b == 'printjumps' then ctx.print_jumps()   -- 1 ноя: кнопка в arranger
   elseif b == 'plnew' then ctx.pl_cmd('new')
   elseif b == 'pldel' then
     local l = ctx.pl_cur()

@@ -1346,6 +1346,19 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
     end
     y = y + L.rh + 4
   end
+  -- 1 ноя: печать прыжков ZB / ZJ — порядок, как его играет трекер, на таймлайн после песни (:pj)
+  if y + L.rh <= ybot then
+    local lab = 'print jumps (ZB ZJ -> timeline)'
+    local bw = math.min(x1 - x - L.pad, U.measure(lab) + 2 * L.pad)
+    local bx = x + L.pad
+    local hot = mx >= bx and mx < bx + bw and my >= y and my < y + L.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, y, bw, L.rh, 1)
+    U.set(U.LINE); gfx.rect(bx, y, bw, L.rh, 0)
+    U.text(bx + L.pad, y + 1, ctx.fit(lab, bw - 2 * L.pad), hot and U.AMBER or U.TEXT)
+    if hot then hover.btn = 'printjumps' end
+    if ctx.hint then ctx.hint('mxbtn', bx, y, bw, L.rh, 'printjumps') end
+    y = y + L.rh + 4
+  end
   -- 31 окт: схема всей песни — в остатке панели
   if regions and y + 4 * L.rh <= ybot then
     U.set(U.LINE); gfx.rect(x, y, w - 4, 1, 1)

@@ -898,6 +898,7 @@ KH.PAGES = {
     { k = 'Tab', t = {}, d = 'in :pl - completes the word with a pattern / section name (again - the next one)' },
     { k = 'play', t = {}, d = 'plays the list: whole patterns follow seamlessly, shortened / skipped ones jump (a short gap); the list ends - stop' },
     { k = 'write', t = {}, d = 'writes the list after the song: whole patterns as linked repeats, shortened ones as their own pattern; u - back' },
+    { k = 'print jumps', t = {}, d = 'the song as the tracker plays it with its ZB (break) / ZJ (jump) commands is written after the song as the section printed - REAPER then renders the jumps too (:pj)' },
     { k = '< > name', t = {}, d = 'the playlists of the project: < > - previous / next, a click on the name - :pl name; new dup del' },
     { k = 'red word', t = {}, d = 'not found (no such pattern / section / number) - skipped, the status line under it says why' },
   } },
