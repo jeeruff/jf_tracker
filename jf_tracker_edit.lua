@@ -1615,6 +1615,29 @@ local function new_midi_item(track, lane_idx, t)
     local ok, isr, rp, re = false, false, 0, 0
     if ri and ri >= 0 then ok, isr, rp, re = R.EnumProjectMarkers(ri) end
     if ok and isr and rp <= t + 1e-9 and re > t then
+      -- 1 ноя: один MIDI-клип на паттерн: в паттерне на этом лейне уже есть клип (не луп) и больше ничего не мешает —
+      -- он растягивается на весь паттерн (ноты на местах), второй клип не создаётся
+      do
+        local mine, other = nil, false
+        local fm = R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2
+        for i = 0, R.CountTrackMediaItems(track) - 1 do
+          local o = R.GetTrackMediaItem(track, i)
+          if not lane_idx or not fm or R.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane_idx then
+            local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+            local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+            if op < re - 1e-6 and oe > rp + 1e-6 then
+              local otk = R.GetActiveTake(o)
+              local inside = op >= rp - 1e-6 and oe <= re + 1e-6
+              if otk and R.TakeIsMIDI(otk) and inside and R.GetMediaItemInfo_Value(o, 'B_LOOPSRC') == 0 and not mine then mine = o
+              else other = true end
+            end
+          end
+        end
+        if mine and not other and R.MIDI_SetItemExtents then
+          R.MIDI_SetItemExtents(mine, R.TimeMap2_timeToQN(0, rp), R.TimeMap2_timeToQN(0, re))
+          return mine, R.GetActiveTake(mine)
+        end
+      end
       local a, b = rp, re
       for i = 0, R.CountTrackMediaItems(track) - 1 do
         local o = R.GetTrackMediaItem(track, i)
