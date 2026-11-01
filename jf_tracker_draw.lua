@@ -10519,7 +10519,11 @@ function D.frame(L, snap, rows, state, info)
       local grey = info.punch and U.RED or { 0.80, 0.80, 0.80 }
       set(grey)
       gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.rl + 2, y0, L.label_w - L.rl - 3, y1 - y0, 1)
-      gfx.a = 0.05; gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, y1 - y0, 1)
+      -- 1 ноя: бледная заливка всего поля (a 0.05, ~3 мс на кадр: полупрозрачная площадь во весь трекер) — заменена
+      -- линиями границ выделения поперёк треков
+      gfx.a = 0.35
+      if info.timesel[1] >= row0 then gfx.rect(tx0 + L.label_w, y0, W - tx0 - L.label_w, 1, 1) end
+      if info.timesel[2] <= row0 + nr then gfx.rect(tx0 + L.label_w, y1 - 1, W - tx0 - L.label_w, 1, 1) end
       gfx.a = 1
       local sx = tx0 + math.max(L.rl, 5) - 3                 -- спина скобки; 18 окт: усы — вправо, «[» (просьба)
       gfx.rect(sx, y0, 2, y1 - y0, 1)
