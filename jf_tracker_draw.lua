@@ -9890,6 +9890,15 @@ function D.frame(L, snap, rows, state, info)
       if L.united and not is_cur_row then nc = U.mix(nc, U.BG, 0.2) end
       text(tx0 + L.rl + L.tl_w + L.pad, ty, r.label, nc)   -- 15 окт: номер — яркостью акцента, как точки
     end
+    -- 1 ноя: имя паттерна у стыка — на последней строке уходящего и на первой строке следующего (в полосе регионов)
+    if L.rg_w > 0 and not L.ruler_right and not r.clip then
+      local pn = (patb[r.row] and patb[r.row].nxt) or (patb[r.row + 1] and patb[r.row + 1].prv)
+      if pn then
+        local px, pw = tx0 + L.jl_w + 3, L.rg_w - 5
+        set(U.BG); gfx.rect(px, y + 1, pw, L.rh - 2, 1)
+        text(px + 1, ty, fit(pn, pw - 1), is_cur_row and U.AMBER or U.TEXT)
+      end
+    end
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
     -- REAPER); слева от номеров шагов, за полосами регионов (3 окт)
     if L.tl_w > 0 and (r.beat or r.bar) and info.tl_label then
