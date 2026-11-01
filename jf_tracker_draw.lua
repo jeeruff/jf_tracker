@@ -11045,6 +11045,7 @@ function D.frame(L, snap, rows, state, info)
         end
         end
         if not info.dspleft then pre_at(bx + L.pad + tw - ptw) end
+        f._prew = (not info.dspleft) and (ptw + L.pad) or 0   -- 1 ноя: пресет справа — входы / выходы левее него
         tw = tw - ptw - L.pad
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
@@ -11069,9 +11070,12 @@ function D.frame(L, snap, rows, state, info)
         if hot then hover.dspbtn = { fx = k, f = f, what = 'bypass' }; on_btn = true end
         hint('dspbtn', ccx - cr - 2, by + 1, 2 * cr + 4, L.rh - 1, { fx = k, what = 'bypass' })
       end
-      if info.gr_fx then D.gr_tag(L, bx + L.pad + ms(nmtxt) + L.pad + (iol and (iow + L.pad) or 0), by, info.gr_fx(f)) end   -- 27 окт: подавление этого эффекта
+      if info.gr_fx then D.gr_tag(L, bx + L.pad + ms(nmtxt) + L.pad, by, info.gr_fx(f)) end   -- 27 окт: подавление этого эффекта
       if iol then
-        local ix0 = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
+        -- 1 ноя: входы / выходы — справа, первой кнопкой группы (перед gui): имя и пресет < > не прыгают от её ширины
+        local lb = bx + bw
+        for _, b in ipairs(bxs) do if b[3] and b[3] < lb then lb = b[3] end end
+        local ix0 = lb - iow - 3 - (f._prew or 0)
         local ihot = not drag and mx >= ix0 and mx < ix0 + iow and my >= by + 1 and my < by + L.rh
         set(ihot and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(ix0, by + 1, iow, L.rh - 1, 1)
         set(ihot and U.AMBER or U.LINE); gfx.rect(ix0, by + 1, iow, L.rh - 1, 0)
@@ -11082,7 +11086,7 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 1 ноя (3): рэк drumrs5k, sim включён — ‹ ξ › всем пэдам сразу за именем (только тройкой: не влезла — нет)
       if D.DR and f.kit and D.padsim and tw > 0 then
-        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
+        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
         local lim = bx + bw - L.pad
         for _, b in ipairs(bxs or {}) do if b[3] and b[3] < lim then lim = b[3] - L.pad end end
         local RB = { { '<', 'krprev' }, { 'ξ', 'krxi' }, { '>', 'krnext' } }
@@ -11104,7 +11108,7 @@ function D.frame(L, snap, rows, state, info)
       -- 24 окт: опция dspleft — кнопки и пресет сразу за именем (у большого модуля не тянуться в правый край)
       -- 24 окт (вечер): кнопки — снова в правом краю (просьба), у имени — только пресет «< имя >»
       if info.dspleft and tw > 0 then
-        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
+        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad
         if pre_at then pre_at(x) end
       end
       -- 27 окт: slixer — 8 слотов быстрой загрузки плитками в свободном месте шапки: мини-волна, имя поверх;
