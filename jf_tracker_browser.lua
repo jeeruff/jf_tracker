@@ -385,7 +385,7 @@ end
 -- 27 окт (9): этап 2 — анализ: очередь (что слушали + группа под мышью), по 2 файла за кадр, пики строятся в фоне
 local function an_file() return R.GetResourcePath() .. '/Data/jf_tracker_mapan.txt' end
 B.an_q, B.an_qs, B.an_t = {}, {}, 0
-function B.an_push(path) if path and not (B.SM.AN[path] and B.SM.AN[path].at) and not B.an_qs[path] then B.an_qs[path] = true; B.an_q[#B.an_q + 1] = path end end
+function B.an_push(path) if path and not (B.SM.AN[path] and B.SM.AN[path].at) and not B.an_qs[path] then B.an_qs[path] = R.time_precise(); B.an_q[#B.an_q + 1] = path end end
 function B.an_tick(G)
   if not B.an_loaded then B.an_loaded = true; pcall(B.SM.an_load, an_file()) end
   local hb = B.map_hv and (B.map_hv.hub or (B.map_hv.node and B.map_hv.node.h))
@@ -414,6 +414,8 @@ function B.an_tick(G)
       table.remove(B.an_q, i); B.an_qs[pth] = nil; done = done + 1
       local n = G and G.bypath and G.bypath[pth]
       if n then n.h.an_new = (n.h.an_new or 0) + 1 end
+    elseif R.time_precise() - (tonumber(B.an_qs[pth]) or 0) > 6 then   -- 1 ноя: пики не строятся 6 с (битый / огромный файл) — вон из очереди, иначе :fprint стоял
+      table.remove(B.an_q, i); B.an_qs[pth] = nil; B.an_skip = (B.an_skip or 0) + 1
     else i = i + 1 end
   end
   local now = R.time_precise()

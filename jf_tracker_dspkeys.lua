@@ -173,6 +173,7 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'p' or ch == 'P' then ctx.pad_paste(sel.fx); return true end
       if ch == 'M' or ch == 'S' then ctx.pad_ms(sel.fx, ch == 'S'); return true end
       if c == 13 then ctx.pad_listen(sel.fx); return true end
+      if (ch == '[' or ch == ']') and ctx.pad_cur then local _, f, _, ki = ctx.pad_cur(sel.fx); if ki and ki > 0 then ctx.pad_similar(f, ki, ch == ']' and 1 or -1) else ctx.msg('pads: no pad here') end; return true end   -- 1 ноя: = < > пэда
       if ch == 'r' then ctx.pad_route_cur(sel.fx); return true end
       if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
@@ -223,7 +224,7 @@ function DK.key(c, sel, n, np, mods)
   elseif ch == '+' or ch == '=' or c == 1 then ctx.dsp_value(sel.fx, sel.param, 1, mods.shift)
   elseif ch == '-' or c == 24 then ctx.dsp_value(sel.fx, sel.param, -1, mods.shift)
   elseif c == 13 and ctx.pad_rack and ctx.pad_rack(sel.fx) then
-    DK.pads = true; ctx.msg('pads: h l j k move, x cut, yy yp p, M mute, S solo, Enter listen, r router, Esc back')   -- 19 окт
+    DK.pads = true; ctx.msg('pads: h l j k move, [ ] similar sample, x cut, yy yp p, M mute, S solo, Enter listen, r router, Esc back')   -- 19 окт
   elseif c == 13 and DK.pslider and np > 0 then   -- 31 окт: Enter на параметре — набор значения (модуль не выключает; выкл — b)
     local p = ctx.dsp_param_kind and ctx.dsp_param_kind(sel.fx, sel.param)
     if p == 'toggle' then ctx.dsp_enter(sel.fx, sel.param)

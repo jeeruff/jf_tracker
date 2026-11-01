@@ -17597,10 +17597,19 @@ end
 -- 31 окт: drumrs5k — похожий сэмпл пэду (класс по имени файла / пэда, ближние по звуку, если прослушаны) из индекса
 -- карты; ‹ › — назад / вперёд по выпавшим (первый шаг назад — исходный); new kit — случайные сэмплы классов пэдов
 ctx.pad_hist = {}
-ctx.pad_cands = function(kid)
+ctx.pad_cands = function(kid, src)
+  if not ctx.ensure_index() then return nil, 'reading the sample index - again in a moment' end
   local G = B.mapG
   if not G or G.building or #G.nodes == 0 then return nil, 'open the map pane once on your samples folder - its index is where the samples come from' end
   local SM = B.SM
+  -- 1 ноя: отпечатки есть (:fprint) — тот же класс (по имени, иначе по звуку), по близости отпечатка, ближние первыми
+  local fl, _, fcat = ctx.similar_list(ctx.map_path_of(src or kid.file))
+  if fl then
+    table.sort(fl, function(p, q) return p.d < q.d end)
+    local out = {}
+    for i = 1, #fl do out[i] = fl[i].n end
+    return out, fcat, true
+  end
   local nm = (kid.file and kid.file:match('[^/]+$')) or kid.name or ''
   local cat = SM.cat_of(nm, nil)
   if cat:sub(1, 1) == '/' or cat == 'other' then cat = SM.cat_of(kid.name or '', nil) end
@@ -17630,14 +17639,20 @@ ctx.pad_similar = function(f, ki, d)
   local H = ctx.pad_hist[gid] or { list = {}, i = 0, orig = kid.file }
   ctx.pad_hist[gid] = H
   local path
-  if d then
+  if d and (d < 0 or H.i < #H.list) then
     local ni = math.max(0, math.min(#H.list, H.i + d))
-    if ni == H.i then vim.msg = d < 0 and 'ξ: the original sample already' or 'ξ: no newer pick - ξ rolls a new one'; return end
+    if ni == H.i then vim.msg = 'ξ: the original sample already'; return end
     H.i = ni; path = ni == 0 and H.orig or H.list[ni]
   else
-    local cands, why = ctx.pad_cands(kid)
+    -- ξ — случайный из 40 ближних; > в конце истории (1 ноя) — следующий по близости, которого ещё не было
+    local cands, why, by_fp = ctx.pad_cands(kid, H.orig)
     if not cands then vim.msg = 'ξ: ' .. why; return end
-    path = cands[math.random(#cands)].path
+    if d then
+      local seen = { [H.orig or ''] = true }
+      for _, p in ipairs(H.list) do seen[p] = true end
+      for _, n in ipairs(cands) do if not seen[n.path] then path = n.path; break end end
+      if not path then vim.msg = 'ξ: no more like it'; return end
+    else path = cands[math.random(math.min(#cands, by_fp and 40 or #cands))].path end
     while #H.list > H.i do H.list[#H.list] = nil end
     H.list[#H.list + 1] = path; H.i = #H.list
   end
@@ -17645,7 +17660,7 @@ ctx.pad_similar = function(f, ki, d)
   edit.run('pad: similar sample', function() ctx.pad_load(tr, kid, path) end)
   model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
   if ctx.preview_file then ctx.preview_file(path) end
-  vim.msg = ('ξ %s: %s (%d/%d; < > - back / forward)'):format(kid.name or 'pad', path:match('[^/]+$'), H.i, #H.list)
+  vim.msg = ('ξ %s: %s (%d/%d; < > or [ ] - back / next like it, ξ - random like it)'):format(kid.name or 'pad', path:match('[^/]+$'), H.i, #H.list)
 end
 ctx.kit_new_menu = function(f, ks, kkey)
   local tgt = dsp_target(); if not (tgt and f and f.kids) then return end
@@ -23371,9 +23386,10 @@ local function frame()
         local n = G.nodes[B.fp_ptr]
         if n and not ((B.SM.AN[n.path] or {}).at) and (not B.SM.ext_type or B.SM.ext_type(n.name or '') == 'samples') then B.an_push(n.path) end
       end
-      pcall(B.an_tick, G)
+      local okt, et = pcall(B.an_tick, G)
+      if not okt then B.an_err = et end   -- 1 ноя: ошибка анализа — видна (молча стоял)
       if B.fp_ptr >= N and #B.an_q == 0 then B.fp_on = false; vim.msg = ('fprint: done - %d files of the map index'):format(N)
-      elseif reaper.time_precise() - (B.fp_msg_t or 0) > 0.5 then B.fp_msg_t = reaper.time_precise(); state.status = ('fprint: %d / %d files (peaks build in the background; :fprint again - stop)'):format(B.fp_ptr - #B.an_q, N) end
+      elseif reaper.time_precise() - (B.fp_msg_t or 0) > 0.5 then B.fp_msg_t = reaper.time_precise(); state.status = ('fprint: %d / %d files%s%s (peaks build in the background; :fprint again - stop)'):format(B.fp_ptr - #B.an_q, N, (B.an_skip or 0) > 0 and (', ' .. B.an_skip .. ' skipped (no peaks)') or '', B.an_err and (' - error: ' .. tostring(B.an_err)) or '') end
     end
     if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then
       ctx.cl_tick = (ctx.cl_tick or 0) + 1
@@ -25049,7 +25065,7 @@ local function frame()
   elseif hover.dspauto then state.status = ('auto volume: the fader so that the output peak becomes %d dB - play the part first (the peak of what played is used), then click; Cmd+Z back'):format(hover.dspauto.db)
   elseif hover.dspcomp then state.status = 'c - gain comp' .. ((function() local tr = hover.dspcomp.track; local d = tr and reaper.ValidatePtr(tr, 'MediaTrack*') and edit.comp_db(tr); return d and ('%+.1f dB'):format(d) or '' end)()) .. ': click - the end of the chain follows the level before the fx (JS Volume Adjustment "gain comp" last in the chain); right click - remove'
   elseif hover.dspbtn and hover.dspbtn.kid then
-    local KT = { kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
+    local KT = { kcls = ' - the class of the sample: by its name, ~ - by its sound (fingerprints)', kdel = ' - remove this plugin from the container', kgroup = ' - group (g): a hit on one pad plays every pad of its group (a layer in the rack)', kchoke = ' - choke group (cg): a hit cuts the other pads of the group (hi-hat open / closed)',
       kpm = ' - mute (= Opt+click on the pad)', kall_m = ' - m: mute the selected pad; anything muted - unmute all', kall_s = ' - s: solo the selected pad; a solo on - all on', kps = ' - solo (= Shift+click on the pad; again - all on)', kpp = ' - listen (= click on the pad)',
       kroute = ' - this pad in the router: l enters it, A adds in parallel (a layer: another RS5K / synth / fx), a after, a container inside' }
     state.status = tostring(hover.dspbtn.kid.name or 'pad') .. ' in ' .. tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. (KT[hover.dspbtn.what] or ' - bypass on / off')   -- 19 окт: без имени пэда кадр падал
@@ -31007,7 +31023,7 @@ local function frame()
         -- 21 окт: цифры — числу параметра, когда параметр в фокусе (слайдер) или набор числа уже идёт; иначе — нотам клавиатуры
         DK.digits_play = vim.piano or vim.mode == 'insert'
         local numkey = DK.num and not DK.digits_play and ch:match('^%d$')   -- 22 окт: значение — в INSERT параметра (i); цифры при KEYS — ноты
-        if not DK.pending and not numkey and (ch == 'm' or vim.plays_note(c) or ch == '[' or ch == ']' or ch == '{' or ch == '}') then return vim.key(c) end   -- 19 окт: октава / vel клавиатуры — и из DSP
+        if not DK.pending and not numkey and (ch == 'm' or vim.plays_note(c) or ((ch == '[' or ch == ']') and not DK.pads) or ch == '{' or ch == '}') then return vim.key(c) end   -- 1 ноя: в пэдах [ ] — похожий сэмпл   -- 19 окт: октава / vel клавиатуры — и из DSP
         if state.dsp_big or state.router_big then   -- роутер (7 окт): свои клавиши; чужие — в vim
           local root, o = ctx.db_tree()
           if root and MX.DB.key(c, root, o) then return end
@@ -33209,7 +33225,30 @@ end
 -- 1 ноя: отпечатки звуков (этапы 1-2): :fprint — скан индекса карты (папка, открытая в map), :similar — похожие на
 -- сэмпл: строка браузера, иначе аудио-нота под курсором трекера; та же категория по имени, ближайшие по отпечатку;
 -- в сетке — слушать при выборе, Enter — в lib (как Enter в браузере)
+-- 1 ноя: индекс сэмплов без панели map — самый большой индекс на диске (Data/jf_tracker_mapcache), читается фоном
+-- (тот же тик, что у карты). → true — готов
+ctx.ensure_index = function()
+  if B.mapG then return not B.mapG.building end
+  local dir = reaper.GetResourcePath() .. '/Data/jf_tracker_mapcache'
+  local best, bsz
+  local i = 0
+  while true do
+    local fn = reaper.EnumerateFiles(dir, i); if not fn then break end
+    local f = io.open(dir .. '/' .. fn, 'rb')
+    if f then local sz = f:seek('end'); f:close(); if not bsz or sz > bsz then best, bsz = fn, sz end end
+    i = i + 1
+  end
+  if not best then return false end
+  local f = io.open(dir .. '/' .. best, 'r'); local head = f and f:read('*l') or ''; if f then f:close() end
+  local root = head:match('^JFMAP1\t(.+)$')
+  local G = root and B.SM.load_cache(root, dir .. '/' .. best)
+  if not G then return false end
+  G.root = root; B.mapG = G
+  if not B.an_loaded and B.an_tick then B.an_loaded = true; pcall(B.SM.an_load, reaper.GetResourcePath() .. '/Data/jf_tracker_mapan.txt') end
+  return false
+end
 ctx.fprint_cmd = function()
+  if B.SM and not ctx.ensure_index() then vim.msg = 'fprint: reading the sample index - again in a moment'; return end
   if not (B.SM and B.mapG and #B.mapG.nodes > 0) then vim.msg = 'fprint: open the map pane on your samples folder once - its index is what gets fingerprinted'; return end
   B.fp_on = not B.fp_on
   if B.fp_on then B.fp_ptr = 0; vim.msg = ('fprint: %d files of the map index - in the background, from REAPER peaks'):format(#B.mapG.nodes)
@@ -33233,12 +33272,30 @@ ctx.similar_cmd = function(arg, o)   -- o: { path = источник, on_pick = 
     if h and h.item and ctx.item_file then path = ctx.item_file(h.item) end
   end
   if not path then vim.msg = 'similar: a sample in the browser or an audio note under the cursor'; return end
-  if not (B.mapG and #B.mapG.nodes > 0) then vim.msg = 'similar: open the map pane on your samples folder once (and :fprint it)'; return end
+  local cands, err, cat, same, by_sound, nfp = ctx.similar_list(path, dir, arg)
+  if not cands then vim.msg = err; return end
+  local nm = path:match('[^/]+$') or path
+  table.sort(cands, function(p, q) return p.d < q.d end)
+  local items = {}
+  for i = 1, math.min(40, #cands) do
+    local n = cands[i].n
+    items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
+  end
+  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - ' .. (o.what or 'into the lib') .. ')'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. (by_sound and 'sounds like ' or '') .. cat .. ')') or '', #items, nfp),
+    items = items, cols = 2, sel = 1,
+    on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
+    on_pick = o.on_pick or function(it) ctx.add_to_depot(it.v) end })
+end
+-- 1 ноя: похожие на path (кандидаты { n, d } без сортировки) | nil, причина; dir — шаг по признаку (ctx.SIM_DIR)
+ctx.similar_list = function(path, dir, arg)
+  local SM = B.SM
+  if not ctx.ensure_index() then return nil, 'similar: reading the sample index - again in a moment' end
+  if not (B.mapG and #B.mapG.nodes > 0) then return nil, 'similar: open the map pane on your samples folder once (and :fprint it)' end
   local a0 = SM.AN[path]
   if not (a0 and a0.at) then
     B.an_push(path); B.an_tick(B.mapG)
     a0 = SM.AN[path]
-    if not (a0 and a0.at) then vim.msg = 'similar: listening to it (REAPER builds its peaks) - again in a moment'; return end
+    if not (a0 and a0.at) then return nil, 'similar: listening to it (REAPER builds its peaks) - again in a moment' end
   end
   local nm = path:match('[^/]+$') or path
   local cat = SM.cat_of(nm, nil)
@@ -33267,18 +33324,33 @@ ctx.similar_cmd = function(arg, o)   -- o: { path = источник, on_pick = 
       end
     end
   end
-  if #cands == 0 and dir and nfp > 0 then vim.msg = ('similar: nothing %s than %s%s among %d fingerprinted'):format(arg:match('%a+'), nm, same and (' in ' .. cat) or '', nfp); return end
-  if #cands == 0 then vim.msg = ('similar: no fingerprints%s yet - :fprint the map index (%d done)'):format(same and (' of ' .. cat) or '', nfp); return end
-  table.sort(cands, function(p, q) return p.d < q.d end)
-  local items = {}
-  for i = 1, math.min(40, #cands) do
-    local n = cands[i].n
-    items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
+  if #cands == 0 and dir and nfp > 0 then return nil, ('similar: nothing %s than %s%s among %d fingerprinted'):format((arg or ''):match('%a+') or '', nm, same and (' in ' .. cat) or '', nfp) end
+  if #cands == 0 then return nil, ('similar: no fingerprints%s yet - :fprint the map index (%d done)'):format(same and (' of ' .. cat) or '', nfp) end
+  return cands, nil, cat, same, by_sound, nfp
+end
+-- 1 ноя: класс сэмпла для подписи: по имени, иначе по звуку «~hat» | nil
+ctx.class_of = function(path)   -- кэш по пути (kNN в кадре дорог), сброс — прибавились отпечатки
+  if not (path and B.SM) then return nil end
+  local cat = B.SM.cat_of(path:match('[^/]+$') or path, nil)
+  if cat:sub(1, 1) ~= '/' and cat ~= 'other' then return cat end
+  if not (B.mapG and not B.mapG.building) then return nil end   -- индекс ещё читается — по звуку потом
+  if not ctx.cls_c or ctx.cls_n ~= B.SM.an_n then ctx.cls_c, ctx.cls_n = {}, B.SM.an_n end
+  local v = ctx.cls_c[path]
+  if v == nil then
+    local sc = ctx.sound_cat(ctx.map_path_of(path))
+    v = sc and ('~' .. sc) or false
+    ctx.cls_c[path] = v
   end
-  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - ' .. (o.what or 'into the lib') .. ')'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. (by_sound and 'sounds like ' or '') .. cat .. ')') or '', #items, nfp),
-    items = items, cols = 2, sel = 1,
-    on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
-    on_pick = o.on_pick or function(it) ctx.add_to_depot(it.v) end })
+  return v or nil
+end
+draw.class_of = ctx.class_of
+-- 1 ноя: путь файла в индексе карты (копия в папке проекта — по имени)
+ctx.map_path_of = function(path)
+  if not (path and B.mapG) then return path end
+  if B.SM.AN[path] or (B.mapG.bypath and B.mapG.bypath[path]) then return path end
+  local nm = path:match('[^/]+$')
+  for _, n in ipairs(B.mapG.nodes) do if n.name == nm then return n.path end end
+  return path
 end
 -- 1 ноя: класс по звуку — размеченные отпечатки карты (класс в имени), пересбор, когда отпечатков прибавилось
 ctx.sound_cat = function(path)

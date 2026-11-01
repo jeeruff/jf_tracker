@@ -11481,10 +11481,9 @@ function D.frame(L, snap, rows, state, info)
               hint('dspbtn', mox, hy, mow, L.rh - 1, { fx = k, what = 'kmidi' })
               ah = ah + mow + 2   -- счётчик пэдов и кнопки правее — после неё
             end
-            -- 31 окт: new kit (случайный кит: все / выбранный / 16 видимых) и ‹ ξ › — похожий сэмпл выбранному пэду
+            -- 31 окт: new kit (случайный кит: все / выбранный / 16 видимых); ‹ ξ › — в шапке пэда (1 ноя)
             do
               local bl = { { 'new kit', 'knew' } }
-              if ks > 0 then bl[#bl + 1] = { '<', 'kxprev' }; bl[#bl + 1] = { 'ξ', 'kxi' }; bl[#bl + 1] = { '>', 'kxnext' } end
               local nx = bx + 2 + ah
               for _, b2 in ipairs(bl) do
                 local w2 = ms(b2[1]) + 2 * L.pad
@@ -11809,7 +11808,27 @@ function D.frame(L, snap, rows, state, info)
                 gx = gx + bw2 + 2
               end
             end
-            text(cx + L.pad, hy, fit(kid.name or '', bw1 - 2 * L.pad - 2 * kb2 - 4 - gw), kid.enabled and U.CYAN or U.GREY)
+            -- 1 ноя: класс сэмпла (по имени; ~ — по звуку) и < ξ > — похожий сэмпл (переехали из шапки рэка: там не влезали); левее on / x
+            local sx1 = cx + bw1 - kb2 - onw - 5
+            if kid.file and D.class_of then
+              local cl = D.class_of(kid.file)
+              local aw = ms('<') + 2 * L.pad
+              local items = { { '>', 'kxnext', aw }, { 'ξ', 'kxi', ms('ξ') + 2 * L.pad }, { '<', 'kxprev', aw } }
+              if cl then table.insert(items, { cl, 'kcls', ms(cl) + 2 * L.pad }) end
+              for _, b in ipairs(items) do
+                local bx3 = sx1 - b[3]
+                if bx3 < cx + L.pad + ms('S01 ') then break end
+                local hb = not drag and mx >= bx3 and mx < bx3 + b[3] and my >= hy and my < hy + L.rh
+                if b[2] ~= 'kcls' then
+                  set(hb and U.tint(U.AMBER, 0.35) or U.BG); gfx.rect(bx3, hy, b[3], L.rh - 1, 1)
+                  set(hb and U.AMBER or U.LINE); gfx.rect(bx3, hy, b[3], L.rh - 1, 0)
+                end
+                text(bx3 + L.pad, hy, b[1], hb and U.AMBER or (b[2] == 'kcls' and U.GREY or U.TEXT))
+                if hb then hover.dspbtn = { fx = k, f = f, what = b[2], kid = kid, ki = ks } end
+                sx1 = bx3 - 2
+              end
+            end
+            text(cx + L.pad, hy, fit(kid.name or '', math.max(0, sx1 - cx - 2 * L.pad)), kid.enabled and U.CYAN or U.GREY)
           else
             text(cx + L.pad, hy, fit(('all %d slices - a change goes to every RS5K'):format(#f.kids), bw1 - 2 * L.pad), U.AMBER)
           end
