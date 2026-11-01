@@ -2373,7 +2373,7 @@ function V.key_impl(c)
     end
     if c == 32 then E.play_stop(); return end
     -- 1 ноя: PT-mode — Enter и в INSERT вставляет пустую строку (Return ProTracker; Shift — все каналы)
-    if c == 13 and ctx.state and ctx.state.ptmode and not env_of(V.cur.fi) and not V.hexbuf and ctx.time_edit then
+    if c == 13 and ctx.state and ctx.state.ptmode and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) and not V.hexbuf and ctx.time_edit then   -- 1 ноя: только поле ноты (в командах Enter — значение)
       ctx.time_edit('insert', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false); return
     end
     local fld = V.cur.field or 1
@@ -3456,7 +3456,7 @@ function V.key_impl(c)
   elseif c == 13 then V.count = nil; finish_move()
     local st = ctx.state
     -- 1 ноя: PT-mode — Enter как Return в ProTracker: пустая строка в канале курсора, ниже — вниз (Shift — все каналы)
-    if st and st.ptmode and not env_of(V.cur.fi) and ctx.time_edit then
+    if st and st.ptmode and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) and ctx.time_edit then   -- 1 ноя: только поле ноты
       ctx.time_edit('insert', V.cur.fi, V.cur.row, n, ctx.mods and ctx.mods().shift or false); finish_edit(); return
     end
     -- старое Enter: на огибающей / MIDI-лейне — меню «что вставить», иначе смарт-панель значений поля

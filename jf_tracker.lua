@@ -30102,7 +30102,7 @@ local function frame()
     local m = ctx.mods()
     if c == 13 and not (m.ctrl or m.cmd or m.alt or m.shift) and state.focus == 'tracker' and not vim.picker and not vim.hydra
        and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.hexbuf and not vim.pending and not vim.op
-       and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') and not state.ptmode then   -- 1 ноя: PT-mode — Enter вставляет строку (vim)
+       and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') and not (state.ptmode and (vim.cur.field or 1) == 1) then   -- 1 ноя: PT-mode — Enter на поле ноты вставляет строку (vim); в остальных — как было
       vim.smart(); c = 0
     end
   end
