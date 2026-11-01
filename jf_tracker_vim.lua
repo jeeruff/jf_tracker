@@ -855,6 +855,21 @@ local function apply(op, f0, f1, r0, r1)
   if op == 'd' or op == 'x' or op == 'c' then
     V.regs['"'] = E.yank(heads, lpb(), r0, f0)
     E.delete(heads, lpb())
+    -- 1 ноя: выделение через несколько колонок (VISUAL, d / x / Delete) — и автоматизация в нём: точки огибающих,
+    -- события MIDI-лейнов (CC / PB / AT / PAT) строк выделения
+    if f0 ~= f1 or V.mode == 'visual' or V.mode == 'vline' then
+      local nl = 0
+      E.run('delete automation in the selection', function()
+        for fi = f0, f1 do
+          local fl = flat()[fi]
+          if fl and fl.env and ctx.env_del_range then ctx.env_del_range(fl.env, r0, r1); nl = nl + 1
+          elseif fl and fl.ml and fl.ml.ev and ctx.ml_del then
+            for r = r0, r1 do if fl.ml.ev[r] then ctx.ml_del(fl, r); nl = nl + 1 end end
+          end
+        end
+      end)
+      if nl > 0 then edited = true end
+    end
     -- 11 окт: OFF в диапазоне — убрать: нота звучит до следующего события подколонки (нет — до конца региона), как в Renoise
     for fi = f0, f1 do
       local fl = flat()[fi]
