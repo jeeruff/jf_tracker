@@ -13118,7 +13118,7 @@ function D.frame(L, snap, rows, state, info)
       local pw2 = D.big_measure('+', pk)
       if pw2 + 2 * L.pad > pw then pw = pw2 + 2 * L.pad end
       if hot then set(U.tint(U.AMBER, 0.12)); gfx.rect(bx, boxy, pw, bh0, 1) end
-      D.big_text(bx + math.floor((pw - pw2) / 2), boxy + math.floor((bh0 - L.rh * pk) / 2), '+', hot and U.AMBER or U.tint(U.AMBER, 0.6), pk)
+      D.big_text(bx + math.floor((pw - pw2) / 2), boxy + math.floor((bh0 - L.rh * pk) / 2), '+', hot and U.tint(U.AMBER, 0.7) or U.mix(U.AMBER, U.BG, 0.65), pk)   -- 1 ноя: тусклее
       local vh = bh0 - L.rh - 10
       local _ = vh   -- 31 окт: надпись drop fx here убрана (просьба), остаётся «+» в рамке
       if hot then hover.dspbtn = { fx = #fxs, what = 'chainadd' } end
