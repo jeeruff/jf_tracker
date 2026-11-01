@@ -19100,7 +19100,8 @@ local function hint_go(t)
     ctx.set_focus('top')
     if d == 'prev' then ctx.retro_cycle(-1) elseif d == 'next' then ctx.retro_cycle(1) elseif d == 'all' then ctx.retro_all()
     elseif d == 'play' then retro_preview(true) elseif d == 'stop' then retro_preview(false)
-    elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'loop' then retro_loop() elseif d == 'add' then ctx.retro_add() end
+    elseif d == 'put' then retro_put('cursor') elseif d == 'depot' then retro_put('depot') elseif d == 'loop' then retro_loop() elseif d == 'add' then ctx.retro_add()
+    elseif d == 'bb' then ctx.retro_bb() end
   elseif t.kind == 'retro' then ctx.set_focus('top'); state.toptab = 'retro'
   elseif t.kind == 'recbtn' then ctx.set_focus('top'); state.toptab = state.toptab == 'retro' and 'sample' or 'retro'
   elseif t.kind == 'ctrl' and (d == 'ratebar' or d == 'swingbar') then   -- 11 окт: фейдер транспорта по f — с клавиатуры
@@ -22044,6 +22045,11 @@ local function expect_put(track, pos, loop_len, to_lib)
   put_pending[#put_pending + 1] = { track = track, pos = pos, before = before, t = reaper.time_precise(), loop = loop_len, lib = to_lib }
 end
 local function settle_puts(now)
+  local br = ctx.bb_retry
+  if br and now - (br.last or 0) > 0.4 then
+    br.last = now
+    if br.fn(br.it) ~= 'wait' or now - br.t > 15 then ctx.bb_retry = nil end
+  end
   for k = #put_pending, 1, -1 do
     local p = put_pending[k]
     local found
@@ -22072,6 +22078,7 @@ local function settle_puts(now)
         end)
       end
       reaper.UpdateArrange(); model.invalidate()
+      if p.after then ctx.bb_retry = { it = found, t = now, fn = p.after } end   -- 1 ноя: bb — разбор после печати (пики строятся — повтор)
       table.remove(put_pending, k)
     elseif now - p.t > 4 then
       vim.msg = 'jf_rec did not print the take - open its panel (TCP embed or window)'
@@ -22337,6 +22344,13 @@ function retro_put(target, raw, at_pos, loop_len)
   retro.put_t = reaper.time_precise()
   retro.msg = ('retro: %.2fs → %s @ %.2fs'):format(samps / c.srate, target == 'depot' and 'lib (track LIB)' or c.col.name, pos)
   vim.msg = retro.msg
+end
+-- 1 ноя: bb во вкладке rec — выделение буфера ставится в строку курсора (как put) и сразу разбирается битбоксом
+-- в MIDI ударных на новом треке ниже (:bb)
+ctx.retro_bb = function()
+  local n0 = #put_pending
+  retro_put('cursor')
+  if #put_pending > n0 then put_pending[#put_pending].after = function(it) return ctx.beatbox_cmd(it) end; vim.msg = 'bb: the take is printed, then the beatbox goes to MIDI' end
 end
 -- ретро-лупер (2 окт): «подхватить уже сыгранное и лупить». Во время игры
 -- берёт из кольца jf_rec последние N тактов, кончающиеся на последней
@@ -34189,12 +34203,13 @@ end
 -- (5 мс), каждый — отпечаток (яркость, шум, тон тела); классы друг относительно друга: тёмный — бочка 36, средний —
 -- малый 38, яркий — хэт 42 (GM, канал 10); сила — от пика. Время — как спето, квантовать потом (gq)
 ctx.BB_NOTE = { 36, 38, 42 }
-ctx.beatbox_cmd = function()
+ctx.beatbox_cmd = function(given)   -- 1 ноя: given — готовый аудио-айтем (кнопка bb вкладки rec); 'wait' — пики ещё строятся
   local col = cur_col()
+  local hit = given and reaper.ValidatePtr(given, 'MediaItem*') and given or nil
+  if hit then local tr0 = reaper.GetMediaItem_Track(hit); local _, tn0 = reaper.GetTrackName(tr0); col = { name = tn0, track = tr0 } end
   if not (col and col.track) then vim.msg = 'beatbox: no track under the cursor'; return end
   local t, tn = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
-  local hit
-  for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+  for i = 0, hit and -1 or (reaper.CountTrackMediaItems(col.track) - 1) do
     local it = reaper.GetTrackMediaItem(col.track, i)
     local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
     local tk = reaper.GetActiveTake(it)
@@ -34216,12 +34231,12 @@ ctx.beatbox_cmd = function()
   local pos, len = reaper.GetMediaItemInfo_Value(hit, 'D_POSITION'), reaper.GetMediaItemInfo_Value(hit, 'D_LENGTH')
   ctx.file_peaks(path, 32)
   local flen = ctx.file_len_of(path)
-  if not (flen and flen > 0) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return end
+  if not (flen and flen > 0) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return 'wait' end
   local a, b = math.max(0, offs / flen), math.min(1, (offs + len * rate) / flen)
   local dur = (b - a) * flen
   local npix = math.max(16, math.min(12000, math.floor(dur / 0.005)))
   local pk = ctx.file_peaks(path, npix, a, b, true)
-  if not (pk and pk.n and pk.n > 4) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return end
+  if not (pk and pk.n and pk.n > 4) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return 'wait' end
   local SM, bin = B.SM, dur / pk.n
   local env = {}
   for i = 1, pk.n do env[i] = math.max(math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0)) end

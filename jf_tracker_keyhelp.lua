@@ -982,7 +982,7 @@ KH.BARS = {
   automation = { { 'Opt+A', 'last touched' }, { 'C', 'canvas' }, { 'M', 'mod' }, { 'L', 'shape' }, { 'P', 'params' }, { 'g p', 'write curve' }, { 'Esc', 'back' } },
   autocanvas = { { 'hl', 'row' }, { '{ }', 'cell' }, { 'jk', 'value' }, { '0-9', 'level' }, { 'v', 'range' }, { 'f r s t q n', 'shape' }, { '[ ]', 'grid' }, { 'Tab', 'curve' }, { 'zp', 'project' }, { 'x', 'remove' }, { 'd D c E', 'draw line shape erase' }, { 'T', 'transform' }, { 'S', 'snap' }, { 'P L', 'pages' }, { 'Esc', 'back' } },
   modulation = { { 'hjkl', 'cell' }, { 'Enter', 'toggle' }, { '+ -', 'value' }, { 'a', 'add' }, { 'x', 'remove' }, { 'o w', 'windows' } },
-  retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
+  retro = { { 'Space', 'listen' }, { 'L', 'loop' }, { 'p', 'put' }, { 'd', 'lib' }, { 'bb', 'beatbox -> MIDI' }, { 'j k', 'channel' }, { '[ ] { }', 'edges' }, { 'h l', 'move' } },
   garden = { { 'N Enter', 'loop' }, { '> <', 'fit' }, { '+ -', 'period' }, { 'm', 'mute' }, { 'o', 'Orca' }, { 'O', 'on/off' },
              { 'p', 'pin' }, { 'x', 'clear' } },
   orca = { { 'arrows', 'move' }, { 'A-Z', 'operator' }, { '!', 'bang' }, { '.', 'erase' }, { 'Space', 'play' }, { 'Esc', 'back' } },
