@@ -10114,7 +10114,7 @@ function D.frame(L, snap, rows, state, info)
               local hw = gfx.measurestr(head)
               ctext(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
               if hw < m.w - L.pad - L.cw then ctext(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
-            else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or (mview == 'steps' and U.TEXT or U.CYAN)) end   -- янтарь: в строке несколько событий
+            else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), mview == 'steps' and U.TEXT or U.CYAN) end   -- 1 ноя: один цвет (янтарь «несколько событий в строке» путал)
           else ctext(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis' or ml.kind == 'chd') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
