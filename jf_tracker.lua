@@ -31274,7 +31274,8 @@ local function frame()
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
           if ch == '_' then ctx.pane_min(); return end   -- 1 ноя: z_ (было zm) — свернуть панель
-          if ch == 'm' then ctx.master_menu(); return end   -- 1 ноя: zm — свойства мастера
+          if ch == 'M' then ctx.master_menu(); return end   -- 1 ноя (2): zM — свойства мастера
+          if ch == 'm' then ctx.toggle_mixer(); return end   -- zm — микшер
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
             local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }

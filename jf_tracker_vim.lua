@@ -3027,7 +3027,8 @@ function V.key_impl(c)
         local f = flat()[V.cur.fi]
         if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
       elseif c == ('_'):byte() then if ctx.pane_min then ctx.pane_min() end   -- 1 ноя: z_ (было zm) — свернуть панель в фокусе (микшер — F3)
-      elseif c == ('m'):byte() then if ctx.master_menu then ctx.master_menu() end   -- 1 ноя: zm — свойства мастера (как i в микшере REAPER)
+      elseif c == ('m'):byte() then if ctx.toggle_mixer then ctx.toggle_mixer() end   -- 1 ноя (2): zm — микшер (= F3)
+      elseif c == ('M'):byte() then if ctx.master_menu then ctx.master_menu() end   -- 1 ноя (2): zM — свойства мастера
       -- 9 окт: ширина по шагу, как Cmd+колесо: z> z< — все треки, z. z, — трек курсора (счётчик: 3z>)
       elseif (c == ('>'):byte() or c == ('<'):byte() or c == ('.'):byte() or c == (','):byte()) and ctx.width_step then
         local d = (c == ('>'):byte() or c == ('.'):byte()) and 1 or -1
@@ -3036,7 +3037,7 @@ function V.key_impl(c)
         for _ = 1, n do ctx.width_step(d, (c == ('.'):byte() or c == (','):byte()) and 'cur' or nil) end
         if col then for i, g in ipairs(flat()) do if g.col == col then V.cur.fi = i; break end end end
         clamp_cur()
-      elseif c == ('M'):byte() then   -- zM (7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
+      elseif c == ('F'):byte() then   -- 1 ноя: zF (было zM, 7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
         local any = false
         for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
         ctx.fold_all(not any); ctx.relayout(); clamp_cur()
@@ -4352,7 +4353,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold | c o compact / open | C monitor FX | ! strip | m master | _ minimize | f folder | M all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',

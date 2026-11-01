@@ -1880,7 +1880,8 @@ function B.key(c)
     elseif ch == 'o' then B.set_mode('recent')
     elseif ch == 'z' then if ctx.zz_zoom then ctx.zz_zoom() end
     elseif ch == '_' then if ctx.pane_min then ctx.pane_min() end   -- 1 ноя: z_ (было zm)
-    elseif ch == 'm' then if ctx.master_menu then ctx.master_menu() end end
+    elseif ch == 'M' then if ctx.master_menu then ctx.master_menu() end
+    elseif ch == 'm' then if ctx.toggle_mixer then ctx.toggle_mixer() end end
     return true
   end
   if ch == 'z' and not B.keys then B.zpend = true; return true end   -- в режиме keys z — нота
