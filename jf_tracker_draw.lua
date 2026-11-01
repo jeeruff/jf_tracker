@@ -895,9 +895,21 @@ function D.layout(snap, state, nregions)
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
   local hide_below = nil          -- глубина свёрнутой папки: дети не показываются
+  local fold_c = nil              -- 1 ноя: колонка свёрнутой папки — сводка событий детей (fsum) и их число (fn)
   for ci, col in ipairs(snap.cols) do
     local depth = col.depth or 0
-    if hide_below and depth <= hide_below then hide_below = nil end
+    if hide_below and depth <= hide_below then hide_below = nil; fold_c = nil end
+    if fold_c and depth > hide_below then
+      fold_c.fn = fold_c.fn + 1
+      local fs = fold_c.fsum
+      for _, ln in ipairs(col.lanes or {}) do
+        for _, sub in ipairs(ln.subs or {}) do
+          for row, cell in pairs(sub) do
+            if type(cell) == 'table' and (cell.kind == 'audio' or cell.kind == 'midi') and not fs[row] then fs[row] = col.rgb or true end
+          end
+        end
+      end
+    end
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
       or (state.thide ~= nil and state.thide[col.guid] == true)                 -- 11 окт: скрыт в track list
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
@@ -917,6 +929,7 @@ function D.layout(snap, state, nregions)
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
     local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini' or fs == 'chord', chord = fs == 'chord', compact = fs == true, hidden = hidden }
+    if hide_below == depth and not fold_c and not hidden then c.fsum, c.fn = {}, 0; fold_c = c end
     -- 27 окт (2): «~» — только автоматизация, которой сейчас не видно колонкой (огибающие / MIDI-лейны этого трека)
     if L.envmark and col.env_rows then
       local seen = {}
@@ -8077,6 +8090,7 @@ function D.frame(L, snap, rows, state, info)
     -- папки: вложенные треки сдвинуты и приглушены, папка помечена «+»
     local indent = (col.depth or 0) * L.cw
     local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or '- ') or '') .. (col.name ~= '' and col.name or '-')
+    if c.fn and c.fn > 0 then nm = nm .. ' /' .. c.fn end   -- 1 ноя: свёрнутая папка — сколько треков внутри
     -- имя трека — на всю ширину колонки (кнопки переехали строкой ниже);
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
@@ -9804,6 +9818,12 @@ function D.frame(L, snap, rows, state, info)
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       -- 20 окт: и на долях (строки с точками темнее) — приоритетные прыжки по трекеру (метки раньше кнопок)
       if (r.bar or r.beat) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
+      -- 1 ноя: свёрнутая папка — полоска у правого края там, где у детей событие (цвет трека ребёнка)
+      local fsr = c.fsum and c.fsum[r.row]
+      if fsr then
+        if fsr == true then set(U.GREY) else rawset_col(fsr) end
+        gfx.rect(c.x + c.w - 3, y + 1, 2, L.rh - 2, 1)
+      end
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
           local fi = ln.f0 + si - 1
