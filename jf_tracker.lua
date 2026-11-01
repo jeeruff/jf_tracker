@@ -4812,7 +4812,7 @@ ctx = {
   -- клетки быстрых опций, которых нет среди встроенных: подпись и вкл из списка Options
   quick_generic = function()
     local out, BUILT = {}, { q_mx = 1, q_ruler = 1, q_hints = 1, q_listen = 1, debug = 1, q_scopes = 1, q_input = 1, q_captions = 1, q_names = 1, q_wave = 1,
-      q_colors = 1, q_envs = 1, q_meters = 1, q_dsp = 1, q_side = 1, q_preview = 1, q_keys = 1, oneclick = 1, autofocus = 1, perf = 1, follow = 1, lock = 1, fixed = 1, xfade = 1, q_endstop = 1 }
+      q_colors = 1, q_envs = 1, q_meters = 1, q_dsp = 1, q_side = 1, q_preview = 1, q_keys = 1, oneclick = 1, autofocus = 1, perf = 1, follow = 1, lock = 1, fixed = 1, xfade = 1, q_endstop = 1, q_font = 1 }
     local need = {}
     for x in ctx.quick_str():gmatch('[^,|]+') do if not BUILT[x] then need[x] = true end end
     if next(need) == nil then return out end
@@ -22150,6 +22150,8 @@ function ctrl_action(name, delta)
       reaper.SetExtState(EXT, 'mixpos', state.mixpos, true)
       relayout(); vim.msg = 'mixer ' .. (state.mixpos == 'bottom' and 'under the tracker' or 'above the tracker, in the headers')
     end
+  elseif name == 'q_fontm' or name == 'q_fontp' then if delta == 0 then ctx.font_step(name == 'q_fontp' and 1 or -1) end   -- 1 ноя
+  elseif name == 'q_font' then if delta == 0 then vim.run_cmd('font') end   -- имя — выбор шрифта (:font)
   elseif name == 'q_kcm' or name == 'q_kcp' then
     if delta == 0 then
       local cur = (state.kc_scale or 0) > 0 and state.kc_scale or draw.SCALE
@@ -24048,6 +24050,7 @@ local function frame()
       q_wave = (state.wavemode or 'back') ~= 'off', q_meters = state.meters, q_ruler = (state.tlruler or 'off') ~= 'off',
       q_names = state.itemnames, q_colors = state.itemcol, q_input = state.hdrin ~= false, q_preview = state.preview, q_endstop = state.endstop, q_captions = state.captions,
       q_keys = state.keycast, q_listen = state.steplisten,
+      q_font_lbl = ('font x%s'):format(tostring(state.fontscale or 2):gsub('%.0$', '')),   -- 1 ноя: font − +
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
@@ -25332,6 +25335,7 @@ local function frame()
       lock = 'lock: the tracker cursor is the REAPER edit cursor and selects the track in REAPER',
       fixed = 'fixed: the cursor stays in the middle of the screen, the rows scroll under it (Impulse Tracker)',
       q_endstop = 'end stop: playback started before =END stops there (recording never stops)',
+      q_font = 'font: the name - pick a font (:font); - + smaller / bigger (Cmd - / +)', q_fontm = 'font smaller (Cmd -)', q_fontp = 'font bigger (Cmd +)',
       wheel_pb = 'pitch wheel: what the MIDI keyboard sends; drag up / down to bend (back to the centre when you let go) - into the virtual keyboard of REAPER (an armed track hears it)',
       wheel_mod = 'mod wheel (CC1): what the MIDI keyboard sends; drag up / down to set it - into the virtual keyboard of REAPER',
       pedal = 'pedal: sustain (CC64) down / up - lit while it is down, also from the pedal of the MIDI keyboard',
@@ -30544,13 +30548,7 @@ local function frame()
     c = 0
   end
   if (c == 61 or c == 43 or c == 45 or c == 95 or c == 31) and ctx.mods().cmd and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-    local d = (c == 45 or c == 95 or c == 31) and -1 or 1
-    -- шаги x1 → x1.5 → x2 → x3 (5 окт)
-    local STEPS = ctx.tt_api.scales()   -- 31 окт: у битмапа без 1.5
-    local cur, i = ctx.tt_api.scale(), 1
-    for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
-    ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
-    vim.msg = ('bitmap x%s'):format(tostring(state.fontscale):gsub('%.0$', ''))
+    ctx.font_step((c == 45 or c == 95 or c == 31) and -1 or 1)
     c = 0
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
@@ -33163,6 +33161,28 @@ ctx.lfo_write_midi = function(tg, pts, t0, t1, where)
   vim.msg = ('%s -> %s: %d points (%s)'):format(LG.type, tg.label, n, where)
 end
 -- 1 ноя: vhs — в быстрые опции один раз (просьба: «vhs сделай быстрой опцией»); убрать — ПКМ по имени в Options
+-- 1 ноя: шрифт крупнее / мельче на шаг — Cmd + / − и font − + в быстрых опциях: x1 → x1.5 → x2 → x3 (у битмапа без 1.5)
+ctx.font_step = function(d)
+  local STEPS = ctx.tt_api.scales()
+  local cur, i = ctx.tt_api.scale(), 1
+  for k, v in ipairs(STEPS) do if math.abs(v - cur) < 0.01 then i = k end end
+  ctx.set_scale(STEPS[math.max(1, math.min(#STEPS, i + d))])
+  vim.msg = ('font x%s  (Cmd + / -)'):format(tostring(state.fontscale):gsub('%.0$', ''))
+end
+-- 1 ноя: font − + — в быстрые опции один раз (просьба); убрать — ПКМ по имени в Options
+ctx.quick_add_once = function(id, flag)
+  if reaper.GetExtState(EXT, flag) == '1' then return end
+  local q = ctx.quick_str()
+  if not (',' .. q:gsub('|', ',') .. ','):find(',' .. id .. ',', 1, true) then
+    local cols = {}
+    for part in (q .. '|'):gmatch('([^|]*)|') do cols[#cols + 1] = part end
+    local k = math.min(3, #cols)
+    cols[k] = (cols[k] ~= '' and (cols[k] .. ',') or '') .. id
+    state.quick = table.concat(cols, '|')
+    reaper.SetExtState(EXT, 'quick', state.quick, true)
+  end
+  reaper.SetExtState(EXT, flag, '1', true)
+end
 ctx.vhs_quick_once = function()   -- функцией: в главном чанке предел 200 локалей
   if reaper.GetExtState(EXT, 'q_vhs') == '1' then return end
   local q = ctx.quick_str()
@@ -33177,6 +33197,18 @@ ctx.vhs_quick_once = function()   -- функцией: в главном чан�
   reaper.SetExtState(EXT, 'q_vhs', '1', true)
 end
 ctx.vhs_quick_once()
+-- font x2 − + встаёт на место клетки font scale (она была в быстрых), иначе — в конец; один раз
+ctx.font_quick_once = function()
+  if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
+  local q = ctx.quick_str()
+  local q2, n = (',' .. q:gsub('|', ',|,') .. ','):gsub(',fontscale,', ',q_font,', 1)
+  if n > 0 then
+    state.quick = q2:gsub(',|,', '|'):gsub('^,', ''):gsub(',$', '')
+    reaper.SetExtState(EXT, 'quick', state.quick, true)
+    reaper.SetExtState(EXT, 'q_font2', '1', true)
+  else ctx.quick_add_once('q_font', 'q_font2') end
+end
+ctx.font_quick_once()
 -- 1 ноя: генератор в колонку курсора: MIDI-лейн (PB / CC / AT / PAT — события по точкам волны), поле ноты vol / pan /
 -- delay — каждой ноте колонки в отрезке значение волны на её строке (delay — сдвиг внутри строки, грув / свинг волной)
 ctx.lfo_here_target = function()

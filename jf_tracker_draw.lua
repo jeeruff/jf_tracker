@@ -4108,12 +4108,13 @@ local function draw_ctrl(L, info, H, hover)
         q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
         q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
         autofocus = 'autofocus', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
+      if c.q_font_lbl then QL.q_font = c.q_font_lbl end   -- 1 ноя: font x2 - +
       local cols = {}
       for part in ((c.quick or '') .. '|'):gmatch('([^|]*)|') do
         local col = {}
         for id in part:gmatch('[^,]+') do
           if id == 'xfade' then col[#col + 1] = q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade)
-          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], (id == 'q_keys' and { sizer = true }) or (id == 'q_side' and { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } }) or nil)   -- browser < > (7 окт): слева / справа
+          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], (id == 'q_keys' and { sizer = true }) or (id == 'q_font' and { sizer = { { '-', 'q_fontm' }, { '+', 'q_fontp' } } }) or (id == 'q_side' and { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } }) or nil)   -- browser < > (7 окт): слева / справа
           elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on, id == 'mixer' and { sizer = { { '^', 'q_mixup' }, { 'v', 'q_mixdn' } } } or nil) end   -- mixer ^ v (8 окт): над / под трекером
         end
         cols[#cols + 1] = col
