@@ -230,6 +230,7 @@ KH.PAGES = {
     { k = 'tw', m = 'wave column of track', d = 'the wave column of the cursor track: show / hide; again - auto (only with audio or a drumrs5k kit with samples)' },
     { k = 'g12 Enter', t = {}, m = 'go to row number', d = 'go to row 0012 (also 12gg)' },
     { k = 'Opt+Space', m = 'close the gap', d = 'the empty rows from the cursor to the next note of the subcolumn go out, the note (and the rest of the pattern below) comes up; on a note - the gap after it' },
+    { k = 'Opt+Tab (curve)', m = 'canvas <-> curve list', d = 'automation curve page: the focus goes to the list of curves (track folders) and back; in the list j k rows, l / Enter open a folder or take a curve (Enter - back to the canvas), h close the folder' },
     { k = 'Opt+w Opt+b', m = 'next / previous note', d = 'the next / previous note of this subcolumn only - past OFFs, commands and the other subcolumns (w / b - the whole track); 3 Opt+w - three notes' },
     { k = 'Opt+W', d = 'the cursor to the master columns (Shift+Opt+w); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
     { k = 'zs', d = 'view: only the section of the cursor (intro, hook ...) / the whole project (the sec button); transpose (F1 F2 ...) takes what you see' },

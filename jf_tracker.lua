@@ -17249,6 +17249,39 @@ ctx.acv_key = function(c)
   local act = curves[ACV.cur]
   local m = ctx.mods()
   if c == 25 then c = 9; m = { shift = true } end
+  -- 1 ноя: Opt+Tab — фокус холст <-> список кривых (папки треков); в списке j k — строки, l / Enter — открыть папку
+  -- или взять кривую (Enter — и назад на холст), h — закрыть папку, Esc / Opt+Tab — на холст
+  if c == 9 and m.alt then
+    ACV.lfoc = not ACV.lfoc
+    if ACV.lfoc then
+      ACV.lsel = 1
+      for i, r in ipairs(ctx.acv_tree(curves)) do if r.i == ACV.cur then ACV.lsel = i end end
+    end
+    vim.msg = ACV.lfoc and 'curve list: j k rows, l / Enter open a folder or take a curve, h close, Opt+Tab / Esc - the canvas' or 'curve: the canvas'
+    return true
+  end
+  if ACV.lfoc then
+    local rows = ctx.acv_tree(curves)
+    local ch = c < 256 and string.char(c) or ''
+    ACV.lsel = math.max(1, math.min(#rows, ACV.lsel or 1))
+    local r = rows[ACV.lsel]
+    local function fold(guid, open) ACV.tfold[guid] = open; ACV.tree_gen = (ACV.tree_gen or 0) + 1 end
+    local function owner(i) for k = i, 1, -1 do if rows[k].hdr then return k, rows[k] end end end
+    if ch == 'j' or c == 1685026670 then ACV.lsel = math.min(#rows, ACV.lsel + 1)
+    elseif ch == 'k' or c == 30064 then ACV.lsel = math.max(1, ACV.lsel - 1)
+    elseif ch == 'g' then ACV.lsel = 1
+    elseif ch == 'G' then ACV.lsel = #rows
+    elseif c == 27 then ACV.lfoc = nil; vim.msg = 'curve: the canvas'
+    elseif r and r.hdr and (ch == 'l' or c == 13 or c == 1919379572) then fold(r.guid, true)
+    elseif r and r.hdr and (ch == 'h' or c == 1818584692) then fold(r.guid, false)
+    elseif r and not r.hdr and (ch == 'h' or c == 1818584692) then
+      local k, hr = owner(ACV.lsel); if hr then fold(hr.guid, false); ACV.lsel = k end
+    elseif r and r.i and (ch == 'l' or c == 13 or c == 1919379572) then
+      ACV.cur = r.i; vim.msg = 'curve: ' .. (curves[r.i].name or '?')
+      if c == 13 then ACV.lfoc = nil end
+    end
+    return true
+  end
   if c == 117 then edit.undo(); vim.msg = 'undo'; return true elseif c == 18 then edit.redo(); vim.msg = 'redo'; return true end   -- u / Ctrl+R — как везде
   local r = ACV.key(c, { r0 = sp.r0, r1 = sp.r1, lpb = state.lpb, ncurves = #curves, kind = act and act.kind }, m)
   if r == true then
