@@ -3232,6 +3232,10 @@ function V.key_impl(c)
             if ctx.env_remove then ctx.env_remove(f); V.count = nil; finish_edit() else finish_move() end
           else
             local last = math.max(0, ctx.snap().last_row or 0) + 1
+            if f.ml and ctx.ml_clear_track then   -- 1 ноя: MIDI-лейн (CC / PB / AT / PAT) — все его события во всех клипах трека
+              local nd = ctx.ml_clear_track(f)
+              V.msg = ('dc: %d event(s) of the lane deleted, the column stays (dC - the column too)'):format(nd); V.count = nil; finish_edit(); return
+            end
             if apply('d', V.cur.fi, V.cur.fi, 0, last) then V.msg = 'dc: every value of the column deleted, the column stays (dC - the column too)'; finish_edit() else finish_move() end
             V.count = nil
           end

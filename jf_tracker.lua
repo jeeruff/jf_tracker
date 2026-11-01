@@ -3199,6 +3199,22 @@ ctx = {
       label = 'automation'
       edit.run('delete the automation of the track', function()
         for _, tr in ipairs(trs) do
+        -- 1 ноя: MIDI-лейны (CC / PB / AT / PAT) в клипах — тоже автоматизация: события уходят, ноты остаются
+        for ii = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
+          local it = reaper.GetTrackMediaItem(tr, ii)
+          local ip = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local tk = reaper.GetActiveTake(it)
+          if tk and reaper.TakeIsMIDI(tk) and ip < t1 and ip + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > t0 then
+            local _, nn, ncc = reaper.MIDI_CountEvts(tk)
+            for ci = ncc - 1, 0, -1 do
+              local _, _, _, pp = reaper.MIDI_GetCC(tk, ci)
+              local tt = reaper.MIDI_GetProjTimeFromPPQPos(tk, pp)
+              if tt >= t0 - 1e-6 and tt < t1 then reaper.MIDI_DeleteCC(tk, ci); n = n + 1 end
+            end
+            local _, nn2, ncc2 = reaper.MIDI_CountEvts(tk)
+            if nn2 == 0 and ncc2 == 0 then reaper.DeleteTrackMediaItem(tr, it) end
+          end
+        end
         for k = 0, reaper.CountTrackEnvelopes(tr) - 1 do
           local env = reaper.GetTrackEnvelope(tr, k)
           local np = reaper.CountEnvelopePoints(env)
@@ -33508,6 +33524,26 @@ ctx.lib_folder_drum = function(name)
   end
   if #files == 0 then vim.msg = 'folder ' .. tostring(name) .. ': no samples (lib folders on, the cursor on the folder)'; return end
   ctx.drum_add_files(files)
+end
+-- 1 ноя: dc на MIDI-лейне — его события во всех MIDI-клипах трека (одна отмена) → сколько удалено
+ctx.ml_clear_track = function(f)
+  local tr = f.col and f.col.track
+  if not tr then return 0 end
+  local n = 0
+  edit.run('dc: clear the lane', function()
+    for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local tk = reaper.GetActiveTake(reaper.GetTrackMediaItem(tr, i))
+      if tk and reaper.TakeIsMIDI(tk) then
+        local _, _, c0 = reaper.MIDI_CountEvts(tk)
+        ctx.ml_clear(tk, f.ml, -1e12, 1e12)
+        local _, _, c1 = reaper.MIDI_CountEvts(tk)
+        n = n + (c0 - c1)
+        reaper.MIDI_Sort(tk)
+      end
+    end
+  end)
+  model.invalidate()
+  return n
 end
 ctx.fxcmd_dir = function() local d = reaper.GetResourcePath() .. '/Data/jf_tracker_fxcmds'; reaper.RecursiveCreateDirectory(d, 0); return d end
 ctx.fxcmd_export = function(name)
