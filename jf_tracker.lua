@@ -26926,6 +26926,8 @@ local function frame()
           local r = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = 'sel', geo = lfo_hover.geo, r_s = r }
           A.sel = nil
+        elseif A.tool == 'cur' and lfo_hover.geo and dbl and click.zone == 'lfo' and click.mx and math.abs(click.mx - gfx.mouse_x) + math.abs(click.my - gfx.mouse_y) < 8 and ctx.acv_point_del(lfo_hover.geo) then   -- 1 ноя: двойной щелчок по точке — удалить
+          ctx.acv_pdrag = nil
         elseif A.tool == 'cur' and lfo_hover.geo and dbl and click.zone == 'lfo' and click.mx and math.abs(click.mx - gfx.mouse_x) + math.abs(click.my - gfx.mouse_y) < 8 then   -- 31 окт: двойной щелчок на том же месте — точка здесь
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_do({ op = 'put', rows = { [r] = v }, tool = 'draw' })
@@ -29047,7 +29049,7 @@ local function frame()
           d.row = r
         end
         d.v, d.moved = vv, true
-        ctx.acv_cc = nil
+        ctx.acv_cc = nil; ctx.ACV.cache = nil
         state.status = ('%s: %d at row %d (release - written)'):format(d.name or 'point', vv, r)
       end
     elseif d.ml then
@@ -29062,8 +29064,9 @@ local function frame()
       if okn and tn then t = math.min(t, tn - 1e-4) end
       local raw = (d.e.min or 0) + v * ((d.e.max or 1) - (d.e.min or 0))
       reaper.SetEnvelopePoint(d.env, d.idx, t, raw, nil, nil, nil, true)
+      reaper.Envelope_SortPoints(d.env)   -- 1 ноя: t зажат соседями — индекс тот же; кривая считается по точкам сразу
       d.moved = true
-      ctx.acv_cc = nil
+      ctx.acv_cc = nil; ctx.ACV.cache = nil   -- 1 ноя: линия кривой — вживую (кэш столбцов ждал undo)
       state.status = ('%s: %d%% at row %.2f%s (release - written)'):format(d.name or 'point', math.floor(v * 100 + 0.5), r, ctx.ACV.snap and ' snap' or '')
     else
       if d.moved then reaper.Envelope_SortPoints(d.env); reaper.Undo_OnStateChange2(0, 'jf_tracker: move envelope point'); model.invalidate() end
@@ -33351,6 +33354,30 @@ ctx.mx_sel_rgs = function()
   local out = {}
   for ri = r0, r1 do local rg = seq[ri]; if rg and not rg.gap then out[#out + 1] = rg end end
   return #out >= 2 and out or nil
+end
+-- 1 ноя: двойной щелчок по точке огибающей на холсте (±8 px) — удалить её. → true, если удалена
+ctx.acv_point_del = function(g)
+  local sp = ctx.acv_span(); local act = ctx.acv_curves(sp)[ctx.ACV.cur]
+  if not (act and act.kind == 'env' and act.write ~= false and act.e and act.e.env) then return false end
+  local best, bd
+  for _, p in ipairs(act.points or {}) do
+    local px = g.gx + (sp.row_of(p[1]) - g.r0) / math.max(1e-9, g.nr) * g.gw
+    local py = g.gy + 2 + (1 - p[2]) * math.max(1, g.gh - 4)
+    local dd = math.abs(px - gfx.mouse_x) + math.abs(py - gfx.mouse_y)
+    if dd <= 8 and (not bd or dd < bd) then best, bd = p, dd end
+  end
+  if not best then return false end
+  local env = act.e.env
+  for i = 0, reaper.CountEnvelopePoints(env) - 1 do
+    local _, t = reaper.GetEnvelopePoint(env, i)
+    if math.abs(t - best[1]) < 1e-7 then
+      edit.run('envelope delete point', function() reaper.DeleteEnvelopePointEx(env, -1, i); reaper.Envelope_SortPoints(env) end)
+      ctx.acv_cc = nil; ctx.ACV.cache = nil; model.invalidate()
+      vim.msg = 'point deleted (double click; u - undo)'
+      return true
+    end
+  end
+  return false
 end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
