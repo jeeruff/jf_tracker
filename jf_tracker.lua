@@ -33497,8 +33497,8 @@ ctx.pl_tick = function(pp)
 end
 -- дописать после песни: целые — связанные повторы, сокращённые / с проскоком — копия, обрезанная, своим именем
 -- 19 окт: at — куда (слот курсора матрицы: цепь встаёт перед ним, остальное едет); sec — имя секции над записанным
-ctx.pl_write = function(at, sec)
-  local steps = ctx.pl_parsed()
+ctx.pl_write = function(at, sec, steps0)
+  local steps = steps0 or ctx.pl_parsed()   -- 1 ноя: steps0 — свои шаги (печать прыжков ZB / ZJ)
   if #steps == 0 then vim.msg = 'seq: nothing to write'; return end
   local t = 0
   for _, rg in ipairs(ctx.real_seq()) do if not rg.session and not rg.lib and rg.rgnend > t then t = rg.rgnend end end
@@ -33540,6 +33540,98 @@ ctx.pl_write = function(at, sec)
   model.invalidate(); regions = model.regions(state.lpb)
   vim.msg = at and ('seq: %d step(s) rendered into the matrix at the cursor%s (u - undo)'):format(n, (sec and sec ~= '') and (' as section ' .. sec) or '')
     or ('seq: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
+  return t_start, t
+end
+-- 1 ноя: печать прыжков — песня проигрывается «в уме» по ZB / ZJ (как их исполняет трекер при игре), получившийся
+-- порядок пишется после песни обычными шагами seq: целые паттерны — связанные повторы, обрезанные брейком — копии.
+-- Так прыжки слышны и в рендере REAPER, без трекера. Петля (ZJ назад) — до первого повтора состояния, потом стоп.
+-- В напечатанном ZB / ZJ снимаются (иначе при игре через трекер прыгало бы снова)
+ctx.jumps_steps = function()
+  local slots, at = {}, {}
+  for i, rg in ipairs(seq or {}) do if not rg.gap and not rg.session and not rg.lib then slots[#slots + 1] = rg; at[rg] = #slots end end
+  if #slots == 0 then return nil, 'no patterns' end
+  -- индекс прыжков: тот же, что у process_jumps (по меткам айтемов)
+  local list = {}
+  for ti = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, ti)
+    for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it = reaper.GetTrackMediaItem(tr, ii)
+      local _, cm = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
+      if cm and cm:find('Z[BJ]') then
+        local q0 = reaper.TimeMap2_timeToQN(0, reaper.GetMediaItemInfo_Value(it, 'D_POSITION'))
+        for tok in cm:gmatch('[^,]+') do
+          local code, xx, off = tok:match('^(Z[BJ])(%x%x)@?([%d%.]*)$')
+          if code then list[#list + 1] = { t = reaper.TimeMap2_QNToTime(0, q0 + (tonumber(off) or 0)), code = code, xx = tonumber(xx, 16) } end
+        end
+      end
+    end
+  end
+  local function jumps_in(rg)   -- строка (от начала паттерна) → { zb = xx, zj = xx }
+    local by = {}
+    for _, j in ipairs(list) do
+      if j.t >= rg.pos - 1e-4 and j.t < rg.rgnend - 1e-4 then
+        local r = math.floor(model.row_of_time(j.t, state.lpb) + 0.5) - math.floor(rg.r0 + 0.5)
+        by[r] = by[r] or {}
+        if j.code == 'ZB' then by[r].zb = j.xx else by[r].zj = j.xx end
+      end
+    end
+    return by
+  end
+  local steps, seen = {}, {}
+  local i, from = 1, 0
+  local nj = #list
+  while i and i <= #slots and #steps < 512 do
+    local rg = slots[i]
+    local rows = math.floor(rg.r1 - rg.r0 + 0.5)
+    local key = i .. ':' .. from
+    if seen[key] then break end   -- петля: дальше то же самое
+    seen[key] = true
+    local by = jumps_in(rg)
+    local hit
+    for r = from, rows - 1 do if by[r] then hit = r; break end end
+    if not hit then
+      steps[#steps + 1] = { rg = rg, from = from, len = rows - from, rows = rows, tok = rg.name }
+      i, from = i + 1, 0
+    else
+      local j = by[hit]
+      steps[#steps + 1] = { rg = rg, from = from, len = hit - from + 1, rows = rows, tok = rg.name }
+      if j.zj then
+        local tg = seq[j.zj]
+        i = tg and at[tg] or nil
+        from = j.zb or 0
+      else i, from = i + 1, j.zb or 0 end
+      if i and slots[i] then from = math.max(0, math.min(from, math.floor(slots[i].r1 - slots[i].r0 + 0.5) - 1)) end
+    end
+  end
+  return steps, nil, nj
+end
+ctx.print_jumps = function()
+  local steps, why, nj = ctx.jumps_steps()
+  if not steps then vim.msg = 'print jumps: ' .. tostring(why); return end
+  if (nj or 0) == 0 then vim.msg = 'print jumps: no ZB / ZJ in the song - nothing changes the order'; return end
+  local t0, t1 = ctx.pl_write(nil, 'printed', steps)
+  -- в напечатанном прыжки сняты
+  edit.run('print jumps: strip ZB / ZJ', function()
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, ii)
+        local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        if t0 and p >= t0 - 1e-6 and p < t1 - 1e-6 then
+          local _, cm = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
+          if cm and cm:find('Z[BJ]') then
+            local keep = {}
+            for tok in cm:gmatch('[^,]+') do if not tok:match('^Z[BJ]') then keep[#keep + 1] = tok end end
+            reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', table.concat(keep, ','), true)
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  local names = {}
+  for k, st in ipairs(steps) do if k <= 12 then names[#names + 1] = st.rg.name .. ((st.from > 0 or st.len < st.rows) and ('[' .. st.from .. '+' .. st.len .. ']') or '') end end
+  vim.msg = ('print jumps: %d steps after the song as section "printed": %s%s (u - undo)'):format(#steps, table.concat(names, ' '), #steps > 12 and ' ...' or '')
 end
 ctx.plist_toggle = function()
   MX.plist = not MX.plist
