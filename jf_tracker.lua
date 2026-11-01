@@ -1187,7 +1187,7 @@ ctx = {
     local items = { { key = 's', label = 'save the current view as …', fn = function() vim.open_prompt('ssave ', '') end } }
     -- готовые виды и свои слоты (4 окт): pt-mode, большой сэмпл, макро;
     -- user1..3 — загрузить, пустой — сохранить в него текущий вид
-    items[#items + 1] = { key = 'p', label = 'pt-mode (4 channels, big)', fn = function() ctx.pt_toggle() end }
+    items[#items + 1] = { key = 'p', label = 'pt-mode (ProTracker: 4 channels, 31 samples, 64 rows, x2)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
     if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
     items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
@@ -12067,7 +12067,7 @@ ctx = {
     edit.run('OG-mode channels', function()
       for k = 1, 4 do
         local nm = 'track' .. k   -- 31 окт: каналы — track1..track4 (были OG1..OG4: старые тоже узнаются)
-        if not have[nm] and not have['OG' .. k] then
+        if not have[nm] and not have['OG' .. k] and not have['CH' .. k] then
           local n = reaper.CountTracks(0)
           reaper.InsertTrackAtIndex(n, true)
           local tr = reaper.GetTrack(0, n)
@@ -12095,17 +12095,19 @@ ctx = {
       for _, p in ipairs(PN.PANELS) do if not KEEP[p.id] and PN.visible(state.panes, p.id) then PN.hide(state.panes, p.id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
-    if state.ogfont then state.fontscale = math.min(4, (tonumber(state.fontscale) or 2) * 2); draw.set_font(state) end   -- 31 окт: вдвое крупнее текущего (2 и так по умолчанию)
     state.og = true
     model.invalidate(); relayout()
     snap = model.snapshot(state.lpb)
-    for ci, c in ipairs(snap.cols) do if c.name == 'track1' or c.name == 'OG1' then state.hscroll = ci; break end end
+    for ci, c in ipairs(snap.cols) do if c.name == 'track1' or c.name == 'OG1' or c.name == 'CH1' then state.hscroll = ci; break end end
     ctx.set_focus('tracker')
     vim.msg = ('OG-mode: track1..track4 (%d new); :og again - back'):format(made)
   end,
+  -- 31 окт: PT-mode = ProTracker, OG-mode слит в него (одна концепция: свобода в ограничениях): 4 канала track1..4
+  -- (OG: создаются с инструментами og channel N, видны только они), 31 сэмпл, паттерн 64 строки, шрифт x2, панели — нужные
   pt_toggle = function()
     local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions' }
     if state.ptmode then
+      if state.og then ctx.og_toggle() end
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
       state.ptmode, state.pt_saved = false, nil
       draw.set_font(state); model.invalidate()
@@ -12114,18 +12116,19 @@ ctx = {
     else
       state.pt_saved = {}
       for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
+      if not state.og then ctx.og_toggle(false) end   -- каналы track1..4 и панели (видны только четыре)
       state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
       state.fixed, state.meters, state.meterstyle, state.khelp = true, true, 'pt', false
       -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
       -- без волны и огибающих, LPB 4 (64 строки = 4 такта), битмап x4
       state.fxcols, state.wavemode, state.wave, state.envs, state.lpb, state.captions = 1, 'off', 'off', false, 4, false
-      state.fontscale = 2                                    -- 6 окт: ×2 (×4 — огромно)
+      state.fontscale = math.min(4, (tonumber(state.pt_saved.fontscale) or 2) * 2)   -- 31 окт: шрифт x2 от текущего
       state.pt_fit = true                                    -- кадр уменьшит масштаб, если 4 канала не влезли
       if not state.scopes then ctx.toggle_scopes(true) end
       state.ptmode = true
       draw.set_font(state); model.invalidate()
       ctx.set_focus('tracker')
-      vim.msg = 'PT-mode: 4 channels, scopes on top (:pt again - back, :pt new - create CH1..CH4)'
+      vim.msg = 'PT-mode: 4 channels, 31 samples, 64-row patterns (:pt again - back)'
     end
   end,
   -- :pt new (3 окт): в проекте ровно 4 канала CH1..CH4 (недостающие — новыми
@@ -12993,14 +12996,6 @@ ctx = {
       flag('ctxdim', 'dim outside the view', 'rows outside the pattern / section of the view (or outside =START .. =END in project) are shown dim; off - they are blank', function() relayout() end),
       flag('outnotes', 'show notes outside clips', 'MIDI notes before the start / after the end of their clip (REAPER keeps them but they do not play): shown grey; off - hidden', function() model.OUTNOTES = state.outnotes; model.invalidate() end),
       flag('clipsnap', 'clip edges on beats', 'a MIDI clip whose start / end is off the beat grid (a delayed first note, a drag) is widened to the beats after every edit - the notes stay where they are', function() edit.CLIP_SNAP = state.clipsnap end),
-      { key = 'ogmode', label = 'og-mode', kind = 'toggle', desc = 'OG-mode: the minimum to write a track - four channels track1..track4 (made if missing, with the instruments below), asks first: keep your tracks visible or only the four; panes - only tracker, matrix, patterns, main, help, lib, browser, fx, dsp, automation, item; off - the layout comes back (:og)', get = function() return state.og and true or false end, set = function(v) if (v and true or false) ~= (state.og and true or false) then ctx.og_toggle() end end },
-      { key = 'ogfont', label = 'og-mode font x2', kind = 'toggle', desc = 'OG-mode with the bitmap font twice as big', get = function() return state.ogfont end, set = function(v)
-        state.ogfont = v; reaper.SetExtState(EXT, 'ogfont', v and '1' or '0', true)
-        if state.og and state.og_back then   -- сразу, если OG-mode уже включён
-          local b = tonumber(state.og_back.fontscale) or 2
-          state.fontscale = v and math.min(4, b * 2) or b; draw.set_font(state); relayout()
-        end
-      end },
       { key = 'ogch1', label = 'og channel 1', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track1 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[1]) end, set = function(v) state.og_ch[1] = v; reaper.SetExtState(EXT, 'ogch1', v, true) end, pick = function() ctx.og_pick(1) end },
       { key = 'ogch2', label = 'og channel 2', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track2 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[2]) end, set = function(v) state.og_ch[2] = v; reaper.SetExtState(EXT, 'ogch2', v, true) end, pick = function() ctx.og_pick(2) end },
       { key = 'ogch3', label = 'og channel 3', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track3 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[3]) end, set = function(v) state.og_ch[3] = v; reaper.SetExtState(EXT, 'ogch3', v, true) end, pick = function() ctx.og_pick(3) end },
@@ -13041,7 +13036,7 @@ ctx = {
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines, the mode word REAPER is torn white-on-black - impossible to miss that the keys go elsewhere. Off - REAPER is written in the mode font like NORMAL', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
-      { key = 'ptmode', label = 'pt-mode', kind = 'toggle', desc = 'ProTracker view: 4 channels, scopes on top, only notes / sample / volume / one command, LPB 4, big bitmap font; the matrix, lib, browser and DSP hidden. Off - the layout comes back as it was (also :pt, :pt new makes CH1..CH4)', get = function() return state.ptmode and true or false end, set = function(v) if (v and true or false) ~= (state.ptmode and true or false) then ctx.pt_toggle() end end },   -- 26 окт: PT-mode — и в опциях / быстрых
+      { key = 'ptmode', label = 'pt-mode', kind = 'toggle', desc = 'ProTracker (OG-mode merged in): four channels track1..track4 (made with the instruments below), 31 samples, 64-row patterns, LPB 4, the font x2, one command column, scopes on top; only the panes a track needs. I am free only when I am limited (Stravinsky). Off - the layout comes back (:pt, :og)', get = function() return state.ptmode and true or false end, set = function(v) if (v and true or false) ~= (state.ptmode and true or false) then ctx.pt_toggle() end end },   -- 26 окт: PT-mode — и в опциях / быстрых
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
@@ -13192,8 +13187,8 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'og-mode', { 'ogmode', 'ogfont', 'ogch1', 'ogch2', 'ogch3', 'ogch4' } },
-      { 'look', { 'ptmode', 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
+      { 'pt-mode', { 'ptmode', 'ogch1', 'ogch2', 'ogch3', 'ogch4' } },   -- 31 окт: OG-mode слит с PT-mode
+      { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'offit', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
@@ -23216,8 +23211,9 @@ local function frame()
   elseif state.viper then pcall(ctx.viper_tick)
   elseif state.phr_edit then state.mxonly = state.phr_edit.only   -- 31 окт: правка фразы — только её трек
   elseif state.og and snap and not state.og_keep then   -- 31 окт: OG-mode — только track1..4 (если не «оставить свои»)
+    if state.ptmode and (vim.inst or 0) > 31 then vim.inst = 31; vim.msg = 'pt-mode: 31 samples (01..1F)' end   -- 31 окт: ProTracker — 31 сэмпл
     local only = {}
-    for _, c in ipairs(snap.cols) do local n = c.name or ''; if n:match('^OG[1-4]$') or n:match('^track[1-4]$') then only[c.guid] = true end end
+    for _, c in ipairs(snap.cols) do local n = c.name or ''; if n:match('^OG[1-4]$') or n:match('^track[1-4]$') or n:match('^CH[1-4]$') then only[c.guid] = true end end
     state.mxonly = next(only) and only or nil
   else state.mxonly = nil end
   if (MX.anchor or next(MX.picks)) and #seq > 0 and snap then
@@ -31479,7 +31475,13 @@ ctx.auto_pattern = function(row)
   for _, rg in ipairs(seq or {}) do
     if rg.gap and t >= rg.pos - 1e-9 and t < rg.rgnend - 1e-9 then
       local code = model.SEC.next_family(regions)
-      edit.run('new pattern ' .. code, function() reaper.AddProjectMarker2(0, true, rg.pos, rg.rgnend, code, -1, 0) end)
+      local e = rg.rgnend
+      if state.ptmode then   -- 31 окт: PT-mode — паттерн 64 строки (до следующего паттерна, если он ближе)
+        local r0 = math.floor(model.row_of_time(rg.pos, state.lpb) + 0.5)
+        e = edit.row_time(r0 + 64, state.lpb, 0)
+        for _, r2 in ipairs(regions or {}) do if r2.pos > rg.pos + 1e-6 and r2.pos < e then e = r2.pos end end
+      end
+      edit.run('new pattern ' .. code, function() reaper.AddProjectMarker2(0, true, rg.pos, e, code, -1, 0) end)
       ctx.mx_refresh()
       ctx.auto_pat_msg = 'new pattern ' .. code .. ' for this bar (u - undo)'
       return true

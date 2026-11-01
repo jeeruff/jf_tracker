@@ -139,6 +139,10 @@ follows that idea with its own code; the user key file (`jf_tracker_keys.lua`) w
 
 Also thanks to my brother **beast**, who showed me trackers and the demoscene in the first place.
 
+PT-mode is ProTracker on the Amiga as a rule, not a skin: four channels, 31 samples, 64-row patterns, one
+command per cell, a big font. Igor Stravinsky (*Poetics of Music*): the more narrowly I limit my field of
+action, the freer I am - I am free only when I am limited.
+
 The dsp big routing view follows the idea of Sexan's ParaNormal FX Router
 for REAPER - an own implementation, no code copied.
 
