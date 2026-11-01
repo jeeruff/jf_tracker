@@ -38,6 +38,7 @@ LG.res = 16             -- точек на период (sin / tri)
 LG.seed = 1             -- случайность rnd (повторяемая)
 LG.sel = 1
 LG.type = 'lfo'
+LG.to = 'env'          -- 1 ноя: куда: огибающая под курсором или огибающая тейка аудио-нот трека (pitch / vol / pan)
 LG.TYPES = { 'lfo', 'podkat', 'follow' }
 -- podkat
 LG.hits = 'events'      -- 'events' | 'transients'
@@ -61,6 +62,7 @@ LG.tol = 0.004
 
 local F = {
   type = { key = 'type', label = 'type', enum = 'TYPES' },
+  to = { key = 'to', label = 'to', enum = { 'env', 'pitch', 'vol', 'pan' } },   -- 1 ноя: огибающая тейка
   shape = { key = 'shape', label = 'shape', enum = 'SHAPES' },
   period = { key = 'period', label = 'period', min = 1, max = 256, step = 1, fmt = '%d rows' },
   depth = { key = 'depth', label = 'depth', min = 0, max = 1, step = 0.05, fmt = '%.2f' },
@@ -84,9 +86,9 @@ local F = {
   points = { key = 'points', label = 'write points', button = true },
 }
 local LAYOUT = {
-  lfo = { 'type', 'shape', 'period', 'depth', 'center', 'phase', 'res', 'ai', 'points' },
-  podkat = { 'type', 'src', 'hits', 'sens', 'lead', 'curve', 'hold', 'release', 'dir', 'depth', 'center', 'ai', 'points' },
-  follow = { 'type', 'fsrc', 'src', 'attack', 'frel', 'shift', 'invert', 'depth', 'center', 'ai', 'points' },
+  lfo = { 'type', 'to', 'shape', 'period', 'depth', 'center', 'phase', 'res', 'ai', 'points' },
+  podkat = { 'type', 'to', 'src', 'hits', 'sens', 'lead', 'curve', 'hold', 'release', 'dir', 'depth', 'center', 'ai', 'points' },
+  follow = { 'type', 'to', 'fsrc', 'src', 'attack', 'frel', 'shift', 'invert', 'depth', 'center', 'ai', 'points' },
 }
 -- поля текущего типа (transients — со sens, events — без)
 function LG.fields()

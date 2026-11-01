@@ -3985,6 +3985,7 @@ ctx = {
   end,
   lfo_make = function(mode)
     local tg = ctx.lfo_target()
+    if LG.to and LG.to ~= 'env' then tg = ctx.lfo_take_target() end   -- 1 ноя: огибающая тейка аудио-нот
     if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope column (or select an envelope in REAPER)'; return end
     local e = tg.e
     local t0, t1, where = ctx.lfo_span()
@@ -4006,6 +4007,7 @@ ctx = {
         pts = LG.follow_points(fn, r0, r1)
       end
     end
+    if tg.take then return ctx.lfo_write_take(tg, pts, t0, t1, where) end
     -- 6 окт: шкала огибающей — громкость фейдерная; 0..1 — между min и max в шкале
     local lo, hi = e.min or 0, e.max or 1
     local smode = reaper.GetEnvelopeScalingMode(e.env)
@@ -23955,7 +23957,7 @@ local function frame()
     -- уводил вкладку на params)
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
-      local tgt = ctx.lfo_target()
+      local tgt = (LG.to and LG.to ~= 'env') and ctx.lfo_take_target() or ctx.lfo_target()
       return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
     end,
     hum_draw = function(Lx, x, y, w, h, foc)
@@ -32994,6 +32996,73 @@ ctx.edge_menu = function()
     { key = 'e', label = 'the pattern ends here', fn = function() ctx.pat_edge_here('end') end },
     { key = 's', label = 'a pattern starts here', fn = function() ctx.pat_edge_here('start') end },
   } })
+end
+-- 1 ноя: генератор (LFO / подкат / follow) в огибающую тейка: аудио-ноты трека курсора в отрезке генератора
+-- (время выделения / регион / такт); огибающая создаётся (действие Take: … envelope на выбранном item, выбор
+-- возвращается). pitch — ±12 полутонов (center 0.5 = 0), vol — амплитуда 0..1 (фейдерная шкала), pan — лево..право
+ctx.LFO_TAKE = { pitch = { 'Pitch', 41612 }, vol = { 'Volume', 40693 }, pan = { 'Pan', 40694 } }
+ctx.lfo_take_target = function()
+  local col = cur_col()
+  local tr = col and col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then return nil end
+  local t0, t1 = ctx.lfo_span()
+  local its = {}
+  for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
+    local it = reaper.GetTrackMediaItem(tr, i)
+    local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local l = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    local tk = reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) and p < t1 - 1e-6 and p + l > t0 + 1e-6 then its[#its + 1] = it end
+  end
+  return { take = true, items = its, kind = LG.to, e = {}, label = ('%s / take %s (%d audio note%s)'):format(col.name or '', LG.to, #its, #its == 1 and '' or 's') }
+end
+ctx.lfo_write_take = function(tg, pts, t0, t1, where)
+  if #tg.items == 0 then vim.msg = 'LFO -> take ' .. tg.kind .. ': no audio notes of the cursor track in the span (' .. where .. ')'; return end
+  local def = ctx.LFO_TAKE[tg.kind]
+  local n = 0
+  edit.run('LFO -> take ' .. tg.kind, function()
+    -- огибающие, которых нет, — действием на выбранных items (выбор — назад)
+    local sel = {}
+    for i = 0, reaper.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = reaper.GetSelectedMediaItem(0, i) end
+    local need = {}
+    for _, it in ipairs(tg.items) do if not reaper.GetTakeEnvelopeByName(reaper.GetActiveTake(it), def[1]) then need[#need + 1] = it end end
+    if #need > 0 then
+      reaper.SelectAllMediaItems(0, false)
+      for _, it in ipairs(need) do reaper.SetMediaItemSelected(it, true) end
+      reaper.Main_OnCommand(def[2], 0)
+      reaper.SelectAllMediaItems(0, false)
+      for _, it in ipairs(sel) do if reaper.ValidatePtr(it, 'MediaItem*') then reaper.SetMediaItemSelected(it, true) end end
+    end
+    for _, it in ipairs(tg.items) do
+      local tk = reaper.GetActiveTake(it)
+      local env = tk and reaper.GetTakeEnvelopeByName(tk, def[1])
+      if env then
+        local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+        if rate <= 0 then rate = 1 end
+        local a, b = math.max(t0, pos), math.min(t1, pos + len)
+        local smode = reaper.GetEnvelopeScalingMode(env)
+        local function raw(v)
+          v = math.max(0, math.min(1, v))
+          if tg.kind == 'pitch' then return (v - 0.5) * 24
+          elseif tg.kind == 'pan' then return (v - 0.5) * 2 end
+          return smode ~= 0 and reaper.ScaleToEnvelopeMode(smode, v) or v
+        end
+        reaper.DeleteEnvelopePointRange(env, (a - pos) * rate - 1e-6, (b - pos) * rate + 1e-6)
+        for _, p in ipairs(pts) do
+          local t = edit.row_time(p.row, state.lpb, 0)
+          if t >= a - 1e-6 and t < b - 1e-6 then
+            reaper.InsertEnvelopePoint(env, (t - pos) * rate, raw(p.v), p.shape or 0, 0, false, true)
+            n = n + 1
+          end
+        end
+        reaper.Envelope_SortPoints(env)
+      end
+    end
+  end)
+  reaper.UpdateArrange()
+  vim.msg = ('%s -> take %s: %d points on %d audio note(s) of %s (%s)'):format(LG.type, tg.kind, n, #tg.items, tg.label:match('^(.-) /') or '', where)
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()

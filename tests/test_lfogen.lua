@@ -57,9 +57,9 @@ local a = LG.points(0, 16); local b = LG.points(0, 16)
 eq('rnd repeatable', a[3].v, b[3].v); eq('rnd 4 steps', #a, 4)
 
 -- поля (1 — type, 2 — shape, 3 — period, 8 — make AI)
-LG.shape = 'sin'; LG.adjust(2, 1); eq('shape cycles', LG.shape, 'tri')
-LG.period = 16; LG.adjust(3, -100); eq('period clamps', LG.period, 1)
-LG.sel = 8; eq('Enter on button -> ai', LG.key(13), 'ai')
+LG.shape = 'sin'; LG.adjust(3, 1); eq('shape cycles', LG.shape, 'tri')
+LG.period = 16; LG.adjust(4, -100); eq('period clamps', LG.period, 1)
+LG.sel = 9; eq('Enter on button -> ai', LG.key(13), 'ai')
 LG.period = 16
 
 -- тип: podkat меняет набор полей
