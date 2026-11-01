@@ -2062,7 +2062,7 @@ ctx = {
     local col = h.col
     if h.what == 'wauto' then state.dsp_wauto = not state.dsp_wauto; return end
     if h.what == 'wmod' then state.dsp_wmod = not state.dsp_wmod; return end
-    if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; return end   -- 28 окт: мини-роутер
+    if h.what == 'wroute' then state.dsp_wroute = not state.dsp_wroute; if state.dsp_wroute then state.dsp_wauto = true end; return end   -- 28 окт: мини-роутер; 1 ноя: открывается вместе с auto (роутер во всю ширину, виднее)
     if h.what == 'rnode' then   -- 28 окт: узел мини-роутера — нажал: тянуть (перенос / =), отпустил на месте — к модулю
       draw.rkb = true; draw.ckb = nil; ctx.set_focus('dsp')   -- 29 окт: клавиатура мини-роутера (Esc — выход)
       ctx.rdrag = { col = col, k = h.k, x0 = gfx.mouse_x, y0 = gfx.mouse_y, name = h.name }
