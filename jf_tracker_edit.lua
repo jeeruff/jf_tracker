@@ -971,6 +971,9 @@ local function apply_fx(h, lpb, cmd, xx)
     -- подстройка в центах (80 = 0): целые полутоны остаются у ноты
     local p = R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH')
     R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', math.floor(p + 0.5) + (xx - 128) / 100)
+  elseif cmd == '09' then   -- 1 ноя: ProTracker 9xx — старт с xx/256 всего сэмпла (без слайсов)
+    R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
+    E.note_modified(it)
   elseif cmd == '0S' then
     -- слайс xx нарезанного инструмента (P_EXT:jf_slices у item); без нарезки —
     -- offset xx/256 источника (как 0Sxx в Renoise)
@@ -1394,7 +1397,7 @@ function E.clear_fx(heads, lpb, cmd, off)
     end)
     return
   end
-  local defaults = { ['0P'] = 128, ['0M'] = 128, SI = 0, SO = 0, SL = 1, SM = 0, ['0S'] = 0, SB = 0, SF = 128, ['0B'] = 0 }
+  local defaults = { ['0P'] = 128, ['0M'] = 128, SI = 0, SO = 0, SL = 1, SM = 0, ['0S'] = 0, ['09'] = 0, SB = 0, SF = 128, ['0B'] = 0 }
   if defaults[cmd] then E.set_fx(heads, lpb, cmd, defaults[cmd]) end
 end
 

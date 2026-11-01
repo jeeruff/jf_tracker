@@ -33,7 +33,7 @@ local R = reaper
 local model
 
 C.CODES = { ['0U'] = true, ['0D'] = true, ['0G'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true,
-  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true }
+  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true, ZB = true }   -- 1 ноя: ZB — pattern break (ProTracker Dxx)
 -- ZJxx — прыжок: когда плейхед доходит до строки события, трекер переводит
 -- воспроизведение в слот xx последовательности (матрица). Хранится как
 -- команда, огибающих не строит — исполняет main в кадре.

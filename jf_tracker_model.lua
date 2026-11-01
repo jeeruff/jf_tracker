@@ -298,7 +298,7 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
-    if slen and slen > 0 then fx[#fx + 1] = '0S' .. M.hex2(offs / slen * 256) end
+    if slen and slen > 0 then fx[#fx + 1] = (M.PTCODES and '09' or '0S') .. M.hex2(offs / slen * 256) end   -- 1 ноя: PT-mode — 09xx
   end
   local pan = R.GetMediaItemTakeInfo_Value(take, 'D_PAN')
   if math.abs(pan) > 1e-6 and not M.PANCOL then fx[#fx + 1] = '0P' .. M.hex2((pan + 1) / 2 * 255) end

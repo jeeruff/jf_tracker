@@ -22813,14 +22813,36 @@ local function process_orca(playpos)
   if planted > 0 then reaper.UpdateArrange(); garden.planted = garden.planted + planted end
 end
 
+-- 1 ноя: ctx.zb_pend — строка с ZBxx и куда: прыжок, когда плейхед уйдёт с неё
 local function process_jumps(playpos)
   local row = math.floor(model.row_of_time(playpos, state.lpb))
   if row == jump_row_done then return end
   jump_row_done = row
+  -- ZB (pattern break, ProTracker Dxx): строка брейка доиграна — следующий паттерн с его строки xx
+  if ctx.zb_pend then
+    local p = ctx.zb_pend
+    ctx.zb_pend = nil
+    if row == p.row + 1 then
+      local cur, nxt
+      for i, rg in ipairs(seq or {}) do if not rg.gap and p.t >= rg.pos - 1e-6 and p.t < rg.rgnend - 1e-6 then cur = i end end
+      if cur then for i = cur + 1, #seq do if not seq[i].gap then nxt = seq[i]; break end end end
+      if nxt then
+        local r0 = math.floor(model.row_of_time(nxt.pos, state.lpb) + 0.5)
+        local tgt = edit.row_time(r0 + p.xx, state.lpb, 0)
+        if tgt >= nxt.rgnend then tgt = nxt.pos end
+        reaper.SetEditCurPos(tgt, false, true); MX.queued = nil
+        jump_row_done = math.floor(model.row_of_time(tgt, state.lpb))
+        vim.msg = ('ZB%02X -> %s row %d'):format(p.xx, nxt.name or '', p.xx)
+        return
+      end
+    end
+  end
   for _, f in ipairs(L.flat) do
     local c = f.sub and f.sub[row]
     if c and (c.kind == 'audio' or c.kind == 'midi') then
       for _, fx in ipairs(c.fx or {}) do
+        local zb = fx:match('^ZB(%x%x)$')
+        if zb then ctx.zb_pend = { row = row, xx = tonumber(zb, 16), t = edit.row_time(row, state.lpb, 0) } end
         local xx = fx:match('^ZJ(%x%x)$')
         if xx then
           local slot = seq[tonumber(xx, 16)]
@@ -22973,6 +22995,7 @@ local function frame()
   end
   edit.keep_samples, edit.copy_media = state.keepsamples, state.copymedia
   model.PANCOL = state.pancol
+  if model.PTCODES ~= (state.ptmode and true or nil) then model.PTCODES = state.ptmode and true or nil; model.invalidate() end   -- 1 ноя: смещение — 09xx
   -- страховка сэмплов: сообщить, что файл ушёл в библиотеку трека
   if edit.msg then vim.msg = edit.msg; edit.msg = nil end   -- 13 окт: сообщение правки (пустой слот и т.п.)
   if edit.rescued then

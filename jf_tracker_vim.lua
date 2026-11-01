@@ -971,7 +971,7 @@ local function hex_entry(c, fld, heads)
     local code
     if buf == '' then
       if ch == '0' or ch == 'S' or ch == 'Z' then
-        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ' or '0D 0U 0V ...')) .. ')'
+        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ ZB' or '0D 0U 0V 09 ...')) .. ')'
         return false
       end
       if not (ch:match('^%a$') and fx_code_ok('0' .. ch)) then return false end
@@ -2284,7 +2284,10 @@ function V.key_impl(c)
   -- лидер \ — hydra действий (контекстное меню с клавиатуры), ? — шпаргалка
   if c == ('\\'):byte() and not (V.mode == 'insert' and (env_of(V.cur.fi) or (V.cur.field or 1) == 2)) then
     -- 31 окт: \ — меню того, что под курсором; \\ — главное (было наоборот)
-    if ctx.context_here then ctx.context_here() elseif ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return
+    -- 1 ноя: в трекере \ — сразу главное меню (меню под курсором — Enter); в модулях — их быстрое меню
+    local st = ctx.state
+    if st and st.focus == 'tracker' and ctx.main_menu then ctx.main_menu()
+    elseif ctx.context_here then ctx.context_here() elseif ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return
   end
 
   record(c)
@@ -2380,6 +2383,10 @@ function V.key_impl(c)
       V.hexbuf = nil; clamp_cur(); ensure_visible(); return
     end
     if c == 32 then E.play_stop(); return end
+    -- 1 ноя: PT-mode — Enter и в INSERT вставляет пустую строку (Return ProTracker; Shift — все каналы)
+    if c == 13 and ctx.state and ctx.state.ptmode and not env_of(V.cur.fi) and not V.hexbuf and ctx.time_edit then
+      ctx.time_edit('insert', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false); return
+    end
     local fld = V.cur.field or 1
     -- MIDI-лейн (6 окт): две hex-цифры — CC / PC в строку (в MIDI item под ней),
     -- BS / Del — события лейна в строке долой; остальное — управление KEYS
@@ -3457,9 +3464,27 @@ function V.key_impl(c)
   local ch = (c < 256) and string.char(c) or ''
   if ch == 'i' then V.mode = 'insert'; V.count = nil; return
   elseif c == 13 then V.count = nil; finish_move()
-    -- 31 окт: Enter на огибающей / MIDI-лейне (PB CC PC AT) — её кривая на холсте automation → curve
-    if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.lane_menu and ctx.lane_menu() then return end   -- 31 окт: выпадашка (холст — в ней)
-    V.smart(); return   -- 12 окт: Enter — смарт-панель значений поля (была gs / Ctrl+Enter)
+    local st = ctx.state
+    -- 1 ноя: PT-mode — Enter как Return в ProTracker: пустая строка в канале курсора, ниже — вниз (Shift — все каналы)
+    if st and st.ptmode and not env_of(V.cur.fi) and ctx.time_edit then
+      ctx.time_edit('insert', V.cur.fi, V.cur.row, n, ctx.mods and ctx.mods().shift or false); finish_edit(); return
+    end
+    -- старое Enter: на огибающей / MIDI-лейне — меню «что вставить», иначе смарт-панель значений поля
+    local function values()
+      if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.lane_menu and ctx.lane_menu() then return end
+      V.smart()
+    end
+    -- 1 ноя: Enter — лидер трекера: меню того, что под курсором; Enter Enter — значения поля (как было)
+    if V.mode == 'normal' and ctx.context_key then
+      V.hydra = nil
+      ctx.context_key()
+      if V.hydra then
+        V.hydra.on_enter = values
+        table.insert(V.hydra.items, 1, { label = 'Enter  - values of this field (note, instrument, vol, command ...)', fn = values })
+        return
+      end
+    end
+    values(); return
   elseif ch == 'I' and not env_of(V.cur.fi) then
     -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
     -- (было «вставить время» — пустая строка со сдвигом; это Insert и :instime)
@@ -3878,6 +3903,7 @@ end
 function V.hydra_key(c)
   local h = V.hydra
   if c == ESC then V.hydra = nil; return end
+  if c == 13 and h and h.on_enter then local f = h.on_enter; V.hydra = nil; local ok, e = pcall(f); if not ok then V.msg = tostring(e):match('[^\n]*$') end; return end   -- 1 ноя: Enter Enter
   if c == BS then V.hydra = table.remove(V.hydra_stack); return end
   local ch = (c < 256) and string.char(c) or ''
   for _, it in ipairs(h.items or {}) do
