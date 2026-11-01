@@ -5051,8 +5051,21 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
           R.SetMediaItemInfo_Value(it, 'D_LENGTH', math.min(fin + dt, limit) - pos)
         elseif midi_in then
           local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
+          -- 1 ноя: сдвиг по всей дорожке (BS mode track) и встык за клипом — клип следующего паттерна (уже сдвинут на dt):
+          -- вытолкнутое за конец клипа переезжает в него, клип не растёт (рос под следующий — нота пряталась под ним)
+          local nx, ntk
+          if limit > fin + EPS then
+            for k2 = 0, R.CountTrackMediaItems(tr) - 1 do
+              local o = R.GetTrackMediaItem(tr, k2)
+              local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+              local otk = o ~= it and R.GetActiveTake(o)
+              if otk and R.TakeIsMIDI(otk) and op >= fin - EPS and op <= fin + dt + EPS then nx, ntk = o, otk; break end
+            end
+          end
           -- 21 окт: клип через границу паттерна — ноты, что уже за границей (следующий паттерн), не трогать, конец клипа — как был
-          local nfin = fin > limit + EPS and fin or math.min(fin + dt, limit)
+          local nfin = fin > limit + EPS and fin or (nx and fin) or math.min(fin + dt, limit)
+          local pfin = P(fin)
+          local function spill_t(a) return R.MIDI_GetPPQPosFromProjTime(ntk, R.MIDI_GetProjTimeFromPPQPos(tk, a)) end
           local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), math.min(P(limit), P(fin) + 1)   -- 31 окт: ноты за концом клипа — не трогать
           local mlim = math.min(P(limit), P(nfin) + 1)   -- 31 окт: клип растёт на dt — граница сдвига по НОВОМУ концу (нота у конца клипа пропадала)
           rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < mlim - 1) and a0 + dp or nil end; return a0 end,
@@ -5062,14 +5075,18 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
             local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
             if a0 >= plim - 1 then   -- в следующем паттерне — на месте
             elseif a0 >= p0 - 1 then
-              if a0 + dp >= mlim - 1 then R.MIDI_DeleteNote(tk, k)
+              if nx and a0 + dp >= pfin - 1 then   -- 1 ноя: вытолкнута за конец клипа — в клип следующего паттерна
+                R.MIDI_InsertNote(ntk, sel, mu, spill_t(a0 + dp), spill_t(a1 + dp), ch, pi, ve, true)
+                R.MIDI_DeleteNote(tk, k)
+              elseif a0 + dp >= mlim - 1 then R.MIDI_DeleteNote(tk, k)
               else R.MIDI_SetNote(tk, k, sel, mu, a0 + dp, math.min(a1 + dp, mlim), ch, pi, ve, true) end
             elseif a1 > p0 then R.MIDI_SetNote(tk, k, sel, mu, a0, math.min(a1 + dp, mlim), ch, pi, ve, true) end
           end
           for k = ncc - 1, 0, -1 do
             local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
             if a0 >= p0 and a0 < plim then
-              if a0 + dp >= mlim then R.MIDI_DeleteCC(tk, k) else R.MIDI_SetCC(tk, k, sel, mu, a0 + dp, cm, ch, m1, m2, true) end
+              if nx and a0 + dp >= pfin then R.MIDI_InsertCC(ntk, sel, mu, spill_t(a0 + dp), cm, ch, m1, m2); R.MIDI_DeleteCC(tk, k)
+              elseif a0 + dp >= mlim then R.MIDI_DeleteCC(tk, k) else R.MIDI_SetCC(tk, k, sel, mu, a0 + dp, cm, ch, m1, m2, true) end
             end
           end
           for k = ntx - 1, 0, -1 do
@@ -5079,6 +5096,7 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
             end
           end
           R.MIDI_Sort(tk)
+          if ntk then R.MIDI_Sort(ntk) end
           if R.MIDI_SetItemExtents then R.MIDI_SetItemExtents(it, R.TimeMap2_timeToQN(0, pos), R.TimeMap2_timeToQN(0, nfin))
           else R.SetMediaItemInfo_Value(it, 'D_LENGTH', nfin - pos) end
         elseif pos < limit - EPS and fin > t0 + EPS then

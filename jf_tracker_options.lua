@@ -643,9 +643,10 @@ function O.masonry_plan(L, bx, y0, bw, ch)
   table.sort(place, function(a, b) return a.i < b.i end)
   if over > 0 then
     O.mscroll = math.max(0, math.min(over, O.mscroll or 0))
-    -- выбранная строка — в окне
+    -- выбранная строка — в окне; 1 ноя: только когда выбор сменился (иначе колесо / полоса откатывались каждый кадр)
     for _, pl in ipairs(place) do
-      if pl.i == O.sel then
+      if pl.i == O.sel and O.msel_seen ~= O.sel then
+        O.msel_seen = O.sel
         local yv = pl.y - O.mscroll
         if yv < y0 + rh then O.mscroll = math.max(0, pl.y - y0 - rh)
         elseif yv + rh > y0 + ch then O.mscroll = math.min(over, pl.y + rh - y0 - ch) end
@@ -721,7 +722,12 @@ function O.draw(L, W, H)
   end
   local bh = (nvis + 5 + ((#O.tabs > 0) and 1 or 0)) * rh   -- 14 окт: +1 строка — поиск в 2 строки
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
-  if dock then bx, by = dock.x, dock.y + dock.h - bh end
+  if dock then
+    bx, by = dock.x, dock.y + dock.h - bh
+    -- 1 ноя: узкая панель — колонка опций не шире панели (разделы друг под другом), подпись ужимается
+    O.roww = math.max(L.cw * 16, math.min(O.roww, bw - 4 * L.pad - 10))
+    if lw + vw + 3 * L.pad > O.roww then lw = math.max(L.cw * 8, O.roww - vw - 3 * L.pad) end
+  end
   if O.compact then
     nvis = math.min(n, math.floor((H - 4 * rh) / rh))
     bw = math.min(W - 2 * L.pad, math.max(lw + vw + 3 * L.pad + L.cw * 12, L.cw * 52))
