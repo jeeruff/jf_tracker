@@ -12040,7 +12040,7 @@ ctx = {
     vim.open_hydra({ title = 'og channel ' .. k, items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }   -- у строки опции
   end,
-  og_toggle = function(keep)
+  og_toggle = function(keep, pt)   -- 1 ноя: pt — каналы пустые (только аудио-айтемы), без DSP / fx / автоматизации
     local PN = draw.panes
     if state.og then
       local bk = state.og_back or {}
@@ -12072,7 +12072,7 @@ ctx = {
           reaper.InsertTrackAtIndex(n, true)
           local tr = reaper.GetTrack(0, n)
           reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', nm, true)
-          local kind = state.og_ch[k] or 'empty'
+          local kind = pt and 'empty' or (state.og_ch[k] or 'empty')
           if kind:match('^tpl:') then   -- 31 окт: шаблон трека — его трек(и), первый переименован в OGk
             reaper.DeleteTrack(tr)
             local n0 = reaper.CountTracks(0)
@@ -12092,6 +12092,7 @@ ctx = {
     -- 31 окт: панели — только нужные для трека: трекер, матрица, паттерны, main, help, lib, browser, fx, dsp, automation, item
     if state.panes and PN.hide then
       local KEEP = { tracker = true, matrix = true, patterns = true, ctrl = true, help = true, inst = true, browser = true, fxb = true, dsp = true, automation = true, sample = true }
+      if pt then KEEP.fxb, KEEP.dsp, KEEP.automation = nil, nil, nil end   -- ProTracker: сэмплы айтемами, без эффектов
       for _, p in ipairs(PN.PANELS) do if not KEEP[p.id] and PN.visible(state.panes, p.id) then PN.hide(state.panes, p.id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
@@ -12116,7 +12117,7 @@ ctx = {
     else
       state.pt_saved = {}
       for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
-      if not state.og then ctx.og_toggle(false) end   -- каналы track1..4 и панели (видны только четыре)
+      if not state.og then ctx.og_toggle(false, true) end   -- каналы track1..4 пустые (аудио-айтемы, без слайсера и эффектов), панели
       state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
       state.fixed, state.meters, state.meterstyle, state.khelp = true, true, 'pt', false
       -- «отупление» (3 окт): 4 канала, нота / сэмпл / громкость / одна команда,
@@ -13036,7 +13037,7 @@ ctx = {
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines, the mode word REAPER is torn white-on-black - impossible to miss that the keys go elsewhere. Off - REAPER is written in the mode font like NORMAL', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
-      { key = 'ptmode', label = 'pt-mode', kind = 'toggle', desc = 'ProTracker (OG-mode merged in): four channels track1..track4 (made with the instruments below), 31 samples, 64-row patterns, LPB 4, the font x2, one command column, scopes on top; only the panes a track needs. I am free only when I am limited (Stravinsky). Off - the layout comes back (:pt, :og)', get = function() return state.ptmode and true or false end, set = function(v) if (v and true or false) ~= (state.ptmode and true or false) then ctx.pt_toggle() end end },   -- 26 окт: PT-mode — и в опциях / быстрых
+      { key = 'ptmode', label = 'pt-mode', kind = 'toggle', desc = 'ProTracker (OG-mode merged in): four channels track1..track4 (empty: samples as audio items only, no slicer, no effects), 31 samples, 64-row patterns, LPB 4, the font x2, one command column, scopes on top; only the panes a track needs. I am free only when I am limited (Stravinsky). Off - the layout comes back (:pt, :og)', get = function() return state.ptmode and true or false end, set = function(v) if (v and true or false) ~= (state.ptmode and true or false) then ctx.pt_toggle() end end },   -- 26 окт: PT-mode — и в опциях / быстрых
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
@@ -13187,7 +13188,7 @@ ctx = {
     -- 9 окт: разделы по смыслу (раньше layout был свалкой); порядок внутри
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
-      { 'pt-mode', { 'ptmode', 'ogch1', 'ogch2', 'ogch3', 'ogch4' } },   -- 31 окт: OG-mode слит с PT-mode
+      { 'pt-mode', { 'ptmode' } },   -- 31 окт: OG-mode слит с PT-mode
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'offit', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
