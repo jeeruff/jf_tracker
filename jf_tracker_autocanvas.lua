@@ -704,7 +704,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       local iy = ly + (ri - 1) * rh
       local hot = mx >= lx and mx < lx + lw and my >= iy and my < iy + rh
       if r.hdr then
-        U.text(lx, iy, ctx.fit((r.open and 'v ' or '> ') .. (r.name or '?'), lw - 2), hot and U.AMBER or U.CYAN)
+        U.text(lx, iy, ctx.fit((r.open and '- ' or '+ ') .. (r.name or '?'), lw - 2), hot and U.AMBER or U.CYAN)
         if hot then hover = { pane = 'curve', tfold = r.guid } end
       else
         local on = r.i and r.i == ACV.cur
