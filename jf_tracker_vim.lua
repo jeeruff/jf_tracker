@@ -2301,7 +2301,7 @@ function V.key_impl(c)
     -- 31 окт: \ — меню того, что под курсором; \\ — главное (было наоборот)
     -- 1 ноя: в трекере \ — сразу главное меню (меню под курсором — Enter); в модулях — их быстрое меню
     local st = ctx.state
-    if st and st.focus == 'tracker' and ctx.main_menu then ctx.main_menu()
+    if st and st.focus == 'tracker' and ctx.context_key then ctx.context_key()   -- 1 ноя: \ — меню того, что под курсором; \\ — главное
     elseif ctx.context_here then ctx.context_here() elseif ctx.main_menu then ctx.main_menu() else V.open_hydra(ctx.hydra_root()) end; return
   end
 
@@ -3542,16 +3542,7 @@ function V.key_impl(c)
       if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.lane_menu and ctx.lane_menu() then return end
       V.smart()
     end
-    -- 1 ноя: Enter — лидер трекера: меню того, что под курсором; Enter Enter — значения поля (как было)
-    if V.mode == 'normal' and ctx.context_key then
-      V.hydra = nil
-      ctx.context_key()
-      if V.hydra then
-        V.hydra.on_enter = values
-        table.insert(V.hydra.items, 1, { label = 'Enter  - values of this field (note, instrument, vol, command ...)', fn = values })
-        return
-      end
-    end
+    -- 1 ноя (2): Enter — снова сразу значения поля; меню того, что под курсором — \ (главное — \\)
     values(); return
   elseif ch == 'I' and not env_of(V.cur.fi) then
     -- 12 окт: I как в Vim — INSERT с начала строки: первая подколонка трека, поле ноты
