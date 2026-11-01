@@ -3638,6 +3638,14 @@ function V.key_impl(c)
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
+  elseif ch == 'X' and V.mode == 'normal' then   -- 1 ноя: Shift+X — вырезать строку курсора на всех треках (3X — три строки); p вернёт
+    local n = math.max(1, V.count or 1); V.count = nil
+    local r0 = V.cur.row
+    local e = apply('x', 1, nflat(), r0, r0 + n - 1)
+    V.cur.row = r0
+    V.msg = ('X: %d row(s) of all tracks cut (p puts them back, u - undo)'):format(n)
+    if e then finish_edit() end
+    return
   elseif ch == 'R' and V.mode == 'normal' and ctx.retro_insert then ctx.retro_insert(); V.count = nil; return   -- 21 окт: R — последнее сыгранное (ретро-буфер MIDI REAPER) с курсора
   elseif ch == 'T' and V.mode == 'normal' then V.transpose_smart(); return   -- 26 окт: Shift+T — транспозитор (выпадашка, как :tr)
   elseif c == 8224 and V.mode == 'normal' then V.pending = 'T'; return   -- 26 окт: Opt+T — take ноты под курсором (было T; t — трек)
