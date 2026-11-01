@@ -4935,7 +4935,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- из NORMAL / INSERT / VISUAL, длиннее — обрезается); остальное правее
   if info and info.status_left then
     local res = 0
-    for _, mw0 in ipairs({ 'NORMAL', 'INSERT', 'VISUAL', 'KEYS' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
+    -- 1 ноя: место — по NORMAL / INSERT (частые); длинные слова (KEYS → КЛАВИСИНЪ, VISUAL) сжимаются шрифтом, а не раздвигают полосу
+    for _, mw0 in ipairs({ 'NORMAL', 'INSERT' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
     D.draw_mode(L, x + L.pad, ly + math.floor((math.min(h, 3 * L.rh) - 2 * L.th) / 2) - 2, 3 * res, info.status_left)
     x = x + res + 3 * L.pad; w = w - res - 3 * L.pad
   end

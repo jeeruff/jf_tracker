@@ -34126,6 +34126,7 @@ ctx.mx_follow_tick = function()
 end
 ctx.foldfast_toggle = function()
   state.foldfast = not state.foldfast; model.FOLD = state.foldfast; model.invalidate(); relayout()
+  reaper.SetExtState(EXT, 'foldfast', state.foldfast and '1' or '0', true)   -- 1 ноя: сразу, не только на выходе
   vim.msg = state.foldfast and 'fold on: a fast note with no free column folds into its row - an o at the side of the cell (O - several); + (LPB) shows them' or 'fold off: every note gets its row and column'
 end
 model.FOLD = state.foldfast
