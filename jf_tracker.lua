@@ -33379,6 +33379,27 @@ ctx.acv_point_del = function(g)
   end
   return false
 end
+-- 1 ноя: :mergeclips — во всех паттернах всех треков MIDI-клипы паттерна сливаются в один (E.pat_merge), одна отмена
+ctx.merge_clips = function()
+  local n = 0
+  edit.run('merge MIDI clips per pattern', function()
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      local fm = reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+      local lanes = fm and math.max(1, math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES'))) or 1
+      for _, rg in ipairs(seq) do
+        if not rg.gap and not rg.section then
+          for l = 0, lanes - 1 do
+            local before = reaper.CountTrackMediaItems(tr)
+            if edit.pat_merge(tr, fm and l or nil, rg.pos, rg.rgnend) then n = n + (before - reaper.CountTrackMediaItems(tr)) end
+          end
+        end
+      end
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('mergeclips: %d MIDI clip(s) merged into their pattern clip (u - undo)'):format(n)
+end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
   local q = ctx.quick_str()

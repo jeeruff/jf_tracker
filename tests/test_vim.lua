@@ -77,8 +77,10 @@ function E.insert_note(track, lane, lpb, row, pitch, vel, len, depot) calls[#cal
 function E.set_vol(heads, lpb, v) calls[#calls + 1] = ('vol:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
 function E.set_pan(heads, v) calls[#calls + 1] = ('pan:%s:%d'):format(names(heads), math.floor(v + 0.5)) end
 function E.run(_, fn) fn() end
+function E.retime(heads, lpb, rows) local t = {}; for i, h in ipairs(heads) do t[#t + 1] = h.name .. '>' .. rows[i] end; calls[#calls + 1] = 'retime:' .. table.concat(t, ',') end
 function E.set_delay(heads, lpb, d) calls[#calls + 1] = ('delay:%s:%d'):format(names(heads), d) end
 E.cmds = { CODES = { ['0U'] = true, ['0D'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true, ['0R'] = true, ZT = true, ZJ = true, ['0G'] = true, ['0Y'] = true } }
+local function had(x) for _, c in ipairs(calls) do if c == x or (c:match('^' .. x)) then return true end end return false end
 local function offs(o) return (o and o > 0) and ('@%g'):format(o) or '' end
 function E.set_fx(heads, lpb, cmd, xx, off) calls[#calls + 1] = ('fx:%s:%s%02X%s'):format(names(heads), cmd, xx, offs(off)) end
 function E.clear_fx(heads, lpb, cmd, off) calls[#calls + 1] = ('clearfx:%s:%s%s'):format(names(heads), cmd, offs(off)) end
@@ -454,7 +456,7 @@ ru('цци'); eq('цци = wwb → snare', V.cur.row, 8)
 ru('пп');  eq('пп = gg', V.cur.row, 0)
 ru('ч');   eq('ч = x deletes', last(), 'delete:kick')
 ru('шй');  eq('шй = iq inserts C-4', last(), 'ins:trA@0:60:1'); V.key(27)
-ru('ввв'); eq('ввв = ddd → dd deletes the row (10 окт: трек — td)', (last() or ''):match('^delete') ~= nil, true)
+ru('ввв'); eq('ввв = ddd → dd deletes the row of the subcolumn (1 ноя)', had('delete'), true)
 eq('Ж = :', keys.translate(utf8.codepoint('Ж')), (':'):byte())
 eq('latin passthrough', keys.translate(104), 104)
 
@@ -594,7 +596,7 @@ keysin('c'); V.cur.row = 4; keysin('q'); eq('note carries vel', last(), 'ins:trA
 keysin('.');  eq('KEYS . → next instrument', last(), 'pool:2')
 keysin(',');  eq('KEYS , → prev instrument', last(), 'pool:1')
 keysin('a');  eq('KEYS a → step auto', V.step_auto, true); keysin('a')
-V.cur.row = 0; keysin('dd'); eq('INSERT dd deletes the event', last(), 'delete:kick'); eq('back in INSERT after dd', V.mode, 'insert')
+V.cur.row = 0; keysin('dd'); eq('INSERT dd deletes the event (and moves the subcolumn below up)', had('delete:kick'), true); eq('back in INSERT after dd', V.mode, 'insert')
 V.cur.row = 0; local nc0 = #calls; keysin('d3'); eq('INSERT d3 waits (no note)', #calls, nc0); keysin('w'); eq('d3w → back in INSERT', V.mode, 'insert'); eq('d3w did not insert a note', (last():find('^ins:') == nil), true)
 reset(); V.mode = 'insert'; V.cur.row = 8; keysin('M'); eq('INSERT M (Shift+m) mutes the track', last(), 'track:mute')
 keysin('f');  eq('KEYS f → fx field', V.cur.field, 4)
@@ -1014,7 +1016,7 @@ do
   keysin('2k'); eq('2k: two rows up', V.cur.row, 1)
   reset(); keysin('5G'); eq('5G: row 5 (row index 4)', V.cur.row, 4)
   reset(); keysin('3x'); eq('3x: rows 0..2 of the column', last(), 'delete:kick')
-  reset(); V.cur.row = 8; keysin('2dd'); eq('2dd: snare (rows 8..9)', last(), 'delete:snare')
+  reset(); V.cur.row = 8; keysin('2dd'); eq('2dd: snare (rows 8..9)', had('delete:snare'), true)
   -- 2. — последнее действие дважды
   reset(); keysin('yy'); keysin('p'); local p0 = #calls
   keysin('2.')

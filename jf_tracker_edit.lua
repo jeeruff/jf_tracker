@@ -1604,6 +1604,50 @@ function E.euclid_loop(track, lane_idx, lpb, row, n, k, r, pitch, vel, stop_row)
   return made
 end
 -- новый MIDI-item от строки row на bars тактов (по размеру такта в этой точке)
+-- 1 ноя: MIDI-клипы паттерна [rp, re) на лейне → один на весь паттерн. Только если в паттерне на лейне нет ничего
+-- другого (аудио, лупов, клипов через границу). → клип | nil
+-- 1 ноя: MIDI-клип реально повторяется (Евклид: длиннее своего источника); флаг loop source REAPER ставит всем новым
+function E.midi_looping(it, tk)
+  if R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 0 then return false end
+  local src = R.GetMediaItemTake_Source(tk)
+  local sl, isqn = R.GetMediaSourceLength(src)
+  local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+  local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  if isqn then local q0 = R.TimeMap2_timeToQN(0, pos); sl = R.TimeMap2_QNToTime(0, q0 + sl) - pos end
+  return len > (sl or len) * 1.001 + 1e-4
+end
+function E.pat_merge(track, lane_idx, rp, re)
+  if not R.MIDI_SetItemExtents then return nil end
+  local fm = R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2
+  local list = {}
+  for i = 0, R.CountTrackMediaItems(track) - 1 do
+    local o = R.GetTrackMediaItem(track, i)
+    if not lane_idx or not fm or R.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane_idx then
+      local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+      local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+      if op < re - 1e-6 and oe > rp + 1e-6 then
+        local otk = R.GetActiveTake(o)
+        if not (otk and R.TakeIsMIDI(otk) and op >= rp - 1e-6 and oe <= re + 1e-6 and not E.midi_looping(o, otk)) then return nil end
+        list[#list + 1] = { it = o, tk = otk, pos = op }
+      end
+    end
+  end
+  if #list == 0 then return nil end
+  table.sort(list, function(a, b) return a.pos < b.pos end)
+  local dst = list[1]
+  R.MIDI_SetItemExtents(dst.it, R.TimeMap2_timeToQN(0, rp), R.TimeMap2_timeToQN(0, re))
+  for k = 2, #list do
+    local src = list[k]
+    local function P(ppq) return R.MIDI_GetPPQPosFromProjTime(dst.tk, R.MIDI_GetProjTimeFromPPQPos(src.tk, ppq)) end
+    local _, nn, ncc, ntx = R.MIDI_CountEvts(src.tk)
+    for i = 0, nn - 1 do local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(src.tk, i); R.MIDI_InsertNote(dst.tk, sel, mu, P(a0), P(a1), ch, pi, ve, true) end
+    for i = 0, ncc - 1 do local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(src.tk, i); R.MIDI_InsertCC(dst.tk, sel, mu, P(a0), cm, ch, m1, m2) end
+    for i = 0, ntx - 1 do local _, sel, mu, a0, ty, msg = R.MIDI_GetTextSysexEvt(src.tk, i); R.MIDI_InsertTextSysexEvt(dst.tk, sel, mu, P(a0), ty, msg) end
+    R.DeleteTrackMediaItem(track, src.it)
+  end
+  R.MIDI_Sort(dst.tk)
+  return dst.it
+end
 local function new_midi_item(track, lane_idx, t)
   local qn = R.TimeMap2_timeToQN(0, t)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)
@@ -1615,28 +1659,11 @@ local function new_midi_item(track, lane_idx, t)
     local ok, isr, rp, re = false, false, 0, 0
     if ri and ri >= 0 then ok, isr, rp, re = R.EnumProjectMarkers(ri) end
     if ok and isr and rp <= t + 1e-9 and re > t then
-      -- 1 ноя: один MIDI-клип на паттерн: в паттерне на этом лейне уже есть клип (не луп) и больше ничего не мешает —
-      -- он растягивается на весь паттерн (ноты на местах), второй клип не создаётся
+      -- 1 ноя: один MIDI-клип на паттерн: MIDI-клипы паттерна на этом лейне (не лупы, целиком внутри) сливаются в один на
+      -- весь паттерн — ноты / CC / текст других переезжают в первый (по времени проекта), остальные удаляются
       do
-        local mine, other = nil, false
-        local fm = R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2
-        for i = 0, R.CountTrackMediaItems(track) - 1 do
-          local o = R.GetTrackMediaItem(track, i)
-          if not lane_idx or not fm or R.GetMediaItemInfo_Value(o, 'I_FIXEDLANE') == lane_idx then
-            local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
-            local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
-            if op < re - 1e-6 and oe > rp + 1e-6 then
-              local otk = R.GetActiveTake(o)
-              local inside = op >= rp - 1e-6 and oe <= re + 1e-6
-              if otk and R.TakeIsMIDI(otk) and inside and R.GetMediaItemInfo_Value(o, 'B_LOOPSRC') == 0 and not mine then mine = o
-              else other = true end
-            end
-          end
-        end
-        if mine and not other and R.MIDI_SetItemExtents then
-          R.MIDI_SetItemExtents(mine, R.TimeMap2_timeToQN(0, rp), R.TimeMap2_timeToQN(0, re))
-          return mine, R.GetActiveTake(mine)
-        end
+        local m = E.pat_merge(track, lane_idx, rp, re)
+        if m then return m, R.GetActiveTake(m) end
       end
       local a, b = rp, re
       for i = 0, R.CountTrackMediaItems(track) - 1 do
