@@ -3985,8 +3985,8 @@ ctx = {
   end,
   lfo_make = function(mode)
     local tg = ctx.lfo_target()
-    if LG.to and LG.to ~= 'env' then tg = ctx.lfo_take_target() end   -- 1 ноя: огибающая тейка аудио-нот
-    if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope column (or select an envelope in REAPER)'; return end
+    if LG.to and LG.to ~= 'here' then tg = ctx.lfo_take_target() else tg = ctx.lfo_here_target() or tg end   -- 1 ноя: тейк / эффект трека; here — колонка курсора
+    if not tg then vim.msg = 'LFO: put the tracker cursor on an envelope, a MIDI lane (PB CC AT) or the vol / pan / delay of notes (or select an envelope in REAPER)'; return end
     local e = tg.e
     local t0, t1, where = ctx.lfo_span()
     if tg.ai then t0, t1, where = tg.ai.pos, tg.ai.pos + tg.ai.len, 'automation item'; mode = 'into' end
@@ -4008,6 +4008,7 @@ ctx = {
       end
     end
     if tg.take then return ctx.lfo_write_take(tg, pts, t0, t1, where) end
+    if tg.lane or tg.notef then return ctx.lfo_write_here(tg, pts, t0, t1, where) end
     -- 6 окт: шкала огибающей — громкость фейдерная; 0..1 — между min и max в шкале
     local lo, hi = e.min or 0, e.max or 1
     local smode = reaper.GetEnvelopeScalingMode(e.env)
@@ -23957,7 +23958,7 @@ local function frame()
     -- уводил вкладку на params)
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
-      local tgt = (LG.to and LG.to ~= 'env') and ctx.lfo_take_target() or ctx.lfo_target()
+      local tgt = (LG.to and LG.to ~= 'here') and ctx.lfo_take_target() or ctx.lfo_here_target() or ctx.lfo_target()
       return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
     end,
     hum_draw = function(Lx, x, y, w, h, foc)
@@ -33113,6 +33114,76 @@ ctx.lfo_write_midi = function(tg, pts, t0, t1, where)
   if not env then vim.msg = 'LFO -> ' .. tg.kind .. ': could not add the effect (ReaPitch / Volume/Pan Smoother)'; return end
   state.envs = true; model.invalidate()
   vim.msg = ('%s -> %s: %d points (%s)'):format(LG.type, tg.label, n, where)
+end
+-- 1 ноя: генератор в колонку курсора: MIDI-лейн (PB / CC / AT / PAT — события по точкам волны), поле ноты vol / pan /
+-- delay — каждой ноте колонки в отрезке значение волны на её строке (delay — сдвиг внутри строки, грув / свинг волной)
+ctx.lfo_here_target = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not (f and f.col) then return nil end
+  if f.ml and f.ml.kind ~= 'tx' and f.ml.kind ~= 'sx' and f.ml.kind ~= 'cmd' and f.ml.kind ~= 'vis' and f.ml.kind ~= 'chd' then
+    return { lane = f, label = (f.col.name or '') .. ' / ' .. (f.ml.name or 'lane') .. ' (lane)' }
+  end
+  local fld = vim.cur.field or 1
+  if not f.env and not f.ml and (fld == 2 or fld == 3) then
+    local what = fld == 3 and 'delay' or (vim.cur.sub == 'pan' and 'pan' or 'vol')
+    return { notef = what, fi = vim.cur.fi, label = (f.col.name or '') .. ' / note ' .. what }
+  end
+  return nil
+end
+ctx.lfo_write_here = function(tg, pts, t0, t1, where)
+  local n = 0
+  -- значение волны на строке (между точками — линейно, shape 1 — ступенька)
+  local function val_at(row)
+    local v = pts[1] and pts[1].v or 0
+    for k, p in ipairs(pts) do
+      if p.row > row then
+        local q = pts[k - 1]
+        if q and q.shape ~= 1 and p.row > q.row then v = q.v + (p.v - q.v) * (row - q.row) / (p.row - q.row) elseif q then v = q.v end
+        return math.max(0, math.min(1, v))
+      end
+      v = p.v
+    end
+    return math.max(0, math.min(1, v))
+  end
+  if tg.lane then
+    local f, ml = tg.lane, tg.lane.ml
+    local tr = f.col.track
+    edit.run('LFO -> ' .. (ml.name or 'lane'), function()
+      local cleared = {}
+      for _, p in ipairs(pts) do
+        local t = edit.row_time(p.row, state.lpb, 0)
+        if t >= t0 - 1e-6 and t < t1 - 1e-6 then
+          local tk = ctx.ml_take(tr, t)
+          if tk then
+            if not cleared[tk] then
+              cleared[tk] = true
+              ctx.ml_clear(tk, ml, reaper.MIDI_GetPPQPosFromProjTime(tk, t0), reaper.MIDI_GetPPQPosFromProjTime(tk, t1))
+            end
+            ctx.ml_ins(tk, ml, reaper.MIDI_GetPPQPosFromProjTime(tk, t), math.max(0, math.min(127, math.floor(math.max(0, math.min(1, p.v)) * 127 + 0.5))))
+            n = n + 1
+          end
+        end
+      end
+      for tk in pairs(cleared) do reaper.MIDI_Sort(tk) end
+    end)
+    model.invalidate()
+    vim.msg = n > 0 and ('%s -> %s: %d events (%s)'):format(LG.type, tg.label, n, where) or ('LFO -> %s: no MIDI clip under the span (\\ n makes one)'):format(tg.label)
+    return
+  end
+  local r0, r1 = math.floor(model.row_of_time(t0, state.lpb) + 0.5), math.ceil(model.row_of_time(t1, state.lpb) - 0.5)
+  local heads = vim.heads_in(tg.fi, tg.fi, r0, r1)
+  if #heads == 0 then vim.msg = 'LFO -> note ' .. tg.notef .. ': no notes in this column in the span (' .. where .. ')'; return end
+  edit.run('LFO -> note ' .. tg.notef, function()
+    for _, h in ipairs(heads) do
+      local v = val_at(h.row0 or r0)
+      if tg.notef == 'vol' then edit.set_vol({ h }, state.lpb, v * 127)
+      elseif tg.notef == 'pan' then edit.set_pan({ h }, v * 255)
+      else edit.set_delay({ h }, state.lpb, v * 255) end
+      n = n + 1
+    end
+  end)
+  model.invalidate()
+  vim.msg = ('%s -> %s: %d notes (%s)'):format(LG.type, tg.label, n, where)
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()

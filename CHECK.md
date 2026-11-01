@@ -2312,3 +2312,4 @@
 - [ ] 1 ноя: lfogen поле to: env / pitch / vol / pan — генератор пишет в огибающую тейка аудио-нот трека курсора в отрезке (огибающая создаётся); pitch ±12 полутонов (center 0.5 = 0)
 - [ ] 1 ноя: lfogen to на MIDI-треке: pitch — pitch bend в клипы (RS5K / slixer его понимают), vol — RS5K Volume / slixer Master gain, pan — RS5K Pan (у slixer нет)
 - [ ] 1 ноя: MIDI-трек, любой инструмент: команды высоты (0U 0D 0V 0A 0G) — ReaPitch в конце цепи, громкости (0I 0O, тремоло 0T / PT 7xy) — Volume/Pan Smoother; огибающие на время клипа, по краям — нейтраль; pitch bend больше не пишется; lfogen to pitch / vol / pan на MIDI — те же эффекты
+- [ ] 1 ноя: lfogen to = here — в колонку курсора: огибающая, MIDI-лейн (PB / CC / AT / PAT), vol / pan / delay нот (каждой ноте колонки значение волны на её строке; delay — грув волной)
