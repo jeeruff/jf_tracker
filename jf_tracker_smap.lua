@@ -193,7 +193,7 @@ end
 -- 1 ноя: ОТПЕЧАТОК — тонкие пики REAPER начала звука (200 столбцов на первые T ≤ 0.4 с, спектральный слой):
 -- at — атака (10 → 90 % пика), лог 0.5..200 мс → 0..1 (0 — резкая: хэт; шейкер — мягче);
 -- dc — спад от пика до −20 дБ, лог 5 мс..1 с → 0..1; nz — шумность: как скачет частота спектра между столбцами
--- (тон — ровно, шум — прыгает), 0..1. Вместе с l (громкость) и b (яркость) — пять чисел на файл
+-- (1 ноя: по тональности спектрального слоя REAPER), 0..1. Вместе с l (громкость) и b (яркость) — пять чисел на файл
 function SM.an_fine(pk, T)
   if not (pk and pk.n and pk.n > 4) then return nil end
   local n, bin = pk.n, T / pk.n
@@ -211,22 +211,23 @@ function SM.an_fine(pk, T)
   local idc = n
   for i = ip, n do if env[i] < mx * 0.1 then idc = i; break end end
   local dec = math.max(0.005, (idc - ip) * bin)
-  local sz, nzn, prev = 0, 0, nil
+  -- 1 ноя: шумность — из тональности спектрального слоя REAPER (биты 15..28: 0 — шум, 16383 — чистый тон)
+  local sz, nzn = 0, 0
   for i = 1, n do
     local sv = pk.spec and pk.spec[i]
-    local f = sv and (math.floor(sv) % 32768) or 0
-    if f > 20 and env[i] > mx * 0.1 then
-      if prev then sz = sz + math.abs(math.log(f / prev, 2)); nzn = nzn + 1 end
-      prev = f
+    if sv and env[i] > mx * 0.1 then
+      local ton = math.floor(sv / 32768) % 16384
+      sz = sz + (1 - ton / 16383); nzn = nzn + 1
     end
   end
   local function lg(v, lo, hi) return math.max(0, math.min(1, math.log(v / lo) / math.log(hi / lo))) end
-  return { at = lg(att, 0.0005, 0.2), dc = lg(dec, 0.005, 1), nz = nzn > 0 and math.min(1, sz / nzn / 1.5) or 0 }
+  return { at = lg(att, 0.0005, 0.2), dc = lg(dec, 0.005, 1), nz = nzn > 0 and math.max(0, math.min(1, sz / nzn)) or 0 }
 end
--- расстояние отпечатков (без отпечатка — далеко); веса: атака и шумность различают хэт / шейкер, яркость — главное
+-- расстояние отпечатков (без отпечатка — далеко); веса: яркость и атака главные (хэт / шейкер — атакой), шумность
+-- по тональности — слабее (на 100 настоящих ударах: 93 % ближайший сосед того же класса, при весе 1 — 88 %)
 function SM.fp_dist(a, b)
   if not (a and b and a.at and b.at) then return 9 end
-  return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 1.0 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
+  return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 0.3 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
 end
 function SM.an_load(file)
   local f = io.open(file, 'r'); if not f then return end
@@ -234,8 +235,8 @@ function SM.an_load(file)
     local pth, l, b, d, rest = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)\t?([%d%.]*)\t?(.*)$')
     if pth then
       local e = { l = tonumber(l), b = tonumber(b), d = tonumber(d) }
-      local at, dc, nz = (rest or ''):match('^([%d%.]+)\t([%d%.]+)\t([%d%.]+)')   -- 1 ноя: отпечаток
-      if at then e.at, e.dc, e.nz = tonumber(at), tonumber(dc), tonumber(nz) end
+      local at, dc, nz, ver = (rest or ''):match('^([%d%.]+)\t([%d%.]+)\t([%d%.]+)\t?(%d*)')   -- 1 ноя: отпечаток; ver 2 — шумность по тональности
+      if at and ver == '2' then e.at, e.dc, e.nz = tonumber(at), tonumber(dc), tonumber(nz) end
       SM.AN[pth] = e; SM.an_n = (SM.an_n or 0) + 1
     end
   end
@@ -244,7 +245,7 @@ end
 function SM.an_save(file)
   if not SM.an_dirty then return end
   local f = io.open(file .. '.tmp', 'w'); if not f then return end
-  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', a.at and ('\t%.3f\t%.3f\t%.3f'):format(a.at, a.dc, a.nz) or '', '\n') end
+  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', a.at and ('\t%.3f\t%.3f\t%.3f\t2'):format(a.at, a.dc, a.nz) or '', '\n') end
   f:close(); os.remove(file); os.rename(file .. '.tmp', file)
   SM.an_dirty = false
 end
