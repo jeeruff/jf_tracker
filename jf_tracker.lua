@@ -17033,14 +17033,15 @@ ctx.acv_curves = function(sp)
   end
   -- 30 окт: курсор на MIDI-лейне (PB / CC / PC) — первой кривой он сам, в отрезке proj / sec / pat; клавиши пишут в лейн
   local fl = L and L.flat and L.flat[vim.cur.fi]
-  if fl and fl.ml and fl.col and fl.ml.kind ~= 'tx' and sp then
-    local ml = fl.ml
+  -- 1 ноя: кривая MIDI-лейна — функцией: и для лейна под курсором, и для всех лейнов трека курсора (курсор на ноте)
+  local function ml_curve(f2)
+    local ml = f2.ml
     local rows = ml.rows or {}
     local pts = {}
     for _, r in ipairs(rows) do if r >= sp.r0 and r < sp.r1 and ml.ev[r] then pts[#pts + 1] = { sp.time(r), (ml.ev[r].v or 0) / 127 } end end
     local rest = ml.kind == 'pb' and 64 / 127 or 0
-    list[1] = { kind = 'ml', f = fl, name = (fl.col.name or '') .. ' / ' .. (ml.name or 'lane'), rgb = U.CYAN, write = true, points = pts,
-      track = fl.col.track,
+    return { kind = 'ml', f = f2, name = (f2.col.name or '') .. ' / ' .. (ml.name or 'lane'), rgb = U.CYAN, write = true, points = pts,
+      track = f2.col.track,
       eval = function(t)
         local r = sp.row_of(t)
         local v
@@ -17048,6 +17049,7 @@ ctx.acv_curves = function(sp)
         return v and v / 127 or rest
       end }
   end
+  if fl and fl.ml and fl.col and fl.ml.kind ~= 'tx' and sp then list[1] = ml_curve(fl) end
   -- 31 окт: курсор на vel колонки нот — громкости нот трека в отрезке кривой (MIDI vel / 127, аудио vol / 255);
   -- мазки и трансформации правят громкость СУЩЕСТВУЮЩИХ нот (новых не создают)
   -- 31 окт: и delay (поле 3) — сдвиг ноты в строке 0..FF: та же кривая по нотам, холст рисует ещё хвост к реальному времени
@@ -17078,6 +17080,14 @@ ctx.acv_curves = function(sp)
   end
   if col then
     for _, e in ipairs(col.envs or {}) do add(e, (col.name or '') .. ' / ' .. (e.name or 'env')) end
+    -- 1 ноя: и MIDI-лейны трека (CC / PB / AT / PAT) — кривые видны, даже когда курсор на ноте
+    if sp then
+      for _, f2 in ipairs(L and L.flat or {}) do
+        if f2.ml and f2.col == col and f2.ml.kind ~= 'tx' and f2 ~= fl and f2.ml.ev and next(f2.ml.ev) then
+          local cv = ml_curve(f2); cv.rgb = U.mix(U.CYAN, ({ U.AMBER, U.RED, U.TEXT })[(#list % 3) + 1], 0.45); list[#list + 1] = cv
+        end
+      end
+    end
     -- 15 окт: модуляция параметров трека — кривые «LFO · param» / «ACS · param»: база — огибающая параметра
     -- (если есть), иначе baseline; j k правят силу, формы — форму LFO; точек нет
     -- трек модуляций — владелец целевой огибающей (курсор может стоять на другом треке / мастере)
