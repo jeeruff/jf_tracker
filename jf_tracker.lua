@@ -10182,6 +10182,7 @@ ctx = {
   bpm_prompt = function(rg)
     if not rg then return end
     state.bpm_rg = { pos = rg.pos, name = rg.name }
+    state.bpm_rgs = ctx.mx_sel_rgs()   -- 1 ноя: блок матрицы — темп всем выделенным
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
     local b = reaper.TimeMap_GetDividedBpmAtTime(rg.pos)
@@ -10192,6 +10193,29 @@ ctx = {
     local rg = state.bpm_rg
     if not (v and rg) then vim.msg = 'BPM: a number'; return end
     v = math.max(20, math.min(400, v))
+    if state.bpm_rgs then   -- 1 ноя: все выделенные паттерны — маркер темпа на долю начала каждого (одна правка)
+      local qs = {}
+      for _, r in ipairs(state.bpm_rgs) do qs[#qs + 1] = reaper.TimeMap2_timeToQN(0, r.pos) end
+      state.bpm_rgs = nil
+      edit.run('patterns tempo', function() edit.keep_markers_qn(function()
+        for _, q in ipairs(qs) do
+          local t = reaper.TimeMap2_QNToTime(0, q)
+          local hit
+          for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
+            local _, tpos = reaper.GetTempoTimeSigMarker(0, i)
+            if math.abs(tpos - t) < 1e-4 then hit = i end
+          end
+          if hit then
+            local _, tpos, _, _, _, num, den, lin = reaper.GetTempoTimeSigMarker(0, hit)
+            reaper.SetTempoTimeSigMarker(0, hit, tpos, -1, -1, v, num, den, lin)
+          else reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, false) end
+        end
+        reaper.UpdateTimeline()
+      end) end)
+      vim.msg = ('%d patterns: %.2f BPM (Cmd+Z back)'):format(#qs, v)
+      model.invalidate()
+      return
+    end
     edit.run('pattern tempo', function() edit.keep_markers_qn(function()   -- 30 окт: регионы остаются на своих долях
       local hit
       for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
@@ -10240,6 +10264,7 @@ ctx = {
     local x, y, above = gfx.mouse_x, gfx.mouse_y + 4, false
     if rg and MX.row_y and MX.row_y[MX.cur.ri] then x, y = 2, MX.row_y[MX.cur.ri] + L.rh
     elseif not rg and draw.strip_cell and draw.strip_cell.sig then x, y, above = draw.strip_cell.sig[1], draw.strip_cell.sig[2], true end
+    state.sig_rgs = rg and ctx.mx_sel_rgs() or nil   -- 1 ноя: блок матрицы — размер всем выделенным
     ctx.SP.open(n, d, rg and 'here' or 'all', here and here.idx, here and here.name, x, y)
     if above then ctx.SP.y = y - ctx.SP.layout(L.cw, L.rh, L.pad, 3).h - 2 end
     vim.msg = 'time signature: click a cell, or digits / Tab / h l j k, a - this pattern / whole project, Enter'
@@ -10261,8 +10286,22 @@ ctx = {
     if state.sig_rg then for _, r in ipairs(regions) do if r.idx == state.sig_rg then rg = r end end end
     state.sig_rg = nil
     rg = rg or alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local multi = state.sig_rgs
+    state.sig_rgs = nil
     local function go(sc)
       if sc == 'here' and not rg then vim.msg = 'sig: the cursor is not in a pattern'; return end
+      if sc == 'here' and multi then   -- 1 ноя: все выделенные в матрице — с конца (сдвиг не сбивает ранние); вопрос — один раз
+        local function all(mode) for k = #multi, 1, -1 do ctx.sig_apply('here', multi[k], n, d, mode) end; vim.msg = ('%d patterns: %d/%d'):format(#multi, n, d) end
+        local on, od = ctx.sig_at(multi[1].pos)
+        if n * 4 / d > on * 4 / od + 1e-9 then
+          OPT.ask.open(('%d patterns -> %d/%d'):format(#multi, n, d), 'what goes into the new beats of each bar? (later patterns and items move)', {
+            { key = 'k', label = 'keep the notes as they are (bars re-count)', fn = function() all('keep') end },
+            { key = 'e', label = 'empty beats at the end of each bar', fn = function() all('empty') end },
+            { key = 'l', label = 'repeat the last beat of each bar', fn = function() all('last') end },
+          })
+        else all('keep') end
+        return
+      end
       local t0 = sc == 'all' and 0 or rg.pos
       local on, od = ctx.sig_at(t0)
       if n * 4 / d > on * 4 / od + 1e-9 then
@@ -10405,14 +10444,23 @@ ctx = {
     local v, unit = (text or ''):match('^%s*([%d%.]+)%s*(%a*)%s*$')
     v = tonumber(v)
     if not v or v <= 0 then vim.msg = 'len N (steps) | Ns (seconds) | Nb (bars)'; return end
-    local t1
-    if unit == 's' then t1 = rg.pos + v
-    elseif unit == 'b' then
-      local q0 = rg.qn0 or reaper.TimeMap2_timeToQN(0, rg.pos)
-      local _, qms, qme = reaper.TimeMap_QNToMeasures(0, q0)
-      t1 = reaper.TimeMap2_QNToTime(0, q0 + v * ((qme and qms) and (qme - qms) or 4))
-    else t1 = edit.row_time(rg.r0 + v, state.lpb, 0) end
-    ctx.set_region_len(rg, t1)
+    local function end_of(r)
+      local q0 = reaper.TimeMap2_timeToQN(0, r.pos)
+      if unit == 's' then return r.pos + v
+      elseif unit == 'b' then
+        local _, qms, qme = reaper.TimeMap_QNToMeasures(0, q0)
+        return reaper.TimeMap2_QNToTime(0, q0 + v * ((qme and qms) and (qme - qms) or 4))
+      end
+      return reaper.TimeMap2_QNToTime(0, q0 + v / state.lpb)
+    end
+    -- 1 ноя: выделен блок матрицы — длина всем выделенным паттернам (с конца: сдвиг не сбивает ранние)
+    local list = ctx.mx_sel_rgs()
+    if list then
+      for k = #list, 1, -1 do ctx.set_region_len(list[k], end_of(list[k])) end
+      vim.msg = ('%d patterns: length %s%s'):format(#list, text, unit == '' and ' steps' or '')
+      return
+    end
+    ctx.set_region_len(rg, end_of(rg))
   end,
   -- общая смена длины региона: маркеры — alias.shift_markers, items и
   -- огибающие — E.time_insert/time_delete (разрез на границе, без лимита)
@@ -33295,6 +33343,14 @@ ctx.pat_len_step = function(d)
   if nr == rows then vim.msg = 'pattern: 1 row is the shortest'; return end
   ctx.set_region_len(rg, reaper.TimeMap2_QNToTime(0, q0 + nr / state.lpb))
   vim.msg = ('%s: %d rows  (Ctrl+Shift+Opt+J longer / K shorter)'):format(rg.name ~= '' and rg.name or 'pattern', nr)
+end
+-- 1 ноя: выделенные паттерны блока матрицы (v / Shift+hjkl), по порядку песни; меньше двух — nil (правка одного, как было)
+ctx.mx_sel_rgs = function()
+  if not MX.anchor then return nil end
+  local r0, r1 = MX.block()
+  local out = {}
+  for ri = r0, r1 do local rg = seq[ri]; if rg and not rg.gap then out[#out + 1] = rg end end
+  return #out >= 2 and out or nil
 end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
