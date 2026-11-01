@@ -33598,6 +33598,11 @@ ctx.master_menu = function()
       if L and L.mfold then state.mfold = false; if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
       else state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded (zM u / Opt+Shift+W / a click on it opens)' end
     end },
+    { key = 'a', label = 'auto fold: the master folds when the cursor leaves it' .. (state.mfoldauto and '  *' or ''), fn = function()   -- 1 ноя: кнопка auto видна только в развёрнутой шапке
+      state.mfoldauto = not state.mfoldauto; state.m_peek = nil
+      if not state.mfoldauto then state.mfold = false end
+      relayout(); vim.msg = state.mfoldauto and 'master auto fold on' or 'master auto fold off - the master stays open'
+    end },
     { key = 'v', label = 'master track visible in REAPER (TCP)' .. on(40075), fn = act(40075, 'master in the arrange toggled') },
     { key = 't', label = 'tempo envelope of the master' .. on(41046), fn = act(41046, 'master tempo envelope toggled') },
     { key = 'w', label = 'master in a separate mixer window' .. on(41636), fn = act(41636, 'master window toggled') },

@@ -3194,7 +3194,8 @@ function V.key_impl(c)
       if p == 'd' and c == ('d'):byte() and not env_of(V.cur.fi) and not (flat()[V.cur.fi] or {}).ml then
         V.count = nil
         local r0, r1 = V.cur.row, V.cur.row + n - 1
-        local _, pend = ctx.region_rows and ctx.region_rows()
+        local pend
+        if ctx.region_rows then _, pend = ctx.region_rows() end   -- 1 ноя: было «x and f()» — and режет второе значение, pend = nil: dd тянул ноты всех следующих паттернов
         local last = pend or (r1 + 4096)
         -- 1 ноя: только события, что НАЧИНАЮТСЯ в строках (heads_in отдаёт и длинную ноту сверху, что тянется через них —
         -- её сдвигало / удаляло, ноты слипались в «+»)
