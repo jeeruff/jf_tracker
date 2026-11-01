@@ -12108,6 +12108,7 @@ ctx = {
       state.ptmode = true
       draw.set_font(state); model.invalidate()
       ctx.set_focus('tracker')
+      ctx.pt64_offer()   -- 1 ноя: паттерны не по 64 строки — спросить (правка сдвигает песню)
       vim.msg = 'PT-mode: 4 channels, 31 samples, 64-row patterns (:pt again - back)'
     end
   end,
@@ -30101,7 +30102,7 @@ local function frame()
     local m = ctx.mods()
     if c == 13 and not (m.ctrl or m.cmd or m.alt or m.shift) and state.focus == 'tracker' and not vim.picker and not vim.hydra
        and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.hexbuf and not vim.pending and not vim.op
-       and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') then
+       and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') and not state.ptmode then   -- 1 ноя: PT-mode — Enter вставляет строку (vim)
       vim.smart(); c = 0
     end
   end
@@ -33204,6 +33205,35 @@ ctx.vhs_quick_once = function()   -- функцией: в главном чан�
 end
 ctx.vhs_quick_once()
 -- font x2 − + встаёт на место клетки font scale (она была в быстрых), иначе — в конец; один раз
+-- 1 ноя: PT-mode — все паттерны песни по 64 строки (ProTracker): короче — дописывается пустое, длиннее — хвост режется,
+-- всё после сдвигается (как :len). С конца песни — сдвиг не сбивает позиции ещё не тронутых. → сколько поменялось
+ctx.pt_64 = function()
+  local n = 0
+  for i = #seq, 1, -1 do
+    local rg = seq[i]
+    if rg and not rg.gap and not rg.section and not rg.session and not rg.lib and rg.name and not rg.name:match('^=') then
+      local q0 = reaper.TimeMap2_timeToQN(0, rg.pos)
+      local rows = math.floor((reaper.TimeMap2_timeToQN(0, rg.rgnend) - q0) * state.lpb + 0.5)
+      if rows ~= 64 then ctx.set_region_len(rg, reaper.TimeMap2_QNToTime(0, q0 + 64 / state.lpb)); n = n + 1 end
+    end
+  end
+  vim.msg = n > 0 and ('PT-mode: %d pattern(s) made 64 rows, the song after them moved (u - undo each)'):format(n) or 'PT-mode: every pattern is 64 rows already'
+  return n
+end
+ctx.pt64_offer = function()
+  local bad = 0
+  for _, rg in ipairs(seq) do
+    if not rg.gap and not rg.section and not rg.session and not rg.lib and rg.name and not rg.name:match('^=') then
+      local q0 = reaper.TimeMap2_timeToQN(0, rg.pos)
+      if math.floor((reaper.TimeMap2_timeToQN(0, rg.rgnend) - q0) * state.lpb + 0.5) ~= 64 then bad = bad + 1 end
+    end
+  end
+  if bad == 0 or not OPT.ask then return end
+  OPT.ask.open(('%d pattern(s) are not 64 rows'):format(bad), 'ProTracker patterns are 64 rows: shorter ones get empty rows, longer ones lose the tail, the song after them moves', {
+    { key = 'y', label = 'make every pattern 64 rows (:pt 64)', fn = function() ctx.pt_64() end },
+    { key = 'n', label = 'keep them as they are', fn = function() vim.msg = 'PT-mode: patterns kept (:pt 64 - later)' end },
+  })
+end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end
   local q = ctx.quick_str()
