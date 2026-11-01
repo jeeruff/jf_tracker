@@ -1991,7 +1991,28 @@ function V.key_impl(c)
     if c == 6 and m1.ctrl and m1.shift and V.mode == 'normal' and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('pickdb'); return end
     -- 20 окт: Shift+Opt+F (Ï) — выбрать базу для поиска сэмпла этого места (Shift+F — сразу поиск в базе)
     if (cpd == 207 or (m1.alt and m1.shift and (c == 70 or c == 102))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.sample_find then ctx.sample_find('sampler'); return end
-    if (cpd == 8721 or (m1.alt and c == 119)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
+    -- 1 ноя: Opt+W (Shift+Opt+w, „) — курсор на мастер (было Opt+w); Opt+w / Opt+b (∑ ∫) — следующая / предыдущая нота
+    -- этой подколонки, мимо OFF, команд и соседних подколонок (w / b — по всему треку)
+    if (cpd == 8222 or (m1.alt and m1.shift and (c == 87 or c == 119))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
+    if (cpd == 8721 or cpd == 8747 or (m1.alt and not m1.shift and (c == 119 or c == 98))) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' then
+      local dir = (cpd == 8747 or c == 98) and -1 or 1
+      local f = flat()[V.cur.fi]
+      local sub = f and not f.env and not f.ml and f.sub
+      if not sub then V.msg = 'Opt+w / Opt+b: notes of a note column'; V.count = nil; return end
+      local r, moved = V.cur.row, 0
+      for _ = 1, V.count or 1 do
+        local best
+        for rr, cell in pairs(sub) do
+          if (cell.kind == 'midi' or cell.kind == 'audio') and (rr - r) * dir > 0 and (not best or (rr - best) * dir < 0) then best = rr end
+        end
+        if not best then break end
+        r, moved = best, moved + 1
+      end
+      V.count = nil
+      if moved == 0 then V.msg = dir > 0 and 'no further note in this subcolumn' or 'no note above in this subcolumn'; return end
+      V.cur.row = r; V.msg = ''
+      return
+    end
     -- 24 окт: Opt+V (√) в NORMAL / VISUAL — умное выделение: до конца субдоли, доли, такта, паттерна; в INSERT — нота
     if (cpd == 8730 or (m1.alt and not m1.shift and c == 118)) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.smart_select then ctx.smart_select(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end

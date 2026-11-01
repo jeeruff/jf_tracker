@@ -32934,7 +32934,7 @@ end
 MX.follow = reaper.GetExtState(EXT, 'mxfollow') ~= '0'
 MX.spacemode = reaper.GetExtState(EXT, 'mxspace') == 'play' and 'play' or 'cue'   -- 31 окт: Space в матрице
 -- 20 окт: мастер сложен (fold / auto) — peek раскрывает его, пока курсор на нём: клик по сложенному,
--- Opt+W (∑), l с последнего поля. Курсор ушёл с мастера — сложить снова (ctx.master_peek_tick)
+-- Opt+W (Shift+Opt+w, „), l с последнего поля. Курсор ушёл с мастера — сложить снова (ctx.master_peek_tick)
 -- 20 окт: autozoom (кнопка в уголке над номерами строк) — подбор общей ширины в relayout; выкл — уровень Cmd+колеса
 -- 20 окт: выпадашка команд паттерна строки курсора — от вертикальной шапки справа от мастера
 ctx.rg_head_menu = function()
