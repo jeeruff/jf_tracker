@@ -15647,6 +15647,9 @@ edit.after = function(desc)
   -- новый регион пуст: синк не нужен, только жёсткие границы
   if desc == 'add region' then if hard then model.invalidate(); alias.trim(model.regions(state.lpb), edit.changed_items()) end; return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
+  -- 1 ноя: строки по всей дорожке (BS mode track: Backspace / Insert) — паттерны сдвинуты намеренно: синк связанных
+  -- копий затирал сдвинутое копией паттерна курсора (ноты следующего паттерна пропадали), жёсткие границы резали клипы
+  if state.bsmode == 'track' and (desc:match('^delete time') or desc:match('^insert time')) then return end
   if state.autosync then
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if rg then alias.sync(regions, rg) end

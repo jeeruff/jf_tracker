@@ -30,7 +30,7 @@ REPORT = os.path.join(HERE, 'shots', 'live_report.md')
 REAPER = '/Applications/REAPER.app/Contents/MacOS/REAPER'
 DLOG = os.path.expanduser('~/Library/Application Support/REAPER/jf_tracker_debug.log')
 
-SPECIAL = {'esc': 27, 'cr': 13, 'enter': 13, 'tab': 9, 'bs': 8, 'del': 6579564, 'up': 30064, 'down': 1685026670,
+SPECIAL = {'esc': 27, 'cr': 13, 'enter': 13, 'tab': 9, 'bs': 8, 'del': 6579564, 'ins': 6909555, 'up': 30064, 'down': 1685026670,
            'left': 1818584692, 'right': 1919379572, 'home': 1752132965, 'end': 6647396, 'pgup': 1885828464,
            'pgdn': 1885824110, 'space': 32, 'f1': 26161, 'lt': 60}
 MOD = {'C': 32, 'M': 4, 'A': 16, 'S': 8}       # gfx.mouse_cap на macOS: 32 Ctrl, 4 Cmd, 16 Option, 8 Shift

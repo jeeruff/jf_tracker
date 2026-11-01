@@ -4949,6 +4949,12 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
           elseif notes and tk and R.TakeIsMIDI(tk) and pos < t1 - EPS then
             -- 13 окт: MIDI-клип в строках трекера — ноты внутри, без разреза: нота через удаляемые строки
             -- короче на них (её конец / note-off подъезжает), в них начинается — удаляется, ниже — едет вверх
+            -- 1 ноя: клип начинается внутри удаляемых строк (R подрезает начало до первой ноты) — начало сперва до t0,
+            -- события на своих местах; иначе ноты уезжали раньше начала клипа и пропадали
+            if pos > t0 + EPS and R.MIDI_SetItemExtents then
+              R.MIDI_SetItemExtents(it, R.TimeMap2_timeToQN(0, t0), R.TimeMap2_timeToQN(0, fin))
+              pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+            end
             local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
             local p0, p1 = P(t0), P(t1)
             local dp = p1 - p0
