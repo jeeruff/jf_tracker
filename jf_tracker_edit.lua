@@ -1433,6 +1433,31 @@ function E.split(heads, lpb, row)
   end)
 end
 
+-- 1 ноя: пустой шаг внутри ноты (dw): строка row вырезается из ноты, ничего не двигается — до неё звучит голова,
+-- после — хвост (аудио — с того же места сэмпла, MIDI — заново)
+function E.hole(h, lpb, row)
+  local t0, t1 = row_time(row, lpb, 0), row_time(row + 1, lpb, 0)
+  run('dw: empty step in the note', function()
+    if h.kind == 'audio' and h.item and R.ValidatePtr(h.item, 'MediaItem*') then
+      local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
+      local fin = pos + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH')
+      if t0 <= pos + 1e-6 then return end
+      local right = t1 < fin - 1e-6 and R.SplitMediaItem(h.item, t1) or nil
+      if right then R.GetSetMediaItemInfo_String(right, 'P_EXT:jf_slice', '', true) end
+      local mid = R.SplitMediaItem(h.item, t0)
+      if mid then R.DeleteTrackMediaItem(R.GetMediaItem_Track(mid), mid) end
+    elseif h.kind == 'midi' then
+      local i, n = midi_note(h, lpb)
+      if not i then return end
+      local p0, p1 = R.MIDI_GetPPQPosFromProjTime(h.take, t0), R.MIDI_GetPPQPosFromProjTime(h.take, t1)
+      if p0 <= n.sppq + 1 then return end
+      R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, p0, n.ch, n.pitch, n.vel, true)
+      if p1 < n.eppq - 1 then R.MIDI_InsertNote(h.take, n.sel, n.muted, p1, n.eppq, n.ch, n.pitch, n.vel, true) end
+      R.MIDI_Sort(h.take)
+    end
+  end)
+end
+
 -- ── note-off: укоротить событие до строки ─────────────────────────────────
 -- 24 окт: явный OFF трекера — note-off этой ноты со скоростью отпускания OFF_REL (1): jf_tracker_choke пропускает
 -- его к one-shot пэду (обычные концы нот глушит). Правка сырого потока: MIDI_SetNote скорость отпускания не пишет

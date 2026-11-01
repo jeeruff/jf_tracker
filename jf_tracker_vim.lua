@@ -3281,12 +3281,36 @@ function V.key_impl(c)
           V.count = nil; finish_edit(); return
         end
       end
-      -- 31 окт: dw на пустой строке, а следующее событие подколонки — OFF: удалить этот OFF (свободный — CC 123;
-      -- OFF ноты — нота звучит дальше, до следующего события / конца клипа), а не ноту целиком
-      if p == 'd' and c == ('w'):byte() and #V.heads_in(V.cur.fi, V.cur.fi, V.cur.row, V.cur.row) == 0 then
+      -- 1 ноя: dw на строке внутри ноты (¦) — пустой шаг: строка вырезана из ноты, ничего не двигается (OFF — это OFF)
+      if p == 'd' and c == ('w'):byte() then
         local f = flat()[V.cur.fi]
+        local cl0 = f and not f.env and not f.ml and f.sub and f.sub[V.cur.row]
+        local h0 = cl0 and cl0.kind == 'cont' and cl0.of
+        if h0 and (h0.kind == 'midi' or h0.kind == 'audio') then
+          ctx.edit.hole(h0, lpb(), V.cur.row)
+          V.msg = ('dw: an empty step at %04d in the note (d` - remove its OFF, dd - one step shorter)'):format(V.cur.row)
+          V.count = nil; finish_edit(); return
+        end
+      end
+      -- 31 окт: (1 ноя: d`, было dw) удалить OFF: курсор внутри ноты — её OFF, иначе ближайший OFF ниже (свободный — CC 123;
+      -- OFF ноты — нота звучит дальше, до следующего события / конца клипа)
+      local fdw = flat()[V.cur.fi]
+      local dw_off = c == ('w'):byte() and fdw and fdw.sub and fdw.sub[V.cur.row] and fdw.sub[V.cur.row].kind == 'off'   -- dw прямо на OFF — он и есть событие строки
+      if p == 'd' and (c == 96 or dw_off) then
+        local f = flat()[V.cur.fi]
+        local cl0 = f and f.sub and f.sub[V.cur.row]
         local nr = f and not f.env and not f.ml and next_ev(V.cur.fi, V.cur.row - 1, 1)
+        if c == 96 and f and f.sub and not dw_off then   -- d`: ближайший OFF ниже (не просто следующее событие)
+          nr = nil
+          for r2, cl in pairs(f.sub) do if type(r2) == 'number' and r2 >= V.cur.row and cl.kind == 'off' and not cl.clipend and (not nr or r2 < nr) then nr = r2 end end
+        end
+        if cl0 and cl0.kind == 'cont' and cl0.of then
+          local h0 = cl0.of
+          local er = (h0.row0 or 0) + math.max(1, h0.rows or 1)
+          for r2 = er - 1, er + 1 do if f.sub[r2] and f.sub[r2].kind == 'off' and f.sub[r2].of == h0 then nr = r2 end end
+        end
         local cell = nr and f.sub and f.sub[nr]
+        if not (cell and cell.kind == 'off') then V.msg = 'd`: no OFF of the note here or below (=== is the pattern end)'; V.count = nil; finish_move(); return end
         if cell and cell.kind == 'off' and cell.of then
           if cell.clipend then V.msg = '=== is the end of the clip (pattern) - nothing to delete'; V.count = nil; finish_move(); return end
           if cell.of.stub then
@@ -3305,8 +3329,8 @@ function V.key_impl(c)
           end
         end
       end
-      -- 21 окт: опция treat OFF as event — dw изнутри ноты / на её OFF: удалить этот OFF (нота до следующего события / конца паттерна)
-      if p == 'd' and c == ('w'):byte() and ctx.state.offevent then
+      -- 21 окт: опция treat OFF as event — (1 ноя: выключено — OFF удаляет d`) dw изнутри ноты / на её OFF
+      if false and p == 'd' and c == ('w'):byte() and ctx.state.offevent then
         local f = flat()[V.cur.fi]
         local cell = f and f.sub and f.sub[V.cur.row]
         local h = cell and (cell.kind == 'off' or cell.kind == 'cont') and cell.of
