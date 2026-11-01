@@ -17234,6 +17234,19 @@ ctx.acv_draw = function(Lx, x, y, w, h)
   return ACV.draw(Lx, x, y, w, h, curves, sp, state.focus == 'top' and mod_pane == 'curve')
 end
 -- клавиша холста: движение → курсор трекера; op → запись
+-- 1 ноя: Cmd+H с холста curve — в список кривых (он слева), Cmd+L из списка — на холст; дальше — соседние панели
+-- (в списке j k — строки, l / Enter — открыть папку или взять кривую, Enter — и на холст, h — закрыть папку, Esc — на холст)
+ctx.acv_zone_step = function(dir)
+  local ACV = ctx.ACV
+  if dir == 'l' and not ACV.lfoc and ACV.has_tree then
+    ACV.lfoc = true; ACV.lsel = 1
+    for i, r in ipairs(ctx.acv_tree(ctx.acv_curves(ctx.acv_span()))) do if r.i == ACV.cur then ACV.lsel = i end end
+    vim.msg = 'curve list: j k rows, l / Enter open a folder or take a curve, h close, Cmd+L / Esc - the canvas'
+    return true
+  elseif dir == 'r' and ACV.lfoc then ACV.lfoc = nil; vim.msg = 'curve: the canvas'; return true end
+  ACV.lfoc = nil   -- уходим в другую панель — список отпускает клавиши
+  return false
+end
 ctx.acv_key = function(c)
   -- 31 окт: x над строкой списка кривых — убрать кривую из списка (скрыть; zh — показать скрытые), не удаляя огибающую
   if c == 120 and lfo_hover and lfo_hover.lenv then
@@ -17249,17 +17262,6 @@ ctx.acv_key = function(c)
   local act = curves[ACV.cur]
   local m = ctx.mods()
   if c == 25 then c = 9; m = { shift = true } end
-  -- 1 ноя: t (tree) — фокус холст <-> список кривых (папки треков); в списке j k — строки, l / Enter — открыть папку
-  -- или взять кривую (Enter — и назад на холст), h — закрыть папку, Esc / t — на холст (Opt+Tab занят: подвкладки)
-  if c == 116 and not ACV.dpend and not ACV.zpend then
-    ACV.lfoc = not ACV.lfoc
-    if ACV.lfoc then
-      ACV.lsel = 1
-      for i, r in ipairs(ctx.acv_tree(curves)) do if r.i == ACV.cur then ACV.lsel = i end end
-    end
-    vim.msg = ACV.lfoc and 'curve list: j k rows, l / Enter open a folder or take a curve, h close, t / Esc - the canvas' or 'curve: the canvas'
-    return true
-  end
   if ACV.lfoc then
     local rows = ctx.acv_tree(curves)
     local ch = c < 256 and string.char(c) or ''
@@ -30437,6 +30439,7 @@ local function frame()
         local id = ctx.pane_cur()
         if m.shift then ctx.pane_move(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
+        elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
         c = 0
       end

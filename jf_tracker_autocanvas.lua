@@ -706,8 +706,9 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     if hot then hover = { pane = 'curve', addp = true } end
     if up then elseif lay.side then ly = ly + rh + 2 else lx = lx + aw + 2 end
   end
+  ACV.has_tree = (lay.side and span.tree) and true or nil   -- 1 ноя: для Cmd+H
   if lay.side and span.tree then   -- 31 окт: дерево: трек — папка, внутри его кривые
-    if ACV.lfoc then U.set(U.AMBER); gfx.rect(lx - 2, ly - 1, lw + 4, math.min(#span.tree, lay.legend_rows - 1) * rh + 2, 0) end   -- 1 ноя: фокус на списке (t)
+    if ACV.lfoc then U.set(U.AMBER); gfx.rect(lx - 2, ly - 1, lw + 4, math.min(#span.tree, lay.legend_rows - 1) * rh + 2, 0) end   -- 1 ноя: фокус на списке (Cmd+H)
     for ri, r in ipairs(span.tree) do
       if ri > lay.legend_rows - 1 then break end
       local iy = ly + (ri - 1) * rh
