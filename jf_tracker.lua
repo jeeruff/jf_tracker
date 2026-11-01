@@ -25267,7 +25267,7 @@ local function frame()
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end
-  if OPT.active then OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end; if HN.active then HN.draw(U, L) end end   -- 31 окт: метки f поверх опций   -- 31 окт: выпадашка из опций — поверх окна опций
+  if OPT.active then OPT.dock = ctx.opt_dock(); OPT.draw(L, gfx.w, gfx.h); if (vim.hydra or vim.picker) and ctx.pop_last then draw.popup(L, ctx.pop_last[1], ctx.pop_last[2]) end; if HN.active then HN.draw(U, L) end end   -- 31 окт: метки f поверх опций   -- 31 окт: выпадашка из опций — поверх окна опций
   if OPT.ask.active then OPT.ask.draw(L, gfx.w, gfx.h) end
   if ctx.LOGOPOP then ctx.logo_draw() end
   if ctx.SP and ctx.SP.on then ctx.SP.hints = state.hints; ctx.SP.draw(U, draw, L, gfx.w, gfx.h - L.status_h) end
@@ -31637,6 +31637,14 @@ end
 -- 21 окт: R — умный ввод из ретро-буфера MIDI REAPER (пишет всегда, пока трек взведён, и без транспорта): последняя
 -- сыгранная фраза — на трек курсора, первая нота — ровно на строку курсора (тишина до неё срезана). Действие 40211
 -- (взведённые и выделенные) — на время только этот трек выделен; выделение и курсор REAPER — как были
+-- 1 ноя: опции — в нижней панели (где DSP), вытянутой вверх до середины окна: трекер сверху виден, что меняется;
+-- нижней панели нет — окно по центру, как было
+ctx.opt_dock = function()
+  local c = L and L.pn and L.pn.by_panel and (L.pn.by_panel['dsp'] or L.pn.by_panel['mixer'] or L.pn.by_panel['notes'])
+  if not (c and c.w and c.h) or c.y < gfx.h * 0.25 then return nil end
+  local y0 = math.min(c.y, math.floor(gfx.h * 0.45))
+  return { x = c.x, y = y0, w = c.w, h = c.y + c.h - y0 }
+end
 -- 31 окт: Opt+Shift+R — то же, но сыгранное сразу становится новой фразой (pN), на месте — её триггер
 ctx.retro_phrase = function() ctx.retro_insert(true) end
 ctx.retro_insert = function(as_phrase)

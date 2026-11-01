@@ -704,8 +704,15 @@ function O.draw(L, W, H)
     bw = math.floor((W - 4 * L.pad) / k)
     nvis = math.max(3, math.floor((H - 4 * L.pad) / k / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
   end
+  -- 1 ноя: O.dock (ставит main) — опции в нижней панели (DSP), вытянутой вверх: трекер над ними виден
+  local dock = not O.compact and O.dock
+  if dock then
+    bw = dock.w
+    nvis = math.max(3, math.floor(dock.h / rh) - 5 - ((#O.tabs > 0) and 1 or 0))
+  end
   local bh = (nvis + 5 + ((#O.tabs > 0) and 1 or 0)) * rh   -- 14 окт: +1 строка — поиск в 2 строки
   local bx, by = math.floor((W - bw) / 2), math.floor((H - bh) / 2)
+  if dock then bx, by = dock.x, dock.y + dock.h - bh end
   if O.compact then
     nvis = math.min(n, math.floor((H - 4 * rh) / rh))
     bw = math.min(W - 2 * L.pad, math.max(lw + vw + 3 * L.pad + L.cw * 12, L.cw * 52))
