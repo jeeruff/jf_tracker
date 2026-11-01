@@ -1921,9 +1921,15 @@ end
 function V.key_impl(c)
   -- 31 окт: INSERT на hex-поле (лейн CC / PC / AT, команда): d набирался цифрой D, и w после него был простым
   -- движением — dw не удалял. D одна в наборе + w W b e (не hex-цифры) = оператор d, как везде
-  if V.mode == 'insert' and (c == 119 or c == 87 or c == 98 or c == 101) and V.hexbuf and V.hexbuf:upper() == 'D' then
+  -- 1 ноя: и все движения d (dd dp dP dc dC di dt … d пробел), если D набрана строчной d — INSERT работает как NORMAL;
+  -- значение DD — заглавной (Shift+D Shift+D)
+  local DMOT = { [100] = true, [112] = true, [80] = true, [99] = true, [67] = true, [83] = true, [105] = true, [116] = true, [114] = true,
+    [82] = true, [84] = true, [97] = true, [32] = true, [106] = true, [107] = true, [104] = true, [108] = true, [71] = true, [103] = true,
+    [123] = true, [125] = true, [36] = true, [48] = true }
+  if V.mode == 'insert' and V.hexbuf and V.hexbuf:upper() == 'D' and ((c == 119 or c == 87 or c == 98 or c == 101) or (V.ins_d and DMOT[c])) then
     V.hexbuf = nil; V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true
   end
+  if c > 0 then V.ins_d = V.mode == 'insert' and c == 100 and not V.hexbuf end   -- строчная d с пустого набора
   if c <= 0 then return end
   local E = ctx.edit
   local st = ctx.state
