@@ -4346,6 +4346,51 @@ ctx = {
     end)
   end,
   -- 28 окт: индекс пресетов (REAPER/presets/*.ini) — один раз, при первом поиске в fx list; :fxpresets — заново
+  -- 1 ноя: фоновая сборка: файл читается, только если его имя — установленный плагин; старый индекс живёт до конца
+  fx_presets_start = function()
+    local dir = reaper.GetResourcePath() .. '/presets'
+    local names, i = {}, 0
+    while true do
+      local fn = reaper.EnumerateFiles(dir, i)
+      if not fn or i > 5000 then break end
+      if fn:match('%.ini$') then names[#names + 1] = fn end
+      i = i + 1
+    end
+    local by = {}
+    for _, it in ipairs(FB.list) do
+      local k1, k2 = FB.PI.key_of_fx(it.label, it.data)
+      if k1 and not by[k1] then by[k1] = it end
+      if k2 and not by[k2] then by[k2] = it end
+    end
+    FB.pjob = { dir = dir, names = names, i = 1, by = by, out = {} }
+  end,
+  fx_presets_tick = function(budget)
+    local J = FB.pjob
+    local t0 = reaper.time_precise()
+    while J.i <= #J.names or J.fh do
+      if not J.fh then   -- следующий файл: только установленного плагина
+        local fn = J.names[J.i]; J.i = J.i + 1
+        local key, builtin = FB.PI.key_of_file(fn)
+        local it = key and J.by[key]
+        if it then J.fh = io.open(J.dir .. '/' .. fn, 'r'); J.it, J.user, J.st, J.nm = it, not builtin, {}, {} end
+      end
+      if J.fh then   -- построчно, порциями: файл в 29 МБ не замораживает кадр
+        local done = true
+        for _ = 1, 4000 do
+          local line = J.fh:read('l')
+          if not line then break end
+          FB.PI.parse_line(J.st, line, J.nm)
+          done = false
+        end
+        if done then
+          J.fh:close(); J.fh = nil
+          for _, nm in ipairs(J.nm) do J.out[#J.out + 1] = { fx = J.it, preset = nm, user = J.user } end
+        end
+      end
+      if reaper.time_precise() - t0 > budget then return end
+    end
+    FB.presets = J.out; FB.pjob = nil; FB.gen = FB.gen + 1
+  end,
   fx_presets_build = function()
     local dir = reaper.GetResourcePath() .. '/presets'
     local files = {}
@@ -24199,8 +24244,9 @@ local function frame()
       if #FB.list == 0 and not FB.loaded then FB.loaded = true; FB.list = ctx.fx_list(); ctx.fxb_load_native() end
       -- 28 окт: начали поиск — индекс пресетов (первый раз и не чаще раза в минуту: свежесохранённые находятся)
       if FB.query ~= '' and FB.pq_prev == '' and #FB.list > 0 and (not FB.presets or reaper.time_precise() - (FB.pres_t or 0) > 60) then
-        FB.pres_t = reaper.time_precise(); ctx.fx_presets_build()
+        FB.pres_t = reaper.time_precise(); ctx.fx_presets_start()
       end
+      if FB.pjob then ctx.fx_presets_tick(0.004) end   -- 1 ноя: индекс пресетов — фоном, ≤ 4 мс за кадр (было: 200 мс на первой букве)
       FB.pq_prev = FB.query
       return FB.draw(U, Lx, x, y, w, h, state.focus == 'fxb', ctx.fit)
     end or nil,

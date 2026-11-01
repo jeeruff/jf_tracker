@@ -38,21 +38,24 @@ function PI.key_of_fx(name, ident)
 end
 
 -- имена пресетов из текста ini: пользовательские ([PresetN] Name=) и заводские ([factory] NNNNN=)
-function PI.parse_ini(txt)
-  local out, sec = {}, nil
-  for line in (txt or ''):gmatch('[^\r\n]+') do
-    local s = line:match('^%[(.-)%]%s*$')
-    if s then sec = s:lower()
-    elseif sec and sec:match('^preset%d+$') then
-      local nm = line:match('^Name=(.*)$')
-      if nm and nm ~= '' then out[#out + 1] = nm end
-    elseif sec == 'factory' or sec == 'aufactory' then
-      local nm = line:match('^%d+=(.*)$')
-      -- безымянные слоты (Program 1, Program List A: Program 0-3, Preset 12) — не пресеты
-      local blank = nm and (nm:match('^[Pp]rogram[%s%d%-]*$') or nm:match('[Pp]rogram [Ll]ist %w+: [Pp]rogram') or nm:match('^[Pp]reset[%s%d%-]*$'))
-      if nm and nm ~= '' and nm ~= '(Custom)' and nm ~= 'Default' and not blank then out[#out + 1] = nm end
-    end
+-- одна строка .ini: st — { sec = текущая секция }, имена пресетов — в out (1 ноя: построчно — файлы бывают по 29 МБ)
+function PI.parse_line(st, line, out)
+  local s = line:match('^%[(.-)%]%s*$')
+  if s then st.sec = s:lower(); return end
+  local sec = st.sec
+  if sec and sec:match('^preset%d+$') then
+    local nm = line:match('^Name=(.*)$')
+    if nm and nm ~= '' then out[#out + 1] = nm end
+  elseif sec == 'factory' or sec == 'aufactory' then
+    local nm = line:match('^%d+=(.*)$')
+    -- безымянные слоты (Program 1, Program List A: Program 0-3, Preset 12) — не пресеты
+    local blank = nm and (nm:match('^[Pp]rogram[%s%d%-]*$') or nm:match('[Pp]rogram [Ll]ist %w+: [Pp]rogram') or nm:match('^[Pp]reset[%s%d%-]*$'))
+    if nm and nm ~= '' and nm ~= '(Custom)' and nm ~= 'Default' and not blank then out[#out + 1] = nm end
   end
+end
+function PI.parse_ini(txt)
+  local out, st = {}, {}
+  for line in (txt or ''):gmatch('[^\r\n]+') do PI.parse_line(st, line, out) end
   return out
 end
 
