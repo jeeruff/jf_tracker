@@ -558,7 +558,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local insel = false
       if MX.anchor then local r0, r1 = MX.block(); insel = ri >= r0 and ri <= r1 end
       if not insel then for _, p in pairs(MX.picks) do if p.ri == ri then insel = true; break end end end
-      if insel then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(xa - 2, y, nx + nw - xa + 2, L.rh, 1); gfx.a = 1 end
+      if insel then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(xa - 2, y, math.max(nx + nw, L.mx_label_w) - xa + 2, L.rh, 1); gfx.a = 1 end   -- 1 ноя: и темп / размер / длина — видно, чему поменяется
     end
     if ctx.hint then ctx.hint('mxname', nx, y, nw, L.rh, ri) end
     -- 19 окт: stack — вторая строка под именем: такт · размер · длина (· темп); те же щелчки и курсор длины
