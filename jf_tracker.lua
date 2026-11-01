@@ -33242,7 +33242,13 @@ ctx.fprint_cmd = function()
   if B.fp_on then B.fp_ptr = 0; vim.msg = ('fprint: %d files of the map index - in the background, from REAPER peaks'):format(#B.mapG.nodes)
   else vim.msg = 'fprint: stopped (:fprint - go on from the start, the done ones are skipped)' end
 end
-ctx.similar_cmd = function()
+-- 1 ноя: :similar brighter / darker / shorter / longer / sharper / softer / noisier / tonal / louder / quieter —
+-- в ту сторону по одному признаку отпечатка, остальные — как можно ближе (небольшой шаг лучше большого)
+ctx.SIM_DIR = { brighter = { 'b', 1 }, darker = { 'b', -1 }, shorter = { 'dc', -1 }, longer = { 'dc', 1 },
+  sharper = { 'at', -1 }, softer = { 'at', 1 }, noisier = { 'nz', 1 }, tonal = { 'nz', -1 }, louder = { 'l', 1 }, quieter = { 'l', -1 } }
+ctx.similar_cmd = function(arg)
+  local dir = arg and arg ~= '' and ctx.SIM_DIR[arg:match('^%s*(%a+)') or ''] or nil
+  if arg and arg:match('%a') and not dir then vim.msg = 'similar: brighter darker shorter longer sharper softer noisier tonal louder quieter'; return end
   local SM = B.SM
   local path
   if state.focus == 'browser' and B.preview_path then path = B.preview_path(B.entries[B.cur]) end
@@ -33268,9 +33274,21 @@ ctx.similar_cmd = function()
     local a = SM.AN[n.path]
     if a and a.at and n.path ~= path then
       nfp = nfp + 1
-      if not same or n.cat == cat then cands[#cands + 1] = { n = n, d = SM.fp_dist(a0, a) } end
+      if not same or n.cat == cat then
+        if dir then
+          local k, sg = dir[1], dir[2]
+          local dv = ((a[k] or 0) - (a0[k] or 0)) * sg
+          if dv > 0.04 then
+            local save = a0[k]; a0[k] = a[k]
+            local d = SM.fp_dist(a0, a)
+            a0[k] = save
+            cands[#cands + 1] = { n = n, d = d + 0.6 * (dv - 0.12) ^ 2 }
+          end
+        else cands[#cands + 1] = { n = n, d = SM.fp_dist(a0, a) } end
+      end
     end
   end
+  if #cands == 0 and dir and nfp > 0 then vim.msg = ('similar: nothing %s than %s%s among %d fingerprinted'):format(arg:match('%a+'), nm, same and (' in ' .. cat) or '', nfp); return end
   if #cands == 0 then vim.msg = ('similar: no fingerprints%s yet - :fprint the map index (%d done)'):format(same and (' of ' .. cat) or '', nfp); return end
   table.sort(cands, function(p, q) return p.d < q.d end)
   local items = {}
@@ -33278,7 +33296,7 @@ ctx.similar_cmd = function()
     local n = cands[i].n
     items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
   end
-  ctx.smart_open({ title = ('similar to %s%s - %d of %d fingerprinted (Enter - into the lib)'):format(nm, same and (' (' .. cat .. ')') or '', #items, nfp),
+  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - into the lib)'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. cat .. ')') or '', #items, nfp),
     items = items, cols = 2, sel = 1,
     on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
     on_pick = function(it) ctx.add_to_depot(it.v) end })

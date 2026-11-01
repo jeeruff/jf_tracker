@@ -2316,3 +2316,4 @@
 - [ ] 1 ноя: zl — пресеты LPB (1 2 3T 4 5D 6T 8 10D 12T 16 20D 24T 32 48T 64 128); в ячейке LPB метка T / D
 - [ ] 1 ноя: :fprint (map открыта на папке сэмплов) — отпечатки в фоне, прогресс в статусе; :similar на строке браузера / аудио-ноте — сетка похожих той же категории, выбор — слушать, Enter — в lib; хэт и шейкер должны расходиться
 - [ ] 1 ноя: arranger — кнопка print jumps (ZB ZJ -> timeline) = :pj
+- [ ] 1 ноя: :similar brighter / darker / shorter / longer / sharper / softer / noisier / tonal / louder / quieter — шаг в сторону по одному признаку, та же категория
