@@ -4993,7 +4993,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 19 окт: слайдер + $pt + pedal — в ширину клавиатуры (слайдер масштабируется), дальше не лезут (там row / col)
       local kr = kx + #D.PIANO_WHITE * kwv - 1
       local tail = (ms('$pt') + 2 * L.pad) + 2 + (ms('ped') + 2 * L.pad) + L.pad   -- 19 окт: ped — короче, vel длиннее
-      local bw = math.max(L.cw * 2, kr - bx - tail)
+      local bw = math.max(L.cw, kr - bx - tail)   -- 1 ноя: узкая клавиатура (шрифт x2) — слайдер короче, ped не пропадает
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
       U.dslider(bx, vy + math.floor(L.rh / 2), bw, ((cc.vel or 100) - 1) / 126, false, (bhot or vhot) and U.AMBER or U.TEXT, bhot, L.rh)
       if bhot then hover.ctrl = 'velbar' end
@@ -5016,7 +5016,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local dl = 'ped'
           local dw2 = ms(dl) + 2 * L.pad
           local dx2 = px2 + pw2 + 2
-          if dx2 + dw2 <= kr + 1 then
+          if dx2 <= kr + 1 then   -- 1 ноя: начинается до края клавиатуры — рисуется (был пропадал на x2)
             local don = info and info.wheels and info.wheels().pedal
             local dh = mx >= dx2 and mx < dx2 + dw2 and my >= vy and my < vy + L.rh
             set(don and U.tint(U.GREEN, 0.35) or (dh and U.tint(U.AMBER, 0.3) or U.BG)); gfx.rect(dx2, vy, dw2, L.rh - 1, 1)
