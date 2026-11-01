@@ -402,7 +402,7 @@ function D.panes_layout(state, L, nregions, ncols)
   M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
   M.minh = function(id)
-    if id == 'sample' and D.sprops_rows then return (math.ceil(D.sprops_rows / 2) + 1) * L.rh + 2 * L.rh + 10 end
+    -- 1 ноя: минимум item (все параметры сэмпла) снят — он держал высоту всего нижнего стека (dsp, options …); свойства — своя панель
     if id == 'mixer' then return 8 * L.rh end           -- 11 окт: фейдер и кнопки читаемы
   end
   M.avail = function(id)
