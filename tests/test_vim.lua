@@ -346,7 +346,7 @@ keysin('l'); V.key(1);      eq('^A on vol → +1', last(), 'vol:kick:129')
 keysin('l'); V.key(1);      eq('^A on fx → 0PA1 (visual order nt vl fx dl)', last(), 'fx:kick:0PA1')
 keysin('ll'); keysin('3'); V.key(24); eq('3^X on delay', last(), 'delay:kick:-3')
 reset()
-keysin('li7f');             eq('insert hex vol 7F', last(), 'vol:kick:127'); eq('advance', V.cur.row, 1)
+keysin('li7F');             eq('insert hex vol 7F', last(), 'vol:kick:127'); eq('advance', V.cur.row, 1)
 V.key(27)
 reset()
 keysin('lllli80');           eq('insert delay 80', last(), 'delay:kick:128')
@@ -356,7 +356,7 @@ reset()
 keysin('lli0d20');          eq('typing on an occupied fx column writes the new command', last(), 'fx:kick:0D20')
 eq('…the old one is cleared first', calls[#calls - 1], 'clearfx:kick:0P')
 eq('status hexbuf clear', V.hexbuf, nil)
-V.cur.row = 0; keysin('0p8f'); eq('the same code: only its value changes', last(), 'fx:kick:0P8F')
+V.cur.row = 0; keysin('0p8F'); eq('the same code: only its value changes', last(), 'fx:kick:0P8F')
 keysin('k'); V.key(27)
 reset()
 keysin('lli'); V.key(8);    eq('backspace on fx clears', last(), 'clearfx:kick:0P')
@@ -364,7 +364,7 @@ V.key(27)
 -- 12 окт: коды команд — два символа, как в Renoise (0U14, SF8E); неизвестный код не берётся
 reset(); state.fxcols = 2; V.cur = { fi = 1, row = 0, field = 5 }; keysin('i')
 keysin('0U14'); eq('empty fx column: 0U14 typed', last(), 'fx:kick:0U14')
-V.cur.row = 0; keysin('sf8e'); eq('SF8E typed (lower case too)', last(), 'fx:kick:SF8E')
+V.cur.row = 0; keysin('sf8E'); eq('SF8E typed (code lower case too; value digits A-F upper - d ≠ D)', last(), 'fx:kick:SF8E')
 local nc = #calls
 V.cur.row = 0; keysin('0X'); eq('unknown code 0X is not taken', #calls, nc); eq('0X: the prefix stays, X does nothing', V.hexbuf, '0')
 eq('0X: says so', (V.msg or ''):find('no such effect', 1, true) ~= nil, true); eq('0X: still INSERT', V.mode, 'insert')
@@ -400,7 +400,7 @@ do
   V.cur.row = 0; keysin('0b'); eq('0 then B -> 0B reverse still', V.hexbuf, '0B'); V.hexbuf = nil; V.cur.sub = nil; V.fx_back = nil
   -- значение без кода: код своей команды слота (kick: 0PA0 в слоте 1)
   V.cur = { fi = 1, row = 0, field = 4, sub = 'val' }
-  keysin('3c'); eq('value half on 0PA0: 3C -> 0P3C', last(), 'fx:kick:0P3C'); eq('…stays on the value half', V.cur.sub, 'val')
+  keysin('3C'); eq('value half on 0PA0: 3C -> 0P3C', last(), 'fx:kick:0P3C'); eq('…stays on the value half', V.cur.sub, 'val')
   -- …или бледной: строка 2 внутри kick, где идёт 0D10
   local cell = snap.cols[1].lanes[1].subs[1][2]
   cell.run = { '0D10' }
@@ -607,7 +607,9 @@ eq('Esc from cmd → back to INSERT', V.mode, 'insert')
 keysin(':w'); V.key(13); eq(':w from INSERT stays in INSERT', V.mode, 'insert')
 V.key(27); eq('INSERT Esc → NORMAL', V.mode, 'normal')
 keysin('v');  eq('NORMAL v → VISUAL', V.mode, 'visual'); V.key(27); keysin('V'); eq('NORMAL V → V-LINE', V.mode, 'vline'); V.key(27)
-reset(); V.mode = 'insert'; V.cur.field = 2; keysin('7f'); eq('hex on vol in KEYS', last(), 'vol:kick:127'); V.cur.field = 1
+reset(); V.mode = 'insert'; V.cur.field = 2; keysin('7F'); eq('hex on vol in KEYS', last(), 'vol:kick:127'); V.cur.field = 1
+-- 1 ноя: d ≠ D для a..f — строчная на поле значения в INSERT — клавиша NORMAL (b — назад), потом снова INSERT
+reset(); V.mode = 'insert'; V.cur.field = 2; V.cur.row = 4; local nb = #calls; keysin('b'); eq('INSERT vol: b is a motion, not the digit B', #calls, nb); eq('…still INSERT', V.mode, 'insert'); V.cur.field = 1
 reset(); keysin('='); eq('= → beatsync kick to beat', last(), 'beatsync:kick:beat')
 keysin('8='); eq('8= → beatsync to 8 rows', last(), 'beatsync:kick:8')
 reset(); keysin('>'); eq('> → loop item to region end', last(), 'loop:item:nil')

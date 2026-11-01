@@ -131,7 +131,7 @@ KH.PAGES = {
     { k = 'S-A-j S-A-k', d = 'transpose the instrument selected in the lib -1 / +1 semitone (a count - by N)' },
     { k = ':mcmd', d = 'master column cmd = project markers on rows: Enter - edit the command of the row, ! - a REAPER action (marker !<id> - REAPER runs it when playback passes), BS / Del / x - delete; :mcmd <text> sets it, :mcmd alone deletes' },
     { k = 'dw (automation)', d = 'on an envelope, a MIDI lane (CC / PB / PC) or a command field: delete the event of the cursor row (none - the next one below); 3dw - three in a row; the cursor stays, dw again - the next one' },
-    { k = 'd ≠ D', d = 'lowercase d - the delete operator in NORMAL and INSERT (dd dw dp dc …, then INSERT again); the hex digit D of a value - uppercase: DD = Shift+D twice' },
+    { k = 'd ≠ D (a..f)', d = 'INSERT on a value field (envelope, lane, vol, delay, command value): lowercase a b c d e f - NORMAL keys (b back, e end, dd dw dp dc …), then INSERT again; hex digits A-F - uppercase: DD = Shift+D twice; command codes and notes as before' },
     { k = 'dc dC', d = 'automation column: dc - every value of it (the column stays), dC - the column itself; vol / delay / command field: dc - cleared in the pattern of the cursor, dC - in the whole track (the notes stay)' },
     { k = 'z1', d = 'lock the track of the cursor to one note lane (mono: a new note cuts the sounding one, overlaps trimmed); again - free (also in the track menu)' },
     { k = '- +', t = {}, d = 'over the note field of a track: how many note subcolumns at least' },

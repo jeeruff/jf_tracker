@@ -1930,6 +1930,15 @@ function V.key_impl(c)
     V.hexbuf = nil; V.mode = 'normal'; V.pending = 'd'; V.count = nil; V.back_insert = true
   end
   if c > 0 then V.ins_d = V.mode == 'insert' and c == 100 and not V.hexbuf end   -- строчная d с пустого набора
+  -- 1 ноя: d ≠ D для всех a..f — в INSERT на поле значения (огибающая, лейн CC / PB / AT, vol, delay, значение команды,
+  -- слайс) строчные a b c d e f — клавиши NORMAL (движения, операторы), потом снова INSERT; цифры значения — заглавные
+  -- (Shift). Половина кода команды (0D, SI …) и поле ноты — как были
+  if V.mode == 'insert' and c >= 97 and c <= 102 and not V.pending and not V.op and not V.picker and not V.hydra then
+    local f = flat()[V.cur.fi]
+    local fld = V.cur.field or 1
+    local hexf = f and ((f.env) or (f.ml) or (fld == 2 or fld == 3) or (fld >= 4 and V.cur.sub == 'val' and not ctx.PTFX) or (fld == 1 and V.cur.sub == 'slc'))
+    if hexf then V.hexbuf = nil; return ins_as_normal(c) end
+  end
   if c <= 0 then return end
   local E = ctx.edit
   local st = ctx.state
