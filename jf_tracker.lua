@@ -3475,12 +3475,25 @@ ctx = {
     local k = (f.col.guid or '') .. '/' .. (f.env.name or '')
     local cur = state.envvals[k]
     local function set(m, what) return function() state.envvals[k] = m; vim.msg = (f.env.name or 'envelope') .. ': ' .. what end end
-    vim.open_hydra({ title = 'view of ' .. (f.env.name or 'the envelope'), items = {
+    -- 1 ноя: чья это огибающая — эффект и параметр в заголовке; e — окно этого эффекта
+    local who, fxw = '', nil
+    if f.env.env and reaper.Envelope_GetParentTrack then
+      local tr, fxi, pi = reaper.Envelope_GetParentTrack(f.env.env)
+      if tr and fxi and fxi >= 0 then
+        local _, fxn = reaper.TrackFX_GetFXName(tr, fxi, '')
+        local _, pn = reaper.TrackFX_GetParamName(tr, fxi, pi, '')
+        who = ('  -  %s : %s'):format(fxn, pn)
+        fxw = function() reaper.TrackFX_Show(tr, fxi, 3); vim.msg = fxn .. ' - its window (the column drives ' .. pn .. ')' end
+      end
+    end
+    local items = {
       { key = 'c', label = ((cur == nil or cur == 'curve') and '* ' or '') .. 'curve (as in REAPER)', fn = set('curve', 'curve') },
       { key = 'v', label = (cur == 'vals' and '* ' or '') .. 'values (as a command column)', fn = set('vals', 'values') },
       { key = 's', label = (cur == 'steps' and '* ' or '') .. 'steps: a fader on every row (square points; drag with the mouse)', fn = set('steps', 'steps - drag across the rows, digits in INSERT') },
       { key = 'b', label = (cur == 'bars' and '* ' or '') .. 'values and bars: the number and a line under it (longer - more), as MIDI CC', fn = set('bars', 'values and bars') },
-    } })
+    }
+    if fxw then table.insert(items, 3, { key = 'e', label = 'the effect window (floating)', fn = fxw }) end
+    vim.open_hydra({ title = 'view of ' .. (f.env.name or 'the envelope') .. who, items = items })
   end,
   -- ── note mod (12 окт): модуляция, которую запускает нота ──────────────
   -- инструмент — выбранный в lib (корень, если слайс); слоты — edit.NM
@@ -13355,6 +13368,18 @@ ctx = {
         for _, en in ipairs(page.e or {}) do
           if en.k and en.d then items[#items + 1] = { label = en.k, kind = 'action', value = mod, key = mod, desc = en.d, hk = true } end
         end
+      end
+    end
+    -- 1 ноя: свои команды эффектов (Project Notes): список и добавить
+    items[#items + 1] = { sep = true, title = 'fx commands (this project)', group = 'options' }
+    items[#items + 1] = { label = 'add a command', kind = 'action', value = ':fxcmd XX', desc = 'a two-letter code (FF, QX ...) -> a parameter of an effect of the cursor track: XXxx in a command column sets it to xx/FF for the note, the effect is added at the end of the chain when missing; kept in the Project Notes', fn = function() OPT.close(); vim.open_prompt('fxcmd ', '') end }
+    do
+      local map = ctx.fxcmd_parse(reaper.GetSetProjectNotes(0, false, ''))
+      local keys = {}
+      for k in pairs(map) do keys[#keys + 1] = k end
+      table.sort(keys)
+      for _, k in ipairs(keys) do
+        items[#items + 1] = { label = k .. '  ' .. map[k].param, kind = 'action', value = 'remove', desc = ('%s = %s | %s - click: remove (:fxcmd %s -)'):format(k, map[k].fx, map[k].param, k), fn = function() map[k] = nil; ctx.fxcmd_write(map); OPT.close(); vim.msg = 'fx command ' .. k .. ' removed' end }
       end
     end
     -- профили (5 окт): сохранить / загрузить / удалить набор опций
@@ -29860,6 +29885,7 @@ local function frame()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   ctx.mod_tick(c)
   ctx.pedal_tick()   -- 21 окт: ` отпущен — педаль вверх
+  ctx.fxcmd_tick()   -- 1 ноя: свои команды эффектов из Project Notes (раз в секунду)
   ctx.focus_back_tick()   -- 21 окт: мышь вернулась с окна плагина — клавиатура трекеру
   if c ~= 0 then idle.input_t = reaper.time_precise() end          -- ввод — выход из простоя
   -- 21 окт: удержание кончилось (клавиша отпущена — повторов нет 0.15 с) — один undo на длину
@@ -33336,6 +33362,92 @@ ctx.vhs_quick_once = function()   -- функцией: в главном чан�
   reaper.SetExtState(EXT, 'q_vhs', '1', true)
 end
 ctx.vhs_quick_once()
+-- 1 ноя: свои команды (fx commands) — блок в Project Notes (едет с проектом, читается глазами):
+--   -- jf_tracker fx commands --
+--   FF = JS: Filther (Saike) | Filter Cutoff
+--   -- end --
+ctx.FXC_HEAD, ctx.FXC_END = '-- jf_tracker fx commands --', '-- end --'
+ctx.fxcmd_parse = function(notes)
+  local map, inb = {}, false
+  for line in ((notes or '') .. '\n'):gmatch('([^\r\n]*)\r?\n') do
+    if line == ctx.FXC_HEAD then inb = true
+    elseif inb and line == ctx.FXC_END then break
+    elseif inb then
+      local code, fx, par = line:match('^%s*(%w%w)%s*=%s*(.-)%s*|%s*(.-)%s*$')
+      if code and fx ~= '' and par ~= '' then map[code:upper()] = { fx = fx, param = par } end
+    end
+  end
+  return map
+end
+ctx.fxcmd_write = function(map)
+  local notes = reaper.GetSetProjectNotes(0, false, '')
+  local a = notes:find(ctx.FXC_HEAD, 1, true)
+  local b = a and notes:find(ctx.FXC_END, a, true)
+  if a and b then notes = notes:sub(1, a - 1) .. notes:sub(b + #ctx.FXC_END):gsub('^\r?\n', '') end
+  local keys = {}
+  for k in pairs(map) do keys[#keys + 1] = k end
+  table.sort(keys)
+  if #keys > 0 then
+    local t = { ctx.FXC_HEAD }
+    for _, k in ipairs(keys) do t[#t + 1] = ('%s = %s | %s'):format(k, map[k].fx, map[k].param) end
+    t[#t + 1] = ctx.FXC_END
+    notes = (notes ~= '' and (notes:gsub('%s*$', '') .. '\n') or '') .. table.concat(t, '\n') .. '\n'
+  end
+  reaper.GetSetProjectNotes(0, true, notes)
+  ctx.fxc_notes = nil; ctx.fxcmd_load()
+end
+-- раз в секунду: заметки поменялись (другой проект, правка руками) — таблица заново, коды — в справочник команд
+ctx.fxcmd_load = function()
+  local notes = reaper.GetSetProjectNotes(0, false, '')
+  if notes == ctx.fxc_notes then return end
+  ctx.fxc_notes = notes
+  local map = ctx.fxcmd_parse(notes)
+  local C = edit.cmds
+  for k in pairs(C.USER) do if not C.BUILTIN[k] then ctx.SM.FX_DESC[k], ctx.SM.FX_NAME[k], ctx.SM.FX_MEAN[k] = nil, nil, nil end end
+  for k, u in pairs(map) do if C.BUILTIN[k] then map[k] = nil end end   -- встроенные коды не перекрыть
+  C.user_set(map)
+  for k, u in pairs(map) do
+    ctx.SM.FX_DESC[k] = ('your command (Project Notes): %s - %s = xx/FF for the note'):format(u.fx, u.param)
+    ctx.SM.FX_NAME[k] = u.param
+    ctx.SM.FX_MEAN[k] = function(v) return ('%s %d%%'):format(u.param, math.floor(v / 255 * 100 + 0.5)) end
+  end
+end
+ctx.fxcmd_tick = function()
+  local now = reaper.time_precise()
+  if now - (ctx.fxc_t or 0) < 1 then return end
+  ctx.fxc_t = now; ctx.fxcmd_load()
+end
+-- :fxcmd XX — назначить код параметру эффекта трека курсора (выбор из всех его параметров); :fxcmd XX - — снять;
+-- :fxcmd — список
+ctx.fxcmd_cmd = function(arg)
+  local code, rest = (arg or ''):match('^%s*(%w%w)%s*(.-)%s*$')
+  local map = ctx.fxcmd_parse(reaper.GetSetProjectNotes(0, false, ''))
+  if not code then
+    local items = {}
+    local keys = {}
+    for k in pairs(map) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do items[#items + 1] = { label = ('%s  %s - %s   (Enter - remove)'):format(k, map[k].fx, map[k].param), v = k } end
+    if #items == 0 then vim.msg = 'fx commands: none yet - :fxcmd FF picks a parameter of the cursor track for the code FF'; return end
+    vim.open_picker('fx commands (Project Notes) - Enter removes', items, function(it) map[it.v] = nil; ctx.fxcmd_write(map); vim.msg = 'fx command ' .. it.v .. ' removed' end)
+    return
+  end
+  code = code:upper()
+  if edit.cmds.BUILTIN[code] then vim.msg = code .. ': a built-in command - pick another code'; return end
+  if rest == '-' then map[code] = nil; ctx.fxcmd_write(map); vim.msg = 'fx command ' .. code .. ' removed'; return end
+  local col = cur_col()
+  if not (col and col.track) then vim.msg = 'fxcmd: no track under the cursor'; return end
+  local rows = MMX.PP.build(col.track, model.fx_addresses)
+  local items = {}
+  for _, r in ipairs(rows) do if r.kind == 'fx' then items[#items + 1] = { label = (r.pname or '') .. '   ' .. (r.fxname or ''), r = r } end end
+  if #items == 0 then vim.msg = 'fxcmd: the cursor track has no fx - add the effect first (af), then :fxcmd ' .. code; return end
+  vim.open_picker(('fx command %s: which parameter? (%sxx = its value xx/FF for the note)'):format(code, code), items, function(it)
+    local _, fxn = reaper.TrackFX_GetFXName(col.track, it.r.fx, '')
+    map[code] = { fx = fxn, param = it.r.pname or '' }
+    ctx.fxcmd_write(map)
+    vim.msg = ('fx command %s = %s | %s (Project Notes) - type %s80 in a command column'):format(code, fxn, it.r.pname or '', code)
+  end)
+end
 -- font x2 − + встаёт на место клетки font scale (она была в быстрых), иначе — в конец; один раз
 -- 1 ноя: PT-mode — все паттерны песни по 64 строки (ProTracker): короче — дописывается пустое, длиннее — хвост режется,
 -- всё после сдвигается (как :len). С конца песни — сдвиг не сбивает позиции ещё не тронутых. → сколько поменялось

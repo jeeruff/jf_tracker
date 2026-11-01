@@ -247,6 +247,46 @@ function C.fx_env(tr, kind, create)
   return env, conv, fx, p
 end
 
+-- 1 ноя: свои команды (fx commands): код → эффект и параметр; xx/FF — значение параметра на время ноты (огибающая
+-- эффекта трека, эффект ставится в конец цепи, если его нет). Таблица — из Project Notes (main, C.user_set)
+C.USER = {}
+C.BUILTIN = {}
+for k in pairs(C.CODES) do C.BUILTIN[k] = true end
+function C.user_set(map)
+  for k in pairs(C.USER) do if not C.BUILTIN[k] then C.CODES[k] = nil end end
+  C.USER = map or {}
+  for k in pairs(C.USER) do if not C.BUILTIN[k] then C.CODES[k] = true end end
+end
+-- огибающая параметра своей команды: fx — по имени (как в списке REAPER), параметр — по имени (точно, иначе подстрока)
+function C.user_env(tr, u, create)
+  local fx
+  local want = (u.fx or ''):lower()
+  for f = 0, R.TrackFX_GetCount(tr) - 1 do
+    local _, fn = R.TrackFX_GetFXName(tr, f, '')
+    local _, on = R.TrackFX_GetNamedConfigParm(tr, f, 'fx_name')
+    fn, on = fn:lower(), (on or ''):lower()
+    if fn == want or on == want or fn:find(want, 1, true) or (on ~= '' and want:find(on, 1, true)) then fx = f; break end
+  end
+  if not fx then
+    if not create then return nil end
+    fx = R.TrackFX_AddByName(tr, u.fx, false, -1)
+    if not fx or fx < 0 then return nil end
+  end
+  local p, pw = nil, (u.param or ''):lower()
+  for k = 0, R.TrackFX_GetNumParams(tr, fx) - 1 do
+    local _, pn = R.TrackFX_GetParamName(tr, fx, k, '')
+    pn = pn:lower()
+    if pn == pw then p = k; break end
+    if not p and pn:find(pw, 1, true) then p = k end
+  end
+  if not p then return nil end
+  local env = R.GetFXEnvelope(tr, fx, p, create and true or false)
+  if not env then return nil end
+  local _, mn, mx = R.TrackFX_GetParam(tr, fx, p)
+  if not (mn and mx and mx > mn) then mn, mx = 0, 1 end
+  return env, mn, mx
+end
+
 -- 1 ноя: BRxx → номер длины среза LiveBeatRepeater (2, 1, 1T, 1/2, 1/2T, 1/4 … 1/128 такта): ближайший к 1/xx такта
 C.BR_BARS = { 2, 1, 2 / 3, 1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8, 1 / 12, 1 / 16, 1 / 24, 1 / 32, 1 / 64, 1 / 128 }
 function C.br_len(xx)
@@ -335,6 +375,25 @@ function C.rebuild(head, lpb, prev_semis)
         end
       end
       R.Envelope_SortPoints(renv); if lenv then R.Envelope_SortPoints(lenv) end
+    end
+  end
+  -- 1 ноя: свои команды — значение параметра xx/FF с их строки до следующей той же / конца ноты (сразу, ступенькой)
+  for code, u in pairs(C.USER) do
+    local need = false
+    for _, c in ipairs(list) do if c.cmd == code then need = true end end
+    local env, mn, mx = C.user_env(tr, u, need)
+    if env then
+      R.DeleteEnvelopePointRange(env, pos - 1e-4, pos + len + 2e-4)
+      if need then
+        local tq = function(off) return R.TimeMap2_QNToTime(0, qn0 + off) - pos end
+        local seg = {}
+        for _, c in ipairs(list) do if c.cmd == code then seg[#seg + 1] = c end end
+        for _, c in ipairs(seg) do
+          local t = pos + math.max(0, math.min(len, tq(c.off or 0)))
+          R.InsertEnvelopePoint(env, t, mn + (mx - mn) * (c.xx / 255), 1, 0, false, true)
+        end
+      end
+      R.Envelope_SortPoints(env)
     end
   end
   if is_midi then
