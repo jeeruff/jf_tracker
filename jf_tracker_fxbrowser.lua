@@ -184,7 +184,16 @@ local function score(hay, term)
   end
   local a, b = hay:find(pat)
   if not a then return nil end
+  -- 1 ноя: буквы вразброс по длинному имени — не совпадение («filthe» ловил 533 эффекта Saike)
+  if (b - a + 1) > #term * 2 + 2 then return nil end
   return math.max(1, 30 - (b - a - #term))             -- плотнее — выше
+end
+-- полная метка (путь, описание) — только точное вхождение и операторы, без подпоследовательности
+local function score_exact(hay, term)
+  local c1 = term:sub(1, 1)
+  if c1 == '!' or c1 == "'" or c1 == '^' or term:sub(-1) == '$' then return score(hay, term) end
+  local p = hay:find(term, 1, true)
+  return p and (60 - math.min(p, 50)) or nil
 end
 FB.subpat = {}
 -- нижний регистр имени / метки — один раз на эффект (не на каждый поиск)
@@ -231,7 +240,7 @@ function FB.results()
     local hay, lab, name = hay_of(it)
     local total, ok = 0, true
     for _, t in ipairs(terms) do
-      local s = score(hay, t) or score(lab, t)
+      local s = score(hay, t) or score_exact(lab, t)
       if not s then ok = false; break end
       total = total + s
     end
@@ -508,6 +517,11 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
       name = no .. ' ' .. name
     end
     local kw = kind ~= '' and (U.measure(kind) + L.pad) or 0
+    -- 1 ноя: «[Saike] Tasty …» не влезает — разработчик в конец: видно само имя («Tasty … [Saike]»)
+    if U.measure(name) > w - 2 * L.pad - kw then
+      local pre, dev, rest = name:match('^(.-)(%[[^%]]+%])%s*(.+)$')
+      if dev and rest then name = pre .. rest .. ' ' .. dev end
+    end
     U.text(x + L.pad, ry + 1, fit(name, w - 2 * L.pad - kw), (sel and focused) and curc or (exl and U.GREY or (mk and U.CYAN or U.TEXT)))
     if kw > 0 and w > kw * 3 then U.text(x + w - L.pad - kw + L.pad, ry + 1, kind, (sel and focused) and U.GREY or U.DIM) end
     if mx >= x and mx < x + w - 1 and my >= ry and my < ry + L.rh then hover = { row = idx } end
