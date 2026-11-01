@@ -58,7 +58,7 @@ function SX.items(v, P)
       { kind = 'val', lab = 'root', val = (function()   -- 31 окт: root note — нотой (C-3), не числом
           local n = math.floor((pv('Base note') or 48) + 0.5)
           return ({ 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' })[n % 12 + 1] .. (n // 12 - 1)
-        end)(), src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'root note: the note of slice 1 (default C-3 = 48); slice 2 - a semitone up, and so on' },
+        end)(), pc = math.floor((pv('Base note') or 48) + 0.5) % 12, src = 'p', name = 'Base note', step = 1, lo = 0, hi = 127, tip = 'root note: the note of slice 1 (default C-3 = 48); slice 2 - a semitone up, and so on' },
     },
   }
   -- 31 окт: STRETCH выбранного среза (и выделенных) — алгоритм, зерно, растяжение (заказ 13 экземпляру);
@@ -106,6 +106,7 @@ local function bw_of(it, ms, pad)
   local w = ms(lab) + 2 * pad
   if it.key and not key_at(it) then w = w + ms(it.key) + 3 end
   if it.kind == 'val' then w = w + math.max(ms(' ' .. (it.val or '')), ms(' 00.00')) end
+  if it.pc then w = w + 7 * math.max(3, math.floor(ms('W') * 0.8)) + pad end   -- 1 ноя: root — клавиатурой октавы, как в сэмплере
   if it.slider then w = w + ms('WWWWW') + pad end   -- 27 окт: дорожка слайдера между подписью и числом
   if it.kind == 'menu' then w = w + 7 end
   return w
@@ -180,6 +181,16 @@ function SX.draw_buttons(U, L, lay, text, ms, set, mx, my, drag)
         set(hot and U.AMBER or U.TEXT); gfx.rect(sx0, y + 3, math.max(1, math.floor(tw2 * fr + 0.5)), h - 6, 1)
         trk = { x = sx0, w = tw2 }
         tx = sx0 + tw2
+      end
+      if it.pc then   -- 1 ноя: мини-клавиатура октавы, нота — янтарём (как note lo / hi / root в сэмплере)
+        local kw = math.max(3, math.floor(ms('W') * 0.8))
+        local kx0, ky, kh = tx + L.pad, y + 2, h - 4
+        local WH = { 0, 2, 4, 5, 7, 9, 11 }
+        for wi, wpc in ipairs(WH) do set(wpc == it.pc and U.AMBER or U.mix(U.TEXT, U.BG, 0.25)); gfx.rect(kx0 + (wi - 1) * kw, ky, kw - 1, kh, 1) end
+        for bpc, after in pairs({ [1] = 1, [3] = 2, [6] = 4, [8] = 5, [10] = 6 }) do
+          set(bpc == it.pc and U.AMBER or U.BG); gfx.rect(kx0 + after * kw - math.floor(kw / 3), ky, math.max(2, math.floor(kw * 2 / 3)), math.floor(kh * 0.6), 1)
+        end
+        tx = kx0 + 7 * kw
       end
       if it.kind == 'val' then text(tx, ty, ' ' .. (it.val or ''), on and U.BG or U.CYAN); tx = tx + ms(' ' .. (it.val or '')) end
       if it.key and not ki then text(tx + 3, ty, it.key, on and U.BG or U.AMBER); tx = tx + 3 + ms(it.key) end
