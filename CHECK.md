@@ -2310,3 +2310,4 @@
 - [ ] 1 ноя: PT-mode — Enter (NORMAL и INSERT) вставляет пустую строку в канале, Shift+Enter — во всех; смещение показывается 09xx, набор 0 9 xx; ZBxx — после строки следующий паттерн с его строки xx (при игре)
 - [ ] 1 ноя: PT-mode — команды как в ProTracker: набор три hex-знака (C40 громкость, 940 offset, D10 break на строку 10, A40 / A04 vol slide, 1xx 2xx slide, 3xx porta, 4xy vib, 0xy arp, Bxx jump, E9x retrig, F7D темп); показ так же (C40 вместо 0M80); нет: 5 6 7, Exx кроме E9, F < 20; шрифт Topaz a500 16 px
 - [ ] 1 ноя: lfogen поле to: env / pitch / vol / pan — генератор пишет в огибающую тейка аудио-нот трека курсора в отрезке (огибающая создаётся); pitch ±12 полутонов (center 0.5 = 0)
+- [ ] 1 ноя: lfogen to на MIDI-треке: pitch — pitch bend в клипы (RS5K / slixer его понимают), vol — RS5K Volume / slixer Master gain, pan — RS5K Pan (у slixer нет)
