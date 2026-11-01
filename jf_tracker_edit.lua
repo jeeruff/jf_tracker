@@ -352,7 +352,8 @@ local function run(desc, fn)
   if ok and depth == 1 then pcall(E.ghost_orphans) end   -- 16 окт: голова удалена (dE, d, x…) — её ghost-слайсы с ней
   if ok and depth == 1 then local okl, el = pcall(E.layers_sync); if not okl then E.layers_err = el end end   -- 19 окт: слои нот (¥) — за нотами
   if ok and depth == 1 then local okp, ep = pcall(E.pk_sync); if not okp then E.pk_err = ep end end
-  if ok and depth == 1 then local okr, er = pcall(E.rtg_sync); if not okr then E.rtg_err = er end end   -- 28 окт: копии 0R без исходной ноты   -- 22 окт: premod — за нотами трека
+  if ok and depth == 1 then local okr, er = pcall(E.rtg_sync); if not okr then E.rtg_err = er end end
+  if ok and depth == 1 then local okf2, ef2 = pcall(E.fipm_sync); if not okf2 then E.fipm_err = ef2 end end   -- 1 ноя: наложенные ноты — полосами free item   -- 28 окт: копии 0R без исходной ноты   -- 22 окт: premod — за нотами трека
   if ok and depth == 1 then local okf, ef = pcall(E.PH.sync); if not okf then E.ph_err = ef end end   -- 30 окт: вхождения фраз за источником и триггером
   if ok and pre then pcall(rescue, pre) end
   depth = depth - 1
@@ -4742,6 +4743,55 @@ function E.clip_snap(it)
   R.MIDI_SetItemExtents(it, a, math.max(a + 1, b))
   return true
 end
+-- 1 ноя: free item positioning — на треке несколько нот звучат разом (аккорд, внахлёст дольше FIPM_OVER): трек сам
+-- переходит в free item positioning, айтемы — полосами по высоте (полоса = подколонка трекера: свободная снизу вверх,
+-- как раскладывает model), в аранжировке каждый виден целиком — волна и спектральные пики. Наложения ушли — режим
+-- снимается. Трек, переведённый в FIPM руками (без P_EXT:jf_fipm), не трогается; фиксированные лейны — тоже
+E.FIPM_ON, E.FIPM_OVER = true, 0.03
+function E.fipm_slots(spans, over)   -- spans { {s, e} … } по возрастанию s → номера полос (1..), их число
+  local ends, slot, n = {}, {}, 0
+  for i, sp in ipairs(spans) do
+    local k = 1
+    while ends[k] and ends[k] > sp[1] + (over or 0) do k = k + 1 end
+    ends[k] = sp[2]; slot[i] = k
+    if k > n then n = k end
+  end
+  return slot, n
+end
+function E.fipm_sync()
+  if not E.FIPM_ON then return end
+  local ch = E.changed_items()   -- включать — только где правка что-то сдвинула (старые кроссфейды не трогать)
+  local touched = {}
+  if ch then for it in pairs(ch) do local t = R.GetMediaItem_Track(it); if t then touched[t] = true end end end
+  for ti = 0, R.CountTracks(0) - 1 do
+    local tr = R.GetTrack(0, ti)
+    local fm = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE')
+    local _, name = R.GetTrackName(tr)
+    local _, mine = R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_fipm', '', false)
+    if fm ~= 2 and (touched[tr] or mine == '1') and not (model and model.is_lib_name and model.is_lib_name(name)) then
+      local its, spans = {}, {}
+      for i = 0, R.CountTrackMediaItems(tr) - 1 do
+        local it = R.GetTrackMediaItem(tr, i)
+        local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+        its[#its + 1] = { it = it, s = p, e = p + R.GetMediaItemInfo_Value(it, 'D_LENGTH') }
+      end
+      table.sort(its, function(a, b) return a.s < b.s end)
+      for i, x in ipairs(its) do spans[i] = { x.s, x.e } end
+      local slot, n = E.fipm_slots(spans, E.FIPM_OVER)
+      if n >= 2 and (fm == 0 or mine == '1') then
+        if fm == 0 then R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 1); R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_fipm', '1', true) end
+        for i, x in ipairs(its) do
+          local y, h = (slot[i] - 1) / n, 1 / n
+          if math.abs(R.GetMediaItemInfo_Value(x.it, 'F_FREEMODE_Y') - y) > 1e-4 then R.SetMediaItemInfo_Value(x.it, 'F_FREEMODE_Y', y) end
+          if math.abs(R.GetMediaItemInfo_Value(x.it, 'F_FREEMODE_H') - h) > 1e-4 then R.SetMediaItemInfo_Value(x.it, 'F_FREEMODE_H', h) end
+        end
+      elseif n < 2 and mine == '1' then
+        R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 0); R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_fipm', '', true)
+      end
+    end
+  end
+end
+
 function E.rtg_sync(dry)
   local n = 0
   for ti = 0, R.CountTracks(0) - 1 do
