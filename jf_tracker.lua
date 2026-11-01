@@ -17249,15 +17249,15 @@ ctx.acv_key = function(c)
   local act = curves[ACV.cur]
   local m = ctx.mods()
   if c == 25 then c = 9; m = { shift = true } end
-  -- 1 ноя: Opt+Tab — фокус холст <-> список кривых (папки треков); в списке j k — строки, l / Enter — открыть папку
-  -- или взять кривую (Enter — и назад на холст), h — закрыть папку, Esc / Opt+Tab — на холст
-  if c == 9 and m.alt then
+  -- 1 ноя: t (tree) — фокус холст <-> список кривых (папки треков); в списке j k — строки, l / Enter — открыть папку
+  -- или взять кривую (Enter — и назад на холст), h — закрыть папку, Esc / t — на холст (Opt+Tab занят: подвкладки)
+  if c == 116 and not ACV.dpend and not ACV.zpend then
     ACV.lfoc = not ACV.lfoc
     if ACV.lfoc then
       ACV.lsel = 1
       for i, r in ipairs(ctx.acv_tree(curves)) do if r.i == ACV.cur then ACV.lsel = i end end
     end
-    vim.msg = ACV.lfoc and 'curve list: j k rows, l / Enter open a folder or take a curve, h close, Opt+Tab / Esc - the canvas' or 'curve: the canvas'
+    vim.msg = ACV.lfoc and 'curve list: j k rows, l / Enter open a folder or take a curve, h close, t / Esc - the canvas' or 'curve: the canvas'
     return true
   end
   if ACV.lfoc then
