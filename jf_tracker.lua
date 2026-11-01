@@ -3166,10 +3166,19 @@ ctx = {
       for i = reaper.CountTrackMediaItems(tr) - 1, 0, -1 do
         local it = reaper.GetTrackMediaItem(tr, i)
         local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-        if pos >= t0 - 1e-6 and pos < t1 - 1e-6 then reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
+        if pos >= t0 - 1e-6 and pos < t1 - 1e-6 then
+          -- 1 ноя: dr / dT — только ноты; MIDI-клип с CC / PB / AT (лейны автоматизации) остаётся, из него уходят ноты
+          local tk = reaper.GetActiveTake(it)
+          local _, nn, ncc = 0, 0, 0
+          if tk and reaper.TakeIsMIDI(tk) then _, nn, ncc = reaper.MIDI_CountEvts(tk) end
+          if tk and reaper.TakeIsMIDI(tk) and ncc > 0 then
+            for k = nn - 1, 0, -1 do reaper.MIDI_DeleteNote(tk, k) end
+            if nn > 0 then n = n + 1 end
+          else reaper.DeleteTrackMediaItem(tr, it); n = n + 1 end
+        end
       end
     end)
-    vim.msg = ('%s: %d item(s) of %s cleared in %s'):format(all and 'dT' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
+    vim.msg = ('%s: notes of %d item(s) of %s cleared in %s (automation kept)'):format(all and 'dT' or 'dr', n, f.col.name, rg and (rg.name ~= '' and rg.name or ('region ' .. rg.idx)) or 'the song (the lib after =LIB kept)')
     return n > 0
   end,
   -- 17 окт: da + что — трек курсора в песне (=START..=END; lib за =LIB цела): e — вся автоматизация (точки и
@@ -3194,6 +3203,11 @@ ctx = {
           local env = reaper.GetTrackEnvelope(tr, k)
           local np = reaper.CountEnvelopePoints(env)
           reaper.DeleteEnvelopePointRange(env, t0 - 1e-6, t1 - 1e-6)
+          -- 1 ноя: точка ровно в 0 (начало песни) диапазоном не удалялась — оставалась одна; добить по индексам
+          for pi = reaper.CountEnvelopePoints(env) - 1, 0, -1 do
+            local _, pt = reaper.GetEnvelopePoint(env, pi)
+            if pt >= t0 - 1e-4 and pt < t1 - 1e-6 then reaper.DeleteEnvelopePointEx(env, -1, pi) end
+          end
           n = n + np - reaper.CountEnvelopePoints(env)
           local ok, ch = reaper.GetEnvelopeStateChunk(env, '', false)
           if ok and ch:find('POOLEDENVINST', 1, true) then
