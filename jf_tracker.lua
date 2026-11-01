@@ -22849,17 +22849,35 @@ local function process_jumps(playpos)
       end
     end
   end
-  for _, f in ipairs(L.flat) do
-    local c = f.sub and f.sub[row]
-    if c and (c.kind == 'audio' or c.kind == 'midi') then
-      for _, fx in ipairs(c.fx or {}) do
-        local zb = fx:match('^ZB(%x%x)$')
-        if zb then ctx.zb_pend = { row = row, xx = tonumber(zb, 16), t = edit.row_time(row, state.lpb, 0) } end
-        local xx = fx:match('^ZJ(%x%x)$')
-        if xx then
-          local slot = seq[tonumber(xx, 16)]
-          if slot then reaper.SetEditCurPos(slot.pos, false, true); MX.queued = nil; vim.msg = 'ZJ' .. xx .. ' → ' .. slot.name; return end
+  -- 1 ноя: команды песни (ZB / ZJ) — из меток всех айтемов проекта, не из видимых ячеек (трек мог быть не на экране,
+  -- строки вне вида не строятся — брейк молчал); индекс пересобирается при изменении проекта
+  local sc = reaper.GetProjectStateChangeCount(0)
+  if not ctx.jidx or ctx.jidx.sc ~= sc then
+    local list = {}
+    for ti = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, ti)
+      for ii = 0, reaper.CountTrackMediaItems(tr) - 1 do
+        local it = reaper.GetTrackMediaItem(tr, ii)
+        local _, cm = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cmds', '', false)
+        if cm and cm:find('Z[BJ]') then
+          local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+          local q0 = reaper.TimeMap2_timeToQN(0, pos)
+          for tok in cm:gmatch('[^,]+') do
+            local code, xx, off = tok:match('^(Z[BJ])(%x%x)@?([%d%.]*)$')
+            if code then list[#list + 1] = { t = reaper.TimeMap2_QNToTime(0, q0 + (tonumber(off) or 0)), code = code, xx = tonumber(xx, 16) } end
+          end
         end
+      end
+    end
+    ctx.jidx = { sc = sc, list = list }
+  end
+  local ra, rb = edit.row_time(row, state.lpb, 0) - 1e-4, edit.row_time(row + 1, state.lpb, 0) - 1e-4
+  for _, j in ipairs(ctx.jidx.list) do
+    if j.t >= ra and j.t < rb then
+      if j.code == 'ZB' then ctx.zb_pend = { row = row, xx = j.xx, t = edit.row_time(row, state.lpb, 0) }
+      else
+        local slot = seq[j.xx]
+        if slot then reaper.SetEditCurPos(slot.pos, false, true); MX.queued = nil; vim.msg = ('ZJ%02X → '):format(j.xx) .. slot.name; return end
       end
     end
   end
