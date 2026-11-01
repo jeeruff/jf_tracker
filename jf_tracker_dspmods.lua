@@ -389,7 +389,7 @@ DM.modules = {
     -- 1 ноя: tilr Albeton - Autopan — две волны L / R (жёлтая / голубая, как в его окне), вид autopan
     match = 'albeton - autopan',
     title = 'Autopan',
-    cols = 2,
+    cols = 1,
     view = 'autopan',
     params = {
       { 'Amount', 'amount' }, { 'Rate (Hz)', 'rate' }, { 'Rate Sync', 'sync' }, { 'Offset', 'offset' },

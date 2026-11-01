@@ -2923,6 +2923,7 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
 end
 
+D.VIEW_BELOW = { autopan = true }   -- 1 ноя: вид под параметрами, не первой колонкой
 D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true, ['repeat'] = true, autopan = true }
 local VRH = 8
 local function pnum(f, vals, label)
@@ -12526,7 +12527,15 @@ function D.frame(L, snap, rows, state, info)
         text(wx, wy + math.max(4, wh) + 2, fit(st, ww), stc)
       end
       local eq_only = f.view == 'eq' and info.eqgraph            -- ReaEQ: только график, во весь блок
-      if f.view and D.FX_VIEWS[f.view] and not (f.view == 'eq' and not info.eqgraph) then
+      if f.view and D.VIEW_BELOW[f.view] then
+        -- 1 ноя: вид под параметрами (компактно: параметры одной колонкой сверху, вид — во всю ширину модуля снизу)
+        VRH = L.rh
+        local np = #(f.params or {})
+        nfit = math.min(nfit, np)
+        local vy = by + L.rh + 1 + aw_off + np * L.rh + 2
+        local vh = by + bh - 3 - vy
+        if vh >= 3 * L.rh then D.fx_view(f.view, f, vals, bx + L.pad, vy, bw - 2 * L.pad, vh) end
+      elseif f.view and D.FX_VIEWS[f.view] and not (f.view == 'eq' and not info.eqgraph) then
         -- вид встроенного эффекта REAPER (4 окт) — первая колонка
         pcol0 = 1
         VRH = L.rh
