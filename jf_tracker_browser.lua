@@ -2187,6 +2187,25 @@ function B.draw(U, L, x, y, w, h)
     if tx0 < x + w - 4 * L.cw then U.text(tx0, y + 1, ctx.fit(where, x + w - L.pad - tx0), (B.filtering and U.AMBER or U.GREY)) end
     y = y + L.rh; h = h - L.rh
   end
+  -- 1 ноя: files — строка «где я» под кнопками: путь папки (последняя часть ярко), в пустой папке видно, где стоишь
+  if B.mode == 'files' then
+    local full = B.path or '/'
+    local home = os.getenv('HOME') or ''
+    if home ~= '' and full:sub(1, #home) == home then full = '~' .. full:sub(#home + 1) end
+    local head, tail = full:match('^(.*/)([^/]+)$')
+    head, tail = head or '', tail or full
+    if B.filter ~= '' or B.filtering then tail = tail .. '  /' .. B.filter .. (B.filtering and '_' or '') .. ('  %d'):format(#B.entries) end
+    if #B.entries == 0 and B.filter == '' then tail = tail .. '   (empty folder - h / BS up)' end
+    local tx, avail = x + L.pad, w - 2 * L.pad
+    local tw = U.measure(tail)
+    if tw < avail then
+      local hs = ctx.fit(head, avail - tw)
+      U.text(tx, y + 1, hs, U.GREY); tx = tx + U.measure(hs)
+    end
+    U.text(tx, y + 1, ctx.fit(tail, x + w - L.pad - tx), B.filtering and U.AMBER or U.CYAN)
+    U.set(U.LINE); gfx.rect(x, y + L.rh, w, 1, 1)
+    y = y + L.rh + 2; h = h - L.rh - 2
+  end
   -- pm-сетка карточек (6 окт): вместо строк списка
   if B.mode == 'pm' and B.grid and not B.pmproj and not B.pm_folders and B.pm_mod() then
     local PM = B.pm_mod()
