@@ -11181,7 +11181,11 @@ function D.frame(L, snap, rows, state, info)
         tw = tw - ptw - L.pad
       end
       -- 23 окт: модуль полосы ÷N (за контейнером) — «полоса > имя», рамка цветом контейнера
-      local inp = f.inner and (f.inner.wrap and (string.rep('.', (f.inner.depth or 1) - 1) .. ((f.inner.par or 0) > 0 and '= ' or '| ')) or ((f.inner.band or '') .. ' > ')) or ''   -- 24 окт: в обёртке — | / = (последовательно / параллельно)
+      -- 1 ноя: и верхний уровень — | последовательно, = параллельно предыдущему (по узлам мини-роутера, кэш по fx_gen)
+      if not f.inner and k > 1 and info.pool_col and info.route_nodes then
+        for _, nd in ipairs(info.route_nodes(info.pool_col)) do if nd.k == k then f._tpar = (nd.par or 0) > 0 and '= ' or '| ' end end
+      end
+      local inp = f.inner and (f.inner.wrap and (string.rep('.', (f.inner.depth or 1) - 1) .. ((f.inner.par or 0) > 0 and '= ' or '| ')) or ((f.inner.band or '') .. ' > ')) or (f._tpar or '')   -- 24 окт: в обёртке — | / = (последовательно / параллельно)
       -- 24 окт: справа от имени — кнопка входов / выходов «2 in 2/6 out» (как у REAPER): щелчок — матрица пинов
       local iol = (not f.container or f.wrap) and info.fx_io and info.fx_io(f) or nil   -- 24 окт: и у контейнера-рэка (пины его выхода)
       local iow = iol and (ms(iol) + 2 * L.pad) or 0
