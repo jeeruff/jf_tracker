@@ -10094,7 +10094,7 @@ function D.frame(L, snap, rows, state, info)
               local d = math.floor((held - 64) / 64 * half + 0.5)
               if d ~= 0 then set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(d > 0 and cx0 or cx0 + d, y + L.rh - 4, math.abs(d), 3, 1) end
             elseif held and (ml.kind == 'cc' or ml.kind == 'at' or ml.kind == 'pat') then
-              if mview == 'steps' then set(U.mix(U.CYAN, U.BG, e and 0.15 or 0.5)); gfx.rect(m.x + 1, y + 2, math.max(1, math.floor(held / 127 * (m.w - 2))), L.rh - 4, 1)   -- фейдер во всю строку
+              if mview == 'steps' then set(U.mix(U.CYAN, U.BG, e and 0.45 or 0.6)); gfx.rect(m.x + 1, y + 2, math.max(1, math.floor(held / 127 * (m.w - 2))), L.rh - 4, 1)   -- фейдер во всю строку
               else set(U.mix(U.CYAN, U.BG, 0.35)); gfx.rect(m.x + 1, y + L.rh - 4, math.max(1, math.floor(held / 127 * (m.w - 2))), 3, 1) end   -- 11 окт: ярче и толще — было еле видно
             end
           end
@@ -10114,7 +10114,7 @@ function D.frame(L, snap, rows, state, info)
               local hw = gfx.measurestr(head)
               ctext(m.x + L.pad, ty, fit(head, m.w - L.pad), hc)
               if hw < m.w - L.pad - L.cw then ctext(m.x + L.pad + hw, ty, fit(rest, m.w - L.pad - hw), U.mix(U.TEXT, U.BG, 0.3)) end
-            else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or U.CYAN) end
+            else ctext(m.x + L.pad, ty, fit(t, m.w - L.pad), e.n > 1 and U.AMBER or (mview == 'steps' and U.TEXT or U.CYAN)) end   -- янтарь: в строке несколько событий
           else ctext(m.x + L.pad, ty, (ml.kind == 'tx' or ml.kind == 'cmd' or ml.kind == 'vis' or ml.kind == 'chd') and '....' or '..', D.EMPTY) end
           if in_body and mx >= m.x and mx < m.x + m.w then hover.col = c.col; hover.fi = m.fi; hover.mlane = ml; hover.field = 1 end
         end
