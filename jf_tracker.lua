@@ -12963,6 +12963,7 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('insred', 'INSERT cursor red', 'in INSERT the cursor accent (cell, edge, playhead) turns red - the keys write; off - the cursor accent colour as always'),
+      { key = 'vhs', label = 'vhs', kind = 'toggle', desc = 'the VHS frame on / off (for videos: costs ~5 ms a frame) - the same as frame = vhs', get = function() return state.framefx == 'vhs' end, set = function(v) state.framefx = v and 'vhs' or 'off'; state.cracks = v and true or false end },   -- 1 ноя: быстрая опция
       { key = 'framefx', label = 'frame (experimental)', kind = 'cycle', values = { 'off', 'cracks', 'blood', 'lightning', 'vhs' }, desc = 'a frame inside the tracker: cracks all over, blood (ragged rim, drips, splatter), vhs (a tracking band rolling and glitching, scanlines), lightning (flickers); red in INSERT (:frame)', get = function() return (state.framefx ~= nil and state.framefx ~= '') and state.framefx or (state.cracks and 'cracks' or 'off') end, set = function(v) state.framefx = v; state.cracks = v ~= 'off' end },
       flag('bloodviz', 'blood visualizer (experimental)', 'a pool of blood along the bottom with waves; the sound of a track throws drops - they stretch, wobble and splash back, ripples run to the neighbours (:blood)'),
       flag('sand', 'sand visualizer (experimental)', 'a sand bed under every track; the sound of the track throws grains up - louder, higher (:sand)'),
@@ -13162,7 +13163,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'pt-mode', { 'ptmode' } },   -- 31 окт: OG-mode слит с PT-mode
-      { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
+      { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'vhs', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'glitch', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'offit', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'cmsens', 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
@@ -32736,9 +32737,9 @@ ctx.fit_width = function()
   if L.cols_cut or L.hs_cut then
     ctx.fold_all(true); relayout()
     if L.cols_cut or L.hs_cut then ctx.fold_all('mini'); relayout() end   -- ещё уже: мини-полоска
-    if (L.cols_cut or L.hs_cut) and L.cols and L.cols[1] and L.cols[1].x then   -- и её мало — полоска уже, до 3 px
+    if (L.cols_cut or L.hs_cut) and L.cols and L.cols[1] and L.cols[1].x then   -- и её мало — полоска уже, до 8 px
       local n = #(snap and snap.cols or {})
-      state.fold_px = math.max(3, math.floor((L.cols_r - L.cols[1].x) / math.max(1, n)) - 2)
+      state.fold_px = math.max(8, math.floor((L.cols_r - L.cols[1].x) / math.max(1, n)) - 2)   -- 1 ноя: не уже 8 px (3 — слишком); не влезло — прокрутка
       relayout()
     end
     vim.msg = ('zw: %d tracks folded to fit%s (za on one opens it)'):format(#(snap and snap.cols or {}), (L.cols_cut or L.hs_cut) and ' - still not all (scroll sideways)' or ', all on screen')
@@ -33105,6 +33106,21 @@ ctx.lfo_write_midi = function(tg, pts, t0, t1, where)
   state.envs = true; model.invalidate()
   vim.msg = ('%s -> %s: %d points (%s)'):format(LG.type, tg.label, n, where)
 end
+-- 1 ноя: vhs — в быстрые опции один раз (просьба: «vhs сделай быстрой опцией»); убрать — ПКМ по имени в Options
+ctx.vhs_quick_once = function()   -- функцией: в главном чанке предел 200 локалей
+  if reaper.GetExtState(EXT, 'q_vhs') == '1' then return end
+  local q = ctx.quick_str()
+  if not (',' .. q:gsub('|', ',') .. ','):find(',vhs,', 1, true) then
+    local cols = {}
+    for part in (q .. '|'):gmatch('([^|]*)|') do cols[#cols + 1] = part end
+    local k = math.min(3, #cols)
+    cols[k] = (cols[k] ~= '' and (cols[k] .. ',') or '') .. 'vhs'
+    state.quick = table.concat(cols, '|')
+    reaper.SetExtState(EXT, 'quick', state.quick, true)
+  end
+  reaper.SetExtState(EXT, 'q_vhs', '1', true)
+end
+ctx.vhs_quick_once()
 -- 1 ноя: генератор в колонку курсора: MIDI-лейн (PB / CC / AT / PAT — события по точкам волны), поле ноты vol / pan /
 -- delay — каждой ноте колонки в отрезке значение волны на её строке (delay — сдвиг внутри строки, грув / свинг волной)
 ctx.lfo_here_target = function()
