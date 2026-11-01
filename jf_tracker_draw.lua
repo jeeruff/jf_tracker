@@ -7694,7 +7694,6 @@ end
 -- вбок на dx(y) = A·g(y)·(sin(0.35y + 9t) + шум), g — гаусс от центра полосы; в ней же белые штрихи шума (их
 -- плотность тоже по g); у низа кадра — head switching: нижние 6 строк дёргаются каждый кадр. Кинескоп: кадр
 -- выгнут бочкой (полосами по 3 px через картинки 83 / 84), углы тёмные и скруглённые, строки развёртки, виньетка
-local VHS_A, VHS_B = 84, 83
 function D.vhs(x, y, w, h, red)
   local now = reaper.time_precise()
   local SRC = gfx.dest   -- 31 окт: кадр рисуется в буфер (1021), не в окно — копировать из него
@@ -7760,35 +7759,7 @@ function D.vhs(x, y, w, h, red)
     D.vhs_tc = tc
   end
   do local om = gfx.mode; gfx.mode = 1; gfx.a = 1; gfx.blit(82, 1, 0, 0, 0, w, tc.h, x, y + 14, w, tc.h); gfx.mode = om or 0 end
-  -- кинескоп: бочка — сначала строки сжимаются к краям по вертикали кадра (ширина строки ~ 1 − k·d²), потом столбцы
-  local kx, ky, S = 0.045, 0.035, 6   -- 1 ноя: полосы по 6 px — вдвое меньше копий (было 3: ~9 мс на кадр)
-  -- 1 ноя: картинки — только при смене размера (пересоздание двух буферов в каждом кадре стоило ~8 мс)
-  if D.vhs_wh ~= w * 100000 + h then
-    gfx.setimgdim(VHS_A, -1, -1); gfx.setimgdim(VHS_A, w, h)
-    gfx.setimgdim(VHS_B, -1, -1); gfx.setimgdim(VHS_B, w, h)
-    D.vhs_wh = w * 100000 + h
-  end
-  local od = gfx.dest
-  gfx.dest = VHS_A; gfx.a = 1; gfx.mode = 0
-  gfx.blit(SRC, 1, 0, x, y, w, h, 0, 0, w, h)
-  gfx.dest = VHS_B; gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, h, 1)
-  gfx.mode = 4   -- 1 ноя: без фильтрации при масштабе — в разы быстрее, на сдвиге в пару px не видно
-  for yy = 0, h - 1, S do
-    local d = (yy + S / 2 - h / 2) / (h / 2)
-    local q = 1 - kx * d * d
-    local nw = math.floor(w * q + 0.5)
-    gfx.blit(VHS_A, 1, 0, 0, yy, w, S, math.floor((w - nw) / 2), yy, nw, S)
-  end
-  gfx.dest = od
-  gfx.mode = 0; gfx.set(0, 0, 0, 1); gfx.rect(x, y, w, h, 1)
-  gfx.mode = 4
-  for xx = 0, w - 1, S do
-    local d = (xx + S / 2 - w / 2) / (w / 2)
-    local q = 1 - ky * d * d
-    local nh = math.floor(h * q + 0.5)
-    gfx.blit(VHS_B, 1, 0, xx, 0, S, h, x + xx, y + math.floor((h - nh) / 2), S, nh)
-  end
-  gfx.mode = 0
+  -- 1 ноя: бочка кинескопа убрана (слишком гнула кадр) — остались развёртка, виньетка, углы
   -- развёртка, виньетка, тёмные скруглённые углы
   gfx.set(0, 0, 0, 0.12)
   for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
