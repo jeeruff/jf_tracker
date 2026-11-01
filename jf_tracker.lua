@@ -26003,7 +26003,7 @@ local function frame()
       state.mfold = false
       if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
     else
-      state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded: L R meter, RMS at the sides (click it or Opt+W to open)'
+      state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded: L R meter, RMS at the sides (click it, Opt+Shift+W or zM u to open)'
     end
   end   -- 17 окт
   -- 20 окт: auto — мастер сложен, пока курсор не на нём; клик по сложенному мастеру — раскрыть и курсор на мастер
@@ -33594,6 +33594,10 @@ ctx.master_menu = function()
     { key = 'b', label = 'monitor FX bypass' .. on(41884), fn = act(41884, 'monitor FX bypass toggled') },
     { key = 'm', label = 'mono (L+R)' .. on(40917), fn = act(40917, 'master mono toggled') },
     { key = 'r', label = 'routing and I/O of the master', fn = act(42235, 'master routing') },
+    { key = 'u', label = (L and L.mfold) and 'unfold the master column (Opt+Shift+W)' or 'fold the master column into a meter', fn = function()   -- 1 ноя
+      if L and L.mfold then state.mfold = false; if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
+      else state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded (zM u / Opt+Shift+W / a click on it opens)' end
+    end },
     { key = 'v', label = 'master track visible in REAPER (TCP)' .. on(40075), fn = act(40075, 'master in the arrange toggled') },
     { key = 't', label = 'tempo envelope of the master' .. on(41046), fn = act(41046, 'master tempo envelope toggled') },
     { key = 'w', label = 'master in a separate mixer window' .. on(41636), fn = act(41636, 'master window toggled') },
