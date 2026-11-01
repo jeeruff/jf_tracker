@@ -3019,8 +3019,10 @@ function V.key_impl(c)
       elseif c == ('f'):byte() then
         local f = flat()[V.cur.fi]
         if f and ctx.fold_folder then ctx.fold_folder(f.col); ctx.relayout() end
-      elseif c == ('C'):byte() then
-        -- zC — прежний fold: трек в полоску шириной в символ
+      elseif c == ('C'):byte() then   -- 1 ноя: zC — цепь monitor FX (мастер; полоска в символ — z!)
+        if ctx.mfx_open then ctx.mfx_open() end
+      elseif c == ('!'):byte() then
+        -- z! (было zC) — прежний fold: трек в полоску шириной в символ
         local f = flat()[V.cur.fi]
         if f then ctx.fold(f.col, 'mini'); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
       elseif c == ('m'):byte() then if ctx.pane_min then ctx.pane_min() end   -- 20 окт: zm — свернуть панель в фокусе (микшер — F3)
@@ -4326,7 +4328,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold | c o compact / open | C strip | f folder | M all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold | c o compact / open | C monitor FX | ! strip | f folder | M all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',

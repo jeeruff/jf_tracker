@@ -157,7 +157,8 @@ KH.PAGES = {
     { k = 'zp', d = 'DSP: the preset list of the module under the cursor (also when its < preset > does not fit in the header)' },
     { k = 'zP', d = 'DSP: modules with pages (Surge XT and every big plugin - its sections osc filter env lfo mod fx are found in the parameter names): all sections in one pane under their titles (default) / one page with tabs (where - option DSP page tabs)' },
     { k = 'css csm csl', d = 'DSP: size of the drumrs5k pads - small (more rows) / medium 4 x 4 / large 4 x 4 (m > s, spectral wave, labels, group)' },
-    { k = 'zC', d = 'fold track into a one-letter strip' },
+    { k = 'z!', d = 'fold track into a one-letter strip (was zC)' },
+    { k = 'zC', d = 'monitor FX: the chain window of the monitoring FX (after the master, only to the speakers); also the MFX button in the master header' },
     { k = 'z> z<', d = 'all tracks one field wider / narrower (as Cmd + horizontal wheel; 3z> - three steps)' },
     { k = '- +  Opt+Shift+J K', d = 'zoom rows: LPB down / up, 1..128 (as Cmd + wheel); Opt+Shift+J - LPB up (opens rows), Opt+Shift+K - down (folds them), no Shift for + on a German layout; a + at the right of a note column - more notes folded into that row, LPB + shows them; a ~ there - the track has automation on that row that you do not see as a column (option mark automation rows) - a row is shorter / longer, the matrix lengths follow (16 / 32 / 64 steps)' },   -- 18 окт: зум мышью тоже вспыхивает здесь
     { k = 'z. z,  Opt+Shift+L H', d = 'the cursor track wider / narrower (its own width): its columns open / close one step at a time; a count - N steps (3 Opt+Shift+L)' },

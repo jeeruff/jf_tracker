@@ -18915,6 +18915,7 @@ local function hint_go(t)
     if not open then state.kslider = { col = d.col, what = d.what }; vim.msg = ('%s %s: h l change (H L fine), 0 reset, Esc done'):format(d.col.name or '', d.what) else state.kslider = nil end
   elseif t.kind == 'slx' then ctx.set_focus('dsp'); ctx.slx_do(d)   -- 25 окт: f на кнопке пульта slixer
   elseif t.kind == 'mmono' then reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
+  elseif t.kind == 'mmfx' then ctx.mfx_open()   -- 1 ноя: прыжок f на MFX
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
   elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
   elseif t.kind == 'btn' then
@@ -25536,6 +25537,7 @@ local function frame()
   elseif hover.slxaim then state.status = 'slixer aim - the edge up close: drag - fine move, wheel - wider / closer'
   elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
   elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: a slice here (on an edge - remove it), drop a file: new sample'
+  elseif hover.mmfx then state.status = 'MFX - monitor FX (after the master, only to the speakers - not in renders): click - the chain window (zC); green - effects on, grey - none / bypassed'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
@@ -28136,6 +28138,7 @@ local function frame()
         vim.msg = 'routing removed: ' .. (hover.btn.col.name or 'track') .. ' ' .. (e.dir or '>') .. ' ' .. (e.name or '') .. ' (u - back)'
       end
       click = { t = now2, zone = 'btn' }
+    elseif hover.mmfx then ctx.mfx_open()   -- 1 ноя
     elseif hover.mmono then   -- 25 окт: mono мастера (как MONO в микшере REAPER)
       reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
       vim.msg = 'master: ' .. (reaper.GetToggleCommandState(40917) == 1 and 'mono (L+R)' or 'stereo')
@@ -33430,6 +33433,12 @@ ctx.fxcmd_load = function()
     ctx.SM.FX_NAME[k] = u.param
     ctx.SM.FX_MEAN[k] = function(v) return ('%s %d%%'):format(u.param, math.floor(v / 255 * 100 + 0.5)) end
   end
+end
+-- 1 ноя: цепь monitor FX — окно REAPER (zC, кнопка MFX мастера)
+ctx.mfx_open = function()
+  reaper.Main_OnCommand(41882, 0)
+  local n = reaper.TrackFX_GetRecCount(reaper.GetMasterTrack(0))
+  vim.msg = ('monitor FX: %d effect(s) - after the master, only to the speakers (not in renders)'):format(n)
 end
 ctx.fxcmd_dir = function() local d = reaper.GetResourcePath() .. '/Data/jf_tracker_fxcmds'; reaper.RecursiveCreateDirectory(d, 0); return d end
 ctx.fxcmd_export = function(name)

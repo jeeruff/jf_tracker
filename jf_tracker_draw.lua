@@ -8411,6 +8411,26 @@ function D.frame(L, snap, rows, state, info)
           if hot then hover.mmono = true end
           hint('mmono', bx, by, mw, bhh + 2, true)
         end
+        -- 1 ноя: MFX — monitor FX (после мастера, только в колонки) в правом углу шапки: есть эффекты — зелёная,
+        -- обойдены (bypass) — серая; щелчок — окно цепи (zC)
+        if now - (D.mmono.ft or 0) > 0.5 then
+          D.mmono.ft = now
+          local mt = reaper.GetMasterTrack(0)
+          D.mmono.mfx = reaper.TrackFX_GetRecCount(mt)
+          D.mmono.mbyp = reaper.GetToggleCommandState(41884) == 1
+        end
+        local fw = ms('MFX') + 6
+        local fx0 = c.x + c.w - fw - 2
+        if fx0 > bx + mw + 2 then
+          local has = (D.mmono.mfx or 0) > 0
+          local live = has and not D.mmono.mbyp
+          local hot = mx >= fx0 and mx < fx0 + fw and my >= by and my < by + bhh + 2
+          set(hot and D.CURROW or (live and U.tint(U.GREEN, 0.3) or U.PANEL)); gfx.rect(fx0, by, fw, bhh, 1)
+          set(hot and U.AMBER or (live and U.GREEN or U.DIM)); gfx.rect(fx0, by, fw, bhh, 0)
+          text(fx0 + 3, by + math.floor((bhh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0), 'MFX', hot and U.AMBER or (live and U.GREEN or BTXT))
+          if hot then hover.mmfx = true end
+          hint('mmfx', fx0, by, fw, bhh + 2, true)
+        end
       end
       local by2 = hy + (L.lane_row - 1) * L.rh
       local x2 = bx
