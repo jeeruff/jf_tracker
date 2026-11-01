@@ -753,7 +753,7 @@ function O.draw(L, W, H)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
   if not O.compact then
-    local hs = #O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'
+    local hs = #O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   z: zoom, tabs   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'
     local hw = bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad   -- до крестика
     if U.hint_text then U.hint_text(hx, by + 2, hs, hw, U.BG) else U.text(hx, by + 2, ctx.fit(hs, hw), U.GREY) end   -- 15 окт: стандарт подсказок
   end

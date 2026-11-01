@@ -30009,6 +30009,7 @@ local function frame()
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
   if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
+    elseif OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c)   -- 1 ноя: z в панели опций — своё z-меню
     else OPT.key(c) end
     c = 0
   end
@@ -30756,7 +30757,10 @@ local function frame()
     if type(r) == 'table' then pcall(hint_go, r) end
     c = 0
   end
-  if ctx.opt_k() and c ~= 0 and not (OPT.pane and ctx.mods().cmd) then OPT.key(c); c = 0 end
+  if ctx.opt_k() and c ~= 0 and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- сюда — клавиши инъекции тестов (читаются позже верхнего перехвата)
+    if OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c) else OPT.key(c) end
+    c = 0
+  end
   if draw.notepop and c ~= 0 then ctx.notepop_key(c); c = 0 end   -- 1 ноя: клавиатура ноты — h l полутон, j k октава, имя D5 / C#3, Enter, Esc
   if ctx.SP and ctx.SP.on and c ~= 0 then
     if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
@@ -31654,6 +31658,33 @@ ctx.tour_help = function()
   if PN.visible(m, 'help') then if PN.set_active(m, 'help') then relayout() end
   else ctx.pane_do(function() return PN.show(m, 'help') end, 'help shown') end
 end
+-- 1 ноя: z-меню панели опций: zz — на всё окно (ещё раз — назад), zx — выше (до ~3/4 окна, ещё раз — назад), вкладки буквами
+ctx.opt_zmenu = function(c)
+  local PN, m = draw.panes, state.panes
+  -- вкладки — по первой свободной букве (z x заняты)
+  local keys, used = {}, { z = true, x = true }
+  for _, t in ipairs(OPT.tabs or {}) do
+    for ch in tostring(t):gmatch('%a') do if not used[ch:lower()] then used[ch:lower()] = true; keys[ch:lower()] = t; break end end
+  end
+  if not OPT.zpend then
+    OPT.zpend = true
+    local hint = {}
+    for k, t in pairs(keys) do hint[#hint + 1] = k .. ' ' .. t end
+    table.sort(hint)
+    vim.msg = 'z: z - whole window, x - taller, ' .. table.concat(hint, ', ')
+    return
+  end
+  OPT.zpend = nil
+  local ch = c < 256 and string.char(c) or ''
+  if ch == 'z' then ctx.zz_zoom()
+  elseif ch == 'x' then
+    local cl = L and L.pn and L.pn.by_panel and L.pn.by_panel['options']
+    if OPT.tall then PN.resize(m, 'options', 'v', -OPT.tall); OPT.tall = nil; vim.msg = 'options: back to their height'
+    elseif cl then local d = math.max(0, (gfx.h * 0.75 - cl.h) / math.max(1, gfx.h)); if d > 0 and PN.resize(m, 'options', 'v', d) then OPT.tall = d; vim.msg = 'options: taller (zx again - back)' end end
+    relayout()
+  elseif keys[ch] then OPT.set_tab(keys[ch]); vim.msg = 'options: ' .. keys[ch]
+  else vim.msg = '' end
+end
 ctx.opt_k = function() return OPT.active and (not OPT.pane or state.focus == 'options') end
 ctx.opt_m = function()
   if not OPT.active then return false end
@@ -31680,6 +31711,7 @@ ctx.opt_show = function()
 end
 ctx.opt_hide = function()
   local PN, m = draw.panes, state.panes
+  if OPT.tall then PN.resize(m, 'options', 'v', -OPT.tall); OPT.tall = nil end
   if OPT.grown then PN.resize(m, 'options', 'v', -OPT.grown); OPT.grown = nil end
   OPT.active = false
   ctx.pane_do(function() return PN.hide(m, 'options') end, 'options hidden')

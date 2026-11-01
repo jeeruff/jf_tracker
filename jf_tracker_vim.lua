@@ -2009,6 +2009,27 @@ function V.key_impl(c)
     -- 1 ноя: Opt+W (Shift+Opt+w, „) — курсор на мастер (было Opt+w); Opt+w / Opt+b (∑ ∫) — следующая / предыдущая нота
     -- этой подколонки, мимо OFF, команд и соседних подколонок (w / b — по всему треку)
     if (cpd == 8222 or (m1.alt and m1.shift and (c == 87 or c == 119))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
+    -- 1 ноя: Opt+Space — сомкнуть пустоту: строки от курсора до следующей ноты подколонки уходят, нота (и всё ниже
+    -- в паттерне) подтягивается к курсору; на ноте — пустота после неё. Это dd по числу пустых строк
+    if (cpd == 160 or (m1.alt and c == 32)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' then
+      local f = flat()[V.cur.fi]
+      local sub = f and not f.env and not f.ml and f.sub
+      if not sub then V.msg = 'Opt+Space: a note column'; return end
+      local c0 = sub[V.cur.row]
+      local from = (c0 and (c0.kind == 'midi' or c0.kind == 'audio' or c0.kind == 'cont' or c0.kind == 'off')) and V.cur.row + 1 or V.cur.row
+      if c0 and c0.kind == 'cont' then   -- внутри длинной ноты — от её конца
+        local r = V.cur.row; while sub[r + 1] and sub[r + 1].kind == 'cont' do r = r + 1 end; from = r + 1
+      end
+      local nr
+      for rr, cell in pairs(sub) do if rr >= from and (cell.kind == 'midi' or cell.kind == 'audio') and (not nr or rr < nr) then nr = rr end end
+      if not nr or nr == from then V.msg = nr and 'Opt+Space: no gap' or 'Opt+Space: no note below'; return end
+      local row0 = V.cur.row
+      V.cur.row = from; V.count = nr - from
+      V.key_impl(('d'):byte()); V.key_impl(('d'):byte())
+      V.cur.row = row0
+      V.msg = ('Opt+Space: %d empty row(s) closed - the note came up (u - undo)'):format(nr - from)
+      return
+    end
     if (cpd == 8721 or cpd == 8747 or (m1.alt and not m1.shift and (c == 119 or c == 98))) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' then
       local dir = (cpd == 8747 or c == 98) and -1 or 1
       local f = flat()[V.cur.fi]
