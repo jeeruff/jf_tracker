@@ -9793,10 +9793,7 @@ function D.frame(L, snap, rows, state, info)
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     -- 31 окт: граница паттерна — явная (Backspace / Insert живут внутри паттерна): 2 px цветом паттерна,
     -- что начинается здесь (нет цвета — ярче линии такта); конец предыдущего — его цветом строкой выше
-    if state.rgedges ~= false then
-      if eg and eg.prv and eg.nxt then set(eg.nxt); gfx.rect(tx0, y + 1, W - tx0, 1, 1) end
-      if en and en.prv and en.nxt then set(en.prv); gfx.rect(tx0, y + L.rh - 1, W - tx0, 1, 1) end
-    end
+    -- 1 ноя: тонкие линии сверху / снизу строки стыка убраны (двойная линия выглядела плохо) — одна линия, см. D.pat_lines
     if secb[r.row] then D.sec_lines = D.sec_lines or {}; D.sec_lines[#D.sec_lines + 1] = { tx0, y, W - tx0, secb[r.row] }   -- 23 окт: поверх ячеек (фон колонок закрывал)
     end
     if patb[r.row] then D.pat_lines = D.pat_lines or {}; D.pat_lines[#D.pat_lines + 1] = { tx0, y, W - tx0, (eg and eg.nxt) or U.mix(U.LINE, U.TEXT, 0.5), patb[r.row].prv, patb[r.row].nxt, eg and eg.prv } end   -- 31 окт: граница паттерна — поверх ячеек, 4 px, цветом паттерна (под ячейками её съедал фон колонок)
@@ -10133,10 +10130,15 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.pmark('draw: ai handles, tint, cursor')
-  for _, e in ipairs(D.pat_lines or {}) do   -- 31 окт: граница паттерна — 4 px через весь трекер, цветом паттерна; имена: над линией — что кончается, под ней — что начинается
-    -- 31 окт (2): серая линия разделения остаётся; над ней 1 px — цвет кончающегося паттерна, под ней 1 px — начинающегося
-    set(e[7] or e[4]); gfx.rect(e[1], e[2] - 3, e[3], 2, 1)   -- 31 окт (3): по рисунку — 2 px над серой, 2 px под ней, через всё до мастера
-    set(e[4]); gfx.rect(e[1], e[2] + 1, e[3], 2, 1)
+  -- 1 ноя: граница паттерна — одна линия 1 px прямо по линии такта, цветом паттерна, где стоит курсор (A1 — цвет A1,
+  -- ушёл в B1 — цвет B1); граница секции рисуется позже — поверх. Имена: над линией — что кончается, под ней — что начинается
+  D.pcol = nil   -- полем D: в этой функции предел 200 локалей
+  do
+    local vc = info.vcur
+    for _, rg in ipairs((vc and info.ruler and info.ruler.regions) or {}) do if vc.row >= rg.r0 - 1e-6 and vc.row < rg.r1 - 1e-6 then D.pcol = rg.rgb end end
+  end
+  for _, e in ipairs(D.pat_lines or {}) do
+    set(D.pcol or e[4]); gfx.rect(e[1], e[2], e[3], 1, 1)   -- 1 px (2 — слишком жирно для разметки), верх строки = линия такта
     local gx = L.matrix_w + L.pad
     if e[5] then local s5 = e[5]; text(gx, e[2] - 2 - L.th, s5, e[7] or U.GREY, U.BG) end
     if e[6] then text(gx, e[2] + 2, e[6], e[4], U.BG) end
@@ -10166,7 +10168,7 @@ function D.frame(L, snap, rows, state, info)
       elseif fl and fl >= 0.6 then D.pf = nil end
     end
   end
-  for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2] - 1, e[3], 2, 1) end   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
+  for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 1, 1) end   -- 1 ноя: 1 px на той же линии — поверх границы паттерна   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
