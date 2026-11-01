@@ -142,7 +142,7 @@ local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
--- 83 / 84 кинескоп VHS, 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
+-- 82 надписи VHS, 83 / 84 кинескоп VHS, 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 89 схема роутера DSP (dspbig), 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
 local IMG_FIRST, IMG_LAST = 100, 796   -- 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
@@ -7680,22 +7680,47 @@ function D.vhs(x, y, w, h, red)
     gfx.a = 1; gfx.blit(SRC, 1, 0, x, yy, w, 1, x + dx, yy, w, 1)
     if rnd() < 0.5 then gfx.set(tint[1], tint[2], tint[3], 0.3); gfx.rect(x + math.floor(rnd() * w), yy, math.floor(10 + rnd() * 80), 1, 1) end
   end
-  -- надписи: PLAY (только при игре) слева вверху, часы и дата справа вверху
-  local col = { tint[1], tint[2], tint[3] }
-  if reaper.GetPlayState() & 1 == 1 then D.big_text(x + 18, y + 14, 'PLAY', col, 2) end
+  -- надписи: PLAY (только при игре) слева вверху, часы и дата справа вверху. 1 ноя: свой шрифт-слот 13, заданный один
+  -- раз на размер (big_text менял TTF-шрифт дважды за кадр — 7.7 мс на кадр)
+  -- 1 ноя (2): надписи — в картинку 82 раз в секунду (при смене текста), кадр — только наложение сложением
+  local playing = reaper.GetPlayState() & 1 == 1
   local t1 = os.date('%I:%M:%S %p'):gsub('^0', ' ')
   local t2 = os.date('%b. %d %Y'):upper()
-  local lh = 2 * gfx.texth + 4
-  D.big_text(x + w - 18 - D.big_measure(t1, 2), y + 14, t1, col, 2)
-  D.big_text(x + w - 18 - D.big_measure(t2, 2), y + 14 + lh, t2, col, 2)
+  local fsz = math.max(12, math.floor(gfx.texth * 2))
+  local key = (playing and 'P' or '-') .. t1 .. t2 .. fsz .. w .. (red and 'r' or '')
+  local tc = D.vhs_tc
+  if not tc or tc.key ~= key then
+    if D.vhs_fsz ~= fsz then gfx.setfont(13, 'Menlo', fsz, string.byte('b')); D.vhs_fsz = fsz end
+    gfx.setfont(13)
+    local w1, w2 = gfx.measurestr(t1), gfx.measurestr(t2)
+    local lh = gfx.texth + 4
+    local od = gfx.dest
+    gfx.setimgdim(82, -1, -1); gfx.setimgdim(82, w, 2 * lh + 4)
+    gfx.dest = 82
+    gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, 2 * lh + 4, 1)
+    gfx.set(tint[1], tint[2], tint[3], 0.9)
+    if playing then gfx.x, gfx.y = 18, 0; gfx.drawstr('PLAY') end
+    gfx.x, gfx.y = w - 18 - w1, 0; gfx.drawstr(t1)
+    gfx.x, gfx.y = w - 18 - w2, lh; gfx.drawstr(t2)
+    gfx.dest = od
+    gfx.setfont(D.font_id or 1)
+    tc = { key = key, h = 2 * lh + 4 }
+    D.vhs_tc = tc
+  end
+  do local om = gfx.mode; gfx.mode = 1; gfx.a = 1; gfx.blit(82, 1, 0, 0, 0, w, tc.h, x, y + 14, w, tc.h); gfx.mode = om or 0 end
   -- кинескоп: бочка — сначала строки сжимаются к краям по вертикали кадра (ширина строки ~ 1 − k·d²), потом столбцы
-  local kx, ky, S = 0.045, 0.035, 3
-  gfx.setimgdim(VHS_A, -1, -1); gfx.setimgdim(VHS_A, w, h)
-  gfx.setimgdim(VHS_B, -1, -1); gfx.setimgdim(VHS_B, w, h)
+  local kx, ky, S = 0.045, 0.035, 6   -- 1 ноя: полосы по 6 px — вдвое меньше копий (было 3: ~9 мс на кадр)
+  -- 1 ноя: картинки — только при смене размера (пересоздание двух буферов в каждом кадре стоило ~8 мс)
+  if D.vhs_wh ~= w * 100000 + h then
+    gfx.setimgdim(VHS_A, -1, -1); gfx.setimgdim(VHS_A, w, h)
+    gfx.setimgdim(VHS_B, -1, -1); gfx.setimgdim(VHS_B, w, h)
+    D.vhs_wh = w * 100000 + h
+  end
   local od = gfx.dest
   gfx.dest = VHS_A; gfx.a = 1; gfx.mode = 0
   gfx.blit(SRC, 1, 0, x, y, w, h, 0, 0, w, h)
   gfx.dest = VHS_B; gfx.set(0, 0, 0, 1); gfx.rect(0, 0, w, h, 1)
+  gfx.mode = 4   -- 1 ноя: без фильтрации при масштабе — в разы быстрее, на сдвиге в пару px не видно
   for yy = 0, h - 1, S do
     local d = (yy + S / 2 - h / 2) / (h / 2)
     local q = 1 - kx * d * d
@@ -7703,13 +7728,15 @@ function D.vhs(x, y, w, h, red)
     gfx.blit(VHS_A, 1, 0, 0, yy, w, S, math.floor((w - nw) / 2), yy, nw, S)
   end
   gfx.dest = od
-  gfx.set(0, 0, 0, 1); gfx.rect(x, y, w, h, 1)
+  gfx.mode = 0; gfx.set(0, 0, 0, 1); gfx.rect(x, y, w, h, 1)
+  gfx.mode = 4
   for xx = 0, w - 1, S do
     local d = (xx + S / 2 - w / 2) / (w / 2)
     local q = 1 - ky * d * d
     local nh = math.floor(h * q + 0.5)
     gfx.blit(VHS_B, 1, 0, xx, 0, S, h, x + xx, y + math.floor((h - nh) / 2), S, nh)
   end
+  gfx.mode = 0
   -- развёртка, виньетка, тёмные скруглённые углы
   gfx.set(0, 0, 0, 0.12)
   for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
