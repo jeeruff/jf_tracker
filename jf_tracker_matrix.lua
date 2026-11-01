@@ -1023,6 +1023,8 @@ function MX.key(c, regions, snap)
     if c == 27 then return true end
     local pcount = MX.pcount; MX.pcount = nil
     if op == 'd' and ch == 'd' then ctx.slot_delete(pcount)
+    elseif op == 'd' and ch == 'w' then   -- 1 ноя: dw удаляет всегда: на ячейке трека — её содержимое (как x), на имени — слот (как dd)
+      if MX.cur.ci and MX.cur.ci >= 1 then ctx.mx_block('cut') else ctx.slot_delete(pcount) end
     elseif op == 'y' and ch == 'y' then ctx.slot_yank()
     elseif op == 'y' and ch == 'p' then ctx.slot_new('clone')        -- yp — дубль (5 окт: одна клавиша на функцию)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
