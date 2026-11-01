@@ -1226,7 +1226,7 @@ ctx = {
   -- всплывашки на модулях; повтор — выключить. :tutorial text — текстом
   tutorial = function(text)
     if text then OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end); return end
-    if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off' else OPT.tour.start(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward' end
+    if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off' else OPT.tour.start(); ctx.tour_help(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward; the help tab shows the keys of the focused module' end
   end,
   -- MIDI-нота слайса зоны (4 окт): выученные пэды — их нота + (k - 1), иначе от C4
   slice_note = function(zone)
@@ -31644,6 +31644,13 @@ end
 -- (взведённые и выделенные) — на время только этот трек выделен; выделение и курсор REAPER — как были
 -- 1 ноя: опции — панель options (в стеке DSP, побольше): клавиши — только когда она в фокусе, мышь — только над ней;
 -- без панелей (опция panes выкл) — окно поверх, модально, как было
+-- 1 ноя: тур — вкладка help (клавиши модуля в фокусе) показана и активна: видно, что делают h j k l и прочее
+ctx.tour_help = function()
+  local PN, m = draw.panes, state.panes
+  if not (state.panes_ui and m and PN) then return end
+  if PN.visible(m, 'help') then if PN.set_active(m, 'help') then relayout() end
+  else ctx.pane_do(function() return PN.show(m, 'help') end, 'help shown') end
+end
 ctx.opt_k = function() return OPT.active and (not OPT.pane or state.focus == 'options') end
 ctx.opt_m = function()
   if not OPT.active then return false end
