@@ -2629,6 +2629,37 @@ ctx = {
     FB.push_recent(it); ctx.fxb_save(); model.invalidate()
     vim.msg = FB.short(it.label) .. ' on a new track (u - undo)'
   end,
+  -- 1 ноя: клавиши всплывашки ноты: h / ← l / → — полутон, j / ↓ k / ↑ — октава (сразу звучит), набор имени
+  -- D5 / D-5 / C#3 — по цифре октавы; Enter — оставить, Esc — вернуть как было; прочее глотается
+  notepop_key = function(c)
+    local np = draw.notepop
+    local function put(n)
+      n = math.max(0, math.min(127, n))
+      if np.orig == nil then np.orig = np.cur or false end
+      np.cur = n
+      if np.set then np.set(n) else ctx.dsp_type_value(np.k, np.pi, np.root and (np.lo - n) or n) end
+      local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+      vim.msg = (np.name or 'note') .. ': ' .. NN[n % 12 + 1] .. (n // 12 - 1) .. '  (Enter - keep, Esc - back)'
+    end
+    local ch = c < 256 and string.char(c) or ''
+    if c == 27 then
+      if np.orig then put(np.orig) end
+      draw.notepop = nil; vim.msg = (np.name or 'note') .. ': unchanged'
+    elseif c == 13 then draw.notepop = nil
+    elseif ch == 'h' or c == 1818584692 then put((np.cur or 60) - 1)
+    elseif ch == 'l' or c == 1919379572 then put((np.cur or 60) + 1)
+    elseif ch == 'j' or c == 1685026670 then put((np.cur or 60) - 12)
+    elseif ch == 'k' or c == 30064 then put((np.cur or 60) + 12)
+    elseif c == 8 then np.buf = (np.buf or ''):sub(1, -2)
+    elseif ch:match('^[A-Ga-g]$') then np.buf = ch:upper()
+    elseif np.buf and ch:match('^[#%-]$') and #np.buf == 1 then np.buf = np.buf .. ch
+    elseif np.buf and ch:match('^%d$') then
+      local PC = { C = 0, D = 2, E = 4, F = 5, G = 7, A = 9, B = 11 }
+      local n = PC[np.buf:sub(1, 1)] + (np.buf:find('#', 1, true) and 1 or 0) + (tonumber(ch) + 1) * 12
+      np.buf = nil; put(n)
+    end
+    if draw.notepop then draw.notepop.buf = np.buf end
+  end,
   -- 22 окт: выпадашка параметра DSP (щелчок / Ctrl+Enter): нота — клавиатура 0..127, ступени — список (до 35 — меню, больше — поиск)
   dsp_param_pop = function(k, pi, x, y)
     local col, f = ctx.dsp_fx(k)
@@ -2645,7 +2676,7 @@ ctx = {
         cur = cur and (lo - cur)
       end
       draw.notepop = { k = k, pi = pi, x = x or math.floor(gfx.w / 2), y = y or math.floor(gfx.h * 0.7), cur = cur and math.floor(cur + 0.5), name = p.name, root = p.show == 'root', lo = lo }
-      vim.msg = p.name .. ': click a key (Esc - close)'
+      vim.msg = p.name .. ': click a key or h l / j k, type D5 (Enter, Esc)'
       return
     end
     if not (p.kind == 'steps' and p.nsteps) then vim.msg = (p.name or 'param') .. ': i - type a value'; return end
@@ -20568,7 +20599,7 @@ function ctx.slx_do(h)
     local v = ctx.slx_param(fi, 'Base note')
     draw.notepop = { x = gfx.mouse_x, y = gfx.mouse_y + 4, cur = v and math.floor(v + 0.5), name = 'root (slice 1)',
       set = function(n) setp('Base note', n); vim.msg = 'slixer root: ' .. n end }
-    vim.msg = 'slixer root: click a key (Esc - close)'
+    vim.msg = 'slixer root: click a key or h l / j k, type D5 (Enter, Esc)'
     return
   end
   if it.kind == 'menu' then
@@ -30720,6 +30751,7 @@ local function frame()
     c = 0
   end
   if OPT.active and c ~= 0 then OPT.key(c); c = 0 end
+  if draw.notepop and c ~= 0 then ctx.notepop_key(c); c = 0 end   -- 1 ноя: клавиатура ноты — h l полутон, j k октава, имя D5 / C#3, Enter, Esc
   if ctx.SP and ctx.SP.on and c ~= 0 then
     if ctx.SP.key(c) == 'apply' then ctx.sig_pick_apply() end
     c = 0
@@ -31269,7 +31301,6 @@ local function frame()
         if ctx.vp and ctx.vp_key(c) then return end   -- 11 окт: редактор кода Video processor
         if draw.rkb and ctx.rt_key(c) then return end   -- 29 окт: мини-роутер с клавиатуры
         if draw.ckb and ctx.ch_key(c) then return end   -- 29 окт: CHAINS контейнера с клавиатуры
-        if draw.notepop and c == 27 then draw.notepop = nil; return end   -- 22 окт
         if c == 13 and ctx.mods().ctrl and not DK.ins and not DK.pads then ctx.dsp_param_pop(dsp_sel.fx, dsp_sel.param); return end   -- 22 окт: Ctrl+Enter — выпадашка параметра
         if DK.ins then local col0 = dsp_target(); local f0 = col0 and col0.fx and col0.fx[dsp_sel.fx]; DK.key(c, dsp_sel, #(col0 and col0.fx or {}), f0 and #f0.params or 0, ctx.mods()); return end   -- 22 окт: INSERT параметра — все клавиши ему
         local ch = c < 256 and string.char(c) or ''
