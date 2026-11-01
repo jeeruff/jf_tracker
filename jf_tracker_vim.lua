@@ -4035,9 +4035,18 @@ function V.transpose_scope(scope, d, micro, diat)   -- 16 окт: micro — d с
     V.msg = ('transpose %s %+d degree(s) of %s %s: %d note(s)'):format(V.TSCOPE[scope] or scope, d, ctx.CH_NAMES[r + 1], TH.BY[id].name, #notes)
     return true
   end
-  if micro then ctx.edit.micro_nudge(notes, lpb(), d) else ctx.edit.transpose(notes, lpb(), d) end
+  local mts_new = false
+  if micro then
+    ctx.edit.micro_nudge(notes, lpb(), d)
+    -- 1 ноя: MIDI-ноты слышат микротон только через MTS-ESP — Master на их трек (как just в harm), один раз
+    local seen = {}
+    for _, h in ipairs(notes) do
+      local tr = h.kind == 'midi' and h.item and reaper.GetMediaItem_Track(h.item)
+      if tr and not seen[tr] then seen[tr] = true; if ctx.edit.mts_master(tr) then mts_new = true end end
+    end
+  else ctx.edit.transpose(notes, lpb(), d) end
   V.last_edit = nil
-  V.msg = ('transpose %s %+d%s: %d note(s)'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes)
+  V.msg = ('transpose %s %+d%s: %d note(s)%s'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes, mts_new and ' + MTS-ESP Master on the track' or '')
   return true
 end
 -- 26 окт: ноты области (как transpose_scope): sel / col / track / pattern (все треки; строки — то, что видно)
