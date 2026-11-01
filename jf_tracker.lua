@@ -30152,10 +30152,8 @@ local function frame()
   -- 11 окт: rec follows selection — новым трекам тоже авто-арм (раз в смену числа треков)
   if state.armsel then
     local nt = reaper.CountTracks(0)
-    -- 1 ноя: и раз в секунду — auto-arm снимают ручной арм (R, ta, прослушка, REAPER): держим его на всех треках
-    local now_a = reaper.time_precise()
-    if ctx.armsel_n ~= nt or now_a - (ctx.armsel_t or 0) > 1 then
-      ctx.armsel_n, ctx.armsel_t = nt, now_a
+    if ctx.armsel_n ~= nt then
+      ctx.armsel_n = nt
       for i = 0, nt - 1 do local tr = reaper.GetTrack(0, i); if reaper.GetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM') ~= 1 then reaper.SetMediaTrackInfo_Value(tr, 'B_AUTO_RECARM', 1) end end
     end
   end
