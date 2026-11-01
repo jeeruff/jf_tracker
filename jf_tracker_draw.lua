@@ -2923,7 +2923,7 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
 end
 
-D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true, ['repeat'] = true }
+D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true, ['repeat'] = true, autopan = true }
 local VRH = 8
 local function pnum(f, vals, label)
   for i, p in ipairs(f.params or {}) do
@@ -3073,6 +3073,40 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       set(g >= 1 and U.RED or U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
       a = a * g
     end
+  elseif kind == 'autopan' then
+    -- 1 ноя: Albeton Autopan — два периода: L жёлтым, R голубым (сдвиг Offset), глубина Amount, форма Waveform + Shape
+    local function pstr(label) for i, p in ipairs(f.params or {}) do if p.name == label then return vals[i] and vals[i].s or '' end end return '' end
+    local amt = math.max(0, math.min(1, pnum(f, vals, 'amount') or 0.5))
+    local off = (pnum(f, vals, 'offset') or 90) / 360
+    local ph = (pnum(f, vals, 'phase') or 0) / 360
+    local shp = math.max(1, pnum(f, vals, 'shape') or 1)
+    local wv = pstr('wave'):lower()
+    local inv = pstr('invert'):lower():find('true') ~= nil
+    local gx, gy, gw, gh = x + 2, y + 2, w - 4, h - VRH - 6
+    local function wave(t)
+      t = t % 1
+      local v
+      if wv:find('tri') then v = 1 - 4 * math.abs(t - 0.5)
+      elseif wv:find('saw') then v = 2 * t - 1
+      elseif wv:find('rand') then v = math.sin(2 * math.pi * t) * math.cos(6 * math.pi * t)
+      else v = math.sin(2 * math.pi * t) end
+      if shp > 1 then v = (v < 0 and -1 or 1) * math.min(1, math.abs(v) * shp) ^ (1 / 1) end   -- shape: к меандру
+      return v
+    end
+    set(U.LINE); gfx.rect(gx, gy + math.floor(gh / 2), gw, 1, 1)
+    for _, ch in ipairs({ { 0, U.AMBER }, { off, U.CYAN } }) do
+      set(ch[2])
+      local px0, py0
+      for i = 0, gw - 1, 2 do
+        local v = wave(2 * i / gw + ph + ch[1]) * amt * (inv and -1 or 1)
+        local py = gy + gh / 2 - v * (gh / 2 - 1)
+        if px0 then gfx.line(px0, py0, gx + i, py, 1) end
+        px0, py0 = gx + i, py
+      end
+    end
+    local sync = pstr('sync')
+    local rate = (sync ~= '' and not sync:lower():find('off')) and sync or pstr('rate')
+    text(x + 3, y + h - VRH - 1, fit(('%s  %s  amount %d%%'):format(rate, pstr('wave'), math.floor(amt * 100 + 0.5)), w - 6), U.GREY)
   elseif kind == 'repeat' then
     -- 1 ноя: LiveBeatRepeater — такт срезами текущей длины (1/4T = 1/6 такта); повтор вкл — первый срез (пойманный)
     -- янтарём, его повторы рамками, буква > / < — направление; freeze — голубая рамка вида; выкл — серая сетка

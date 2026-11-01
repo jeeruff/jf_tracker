@@ -834,7 +834,7 @@ function O.draw(L, W, H)
       if not O.items[i] then break end
       local col, rr = (r - 1) // nvis, (r - 1) % nvis
       local x, w = bx + col * colw, (col == ncol - 1) and (bw - col * colw) or (colw - L.pad)
-      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = (O.tab == 'hotkeys' or O.tab == 'theme') and w or math.min(w, O.roww or w) }   -- 17 окт: хоткеи — во всю ширину (описания резались); 18 окт: и theme
+      place[#place + 1] = { i = i, x = x, y = by + rh + 4 + rr * rh, w = (O.tab == 'hotkeys' or O.tab == 'theme' or O.tab == 'fx commands') and w or math.min(w, O.roww or w) }   -- 17 окт: хоткеи — во всю ширину (описания резались); 18 окт: и theme
     end
   end
   O.masonry_on = masonry and true or nil

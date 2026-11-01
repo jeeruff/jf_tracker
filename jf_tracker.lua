@@ -13372,6 +13372,10 @@ ctx = {
     end
     -- 1 ноя: вкладка fx commands — таблица: код | плагин | что делает; свои (Project Notes) — менять / удалять, встроенные — справка
     items[#items + 1] = { sep = true, title = 'fx commands', group = 'fx commands' }
+    -- 1 ноя: файлы наборов — Data/jf_tracker_fxcmds/*.txt (строки «FF = плагин | параметр»): export / import / backup
+    items[#items + 1] = { label = 'export', kind = 'action', value = 'to a file', hk = true, desc = 'the commands of this project into Data/jf_tracker_fxcmds/<name>.txt (asks the name)', fn = function() OPT.close(); vim.open_prompt('fxcmdexport ', '') end }
+    items[#items + 1] = { label = 'import', kind = 'action', value = 'from a file', hk = true, desc = 'a saved set into this project (added to yours; the same code - replaced)', fn = function() OPT.close(); ctx.fxcmd_import() end }
+    items[#items + 1] = { label = 'backup', kind = 'action', value = 'dated copy', hk = true, desc = 'the commands of this project into Data/jf_tracker_fxcmds/backup-<date>.txt at once', fn = function() ctx.fxcmd_export('backup-' .. os.date('%Y%m%d-%H%M%S')) end }
     items[#items + 1] = { label = '+ add', kind = 'action', value = 'your code', hk = true, desc = 'a two-letter code (FF, QX ...) on a parameter of a plugin: XXxx in a command column sets it to xx/FF for the note; the plugin goes on the track when missing; kept in the Project Notes of this project', fn = function() OPT.close(); vim.open_prompt('fxcmd ', '') end }
     do
       local map = ctx.fxcmd_parse(reaper.GetSetProjectNotes(0, false, ''))
@@ -31275,6 +31279,9 @@ local function frame()
           elseif ch == 'x' then ctx.dsp_xy_toggle(dsp_sel.fx)   -- 31 окт: zx — XY модуля вкл / выкл
           elseif ch == 'X' then ctx.dsp_tall()   -- 26 окт: zX — DSP в 1.5 раза выше канонического, ещё раз — назад (было zx); zw — шире
           elseif ch == 'e' then local t0 = dsp_target(); ctx.inst_window(t0 and t0.col)   -- 26 окт: ze и в DSP — окно инструмента трека
+          elseif ch == 'E' then   -- 1 ноя: zE — родное окно (gui) выбранного модуля поверх его блока; ещё раз — назад
+            local t0 = dsp_target(); local f0 = t0 and t0.fx and t0.fx[dsp_sel.fx]
+            if f0 and ctx.fxgui_toggle then ctx.fxgui_toggle(f0) else vim.msg = 'zE: no module selected' end
           elseif ch == 'p' then ctx.dsp_preset(dsp_sel.fx, 'pick')   -- 22 окт: zp — выпадашка пресетов модуля под курсором (и узкого, где «< пресет >» не влез)
           elseif ch == 'P' then   -- 16 окт: модули со страницами: все сразу ↔ по одной; 22 окт: zP (было zf), любой эффект со страницами (и автовкладки)
             model.dsp_fold = not model.dsp_fold; reaper.SetExtState(EXT, 'dspfold', model.dsp_fold and '1' or '0', true)
@@ -33423,6 +33430,37 @@ ctx.fxcmd_load = function()
     ctx.SM.FX_NAME[k] = u.param
     ctx.SM.FX_MEAN[k] = function(v) return ('%s %d%%'):format(u.param, math.floor(v / 255 * 100 + 0.5)) end
   end
+end
+ctx.fxcmd_dir = function() local d = reaper.GetResourcePath() .. '/Data/jf_tracker_fxcmds'; reaper.RecursiveCreateDirectory(d, 0); return d end
+ctx.fxcmd_export = function(name)
+  name = (name or ''):gsub('[^%w%-_ ]', ''):gsub('^%s+', ''):gsub('%s+$', '')
+  if name == '' then vim.msg = 'export: a name'; return end
+  local map = ctx.fxcmd_parse(reaper.GetSetProjectNotes(0, false, ''))
+  local keys = {}
+  for k in pairs(map) do keys[#keys + 1] = k end
+  table.sort(keys)
+  if #keys == 0 then vim.msg = 'export: no commands in this project yet'; return end
+  local fn = ctx.fxcmd_dir() .. '/' .. name .. '.txt'
+  local fh = io.open(fn, 'w'); if not fh then vim.msg = 'export: cannot write ' .. fn; return end
+  for _, k in ipairs(keys) do fh:write(('%s = %s | %s\n'):format(k, map[k].fx, map[k].param)) end
+  fh:close()
+  vim.msg = ('fx commands: %d saved to Data/jf_tracker_fxcmds/%s.txt'):format(#keys, name)
+end
+ctx.fxcmd_import = function()
+  local items = {}
+  for _, nm in ipairs(ctx.list_files(ctx.fxcmd_dir(), 'txt')) do items[#items + 1] = { label = nm, v = nm } end
+  if #items == 0 then vim.msg = 'import: no saved sets yet (export / backup first)'; return end
+  table.sort(items, function(a, b) return a.v > b.v end)
+  vim.open_picker('import fx commands into this project', items, function(it)
+    local fh = io.open(ctx.fxcmd_dir() .. '/' .. it.v .. '.txt', 'r'); if not fh then return end
+    local txt = fh:read('a'); fh:close()
+    local add = ctx.fxcmd_parse(ctx.FXC_HEAD .. '\n' .. txt .. '\n' .. ctx.FXC_END)
+    local map = ctx.fxcmd_parse(reaper.GetSetProjectNotes(0, false, ''))
+    local n = 0
+    for k, u in pairs(add) do if not edit.cmds.BUILTIN[k] then map[k] = u; n = n + 1 end end
+    ctx.fxcmd_write(map)
+    vim.msg = ('fx commands: %d imported from %s'):format(n, it.v)
+  end)
 end
 ctx.fxcmd_tick = function()
   local now = reaper.time_precise()
