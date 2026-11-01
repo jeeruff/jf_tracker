@@ -8200,12 +8200,15 @@ function D.frame(L, snap, rows, state, info)
         text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent - (amw > 0 and amw + 2 or 0)), ncol)
       end
     else
-      text(c.x + L.pad, hy - HX + 1 + math.floor(HX / 2), fit('∑ master', c.w - 2 * L.pad), U.AMBER)   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
+      -- 1 ноя: big trackname — и мастер крупно
+      local mk = L.hname_k or 1
+      if mk > 1 and D.big_measure('∑ master', mk) <= c.w - 2 * L.pad then D.big_text(c.x + L.pad, hy - HX + 1, '∑ master', U.AMBER, mk)
+      else text(c.x + L.pad, hy - HX + 1 + math.floor(HX / 2), fit('∑ master', c.w - 2 * L.pad), U.AMBER) end   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
       -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
       if c.mtrack then
         local fw = ms('fold') + 4
         local fx = c.x + c.w - fw - 2
-        if fx > c.x + ms('∑ master') + 2 * L.pad then
+        if fx > c.x + ((L.hname_k or 1) > 1 and D.big_measure('∑ master', L.hname_k) or ms('∑ master')) + 2 * L.pad then
           local fhot = mx >= fx and mx < fx + fw and my >= hy and my < hy + L.rh
           set(fhot and D.CURROW or U.PANEL); gfx.rect(fx, hy + 1, fw, L.rh - 2, 1)
           set(U.DIM); gfx.rect(fx, hy + 1, fw, L.rh - 2, 0)
@@ -8227,12 +8230,12 @@ function D.frame(L, snap, rows, state, info)
     end
     if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     -- 9 окт: полосы отступа вложенного трека нет (лишний серый разделитель) — вложенность видна по отступу имени
-    if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0) end   -- выделен в REAPER (Option+цифра)
+    if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy - HX, c.w - 1, L.rh + HX, 0) end   -- 1 ноя: рамка — и по крупному имени (big trackname)   -- выделен в REAPER (Option+цифра)
     -- 30 окт: мастер — курсор на его колонке (или выделен в REAPER): рамка имени, как у выделенного трека
     if c.master then
       local vcm = info.vcur and L.flat and L.flat[info.vcur.fi]
       if (vcm and vcm.col == col) or (col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') and reaper.IsTrackSelected(col.track)) then
-        set(U.CYAN); gfx.rect(c.x + 1, hy, c.w - 1, L.rh, 0)
+        set(U.CYAN); gfx.rect(c.x + 1, hy - HX, c.w - 1, L.rh + HX, 0)
       end
     end
     if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
@@ -9251,12 +9254,14 @@ function D.frame(L, snap, rows, state, info)
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
     end
     U.TEXT, U.GREY = T0, G0
-    set(U.LINE); gfx.rect(c.x, hy, 1, L.header_h, 1)
+    set(U.LINE); gfx.rect(c.x, hy - HX, 1, L.header_h, 1)   -- 1 ноя: от верха шапки (было ниже на запас имени — сверху недорисовано)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
     -- 9 окт: фон полосы нижнего микшера — тоже «шапка» (щелчок выделяет трек)
     if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
-  set(D.SEP); gfx.rect(tx0, hy + L.header_h - 2, W - tx0, 1, 1)
+  -- 1 ноя: правая граница последнего трека — и в шапке (в строках она есть; в шапке была порвана)
+  do local lc = L.cols and L.cols[#L.cols]; if lc and lc.x and not lc.master then set(U.LINE); gfx.rect(lc.x + lc.w, hy - HX, 1, L.header_h, 1) end end
+  set(D.SEP); gfx.rect(tx0, hy - HX + L.header_h - 2, W - tx0, 1, 1)
   -- 9 окт: линейка прыжков (опция jumps) — между клипами и строками, как relativenumber в
   -- Vim по горизонтали: у каждого трека — сколько до него от курсора (3L / 3H
   -- прыгают туда), у трека курсора — его номер янтарём
