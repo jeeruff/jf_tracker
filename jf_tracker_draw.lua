@@ -10952,7 +10952,7 @@ function D.frame(L, snap, rows, state, info)
     D.dg = drag and D.dgap or nil
     if not drag then D.dgap = nil end
     D.dgap_x = nil
-    D.DGW = math.max(ms('=') + 2 * L.pad, 3 * L.pad) + L.pad
+    D.DGW = 4 * math.max(ms('=') + 2 * L.pad, 3 * L.pad) + L.pad   -- 1 ноя: проём в 4 раза шире
     for k, f in ipairs(fxs) do
       if D.dg and D.dg.before == k and not D.dg.inner_first then D.dgap_x = bx + math.floor(D.DGW / 2) - math.floor(L.pad / 2); bx = bx + D.DGW end
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
@@ -13113,9 +13113,12 @@ function D.frame(L, snap, rows, state, info)
       -- 31 окт: узкая колонка: «+» сверху, под ним вертикально «drop fx here», рамкой
       local pw = math.max(3 * L.cw, (L.th or L.rh) + 4 * L.pad)
       local hot = mx >= bx and mx < bx + pw and my >= boxy and my < boxy + bh0
-      if hot then set(U.tint(U.AMBER, 0.15)); gfx.rect(bx, boxy, pw, bh0, 1) end
-      set(hot and U.AMBER or U.tint(U.AMBER, 0.35)); gfx.rect(bx + 2, boxy + 2, pw - 4, bh0 - 4, 0)
-      text(bx + math.floor((pw - ms('+')) / 2), boxy + 4, '+', hot and U.AMBER or U.tint(U.AMBER, 0.7))
+      -- 1 ноя: без рамки, «+» в 4 раза крупнее по центру поля
+      local pk = 4
+      local pw2 = D.big_measure('+', pk)
+      if pw2 + 2 * L.pad > pw then pw = pw2 + 2 * L.pad end
+      if hot then set(U.tint(U.AMBER, 0.12)); gfx.rect(bx, boxy, pw, bh0, 1) end
+      D.big_text(bx + math.floor((pw - pw2) / 2), boxy + math.floor((bh0 - L.rh * pk) / 2), '+', hot and U.AMBER or U.tint(U.AMBER, 0.6), pk)
       local vh = bh0 - L.rh - 10
       local _ = vh   -- 31 окт: надпись drop fx here убрана (просьба), остаётся «+» в рамке
       if hot then hover.dspbtn = { fx = #fxs, what = 'chainadd' } end
@@ -13140,6 +13143,18 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_view, D.dsp_maxpx = vw, maxpx
     D.dsp_px = math.max(0, math.min(maxpx, D.dsp_px))
     if D.dsp_px_t then D.dsp_px_t = math.max(0, math.min(maxpx, D.dsp_px_t)) end
+    -- 1 ноя: перетаскивание — у края окна цепочки прокрутка туда (дальше за модули, за край контейнера);
+    -- раскрытый проём вне окна — окно к нему
+    if drag and maxpx > 0 and my >= boxy and my < boxy + bh0 then
+      local edge = 4 * L.cw
+      if mx0 >= cx0 and mx0 < cx0 + edge then D.dsp_px_t = nil; D.dsp_px = math.max(0, D.dsp_px - math.max(4, (cx0 + edge - mx0) / 2))
+      elseif mx0 < cx1 and mx0 >= cx1 - edge then D.dsp_px_t = nil; D.dsp_px = math.min(maxpx, D.dsp_px + math.max(4, (mx0 - (cx1 - edge)) / 2))
+      elseif D.dgap_x and not D.dsp_px_t then
+        local half = math.floor((D.DGW or 0) / 2)
+        if D.dgap_x - half < cx0 then D.dsp_px_t = math.max(0, D.dsp_px - (cx0 - (D.dgap_x - half)) - L.pad)
+        elseif D.dgap_x + half > cx1 then D.dsp_px_t = math.min(maxpx, D.dsp_px + (D.dgap_x + half - cx1) + L.pad) end
+      end
+    end
     -- выбранный модуль (w / W, щелчок, harpoon) — плавно в поле зрения, целиком, если влезает
     if sel.fx ~= D.dsp_sel_last and D.dsp_noscroll and reaper.time_precise() - D.dsp_noscroll < 0.5 then
       D.dsp_sel_last, D.dsp_noscroll = sel.fx, nil   -- 24 окт: выбор щелчком по параметру — без прокрутки
@@ -13231,7 +13246,7 @@ function D.frame(L, snap, rows, state, info)
       -- 1 ноя: проём раздвинут (D.dgap_x) — плашка в нём, ничего не закрывает: жёлтая рамка, фон прозрачный,
       -- верх | — последовательно, низ = — параллельно; активная половина подсвечена
       if D.dgap_x then gx = D.dgap_x end
-      local sw2 = math.max(ms('=') + 2 * L.pad, 3 * L.pad)
+      local sw2 = 4 * math.max(ms('=') + 2 * L.pad, 3 * L.pad)
       local x0 = gx - math.floor(sw2 / 2)
       local hh = math.floor(h0 / 2)
       local low = my >= y0 + hh
