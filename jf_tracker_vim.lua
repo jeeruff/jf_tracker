@@ -3250,7 +3250,18 @@ function V.key_impl(c)
         local F = flat()
         local f0, f1 = V.cur.fi, V.cur.fi
         if c == ('W'):byte() then f0, f1 = 1, #F end
-        local e = apply('d', f0, f1, V.cur.row, V.cur.row + n - 1); V.count = nil
+        -- 1 ноя: dNw — N СОБЫТИЙ (нота на курсоре — первое), а не N строк: d3w на D-3 D-3 . E-3 удаляет все три
+        local r1 = V.cur.row + n - 1
+        if c == ('w'):byte() and n > 1 then
+          local rows, seen = {}, {}
+          for _, h in ipairs(V.heads_in(f0, f1, V.cur.row, V.cur.row + 4096)) do
+            local r = h.row0 or -1
+            if r >= V.cur.row and not seen[r] then seen[r] = true; rows[#rows + 1] = r end
+          end
+          table.sort(rows)
+          r1 = rows[math.min(n, #rows)] or r1
+        end
+        local e = apply('d', f0, f1, V.cur.row, r1); V.count = nil
         if e then finish_edit() else finish_move() end
         return
       end
