@@ -17191,7 +17191,7 @@ ctx.acv_tree = function(curves)
     if (c.envs and #c.envs > 0) or #mls > 0 or #vl > 0 then
       local open = A.tfold[c.guid]
       if open == nil then open = cc and c.guid == cc.guid end
-      rows[#rows + 1] = { hdr = true, name = (c.name ~= '' and c.name or 'track') .. ' (' .. (#(c.envs or {}) + #mls) .. ')', guid = c.guid, open = open }
+      rows[#rows + 1] = { hdr = true, name = (c.name ~= '' and c.name or 'track') .. ' (' .. (#(c.envs or {}) + #mls) .. ')', guid = c.guid, open = open, rgb = c.rgb }   -- 1 ноя: цвет трека
       if open then
         for _, i in ipairs(vl) do rows[#rows + 1] = { i = i, name = (curves[i].name or ''):match('/ (.*)$') or curves[i].name } end
         for _, ml in ipairs(mls) do rows[#rows + 1] = { i = mlidx[ml], name = ml.name or 'lane', mlane = ml } end

@@ -714,7 +714,11 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
       local hot = mx >= lx and mx < lx + lw and my >= iy and my < iy + rh
       if ACV.lfoc and ri == ACV.lsel then U.set(U.AMBER); gfx.rect(lx, iy, lw, rh, 0) end   -- 1 ноя: курсор списка (Opt+Tab)
       if r.hdr then
-        U.text(lx, iy, ctx.fit((r.open and '- ' or '+ ') .. (r.name or '?'), lw - 2), hot and U.AMBER or U.CYAN)
+        -- 1 ноя: квадратик цвета трека (как шапка его колонки) перед именем папки
+        local sq = rh - 6
+        if r.rgb then gfx.set(r.rgb[1], r.rgb[2], r.rgb[3], 1) else U.set(U.LINE) end
+        gfx.rect(lx + 1, iy + 3, sq, sq, 1)
+        U.text(lx + sq + 4, iy, ctx.fit((r.open and '- ' or '+ ') .. (r.name or '?'), lw - sq - 6), hot and U.AMBER or U.CYAN)
         if hot then hover = { pane = 'curve', tfold = r.guid } end
       else
         local on = r.i and r.i == ACV.cur
