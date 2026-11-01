@@ -13507,11 +13507,25 @@ function D.frame(L, snap, rows, state, info)
           if D.kcfont then
             -- 20 окт: опция keycast font — свой шрифт (из mode font), высота строки keycast
             -- длинное слово — мельче, пока не влезет в зону (до полувысоты), потом — обрезка по символам
-            local px = math.floor(krh * 1.1)
-            gfx.setfont(8, D.kcfont, px)   -- 20 окт: свой слот 8 — слот 5 кэширует Menlo для ∆ (kcast портил его: огромная ∆)
-            local lw = gfx.measurestr(lbl)
-            while lw > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(8, D.kcfont, px); lw = gfx.measurestr(lbl) end
-            while lw > kx1 - kx0 and #lbl > 1 do lbl = lbl:sub(1, (utf8.offset(lbl, -1) or #lbl) - 1); lw = gfx.measurestr(lbl) end
+            -- 1 ноя: подбор кегля и обрезка — кэш по (надпись, зона, высота): setfont + measurestr в цикле каждый кадр
+            -- стоили ~3 мс после набора клавиш
+            D.kcc = D.kcc or {}
+            local ck = lbl .. '|' .. (kx1 - kx0) .. '|' .. krh .. '|' .. D.kcfont
+            local cc = D.kcc[ck]
+            if not cc then
+              local px = math.floor(krh * 1.1)
+              gfx.setfont(8, D.kcfont, px)   -- 20 окт: свой слот 8 — слот 5 кэширует Menlo для ∆ (kcast портил его: огромная ∆)
+              local lb2 = lbl
+              local lw0 = gfx.measurestr(lb2)
+              while lw0 > kx1 - kx0 and px > math.floor(krh * 0.5) do px = px - 1; gfx.setfont(8, D.kcfont, px); lw0 = gfx.measurestr(lb2) end
+              while lw0 > kx1 - kx0 and #lb2 > 1 do lb2 = lb2:sub(1, (utf8.offset(lb2, -1) or #lb2) - 1); lw0 = gfx.measurestr(lb2) end
+              cc = { px = px, lbl = lb2, lw = lw0 }
+              D.kcn = (D.kcn or 0) + 1; if D.kcn > 300 then D.kcc, D.kcn = {}, 0 end
+              D.kcc[ck] = cc
+            end
+            gfx.setfont(8, D.kcfont, cc.px)
+            lbl = cc.lbl
+            local lw = cc.lw
             if kback then set(U.BG); gfx.rect(kx1 - lw - L.pad, y, lw + 2 * L.pad, krh, 1) end
             set(col); gfx.x, gfx.y = kx1 - lw, y + math.floor((krh - gfx.texth) / 2); gfx.drawstr(lbl)
             gfx.setfont(D.font_id)
