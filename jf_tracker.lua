@@ -28495,6 +28495,14 @@ local function frame()
           local fl2 = L.flat[hover.fi]
           if fl2 and (fl2.env or fl2.ml) then vim.cur.fi, vim.cur.row = hover.fi, hover.row.row; ctx.curve_open() end
         end
+        -- 1 ноя: щелчок по каналу — трек выделен в REAPER (его auto-arm армит сам, ARM работает как в REAPER)
+        do
+          local fl3 = L.flat[hover.fi]
+          local tr3 = fl3 and fl3.col and fl3.col.track
+          if tr3 and reaper.ValidatePtr(tr3, 'MediaTrack*') and not reaper.IsTrackSelected(tr3) and not ctx.mods().cmd and not ctx.mods().shift then
+            reaper.SetOnlyTrackSelected(tr3); model.invalidate()
+          end
+        end
         click = { t = now2, zone = 'body', fi = hover.fi, row = hover.row.row }
       end
     end
