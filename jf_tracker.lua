@@ -31760,6 +31760,7 @@ ctx.opt_zmenu = function(c)
   elseif keys[ch] then OPT.set_tab(keys[ch]); vim.msg = 'options: ' .. keys[ch]
   else vim.msg = '' end
 end
+ctx.draw_ref = function() return draw end   -- 1 ноя: модуль отрисовки для команд vim (:vhsround)
 ctx.opt_k = function() return OPT.active and (not OPT.pane or state.focus == 'options') end
 ctx.opt_m = function()
   if not OPT.active then return false end

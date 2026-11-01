@@ -7706,11 +7706,12 @@ function D.vhs(x, y, w, h, red)
   -- полоса: центр плывёт вниз, ширина дышит; иногда рывок (шире и сильнее)
   st.band = st.band + dt * 0.05
   if st.band > 1.15 then st.band = -0.15 end
-  if rnd() < dt * 0.5 then st.jump = 0.3 + rnd() * 0.5 end
+  -- 1 ноя: кассета зажевана — рывки чаще и сильнее, полоса шире
+  if rnd() < dt * 1.6 then st.jump = 0.4 + rnd() * 0.8 end
   st.jump = math.max(0, st.jump - dt)
   local cy = y + st.band * h
-  local sig = 8 + 4 * math.sin(now * 0.7) + (st.jump > 0 and 10 or 0)
-  local A = 5 + (st.jump > 0 and 22 * st.jump or 0)
+  local sig = 14 + 8 * math.sin(now * 0.7) + (st.jump > 0 and 22 or 0)
+  local A = 10 + (st.jump > 0 and 45 * st.jump or 0)
   local y0, y1 = math.max(y, math.floor(cy - 3 * sig)), math.min(y + h - 1, math.floor(cy + 3 * sig))
   for yy = y0, y1, 2 do
     local g = math.exp(-((yy - cy) / sig) ^ 2)
@@ -7720,14 +7721,40 @@ function D.vhs(x, y, w, h, red)
     local xx = x
     while xx < x + w do
       local ln = 2 + rnd() * 40
-      if rnd() < 0.5 * g then gfx.set(tint[1], tint[2], tint[3], (0.25 + rnd() * 0.6) * g); gfx.rect(math.floor(xx), yy, math.floor(ln), 1, 1) end
+      if rnd() < 0.8 * g then gfx.set(tint[1], tint[2], tint[3], (0.35 + rnd() * 0.6) * g); gfx.rect(math.floor(xx), yy, math.floor(ln), 1, 1) end
       xx = xx + ln + rnd() * 25
     end
   end
-  -- head switching у низа: нижние строки рвёт вбок
-  for k = 1, 6 do
+  -- 1 ноя: зажёванная плёнка — рваные блоки (кусок кадра уезжает вбок, по краю цветная кайма), прыжок кадра
+  -- по вертикали, выпадения (белые полосы во всю ширину), снег по всему кадру
+  if rnd() < dt * 6 then st.tears = st.tears or {}; st.tears[#st.tears + 1] = { y = rnd(), hh = 4 + rnd() * 50, dx = (rnd() - 0.5) * 160, life = 0.05 + rnd() * 0.25 } end
+  for k = #(st.tears or {}), 1, -1 do
+    local tr = st.tears[k]
+    tr.life = tr.life - dt
+    if tr.life <= 0 then table.remove(st.tears, k)
+    else
+      local ty0, th0, dx = y + math.floor(tr.y * h), math.floor(tr.hh), math.floor(tr.dx)
+      gfx.a = 1; gfx.blit(SRC, 1, 0, x, ty0, w, th0, x + dx, ty0, w, th0)
+      gfx.set(1, 0.2, 0.3, 0.35); gfx.rect(dx > 0 and x or x + w + dx, ty0, math.abs(dx), th0, 1)
+      gfx.set(0.2, 1, 1, 0.25); gfx.rect(x + math.floor(rnd() * w), ty0, math.floor(20 + rnd() * 120), 2, 1)
+    end
+  end
+  if rnd() < dt * 0.35 then st.roll = 0.15 + rnd() * 0.3 end
+  if (st.roll or 0) > 0 then
+    st.roll = st.roll - dt
+    local sh = math.floor((rnd() * 0.6 + 0.2) * 40)
+    gfx.a = 1; gfx.blit(SRC, 1, 0, x, y, w, h - sh, x, y + sh, w, h - sh)
+    gfx.set(0, 0, 0, 1); gfx.rect(x, y, w, sh, 1)
+    gfx.set(tint[1], tint[2], tint[3], 0.5); gfx.rect(x, y + sh - 2, w, 2, 1)
+  end
+  for _ = 1, math.floor(rnd() * 3) do gfx.set(1, 1, 1, 0.25 + rnd() * 0.5); gfx.rect(x, y + math.floor(rnd() * h), w, 1, 1) end
+  for _ = 1, math.floor(w * h / 5000) do
+    local v = rnd(); gfx.set(v, v, v, 0.35); gfx.rect(x + math.floor(rnd() * w), y + math.floor(rnd() * h), 1 + math.floor(rnd() * 3), 1, 1)
+  end
+  -- head switching у низа: нижние строки рвёт вбок (1 ноя: выше и сильнее)
+  for k = 1, 14 do
     local yy = y + h - 1 - k
-    local dx = math.floor((rnd() - 0.3) * 14)
+    local dx = math.floor((rnd() - 0.3) * 34)
     gfx.a = 1; gfx.blit(SRC, 1, 0, x, yy, w, 1, x + dx, yy, w, 1)
     if rnd() < 0.5 then gfx.set(tint[1], tint[2], tint[3], 0.3); gfx.rect(x + math.floor(rnd() * w), yy, math.floor(10 + rnd() * 80), 1, 1) end
   end
@@ -7759,12 +7786,11 @@ function D.vhs(x, y, w, h, red)
     D.vhs_tc = tc
   end
   do local om = gfx.mode; gfx.mode = 1; gfx.a = 1; gfx.blit(82, 1, 0, 0, 0, w, tc.h, x, y + 14, w, tc.h); gfx.mode = om or 0 end
-  -- 1 ноя: бочка кинескопа убрана (слишком гнула кадр) — остались развёртка, виньетка, углы
-  -- развёртка, виньетка, тёмные скруглённые углы
+  -- 1 ноя: бочка кинескопа убрана; скругление углов — только командой :vhsround; развёртка и виньетка
   gfx.set(0, 0, 0, 0.12)
   for yy = y, y + h - 1, 3 do gfx.rect(x, yy, w, 1, 1) end
   for k = 0, 14 do gfx.set(0, 0, 0, 0.07); gfx.rect(x + k, y + k, w - 2 * k, h - 2 * k, 0) end
-  local R = math.floor(math.min(w, h) * 0.06)
+  local R = D.vhsround and math.floor(math.min(w, h) * 0.06) or -1
   gfx.set(0, 0, 0, 1)
   for k = 0, R do
     local e = R - math.floor(math.sqrt(R * R - (R - k) * (R - k)) + 0.5)
