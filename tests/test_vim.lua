@@ -873,14 +873,14 @@ state.focus = 'slices'
 V.key(('x'):byte()); eq('slicer open, focus on it: other keys go to the slicer', last(), 'slkey:120')
 state.focus = nil   -- 24 окт: фокус в трекере — клавиши трекеру, не слайсеру
 SLICER = nil
--- 10 окт: dp — до паузы (серия лейна без пустой строки), dP — всё выбранных треков
+-- 10 окт: d пробел (было dp) — до паузы (серия лейна без пустой строки), dS (было dP) — всё выбранных треков; 1 ноя: dp / dP — к началу / концу паттерна
 reset(); V.cur = { fi = 1, row = 0, field = 1 }
-keysin('dp'); eq('dp from row 0: kick + its overlapping ov (rows 0-3)', last(), 'delete:kick,ov')
+keysin('d '); eq('d Space from row 0: kick + its overlapping ov (rows 0-3)', last(), 'delete:kick,ov')
 reset(); V.cur = { fi = 1, row = 5, field = 1 }
-keysin('dp'); eq('dp on an empty row: the next run (snare, rows 8-9)', last(), 'delete:snare')
+keysin('d '); eq('d Space on an empty row: the next run (snare, rows 8-9)', last(), 'delete:snare')
 reset(); V.cur = { fi = 1, row = 20, field = 1 }
-local nc = #calls; keysin('dp'); eq('dp below the last event: nothing', #calls, nc)
-reset(); keysin('dP'); eq('dP: all of the selected tracks', last(), 'dP')
+local nc = #calls; keysin('d '); eq('d Space below the last event: nothing', #calls, nc)
+reset(); keysin('dS'); eq('dS: all of the selected tracks', last(), 'dP')
 -- 10 окт: транспозиция как в Renoise — области: выделение / колонка / трек / паттерн
 reset()
 V.cur = { fi = 1, row = 0, field = 1 }

@@ -15,7 +15,7 @@ local MOTIONS = {
 }
 
 local T = {
-  d = { title = 'd - delete', items = { { 'd', 'rows out, below moves up (3dd)' }, { 'w', 'clear the row, nothing moves (3dw)' }, { 'W', 'clear the row on all tracks' }, { 'i', 'whole item' }, { 'c', 'automation column' }, { 'C', 'field column, whole track' }, { 'p', 'up to the pause' }, { 'P', 'all of sel. tracks' },
+  d = { title = 'd - delete', items = { { 'd', 'rows out, below moves up (3dd)' }, { 'w', 'clear the row, nothing moves (3dw)' }, { 'W', 'clear the row on all tracks' }, { 'i', 'whole item' }, { 'c', 'automation column' }, { 'C', 'field column, whole track' }, { 'p', 'to pattern start' }, { 'P', 'to pattern end' }, { 'S', 'all of sel. tracks' }, { 'Space', 'up to the pause' },
         { 't', 'time select' }, { 'r', 'track in rgn' }, { 'R', 'region, all tracks' }, { 'T', 'track, all regions' }, { 'a', 'all … (e l j k h)' } } },
   y = { title = 'y - copy', items = { { 'y', 'row (3yy)' }, { 'c', 'the field column (vol / delay / command) in the pattern - p puts it' } } },
   c = { title = 'c - change', items = { { 'c', 'row + INSERT' } } },

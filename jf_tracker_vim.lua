@@ -3285,14 +3285,30 @@ function V.key_impl(c)
         V.count = nil; return
       end
       if p == 'd' and c == ('a'):byte() then V.pending = 'da'; return end
-      -- 10 окт: dP — все items и автоматизация выбранных треков во всём проекте
-      if p == 'd' and c == ('P'):byte() then
+      -- 1 ноя: dp — от начала паттерна до курсора, dP — от курсора до конца паттерна (подколонки трека курсора)
+      if p == 'd' and (c == ('p'):byte() or c == ('P'):byte()) and ctx.region_rows then
+        local f = flat()[V.cur.fi]
+        local pr0, pr1 = ctx.region_rows()
+        if not f or f.env or not pr0 then V.msg = 'dp / dP: no pattern here'; finish_move(); V.count = nil; return end
+        local fa, fb = V.cur.fi, V.cur.fi
+        while flat()[fa - 1] and flat()[fa - 1].col == f.col and flat()[fa - 1].lane == f.lane and not flat()[fa - 1].env do fa = fa - 1 end
+        while flat()[fb + 1] and flat()[fb + 1].col == f.col and flat()[fb + 1].lane == f.lane and not flat()[fb + 1].env do fb = fb + 1 end
+        local up = c == ('p'):byte()
+        local r0, r1 = up and pr0 or V.cur.row, up and V.cur.row or pr1
+        if apply('d', fa, fb, r0, r1) then
+          V.msg = ('d%s: rows %04d-%04d deleted (%s)'):format(up and 'p' or 'P', r0, r1, up and 'pattern start .. cursor' or 'cursor .. pattern end')
+          finish_edit()
+        else finish_move() end
+        V.count = nil; return
+      end
+      -- 10 окт: dS (было dP до 1 ноя) — все items и автоматизация выбранных треков во всём проекте
+      if p == 'd' and c == ('S'):byte() then
         if ctx.clear_tracks_all and ctx.clear_tracks_all() then finish_edit() else finish_move() end
         V.count = nil; return
       end
-      -- 10 окт: dp — до паузы (как d} в Vim: абзац = серия событий лейна без
+      -- 10 окт: d пробел (было dp до 1 ноя) — до паузы (как d} в Vim: абзац = серия событий лейна без
       -- пустой строки). С курсора вниз; курсор на пустой строке — ближайшая серия
-      if p == 'd' and c == ('p'):byte() then
+      if p == 'd' and c == 32 then
         local f = flat()[V.cur.fi]
         if not f or f.env then finish_move(); V.count = nil; return end
         local fa, fb = V.cur.fi, V.cur.fi
@@ -3306,11 +3322,11 @@ function V.key_impl(c)
         end
         local r0 = V.cur.row
         while r0 <= maxr and not busy(r0) do r0 = r0 + 1 end
-        if r0 > maxr then V.msg = 'dp: nothing below - no events until the end'; finish_move(); V.count = nil; return end
+        if r0 > maxr then V.msg = 'd Space: nothing below - no events until the end'; finish_move(); V.count = nil; return end
         local r1 = r0
         while r1 + 1 <= maxr and busy(r1 + 1) do r1 = r1 + 1 end
         if apply('d', fa, fb, r0, r1) then
-          V.msg = ('dp: rows %04d-%04d deleted (up to the pause)'):format(r0, r1)
+          V.msg = ('d Space: rows %04d-%04d deleted (up to the pause)'):format(r0, r1)
           finish_edit()
         else finish_move() end
         V.count = nil; return
@@ -4251,7 +4267,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c automation column | C the cursor field in the whole track | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p up to the pause | P all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d rows out, below moves up (3dd) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c automation column | C the cursor field in the whole track | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',

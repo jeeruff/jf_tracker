@@ -3279,7 +3279,7 @@ ctx = {
       end
     end)
     model.invalidate()
-    vim.msg = ('dP: %s - %d item(s), automation cleared on %d envelope(s) (u - undo)'):format(table.concat(names, ', '), ni, ne)
+    vim.msg = ('dS: %s - %d item(s), automation cleared on %d envelope(s) (u - undo)'):format(table.concat(names, ', '), ni, ne)
     return ni > 0 or ne > 0
   end,
   -- dt (4 окт) — вырезать выделенное время во всём проекте: нативное «Remove
