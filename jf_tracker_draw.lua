@@ -10952,7 +10952,7 @@ function D.frame(L, snap, rows, state, info)
     D.dg = drag and D.dgap or nil
     if not drag then D.dgap = nil end
     D.dgap_x = nil
-    D.DGW = 4 * math.max(ms('=') + 2 * L.pad, 3 * L.pad) + L.pad   -- 1 ноя: проём в 4 раза шире
+    D.DGW = 2 * math.max(ms('=') + 2 * L.pad, 3 * L.pad) + L.pad   -- 1 ноя: проём вдвое шире исходного (4x было много)
     for k, f in ipairs(fxs) do
       if D.dg and D.dg.before == k and not D.dg.inner_first then D.dgap_x = bx + math.floor(D.DGW / 2) - math.floor(L.pad / 2); bx = bx + D.DGW end
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
@@ -13246,7 +13246,7 @@ function D.frame(L, snap, rows, state, info)
       -- 1 ноя: проём раздвинут (D.dgap_x) — плашка в нём, ничего не закрывает: жёлтая рамка, фон прозрачный,
       -- верх | — последовательно, низ = — параллельно; активная половина подсвечена
       if D.dgap_x then gx = D.dgap_x end
-      local sw2 = 4 * math.max(ms('=') + 2 * L.pad, 3 * L.pad)
+      local sw2 = 2 * math.max(ms('=') + 2 * L.pad, 3 * L.pad)
       local x0 = gx - math.floor(sw2 / 2)
       local hh = math.floor(h0 / 2)
       local low = my >= y0 + hh
