@@ -396,6 +396,8 @@ do
   keysin('14'); eq('…14 writes 0U14', last(), 'fx:kick:0U14'); eq('…back to the code half', V.cur.sub, nil); eq('…a step down', V.cur.row, 1)
   V.cur.row = 0; keysin('si'); eq('S then I -> SI', V.hexbuf, 'SI'); keysin('08'); eq('SI08', last(), 'fx:kick:SI08')
   V.cur.row = 0; keysin('zj'); eq('Z then J -> ZJ (j is the code here, not a move)', V.hexbuf, 'ZJ'); V.hexbuf = nil; V.cur.sub = nil; V.fx_back = nil
+  V.cur.row = 0; keysin('br'); eq('B then R -> BR beat repeat (1 ноя: B is a prefix)', V.hexbuf, 'BR'); keysin('08'); eq('BR08', last(), 'fx:kick:BR08')
+  V.cur.row = 0; keysin('0b'); eq('0 then B -> 0B reverse still', V.hexbuf, '0B'); V.hexbuf = nil; V.cur.sub = nil; V.fx_back = nil
   -- значение без кода: код своей команды слота (kick: 0PA0 в слоте 1)
   V.cur = { fi = 1, row = 0, field = 4, sub = 'val' }
   keysin('3c'); eq('value half on 0PA0: 3C -> 0P3C', last(), 'fx:kick:0P3C'); eq('…stays on the value half', V.cur.sub, 'val')

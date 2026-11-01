@@ -20,6 +20,9 @@
 --   0Yxx        вероятность: item заглушается с шансом 1 − xx/FF (бросок
 --               при каждой пересборке)
 --   ZTxx        темп: tempo-маркер в строке события, BPM = xx (hex)
+--   BRxx        beat repeat: со своей строки до следующей BR / конца ноты повторяется срез 1/xx такта (xx — деления
+--               такта hex: 04 = 1/4, 08 = 1/8, 10 = 1/16, 06 = 1/4T, 0C = 1/8T, 01 = такт); BR00 — стоп. Эффект —
+--               LiveBeatRepeater (ReaTeam) в конце цепи трека: ставится сам, его огибающие repeat / length (1 ноя)
 --
 -- 12 окт: у каждой строки своя команда. Токен с @смещением (четверти от
 -- начала ноты, не строки — LPB не ломает): «0U08@0.75». Без @ — первая строка.
@@ -33,7 +36,7 @@ local R = reaper
 local model
 
 C.CODES = { ['0U'] = true, ['0D'] = true, ['0G'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true,
-  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true, ZB = true, ['0T'] = true }   -- 1 ноя: 0T — тремоло (PT 7xy)   -- 1 ноя: ZB — pattern break (ProTracker Dxx)
+  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true, ZB = true, ['0T'] = true, BR = true }   -- 1 ноя: BR — beat repeat (LiveBeatRepeater)   -- 1 ноя: 0T — тремоло (PT 7xy)   -- 1 ноя: ZB — pattern break (ProTracker Dxx)
 -- ZJxx — прыжок: когда плейхед доходит до строки события, трекер переводит
 -- воспроизведение в слот xx последовательности (матрица). Хранится как
 -- команда, огибающих не строит — исполняет main в кадре.
@@ -189,6 +192,8 @@ local function pt(env, t, v, shape) R.InsertEnvelopePoint(env, t, v, shape or 0,
 C.FX_MOD = {
   pitch = { add = 'ReaPitch', match = 'reapitch', param = 'shift (semitones)' },
   vol = { add = 'JS: Volume/Pan Smoother v5', match = 'volume/pan smoother', param = 'volume' },
+  brep = { add = 'LiveBeatRepeater', match = 'livebeatrepeater', param = 'loop-repeat' },   -- 1 ноя: BRxx
+  blen = { add = 'LiveBeatRepeater', match = 'livebeatrepeater', param = 'slice length [bars]' },
   pan = { add = 'JS: Volume/Pan Smoother v5', match = 'volume/pan smoother', param = 'pan' },
 }
 local function num_of(s) return tonumber(((s or ''):match('[-+]?%d+%.?%d*')) or '') end
@@ -204,6 +209,15 @@ function C.fx_env(tr, kind, create)
     if not create then return nil end
     fx = R.TrackFX_AddByName(tr, d.add, false, -1)
     if not fx or fx < 0 then return nil end
+    if d.match == 'livebeatrepeater' then   -- 1 ноя: репитер для BR — сразу на строке (не со следующей доли), MIDI трека его не трогает
+      for k = 0, R.TrackFX_GetNumParams(tr, fx) - 1 do
+        local _, pn = R.TrackFX_GetParamName(tr, fx, k, '')
+        pn = pn:lower()
+        if pn:find('^loop start') then R.TrackFX_SetParam(tr, fx, k, 0)
+        elseif pn:find('midi loop%-repeat') then R.TrackFX_SetParam(tr, fx, k, 0)
+        elseif pn:find('slice length transitions') then R.TrackFX_SetParam(tr, fx, k, 0) end
+      end
+    end
   end
   local p
   for k = 0, R.TrackFX_GetNumParams(tr, fx) - 1 do
@@ -223,12 +237,23 @@ function C.fx_env(tr, kind, create)
     local a, b = num_of(s0) or -12, num_of(s1) or 12
     if b == a then a, b = -12, 12 end
     conv = function(semis) local nrm = math.max(0, math.min(1, (semis - a) / (b - a))); return mn + nrm * (mx - mn) end
+  elseif kind == 'brep' or kind == 'blen' then
+    conv = function(v) return v end   -- сырое значение слайдера: 0 / 1, номер длины 0..13
   elseif kind == 'vol' then
     conv = function(amp) local db = amp > 1e-6 and 20 * math.log(amp, 10) or -200; return math.max(mn, math.min(mx, db)) end
   else
     conv = function(pan) return mn + (math.max(-1, math.min(1, pan)) + 1) / 2 * (mx - mn) end
   end
   return env, conv, fx, p
+end
+
+-- 1 ноя: BRxx → номер длины среза LiveBeatRepeater (2, 1, 1T, 1/2, 1/2T, 1/4 … 1/128 такта): ближайший к 1/xx такта
+C.BR_BARS = { 2, 1, 2 / 3, 1 / 2, 1 / 3, 1 / 4, 1 / 6, 1 / 8, 1 / 12, 1 / 16, 1 / 24, 1 / 32, 1 / 64, 1 / 128 }
+function C.br_len(xx)
+  local want = 1 / math.max(1, xx)
+  local best, bd = 5, 1e9
+  for i, b in ipairs(C.BR_BARS) do local d = math.abs(math.log(b / want)); if d < bd then best, bd = i - 1, d end end
+  return best
 end
 
 -- ── генераторы ────────────────────────────────────────────────────────────
@@ -289,6 +314,28 @@ function C.rebuild(head, lpb, prev_semis)
   for _, c in ipairs(list) do
     if c.cmd == '0U' or c.cmd == '0D' or c.cmd == '0G' or c.cmd == '0V' or c.cmd == '0A' then need_pitch = true end
     if c.cmd == '0I' or c.cmd == '0O' or c.cmd == '0T' then need_vol = true end
+  end
+  -- 1 ноя: BRxx — огибающие репитера на время ноты (аудио и MIDI одинаково, время проекта)
+  do
+    local need_br = false
+    for _, c in ipairs(list) do if c.cmd == 'BR' then need_br = true end end
+    local renv = C.fx_env(tr, 'brep', need_br)
+    local lenv = renv and C.fx_env(tr, 'blen', need_br)
+    if renv then
+      R.DeleteEnvelopePointRange(renv, pos - 1e-4, pos + len + 2e-4)
+      if lenv then R.DeleteEnvelopePointRange(lenv, pos - 1e-4, pos + len + 2e-4) end
+      if need_br then
+        local tq = function(off) return R.TimeMap2_QNToTime(0, qn0 + off) - pos end
+        R.InsertEnvelopePoint(renv, pos - 1e-4, 0, 1, 0, false, true)
+        R.InsertEnvelopePoint(renv, pos + len + 1e-4, 0, 1, 0, false, true)
+        for _, sg in ipairs(C.segments(list, { BR = true }, tq, len)) do
+          R.InsertEnvelopePoint(renv, pos + sg[1], 1, 1, 0, false, true)
+          R.InsertEnvelopePoint(renv, pos + sg[2], 0, 1, 0, false, true)
+          if lenv then R.InsertEnvelopePoint(lenv, pos + sg[1], C.br_len(sg[3].xx), 1, 0, false, true) end
+        end
+      end
+      R.Envelope_SortPoints(renv); if lenv then R.Envelope_SortPoints(lenv) end
+    end
   end
   if is_midi then
     -- 1 ноя: высота MIDI-ноты — не pitch bend (не каждый инструмент его понимает), а ReaPitch в конце цепи трека

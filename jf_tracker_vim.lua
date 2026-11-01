@@ -953,8 +953,8 @@ local function hex_entry(c, fld, heads)
     -- (h j k l — не коды, они ходят; ZJ — J после Z, это код)
     local code
     if buf == '' then
-      if ch == '0' or ch == 'S' or ch == 'Z' then
-        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ ZB' or '0D 0U 0V 0T 09 ...')) .. ')'
+      if ch == '0' or ch == 'S' or ch == 'Z' or ch == 'B' then   -- 1 ноя: B — приставка (BR beat repeat); реверс — 0 B
+        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ ZB' or (ch == 'B' and 'BR beat repeat; reverse is 0B' or '0D 0U 0V 0T 09 0B ...'))) .. ')'
         return false
       end
       if not (ch:match('^%a$') and fx_code_ok('0' .. ch)) then return false end

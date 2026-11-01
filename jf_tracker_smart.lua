@@ -293,9 +293,10 @@ SM.FX = {
   { 'SF', 'finetune in cents (80 = 0)' }, { 'SL', 'SL00: loop source off' }, { 'SM', 'channel mode 0..4' },
   { 'ZT', 'tempo: BPM = xx' }, { 'ZJ', 'jump to sequence slot xx' }, { 'ZB', 'pattern break: after this row the next pattern plays, from its row xx' },
   { '09', 'sample offset xx/256 of the whole sample (ProTracker 9xx)' },
+  { 'BR', 'beat repeat: from this row the track repeats a 1/xx bar slice (04 quarter, 08 eighth, 10 sixteenth, 06 / 0C triplets) till the next BR or the note end; BR00 stop. Puts LiveBeatRepeater at the end of the chain itself' },
 }
 -- 12 окт: короткие имена — список команд читается словами (0U pitch up), не только кодами
-SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0T'] = 'tremolo', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['0B'] = 'reverse', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump', ['ZB'] = 'break', ['09'] = 'offset' }
+SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0T'] = 'tremolo', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['0B'] = 'reverse', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump', ['ZB'] = 'break', ['09'] = 'offset', BR = 'beat repeat' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 -- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
@@ -325,6 +326,14 @@ SM.FX_MEAN = {
   ZJ = function(v) return ('jump to sequence slot %d'):format(v) end,
   ZB = function(v) return ('break: the next pattern from its row %d'):format(v) end,
   ['09'] = function(v) return ('start at %d%% of the sample'):format(math.floor(v / 256 * 100 + 0.5)) end,
+  BR = function(v)   -- то же округление, что C.br_len: ближайшая длина репитера к 1/xx такта
+    if v == 0 then return 'repeat off' end
+    local B = { { 2, '2 bars' }, { 1, '1 bar' }, { 2 / 3, '1T' }, { 1 / 2, '1/2' }, { 1 / 3, '1/2T' }, { 1 / 4, '1/4' }, { 1 / 6, '1/4T' }, { 1 / 8, '1/8' },
+      { 1 / 12, '1/8T' }, { 1 / 16, '1/16' }, { 1 / 24, '1/16T' }, { 1 / 32, '1/32' }, { 1 / 64, '1/64' }, { 1 / 128, '1/128' } }
+    local best, bd = '?', 1e9
+    for _, b in ipairs(B) do local d = math.abs(math.log(b[1] * v)); if d < bd then best, bd = b[2], d end end
+    return 'repeat ' .. best .. ' bar slice'
+  end,
 }
 function SM.fx_letters(only)   -- only(code) → false: команда этой ноте не подходит (19 окт: MIDI — без 0S, SI, SO …)
   local items = {}
