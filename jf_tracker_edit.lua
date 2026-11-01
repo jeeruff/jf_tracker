@@ -3216,6 +3216,14 @@ function E.keep_markers_qn(fn)
     R.SetProjectMarker3(0, m.idx, m.isrgn, p, e, m.name, m.col)
   end
 end
+-- 1 ноя: DeleteEnvelopePointRange не берёт точку ровно в 0 (диапазон с отрицательного времени) — удалять по индексам
+function E.env_del_pts(env, t0, t1)
+  R.DeleteEnvelopePointRange(env, t0, t1)
+  for i = R.CountEnvelopePoints(env) - 1, 0, -1 do
+    local _, pt = R.GetEnvelopePoint(env, i)
+    if pt >= t0 and pt < t1 then R.DeleteEnvelopePointEx(env, -1, i) end
+  end
+end
 function E.env_del_range(e, t0, t1)
   local n = #E.env_points(e, t0, t1)
   if n == 0 then return 0 end
@@ -3230,13 +3238,13 @@ function E.env_del_range(e, t0, t1)
     end) end)
     return n
   end
-  run('envelope delete points', function() R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9) end)
+  run('envelope delete points', function() E.env_del_pts(e.env, t0 - 1e-9, t1 - 1e-9) end)
   return n
 end
 -- вставка точек (замена в своём диапазоне): pts уже со временами цели
 function E.env_put_points(e, t0, t1, pts)
   run('envelope paste points', function()
-    R.DeleteEnvelopePointRange(e.env, t0 - 1e-9, t1 - 1e-9)
+    E.env_del_pts(e.env, t0 - 1e-9, t1 - 1e-9)
     for _, p in ipairs(pts) do R.InsertEnvelopePoint(e.env, p.t, p.v, p.shape or 0, p.tension or 0, false, true) end
     R.Envelope_SortPoints(e.env)
   end)
