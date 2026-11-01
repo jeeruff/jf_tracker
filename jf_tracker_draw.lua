@@ -8420,8 +8420,17 @@ function D.frame(L, snap, rows, state, info)
           D.mmono.mbyp = reaper.GetToggleCommandState(41884) == 1
         end
         local fw = ms('mfx') + 6
-        local fx0 = c.x + c.w - fw - 2
+        local iw = ms('i') + 6
+        local fx0 = c.x + c.w - fw - iw - 4
         if fx0 > bx + mw + 2 then
+          -- 1 ноя: i — свойства мастера (zm), в самом углу, правее mfx
+          local ix = fx0 + fw + 2
+          local ihot = mx >= ix and mx < ix + iw and my >= by and my < by + bhh + 2
+          set(ihot and D.CURROW or U.PANEL); gfx.rect(ix, by, iw, bhh, 1)
+          set(ihot and U.AMBER or U.DIM); gfx.rect(ix, by, iw, bhh, 0)
+          text(ix + 3, by + math.floor((bhh - (L.th or (L.rh - 2))) / 2) - (D.SPACE or 0), 'i', ihot and U.AMBER or BTXT)
+          if ihot then hover.minfo = true end
+          hint('minfo', ix, by, iw, bhh + 2, true)
           local has = (D.mmono.mfx or 0) > 0
           local live = has and not D.mmono.mbyp
           local hot = mx >= fx0 and mx < fx0 + fw and my >= by and my < by + bhh + 2
@@ -10355,15 +10364,17 @@ function D.frame(L, snap, rows, state, info)
     gfx.a = 1
   end
 
-  -- разделители
+  -- разделители; 1 ноя: у трека, ушедшего под мастер, — не правее его края (мастер поверх всех линий)
   for _, c in ipairs(L.cols) do
-    set(U.LINE); gfx.rect(c.x, L.body_y, 1, L.body_h, 1)
+    local lim = c.master and math.huge or L.cols_r
+    local function vl(x, col) if x < lim then set(col); gfx.rect(x, L.body_y, 1, L.body_h, 1) end end
+    vl(c.x, U.LINE)
     for li, ln in ipairs(c.lanes) do
-      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, L.body_y, 1, L.body_h, 1) end
-      for si = 2, ln.nsub do set(D.EMPTY); gfx.rect(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), L.body_y, 1, L.body_h, 1) end
+      if li > 1 then vl(ln.x - 1, U.DIM) end
+      for si = 2, ln.nsub do vl(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), D.EMPTY) end
     end
-    for _, ev in ipairs(c.envs) do set(U.DIM); gfx.rect(ev.x - 1, L.body_y, 1, L.body_h, 1) end
-    for _, m in ipairs(c.mls or {}) do set(U.DIM); gfx.rect(m.x - 1, L.body_y, 1, L.body_h, 1) end
+    for _, ev in ipairs(c.envs) do vl(ev.x - 1, U.DIM) end
+    for _, m in ipairs(c.mls or {}) do vl(m.x - 1, U.DIM) end
   end
   -- 21 окт: треки не влезли — уходят под мастер: виньетка у правого края (мастер не рисуется поверх)
   if L.cols_cut or L.hs_cut then

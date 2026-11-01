@@ -10312,7 +10312,7 @@ ctx = {
         vim.msg = 'sections strip ' .. (MX.sections and 'on' or 'off') .. ((MX.sections and not MX.has_sec) and ' - empty for now: Tr in the matrix makes a section (several patterns in a row)' or '') end },
       -- 19 окт: пункт palette убран — палитра заменена кубиками в углу (MX.palette_old)
       { key = 'c', label = 'cell: the tracker shows only the tracks of the selected cells (F)' .. on(MX.selmode), fn = function() ctx.mx_zoom_cycle() end },   -- 18 окт: была кнопкой cell
-      { key = 'm', label = 'minimize the pane (zm)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
+      { key = '_', label = 'minimize the pane (z_)', fn = function() ctx.pane_min() end },   -- 21 окт: zm в матрице — z m
     }
     if ctx.dev_on and ctx.dev_on() then items[#items + 1] = { key = 'l', label = 'loops (dev): the cells show item loop periods, digits+Enter - loop N steps' .. on(MX.loops), fn = function() ctx.mx_loops_toggle() end } end
     vim.open_hydra({ title = 'matrix view (z)', items = items })
@@ -18916,6 +18916,7 @@ local function hint_go(t)
   elseif t.kind == 'slx' then ctx.set_focus('dsp'); ctx.slx_do(d)   -- 25 окт: f на кнопке пульта slixer
   elseif t.kind == 'mmono' then reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
   elseif t.kind == 'mmfx' then ctx.mfx_open()   -- 1 ноя: прыжок f на MFX
+  elseif t.kind == 'minfo' then ctx.master_menu()
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
   elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
   elseif t.kind == 'btn' then
@@ -25537,6 +25538,7 @@ local function frame()
   elseif hover.slxaim then state.status = 'slixer aim - the edge up close: drag - fine move, wheel - wider / closer'
   elseif hover.slxwave and hover.slxwave.w and hover.slxwave.w.edge then state.status = ('slixer: start of slice %d - drag it'):format(hover.slxwave.w.edge)
   elseif hover.slxwave then state.status = 'slixer wave - click: select and hear the slice, drag an edge: move it, wheel: zoom (Shift - scroll), dblclick: a slice here (on an edge - remove it), drop a file: new sample'
+  elseif hover.minfo then state.status = 'i - master properties: fx chain, monitor FX, mono, routing, visibility, tempo envelope (zm)'
   elseif hover.mmfx then state.status = 'mfx - monitor FX (after the master, only to the speakers - not in renders): click - the chain window (zC); green - effects on, grey - none / bypassed'
   elseif hover.mmono then state.status = 'master mono - click: L+R summed to mono / back to stereo (as MONO in the REAPER mixer)'
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
@@ -28139,6 +28141,7 @@ local function frame()
       end
       click = { t = now2, zone = 'btn' }
     elseif hover.mmfx then ctx.mfx_open()   -- 1 ноя
+    elseif hover.minfo then ctx.master_menu(); state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
     elseif hover.mmono then   -- 25 окт: mono мастера (как MONO в микшере REAPER)
       reaper.Main_OnCommand(40917, 0); if draw.mmono then draw.mmono.t = 0 end
       vim.msg = 'master: ' .. (reaper.GetToggleCommandState(40917) == 1 and 'mono (L+R)' or 'stereo')
@@ -31260,7 +31263,8 @@ local function frame()
         -- z-операторы (7 окт): zz / zr — роутер в DSP FX, zR — большой роутер
         if state.dsp_z and not DK.pending then
           state.dsp_z = nil
-          if ch == 'm' then ctx.pane_min(); return end   -- 21 окт: zm и в DSP — свернуть панель
+          if ch == '_' then ctx.pane_min(); return end   -- 1 ноя: z_ (было zm) — свернуть панель
+          if ch == 'm' then ctx.master_menu(); return end   -- 1 ноя: zm — свойства мастера
           if ch == 'r' then ctx.dsp_big() elseif ch == 'R' then ctx.router_big()
           elseif ch == 'z' then   -- 22 окт: zz — эффекты на всё окно, микшер над ними (роутер — zr)
             local ids, fr = { 'mixer', 'dsp' }, { 0.3, 0.7 }
@@ -33433,6 +33437,26 @@ ctx.fxcmd_load = function()
     ctx.SM.FX_NAME[k] = u.param
     ctx.SM.FX_MEAN[k] = function(v) return ('%s %d%%'):format(u.param, math.floor(v / 255 * 100 + 0.5)) end
   end
+end
+-- 1 ноя: свойства мастера — zm и кнопка i в шапке мастера (как i / меню мастера в микшере REAPER)
+ctx.master_menu = function()
+  local mt = reaper.GetMasterTrack(0)
+  local function on(id) return reaper.GetToggleCommandState(id) == 1 and '  *' or '' end
+  local function act(id, msg) return function() reaper.Main_OnCommand(id, 0); vim.msg = msg end end
+  local nfx, nmfx = reaper.TrackFX_GetCount(mt), reaper.TrackFX_GetRecCount(mt)
+  vim.open_hydra({ title = 'master', items = {
+    { key = 'f', label = ('fx chain of the master (%d)'):format(nfx), fn = act(40846, 'master fx chain') },
+    { key = 'C', label = ('monitor FX (%d) - only to the speakers'):format(nmfx) .. on(41884):gsub('%*', 'bypassed'), fn = function() ctx.mfx_open() end },
+    { key = 'b', label = 'monitor FX bypass' .. on(41884), fn = act(41884, 'monitor FX bypass toggled') },
+    { key = 'm', label = 'mono (L+R)' .. on(40917), fn = act(40917, 'master mono toggled') },
+    { key = 'r', label = 'routing and I/O of the master', fn = act(42235, 'master routing') },
+    { key = 'v', label = 'master track visible in REAPER (TCP)' .. on(40075), fn = act(40075, 'master in the arrange toggled') },
+    { key = 't', label = 'tempo envelope of the master' .. on(41046), fn = act(41046, 'master tempo envelope toggled') },
+    { key = 'w', label = 'master in a separate mixer window' .. on(41636), fn = act(41636, 'master window toggled') },
+    { key = '0', label = 'volume 0 dB, pan centre', fn = function()
+      edit.run('master reset', function() reaper.SetMediaTrackInfo_Value(mt, 'D_VOL', 1); reaper.SetMediaTrackInfo_Value(mt, 'D_PAN', 0) end)
+      vim.msg = 'master: 0 dB, centre' end },
+  } })
 end
 -- 1 ноя: цепь monitor FX — окно REAPER (zC, кнопка MFX мастера)
 ctx.mfx_open = function()
