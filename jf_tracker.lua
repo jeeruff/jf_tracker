@@ -29827,6 +29827,12 @@ local function frame()
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
+  -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
+  if OPT.active and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker then
+    if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
+    else OPT.key(c) end
+    c = 0
+  end
   -- 28 окт: Ctrl+- с клавиатуры не доходит до gfx.getchar (Ctrl+= доходит, логика шага верна — проверено инъекцией):
   -- берём физическое нажатие vk 0xBD; если getchar сам прислал Ctrl+- (45 / 31) — запасной путь выключается
   if c > 0 and (c == 45 or c == 31) and not from_q and ctx.mods().ctrl then ctx.kmin_native = true end
