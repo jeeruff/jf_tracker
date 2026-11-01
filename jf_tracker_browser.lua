@@ -385,7 +385,7 @@ end
 -- 27 окт (9): этап 2 — анализ: очередь (что слушали + группа под мышью), по 2 файла за кадр, пики строятся в фоне
 local function an_file() return R.GetResourcePath() .. '/Data/jf_tracker_mapan.txt' end
 B.an_q, B.an_qs, B.an_t = {}, {}, 0
-function B.an_push(path) if path and not B.SM.AN[path] and not B.an_qs[path] then B.an_qs[path] = true; B.an_q[#B.an_q + 1] = path end end
+function B.an_push(path) if path and not (B.SM.AN[path] and B.SM.AN[path].at) and not B.an_qs[path] then B.an_qs[path] = true; B.an_q[#B.an_q + 1] = path end end
 function B.an_tick(G)
   if not B.an_loaded then B.an_loaded = true; pcall(B.SM.an_load, an_file()) end
   local hb = B.map_hv and (B.map_hv.hub or (B.map_hv.node and B.map_hv.node.h))
@@ -395,13 +395,22 @@ function B.an_tick(G)
   end
   local done = 0
   local i = 1
-  while i <= #B.an_q and done < 2 and i <= 6 do
+  local per = B.fp_on and 6 or 2   -- 1 ноя: :fprint — быстрее
+  while i <= #B.an_q and done < per and i <= 12 do
     local pth = B.an_q[i]
     local pk = ctx.file_peaks and ctx.file_peaks(pth, 32, 0, 1, true)
-    if pk then
+    local len = pk and ctx.file_len_of and ctx.file_len_of(pth)
+    -- 1 ноя: отпечаток — тонкие пики начала звука (атака / спад / шумность); строятся фоном, как и грубые
+    local T = len and math.min(0.4, len) or nil
+    local fk = T and T > 0.005 and ctx.file_peaks(pth, 200, 0, math.min(1, T / len), true)
+    if pk and (fk or not T or T <= 0.005) then
       local a = B.SM.an_from_peaks(pk)
-      if a and ctx.file_len_of then a.d = ctx.file_len_of(pth) end   -- 27 окт: длина — для песчинок
-      if a then B.SM.AN[pth] = a; B.SM.an_dirty = true; B.SM.an_n = (B.SM.an_n or 0) + 1 end
+      if a then a.d = len end   -- 27 окт: длина — для песчинок
+      if a then
+        local fp = fk and B.SM.an_fine(fk, T) or { at = 1, dc = 0, nz = 0 }
+        a.at, a.dc, a.nz = fp.at, fp.dc, fp.nz
+        B.SM.AN[pth] = a; B.SM.an_dirty = true; B.SM.an_n = (B.SM.an_n or 0) + 1
+      end
       table.remove(B.an_q, i); B.an_qs[pth] = nil; done = done + 1
       local n = G and G.bypath and G.bypath[pth]
       if n then n.h.an_new = (n.h.an_new or 0) + 1 end

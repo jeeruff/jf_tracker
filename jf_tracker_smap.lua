@@ -190,18 +190,61 @@ function SM.an_from_peaks(pk)
   end
   return { l = math.min(1, sl / pk.n * 1.6), b = nb > 0 and sb / nb or 0.5 }
 end
+-- 1 ноя: ОТПЕЧАТОК — тонкие пики REAPER начала звука (200 столбцов на первые T ≤ 0.4 с, спектральный слой):
+-- at — атака (10 → 90 % пика), лог 0.5..200 мс → 0..1 (0 — резкая: хэт; шейкер — мягче);
+-- dc — спад от пика до −20 дБ, лог 5 мс..1 с → 0..1; nz — шумность: как скачет частота спектра между столбцами
+-- (тон — ровно, шум — прыгает), 0..1. Вместе с l (громкость) и b (яркость) — пять чисел на файл
+function SM.an_fine(pk, T)
+  if not (pk and pk.n and pk.n > 4) then return nil end
+  local n, bin = pk.n, T / pk.n
+  local env, mx, ip = {}, 0, 1
+  for i = 1, n do
+    local a = math.max(math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0))
+    env[i] = a
+    if a > mx then mx, ip = a, i end
+  end
+  if mx < 1e-4 then return { at = 1, dc = 0, nz = 0 } end
+  local i10, i90 = 1, ip
+  for i = 1, ip do if env[i] >= mx * 0.1 then i10 = i; break end end
+  for i = i10, ip do if env[i] >= mx * 0.9 then i90 = i; break end end
+  local att = math.max(0.0005, (i90 - i10) * bin)
+  local idc = n
+  for i = ip, n do if env[i] < mx * 0.1 then idc = i; break end end
+  local dec = math.max(0.005, (idc - ip) * bin)
+  local sz, nzn, prev = 0, 0, nil
+  for i = 1, n do
+    local sv = pk.spec and pk.spec[i]
+    local f = sv and (math.floor(sv) % 32768) or 0
+    if f > 20 and env[i] > mx * 0.1 then
+      if prev then sz = sz + math.abs(math.log(f / prev, 2)); nzn = nzn + 1 end
+      prev = f
+    end
+  end
+  local function lg(v, lo, hi) return math.max(0, math.min(1, math.log(v / lo) / math.log(hi / lo))) end
+  return { at = lg(att, 0.0005, 0.2), dc = lg(dec, 0.005, 1), nz = nzn > 0 and math.min(1, sz / nzn / 1.5) or 0 }
+end
+-- расстояние отпечатков (без отпечатка — далеко); веса: атака и шумность различают хэт / шейкер, яркость — главное
+function SM.fp_dist(a, b)
+  if not (a and b and a.at and b.at) then return 9 end
+  return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 1.0 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
+end
 function SM.an_load(file)
   local f = io.open(file, 'r'); if not f then return end
   for line in f:lines() do
-    local pth, l, b, d = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)\t?([%d%.]*)$')
-    if pth then SM.AN[pth] = { l = tonumber(l), b = tonumber(b), d = tonumber(d) }; SM.an_n = (SM.an_n or 0) + 1 end
+    local pth, l, b, d, rest = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)\t?([%d%.]*)\t?(.*)$')
+    if pth then
+      local e = { l = tonumber(l), b = tonumber(b), d = tonumber(d) }
+      local at, dc, nz = (rest or ''):match('^([%d%.]+)\t([%d%.]+)\t([%d%.]+)')   -- 1 ноя: отпечаток
+      if at then e.at, e.dc, e.nz = tonumber(at), tonumber(dc), tonumber(nz) end
+      SM.AN[pth] = e; SM.an_n = (SM.an_n or 0) + 1
+    end
   end
   f:close()
 end
 function SM.an_save(file)
   if not SM.an_dirty then return end
   local f = io.open(file .. '.tmp', 'w'); if not f then return end
-  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', '\n') end
+  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', a.at and ('\t%.3f\t%.3f\t%.3f'):format(a.at, a.dc, a.nz) or '', '\n') end
   f:close(); os.remove(file); os.rename(file .. '.tmp', file)
   SM.an_dirty = false
 end

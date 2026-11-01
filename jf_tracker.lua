@@ -23391,6 +23391,20 @@ local function frame()
     if G.building then B.SM.scan(G, 0.003) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
     -- 28 окт: вид cloud — грубый анализ частот фоном: каждый 3-й тик два ещё не слышанных файла (шагом по списку,
     -- чтобы облако заполнялось равномерно); группы и облако пересобираются по мере (B.an_tick, раз в 1.5 с)
+    -- 1 ноя: :fprint — отпечатки всех файлов индекса карты по порядку (пропуская готовые), прогресс в статусе
+    if not G.building and B.fp_on and B.an_tick then
+      local N = #G.nodes
+      B.fp_ptr = B.fp_ptr or 0
+      local tries = 0
+      while #B.an_q < 12 and B.fp_ptr < N and tries < 400 do
+        B.fp_ptr = B.fp_ptr + 1; tries = tries + 1
+        local n = G.nodes[B.fp_ptr]
+        if n and not ((B.SM.AN[n.path] or {}).at) and (not B.SM.ext_type or B.SM.ext_type(n.name or '') == 'samples') then B.an_push(n.path) end
+      end
+      pcall(B.an_tick, G)
+      if B.fp_ptr >= N and #B.an_q == 0 then B.fp_on = false; vim.msg = ('fprint: done - %d files of the map index'):format(N)
+      elseif reaper.time_precise() - (B.fp_msg_t or 0) > 0.5 then B.fp_msg_t = reaper.time_precise(); state.status = ('fprint: %d / %d files (peaks build in the background; :fprint again - stop)'):format(B.fp_ptr - #B.an_q, N) end
+    end
     if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then
       ctx.cl_tick = (ctx.cl_tick or 0) + 1
       if #B.an_q >= 12 and ctx.cl_tick % 60 == 0 then local old = table.remove(B.an_q, 1); if old then B.an_qs[old] = nil end end   -- застрявший (пики не строятся) — вон
@@ -33199,6 +33213,56 @@ ctx.lpb_menu = function()
     items[#items + 1] = { key = p[1], label = ('LPB %d%s  - %s%s'):format(p[2], m ~= '' and (' ' .. m) or '', p[3], state.lpb == p[2] and '  *' or ''), fn = function() ctx.set_lpb(p[2]); vim.msg = ('LPB %d %s- a row is a %s'):format(p[2], m ~= '' and (m .. ' ') or '', p[3]:gsub('s$', '')) end }
   end
   vim.open_hydra({ title = 'LPB of the view (rows per beat; T triplets, D quintuplets)', items = items })
+end
+-- 1 ноя: отпечатки звуков (этапы 1-2): :fprint — скан индекса карты (папка, открытая в map), :similar — похожие на
+-- сэмпл: строка браузера, иначе аудио-нота под курсором трекера; та же категория по имени, ближайшие по отпечатку;
+-- в сетке — слушать при выборе, Enter — в lib (как Enter в браузере)
+ctx.fprint_cmd = function()
+  if not (B.SM and B.mapG and #B.mapG.nodes > 0) then vim.msg = 'fprint: open the map pane on your samples folder once - its index is what gets fingerprinted'; return end
+  B.fp_on = not B.fp_on
+  if B.fp_on then B.fp_ptr = 0; vim.msg = ('fprint: %d files of the map index - in the background, from REAPER peaks'):format(#B.mapG.nodes)
+  else vim.msg = 'fprint: stopped (:fprint - go on from the start, the done ones are skipped)' end
+end
+ctx.similar_cmd = function()
+  local SM = B.SM
+  local path
+  if state.focus == 'browser' and B.preview_path then path = B.preview_path(B.entries[B.cur]) end
+  if not path then
+    local f = L and L.flat[vim.cur.fi]
+    local c = f and f.sub and f.sub[vim.cur.row]
+    local h = c and (c.kind == 'audio' and c or c.of)
+    if h and h.item and ctx.item_file then path = ctx.item_file(h.item) end
+  end
+  if not path then vim.msg = 'similar: a sample in the browser or an audio note under the cursor'; return end
+  if not (B.mapG and #B.mapG.nodes > 0) then vim.msg = 'similar: open the map pane on your samples folder once (and :fprint it)'; return end
+  local a0 = SM.AN[path]
+  if not (a0 and a0.at) then
+    B.an_push(path); B.an_tick(B.mapG)
+    a0 = SM.AN[path]
+    if not (a0 and a0.at) then vim.msg = 'similar: listening to it (REAPER builds its peaks) - again in a moment'; return end
+  end
+  local nm = path:match('[^/]+$') or path
+  local cat = SM.cat_of(nm, nil)
+  local same = cat:sub(1, 1) ~= '/' and cat ~= 'other'
+  local cands, nfp = {}, 0
+  for _, n in ipairs(B.mapG.nodes) do
+    local a = SM.AN[n.path]
+    if a and a.at and n.path ~= path then
+      nfp = nfp + 1
+      if not same or n.cat == cat then cands[#cands + 1] = { n = n, d = SM.fp_dist(a0, a) } end
+    end
+  end
+  if #cands == 0 then vim.msg = ('similar: no fingerprints%s yet - :fprint the map index (%d done)'):format(same and (' of ' .. cat) or '', nfp); return end
+  table.sort(cands, function(p, q) return p.d < q.d end)
+  local items = {}
+  for i = 1, math.min(40, #cands) do
+    local n = cands[i].n
+    items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
+  end
+  ctx.smart_open({ title = ('similar to %s%s - %d of %d fingerprinted (Enter - into the lib)'):format(nm, same and (' (' .. cat .. ')') or '', #items, nfp),
+    items = items, cols = 2, sel = 1,
+    on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
+    on_pick = function(it) ctx.add_to_depot(it.v) end })
 end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()
