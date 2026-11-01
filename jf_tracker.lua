@@ -31671,6 +31671,9 @@ ctx.retro_insert = function(as_phrase)
           if not first or t < first then first = t end
         end
       end
+      -- 1 ноя: сыгранное при идущем транспорте REAPER кладёт на его время (не на курсор) — там и оставить;
+      -- сыгранное при стопе приходит к курсору — его ставим на строку курсора, как было
+      ctx.retro_at = math.abs(reaper.GetMediaItemInfo_Value(made, 'D_POSITION') - t_row) > 0.002
       if first then
         local pos = reaper.GetMediaItemInfo_Value(made, 'D_POSITION')
         local lead = first - pos
@@ -31679,7 +31682,7 @@ ctx.retro_insert = function(as_phrase)
           reaper.SetMediaItemInfo_Value(made, 'D_LENGTH', reaper.GetMediaItemInfo_Value(made, 'D_LENGTH') - lead)
           reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + lead)
         end
-        reaper.SetMediaItemInfo_Value(made, 'D_POSITION', t_row)
+        if not ctx.retro_at then reaper.SetMediaItemInfo_Value(made, 'D_POSITION', t_row) end
       end
       if f.col.fixed and f.lane and f.lane.idx and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then reaper.SetMediaItemInfo_Value(made, 'I_FIXEDLANE', f.lane.idx) end
     end
@@ -31690,7 +31693,8 @@ ctx.retro_insert = function(as_phrase)
   model.invalidate()
   if not made then vim.msg = 'R: nothing in the retro buffer of this track (it records while armed - play something first)'; return end
   local _, nn = reaper.MIDI_CountEvts(reaper.GetActiveTake(made))
-  vim.msg = ('R: %d note(s) of the last played - from row %04d (u - undo)'):format(nn or 0, vim.cur.row)
+  vim.msg = ctx.retro_at and ('R: %d note(s) of the last played - where they were played, from row %04d (u - undo)'):format(nn or 0, math.floor(model.row_of_time(reaper.GetMediaItemInfo_Value(made, 'D_POSITION'), state.lpb) + 1e-6))
+    or ('R: %d note(s) of the last played - from row %04d (u - undo)'):format(nn or 0, vim.cur.row)
   if as_phrase then
     -- строки сыгранного: от курсора до конца айтема — блок фразы на треке курсора
     local e = reaper.GetMediaItemInfo_Value(made, 'D_POSITION') + reaper.GetMediaItemInfo_Value(made, 'D_LENGTH')
