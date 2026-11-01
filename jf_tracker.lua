@@ -21711,6 +21711,8 @@ local function poll_midi_in()
           end
         end
         if not midiin.held[d1] then midiin.held[d1] = true; midiin.nheld = midiin.nheld + 1 end
+        midiin.hold = midiin.hold or {}
+        midiin.hold[d1] = nil
         -- нарезанный инструмент (4 окт): нота = слайс (C-4 = 1, хроматически)
         local inst = col.pool and col.pool[vim.inst]
         local k = inst and inst.slices and #inst.slices > 0 and (d1 - ctx.slice_base() + 1) or nil   -- 24 окт: как клавиши (было от C-4)
@@ -21723,17 +21725,31 @@ local function poll_midi_in()
           if state.unhuman then d2 = vim.vel or 100 end   -- 31 окт: unhuman — одна velocity
           edit.rec_note(col.track, lane_idx, state.lpb, midiin.row, d1, d2, math.max(1, vim.step))
           vim.msg = ('rec %s vel %d'):format(model.note_name(d1), d2)
+          -- 1 ноя: hold (не roll) — нота длится, пока держишь; длина — на отпускании
+          if not state.holdroll then midiin.hold[d1] = { t0 = edit.swing_time(midiin.row, state.lpb), wall = reaper.time_precise(), track = col.track, lane = lane_idx } end
         end
       elseif kind == 0x80 or (kind == 0x90 and d2 == 0) then
         if midiin.held[d1] then midiin.held[d1] = nil; midiin.nheld = math.max(0, midiin.nheld - 1) end
+        local hn = midiin.hold and midiin.hold[d1]
+        local rel_row
+        if hn then   -- 1 ноя: hold — длина ноты = сколько держал (не меньше строки); курсор — за её конец
+          midiin.hold[d1] = nil
+          local t1 = math.max(edit.row_time(midiin.row + 1, state.lpb, 0), hn.t0 + (reaper.time_precise() - hn.wall))
+          if edit.rec_note_len(hn.track, hn.lane, hn.t0, d1, t1) then
+            rel_row = math.ceil(model.row_of_time(t1, state.lpb) - 1e-3)
+            vim.msg = ('rec %s held %.2f s'):format(model.note_name(d1), reaper.time_precise() - hn.wall)
+          end
+        end
         if midiin.nheld == 0 and midiin.row then
-          vim.cur.row = midiin.row + vim.step                  -- шаг после отпускания всех клавиш
+          vim.cur.row = math.max(midiin.row + vim.step, rel_row or 0)   -- шаг после отпускания всех клавиш (hold — за конец ноты)
           if vim.cur.row >= state.row0 + L.nrows - 1 then state.row0 = vim.cur.row - math.floor(L.nrows / 3) end
         end
-      elseif (kind == 0xA0 or kind == 0xD0 or kind == 0xB0) and midiin.nheld > 0 and midiin.row and not (kind == 0xA0 and d2 == 0) then   -- 11 окт: poly AT 0 (отпускание) не пишем
+      elseif (kind == 0xA0 or kind == 0xD0 or kind == 0xB0 or kind == 0xE0) and midiin.nheld > 0 and midiin.row and not (kind == 0xA0 and d2 == 0) then   -- 1 ноя: + pitch bend   -- 11 окт: poly AT 0 (отпускание) не пишем
         local len = edit.row_time(midiin.row + math.max(1, vim.step), state.lpb, 0) - midiin.t0
-        local t = midiin.t0 + math.min(len * 0.999, reaper.time_precise() - midiin.wall0)
-        edit.rec_cc(col.track, lane_idx, t, kind, ch, d1, d2)
+        local el = reaper.time_precise() - midiin.wall0
+        -- 1 ноя: hold — крутилки по реальному времени удержания (клип дотягивается), roll — в пределах шага, как было
+        local t = midiin.t0 + (state.holdroll and math.min(len * 0.999, el) or el)
+        edit.rec_cc(col.track, lane_idx, t, kind, ch, d1, d2, (not state.holdroll) and midiin.t0 or nil)
       end
     end
   end

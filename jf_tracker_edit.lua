@@ -2980,9 +2980,32 @@ function E.rec_note(track, lane_idx, lpb, row, pitch, vel, len_rows)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   run('rec note', function() insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false); if E.mono_on(track) then E.mono_cut_at(track, lane_idx, t0) end end)
 end
--- CC / aftertouch в MIDI-item, покрывающий t (status: 0xA0 poly AT, 0xD0 channel AT, 0xB0 CC)
-function E.rec_cc(track, lane_idx, t, status, chan, d1, d2)
+-- 1 ноя: hold с MIDI-клавиатуры — нота pitch со старта t0 длится до t1 (отпустил клавишу); клип дотягивается
+function E.rec_note_len(track, lane_idx, t0, pitch, t1)
+  local it, tk = midi_item_at(track, lane_idx, t0)
+  if not tk then return false end
+  local done = false
+  run('note length (held)', function()
+    local fin = R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+    if t1 > fin then R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - R.GetMediaItemInfo_Value(it, 'D_POSITION')) end
+    local p0, p1 = R.MIDI_GetPPQPosFromProjTime(tk, t0), R.MIDI_GetPPQPosFromProjTime(tk, t1)
+    local _, nn = R.MIDI_CountEvts(tk)
+    for k = 0, nn - 1 do
+      local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
+      if pi == pitch and math.abs(a0 - p0) < 2 then R.MIDI_SetNote(tk, k, sel, mu, a0, math.max(a0 + 1, p1), ch, pi, ve, true); done = true; break end
+    end
+    R.MIDI_Sort(tk)
+  end)
+  return done
+end
+-- CC / aftertouch в MIDI-item, покрывающий t (status: 0xA0 poly AT, 0xD0 channel AT, 0xB0 CC);
+-- 1 ноя: from — старт удерживаемой ноты: t за концом клипа — клип дотягивается (hold пишет крутилки по времени)
+function E.rec_cc(track, lane_idx, t, status, chan, d1, d2, from)
   local it, tk = midi_item_at(track, lane_idx, t)
+  if not tk and from then
+    it, tk = midi_item_at(track, lane_idx, from)
+    if tk then R.SetMediaItemInfo_Value(it, 'D_LENGTH', t + 0.01 - R.GetMediaItemInfo_Value(it, 'D_POSITION')) end
+  end
   if not tk then return end
   local ppq = R.MIDI_GetPPQPosFromProjTime(tk, t)
   R.MIDI_InsertCC(tk, false, false, ppq, status, chan or 0, d1 or 0, d2 or 0)
