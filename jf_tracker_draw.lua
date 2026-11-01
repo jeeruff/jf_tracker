@@ -13209,25 +13209,24 @@ function D.frame(L, snap, rows, state, info)
       end
       for _, b in ipairs(blocks) do
         if b.cont and not b.bands and b.k ~= drag.k and mx >= b.x + b.w / 4 and mx < b.x + b.w * 3 / 4 and my >= b.y and my < b.y + b.h then
-          set(U.CYAN); gfx.rect(b.x, b.y, b.w, b.h, 0); gfx.rect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 0)
+          set(U.YELLOW); gfx.rect(b.x, b.y, b.w, b.h, 0)   -- 1 ноя: внутрь контейнера — тонкая жёлтая рамка, без заливки
           hover.dsp_into = b.k
           hover.dsp_into_par = my >= b.y + b.h / 2 and 1 or 0     -- 28 окт: нижняя половина — parallel (как у поля «+»)
-          set(U.CYAN); gfx.rect(b.x + 2, math.floor(b.y + b.h / 2), b.w - 4, 1, 1)
+          set(U.mix(U.YELLOW, U.BG, 0.5)); gfx.rect(b.x + 2, math.floor(b.y + b.h / 2), b.w - 4, 1, 1)
         end
       end
     end
     -- 28 окт: щель броска — небольшой проём во всю высоту, две секции: верх | — последовательно, низ = — параллельно
     -- предыдущему (половина под мышью — по высоте модуля); → 0 / 1
     local function drop_slot(gx, y0, h0)
-      local sw2 = math.max(ms('=') + 2 * L.pad, 3 * L.pad)
-      local x0 = gx - math.floor(sw2 / 2)
+      -- 1 ноя: тонкая жёлтая черта в зазоре между модулями (ничего не закрывает, фон прозрачный): верхняя половина —
+      -- одна черта (| последовательно), нижняя — две (= параллельно); активная половина ярко, другая тускло
       local hh = math.floor(h0 / 2)
       local low = my >= y0 + hh
-      set(U.BG); gfx.rect(x0, y0, sw2, h0, 1)
-      set(U.tint(U.CYAN, 0.3)); gfx.rect(x0, low and y0 + hh or y0, sw2, low and h0 - hh or hh, 1)
-      set(U.CYAN); gfx.rect(x0, y0, sw2, h0, 0); gfx.rect(x0, y0 + hh, sw2, 1, 1)
-      text(x0 + math.floor((sw2 - ms('|')) / 2), y0 + math.floor((hh - L.rh) / 2), '|', low and U.GREY or U.CYAN)
-      text(x0 + math.floor((sw2 - ms('=')) / 2), y0 + hh + math.floor((h0 - hh - L.rh) / 2), '=', low and U.CYAN or U.GREY)
+      local on, off = U.YELLOW, U.mix(U.YELLOW, U.BG, 0.65)
+      set(low and off or on); gfx.rect(gx - 1, y0, 2, hh - 1, 1)
+      set(low and on or off); gfx.rect(gx - 2, y0 + hh + 1, 1, h0 - hh - 1, 1); gfx.rect(gx + 1, y0 + hh + 1, 1, h0 - hh - 1, 1)
+      set(U.YELLOW); gfx.rect(gx - 3, low and (y0 + hh + 1) or y0, 7, 1, 1); gfx.rect(gx - 3, low and (y0 + h0 - 1) or (y0 + hh - 2), 7, 1, 1)
       return low and 1 or 0
     end
     -- 24 окт: над модулем внутри рэка — место в его контейнере: левая половина — перед ним, правая — после
