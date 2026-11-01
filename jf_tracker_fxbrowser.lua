@@ -230,7 +230,7 @@ function FB.results()
   if cache.res and cache.q and cache.q ~= '' and FB.query:sub(1, #cache.q) == cache.q and not FB.query:find('!', 1, true)
      and cache.list == FB.list and cache.folder == fkey and cache.gen == FB.gen then
     src = {}
-    for _, r in ipairs(cache.res) do if r.it then src[#src + 1] = r.it end end
+    for _, r in ipairs(cache.res) do if r.it and not r.it.preset then src[#src + 1] = r.it end end   -- 1 ноя: строки пресетов — не плагины (перемешивались, удваивались)
   end
   for _, it in ipairs(src) do
     if tree then if not node_ok(it, FB.node, rec_i) then goto skip end
@@ -269,10 +269,13 @@ function FB.results()
   if #terms > 0 and FB.presets and (folder == 'all' or (tree and FB.node.k == 'all')) then
     local pr = {}
     for _, e in ipairs(FB.presets) do
-      local hay = (e.preset .. ' ' .. (e.fx.label or '')):lower()
+      -- 1 ноя: строка поиска пресета — один раз на пресет; только точное вхождение (подпоследовательность по тысячам
+      -- пресетов на каждую клавишу тормозила ввод)
+      local hay = e._hay
+      if not hay then hay = (e.preset .. ' ' .. (e.fx.label or '')):lower(); e._hay = hay end
       local total, okp = 0, true
       for _, t in ipairs(terms) do
-        local sc = score(hay, t)
+        local sc = score_exact(hay, t)
         if not sc then okp = false; break end
         total = total + sc
       end
