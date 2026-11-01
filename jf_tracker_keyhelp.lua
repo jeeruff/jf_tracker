@@ -229,6 +229,7 @@ KH.PAGES = {
     { k = 'zu', d = 'unfold: the folded notes (cyan line under the row, +N) of the selection / cursor row - LPB rises to the smallest one that gives each its row (up to 128); zu again - the previous LPB (:unfold)' },
     { k = 'zW', d = 'wave view: own column / in the note field / item background / off, or wave only / text only' },
     { k = 'zw', d = 'width: all tracks the same width, the widest at which all fit (button W next to autozoom); again - slim: each track only as many command columns as its notes use, empty tracks compact' },
+    { k = 'zl', d = 'LPB presets of the view: straight (4 16ths, 8 32nds ...), T triplets (3 6 12 ...), D quintuplets (5 10 20); the LPB cell shows T / D too' },
     { k = 'zh', d = 'height: what the view shows (pattern / section / project) fits the screen - the finest LPB at which it does (button H); again - slim: the coarsest LPB where every note still sits on a row' },
     { k = 'zZ', d = 'fixed cursor on / off: the cursor row stays in the middle, the pattern scrolls under it (zz - centre once)' },
     { k = 'gt  gT', d = 'go to a module of the layout (menu by its letter: d dsp, f fx, a automation …) / REAPER project tab; 3gt - the third at once; the next tab of a module - Tab' },

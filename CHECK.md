@@ -2313,3 +2313,4 @@
 - [ ] 1 ноя: lfogen to на MIDI-треке: pitch — pitch bend в клипы (RS5K / slixer его понимают), vol — RS5K Volume / slixer Master gain, pan — RS5K Pan (у slixer нет)
 - [ ] 1 ноя: MIDI-трек, любой инструмент: команды высоты (0U 0D 0V 0A 0G) — ReaPitch в конце цепи, громкости (0I 0O, тремоло 0T / PT 7xy) — Volume/Pan Smoother; огибающие на время клипа, по краям — нейтраль; pitch bend больше не пишется; lfogen to pitch / vol / pan на MIDI — те же эффекты
 - [ ] 1 ноя: lfogen to = here — в колонку курсора: огибающая, MIDI-лейн (PB / CC / AT / PAT), vol / pan / delay нот (каждой ноте колонки значение волны на её строке; delay — грув волной)
+- [ ] 1 ноя: zl — пресеты LPB (1 2 3T 4 5D 6T 8 10D 12T 16 20D 24T 32 48T 64 128); в ячейке LPB метка T / D

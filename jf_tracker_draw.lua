@@ -4800,7 +4800,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   local col2, col3 = 'pitch resample', 'legato'   -- 31 окт: human — всегда словом (процент — в статусе), колонка не шире legato
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
-                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d'):format(c.lpb or 0), res = col2 },
+                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d%s'):format(c.lpb or 0, ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
                   { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = 'ripple*' },   -- 28 окт: Opt+`
                   { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
                 { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },

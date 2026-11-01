@@ -33185,6 +33185,21 @@ ctx.lfo_write_here = function(tg, pts, t0, t1, where)
   model.invalidate()
   vim.msg = ('%s -> %s: %d notes (%s)'):format(LG.type, tg.label, n, where)
 end
+-- 1 ноя: zl — пресеты LPB вида: прямые, триоли (T), квинтоли (D); метка — и в ячейке LPB транспорта
+ctx.lpb_mark = function(n) if n % 3 == 0 then return 'T' elseif n % 5 == 0 then return 'D' end; return '' end
+ctx.lpb_menu = function()
+  local P = {
+    { '1', 1, 'quarters' }, { '2', 2, '8ths' }, { '3', 3, '8th triplets' }, { '4', 4, '16ths' }, { '5', 5, '16th quintuplets' },
+    { '6', 6, '16th triplets' }, { '8', 8, '32nds' }, { 'a', 10, '32nd quintuplets' }, { 'b', 12, '32nd triplets' }, { 'c', 16, '64ths' },
+    { 'd', 20, '64th quintuplets' }, { 'e', 24, '64th triplets' }, { 'f', 32, '128ths' }, { 'g', 48, '128th triplets' }, { 'h', 64, '256ths' }, { 'i', 128, '512ths' },
+  }
+  local items = {}
+  for _, p in ipairs(P) do
+    local m = ctx.lpb_mark(p[2])
+    items[#items + 1] = { key = p[1], label = ('LPB %d%s  - %s%s'):format(p[2], m ~= '' and (' ' .. m) or '', p[3], state.lpb == p[2] and '  *' or ''), fn = function() ctx.set_lpb(p[2]); vim.msg = ('LPB %d %s- a row is a %s'):format(p[2], m ~= '' and (m .. ' ') or '', p[3]:gsub('s$', '')) end }
+  end
+  vim.open_hydra({ title = 'LPB of the view (rows per beat; T triplets, D quintuplets)', items = items })
+end
 -- 31 окт: f в окне опций — метки только его строк и вкладок
 ctx.opt_hints = function()
   if HN.start(function(t) return t.kind == 'optrow' or t.kind == 'opttab' end) then vim.msg = 'options: type the label, Esc' else vim.msg = 'no targets' end
