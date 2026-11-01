@@ -5879,10 +5879,53 @@ local function sq_bracket(x, y, h, right, L)
   local hx = right and (x + 2 - hw) or x
   gfx.rect(hx, y, hw, 2, 1); gfx.rect(hx, y + h - 2, hw, 2, 1)
 end
+-- 1 ноя: края контейнера — полосы «осторожно» (диагональ жёлтая / чёрная, приглушённая), у левой срезаны
+-- внешние углы слева, у правой — справа. Узор периодичен по высоте (2·st строк): плитка на цвет — в картинке 83
+-- (освободилась от бочки VHS), середина полосы — blit плиток; срезанные концы (c строк) — по пикселю
+local HZ = { cols = {} }
+local function hazard(x, y, h, right, col, L)
+  y, h = y - 1, h + 2
+  local bw = math.max(5, L.pad + 1)
+  local st = math.max(3, bw - 1)
+  local P, c = 2 * st, bw - 1
+  local dark = { 0.06, 0.06, 0.05 }
+  if HZ.bw ~= bw then HZ.bw, HZ.cols, HZ.n = bw, {}, 0; gfx.setimgdim(83, -1, -1); gfx.setimgdim(83, bw * 8, P) end
+  local key = ('%.3f %.3f %.3f'):format(col[1], col[2], col[3])
+  local ci = HZ.cols[key]
+  if not ci then
+    HZ.n = HZ.n % 8 + 1; ci = HZ.n
+    for k, v in pairs(HZ.cols) do if v == ci then HZ.cols[k] = nil end end
+    HZ.cols[key] = ci
+    local od = gfx.dest; gfx.dest = 83
+    for yy = 0, P - 1 do for xx = 0, bw - 1 do
+      local cc = ((xx + yy) // st) % 2 == 0 and col or dark
+      gfx.set(cc[1], cc[2], cc[3], 1); gfx.rect((ci - 1) * bw + xx, yy, 1, 1, 1)
+    end end
+    gfx.dest = od
+  end
+  gfx.a = 1; gfx.mode = 0
+  local yy = c
+  while yy < h - c do
+    local ph = yy % P
+    local n = math.min(P - ph, h - c - yy)
+    gfx.blit(83, 1, 0, (ci - 1) * bw, ph, bw, n, x, y + yy, bw, n)
+    yy = yy + n
+  end
+  for k = 0, c - 1 do   -- концы: срез внешнего угла
+    for _, ry in ipairs({ k, h - 1 - k }) do
+      local cut = c - k
+      for xx = right and 0 or cut, right and (bw - 1 - cut) or (bw - 1) do
+        local cc = ((xx + ry) // st) % 2 == 0 and col or dark
+        gfx.set(cc[1], cc[2], cc[3], 1); gfx.rect(x + xx, y + ry, 1, 1, 1)
+      end
+    end
+  end
+  return bw
+end
 -- 28 окт (4): цвет скобок — тёмный янтарь; ярко — только у выделенного в DSP контейнера; выключен — тускло
 local function br_col(c)
   if not (c.enabled and not c.poff) then return U.DIM end
-  return (D.sel_i and c.i == D.sel_i) and U.AMBER or U.tint(U.AMBER, 0.45)
+  return (D.sel_i and c.i == D.sel_i) and U.mix(U.YELLOW, U.BG, 0.25) or U.mix(U.YELLOW, U.BG, 0.55)   -- 1 ноя: приглушённый жёлтый полос
 end
 local function brg(L) return math.max(3, L.pad) + 4 end   -- 31 окт (2): скобки прилипли к модулям — 3 px видимого зазора (+ внешний пиксель рамки модуля)   -- 31 окт: [ ] ближе к контейнеру (было 2 pad)   -- 28 окт (2): от скобки до модуля — полный зазор (пол-зазора липло)
 function D.lane_close(L, f, bx, boxy, bh0)
@@ -5895,7 +5938,7 @@ function D.lane_close(L, f, bx, boxy, bh0)
 end
 function D.rack_open(L, f, k, bx, boxy, bh0)
   if f.wrap then
-    set(br_col(f)); sq_bracket(bx, boxy, bh0, false, L)
+    hazard(bx, boxy, bh0, false, br_col(f), L)
     D.cst[f] = { x = bx, y = boxy, k = k }
     bx = bx + 2 + brg(L)
   end
@@ -5909,7 +5952,7 @@ function D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover)
     local x = bx - L.pad + brg(L)
     -- 28 окт (2): поля броска в конце нет — щель «после последнего модуля» делает то же (была двойная плашка)
     if st and st.y == boxy then
-      set(br_col(c)); sq_bracket(x, boxy, bh0, true, L)
+      hazard(x + 2 - math.max(5, L.pad + 1), boxy, bh0, true, br_col(c), L)
     end
     bx = x + 2 + L.pad
   end
