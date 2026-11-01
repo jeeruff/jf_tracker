@@ -17631,32 +17631,54 @@ ctx.pad_load = function(tr, kid, path)
   if pi.start then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.start, 0) end
   if pi.stop then reaper.TrackFX_SetParamNormalized(tr, kid.rs5k_i, pi.stop, 1) end
 end
-ctx.pad_similar = function(f, ki, d)
-  local tgt = dsp_target(); local kid = f and f.kids and f.kids[ki]
-  if not (tgt and kid and kid.rs5k_i) then vim.msg = 'ξ: pick a pad with a sample'; return end
-  local tr = tgt.track
+-- шаг истории пэда: d nil — случайный похожий (ξ), 1 — следующий (в конце истории — ближний, которого не было), −1 — назад
+-- → путь, история | nil, причина
+ctx.pad_pick = function(tr, kid, ki, d)
   local gid = reaper.TrackFX_GetFXGUID(tr, kid.rs5k_i) or tostring(ki)
   local H = ctx.pad_hist[gid] or { list = {}, i = 0, orig = kid.file }
   ctx.pad_hist[gid] = H
   local path
   if d and (d < 0 or H.i < #H.list) then
     local ni = math.max(0, math.min(#H.list, H.i + d))
-    if ni == H.i then vim.msg = 'ξ: the original sample already'; return end
+    if ni == H.i then return nil, 'the original sample already' end
     H.i = ni; path = ni == 0 and H.orig or H.list[ni]
   else
     -- ξ — случайный из 40 ближних; > в конце истории (1 ноя) — следующий по близости, которого ещё не было
     local cands, why, by_fp = ctx.pad_cands(kid, H.orig)
-    if not cands then vim.msg = 'ξ: ' .. why; return end
+    if not cands then return nil, why end
     if d then
       local seen = { [H.orig or ''] = true }
       for _, p in ipairs(H.list) do seen[p] = true end
       for _, n in ipairs(cands) do if not seen[n.path] then path = n.path; break end end
-      if not path then vim.msg = 'ξ: no more like it'; return end
+      if not path then return nil, 'no more like it' end
     else path = cands[math.random(math.min(#cands, by_fp and 40 or #cands))].path end
     while #H.list > H.i do H.list[#H.list] = nil end
     H.list[#H.list + 1] = path; H.i = #H.list
   end
-  if not path then return end
+  return path, H
+end
+-- 1 ноя (3): < ξ > шапки рэка — всем пэдам сразу (каждый — по своей истории), одна отмена
+ctx.rack_similar = function(f, d)
+  local tgt = dsp_target(); if not (tgt and f and f.kids) then return end
+  local tr = tgt.track
+  local n, why = 0, nil
+  edit.run('rack: similar samples', function()
+    for ki, kid in ipairs(f.kids) do
+      if kid.rs5k_i then
+        local path, e = ctx.pad_pick(tr, kid, ki, d)
+        if path then ctx.pad_load(tr, kid, path); n = n + 1 else why = why or e end
+      end
+    end
+  end)
+  model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+  vim.msg = ('rack: %d pad(s) %s%s'):format(n, d == nil and 'got a random sample like theirs' or (d > 0 and 'stepped to the next like it' or 'stepped back'), why and (' (' .. why .. ' for the rest)') or '')
+end
+ctx.pad_similar = function(f, ki, d)
+  local tgt = dsp_target(); local kid = f and f.kids and f.kids[ki]
+  if not (tgt and kid and kid.rs5k_i) then vim.msg = 'ξ: pick a pad with a sample'; return end
+  local tr = tgt.track
+  local path, H = ctx.pad_pick(tr, kid, ki, d)
+  if not path then vim.msg = 'ξ: ' .. tostring(H); return end
   edit.run('pad: similar sample', function() ctx.pad_load(tr, kid, path) end)
   model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
   if ctx.preview_file then ctx.preview_file(path) end
@@ -25072,7 +25094,7 @@ local function frame()
   elseif hover.dspbtn and hover.dspbtn.what == 'cvar' then state.status = ('variant %d of %s: click - %s, Shift+click - save over it, Opt+click - clear (parameters, chain mix / on, the XY corners)'):format(hover.dspbtn.i, hover.dspbtn.f and hover.dspbtn.f.name or 'container', (ctx.cvar_info(dsp_target() and dsp_target().col, hover.dspbtn.f) or { has = {} }).has[hover.dspbtn.i] and 'recall' or 'save')
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', cxfade = 'A<>B: crossfade the two chains with one knob - the mix of the first: 100 % only A, 0 % only B (the mix of B follows inverted, a native REAPER link); click again - off', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
-    kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
+    kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks', krprev = 'every pad of the rack - back to its previous sample', krxi = 'every pad of the rack - a random sample like its own (one undo)', krnext = 'every pad of the rack - the next sample like its own' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
   elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
@@ -27471,6 +27493,8 @@ local function frame()
       elseif hover.dspbtn.what == 'ksim' then   -- 1 ноя (2): < ξ > в шапке пэда — вкл / выкл
         draw.padsim = not draw.padsim; reaper.SetExtState('jf_tracker', 'padsim', draw.padsim and '1' or '0', true)
         vim.msg = 'pad: similar sample buttons ' .. (draw.padsim and 'on: < back, ξ random like it, > next like it ([ ] in pads)' or 'off ([ ] in pads still step)')
+      elseif hover.dspbtn.what == 'krxi' or hover.dspbtn.what == 'krprev' or hover.dspbtn.what == 'krnext' then   -- 1 ноя (3): весь рэк
+        ctx.rack_similar(hover.dspbtn.f, ({ krxi = nil, krprev = -1, krnext = 1 })[hover.dspbtn.what])
       elseif hover.dspbtn.what == 'kxi' or hover.dspbtn.what == 'kxprev' or hover.dspbtn.what == 'kxnext' then
         ctx.pad_similar(hover.dspbtn.f, hover.dspbtn.ki, ({ kxi = nil, kxprev = -1, kxnext = 1 })[hover.dspbtn.what])
       elseif hover.dspbtn.what == 'kcell' then ctx.drum_cell_menu()   -- 16 окт: drumrs5k — подпись ячеек

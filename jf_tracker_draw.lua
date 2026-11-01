@@ -11048,6 +11048,27 @@ function D.frame(L, snap, rows, state, info)
         if ihot then hover.dspbtn = { fx = k, f = f, what = 'pins' }; on_btn = true end
         hint('dspbtn', ix0, by + 1, iow, L.rh - 1, { fx = k, what = 'pins' })
       end
+      -- 1 ноя (3): рэк drumrs5k, sim включён — ‹ ξ › всем пэдам сразу за именем (только тройкой: не влезла — нет)
+      if D.DR and f.kit and D.padsim and tw > 0 then
+        local x = bx + L.pad + ms(nmtxt .. '.') - ms('.') + L.pad + (iol and (iow + L.pad) or 0)
+        local lim = bx + bw - L.pad
+        for _, b in ipairs(bxs or {}) do if b[3] and b[3] < lim then lim = b[3] - L.pad end end
+        local RB = { { '<', 'krprev' }, { 'ξ', 'krxi' }, { '>', 'krnext' } }
+        local tot = 0
+        for _, b in ipairs(RB) do tot = tot + ms(b[1]) + 2 * L.pad + 2 end
+        if x + tot < lim then
+          for _, b in ipairs(RB) do
+            local w2 = ms(b[1]) + 2 * L.pad
+            local hn = not drag and mx >= x and mx < x + w2 and my >= by + 1 and my < by + L.rh
+            set(hn and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(x, by + 1, w2, L.rh - 1, 1)
+            set(hn and U.AMBER or U.LINE); gfx.rect(x, by + 1, w2, L.rh - 1, 0)
+            text(x + L.pad, by + 1, b[1], hn and U.AMBER or U.CYAN)
+            if hn then hover.dspbtn = { fx = k, f = f, what = b[2] }; on_btn = true end
+            hint('dspbtn', x, by + 1, w2, L.rh - 1, { fx = k, what = b[2] })
+            x = x + w2 + 2
+          end
+        end
+      end
       -- 24 окт: опция dspleft — кнопки и пресет сразу за именем (у большого модуля не тянуться в правый край)
       -- 24 окт (вечер): кнопки — снова в правом краю (просьба), у имени — только пресет «< имя >»
       if info.dspleft and tw > 0 then
@@ -11481,7 +11502,7 @@ function D.frame(L, snap, rows, state, info)
               hint('dspbtn', mox, hy, mow, L.rh - 1, { fx = k, what = 'kmidi' })
               ah = ah + mow + 2   -- счётчик пэдов и кнопки правее — после неё
             end
-            -- 31 окт: new kit (случайный кит: все / выбранный / 16 видимых); ‹ ξ › — в шапке пэда (1 ноя)
+            -- 31 окт: new kit (случайный кит: все / выбранный / 16 видимых); ‹ ξ › всем пэдам — в строке имени рэка, у пэда — в его шапке
             do
               local bl = { { 'new kit', 'knew' } }
               local nx = bx + 2 + ah
