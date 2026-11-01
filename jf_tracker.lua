@@ -32776,6 +32776,7 @@ ctx.fit_width = function()
   local now = reaper.time_precise()
   if ctx.zw_t and now - ctx.zw_t < 8 and ctx.zw_mode == 'even' then ctx.zw_t, ctx.zw_mode = now, 'slim'; return ctx.fit_slim() end
   ctx.zw_t, ctx.zw_mode = now, 'even'
+  state.fold_px = nil
   state.autozoom = nil; reaper.SetExtState(EXT, 'autozoom', '0', true)
   state.wlevel = {}; state.wzlevel = nil; state.hscroll = 0
   relayout()
@@ -32787,6 +32788,19 @@ ctx.fit_width = function()
     end
   end
   reaper.SetExtState(EXT, 'wzlevel', tostring(state.wzlevel or ''), true)
+  -- 1 ноя: и самой узкой ширины мало (50-100 каналов) — все треки свёрнуты в полоску с точками событий: видно всё
+  -- сразу; za / zo на треке — раскрыть его, zw ещё раз — slim
+  if L.cols_cut or L.hs_cut then
+    ctx.fold_all(true); relayout()
+    if L.cols_cut or L.hs_cut then ctx.fold_all('mini'); relayout() end   -- ещё уже: мини-полоска
+    if (L.cols_cut or L.hs_cut) and L.cols and L.cols[1] and L.cols[1].x then   -- и её мало — полоска уже, до 3 px
+      local n = #(snap and snap.cols or {})
+      state.fold_px = math.max(3, math.floor((L.cols_r - L.cols[1].x) / math.max(1, n)) - 2)
+      relayout()
+    end
+    vim.msg = ('zw: %d tracks folded to fit%s (za on one opens it)'):format(#(snap and snap.cols or {}), (L.cols_cut or L.hs_cut) and ' - still not all (scroll sideways)' or ', all on screen')
+    return
+  end
   vim.msg = 'zw: all tracks the same width' .. ((L.cols_cut or L.hs_cut) and ' - still not all fit (scroll sideways)' or ', all fit')
 end
 -- 31 окт: zh / кнопка H — то, что показывает вид (паттерн / секция / проект), целиком по высоте: самый мелкий LPB,

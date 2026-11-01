@@ -562,7 +562,8 @@ function D.layout(snap, state, nregions)
     L.GKc[G] = k
     return k
   end
-  L.fold_w = ms('o') + 2 * L.pad
+  L.fold_w = state.fold_px or (ms('o') + 2 * L.pad)   -- 1 ноя: fold_px — zw на 50-100 каналов: полоска в несколько px
+  D.fold_px = state.fold_px
   L.chord_w = ms('G#maj7/C') + 2 * L.pad              -- лейн аккордов (:chord, 8 окт)
   -- уровни ширины колонки (7 окт): колесо (высота трека REAPER при sync
   -- header) шагает по одному полю: 0 полоска, 1 нота, 2 + vol, 3 + delay,
@@ -2595,6 +2596,10 @@ local function draw_fold_cell(L, col, row, x, y, ty, inv)
       end
     end
     if glyph == 'o' then break end
+  end
+  if D.fold_px and D.fold_px < ms('o') then   -- 1 ноя: узкая полоска — событие прямоугольником, пусто — ничего
+    if glyph == 'o' or inv then set(inv and (D.inv_bg or U.TEXT) or colr); gfx.rect(x, y + 2, math.max(1, D.fold_px - 1), L.rh - 4, 1) end
+    return
   end
   text(x + (L.fold_w - ms(glyph)) / 2, ty, glyph, inv and U.BG or colr)
 end
