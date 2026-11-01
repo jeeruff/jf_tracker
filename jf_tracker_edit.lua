@@ -1561,7 +1561,10 @@ function E.yank(heads, lpb, origin_row, origin_fi)
 end
 
 -- MIDI-item трека/lane, накрывающий время t (или nil)
+-- 1 ноя: клипы внахлёст (клип прошлого паттерна длиннее его) — тот, что начался позже: клип текущего паттерна;
+-- было — первый по порядку, нота в первую строку паттерна уходила в невидимый хвост прошлого клипа
 local function midi_item_at(track, lane_idx, t)
+  local best, btk, bpos
   for i = 0, R.CountTrackMediaItems(track) - 1 do
     local it = R.GetTrackMediaItem(track, i)
     local tk = R.GetActiveTake(it)
@@ -1569,10 +1572,10 @@ local function midi_item_at(track, lane_idx, t)
       local lane = R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')
       local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
       local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
-      if (lane_idx == nil or lane == lane_idx) and t >= pos - 1e-6 and t < pos + len - 1e-6 then return it, tk end
+      if (lane_idx == nil or lane == lane_idx) and t >= pos - 1e-6 and t < pos + len - 1e-6 and (not bpos or pos > bpos) then best, btk, bpos = it, tk, pos end
     end
   end
-  return nil
+  return best, btk
 end
 
 -- 30 окт: Евклид геометрией айтема — новый MIDI-айтем на n строк от row: k нот (Бьёрклунд, ротация r), источник
