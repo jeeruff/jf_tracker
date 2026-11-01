@@ -212,22 +212,29 @@ function SM.an_fine(pk, T)
   for i = ip, n do if env[i] < mx * 0.1 then idc = i; break end end
   local dec = math.max(0.005, (idc - ip) * bin)
   -- 1 ноя: шумность — из тональности спектрального слоя REAPER (биты 15..28: 0 — шум, 16383 — чистый тон)
-  local sz, nzn = 0, 0
+  -- «тон тела» — тональность там, где громче всего низ (< 1 кГц): пластик малого, бочка, том; у хэтов — почти 0
+  local sz, nzn, sb, sw = 0, 0, 0, 0
   for i = 1, n do
     local sv = pk.spec and pk.spec[i]
     if sv and env[i] > mx * 0.1 then
       local ton = math.floor(sv / 32768) % 16384
+      local fq = math.floor(sv) % 32768
       sz = sz + (1 - ton / 16383); nzn = nzn + 1
+      if fq > 20 and fq < 1000 then sb = sb + env[i] * ton / 16383 end
+      sw = sw + env[i]
     end
   end
   local function lg(v, lo, hi) return math.max(0, math.min(1, math.log(v / lo) / math.log(hi / lo))) end
-  return { at = lg(att, 0.0005, 0.2), dc = lg(dec, 0.005, 1), nz = nzn > 0 and math.max(0, math.min(1, sz / nzn)) or 0 }
+  return { at = lg(att, 0.0005, 0.2), dc = lg(dec, 0.005, 1), nz = nzn > 0 and math.max(0, math.min(1, sz / nzn)) or 0, bt = sw > 0 and math.min(1, sb / sw) or 0 }
 end
 -- расстояние отпечатков (без отпечатка — далеко); веса: яркость и атака главные (хэт / шейкер — атакой), шумность
--- по тональности — слабее (на 100 настоящих ударах: 93 % ближайший сосед того же класса, при весе 1 — 88 %)
+-- по тональности — слабее; 1 ноя: + тон тела (bt). Проверка на 480 настоящих ударах 8 классов (kick snare clap tom
+-- closed / open hat shaker crash): ближайший сосед того же класса 62 % (без bt 56 %); путает родственные пары —
+-- snare / clap, kick / tom, closed hat / shaker, open hat / crash. На 4 классах (kick snare hat shaker) — 93 %
 function SM.fp_dist(a, b)
   if not (a and b and a.at and b.at) then return 9 end
-  return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 0.3 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
+  return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 0.6 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
+    + 1.0 * ((a.bt or 0) - (b.bt or 0)) ^ 2
 end
 function SM.an_load(file)
   local f = io.open(file, 'r'); if not f then return end
@@ -235,8 +242,8 @@ function SM.an_load(file)
     local pth, l, b, d, rest = line:match('^(.-)\t([%d%.]+)\t([%d%.]+)\t?([%d%.]*)\t?(.*)$')
     if pth then
       local e = { l = tonumber(l), b = tonumber(b), d = tonumber(d) }
-      local at, dc, nz, ver = (rest or ''):match('^([%d%.]+)\t([%d%.]+)\t([%d%.]+)\t?(%d*)')   -- 1 ноя: отпечаток; ver 2 — шумность по тональности
-      if at and ver == '2' then e.at, e.dc, e.nz = tonumber(at), tonumber(dc), tonumber(nz) end
+      local at, dc, nz, bt, ver = (rest or ''):match('^([%d%.]+)\t([%d%.]+)\t([%d%.]+)\t([%d%.]+)\t(%d+)')   -- 1 ноя: отпечаток; ver 3 — + тон тела
+      if at and ver == '3' then e.at, e.dc, e.nz, e.bt = tonumber(at), tonumber(dc), tonumber(nz), tonumber(bt) end
       SM.AN[pth] = e; SM.an_n = (SM.an_n or 0) + 1
     end
   end
@@ -245,7 +252,7 @@ end
 function SM.an_save(file)
   if not SM.an_dirty then return end
   local f = io.open(file .. '.tmp', 'w'); if not f then return end
-  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', a.at and ('\t%.3f\t%.3f\t%.3f\t2'):format(a.at, a.dc, a.nz) or '', '\n') end
+  for pth, a in pairs(SM.AN) do f:write(pth, '\t', ('%.3f'):format(a.l), '\t', ('%.3f'):format(a.b), '\t', a.d and ('%.3f'):format(a.d) or '', a.at and ('\t%.3f\t%.3f\t%.3f\t%.3f\t3'):format(a.at, a.dc, a.nz, a.bt or 0) or '', '\n') end
   f:close(); os.remove(file); os.rename(file .. '.tmp', file)
   SM.an_dirty = false
 end

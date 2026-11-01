@@ -408,7 +408,7 @@ function B.an_tick(G)
       if a then a.d = len end   -- 27 окт: длина — для песчинок
       if a then
         local fp = fk and B.SM.an_fine(fk, T) or { at = 1, dc = 0, nz = 0 }
-        a.at, a.dc, a.nz = fp.at, fp.dc, fp.nz
+        a.at, a.dc, a.nz, a.bt = fp.at, fp.dc, fp.nz, fp.bt
         B.SM.AN[pth] = a; B.SM.an_dirty = true; B.SM.an_n = (B.SM.an_n or 0) + 1
       end
       table.remove(B.an_q, i); B.an_qs[pth] = nil; done = done + 1

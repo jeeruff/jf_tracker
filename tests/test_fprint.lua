@@ -23,5 +23,8 @@ local function fp(t, b) return { l = 0.5, b = b, at = t.at, dc = t.dc, nz = t.nz
 local hat2 = SM.an_fine(pk(200, function(i) return i < 3 and 0 or math.exp(-(i - 3) / 7) end, function(i) return sp(6500 + (i * 104729 % 4000), 2100) end), T)
 ok(SM.fp_dist(fp(hat, 0.8), fp(hat2, 0.8)) < SM.fp_dist(fp(hat, 0.8), fp(shaker, 0.8)), 'a hat is nearer to another hat than to a shaker')
 ok(SM.fp_dist(fp(hat, 0.8), { l = 0.5, b = 0.8 }) == 9, 'no fingerprint - far away')
+-- тон тела: низ тональный (бочка) против высокого шума (хэт)
+local kick = SM.an_fine(pk(200, function(i) return i < 2 and 0 or math.exp(-(i - 2) / 40) end, function() return sp(60, 15000) end), T)
+ok(kick.bt > 0.8 and hat.bt < 0.05, ('body tone: kick %.2f, hat %.2f'):format(kick.bt, hat.bt))
 print(('test_fprint: %d/%d ok'):format(n - fails, n))
 os.exit(fails == 0 and 0 or 1)
