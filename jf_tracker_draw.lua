@@ -2923,7 +2923,7 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
 end
 
-D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true }
+D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true, ['repeat'] = true }
 local VRH = 8
 local function pnum(f, vals, label)
   for i, p in ipairs(f.params or {}) do
@@ -3073,6 +3073,35 @@ function D.fx_view(kind, f, vals, x, y, w, h)
       set(g >= 1 and U.RED or U.AMBER); gfx.rect(px, y + h - 2 - hh, 2, hh, 1)
       a = a * g
     end
+  elseif kind == 'repeat' then
+    -- 1 ноя: LiveBeatRepeater — такт срезами текущей длины (1/4T = 1/6 такта); повтор вкл — первый срез (пойманный)
+    -- янтарём, его повторы рамками, буква > / < — направление; freeze — голубая рамка вида; выкл — серая сетка
+    local function pstr(label) for i, p in ipairs(f.params or {}) do if p.name == label then return vals[i] and vals[i].s or '' end end return '' end
+    local on = pstr('repeat'):lower():find('on') ~= nil
+    local fz = pstr('freeze'):lower():find('on') ~= nil
+    local rev = pstr('reverse'):lower():find('rev') ~= nil
+    local ls = pstr('length')
+    local a, b = ls:match('^%s*(%d+)/(%d+)')
+    local frac = a and (tonumber(a) / tonumber(b)) or tonumber(ls:match('^%s*(%d+)') or '') or 0.25
+    if ls:match('^%s*[%d/]+T') then frac = frac * 2 / 3 end
+    local n = math.max(1, math.min(64, math.floor(1 / math.max(frac, 1 / 64) + 0.5)))
+    local gx, gw, gy, gh = x + 2, w - 4, y + 2, h - VRH - 5
+    local sw = gw / n
+    for i = 0, n - 1 do
+      local sx = math.floor(gx + i * sw)
+      local ex = math.floor(gx + (i + 1) * sw) - 1
+      if on then
+        if i == 0 then set(U.AMBER); gfx.rect(sx, gy, math.max(1, ex - sx), gh, 1)
+        else set(U.AMBER); gfx.rect(sx, gy, math.max(1, ex - sx), gh, 0) end
+        local ch = rev and '<' or '>'
+        if ex - sx > ms(ch) + 2 then text(sx + math.floor((ex - sx - ms(ch)) / 2), gy + math.floor((gh - TH()) / 2), ch, i == 0 and U.BG or U.AMBER) end
+      else
+        set(U.LINE); gfx.rect(sx, gy, 1, gh, 1)
+      end
+    end
+    if fz then set(U.CYAN); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0); gfx.rect(x + 2, y + 2, w - 4, h - 4, 0) end
+    local st = (on and 'repeat ' or 'off ') .. (ls ~= '' and ls:gsub('%(.*', '') or '?') .. (fz and '  freeze' or '')
+    text(x + 3, y + h - VRH - 1, fit(st, w - 6), on and U.AMBER or U.GREY)
   elseif kind == 'ir' then
     -- импульс ReaVerb (5 окт): спектрограмма файла импульса; ниже — имя
     local j, nm

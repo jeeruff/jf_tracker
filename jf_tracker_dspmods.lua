@@ -386,6 +386,18 @@ DM.modules = {
     },
   },
   {
+    -- 1 ноя: brumbear LiveBeatRepeater (ReaTeam): повтор куска такта + freeze / recall (вид repeat — такт срезами)
+    match = 'livebeatrepeater',
+    title = 'Repeater',
+    cols = 2,
+    view = 'repeat',
+    params = {
+      { 'Loop-Repeat', 'repeat' }, { 'Freeze/Recall', 'freeze' }, { 'Slice Length [bar', 'length' }, { 'Loop Direction', 'reverse' },
+      { 'Loop Start', 'start' }, { 'Loop Fade Out', 'fade out' }, { 'Slice Length Transitions', 'change' }, { 'Slice Fade-In Time', 'fade in' },
+      { 'MIDI Loop-Repeat', 'midi' }, { 'MIDI 1st Slice', 'note' }, { 'Main=', 'routing' },
+    },
+  },
+  {
     -- ReaVerbate (4 окт): комната — размер, затухание, ширина (вид verb)
     match = 'reaverbate',
     title = 'ReaVerbate',
