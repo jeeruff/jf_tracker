@@ -3166,8 +3166,15 @@ function V.key_impl(c)
         local below = starting(V.heads_in(V.cur.fi, V.cur.fi, r1 + 1, last), r1 + 1, last)
         local rows = {}
         for i, h in ipairs(below) do rows[i] = (h.row0 or 0) + (h.delay or 0) / 256 - n end
+        -- 1 ноя (2): нота сверху, что проходит через удаляемые строки, — короче на них (строка = шаг, как Backspace)
+        local long = {}
+        for _, h in ipairs(V.covering(V.cur.fi, r0)) do
+          local endr = (h.row0 or 0) + math.max(1, h.rows or 1)
+          if (h.row0 or 0) < r0 and endr > r0 then long[#long + 1] = { h = h, to = math.max(r0, endr - n) } end
+        end
         local E = ctx.edit
         E.run('dd subcolumn', function()
+          for _, l in ipairs(long) do E.note_off({ l.h }, lpb(), l.to - (E.OFF_END and 1 or 0)) end
           if #gone > 0 then E.delete(gone, lpb()) end
           if #below > 0 then E.retime(below, lpb(), rows, nil, 'dd subcolumn') end
         end)
