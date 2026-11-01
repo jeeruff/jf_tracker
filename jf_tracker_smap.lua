@@ -236,6 +236,100 @@ function SM.fp_dist(a, b)
   return 1.0 * (a.b - b.b) ^ 2 + 1.2 * (a.at - b.at) ^ 2 + 0.8 * (a.dc - b.dc) ^ 2 + 0.6 * (a.nz - b.nz) ^ 2 + 0.3 * (a.l - b.l) ^ 2
     + 1.0 * ((a.bt or 0) - (b.bt or 0)) ^ 2
 end
+-- 1 ноя: КЛАСС ПО ЗВУКУ — у файла без класса в имени (Untitled_03.wav, /папка): голосование k ближайших отпечатков
+-- среди файлов с классом в имени (ударные: kick snare hat clap tom cymbal perc). lab — список { a, cat }, строится
+-- раз на набор отпечатков (SM.lab_build). → класс, доля голосов | nil (мало размеченных или голоса врозь)
+SM.DRUM = { kick = true, snare = true, hat = true, clap = true, tom = true, cymbal = true, perc = true }
+function SM.lab_build(nodes)
+  local lab = {}
+  for _, n in ipairs(nodes or {}) do
+    local a = SM.AN[n.path]
+    if a and a.at and SM.DRUM[n.cat] then lab[#lab + 1] = { a = a, cat = n.cat, path = n.path } end
+  end
+  return lab
+end
+function SM.guess_cat(a0, lab, k, skip)
+  if not (a0 and a0.at and lab and #lab >= 8) then return nil end
+  k = k or 7
+  local best = {}
+  for _, e in ipairs(lab) do
+    if e.path ~= skip then
+      local d = SM.fp_dist(a0, e.a)
+      if #best < k or d < best[#best].d then
+        local j = #best < k and #best + 1 or #best
+        best[j] = { d = d, cat = e.cat }
+        while j > 1 and best[j].d < best[j - 1].d do best[j], best[j - 1] = best[j - 1], best[j]; j = j - 1 end
+      end
+    end
+  end
+  local votes, top, tn = {}, nil, 0
+  for i, b in ipairs(best) do
+    local w = 1 / (1 + i * 0.15)   -- ближние весомее
+    votes[b.cat] = (votes[b.cat] or 0) + w
+    if votes[b.cat] > tn then top, tn = b.cat, votes[b.cat] end
+  end
+  local sum = 0
+  for _, v in pairs(votes) do sum = sum + v end
+  if not top or tn / sum < 0.4 then return nil end
+  return top, tn / sum
+end
+-- 1 ноя: :beatbox — удары в огибающей (столбцы bin с): подъём над недавним фоном и над порогом от максимума,
+-- не чаще gap. env — уровни 0..1 → номера столбцов ударов
+function SM.onsets(env, bin, o)
+  o = o or {}
+  local mx = 0
+  for i = 1, #env do if env[i] > mx then mx = env[i] end end
+  if mx < 1e-3 then return {} end
+  local thr, gap, rise = (o.thr or 0.12) * mx, math.max(1, math.floor((o.gap or 0.07) / bin + 0.5)), o.rise or 1.8
+  local back = math.max(2, math.floor(0.03 / bin + 0.5))
+  local out, last = {}, -1e9
+  for i = 1, #env do   -- с 1: удар в самом начале файла (запись без паузы)
+    if env[i] >= thr and i - last >= gap then
+      local bg = 0
+      for j = math.max(1, i - back), i - 1 do bg = math.max(bg, env[j]) end
+      if env[i] > bg * rise or (bg < thr * 0.5) then
+        out[#out + 1] = i; last = i
+      end
+    end
+  end
+  return out
+end
+-- удары битбокса → классы 1 бочка / 2 малый / 3 хэт: ОТНОСИТЕЛЬНО друг друга (голос в микрофоне не похож на
+-- сэмплы ударных — сравнивать с библиотекой бесполезно): шкала s = яркость + шум − тон тела, три кластера (k-means)
+-- от тёмного к яркому. Разброс мал — по абсолютной шкале. feats — { b, nz, bt } → классы, s
+function SM.bb_score(f) return (f.b or 0.5) + 0.4 * (f.nz or 0) - 0.6 * (f.bt or 0) end
+function SM.bb_classify(feats)
+  local n = #feats
+  local s, lo, hi = {}, 1e9, -1e9
+  for i, f in ipairs(feats) do s[i] = SM.bb_score(f); lo = math.min(lo, s[i]); hi = math.max(hi, s[i]) end
+  local cls = {}
+  if n == 0 then return cls, s end
+  if hi - lo < 0.06 then
+    for i = 1, n do cls[i] = s[i] < 0.45 and 1 or (s[i] < 0.65 and 2 or 3) end
+    return cls, s
+  end
+  local srt = {}
+  for i = 1, n do srt[i] = s[i] end
+  table.sort(srt)
+  local function q(p) return srt[math.max(1, math.min(n, math.floor(p * (n - 1) + 1.5)))] end
+  local c = { q(0.1), q(0.5), q(0.9) }
+  for _ = 1, 20 do
+    local sum, cnt = { 0, 0, 0 }, { 0, 0, 0 }
+    for i = 1, n do
+      local k = 1
+      for j = 2, 3 do if math.abs(s[i] - c[j]) < math.abs(s[i] - c[k]) then k = j end end
+      cls[i] = k; sum[k] = sum[k] + s[i]; cnt[k] = cnt[k] + 1
+    end
+    for j = 1, 3 do if cnt[j] > 0 then c[j] = sum[j] / cnt[j] end end
+  end
+  -- центры по возрастанию → 1 2 3; совпавшие центры (два класса) — средний не нужен
+  local ord = { 1, 2, 3 }
+  table.sort(ord, function(x, y) return c[x] < c[y] end)
+  local rank = {}
+  for r, j in ipairs(ord) do rank[j] = r end
+  for i = 1, n do cls[i] = rank[cls[i]] end
+  return cls, s
+end
 function SM.an_load(file)
   local f = io.open(file, 'r'); if not f then return end
   for line in f:lines() do

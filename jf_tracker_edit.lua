@@ -5480,6 +5480,30 @@ function E.drop(track, lane_idx, lpb, row, path)
   return item
 end
 
+-- 1 ноя: :beatbox — удары аудио-айтема → MIDI ударных (GM, канал 10) на новом треке под его треком.
+-- hits — { t = время проекта, len = с, pitch, vel }
+function E.beatbox_write(item, hits, name)
+  local tr
+  run('beatbox', function()
+    local st = R.GetMediaItem_Track(item)
+    local idx = math.floor(R.GetMediaTrackInfo_Value(st, 'IP_TRACKNUMBER'))
+    R.InsertTrackAtIndex(idx, true)
+    tr = R.GetTrack(0, idx)
+    R.GetSetMediaTrackInfo_String(tr, 'P_NAME', name or 'beatbox', true)
+    local pos = R.GetMediaItemInfo_Value(item, 'D_POSITION')
+    local it = R.CreateNewMIDIItemInProj(tr, pos, pos + R.GetMediaItemInfo_Value(item, 'D_LENGTH'), false)
+    local tk = it and R.GetActiveTake(it)
+    if not tk then return end
+    for _, h in ipairs(hits) do
+      local p0, p1 = R.MIDI_GetPPQPosFromProjTime(tk, h.t), R.MIDI_GetPPQPosFromProjTime(tk, h.t + h.len)
+      R.MIDI_InsertNote(tk, false, false, p0, math.max(p0 + 1, p1), 9, h.pitch, h.vel, true)
+    end
+    R.MIDI_Sort(tk)
+  end)
+  if model then model.invalidate() end
+  return tr
+end
+
 -- трек из другого проекта (chunk с абсолютными FILE) — после after_track или в конец
 function E.insert_track_chunk(chunk, name, after_track)
   local tr

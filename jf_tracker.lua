@@ -33243,6 +33243,11 @@ ctx.similar_cmd = function(arg, o)   -- o: { path = источник, on_pick = 
   local nm = path:match('[^/]+$') or path
   local cat = SM.cat_of(nm, nil)
   local same = cat:sub(1, 1) ~= '/' and cat ~= 'other'
+  local by_sound = false
+  if not same then   -- 1 ноя: класса в имени нет — по звуку (ближайшие размеченные отпечатки)
+    local sc = ctx.sound_cat(path)
+    if sc then cat, same, by_sound = sc, true, true end
+  end
   local cands, nfp = {}, 0
   for _, n in ipairs(B.mapG.nodes) do
     local a = SM.AN[n.path]
@@ -33270,10 +33275,80 @@ ctx.similar_cmd = function(arg, o)   -- o: { path = источник, on_pick = 
     local n = cands[i].n
     items[#items + 1] = { label = SM.short and SM.short(n.name, 28) or n.name, v = n.path, tip = n.path }
   end
-  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - ' .. (o.what or 'into the lib') .. ')'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. cat .. ')') or '', #items, nfp),
+  ctx.smart_open({ title = ('%s %s%s - %d of %d fingerprinted (Enter - ' .. (o.what or 'into the lib') .. ')'):format(dir and (arg:match('%a+') .. ' than') or 'similar to', nm, same and (' (' .. (by_sound and 'sounds like ' or '') .. cat .. ')') or '', #items, nfp),
     items = items, cols = 2, sel = 1,
     on_sel = function(it) if ctx.preview_file then ctx.preview_file(it.v) end end,
     on_pick = o.on_pick or function(it) ctx.add_to_depot(it.v) end })
+end
+-- 1 ноя: класс по звуку — размеченные отпечатки карты (класс в имени), пересбор, когда отпечатков прибавилось
+ctx.sound_cat = function(path)
+  local SM = B.SM
+  if not (SM and B.mapG and path) then return nil end
+  if not ctx.lab or ctx.lab_n ~= SM.an_n or ctx.lab_g ~= B.mapG then ctx.lab, ctx.lab_n, ctx.lab_g = SM.lab_build(B.mapG.nodes), SM.an_n, B.mapG end
+  return SM.guess_cat(SM.AN[path], ctx.lab, 7, path)
+end
+-- 1 ноя: :beatbox — аудио под курсором (голос: «бум ц пщ ц») → MIDI ударных на новом треке под ним: удары из огибающей
+-- (5 мс), каждый — отпечаток (яркость, шум, тон тела); классы друг относительно друга: тёмный — бочка 36, средний —
+-- малый 38, яркий — хэт 42 (GM, канал 10); сила — от пика. Время — как спето, квантовать потом (gq)
+ctx.BB_NOTE = { 36, 38, 42 }
+ctx.beatbox_cmd = function()
+  local col = cur_col()
+  if not (col and col.track) then vim.msg = 'beatbox: no track under the cursor'; return end
+  local t, tn = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
+  local hit
+  for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+    local it = reaper.GetTrackMediaItem(col.track, i)
+    local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local tk = reaper.GetActiveTake(it)
+    if tk and not reaper.TakeIsMIDI(tk) and p < tn - 1e-6 and p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') > t + 1e-6 then hit = it; break end
+  end
+  if not hit then   -- выделенный аудио-айтем трека тоже годится
+    for i = 0, reaper.CountTrackMediaItems(col.track) - 1 do
+      local it = reaper.GetTrackMediaItem(col.track, i)
+      local tk = reaper.GetActiveTake(it)
+      if reaper.IsMediaItemSelected(it) and tk and not reaper.TakeIsMIDI(tk) then hit = it; break end
+    end
+  end
+  if not hit then vim.msg = ('beatbox: no audio item on the cursor row of %s (%.2f s) - record the beatbox, put the cursor on it or select it'):format(col.name, t); return end
+  local path = ctx.item_file and ctx.item_file(hit)
+  if not path then vim.msg = 'beatbox: the item has no file'; return end
+  local tk = reaper.GetActiveTake(hit)
+  local rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+  local offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+  local pos, len = reaper.GetMediaItemInfo_Value(hit, 'D_POSITION'), reaper.GetMediaItemInfo_Value(hit, 'D_LENGTH')
+  ctx.file_peaks(path, 32)
+  local flen = ctx.file_len_of(path)
+  if not (flen and flen > 0) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return end
+  local a, b = math.max(0, offs / flen), math.min(1, (offs + len * rate) / flen)
+  local dur = (b - a) * flen
+  local npix = math.max(16, math.min(12000, math.floor(dur / 0.005)))
+  local pk = ctx.file_peaks(path, npix, a, b, true)
+  if not (pk and pk.n and pk.n > 4) then vim.msg = 'beatbox: REAPER builds the peaks of the file - again in a moment'; return end
+  local SM, bin = B.SM, dur / pk.n
+  local env = {}
+  for i = 1, pk.n do env[i] = math.max(math.abs(pk.max[i] or 0), math.abs(pk.min[i] or 0)) end
+  local on = SM.onsets(env, bin)
+  if #on == 0 then vim.msg = 'beatbox: no hits found in the item'; return end
+  local feats, mx = {}, 0
+  for k, i0 in ipairs(on) do
+    local i1 = math.min(pk.n, (on[k + 1] or (pk.n + 1)) - 1, i0 + math.floor(0.3 / bin))
+    local sub = { n = 0, max = {}, min = {}, spec = {} }
+    local p = 0
+    for i = math.max(1, i0 - 1), i1 do sub.n = sub.n + 1; sub.max[sub.n], sub.min[sub.n], sub.spec[sub.n] = pk.max[i], pk.min[i], pk.spec and pk.spec[i]; p = math.max(p, env[i]) end
+    local f = (sub.n > 4 and SM.an_fine(sub, sub.n * bin)) or {}
+    local c = SM.an_from_peaks(sub) or {}
+    feats[k] = { b = c.b, nz = f.nz, bt = f.bt, p = p, i0 = i0, i1 = i1 }
+    mx = math.max(mx, p)
+  end
+  local cls = SM.bb_classify(feats)
+  local hits, cnt = {}, { 0, 0, 0 }
+  for k, f in ipairs(feats) do
+    local ts = (f.i0 - 1) * bin / rate
+    hits[k] = { t = pos + ts, len = math.max(0.03, (f.i1 - f.i0 + 1) * bin / rate), pitch = ctx.BB_NOTE[cls[k]], vel = math.max(30, math.min(127, math.floor(127 * (f.p / mx) ^ 0.7 + 0.5))) }
+    cnt[cls[k]] = cnt[cls[k]] + 1
+  end
+  local tr = edit.beatbox_write(hit, hits, 'beatbox ' .. (col.name or ''))
+  vim.msg = ('beatbox: %d hits -> MIDI on %s: %d kick (36), %d snare (38), %d hat (42) - put a drum kit on it, gq to quantize'):format(#hits, tr and 'a new track below' or '?', cnt[1], cnt[2], cnt[3])
 end
 -- 1 ноя: меню звука — похожие и шаги по признакам отпечатка (map: s; lib: Enter). o — как у similar_cmd
 ctx.sound_menu = function(path, o, extra)
