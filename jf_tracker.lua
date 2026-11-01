@@ -31454,8 +31454,8 @@ local function frame()
               end, 'z Tab: ' .. table.concat(m.zoomv, ' / ') .. ' swapped')
             else vim.msg = 'z Tab: dsp ' .. (state.dsp_zzflip and 'above' or 'below') .. ' the mixer in the next zz' end
           elseif ch == 'w' then ctx.pane_wide('dsp')   -- 22 окт: полосой во всю ширину снизу; 24 окт: zw (wide), общая для панелей
-          elseif ch == 'x' then ctx.dsp_xy_toggle(dsp_sel.fx)   -- 31 окт: zx — XY модуля вкл / выкл
-          elseif ch == 'X' then ctx.dsp_tall()   -- 26 окт: zX — DSP в 1.5 раза выше канонического, ещё раз — назад (было zx); zw — шире
+          elseif ch == 'x' then ctx.dsp_tall()   -- 1 ноя: zx — выше (x1.5 канонического), ещё раз — назад; как zx у item / options
+          elseif ch == 'X' then ctx.dsp_xy_toggle(dsp_sel.fx)   -- 1 ноя: zX — XY модуля вкл / выкл (было zx)
           elseif ch == 'e' then local t0 = dsp_target(); ctx.inst_window(t0 and t0.col)   -- 26 окт: ze и в DSP — окно инструмента трека
           elseif ch == 'E' then   -- 1 ноя: zE — родное окно (gui) выбранного модуля поверх его блока; ещё раз — назад
             local t0 = dsp_target(); local f0 = t0 and t0.fx and t0.fx[dsp_sel.fx]
