@@ -3128,11 +3128,6 @@ function V.key_impl(c)
         finish_move()
       end
       V.count = nil; return
-    elseif p == 'D' then
-      -- 1 ноя: DD — строки трека целиком (все подколонки), ниже подтягивается (бывший dd); Backspace — то же
-      if c == ('D'):byte() and ctx.time_edit and not env_of(V.cur.fi) then ctx.time_edit('delete', V.cur.fi, V.cur.row, n, false); finish_edit()
-      else finish_move() end
-      V.count = nil; return
     elseif p == 'da' then
       -- 19 окт: daw → dT (одна клавиша на функцию)
       if ctx.clear_track_part and string.char(c):lower():match('^[eljkh]$')
@@ -3143,6 +3138,11 @@ function V.key_impl(c)
       -- 10 окт: dd — строки (5dd — пять, как в Vim); трек удаляет td (было dd с 4 окт)
       -- 30 окт: dd как в Vim — строки уходят, ниже подтягивается (как Backspace; Ndd — N строк); dw — очистить N строк
       -- трека без сдвига (прежний dd), dW — то же на всех треках; целый item — di
+      -- 1 ноя: dD — строки трека целиком (все подколонки и лейны), ниже подтягивается (= Backspace);
+      -- dl — строка на всех треках (= Shift+Backspace; было dl = x)
+      if p == 'd' and (c == ('D'):byte() or c == ('l'):byte()) and ctx.time_edit and not env_of(V.cur.fi) and not (flat()[V.cur.fi] or {}).ml then
+        ctx.time_edit('delete', V.cur.fi, V.cur.row, n, c == ('l'):byte()); V.count = nil; finish_edit(); return
+      end
       -- 1 ноя: dd — строки только этой подколонки: её события в строках уходят, её события ниже (до конца паттерна)
       -- подтягиваются; соседние подколонки на месте. Весь трек — DD / Backspace
       if p == 'd' and c == ('d'):byte() and not env_of(V.cur.fi) and not (flat()[V.cur.fi] or {}).ml then
@@ -3159,7 +3159,7 @@ function V.key_impl(c)
           if #gone > 0 then E.delete(gone, lpb()) end
           if #below > 0 then E.retime(below, lpb(), rows, nil, 'dd subcolumn') end
         end)
-        V.msg = ('dd: %d row(s) of this subcolumn out, %d event(s) below moved up (DD / Backspace - the whole track)'):format(n, #below)
+        V.msg = ('dd: %d row(s) of this subcolumn out, %d event(s) below moved up (dD / Backspace - the whole track, dl - all tracks)'):format(n, #below)
         finish_edit(); return
       end
       -- 31 окт: только когда в строках есть что чистить и колонка не огибающая / лейн / команда (у них свой dw ниже);
@@ -3577,7 +3577,6 @@ function V.key_impl(c)
     if h then V.search = h.name ~= '' and h.name or h.note; V.find_next(1) end
   elseif ch == '?' then V.open_hydra(ctx.hydra_keys())
   elseif ch == 'd' or ch == 'y' or ch == 'c' then V.pending = ch; return
-  elseif ch == 'D' then V.pending = 'D'; V.msg = 'D: D - rows out of the whole track (all its subcolumns), below moves up (dd - only this subcolumn)'; return   -- 1 ноя
   elseif ch == 't' and V.mode == 'normal' then V.pending = 't'; return   -- 8 окт: tt — новый трек
   elseif ch == 'R' and V.mode == 'normal' and ctx.retro_insert then ctx.retro_insert(); V.count = nil; return   -- 21 окт: R — последнее сыгранное (ретро-буфер MIDI REAPER) с курсора
   elseif ch == 'T' and V.mode == 'normal' then V.transpose_smart(); return   -- 26 окт: Shift+T — транспозитор (выпадашка, как :tr)
@@ -4314,7 +4313,7 @@ end
 -- подсказка продолжений ожидающего оператора — справа в строке статуса
 -- (просьба 2 окт: нажал d — видно, что можно дальше)
 local PENDING_HINT = {
-  d = 'd: d rows of this subcolumn out, below moves up (3dd; DD - whole track) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c column values (field - pattern) | C the whole column (field - the whole track) | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
+  d = 'd: d rows of this subcolumn out, below moves up (3dd; dD - whole track, dl - all tracks) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c column values (field - pattern) | C the whole column (field - the whole track) | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
