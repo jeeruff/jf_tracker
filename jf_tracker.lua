@@ -30133,7 +30133,7 @@ local function frame()
     local m = ctx.mods()
     if state.pane_mode then ctx.pane_key(c); c = 0
     elseif c == 23 and m.ctrl and not m.cmd then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc'; c = 0
-    elseif m.cmd and not m.ctrl and not m.alt then
+    elseif (m.cmd or ctx.cmd_letter(c, m)) and not m.ctrl and not m.alt then   -- 1 ноя: в INSERT Cmd не доходит до mouse_cap — по коду / клавише
       local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
       -- Cmd+h j k l приходят кодами 8 10 11 12 (как Ctrl+H …), а не буквами (журнал 9 окт)
       local CODE = { [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l', [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l' }   -- 23 окт: и Cmd+стрелки
@@ -33272,6 +33272,29 @@ ctx.lib_shift_range = function(from, to)
   IK.clear_marks()
   for k = math.min(pa, pb), math.max(pa, pb) do IK.marks[order[k]] = true end
   vim.msg = ('lib: %d selected as shown - dd / x cut, yy yank, u unmark'):format(IK.nmarks())
+end
+-- 1 ноя: Cmd+h j k l в INSERT: клавиатура нот перехватывается, бит Cmd в gfx.mouse_cap не приходит. Коды 10 11 12 без
+-- модификатора не бывают (Enter = 13); 8 — Backspace или Cmd / Ctrl+H: различаем по физически нажатой H (js_ReaScriptAPI)
+ctx.cmd_letter = function(c, m)
+  if m.ctrl or m.alt or m.shift then return false end
+  if c == 10 or c == 11 or c == 12 then return true end
+  if c == 8 and reaper.JS_VKeys_GetState then
+    local st = reaper.JS_VKeys_GetState(reaper.time_precise() - 1)
+    return st ~= nil and st:byte(0x48) ~= 0
+  end
+  return false
+end
+-- 1 ноя: Ctrl+Shift+Opt+J / K — длина паттерна курсора ± d строк (всё после сдвигается, как :len)
+ctx.pat_len_step = function(d)
+  local t = edit.row_time(vim.cur.row, state.lpb, 0)
+  local rg = alias.region_at(regions, t)
+  if not rg then vim.msg = 'no pattern here'; return end
+  local q0 = reaper.TimeMap2_timeToQN(0, rg.pos)
+  local rows = math.floor((reaper.TimeMap2_timeToQN(0, rg.rgnend) - q0) * state.lpb + 0.5)
+  local nr = math.max(1, rows + d)
+  if nr == rows then vim.msg = 'pattern: 1 row is the shortest'; return end
+  ctx.set_region_len(rg, reaper.TimeMap2_QNToTime(0, q0 + nr / state.lpb))
+  vim.msg = ('%s: %d rows  (Ctrl+Shift+Opt+J longer / K shorter)'):format(rg.name ~= '' and rg.name or 'pattern', nr)
 end
 ctx.font_quick_once = function()
   if reaper.GetExtState(EXT, 'q_font2') == '1' then return end

@@ -2338,3 +2338,4 @@
 - 1 ноя: lib — Shift+щелчок выделяет (отмечает) строки между щелчками в порядке экрана, при любой сортировке; dd / x / yy по ним.
 - 1 ноя: Options — раздел experimental (pt-mode, og channels, frame, vhs, cracks, blood, sand, glitch, human, fader speed, pm cards).
 - 1 ноя: hold с MIDI-клавиатуры (INSERT + R, режим hold, не roll): нота длится, пока держишь клавишу; CC / pitch bend / aftertouch за время удержания пишутся по реальному времени (клип дотягивается); курсор — за конец ноты. Проверить: держать ноту и крутить mod wheel.
+- 1 ноя: INSERT — Cmd+h j k l переключают панели (Cmd не доходил: Cmd+H = Backspace удалял строку). Ctrl+Shift+Opt+J / K — паттерн курсора на строку длиннее / короче (счётчик).

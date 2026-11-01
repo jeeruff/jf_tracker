@@ -2176,6 +2176,11 @@ function V.key_impl(c)
     if ctx.inst_rate then ctx.inst_rate(((hk == 'l' or c == RIGHT) and 1 or -1) * n) end
     V.count = nil; return
   end
+  -- 1 ноя: Ctrl+Shift+Opt+J / K — паттерн курсора на строку длиннее / короче (счётчик — N строк); на лейне автоматизации — jog, как было
+  if mods.alt and mods.ctrl and mods.shift and not mods.cmd and (hk == 'j' or hk == 'k' or c == DOWN or c == UP) and V.mode ~= 'cmd' and V.mode ~= 'search' and not env_of(V.cur.fi) and ctx.pat_len_step then
+    ctx.pat_len_step(((hk == 'j' or c == DOWN) and 1 or -1) * n)
+    V.count = nil; return
+  end
   if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then
     if ctx.repeat_pattern then ctx.repeat_pattern(false) end
     V.count = nil; return
