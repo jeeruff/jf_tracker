@@ -13161,7 +13161,7 @@ ctx = {
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('insred', 'INSERT cursor red', 'in INSERT the cursor accent (cell, edge, playhead) turns red - the keys write; off - the cursor accent colour as always'),
-      { key = 'bsplit', label = 'browser split', kind = 'toggle', desc = 'the browser in two columns when it is 40+ characters wide: folders left, files right (Cmd+H / Cmd+L between them)', get = function() return B.split end, set = function(v) B.split = v and true or false; reaper.SetExtState(EXT, 'bsplit', v and '1' or '0', true) end },   -- 1 ноя
+      { key = 'bsplit', label = 'browser split', kind = 'toggle', desc = 'the browser in two columns when it is 40+ characters wide: the folders of this folder left, its files right - only a view, j k go through both (off by default)', get = function() return B.split end, set = function(v) B.split = v and true or false; reaper.SetExtState(EXT, 'bsplit', v and '1' or '0', true) end },   -- 1 ноя
       { key = 'vhs', label = 'vhs', kind = 'toggle', desc = 'the VHS frame on / off (for videos: costs ~5 ms a frame) - the same as frame = vhs', get = function() return state.framefx == 'vhs' end, set = function(v) state.framefx = v and 'vhs' or 'off'; state.cracks = v and true or false end },   -- 1 ноя: быстрая опция
       { key = 'framefx', label = 'frame (experimental)', kind = 'cycle', values = { 'off', 'cracks', 'blood', 'lightning', 'vhs' }, desc = 'a frame inside the tracker: cracks all over, blood (ragged rim, drips, splatter), vhs (a tracking band rolling and glitching, scanlines), lightning (flickers); red in INSERT (:frame)', get = function() return (state.framefx ~= nil and state.framefx ~= '') and state.framefx or (state.cracks and 'cracks' or 'off') end, set = function(v) state.framefx = v; state.cracks = v ~= 'off' end },
       flag('bloodviz', 'blood visualizer (experimental)', 'a pool of blood along the bottom with waves; the sound of a track throws drops - they stretch, wobble and splash back, ripples run to the neighbours (:blood)'),
@@ -30454,8 +30454,7 @@ local function frame()
         local id = ctx.pane_cur()
         if m.shift then ctx.pane_move(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
-        elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then
-        elseif id == 'browser' and B.split_step and B.split_step(DIR[ch]) then   -- 1 ноя: колонки браузера — папки | файлы   -- 1 ноя: холст <-> список кривых
+        elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
         c = 0
       end

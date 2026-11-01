@@ -231,7 +231,6 @@ KH.PAGES = {
     { k = 'g12 Enter', t = {}, m = 'go to row number', d = 'go to row 0012 (also 12gg)' },
     { k = 'Opt+Space', m = 'close the gap', d = 'the empty rows from the cursor to the next note of the subcolumn go out, the note (and the rest of the pattern below) comes up; on a note - the gap after it' },
     { k = 'Cmd+H Cmd+L (curve)', m = 'canvas <-> curve list', d = 'automation curve page: Cmd+H from the canvas - into the list of curves (track folders, on its left), Cmd+L - back; again Cmd+H - the pane on the left; in the list j k rows, l / Enter open a folder or take a curve (Enter - back to the canvas), h close the folder' },
-    { k = 'Cmd+H Cmd+L (browser)', m = 'folders <-> files', d = 'the browser in two columns (option browser split, 40+ characters wide): folders left, files right; j k stay in the column; from the edge column - the next pane' },
     { k = 'Opt+w Opt+b', m = 'next / previous note', d = 'the next / previous note of this subcolumn only - past OFFs, commands and the other subcolumns (w / b - the whole track); 3 Opt+w - three notes' },
     { k = 'Opt+W', d = 'the cursor to the master columns (Shift+Opt+w); a folded master opens while the cursor is on it (auto / fold in its header), l from the last track - the same' },
     { k = 'zs', d = 'view: only the section of the cursor (intro, hook ...) / the whole project (the sec button); transpose (F1 F2 ...) takes what you see' },

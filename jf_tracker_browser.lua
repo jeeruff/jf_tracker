@@ -86,7 +86,7 @@ local function wanted(name, map)
   return B.all_files or (ext ~= nil and AUDIO[ext:lower()] == true)
 end
 
-B.split = not (R.GetExtState and R.GetExtState('jf_tracker', 'bsplit') == '0')   -- 1 ноя: две колонки (папки | файлы), по умолчанию вкл
+B.split = R.GetExtState and R.GetExtState('jf_tracker', 'bsplit') == '1'   -- 1 ноя: две колонки (папки | файлы) — только вид, по умолчанию выкл
 function B.init(c, root)
   ctx = c
   -- ~/samples, если есть; иначе домашняя папка (релиз 5 окт)
@@ -1860,21 +1860,6 @@ end
 
 function B.refilter_soon() if R.time_precise then B.filter_due = R.time_precise() + 0.25 else B.set_all(B.all) end end
 -- клавиши в фокусе браузера; true — съедена
--- 1 ноя: две колонки — диапазон строк колонки курсора (папки 1..nd, файлы nd+1..N); без колонок — весь список
-function B.col_range()
-  local nd = B.split_nd
-  if not nd then return 1, math.max(1, #B.entries) end
-  if B.cur <= nd then return 1, nd end
-  return nd + 1, #B.entries
-end
--- Cmd+H / Cmd+L: в колонку папок / файлов (курсор — где был в ней); с крайней колонки — false (соседняя панель)
-function B.split_step(dir)
-  local nd = B.split_nd
-  if not nd then return false end
-  if dir == 'l' and B.cur > nd then B.cur_f = B.cur; B.cur = math.min(nd, B.cur_d or 1); return true end
-  if dir == 'r' and B.cur <= nd then B.cur_d = B.cur; B.cur = math.max(nd + 1, math.min(#B.entries, B.cur_f or (nd + 1))); return true end
-  return false
-end
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
   if B.filtering then
@@ -1932,10 +1917,10 @@ function B.key(c)
   elseif ch == 'w' then B.click('size')
   elseif ch == 'q' then B.click('hide')
   elseif c == 27 and B.filter ~= '' then B.filter = ''; B.set_all(B.all)
-  elseif ch == 'j' or c == 1685026670 then local a, b = B.col_range(); B.cur = math.max(a, math.min(b, B.cur + n))
-  elseif ch == 'k' or c == 30064 then local a = B.col_range(); B.cur = math.max(a, B.cur - n)
-  elseif ch == 'g' then B.cur = (B.col_range())
-  elseif ch == 'G' then local a, b = B.col_range(); B.cur = had_count and math.max(a, math.min(b, a + n - 1)) or b   -- 3G — третья строка
+  elseif ch == 'j' or c == 1685026670 then B.cur = math.max(1, math.min(#B.entries, B.cur + n))
+  elseif ch == 'k' or c == 30064 then B.cur = math.max(1, B.cur - n)
+  elseif ch == 'g' then B.cur = 1
+  elseif ch == 'G' then B.cur = had_count and math.max(1, math.min(#B.entries, n)) or #B.entries   -- 3G — третья строка
   elseif c == 13 and ctx.sf_enter and ctx.sf_enter() then   -- 20 окт: Shift+F — найденный сэмпл на место в трекере (первым: пэд / отметки не перехватывают)
   elseif c == 13 and ctx.mods and ctx.mods().cmd then if ctx.browser_replace then ctx.browser_replace() end   -- Cmd+Enter: заменить сэмпл инструмента
   elseif c == 13 and ctx.mods and ctx.mods().alt then   -- Opt+Enter (7 окт): файл — слайсом выбранного инструмента
@@ -2227,7 +2212,7 @@ function B.draw(U, L, x, y, w, h)
     pv_x, pv_w = x + pw + cw0 + 1, w - pw - cw0 - 3
     x, w = x + pw, cw0 - 1
   end
-  -- 1 ноя: две колонки (опция browser split, ширина >= 40 знаков): папки слева, файлы справа; Cmd+H / Cmd+L — между ними
+  -- 1 ноя: две колонки (опция browser split, ширина >= 40 знаков): папки слева, файлы справа — только вид, j k идут сквозь
   local nd = 0
   for _, e in ipairs(B.entries) do if e.dir then nd = nd + 1 else break end end
   local split = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and not cols and w >= L.cw * 40 and nd > 0 and nd < #B.entries
