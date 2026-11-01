@@ -1286,7 +1286,6 @@ ctx = {
   -- колонки: < 36 px — свёрнута (mini), < 80 — компактная, выше — полная;
   -- свёртка в трекере ставит высоту 24 / 56 / 96 (I_HEIGHTOVERRIDE)
   HDR_H = { mini = 24, compact = 34, full = 64 },   -- 7 окт: высоты = уровни 0 / 1 / 4 (шаг 10 px)
-  hdr_want = function(h) return h < 36 and 'mini' or (h < 80 and true or nil) end,
   -- 7 окт: высота → уровень ширины колонки, шаг 10 px (24 px — полоска)
   hdr_level = function(h) return math.max(0, math.min(L and L.MAXLVL or 10, math.floor((h - 24) / 10 + 0.5))) end,
   hdr_push = function(col)
@@ -4473,30 +4472,6 @@ ctx = {
       vim.open_hydra({ title = (pname or '?') .. ' follows ' .. it.label .. ': how much', items = amt })
     end)
   end,
-  macro_assign = function(tr, cont, tgt, tparam, pname)
-    local P = ('param.%d.'):format(tparam)
-    local A = model.fxapi(tr)
-    local _, act = A.GetNamedConfigParm(tr, tgt, P .. 'plink.active')
-    local _, lp = A.GetNamedConfigParm(tr, tgt, P .. 'plink.param')
-    local _, sc = A.GetNamedConfigParm(tr, tgt, P .. 'plink.scale')
-    local cur = act == '1' and edit.macro_find(tr, cont.i) and (tonumber(lp) or -1) + 1 or nil
-    local items = {}
-    for m = 1, 8 do
-      items[#items + 1] = { key = tostring(m), label = ('M%d'):format(m) .. (cur == m and ('  (now %+d %%)'):format(math.floor((tonumber(sc) or 0) * 100 + 0.5)) or ''), fn = function()
-        local amt = {}
-        for _, a in ipairs({ { '1', 100 }, { '2', 50 }, { '3', 25 }, { '4', -25 }, { '5', -50 }, { '6', -100 } }) do
-          amt[#amt + 1] = { key = a[1], label = ('%+d %%'):format(a[2]) .. (a[2] < 0 and '  (the macro up - this down)' or ''), fn = function()
-            if edit.macro_link(tr, cont.i, tgt, tparam, m, a[2] / 100) then
-              vim.msg = ('M%d -> %s %+d %% (container %s; the macro at 0 - where it stands now)'):format(m, pname or '?', a[2], cont.name or '')
-            else vim.msg = 'macro: could not link (REAPER 7 containers)' end
-          end }
-        end
-        vim.open_hydra({ title = ('M%d -> %s: how much'):format(m, pname or '?'), items = amt })
-      end }
-    end
-    if cur then items[#items + 1] = { key = 'x', label = 'unlink from M' .. cur, fn = function() edit.macro_unlink(tr, tgt, tparam); vim.msg = (pname or '') .. ': not on a macro' end } end
-    vim.open_hydra({ title = (pname or 'parameter') .. ' -> a macro of ' .. (cont.name or 'the container'), items = items })
-  end,
   -- история касаний параметров трека: новые — сверху, 8 штук
   ptouch_push = function(guid, key)
     ctx.ptouch = ctx.ptouch or {}
@@ -4619,7 +4594,6 @@ ctx = {
     MX.selmode = not MX.selmode
     vim.msg = MX.selmode and 'matrix sel: the tracker shows only the tracks of the selected cells (Cmd+click adds a cell, v / Shift - a block, Esc clears)' or 'matrix sel off: all tracks'
   end,
-  mx_fold_toggle = function() MX.fold = not MX.fold; state.mxfold = MX.fold; vim.msg = MX.fold and 'matrix folded: numbers, tracks, cells (fold / F to unfold)' or 'matrix unfolded' end,
   vtext = draw.vtext,
   -- огибающие: точка в строке (tol — полстроки), значение 0..1
   env_set = function(e, row, v)
@@ -10907,16 +10881,6 @@ ctx = {
     model.invalidate()
     vim.msg = n == 0 and 'dub: nothing in the loop' or (('dub: the loop copied forward (%d item(s))'):format(n) .. (muted > 0 and (', ' .. muted .. ' muted in the copy') or '') .. ((mode == 'move' or mode == 'mutemove') and ', the loop moved onto it' or '') .. ' - Cmd+Z back')
   end,
-  dub_menu = function()
-    local cur = state.dubmode or 'move'
-    local items = {}
-    for _, o in ipairs({ { 'c', 'copy', 'dub: copy the loop forward' }, { 'm', 'move', 'dub: copy forward, the loop moves onto the copy (keep dubbing)' },
-                         { 'r', 'mute', 'dub: copy forward, random tracks muted in the copy' }, { 'x', 'mutemove', 'dub: copy with random mutes, the loop moves on' } }) do
-      items[#items + 1] = { key = o[1], label = o[3] .. (cur == o[2] and '  (on)' or ''), fn = function() state.dubmode = o[2]; ctx.dub(o[2]) end }
-    end
-    vim.open_hydra({ title = 'dub - click repeats the chosen one', items = items })
-    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
-  end,
   -- 12 окт: игра на скорости r (x0.5 / x2): кнопки под play, Ctrl+Cmd+Space / Opt+Cmd+Space; стоп — x1 назад
   half_play = function(r)
     r = r or 0.5
@@ -11600,7 +11564,6 @@ ctx = {
   -- = 'chord', ещё раз — обратно); :chord Cm7 — гармонайзер: аккорд в строку
   -- курсора (ноты, что там начинаются, заменяются; длина — как у них, иначе
   -- до следующих нот трека, не больше такта)
-  chord_name = function(pitches) return MMX.CH.name(pitches) end,   -- клипы сессии: имена аккордов
   chord_heads = function(col, row)
     local heads, pitches = {}, {}
     for _, lane in ipairs(col.lanes or {}) do
@@ -11907,7 +11870,6 @@ ctx = {
       if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then reaper.SetOnlyTrackSelected(col.track); reaper.Main_OnCommand(40293, 0) end
     end
   end,
-  empty_row = function(y) draw.empty_row(L, y) end,
   -- песочница тестов: проект без имени, треки sandbox_setup.lua
   is_sandbox = function()
     local _, pname = reaper.EnumProjects(-1, '')
@@ -12409,7 +12371,6 @@ ctx = {
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
   end,
   file_exists = function(p) return reaper.file_exists(p) end,
-  src_path = function(ps) return reaper.GetMediaSourceFileName(ps, '') end,
   FOCUS = function() return draw.FOCUS end,
   msg = function(t) vim.msg = t end,
   -- 13 окт: zx — нативный редактор кроссфейдов REAPER (41827) для ноты под курсором и тех нот
@@ -17096,15 +17057,6 @@ ctx.ctl_lane_start = function()
   end
   return { lane = fl, row = row, v = v, x0 = gfx.mouse_x }
 end
--- значение строки лейна / огибающей 0..1 (для джога: соседние шаги)
-ctx.ctl_val_at = function(fl, row)
-  if fl.env and fl.env.env then return edit.env_value(fl.env, edit.row_time(row, state.lpb, 0)) end
-  local ml = fl.ml
-  local ev = ml.ev and ml.ev[row]
-  if ev then return (ev.v or 0) / 127 end
-  for k = #(ml.rows or {}), 1, -1 do if ml.rows[k] < row then return (ml.ev[ml.rows[k]].v or 0) / 127 end end
-  return ml.kind == 'pb' and 64 / 127 or 0
-end
 -- 31 окт: относительный сдвиг мыши; курсор назад — только у края экрана (перенос каждый кадр глушил движение)
 ctx.mouse_rel = function(SG)
   local sx, sy = reaper.GetMousePosition()
@@ -18373,7 +18325,6 @@ local function ac_ext()
   end
   return AC.ext
 end
-local function ac_fav() return ac_ext().fav end
 local function ac_recent() return ac_ext().rec end
 local function ac_groups(c)
   local ex = ac_ext()
@@ -28098,12 +28049,7 @@ local function frame()
       click = { t = now2, zone = 'itemedge' }
     elseif hover.row and hover.fi then
       ctx.set_focus('tracker')
-      if false then
-        -- (2 окт: Option+протяжка теперь переносит событие / блок — ниже, ev_drag)
-        local pos = reaper.GetMediaItemInfo_Value(hover.itemedge.item, 'D_POSITION')
-        item_drag = { item = hover.itemedge.item, edge = 'move', col = hover.itemedge.col, y0 = gfx.mouse_y, active = false, grab = edit.row_time(hover.row.row, state.lpb, 0) - pos }
-        click = { t = now2, zone = 'itemmove' }
-      elseif gfx.mouse_cap & 8 == 8 then
+      if gfx.mouse_cap & 8 == 8 then
         -- Shift+клик: блок от якоря (курсор до клика) до клика; Shift+протяжка
         -- тянет второй угол (как в Renoise)
         if vim.mode ~= 'visual' and vim.mode ~= 'vline' then
@@ -31930,9 +31876,6 @@ ctx.mx_btn_do = function(b)
   elseif b == 'follow' then   -- 19 окт: матрица за курсором трекера
     MX.follow = not MX.follow; reaper.SetExtState(EXT, 'mxfollow', MX.follow and '1' or '0', true)
     vim.msg = 'matrix follow ' .. (MX.follow and 'on: the matrix cursor goes with the tracker cursor (slot and track)' or 'off')
-  elseif b == 'vismetro' then
-    MX.vismetro = not MX.vismetro; reaper.SetExtState(EXT, 'vismetro', MX.vismetro and '1' or '0', true)
-    vim.msg = 'vismetro ' .. (MX.vismetro and 'on: the beats of a slot as vertical strips, the playing beat lights up' or 'off: the quarters as lines')
   elseif b == 'plist' then ctx.plist_toggle()
   elseif b == 'plprev' then ctx.pl_cmd('prev')
   elseif b == 'plnext' then ctx.pl_cmd('next')
@@ -35101,10 +35044,6 @@ ctx.spl_draw = function(Lx, x, y, w)
     cx = cx + bw + 2
   end
   return hv
-end
-ctx.pal_in_pane = function()
-  local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
-  return bp and bp.patterns ~= nil
 end
 ctx.palette_draw = function(Lx, x, y, w, h)   -- 19 окт: h — своя панель patterns (рядов сколько влезет)
   local hover = {}

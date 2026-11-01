@@ -486,31 +486,6 @@ function V.next_rows()
   return math.max(1, r - V.cur.row)
 end
 
--- W / B — следующее / предыдущее событие в ЛЮБОЙ колонке (все треки, подколонки
--- и лейны; огибающие — нет): ближайшая строка, при равенстве — от колонки
--- курсора вправо по кругу; курсор переходит в эту колонку (просьба 2 окт)
-local function next_any(fi, row, dir)
-  local F = flat()
-  local nf = #F
-  if nf == 0 then return nil end
-  local last = ctx.snap().last_row or 0
-  local r = row + dir
-  while r >= 0 and r <= last + 1 do
-    for k = 0, nf - 1 do
-      local i = (fi - 1 + k) % nf + 1
-      local f = F[i]
-      if f and f.env then
-        if env_has(f, r) then return i, r end
-      elseif f and f.ml then
-        if (f.ml.ev or {})[r] then return i, r end
-      elseif f then
-        for _, sub in ipairs(subs_of(f)) do if is_head(sub[r]) then return i, r end end
-      end
-    end
-    r = r + dir
-  end
-  return nil
-end
 
 -- w / b (6 окт): события ТРЕКА курсора — все его подколонки и лейны
 -- огибающих (точки — тоже события), как слова текста в Vim: строка трека —
@@ -955,10 +930,6 @@ end
 local function fx_code_ok(code)
   local d = ctx.SM and ctx.SM.FX_DESC
   return d and d[code] ~= nil
-end
-local function fx_prefix_ok(ch)
-  for _, e in ipairs((ctx.SM and ctx.SM.FX) or {}) do if e[1]:sub(1, 1) == ch then return true end end
-  return false
 end
 local function hex_entry(c, fld, heads)
   local ch = (c < 256) and string.char(c):upper() or ''

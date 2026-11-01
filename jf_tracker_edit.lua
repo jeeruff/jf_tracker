@@ -6074,7 +6074,6 @@ function E.layers_set(root_it, list)
     R.GetSetMediaItemInfo_String(root_it, LAYERS, #list > 0 and E.LY.tag(list) or '', true)
   end)
 end
-function E.layer_item(guid) local _, srcs = E.layer_roots(); return srcs[guid] end
 
 -- ── premod (22 окт): кривая автоматизации до каждой ноты трека ──
 -- Настройки — P_EXT:jf_premod трека (jf_tracker_premod.lua); AI одного пула на

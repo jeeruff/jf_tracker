@@ -276,13 +276,6 @@ function P.live(items)
   P.cur_rate = rate
   return true
 end
--- секунды от начала item, который играет (nil — не играет инструмент)
-function P.inst_position(item)
-  if not ((cur or P.geo) and P.cur_item) or (item and item ~= P.cur_item) then return nil end
-  local ok, pos = P.cur_pos()
-  if not ok then return nil end
-  return (pos - P.cur_offs) / P.cur_rate
-end
 function P.playing() return cur ~= nil or stop_at ~= nil end
 -- позиция звучащего инструмента в файле: голос с лупом (P.geo) или превью cur → ok, секунды
 function P.cur_pos()

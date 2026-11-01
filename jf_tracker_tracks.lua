@@ -66,7 +66,6 @@ function T.sibling(list, i, dir)
   return nil
 end
 
-function T.is_folder(list, i) return list[i + 1] ~= nil and list[i + 1].d > list[i].d end
 
 local function copy(list) local o = {}; for k, e in ipairs(list) do o[k] = { id = e.id, d = e.d } end; return o end
 local function index(list, id) for k, e in ipairs(list) do if e.id == id then return k end end end

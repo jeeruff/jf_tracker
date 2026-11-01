@@ -66,12 +66,6 @@ function TH.step(p, n, root, id)
   local k2 = j % m + 1
   return root + o2 * 12 + (pcs[k2] - root) % 12
 end
--- ноты лада в диапазоне (как scale_pitches в jf_chordcheat)
-function TH.scale_pitches(root, id, lo, hi)
-  local out = {}
-  for p = lo, hi do if TH.in_scale(p, root, id) then out[#out + 1] = p end end
-  return out
-end
 
 -- лад по нотам: лучший по всем ладам (вес тоники и квинты ×1.3, 7-ступенные впереди при равенстве);
 -- ids — какие лады пробовать (по умолчанию все 7-ступенные)

@@ -45,7 +45,6 @@ function D.init(u, peaks_fn, matrix)
   -- общие примитивы для матрицы/браузера/слайсера — через масштабируемый текст
   U.text = function(x, y, str, col, bg) D.text(x, y, str, col, bg) end
   U.textc = function(x, y, w, str, col) D.text(x + (w - ms(str)) / 2, y, str, col) end
-  U.textr = function(x, y, w, str, col) D.text(x + w - ms(str), y, str, col) end
   U.measure, U.texth = ms, TH
   U.hint_text, U.hint_colors = D.hint_text, D.hint_colors   -- 15 окт: стандарт подсказок для модулей
   -- контраст ярче: текст тянем к 7:1 (U — копия модуля, jf_looper не трогаем)
@@ -2565,23 +2564,6 @@ local function draw_cell(L, cell, x, y, ty, inv)
   end
 end
 
--- пустая строка трекера (7 окт, session в масштабе трекера): точки во всех
--- полях всех видимых колонок — сетка та же, что у строк трекера
-function D.empty_row(L, y)
-  for _, c in ipairs(L.cols or {}) do
-    if c.x then
-      for _, ln in ipairs(c.lanes) do
-        for si = 1, ln.nsub do
-          local f = L.flat[ln.f0 + si - 1]
-          if f and f.x then
-            if c.folded then text(f.x + L.pad, y + 1, '...', D.EMPTY)
-            else draw_cell(f.G or L, nil, f.x, y, y + 1) end
-          end
-        end
-      end
-    end
-  end
-end
 
 local function draw_fold_cell(L, col, row, x, y, ty, inv)
   local text_ = text
@@ -2928,21 +2910,6 @@ function D.dsp_meter(L, x, y, w, h, label, lv, what, hover)
   if hover and mx >= x and mx < x + w and my >= y and my < y + h then hover.dspmeter = what end
 end
 
--- ── виды встроенных эффектов REAPER (4 окт): картинка состояния в первой
--- колонке блока — АЧХ ReaEQ, кривая ReaComp, полосы ReaXcomp, повторы
--- ReaDelay, комната ReaVerbate, шкалы ReaGate / ReaLimit. Значения — из
--- отформатированных строк параметров (v.s) по подписям из реестра
--- цвет категории Airwindows: стабильный по имени, читаемый на фоне
-function D.aw_colour(cat)
-  local h = 0
-  for i = 1, #(cat or '') do h = (h * 31 + cat:byte(i)) % 360 end
-  local c = U.hsv and U.hsv(h, 0.55, 0.95) or nil
-  if not c then
-    local pal = { U.CYAN, U.GREEN, U.AMBER, U.RED, U.mix(U.CYAN, U.RED, 0.5), U.mix(U.GREEN, U.AMBER, 0.5) }
-    c = pal[h % #pal + 1]
-  end
-  return U.readable(c, U.BG, 4.0)
-end
 D.FX_VIEWS = { ir = true, amigo = true, eq = true, comp = true, gate = true, limit = true, xcomp = true, delay = true, verb = true }
 local VRH = 8
 local function pnum(f, vals, label)
@@ -10742,16 +10709,6 @@ function D.frame(L, snap, rows, state, info)
     -- первый видимый блок — D.dsp_first (полоса прокрутки); выбор другого эффекта
     -- подтягивает его в поле зрения, прокрутка мимо выбора его не трогает
     local first = 1   -- 22 окт: прокрутка по пикселям (D.dsp_px) — блоки не пропускаются
-    if false then
-      D.dsp_sel_last = sel.fx
-      if sel.fx and sel.fx >= 1 and sel.fx <= #fxs then
-        local est = 1
-        local sum = 0
-        for k = 1, sel.fx do sum = sum + L.cw * 14 + L.pad end      -- по самой узкой колонке
-        while est < sel.fx and bx + sum > right do sum = sum - L.cw * 14 - L.pad; est = est + 1 end
-        if sel.fx < first then first = sel.fx elseif est > first then first = est end
-      end
-    end
     first = math.max(1, math.min(first, math.max(1, #fxs)))
     D.dsp_first = first
     local sb_x0, nshown = bx, 0

@@ -199,19 +199,6 @@ function MX.vcols(snap)
   vcache.snap, vcache.vs, vcache.grid, vcache.regs = snap, { cols = V }, nil, nil
   return vcache.vs
 end
-function MX.vgrid(snap, regions)
-  local vs = MX.vcols(snap)
-  if vcache.grid and vcache.regs == regions then return vcache.grid end
-  local grid, rgb_of, model = {}, {}, ctx and ctx.model
-  local vidx = {}
-  for ri, rg in ipairs(regions) do
-    local row = {}
-    for vi, v in ipairs(vs.cols) do vidx[vi] = vidx[vi] or col_index(v.lanes); row[vi] = cell_of(v.col, v.lanes, rg, rgb_of, model, vidx[vi]) end
-    grid[ri] = row
-  end
-  vcache.grid, vcache.regs = grid, regions
-  return grid
-end
 
 -- ── раскладка ─────────────────────────────────────────────────────────────
 MX.fill = true          -- схематичное заполнение ячеек (кнопка «fill»)
@@ -485,13 +472,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local pc = reaper.GetThemeColor('col_cursor', 0)   -- зелёный курсор темы (как на снимке пользователя)
       if pc and pc >= 0 then local r, g, b = reaper.ColorFromNative(pc); gfx.set(r / 255, g / 255, b / 255, 1) else U.set(U.GREEN) end
       gfx.rect(L.mx_label_w, fy, W - L.mx_label_w, 2, 1)
-    elseif false then
-      -- 8 окт: строка в одну высоту — плейхед по горизонтали: полоса прогресса
-      -- снизу и риска на месте (по клеткам паттерна, слева направо)
-      local frac = (info.play_row - rg.r0) / math.max(1, rg.r1 - rg.r0)
-      local x0 = L.mx_label_w
-      local fx = x0 + math.floor(frac * (W - x0 - 2) + 0.5)
-      U.set(U.AMBER); gfx.rect(fx, y + 1, 2, rh - 2, 1)   -- 28 окт: без полосы прогресса снизу (лишняя), только риска
     end
     if my >= y and my < y + rh and mx < W then hover.ri = ri end
     -- 18 окт: колонка линейки — зона выделения / лупа (двойной щелчок — луп на слот, протяжка — несколько, Cmd — выборочно)
@@ -722,35 +702,6 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
                 px, py = vx, vy
               end
             end
-          end
-        elseif MX.beat_strips then   -- 18 окт: полоски долей в клетке — отложено для клипов (показать их размер); vismetro теперь в колонке размера
-          -- 18 окт: vismetro — доли такта вертикальными полосками слева направо (размер паттерна: 4/4 — четыре);
-          -- полоска с событиями — цветом item, у играющего слота доля под плейхедом горит, как счётчик метронома
-          local n = 4
-          if info.sig_at and not rg.gap then n = math.max(1, math.min(8, (info.sig_at(rg.pos)) or 4)) end
-          MX.q8 = MX.q8 or {}                 -- 21 окт: одна таблица на все клетки (была новая на клетку в кадре)
-          local q = MX.q8
-          for k = 1, n do q[k] = 0 end
-          for _, e in ipairs(g.ev) do
-            local a, b = e.pos, e.pos + e.len
-            for k = 1, n do
-              local ov = math.min(b, k / n) - math.max(a, (k - 1) / n)
-              if ov > 0 then q[k] = math.min(1, q[k] + ov * n) end
-            end
-          end
-          local lit
-          if playing then
-            local lpb = (ctx.state and ctx.state.lpb) or 4
-            lit = math.floor((info.play_row - rg.r0) / lpb) % n + 1
-          end
-          local rgb = g.ev[1] and g.ev[1].rgb or U.TEXT
-          local sw = math.max(1, math.floor((iw - (n - 1)) / n))
-          local ih = rh - 4
-          for k = 1, n do
-            local sx = x + 2 + (k - 1) * (sw + 1)
-            if k == lit then U.set(U.AMBER); gfx.rect(sx, y + 2, sw, ih, 1)
-            elseif q[k] > 0 then U.set(g.state == 'muted' and U.GREY or U.mix(rgb, U.BG, 0.35)); gfx.rect(sx, y + 2, sw, ih, 1)
-            else U.set(U.mix(U.LINE, U.BG, 0.5)); gfx.rect(sx, y + 2, sw, ih, 0) end
           end
         else
           -- схема: четыре четверти региона сверху вниз — линия там, где есть события

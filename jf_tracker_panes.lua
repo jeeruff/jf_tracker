@@ -615,15 +615,6 @@ local function stack_keep(m, id, into)
   if cur then PN.set_active(m, cur) end
   return true
 end
--- 13 окт: панель id — вкладкой в стек панели into (активная вкладка не меняется); уже там — ничего
-function PN.keep_in(m, id, into)
-  if not PN.visible(m, into) then return false end
-  local a, b = PN.find(m, id), PN.find(m, into)
-  if a and a == b then return false end
-  if a then detach(m, id) end
-  m.hidden[id] = true
-  return stack_keep(m, id, into)
-end
 PN.LATE = {
   { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
   { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },

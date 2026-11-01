@@ -176,9 +176,6 @@ function U.textc(x, y, w, s, col)
   U.text(x + (w - gfx.measurestr(s)) / 2, y, s, col)
 end
 
-function U.textr(x, y, w, s, col)
-  U.text(x + w - gfx.measurestr(s), y, s, col)
-end
 
 -- Панель: заголовок НАД рамкой, приглушённым цветом. Никаких врезок в линию.
 function U.panel(x, y, w, h, title)
@@ -204,9 +201,6 @@ function U.button(x, y, w, h, label, on, col)
   return hot and U.click
 end
 
-function U.numbtn(x, y, sz, n, on, col)
-  return U.button(x, y, sz, sz, tostring(n), on, col)
-end
 
 -- Иконки типов: линиями, без картинок. Мельче и суше, чем было.
 -- project — папка, loop — стрелка по кругу, reel — бабина, pack — стопка,

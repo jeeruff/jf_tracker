@@ -606,16 +606,6 @@ end
 -- кусок неба, плотность галактики сохраняется); секторы — рамки поверх облака с подписью «KICK SECTOR 34»
 SM.NEB_MAX = 24000                             -- звёзд на экране (у каждой группы — доля, минимум одна)
 local function rnd(k) local v = math.sin(k * 12.9898 + 78.233) * 43758.5453; return v - math.floor(v) end
-local function galaxy_star(k)
-  -- две спиральные ветви + ядро; детерминированно по номеру
-  local u, v, wv = rnd(k), rnd(k + 0.37), rnd(k + 0.71)
-  local r = u ^ 0.65
-  local arm = (wv < 0.5) and 0 or math.pi
-  local a = arm + r * 5.2 + (v - 0.5) * (0.9 - 0.5 * r) * 2
-  if wv > 0.85 then a = v * 2 * math.pi; r = u ^ 1.6 * 0.5 end   -- ядро / гало
-  local sx, sy = r * math.cos(a), r * math.sin(a) * 0.78
-  return sx + (rnd(k + 0.13) - 0.5) * 0.06, sy + (rnd(k + 0.91) - 0.5) * 0.06
-end
 -- 29 окт: граница облака группы по углу: радиус с лопастями (3 и 5 гармоник) — звёзды внутри, контур сектора по ней
 function SM.neb_bound(hb, a)
   return hb.R * (1 + hb.lobe * math.sin(3 * a + hb.ph1) + 0.12 * math.sin(5 * a + hb.ph2) + 0.06 * math.sin(8 * a + hb.ph3))
