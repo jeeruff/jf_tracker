@@ -6008,6 +6008,9 @@ ctx = {
   -- вправо, T<буква> в стек, X<буква> своп, B из стека, x своп с прошлым,
   -- Tab стек, + - < > размер, = поровну, z zoom, c скрыть, Space пресет,
   -- u отмена, Esc / Enter / Ctrl+W — выход
+  -- 1 ноя: буквы-команды режима PANE (панель с такой буквой — только g + буква)
+  PANE_CMD = { h = 1, j = 1, k = 1, l = 1, H = 1, J = 1, K = 1, L = 1, w = 1, W = 1, g = 1, s = 1, v = 1, T = 1, B = 1, X = 1, x = 1,
+    z = 1, c = 1, q = 1, u = 1, ['+'] = 1, ['-'] = 1, ['<'] = 1, ['>'] = 1, ['='] = 1, [' '] = 1 },
   pane_key = function(c)
     local PN, m = draw.panes, state.panes
     local ch = (c > 0 and c < 256) and string.char(c) or ''
@@ -6043,6 +6046,10 @@ ctx = {
     elseif ch:match('^[1-9]$') then ctx.pane_focus(L.pn.order[tonumber(ch)])
     elseif ch == 'g' or ch == 's' or ch == 'v' or ch == 'T' or ch == 'X' then
       ctx.pn_pend = ch; vim.msg = '-- PANE -- ' .. ch .. ' + panel letter'
+    elseif not ctx.PANE_CMD[ch] and PN.BYKEY[ch] then   -- 1 ноя: буква панели — сразу к ней (меню это и обещало), как g + буква
+      local tgt = PN.BYKEY[ch]
+      if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
+      ctx.pane_focus(tgt)
     elseif ch == 'B' then ctx.pane_do(function() return PN.unstack(m, id, 'd') end, 'pane ' .. id .. ' out of the stack')
     elseif ch == 'x' then if ctx.pn_prev then ctx.pane_do(function() return PN.swap(m, id, ctx.pn_prev) end, 'pane swap') end
     elseif c == 9 or c == 25 then
@@ -24972,7 +24979,8 @@ local function frame()
         table.sort(list, function(a, b) local ra, rb = vim.key_rank(a.key), vim.key_rank(b.key); if ra ~= rb then return ra < rb end; return a.label:lower() < b.label:lower() end)   -- 28 окт: по клавишам
         -- 16 окт (вечер): строкой на панель — «клавиша  имя» колонкой, как остальной which-key (чипы слипались:
         -- measurestr не считает пробел в конце «a »)
-        for _, pp in ipairs(list) do lines[#lines + 1] = { key = pp.key, text = pp.label } end
+        -- 1 ноя: буква панели в PANE — сразу к ней (показать + фокус); занятые командами режима — через g
+        for _, pp in ipairs(list) do lines[#lines + 1] = { key = (ctx.PANE_CMD[pp.key] and ('g ' .. pp.key) or pp.key), text = pp.label } end
       end
       pop = { title = wk.title, lines = lines, kind = 'hydra' }
       if state.focus == 'dsp' and not anchor then anchor = { x = L.matrix_w + 4 * L.pad, y = (L.dsp_y or 0) + L.rh + 4 } end
