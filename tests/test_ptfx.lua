@@ -14,7 +14,7 @@ ok(to('A', 0x40) == '0I40' and to('A', 0x04) == '0O40', 'A40 up, A04 down')
 ok(to('A', 0x44) == nil, 'A44 both ways - refused')
 ok(to('F', 0x7D) == 'ZT7D' and to('F', 0x06) == nil, 'F7D tempo, F06 speed refused')
 ok(to('E', 0x93) == '0R08', 'E93 retrig 3 ticks -> 8/16 row')
-ok(to('E', 0xC3) == nil and to('7', 0x44) == nil, 'EC3 and 7xx not in jf_tracker')
+ok(to('E', 0xC3) == nil and to('7', 0x44) == '0T44', 'EC3 not in jf_tracker, 744 -> tremolo 0T44')
 ok(to('0', 0x37) == '0A37' and to('1', 0x05) == '0U05' and to('2', 0x05) == '0D05' and to('B', 0x03) == 'ZJ03', '0 1 2 B')
 
 ok(PT.show('0M80') == 'C40 ', 'show 0M80 as C40')

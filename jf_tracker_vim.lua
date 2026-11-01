@@ -968,7 +968,7 @@ local function hex_entry(c, fld, heads)
   if fld >= 4 and ctx.PTFX then
     if not is_hex then return false end
     buf = buf .. ch
-    if #buf < 3 then V.hexbuf = buf; V.msg = buf .. '_: ProTracker command (0 arp 1 2 slide 3 porta 4 vib 9 offset A vol slide B jump C vol D break E9 retrig F tempo)'; return false end
+    if #buf < 3 then V.hexbuf = buf; V.msg = buf .. '_: ProTracker command (0 arp 1 2 slide 3 porta 4 vib 7 trem 9 offset A vol slide B jump C vol D break E9 retrig F tempo)'; return false end
     V.hexbuf = nil
     local code, val = ctx.PTFX.to_ours(buf:sub(1, 1), tonumber(buf:sub(2), 16))
     if not code then V.msg = buf .. ': ' .. tostring(val); return 'none' end
@@ -983,7 +983,7 @@ local function hex_entry(c, fld, heads)
     local code
     if buf == '' then
       if ch == '0' or ch == 'S' or ch == 'Z' then
-        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ ZB' or '0D 0U 0V 09 ...')) .. ')'
+        V.hexbuf = ch; V.msg = ch .. '_: the second letter of the code (' .. (ch == 'S' and 'SI SO SL SM SB SF' or (ch == 'Z' and 'ZT ZJ ZB' or '0D 0U 0V 0T 09 ...')) .. ')'
         return false
       end
       if not (ch:match('^%a$') and fx_code_ok('0' .. ch)) then return false end

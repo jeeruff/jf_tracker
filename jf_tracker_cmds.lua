@@ -33,7 +33,7 @@ local R = reaper
 local model
 
 C.CODES = { ['0U'] = true, ['0D'] = true, ['0G'] = true, ['0V'] = true, ['0A'] = true, ['0I'] = true, ['0O'] = true,
-  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true, ZB = true }   -- 1 ноя: ZB — pattern break (ProTracker Dxx)
+  ['0R'] = true, ['0Y'] = true, ZT = true, ZJ = true, ZB = true, ['0T'] = true }   -- 1 ноя: 0T — тремоло (PT 7xy)   -- 1 ноя: ZB — pattern break (ProTracker Dxx)
 -- ZJxx — прыжок: когда плейхед доходит до строки события, трекер переводит
 -- воспроизведение в слот xx последовательности (матрица). Хранится как
 -- команда, огибающих не строит — исполняет main в кадре.
@@ -48,6 +48,7 @@ function C.init(m) model = m end
 -- Что делает 00 — отдельная опция (C.ZERO)
 -- Новая нота во всех — со своей высоты (слайд — внутри ноты)
 C.MODE, C.SPEED = 'renoise', 6
+C.MIDI_FX = true   -- 1 ноя: высота / громкость MIDI-нот — эффектами трека (любой инструмент), не pitch bend
 C.ZERO = 'repeat'   -- 00 у 0U / 0D: repeat — повтор прошлого значения (как в Renoise), stop — слайд стоит (опция slide 00)
 C.MODES = { 'renoise', 'ft2', 'it', 'pt' }
 local function pt_period(pitch) return 428 * 2 ^ ((60 - (pitch or 60)) / 12) end   -- C-4 трекера (60) = C-2 ProTracker
@@ -181,6 +182,55 @@ end
 
 local function pt(env, t, v, shape) R.InsertEnvelopePoint(env, t, v, shape or 0, 0, false, true) end
 
+-- ── 1 ноя: модуляция MIDI-трека — простые эффекты в конце цепи, для любого инструмента ──
+-- pitch — ReaPitch «Shift (semitones)», vol / pan — JS Volume/Pan Smoother v5. Нет эффекта и create — ставится
+-- в конец цепи (после инструмента); есть — берётся тот же. → огибающая, перевод значения в сырое значение
+-- параметра (pitch — полутоны, vol — амплитуда 0..2, pan — −1..1), индекс эффекта
+C.FX_MOD = {
+  pitch = { add = 'ReaPitch', match = 'reapitch', param = 'shift (semitones)' },
+  vol = { add = 'JS: Volume/Pan Smoother v5', match = 'volume/pan smoother', param = 'volume' },
+  pan = { add = 'JS: Volume/Pan Smoother v5', match = 'volume/pan smoother', param = 'pan' },
+}
+local function num_of(s) return tonumber(((s or ''):match('[-+]?%d+%.?%d*')) or '') end
+function C.fx_env(tr, kind, create)
+  local d = C.FX_MOD[kind]
+  if not d then return nil end
+  local fx
+  for f = 0, R.TrackFX_GetCount(tr) - 1 do
+    local _, fn = R.TrackFX_GetFXName(tr, f, '')
+    if fn:lower():find(d.match, 1, true) then fx = f end
+  end
+  if not fx then
+    if not create then return nil end
+    fx = R.TrackFX_AddByName(tr, d.add, false, -1)
+    if not fx or fx < 0 then return nil end
+  end
+  local p
+  for k = 0, R.TrackFX_GetNumParams(tr, fx) - 1 do
+    local _, pn = R.TrackFX_GetParamName(tr, fx, k, '')
+    if not p and pn:lower():find(d.param, 1, true) then p = k end
+  end
+  if not p then return nil end
+  local env = R.GetFXEnvelope(tr, fx, p, create and true or false)
+  if not env then return nil end
+  local _, mn, mx = R.TrackFX_GetParam(tr, fx, p)
+  if not (mn and mx and mx > mn) then mn, mx = 0, 1 end
+  local conv
+  if kind == 'pitch' then
+    -- полутоны → сырое: показ параметра на краях (0 и 1) даёт шкалу
+    local _, s0 = R.TrackFX_FormatParamValueNormalized(tr, fx, p, 0, '')
+    local _, s1 = R.TrackFX_FormatParamValueNormalized(tr, fx, p, 1, '')
+    local a, b = num_of(s0) or -12, num_of(s1) or 12
+    if b == a then a, b = -12, 12 end
+    conv = function(semis) local nrm = math.max(0, math.min(1, (semis - a) / (b - a))); return mn + nrm * (mx - mn) end
+  elseif kind == 'vol' then
+    conv = function(amp) local db = amp > 1e-6 and 20 * math.log(amp, 10) or -200; return math.max(mn, math.min(mx, db)) end
+  else
+    conv = function(pan) return mn + (math.max(-1, math.min(1, pan)) + 1) / 2 * (mx - mn) end
+  end
+  return env, conv, fx, p
+end
+
 -- ── генераторы ────────────────────────────────────────────────────────────
 local function strip_guids(chunk)
   return (chunk:gsub('\n%s*GUID %b{}', ''):gsub('\n%s*IGUID %b{}', ''))
@@ -238,12 +288,13 @@ function C.rebuild(head, lpb, prev_semis)
   local need_pitch, need_vol = false, false
   for _, c in ipairs(list) do
     if c.cmd == '0U' or c.cmd == '0D' or c.cmd == '0G' or c.cmd == '0V' or c.cmd == '0A' then need_pitch = true end
-    if c.cmd == '0I' or c.cmd == '0O' then need_vol = true end
+    if c.cmd == '0I' or c.cmd == '0O' or c.cmd == '0T' then need_vol = true end
   end
   if is_midi then
-    -- MIDI: только 0U/0D через pitchbend (±2 полутона = 8191)
+    -- 1 ноя: высота MIDI-ноты — не pitch bend (не каждый инструмент его понимает), а ReaPitch в конце цепи трека
+    -- (C.MIDI_FX; ниже, вместе с аудио); pitch bend — только если C.MIDI_FX выключен
     local _, _, ncc = R.MIDI_CountEvts(take)
-    for i = ncc - 1, 0, -1 do
+    for i = (C.MIDI_FX and -1 or ncc - 1), 0, -1 do
       local _, _, _, ppq, typ = R.MIDI_GetCC(take, i)
       if typ == 0xE0 then
         local tt = R.MIDI_GetProjTimeFromPPQPos(take, ppq)
@@ -272,7 +323,7 @@ function C.rebuild(head, lpb, prev_semis)
       for _, ne in ipairs(nends) do if ne.s <= t + 1e-6 and ne.e > t + 1e-6 then return ne end end
     end
     local segs = C.segments(C.slide_memory(list), { ['0U'] = true, ['0D'] = true }, tq, len)
-    if #segs > 0 then
+    if #segs > 0 and not C.MIDI_FX then
       local brange = (C.bend_range and C.bend_range(tr)) or 2   -- 19 окт: диапазон bend инструмента (пэды кита — их Pitchbend range)
       local function bend_at(semis) return math.max(0, math.min(16383, math.floor(8192 + semis / brange * 8191 + 0.5))) end
       local pts = { { 0, 0 } }
@@ -379,15 +430,39 @@ function C.rebuild(head, lpb, prev_semis)
       end
       if changed then R.MIDI_Sort(take) end
     end
-    return
+    if not C.MIDI_FX then return end
   end
-  -- аудио: огибающие
-  local penv = need_pitch and ensure_take_env(it, take, 'Pitch') or R.GetTakeEnvelopeByName(take, 'Pitch')
-  local venv = need_vol and ensure_take_env(it, take, 'Volume') or R.GetTakeEnvelopeByName(take, 'Volume')
-  if penv then clear_env(penv, it, take) end
-  if venv then clear_env(venv, it, take) end
+  -- аудио: огибающие тейка; MIDI (1 ноя): огибающие эффектов трека (ReaPitch, Volume/Pan Smoother) на время клипа
+  local penv, venv, pconv, vconv
+  local T0 = 0
   local pmin, pmax = -3, 3
-  if penv then pmin, pmax = env_range(penv, -3, 3) end
+  if is_midi then
+    penv, pconv = C.fx_env(tr, 'pitch', need_pitch)
+    venv, vconv = C.fx_env(tr, 'vol', need_vol)
+    T0, pmin, pmax = pos, -12, 12
+    -- на время клипа — своё; по краям — нейтраль (огибающая трека общая с соседними клипами)
+    for _, e in ipairs({ { penv, pconv, 0 }, { venv, vconv, 1 } }) do
+      if e[1] then
+        R.DeleteEnvelopePointRange(e[1], pos - 1e-4, pos + len + 1e-4)
+        if (e[1] == penv and need_pitch) or (e[1] == venv and need_vol) then
+          R.InsertEnvelopePoint(e[1], pos - 1e-4, e[2](e[3]), 0, 0, false, true)
+          R.InsertEnvelopePoint(e[1], pos + len + 1e-4, e[2](e[3]), 0, 0, false, true)
+        end
+      end
+    end
+    if not need_pitch then penv = nil end
+    if not need_vol then venv = nil end
+  else
+    penv = need_pitch and ensure_take_env(it, take, 'Pitch') or R.GetTakeEnvelopeByName(take, 'Pitch')
+    venv = need_vol and ensure_take_env(it, take, 'Volume') or R.GetTakeEnvelopeByName(take, 'Volume')
+    if penv then clear_env(penv, it, take) end
+    if venv then clear_env(venv, it, take) end
+    if penv then pmin, pmax = env_range(penv, -3, 3) end
+  end
+  local function pt(env, t, v, shape)
+    if env == penv and pconv then v = pconv(v) elseif env == venv and vconv then v = vconv(v) end
+    R.InsertEnvelopePoint(env, T0 + t, v, shape or 0, 0, false, true)
+  end
   local function clampp(v) return math.max(pmin, math.min(pmax, v)) end
   local muted = false
   -- 12 окт: команды со своих строк — отрезки (как в Furnace: до следующей того же рода, 00 — стоп)
@@ -456,16 +531,44 @@ function C.rebuild(head, lpb, prev_semis)
   end
   -- 0I / 0O — громкость: накопленный наклон по отрезкам (вверх / вниз), одна огибающая
   local vsegs = C.segments(list, { ['0I'] = true, ['0O'] = true }, ts, tlen)
-  if venv and #vsegs > 0 then
-    local vmin, vmax = env_range(venv, 0, 2)
-    local acc = 1
-    pt(venv, 0, 1)
-    for _, sg in ipairs(vsegs) do
-      local slope = (sg[3].xx / 256) * (sg[3].cmd == '0I' and 1 or -1) / rs
-      pt(venv, sg[1], math.max(vmin, math.min(vmax, acc)))
-      acc = acc + slope * (sg[2] - sg[1])
-      pt(venv, sg[2], math.max(vmin, math.min(vmax, acc)))
+  local tsegs = C.segments(list, { ['0T'] = true }, ts, tlen)   -- 1 ноя: тремоло 0Txy — скорость x (период 16/x строк), глубина y/16
+  if venv and (#vsegs > 0 or #tsegs > 0) then
+    local vmin, vmax = 0, 2
+    if not is_midi then vmin, vmax = env_range(venv, 0, 2) end
+    local function slope_at(t)   -- накопленная громкость 0I / 0O к моменту t
+      local acc = 1
+      for _, sg in ipairs(vsegs) do
+        if t <= sg[1] then break end
+        acc = acc + (sg[3].xx / 256) * (sg[3].cmd == '0I' and 1 or -1) / rs * (math.min(t, sg[2]) - sg[1])
+      end
+      return acc
     end
+    local function trem_at(t)
+      for _, sg in ipairs(tsegs) do
+        if t >= sg[1] - 1e-9 and t < sg[2] - 1e-9 then
+          local c = sg[3]
+          local period = (c.x > 0 and 16 / c.x or 4) * rs
+          return 1 - (c.y / 16) * (0.5 - 0.5 * math.cos(2 * math.pi * (t - sg[1]) / period))
+        end
+      end
+      return 1
+    end
+    local times, seen = {}, {}
+    local function add(t) t = math.max(0, math.min(tlen, t)); local k = ('%.6f'):format(t); if not seen[k] then seen[k] = true; times[#times + 1] = t end end
+    add(0); add(tlen)
+    for _, sg in ipairs(vsegs) do add(sg[1]); add(sg[2]) end
+    for _, sg in ipairs(tsegs) do
+      local period = (sg[3].x > 0 and 16 / sg[3].x or 4) * rs
+      local n = math.max(2, math.min(256, math.floor((sg[2] - sg[1]) / period * 8)))
+      for i = 0, n do add(sg[1] + (sg[2] - sg[1]) * i / n) end
+    end
+    table.sort(times)
+    for _, t in ipairs(times) do pt(venv, t, math.max(vmin, math.min(vmax, slope_at(t) * trem_at(t)))) end
+  end
+  if is_midi then
+    if penv then R.Envelope_SortPoints(penv) end
+    if venv then R.Envelope_SortPoints(venv) end
+    return
   end
   -- 0R — перезапуск со своей строки: копии каждые y/16 строки до конца отрезка; последняя звучит до конца ноты
   local rsegs = C.segments(list, { ['0R'] = true }, function(off) return R.TimeMap2_QNToTime(0, qn0 + off) - pos end, len)

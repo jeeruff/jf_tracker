@@ -2311,3 +2311,4 @@
 - [ ] 1 ноя: PT-mode — команды как в ProTracker: набор три hex-знака (C40 громкость, 940 offset, D10 break на строку 10, A40 / A04 vol slide, 1xx 2xx slide, 3xx porta, 4xy vib, 0xy arp, Bxx jump, E9x retrig, F7D темп); показ так же (C40 вместо 0M80); нет: 5 6 7, Exx кроме E9, F < 20; шрифт Topaz a500 16 px
 - [ ] 1 ноя: lfogen поле to: env / pitch / vol / pan — генератор пишет в огибающую тейка аудио-нот трека курсора в отрезке (огибающая создаётся); pitch ±12 полутонов (center 0.5 = 0)
 - [ ] 1 ноя: lfogen to на MIDI-треке: pitch — pitch bend в клипы (RS5K / slixer его понимают), vol — RS5K Volume / slixer Master gain, pan — RS5K Pan (у slixer нет)
+- [ ] 1 ноя: MIDI-трек, любой инструмент: команды высоты (0U 0D 0V 0A 0G) — ReaPitch в конце цепи, громкости (0I 0O, тремоло 0T / PT 7xy) — Volume/Pan Smoother; огибающие на время клипа, по краям — нейтраль; pitch bend больше не пишется; lfogen to pitch / vol / pan на MIDI — те же эффекты

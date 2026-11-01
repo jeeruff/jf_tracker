@@ -15,7 +15,8 @@
 -- Dxy    ZB     pattern break, строка десятичная: D10 = строка 10
 -- E9x    0R     retrig каждые x тиков (speed 6) → y/16 строки
 -- Fxx    ZT xx  xx ≥ 20: темп BPM; меньше — speed (тики) — нет
--- Нет: 5, 6, 7 (tremolo), E0..E8, EA..EF (fine slides, cut, delay …)
+-- 7xy    0T xy  tremolo (1 ноя)
+-- Нет: 5, 6, E0..E8, EA..EF (fine slides, cut, delay …)
 
 local PT = {}
 
@@ -28,6 +29,7 @@ function PT.to_ours(c, xx)
   elseif c == '2' then return '0D', xx
   elseif c == '3' then return '0G', xx
   elseif c == '4' then return '0V', xx
+  elseif c == '7' then return '0T', xx
   elseif c == '8' then return '0P', xx
   elseif c == '9' then return '09', xx
   elseif c == 'A' then
@@ -46,7 +48,7 @@ function PT.to_ours(c, xx)
     if xx >= 0x20 then return 'ZT', xx end
     return nil, 'Fxx under 20 is the speed in ticks - jf_tracker has no ticks (F20..FF is the tempo)'
   end
-  return nil, c .. 'xx: not in jf_tracker (5, 6, 7 tremolo)'
+  return nil, c .. 'xx: not in jf_tracker (5, 6)'
 end
 
 -- наш код и значение → 3 знака PT для показа | nil (показать как есть)
@@ -57,6 +59,7 @@ function PT.from_ours(code, v)
   elseif code == '0D' then return '2' .. h(v)
   elseif code == '0G' then return '3' .. h(v)
   elseif code == '0V' then return '4' .. h(v)
+  elseif code == '0T' then return '7' .. h(v)
   elseif code == '0P' then return '8' .. h(v)
   elseif code == '09' or code == '0S' then return '9' .. h(v)
   elseif code == '0I' then return 'A' .. h(math.min(15, v // 16) * 16)

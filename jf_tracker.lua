@@ -33026,7 +33026,7 @@ ctx.lfo_take_target_calc = function()
   if #its > 0 then
     return { take = true, items = its, kind = LG.to, e = {}, label = ('%s / take %s (%d audio note%s)'):format(col.name or '', LG.to, #its, #its == 1 and '' or 's') }
   end
-  -- 1 ноя: MIDI-трек (сэмплер RS5K / jf_slixer): pitch — pitch bend в MIDI-клипах (оба понимают PB), vol / pan — параметр сэмплера
+  -- 1 ноя: MIDI-трек (любой инструмент): pitch / vol / pan — простые эффекты в конце цепи (ReaPitch, Volume/Pan Smoother)
   local mids = {}
   for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
     local it = reaper.GetTrackMediaItem(tr, i)
@@ -33035,25 +33035,8 @@ ctx.lfo_take_target_calc = function()
     local tk = reaper.GetActiveTake(it)
     if tk and reaper.TakeIsMIDI(tk) and p < t1 - 1e-6 and p + l > t0 + 1e-6 then mids[#mids + 1] = it end
   end
-  local fxi, pi, pname
-  if LG.to ~= 'pitch' then
-    local want = LG.to == 'vol' and { 'master gain', 'volume', 'gain' } or { 'pan' }
-    for f = 0, reaper.TrackFX_GetCount(tr) - 1 do
-      local _, fn = reaper.TrackFX_GetFXName(tr, f, '')
-      local l = fn:lower()
-      if l:find('reasamplomatic', 1, true) or l:find('jf_slixer', 1, true) or l:find('rs5k', 1, true) then
-        for _, w in ipairs(want) do
-          for p = 0, reaper.TrackFX_GetNumParams(tr, f) - 1 do
-            local _, pn = reaper.TrackFX_GetParamName(tr, f, p, '')
-            if not pi and pn:lower():find(w, 1, true) then fxi, pi, pname = f, p, pn end
-          end
-        end
-      end
-      if pi then break end
-    end
-  end
-  local what = LG.to == 'pitch' and 'pitch bend' or (pname or ('no ' .. LG.to .. ' on the sampler'))
-  return { take = true, midi = true, items = mids, kind = LG.to, fx = fxi, param = pi, e = {}, label = ('%s / %s (%d MIDI clip%s)'):format(col.name or '', what, #mids, #mids == 1 and '' or 's') }
+  local what = ({ pitch = 'ReaPitch shift', vol = 'Volume/Pan Smoother volume', pan = 'Volume/Pan Smoother pan' })[LG.to]
+  return { take = true, midi = true, items = mids, kind = LG.to, e = {}, label = ('%s / %s (MIDI track)'):format(col.name or '', what) }
 end
 ctx.lfo_write_take = function(tg, pts, t0, t1, where)
   if tg.midi then return ctx.lfo_write_midi(tg, pts, t0, t1, where) end
@@ -33109,50 +33092,25 @@ end
 ctx.lfo_write_midi = function(tg, pts, t0, t1, where)
   local col = cur_col()
   local tr = col and col.track
+  if not tr then return end
   local n = 0
-  if tg.kind == 'pitch' then
-    if #tg.items == 0 then vim.msg = 'LFO -> pitch bend: no MIDI clips of the cursor track in the span (' .. where .. ')'; return end
-    edit.run('LFO -> pitch bend', function()
-      for _, it in ipairs(tg.items) do
-        local tk = reaper.GetActiveTake(it)
-        local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
-        local a, b = math.max(t0, pos), math.min(t1, pos + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'))
-        local pa, pb = reaper.MIDI_GetPPQPosFromProjTime(tk, a), reaper.MIDI_GetPPQPosFromProjTime(tk, b)
-        local _, _, ncc = reaper.MIDI_CountEvts(tk)
-        for k = ncc - 1, 0, -1 do
-          local _, _, _, ppq, chm = reaper.MIDI_GetCC(tk, k)
-          if chm == 0xE0 and ppq >= pa - 0.5 and ppq < pb - 0.5 then reaper.MIDI_DeleteCC(tk, k) end
-        end
-        for _, p in ipairs(pts) do
-          local t = edit.row_time(p.row, state.lpb, 0)
-          if t >= a - 1e-6 and t < b - 1e-6 then
-            local v = math.max(0, math.min(16383, math.floor(math.max(0, math.min(1, p.v)) * 16383 + 0.5)))
-            reaper.MIDI_InsertCC(tk, false, false, reaper.MIDI_GetPPQPosFromProjTime(tk, t), 0xE0, 0, v & 127, v >> 7)
-            n = n + 1
-          end
-        end
-        reaper.MIDI_Sort(tk)
-      end
-    end)
-    model.invalidate()
-    vim.msg = ('%s -> pitch bend: %d events in %d MIDI clip(s) (%s)'):format(LG.type, n, #tg.items, where)
-    return
-  end
-  if not (tr and tg.fx and tg.param) then vim.msg = 'LFO -> ' .. tg.kind .. ': no RS5K / jf_slixer parameter for it on this track'; return end
-  local env = reaper.GetFXEnvelope(tr, tg.fx, tg.param, true)
-  if not env then vim.msg = 'LFO: could not make the parameter envelope'; return end
-  local _, mn, mx = reaper.TrackFX_GetParam(tr, tg.fx, tg.param)
+  local env, conv
   edit.run('LFO -> ' .. tg.kind, function()
+    env, conv = edit.cmds.fx_env(tr, tg.kind, true)   -- 1 ноя: эффект ставится в конец цепи, если его нет
+    if not env then return end
     reaper.DeleteEnvelopePointRange(env, t0 - 1e-6, t1 - 1e-6)
     for _, p in ipairs(pts) do
       local t = edit.row_time(p.row, state.lpb, 0)
       if t >= t0 - 1e-6 and t < t1 - 1e-6 then
-        reaper.InsertEnvelopePoint(env, t, mn + math.max(0, math.min(1, p.v)) * (mx - mn), p.shape or 0, 0, false, true)
+        local v = math.max(0, math.min(1, p.v))
+        local u = tg.kind == 'pitch' and (v - 0.5) * 24 or (tg.kind == 'pan' and (v - 0.5) * 2 or v)
+        reaper.InsertEnvelopePoint(env, t, conv(u), p.shape or 0, 0, false, true)
         n = n + 1
       end
     end
     reaper.Envelope_SortPoints(env)
   end)
+  if not env then vim.msg = 'LFO -> ' .. tg.kind .. ': could not add the effect (ReaPitch / Volume/Pan Smoother)'; return end
   state.envs = true; model.invalidate()
   vim.msg = ('%s -> %s: %d points (%s)'):format(LG.type, tg.label, n, where)
 end

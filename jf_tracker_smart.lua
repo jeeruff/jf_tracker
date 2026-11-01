@@ -287,7 +287,7 @@ SM.FX = {
   { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx; slixer: of the slice)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
   { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
   { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
-  { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0O', 'volume down xx/256 per row' },
+  { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0T', 'tremolo: speed x (period 16/x rows), depth y/16' }, { '0O', 'volume down xx/256 per row' },
   { '0R', 'retrigger every y/16 row, volume falls by x/16 each' }, { '0Y', 'maybe: probability xx/FF' },
   { 'SI', 'sample fade in xx/16 row' }, { 'SO', 'sample fade out xx/16 row' }, { 'SB', 'beatsync to xx rows (slixer: the slice stretched to xx rows)' }, { '0B', 'backwards: reverse (slixer note)' },
   { 'SF', 'finetune in cents (80 = 0)' }, { 'SL', 'SL00: loop source off' }, { 'SM', 'channel mode 0..4' },
@@ -295,7 +295,7 @@ SM.FX = {
   { '09', 'sample offset xx/256 of the whole sample (ProTracker 9xx)' },
 }
 -- 12 окт: короткие имена — список команд читается словами (0U pitch up), не только кодами
-SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['0B'] = 'reverse', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump', ['ZB'] = 'break', ['09'] = 'offset' }
+SM.FX_NAME = { ['0S'] = 'start offset', ['0M'] = 'volume', ['0P'] = 'pan', ['0U'] = 'pitch up', ['0D'] = 'pitch down', ['0G'] = 'glide', ['0V'] = 'vibrato', ['0A'] = 'arpeggio', ['0I'] = 'vol up', ['0O'] = 'vol down', ['0T'] = 'tremolo', ['0R'] = 'retrig', ['0Y'] = 'maybe', ['SI'] = 'fade in', ['SO'] = 'fade out', ['SB'] = 'beatsync', ['0B'] = 'reverse', ['SF'] = 'finetune', ['SL'] = 'loop', ['SM'] = 'channels', ['ZT'] = 'tempo', ['ZJ'] = 'jump', ['ZB'] = 'break', ['09'] = 'offset' }
 SM.FX_DESC = {}
 for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 -- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
@@ -311,6 +311,7 @@ SM.FX_MEAN = {
   ['0A'] = function(v) return ('arpeggio 0, +%d, +%d semitones'):format(v >> 4, v & 15) end,
   ['0I'] = function(v) return ('volume +%d%% per row'):format(math.floor(v / 256 * 100 + 0.5)) end,
   ['0O'] = function(v) return ('volume -%d%% per row'):format(math.floor(v / 256 * 100 + 0.5)) end,
+  ['0T'] = function(v) local x, y = v >> 4, v & 15; return x == 0 and 'tremolo off' or ('period %s rows, depth %d%%'):format(st(16 / x):gsub('^%+', ''), math.floor(y / 16 * 100 + 0.5)) end,
   ['0R'] = function(v) local x, y = v >> 4, v & 15; return ('retrig every %s row, volume -%d%% each'):format(st((y > 0 and y or 4) / 16):gsub('^%+', ''), math.floor(x / 16 * 100 + 0.5)) end,
   ['0Y'] = function(v) return ('plays %d%% of the time'):format(math.floor(v / 255 * 100 + 0.5)) end,
   SI = function(v) return ('fade in %s row'):format(st(v / 16):gsub('^%+', '')) end,
