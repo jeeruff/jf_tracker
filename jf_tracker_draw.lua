@@ -10947,8 +10947,16 @@ function D.frame(L, snap, rows, state, info)
     D.dsp_selk = sel.fx   -- 28 окт: мини-роутер — выбранный узел
     D.pmark('dsp: layout')
     D.stk = nil   -- 31 окт: колонка маленьких модулей (сверху вниз)
+    -- 1 ноя: щель броска раздвигает модули: место (D.dgap — цель прошлого кадра) — перед модулем k или после него
+    -- (тогда край контейнера едет правее); D.dgap_x — середина проёма для черты
+    D.dg = drag and D.dgap or nil
+    if not drag then D.dgap = nil end
+    D.dgap_x = nil
+    D.DGW = math.max(ms('=') + 2 * L.pad, 3 * L.pad) + L.pad
     for k, f in ipairs(fxs) do
+      if D.dg and D.dg.before == k and not D.dg.inner_first then D.dgap_x = bx + math.floor(D.DGW / 2) - math.floor(L.pad / 2); bx = bx + D.DGW end
       bx = D.rack_open(L, f, k, bx, boxy, bh0)
+      if D.dg and D.dg.before == k and D.dg.inner_first then D.dgap_x = bx + math.floor(D.DGW / 2) - math.floor(L.pad / 2); bx = bx + D.DGW end
       do
       -- 22 окт: модуль сложен (zf / zF) — узкая полоса во всю высоту: кнопки x B сверху, имя вертикально (щелчок — развернуть)
       if info.dsp_mfold and info.dsp_mfold[tostring(f.fguid or f.i)] then
@@ -13095,6 +13103,7 @@ function D.frame(L, snap, rows, state, info)
       bx = bx + bw + L.pad
       end
       ::next_block::
+      if D.dg and D.dg.after == k then D.dgap_x = bx + math.floor(D.DGW / 2) - math.floor(L.pad / 2); bx = bx + D.DGW end
       if f.inner and (f.inner.lane or f.inner.bi) and not f.wrap then D.lane_close(L, f, bx, boxy, bh0) end
       if f.cend then bx = D.rack_close(L, f, bx, boxy, bh0, drag, mx, my, hover) end
     end
@@ -13219,18 +13228,31 @@ function D.frame(L, snap, rows, state, info)
     -- 28 окт: щель броска — небольшой проём во всю высоту, две секции: верх | — последовательно, низ = — параллельно
     -- предыдущему (половина под мышью — по высоте модуля); → 0 / 1
     local function drop_slot(gx, y0, h0)
-      -- 1 ноя: тонкая жёлтая черта в зазоре между модулями (ничего не закрывает, фон прозрачный): верхняя половина —
-      -- одна черта (| последовательно), нижняя — две (= параллельно); активная половина ярко, другая тускло
+      -- 1 ноя: проём раздвинут (D.dgap_x) — плашка в нём, ничего не закрывает: жёлтая рамка, фон прозрачный,
+      -- верх | — последовательно, низ = — параллельно; активная половина подсвечена
+      if D.dgap_x then gx = D.dgap_x end
+      local sw2 = math.max(ms('=') + 2 * L.pad, 3 * L.pad)
+      local x0 = gx - math.floor(sw2 / 2)
       local hh = math.floor(h0 / 2)
       local low = my >= y0 + hh
-      local on, off = U.YELLOW, U.mix(U.YELLOW, U.BG, 0.65)
-      set(low and off or on); gfx.rect(gx - 1, y0, 2, hh - 1, 1)
-      set(low and on or off); gfx.rect(gx - 2, y0 + hh + 1, 1, h0 - hh - 1, 1); gfx.rect(gx + 1, y0 + hh + 1, 1, h0 - hh - 1, 1)
-      set(U.YELLOW); gfx.rect(gx - 3, low and (y0 + hh + 1) or y0, 7, 1, 1); gfx.rect(gx - 3, low and (y0 + h0 - 1) or (y0 + hh - 2), 7, 1, 1)
+      set(U.YELLOW, 0.18); gfx.rect(x0, low and y0 + hh or y0, sw2, low and h0 - hh or hh, 1); gfx.a = 1
+      set(U.YELLOW); gfx.rect(x0, y0, sw2, h0, 0)
+      set(U.mix(U.YELLOW, U.BG, 0.5)); gfx.rect(x0 + 2, y0 + hh, sw2 - 4, 1, 1)
+      text(x0 + math.floor((sw2 - ms('|')) / 2), y0 + math.floor((hh - L.rh) / 2), '|', low and U.GREY or U.YELLOW)
+      text(x0 + math.floor((sw2 - ms('=')) / 2), y0 + hh + math.floor((h0 - hh - L.rh) / 2), '=', low and U.YELLOW or U.GREY)
+      D.dgap_rect = { x0 - L.pad, y0, sw2 + 2 * L.pad, h0 }
       return low and 1 or 0
     end
     -- 24 окт: над модулем внутри рэка — место в его контейнере: левая половина — перед ним, правая — после
-    if drag and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
+    -- 1 ноя: мышь в раздвинутом проёме — цель та же (иначе проём закрывался под мышью и мигал)
+    do local gr = D.dgap_rect; D.in_gap = drag and D.dgap and gr and mx >= gr[1] and mx < gr[1] + gr[3] and my >= gr[2] and my < gr[2] + gr[4] end
+    D.dgap_rect = nil
+    if D.in_gap and not hover.dsp_into then
+      local g0 = D.dgap
+      if g0.gin then local par = drop_slot(D.dgap_x or mx, g0.y, g0.h); hover.dsp_gin = { c = g0.gin.c, pos = g0.gin.pos, name = g0.gin.name, par = par }
+      elseif g0.gap then hover.dsp_gpar = drop_slot(D.dgap_x or mx, boxy, bh0); hover.dsp_gap = g0.gap end
+    end
+    if drag and not D.in_gap and not hover.dsp_into and my >= dy and my < dy + DH and mx >= fbw then
       for _, b in ipairs(blocks) do
         local inn = b.inner
         if inn and inn.wrap and inn.parent and b.k ~= drag.k and mx >= b.x and mx < b.x + b.w and my >= b.y and my < b.y + b.h then
@@ -13238,19 +13260,26 @@ function D.frame(L, snap, rows, state, info)
           local gx = before and (b.x - math.floor(L.pad / 2) - 1) or (b.x + b.w + math.floor(L.pad / 2))
           local par = drop_slot(gx, b.y, b.h)
           hover.dsp_gin = { c = inn.parent, pos = before and ((inn.ki or 1) - 1) or (inn.ki or 1), name = fxs[b.k] and fxs[b.k].name, par = par }
+          local ng = before and { before = b.k, inner_first = (inn.ki or 1) == 1 } or { after = b.k }
+          ng.gin, ng.y, ng.h = hover.dsp_gin, b.y, b.h
+          if not (D.dgap and D.dgap.before == ng.before and D.dgap.after == ng.after) then D.dgap = ng end
           break
         end
       end
     end
-    if drag and not hover.dsp_into and not hover.dsp_gin and my >= dy and my < dy + DH and mx >= fbw then
+    if drag and not D.in_gap and not hover.dsp_into and not hover.dsp_gin and my >= dy and my < dy + DH and mx >= fbw then
       local gap, gx = #blocks > 0 and blocks[#blocks].k or 0, (#blocks > 0 and (blocks[#blocks].x + blocks[#blocks].w + math.floor(L.pad / 2)) or (fbw + L.pad))
+      local bk
       for _, b in ipairs(blocks) do   -- 23 окт: модули полосы (inner) — не щели верхнего уровня
-        if not b.inner and mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; break end
+        if not b.inner and mx < b.x + b.w / 2 then gap = b.k - 1; gx = b.x - math.floor(L.pad / 2) - 1; bk = b.k; break end
       end
       local tl = 0   -- щель — в позициях верхнего уровня REAPER (без модулей полос)
       for i = 1, gap do if fxs[i] and not fxs[i].inner then tl = tl + 1 end end
       gap = tl
       local gy, gh = dy + 3 + L.rh, DH - L.rh - 6 - (L.hint_h or 0)
+      local ng = bk and { before = bk } or { after = #fxs }
+      ng.gap = gap
+      if not (D.dgap and D.dgap.before == ng.before and D.dgap.after == ng.after) then D.dgap = ng; D.dgap_x = nil end
       hover.dsp_gpar = drop_slot(gx, boxy, bh0)   -- 28 окт: | / = — как внутри рэка
       hover.dsp_gap = gap
     end
