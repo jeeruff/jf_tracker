@@ -111,8 +111,10 @@ function G.take_reader(take)
   local st = R.GetAudioAccessorStartTime(acc)
   local a = R.new_array(N)
   return function(t, n)
+    if not R.ValidatePtr(take, 'MediaItem_Take*') then return nil end   -- 2 ноя: take удалён (перетаскивание из превью) — аксессор мёртв
     a.clear()
-    if R.GetAudioAccessorSamples(acc, sr, 1, st + math.max(0, t), n, a) < 0 then return nil end
+    local rv = R.GetAudioAccessorSamples(acc, sr, 1, st + math.max(0, t), n, a)
+    if not rv or rv < 0 then return nil end
     return a.table()
   end, sr, (R.GetAudioAccessorEndTime(acc) - st)
 end
