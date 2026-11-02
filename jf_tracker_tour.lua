@@ -14,10 +14,12 @@ T.STEPS = {
   -- 2 ноя: у шага — короткое объяснение (text) и шаги «нажмите …» (todo), звёздочками, как в справке
   -- 5 окт: сначала философия (почему jf), потом hjkl, потом f — куда угодно
   { mod = 'tracker', focus = 'tracker', title = 'Why jf',
+    ticks = { function() return true end, function(e, b) return e.row ~= b.row end },
     text = 'Your index fingers rest on f and j - the two keys with bumps. That is the name: jf = hands on the home row. Every module answers to letters, the mouse is optional.',
     todo = { 'Put your fingers on f and j.', 'Press j - the cursor goes one row down.' },
     check = function(e, b) return e.row ~= b.row end },
   { mod = 'tracker', focus = 'tracker', title = 'Move',
+    ticks = { function(e, b, s) if e.fi ~= b.fi then s.moved = e.fi end; return s.moved ~= nil end, function(e, b, s) return s.moved and e.fi ~= s.moved end },
     text = 'h j k l move the cursor: left, down, up, right. gg - the start, G - the end, { } - a bar back / on.',
     todo = { 'Press l a few times - the cursor walks right across the columns.', 'Press h to come back.' },
     check = function(e, b) return e.fi ~= b.fi end },
@@ -27,10 +29,12 @@ T.STEPS = {
     check = function(e, b) return e.hj ~= b.hj end },
   -- 1 ноя: режимы — отдельным шагом, до записи нот
   { mod = 'tracker', focus = 'tracker', title = 'Two modes: NORMAL and INSERT',
+    ticks = { function(e) return e.mode == 'insert' end, function(e, b, s) return s.t1 and e.mode == 'normal' end, function(e, b, s) return s.t2 end },
     text = 'jf_tracker works in modes, like Vim. NORMAL (where you start): keys move and edit - j moves, x deletes. INSERT: keys write notes. The big word at the bottom left says which mode you are in.',
     todo = { 'Press i - the word says INSERT, the cursor turns red.', 'Press Esc - back to NORMAL.', '(Esc also enters INSERT - a habit kept from Renoise; with the keyboard on, i is a note, so then use Esc.)' },
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'tracker', focus = 'tracker', title = 'Write notes',
+    ticks = { function(e) return e.mode == 'insert' end, function(e, b) return e.mode == 'insert' and e.change ~= b.change end, function(e, b, s) return s.t2 and e.mode == 'normal' end },
     text = 'In INSERT the keyboard writes notes. Layout frow: 1 f1 2 f2 3 ... are the notes, [ ] the octave. Layout qwerty: q 2 w 3 e ..., z / x the octave. m turns the note keyboard off and on.',
     todo = { 'Press i to enter INSERT.', 'Press a few note keys - notes appear and the cursor moves on.', 'Press Esc to leave INSERT.' },
     check = function(e, b, s) if e.mode == 'insert' and e.change ~= b.change then s.seen = true end; return s.seen and e.mode == 'normal' end },
@@ -47,14 +51,17 @@ T.STEPS = {
     todo = { 'Put the cursor on a note and press x - it is gone.', 'Press u - it is back.' },
     check = function(e, b) return e.change ~= b.change end },
   { mod = 'tracker', focus = 'tracker', title = 'Select',
+    ticks = { function(e) return e.mode == 'visual' or e.mode == 'vline' end, function(e, b, s) return s.t1 and e.row ~= b.row end, function(e, b, s) return s.t2 and e.mode == 'normal' end },
     text = 'v starts a block selection, V selects whole rows. Then d deletes it, y copies it, :interp vol ramps the volumes in it.',
     todo = { 'Press v.', 'Press j a few times - the block grows.', 'Press Esc to drop it.' },
     check = function(e) return e.mode == 'visual' or e.mode == 'vline' end },
   { mod = 'tracker', focus = 'tracker', title = 'Commands',
+    ticks = { function(e) return e.mode == 'cmd' end, function(e, b, s) return s.t1 end, function(e, b, s) return s.t1 and e.mode ~= 'cmd' end },
     text = ': opens the command line: :arp up 2, :legato, :macro, :pt, :big ... Tab completes a command name.',
     todo = { 'Press : (Shift+;).', 'Type ar and press Tab - it completes to arp.', 'Press Esc to close it.' },
     check = function(e) return e.mode == 'cmd' end },
   { mod = 'tracker', focus = 'tracker', title = 'Menus',
+    ticks = { function(e) return e.hydra end, function(e, b, s) return s.t1 and not e.hydra end },
     text = '\\ opens the menu of what is under the cursor - the same as the right click. \\ twice opens the main menu of everything (v view, P project, o options). Every item has its letter.',
     todo = { 'Press \\ - the menu of the cursor cell opens.', 'Press Esc to close it.' },
     check = function(e) return e.hydra end },
@@ -64,10 +71,12 @@ T.STEPS = {
     todo = { 'Press Ctrl+W, then g, then w - the map pane gets the focus.', 'Click a few dots, or press r.' },
     check = function(e) return e.focus == 'map' end },
   { mod = 'ctrl', focus = 'tracker', title = 'Play',
+    ticks = { function(e) return e.playing end, function(e, b, s) return s.t1 and not e.playing end },
     text = 'Space plays and stops. It is all plain REAPER underneath: close the tracker window and the tracks, items and MIDI stay and play.',
     todo = { 'Press Space - it plays.', 'Press Space again to stop.' },
     check = function(e) return e.playing end },
   { mod = 'dsp', focus = 'tracker', title = 'Help',
+    ticks = { function(e) return e.khelp_big end, function(e, b, s) return s.t1 and not e.khelp_big end },
     text = 'F1 opens the whole help: sections on the left, / finds anything. ? shows the keys of the module you are in, and the help pane follows the focus.',
     todo = { 'Press F1 - the help opens.', 'Press F1 again to close it.' },
     check = function(e) return e.khelp_big end },
@@ -86,7 +95,17 @@ function T.tick(env, now)
   if not T.active then return end
   local st = T.STEPS[T.step]
   if not T.base then T.base = env end
-  if not T.ok and st.check(env, T.base, T.state) then T.ok, T.ok_t = true, now end
+  -- 2 ноя: пункты шага отмечаются по очереди (s.t1, s.t2 …): следующий — только после предыдущего
+  local S = T.state
+  if st.ticks then
+    for k, f in ipairs(st.ticks) do
+      if not S['t' .. k] then
+        if (k == 1 or S['t' .. (k - 1)]) and f(env, T.base, S) then S['t' .. k] = true else break end
+      end
+    end
+  end
+  local all = st.ticks and S['t' .. #st.ticks]
+  if not T.ok and (all or (not st.ticks and st.check(env, T.base, S))) then T.ok, T.ok_t = true, now end
   if T.ok and now - T.ok_t > 0.8 then
     if T.step < #T.STEPS then T.go(1) else T.ok = true; T.finished = true end
   end
@@ -145,7 +164,10 @@ function T.draw_bubble(U, L, rects, W, H, fit)
   wrap(st.text, '', '', U.TEXT)
   if st.todo then
     lines[#lines + 1] = { '', U.TEXT }
-    for _, d in ipairs(st.todo) do wrap(d, '* ', '  ', d:sub(1, 1) == '(' and U.GREY or U.TEXT) end
+    for k, d in ipairs(st.todo) do
+      local done = T.ok or T.state['t' .. k]
+      wrap(d, done and '+ ' or '* ', '  ', done and U.GREY or (d:sub(1, 1) == '(' and U.GREY or U.TEXT))
+    end
   end
   local bh = (#lines + 1) * L.rh + 2 * L.pad
   local bx = math.max(L.pad, math.min(W - bw - L.pad, r[1] + math.floor((r[3] - bw) / 2)))
@@ -155,7 +177,8 @@ function T.draw_bubble(U, L, rects, W, H, fit)
   U.text(bx + L.pad, by + L.pad, fit(('%d. %s%s'):format(T.step, st.title, T.ok and '  - ok' or ''), bw - 2 * L.pad), T.ok and U.GREEN or U.AMBER)
   for i, l in ipairs(lines) do
     local yy = by + L.pad + i * L.rh
-    if l[1]:sub(1, 2) == '* ' then U.text(bx + L.pad, yy, '*', U.AMBER); U.text(bx + L.pad + U.measure('* '), yy, l[1]:sub(3), l[2])
+    local mk = l[1]:sub(1, 2)
+    if mk == '* ' or mk == '+ ' then U.text(bx + L.pad, yy, mk == '+ ' and '+' or '*', mk == '+ ' and U.GREEN or U.AMBER); U.text(bx + L.pad + U.measure('* '), yy, l[1]:sub(3), l[2])   -- 2 ноя: сделанный пункт — зелёный +
     else U.text(bx + L.pad, yy, l[1], l[2]) end
   end
 end
