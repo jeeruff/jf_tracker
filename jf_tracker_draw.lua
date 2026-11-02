@@ -4975,6 +4975,12 @@ function D.strip_hints(L, x, y, w, active)
   end
   return true
 end
+-- 2 ноя: ширина белой клавиши в панели keys — на всю ширину панели; small piano — уже
+function D.kb_pane_kw(L, w, lw, info)
+  local wh0 = (info.wheels and (2 * (math.max(6, math.floor(L.cw * 0.9)) + L.pad) + L.pad)) or 0
+  local cap = math.floor((w - lw - wh0 - 3 * L.pad) / #D.PIANO_WHITE)
+  return math.max(4, math.min(cap, (D.PIANO_SMALL or D.PIANO_RENOISE) and (ms('W') + 4) or (2 * ms('W') + 8)))
+end
 function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local out = { white = 0, black = 0, letters = 0 }
   D.strip_cols = {}
@@ -5044,6 +5050,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cell.vel = { x + L.pad, vy, vw }
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
       local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      if info and info.kbd_only then kwv = D.kb_pane_kw(L, w, lw, info) end   -- 2 ноя: панель keys — та же ширина клавиши
       -- 2 ноя: слайдер + $pt + ped — ровно под клавишами: от первой белой (после колёс pitch / mod) до последней
       local k0 = kx + ((info and info.wheels) and (2 * (math.max(6, math.floor(L.cw * 0.9)) + L.pad) + L.pad) or 0)
       local bx = math.max(k0, x + L.pad + vw + L.pad + 2)
@@ -5090,6 +5097,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- впритык к букве (для крупного битмапа x2 и узких окон)
     local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4   -- 14 окт: renoise — 2 октавы, узко
     local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+    -- 2 ноя: панель keys — клавиши на всю её ширину (без запаса под транспорт), small piano — уже; буквы видны
+    if info and info.kbd_only then kw = D.kb_pane_kw(L, w, lw, info) end
     if kw >= 4 then
       local ky, kh = ly - 1, 2 * L.rh + 3
       local letters = kw >= ms('W') + 4
