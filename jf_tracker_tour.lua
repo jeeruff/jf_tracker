@@ -44,7 +44,7 @@ T.STEPS = {
     text = ': opens the command line - :arp up 2, :legato, :macro, :pt, :big; Tab completes. Press :',
     check = function(e) return e.mode == 'cmd' end },
   { mod = 'tracker', focus = 'tracker', title = 'Leader menu',
-    text = '\\ opens the main menu of everything (v view, P project, o options); \\\\ - the menu of what is under the cursor, like the right click. Press \\',
+    text = '\\ opens the menu of what is under the cursor, like the right click; \\\\ (twice) - the main menu of everything (v view, P project, o options). Press \\',
     check = function(e) return e.hydra end },
   -- 27 окт: карта сэмплов — найти звук случайно, а не листая списки
   { mod = 'map', focus = 'map', title = 'Find a sound by chance',

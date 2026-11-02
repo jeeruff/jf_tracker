@@ -970,7 +970,7 @@ V.TUTORIAL = {
   '8. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '9. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '10. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
-  '11. Menus. \\ - the main menu of everything (v view, P project, o options); \\\\ - the context menu of what is under the cursor, the same as the right click; ? - any REAPER action. Ctrl+/ - find an effect, Option+/ - inside the DSP chain, Cmd+/ - a file.',
+  '11. Menus. \\ - the menu of what is under the cursor, the same as the right click; \\\\ (twice) - the main menu of everything (v view, P project, o options); ? - any REAPER action. Ctrl+/ - find an effect, Option+/ - inside the DSP chain, Cmd+/ - a file.',
   '12. Play. Space - play / stop, F - follow the playhead; =START and =END markers bound the song.',
   '13. Find by chance. The map pane (next to the browser): the files of the browser folder as groups of dots; v - graph / cards / nebula, r or ξ - a random file, plays at once. In the lib R gives the selected sample a random one like the name of its folder (kick), [ ] - back / forward.',
   '14. Help. F1 - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live.',
