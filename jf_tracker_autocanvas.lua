@@ -293,6 +293,9 @@ function ACV.key(c, st, mods)
   if ACV.zpend then
     ACV.zpend = nil
     if ch == 'p' then ACV.proj = not ACV.proj; return true end
+    if ch == ',' or ch == '.' then   -- 2 ноя: z, z. — сетка мельче / крупнее (как [ ])
+      return ACV.key((ch == ',') and ('['):byte() or (']'):byte(), st, mods)
+    end
     if ch == 'g' then return { op = 'gridmenu' } end   -- 2 ноя: zg — сетка (и паттерны / секции / весь отрезок)
     if ch == 'h' then ACV.showhidden = not ACV.showhidden; ACV.tree_gen = (ACV.tree_gen or 0) + 1; return true end   -- 31 окт: zh — скрытые кривые
     if c == 27 then return true end
@@ -328,6 +331,9 @@ function ACV.key(c, st, mods)
     if ACV.anchor then ACV.anchor = nil; return true end
     if ACV.sel then ACV.sel = nil; return true end
     return { op = 'leave' }
+  elseif ch == 'H' or ch == 'L' then   -- 2 ноя: Shift+h l — выделение от курсора (как v и движение)
+    ACV.anchor = ACV.anchor or ACV.row
+    ACV.row = ACV.row + (ch == 'H' and -1 or 1); clamp_row(); return true
   elseif ch == 'h' or c == 1818584692 then ACV.row = ACV.row - 1; clamp_row(); return true
   elseif ch == 'l' or c == 1919379572 then ACV.row = ACV.row + 1; clamp_row(); return true
   elseif (ch == '{' or ch == '}') and ACV.gmode then   -- 2 ноя: к соседней границе клетки

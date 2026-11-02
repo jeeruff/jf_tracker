@@ -27304,6 +27304,11 @@ local function frame()
               end
             end
           end
+          -- 2 ноя: мимо точек — протяжка курсором выделяет строки (как v + движение)
+          if not ctx.acv_pdrag then
+            local r = A.at(g, gfx.mouse_x, gfx.mouse_y)
+            if r then A.row = math.floor(r + 1e-6); A.anchor = A.row; ctx.acv_seldrag = { geo = g } end
+          end
         elseif A.tool ~= 'cur' and lfo_hover.geo then   -- 30 окт: мазок мыши — превью, запись при отпускании
           local r, v = A.at(lfo_hover.geo, gfx.mouse_x, gfx.mouse_y)
           ctx.acv_mdrag = { tool = A.tool, geo = lfo_hover.geo, r = r, v = v, r_s = r, v_s = v, mx0 = gfx.mouse_x, my0 = gfx.mouse_y }
@@ -29379,6 +29384,16 @@ local function frame()
     end
   end
   -- 31 окт: точка огибающей тянется вживую (значение и строка между соседями), одна отмена при отпускании
+  if ctx.acv_seldrag then   -- 2 ноя: выделение протяжкой в холсте кривых
+    local A = ctx.ACV
+    if gfx.mouse_cap & 1 == 1 then
+      local r = A.at(ctx.acv_seldrag.geo, gfx.mouse_x, gfx.mouse_y)
+      if r then A.row = math.floor(r + 1e-6) end
+    else
+      if A.anchor == A.row then A.anchor = nil end   -- просто щелчок — без выделения
+      ctx.acv_seldrag = nil
+    end
+  end
   if ctx.acv_pdrag then
     local d = ctx.acv_pdrag
     -- 31 окт: щелчок без движения точку не трогает — тянется только после сдвига мыши на 3 px
@@ -31697,7 +31712,7 @@ local function frame()
           local r = MMX.PP.key(c, cur_col())
           if r == 'leave' then ctx.set_focus('tracker')
           elseif not r then return vim.key(c) end
-        elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and c ~= 76 and ctx.acv_key(c) then   -- 15 окт: холст (L P — страницы, как в подсказке)
+        elseif state.toptab == 'automation' and mod_pane == 'curve' and c ~= 80 and ctx.acv_key(c) then   -- 2 ноя: L — выделение (Shift+l), lfogen — Ctrl+W g G   -- 15 окт: холст (L P — страницы, как в подсказке)
         elseif state.toptab == 'automation' and c == 80 then mod_pane = 'params'; vim.msg = 'params: all parameters of the track - Enter: envelope, m: modulate, c: curve, v: used only, P: back'
         elseif state.toptab == 'automation' and c == 76 then ctx.pane_focus('lfogen'); vim.msg = 'lfogen: j k field, h l value, g auto-item, p write points, Esc back'   -- 31 окт: генератор — своя панель
         elseif state.toptab == 'automation' then

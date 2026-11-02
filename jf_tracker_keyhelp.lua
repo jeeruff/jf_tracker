@@ -835,6 +835,8 @@ KH.PAGES = {
     { k = 'hum', d = 'the button in the header: humanize - the values of the selection (sel) or of the cell under the cursor +-8 % at random; again - another spread' },
     { k = 'S', d = 'snap: the stroke goes by grid cells (on) or by rows (off); the grid - [ ] or the buttons [ 1/4 ] in the header (a click on the value - the list)' },
     { k = 'Space (list)', d = 'in the curve list (Cmd+H): the curve into the stack - the canvas splits into lanes, one per marked curve under the active one (4-5 fit); Space again - out; Shift+click does the same. Other curves are not drawn behind (option curves behind)' },   -- 2 ноя
+    { k = 'z, z.', d = 'grid finer / coarser (as [ ])' },
+    { k = 'H L  drag', d = 'select rows from the cursor (Shift+h / l, or drag with cur on empty space); then d y p, Esc drops it' },
     { k = 'zg', d = 'the grid list: even (1/192 .. 1/2) or uneven - p = a cell per pattern, s = per section; { } go cell to cell, [ ] back to even' },
     { k = 'zp', d = 'the whole project / back to the span (the bar at the cursor, the region, the time selection) - automation and modulation over the song' },
     { k = 'Tab  S-Tab', d = 'the active curve: the lane under the cursor, every envelope of the track, the take envelopes of the samples selected in the lib (v there) and the envelopes of their tracks, note mod slots, LFO / ACS curves; a click on the legend too' },

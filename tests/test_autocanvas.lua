@@ -18,7 +18,7 @@ ACV.row, ACV.grid, ACV.cur = 0, 4, 1
 ACV.key(('l'):byte(), st); eq('l', ACV.row, 1)
 ACV.key(('}'):byte(), st); eq('} = grid', ACV.row, 5)
 ACV.key(('h'):byte(), st); ACV.key(('{'):byte(), st); eq('{', ACV.row, 0)
-eq('L is not the canvas key', ACV.key(('L'):byte(), st), false)
+ACV.key(('L'):byte(), st); eq('L selects from the cursor', ACV.anchor, 0); eq('L moves', ACV.row, 1); ACV.key(27, st); eq('Esc drops the selection', ACV.anchor, nil); ACV.row = 0   -- 2 ноя
 ACV.key(('G'):byte(), st); eq('G', ACV.row, 31); ACV.key(('g'):byte(), st); eq('g', ACV.row, 0)
 ACV.key(('['):byte(), st); eq('[ finer', ACV.grid, 2); ACV.key((']'):byte(), st); ACV.key((']'):byte(), st); eq('] coarser', ACV.grid, 8)
 eq('grid label 1/8', ACV.grid_label(2, 4), '1/8'); eq('grid label rows', ACV.grid_label(3, 4), '3 rows'); eq('grid label bar', ACV.grid_label(16, 4), '1/1')
