@@ -30,7 +30,7 @@ end
 local m = PN.DEFAULT()
 local lay = tiling('default 1600x900', m, 1600, 900)
 tiling('default 800x500', m, 800, 500)
-eq('cells', #lay.cells, 9)   -- 9 окт: browser | pm | fx — один стек, dsp один; 11 окт: + mixer под трекером
+eq('cells', #lay.cells, 10)   -- 2 ноя: + keys под браузером; 9 окт: browser | pm | fx — один стек, dsp один; 11 окт: + mixer под трекером
 ok('tracker rect', lay.rects.tracker ~= nil)
 ok('tracker has no tab', lay.by_panel.tracker.tab == nil)
 eq('order starts with tracker', lay.order[1], 'tracker')
@@ -40,7 +40,7 @@ ok('tabs in one cell', lay.by_panel.sample == lay.by_panel.midi)
 -- недоступная панель: slices нет → лист схлопнут
 local M2 = setmetatable({ avail = function(id) return id ~= 'slices' end }, { __index = M })
 local lay2 = tiling('no slices', m, 1600, 900, M2)
-eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 8)
+eq('slices gone', lay2.by_panel.slices, nil); eq('cells -1', #lay2.cells, 9)
 -- все скрыты
 local t = PN.preset('tracker')
 local lay3 = tiling('tracker only', t, 1600, 900)

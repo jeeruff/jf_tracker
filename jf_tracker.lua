@@ -459,6 +459,11 @@ state.panes = (function()
   if s ~= '' then
     local m = draw.panes.decode(s)
     if state.autoadd then draw.panes.add_new(m, s) end   -- 13 окт: новые модули — на свои места
+    -- 2 ноя: клавиатура-панель — один раз под браузер и без autoadd
+    if reaper.GetExtState(EXT, 'keyspane') == '' and not draw.panes.visible(m, 'keys') and draw.panes.visible(m, 'browser') then
+      draw.panes.split(m, 'browser', 'keys', 'd', 0.15)
+    end
+    reaper.SetExtState(EXT, 'keyspane', '1', true)
     return m
   end
   return draw.panes.DEFAULT()

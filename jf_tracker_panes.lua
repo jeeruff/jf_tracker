@@ -29,6 +29,7 @@ PN.PANELS = {
   { id = 'arranger',   label = 'arranger',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
+  { id = 'keys',       label = 'keys',       key = 'K', hint = 'keys',    side = 'right' },   -- 2 ноя: клавиатура (oct / клавиши / vel / ped) — панелью, по умолчанию под браузером
   { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
@@ -94,7 +95,7 @@ function PN.DEFAULT()
         node('v', { 0.72, 0.28 }, leaf('tracker'), leaf('mixer')),   -- 11 окт: микшер — модуль под трекером
         leaf('dsp')),
       -- 9 окт: browser | pm | fx — один стек справа внизу
-      node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'))),
+      node('v', { 0.40, 0.20, 0.32, 0.08 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'), leaf('keys'))),
     hidden = { notes = true } })
 end
 
@@ -617,6 +618,7 @@ local function stack_keep(m, id, into)
   return true
 end
 PN.LATE = {
+  { 'keys', function(m) return PN.visible(m, 'browser') and PN.split(m, 'browser', 'keys', 'd', 0.15) end },   -- 2 ноя
   { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
   { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },
   -- 12 окт: note mod — вкладкой в стеке properties (item = волна / свойства / модуляция)
@@ -931,6 +933,7 @@ end
 -- 28 окт: описание модуля для панели hints (\ h): что это, как с ним работать — коротко. Модуль может отдать живое
 -- описание сам: ctx.about_fn[id] = function() return 'текст' end (API модулей; иначе — строка отсюда)
 PN.ABOUT = {
+  keys = 'The keyboard: octave, the note keys you type (lit when they sound), velocity, $pt (keys play the selected slice by pitch) and the sustain pedal. Under the browser by default - click a key to hear the sample you picked there.',
   tracker = 'The song as rows and columns over real REAPER items: note, instrument, volume, delay and command fields per track, envelope and MIDI lanes beside them. NORMAL moves and edits with Vim keys (h j k l, w b, d y p, counts), INSERT types notes from the keyboard, VISUAL selects a block. Every edit is one REAPER undo step.',
   patterns = 'The pattern codes of the song as a grid of cubes: a letter is a family (A, B, C ...), a number its variant (A1, A2 ...). Bright - in the song, grey - not made yet, green - playing, xN - how many times it repeats. Click or Enter jumps there; Shift / v selects several to glue, split, copy, rename or remove. The chain row under the grid is the song order as text, edited with Vim keys (h l w b, x dw dd, y p P), Space plays it, C types it.',
   matrix = 'The song as slots: one row per pattern (region), columns are the tracks. Shows =START and =END, sections on the left, the length and signature of each pattern; a free bar after the song makes a new pattern. Wheel on =START / =END moves them a bar (what is after =END moves along). Enter on a cell lists the patterns that sound on that track.',

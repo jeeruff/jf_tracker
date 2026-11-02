@@ -5163,7 +5163,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- (step / inst / vel / pitch), кнопки транспорта, время и BPM, LPB / sig /
   -- доли / metro, запись; тоглы — у самого правого края. Блоки слева
   -- направо, что не влезло — не рисуется (без наложений)
-  if not info then if p then D.kbd_block(x) end; return out end   -- без транспорта (тест, узкая полоса) — клавиатура на старом месте
+  if not info or info.kbd_only then if p then D.kbd_block(x) end; return out end   -- 2 ноя: kbd_only — панель keys   -- без транспорта (тест, узкая полоса) — клавиатура на старом месте
   local tw = x + w - L.pad - tx
   if tw <= 0 or not info then return out end
   local c = info.ctrl or {}
@@ -5545,7 +5545,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   addg('step')
   addg('listen')   -- 12 окт: step / sel / line
-  if D.kbd_w > 0 then order[#order + 1] = { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } end
+  if D.kbd_w > 0 and not (L.pn and L.pn.by_panel and L.pn.by_panel.keys) then order[#order + 1] = { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } end
   order[#order + 1] = { w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
@@ -7332,6 +7332,10 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if inside and type(mh) == 'table' then for k2, v2 in pairs(mh) do hover[k2] = v2 end end
       elseif id == 'console' and info.console_draw then   -- 28 окт: консоль Strudel
         info.console_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'console')
+      elseif id == 'keys' then   -- 2 ноя: клавиатура панелью (та же отрисовка, что в полосе транспорта)
+        local pp = info.piano
+        if pp then pp.ins = info.vmode == 'insert' end
+        D.piano_strip(L, ct.x, ct.y, ct.w, ct.h, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
       elseif id == 'hints' and info.hints_draw then   -- 28 окт: что делает модуль под мышью
         info.hints_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'hints', hover)
       elseif id == 'help' and info.help_draw then   -- 17 окт: справка модуля в фокусе
