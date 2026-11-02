@@ -1172,6 +1172,37 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   if wh > 4 * rh then
     local RH = rh - 2
     U.set(U.BG); gfx.rect(x, wy, w, RH, 1)
+    -- 2 ноя: айтем на таймлайне — строки трекера (номер как в колонке номеров, доля ярче); lib / щелчок — кадры
+    local st0 = ctx.state
+    local ip = e.item and not e.depot and R.ValidatePtr(e.item, 'MediaItem*') and R.GetMediaItemInfo_Value(e.item, 'D_POSITION')
+    local rows_on = ip and st0 and not S.rul_frames
+    local rmx, rmy = gfx.mouse_x, gfx.mouse_y
+    local rdown = (gfx.mouse_cap & 1) == 1
+    if rdown and not S.rul_prev and rmx >= x and rmx < x + w and rmy >= wy and rmy < wy + RH then
+      S.rul_frames = not S.rul_frames
+      S.msg = 'ruler: ' .. (S.rul_frames and 'frames of the source (hex)' or 'tracker rows')
+    end
+    S.rul_prev = rdown
+  if rows_on then
+    local lpb = st0.lpb or 4
+    local base = (ctx.model and ctx.model.ROW_BASE) or 1
+    local q0 = R.TimeMap2_timeToQN(0, ip + va) * lpb
+    local q1 = R.TimeMap2_timeToQN(0, ip + vb) * lpb
+    local need = (q1 - q0) * (U.measure('00000') + 2 * L.pad) / math.max(1, w)   -- строк на подпись
+    local st = 1
+    while st < need do st = st * 2 end
+    local tick = 1
+    while (q1 - q0) / tick > w / 3 do tick = tick * 2 end   -- риски не гуще 3 px
+    for r = math.ceil(q0 / tick) * tick, math.floor(q1), tick do
+      local px = x + math.floor((R.TimeMap2_QNToTime(0, r / lpb) - ip - va) / span * w)
+      local beat = r % lpb == 0
+      U.set(beat and U.GREY or U.LINE); gfx.rect(px, wy + RH - (beat and 5 or 3), 1, beat and 5 or 3, 1)
+      if r % st == 0 then
+        local lab = ('%d'):format(r + base)
+        if px + 2 + U.measure(lab) < x + w then U.text(px + 2, wy, lab, beat and U.TEXT or U.GREY) end
+      end
+    end
+  else
     local sr, rate = S.srate(e), (e.rate and e.rate ~= 0) and e.rate or 1
     local f0, f1 = va * rate * sr, vb * rate * sr
     local lw = U.measure('FFFFFF') + 2 * L.pad
@@ -1190,6 +1221,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local lab = ('%X'):format(fr)
       if px + 2 + U.measure(lab) < x + w then U.text(px + 2, wy, lab, U.GREY) end
     end
+  end
     U.set(U.LINE); gfx.rect(x, wy + RH - 1, w, 1, 1)
     wy, wh = wy + RH, wh - RH
   end
