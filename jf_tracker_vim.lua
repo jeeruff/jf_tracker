@@ -3113,7 +3113,8 @@ function V.key_impl(c)
       end
       V.count = nil; finish_move(); return
     elseif p == 'zv' then   -- 2 ноя: zv — подменю вида; zvw — вид волны (было zW)
-      if c == ('w'):byte() then if ctx.wave_menu then ctx.wave_menu() end end
+      if c == ('w'):byte() then if ctx.wave_menu then ctx.wave_menu() end
+      elseif c == ('p'):byte() then if ctx.pan_view then ctx.pan_view() end end   -- 2 ноя: zvp — вид пана трека
       V.count = nil; finish_move(); return
     elseif p == 'z' then
       local L = ctx.layout()

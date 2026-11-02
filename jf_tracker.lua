@@ -343,6 +343,7 @@ local state = {
   rulerside = reaper.GetExtState(EXT, 'rulerside') == 'right' and 'right' or 'left', mkedges = flag('mkedges', false),   -- 13 окт
   dotcolor = flag('dotcolor', false),   -- 18 окт: пустые точки — цветом поля
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
+  pan33 = flag('pan33', false),     -- 2 ноя: вид пана (zvp) — 33 позиции вместо 17
   fxbenter = flag('fxbenter', false),   -- 2 ноя: браузер эффектов — папка открывается по Enter (иначе как lf: сразу справа)
   namedrag = flag('namedrag', false),
   typedtag = flag('typedtag', true),
@@ -511,7 +512,7 @@ vim.step_next = tostring(ext('step_next', '0')) == '1'
 -- fold: «guid» — компактный, «guid=m» — полоска (zC), ревью 2 окт
 for g in tostring(ext('folds', '')):gmatch('[^,]+') do
   local id, m = g:match('^([^=]+)=?(%a*)$')
-  if id then state.folds[id] = (m == 'm') and 'mini' or true end
+  if id then state.folds[id] = (m == 'm') and 'mini' or (m == 'p' and 'pan') or true end   -- 2 ноя: =p — вид пана
 end
 for g in tostring(ext('fcollapse', '')):gmatch('[^,]+') do state.fcollapse[g] = true end
 for g in tostring(ext('thide', '')):gmatch('[^,]+') do state.thide[g] = true end
@@ -701,7 +702,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'pan33', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -716,7 +717,7 @@ local function save_win()
   for g, m in pairs(state.pitchmodes) do pm[#pm + 1] = g .. '=' .. m end
   S('pitchmodes', table.concat(pm, ','))
   local fl = {}
-  for g, v in pairs(state.folds) do if v then fl[#fl + 1] = g .. (v == 'mini' and '=m' or '') end end
+  for g, v in pairs(state.folds) do if v and v ~= 'chord' then fl[#fl + 1] = g .. (v == 'mini' and '=m' or (v == 'pan' and '=p' or '')) end end
   S('folds', table.concat(fl, ','))
   local fc = {}
   for g, v in pairs(state.fcollapse) do if v then fc[#fc + 1] = g end end
@@ -13370,6 +13371,7 @@ ctx = {
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
       flag('fxbenter', 'fx browser: Enter opens a folder', 'off (default) - as in lf: moving over a folder on the left shows its plugins on the right at once; on - the list changes only on Enter'),
       flag('pancol', 'pan column', 'a pan field after the volume of every audio note (00 left .. 80 centre .. FF right; empty - centre); 0Pxx is then not shown'),
+      flag('pan33', 'pan view: 33', 'the pan view of a track (zvp) has 33 positions instead of 17 (the centre is always in the middle)'),
       { key = 'textonly', label = 'text only', kind = 'toggle', desc = 'cells show only the text: no wave behind the notes, no item fill, no item frame', get = function() return state.textonly end, set = function(v) state.textonly = v; if v then state.waveonly = false end end },
       -- 11 окт: противоположность text only — аудио-подколонка трека узкой полосой волны (ширина — зум трека колесом)
       { key = 'waveonly', label = 'wave only', kind = 'toggle', desc = 'audio columns show only the wave: a narrow strip per audio subcolumn, no note / instrument / volume text (MIDI notes beside stay); wheel over the track (track zoom) widens the strip', get = function() return state.waveonly end, set = function(v) state.waveonly = v; if v then state.textonly = false end; ctx.relayout() end },
@@ -13426,7 +13428,7 @@ ctx = {
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'contedge', 'fxguiauto', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'fxbenter', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'pan33', 'fxbenter', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
       -- 1 ноя: experimental — всё экспериментальное в одном месте (просьба): PT-mode, рамки и визуализаторы, human, скорость фейдеров, карточки pm
@@ -25495,6 +25497,7 @@ local function frame()
       U.text(lx + L.pad, ly + 1, lab, U.AMBER)
     end
   end
+  ctx.pan_frame()   -- 2 ноя: вид пана — позиция курсора для отрисовки, пан только что набранной ноты
   -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
@@ -30835,6 +30838,7 @@ local function frame()
   do
     local m = ctx.mods()
     local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing() or state.focus == 'manual' or DK.ins or OPT.active
+    if c ~= 0 and state.focus == 'tracker' and not busy and ctx.pan_key(c, m) then c = 0 end   -- 2 ноя: вид пана — h l по позициям, H L двигают ноту
     -- 31 окт: Ctrl+Opt+H / L в трекере — колонок команд fx у трека курсора меньше / больше
     if m.ctrl and m.alt and not m.cmd and not busy and state.focus == 'tracker' and (vim.cur.field or 1) >= 4 and (c == 8 or c == 12 or c == 104 or c == 108) then   -- на колонке fx (иначе — playrate инструмента)
       local f0 = L and L.flat and L.flat[vim.cur.fi]
@@ -32274,6 +32278,64 @@ ctx.cm_draw = function(id, Lx, x, y, w, h, foc)
   if not cm then return end
   local ok, err = pcall(cm.draw, U, Lx, x, y, w, h, foc)
   if not ok then vim.msg = 'module ' .. id .. ': ' .. tostring(err) end
+end
+-- 2 ноя: ВИД ПАНА (zvp) — трек курсора полем из N позиций (state.panpos 17 / 33); пан пишется командой 0P
+-- (аудио — пан take, slixer — jf_nx): так же, как колонка пана и 0Pxx
+ctx.pan_view = function()
+  local col = cur_col(); if not col or col.master then vim.msg = 'zvp: put the cursor on a track'; return end
+  local on = state.folds[col.guid] == 'pan'
+  state.folds[col.guid] = (not on) and 'pan' or nil
+  if state.wlevel then state.wlevel[col.guid] = nil end
+  vim.cur.ppos = nil
+  relayout()
+  vim.msg = on and (col.name .. ': notes again') or (col.name .. (': pan view - h l over %d positions, a note key writes the note with that pan, H L move the note under the cursor; zvp - back'):format((state.pan33 and 33 or 17)))
+end
+ctx.pan_set = function(heads, pos)
+  if #heads == 0 then return end
+  local PV, n = draw.PV, (state.pan33 and 33 or 17)
+  edit.set_fx(heads, state.lpb, '0P', PV.pan_hex(PV.pan_of(pos, n)))
+  model.invalidate()
+end
+ctx.pan_key = function(c, m)
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not (f and f.pan) or m.cmd or m.ctrl or m.alt then return false end
+  if vim.mode ~= 'normal' and vim.mode ~= 'insert' then return false end
+  local n = (state.pan33 and 33 or 17)
+  local mid = (n + 1) // 2
+  local p = vim.cur.ppos or mid
+  if c == 104 or c == 1818584692 then if p > 1 then vim.cur.ppos = p - 1; return true end; vim.cur.ppos = nil; return false end   -- h ←: за краем — поле слева
+  if c == 108 or c == 1919379572 then if p < n then vim.cur.ppos = p + 1; return true end; vim.cur.ppos = nil; return false end
+  if c == 72 or c == 76 then   -- H L: нота в позиции курсора (голова или её продолжение) — на позицию влево / вправо
+    local heads, seen = {}, {}
+    for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
+    if #heads == 0 then vim.msg = 'pan view: no note here - h l to the note first'; return true end
+    local np = math.max(1, math.min(n, p + (c == 72 and -1 or 1)))
+    ctx.pan_set(heads, np); vim.cur.ppos = np
+    return true
+  end
+  if vim.mode == 'insert' and keys.piano[c] then   -- набор: нота встанет в центр — пан ей после пересборки снимка
+    ctx.pan_pend = { guid = f.col.guid, row = vim.cur.row, pos = p, sc = reaper.GetProjectStateChangeCount(0) }
+  end
+  return false
+end
+ctx.pan_frame = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  draw.PANN = (state.pan33 and 33 or 17)
+  draw.pan_cur = (f and f.pan) and (vim.cur.ppos or (draw.PANN + 1) // 2) or nil
+  local pp = ctx.pan_pend
+  if pp then pp.n = (pp.n or 0) + 1 end
+  if pp and snap and reaper.GetProjectStateChangeCount(0) ~= pp.sc and pp.n >= 3 then   -- правка была и снимок пересобран (кадр-другой)
+    ctx.pan_pend = nil
+    local mid = (draw.PANN + 1) // 2
+    if pp.pos == mid then return end
+    for _, col in ipairs(snap.cols or {}) do
+      if col.guid == pp.guid then
+        local heads = {}
+        for _, it in ipairs(draw.PV.row(col, pp.row, draw.PANN)) do if not it.cont and it.pos == mid then heads[#heads + 1] = it.head end end
+        ctx.pan_set(heads, pp.pos)
+      end
+    end
+  end
 end
 ctx.auto_pattern = function(row)
   local t = edit.row_time(row, state.lpb, 0)

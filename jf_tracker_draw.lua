@@ -948,12 +948,12 @@ function D.layout(snap, state, nregions)
     local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать
-    if azc then lvl = nil; if fs ~= 'chord' then fs = nil end end
-    if lvl and fs ~= 'chord' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
+    if azc then lvl = nil; if fs ~= 'chord' and fs ~= 'pan' then fs = nil end end
+    if lvl and fs ~= 'chord' and fs ~= 'pan' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
-    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini' or fs == 'chord', chord = fs == 'chord', compact = fs == true, hidden = hidden }
+    local c = { col = col, ci = ci, x = vis and cx or nil, lanes = {}, envs = {}, folded = fs == 'mini' or fs == 'chord' or fs == 'pan', chord = fs == 'chord', pan = fs == 'pan', compact = fs == true, hidden = hidden }
     if hide_below == depth and not fold_c and not hidden then c.fsum, c.fn = {}, 0; fold_c = c end
     -- 27 окт (2): «~» — только автоматизация, которой сейчас не видно колонкой (огибающие / MIDI-лейны этого трека)
     if L.envmark and col.env_rows then
@@ -973,8 +973,8 @@ function D.layout(snap, state, nregions)
     end
     local lx = (c.x or 0) + 1
     if c.folded then
-      local fw = c.chord and L.chord_w or L.fold_w    -- 8 окт: лейн аккордов — шире полоски
-      L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, chord = c.chord, x = vis and lx or nil, w = fw }
+      local fw = c.chord and L.chord_w or (c.pan and (D.PANN * L.cw + 2 * L.pad) or L.fold_w)    -- 8 окт: лейн аккордов — шире полоски; 2 ноя: вид пана — N позиций
+      L.flat[#L.flat + 1] = { ci = ci, col = col, folded = true, chord = c.chord, pan = c.pan, x = vis and lx or nil, w = fw }
       c.lanes[1] = { lane = col.lanes[1], x = lx, w = fw, nsub = 1, f0 = #L.flat, folded = true }
       lx = lx + fw + 1
     else
@@ -2646,6 +2646,30 @@ local function draw_cell(L, cell, x, y, ty, inv)
   end
 end
 
+
+-- 2 ноя: вид пана (zvp) — трек полем из D.PANN позиций: точки, центр «:», нота — буквой в позиции своего пана,
+-- продолжение — «|»; курсор — позиция D.pan_cur у трека курсора
+D.PV = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_panview.lua')
+D.PANN = 17
+function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
+  local n = D.PANN
+  local cw = L.cw
+  local x0 = x + math.floor((w - n * cw) / 2)
+  local mid = (n + 1) // 2
+  local cur = inv and D.pan_cur or nil
+  for i = 1, n do
+    if i == cur then set(D.inv_bg or U.TEXT); gfx.rect(x0 + (i - 1) * cw, y, cw, L.rh, 1) end
+    text(x0 + (i - 1) * cw, ty, i == mid and ':' or '.', i == cur and U.BG or (i == mid and D.CONT or D.EMPTY))
+  end
+  for _, it in ipairs(D.PV.row(col, row, n)) do
+    local h = it.head
+    local colr = h.muted and U.GREY or (h.kind == 'midi' and U.CYAN or U.TEXT)
+    local gx = x0 + (it.pos - 1) * cw
+    if it.pos == cur then set(D.inv_bg or U.TEXT); gfx.rect(gx, y, cw, L.rh, 1); colr = U.BG end
+    if not it.cont then set(it.pos == cur and (D.inv_bg or U.TEXT) or U.BG); gfx.rect(gx, y + 1, cw, L.rh - 2, 1) end
+    text(gx, ty, it.cont and '|' or D.PV.glyph(h), it.cont and (it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) or colr)
+  end
+end
 
 local function draw_fold_cell(L, col, row, x, y, ty, inv)
   local text_ = text
@@ -10158,6 +10182,7 @@ function D.frame(L, snap, rows, state, info)
                 D.EMPTY, D.EMPTY_UNDER = e0, u0
               end
             elseif c.chord then D.draw_chord_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)
+            elseif c.pan then D.draw_pan_cell(L, c.col, r.row, x, y, ty, inv ~= nil, f.w)   -- 2 ноя: вид пана
             elseif c.folded then draw_fold_cell(L, c.col, r.row, x, y, ty, inv ~= nil)
             else
               cell = f.sub[r.row]
