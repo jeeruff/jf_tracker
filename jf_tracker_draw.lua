@@ -1311,6 +1311,13 @@ D.PADKEYS = { volume = 'v', pan = 'n', ['min vol'] = 'i', root = 'o', pitch = 't
 -- 19 окт: ADSR поверх волны — линия в 2 px контрастным зелёным, на узлах ромбики (hot — янтарём, залитый)
 function D.adsr_line(pts, bg, hot_i)
   local c = U.readable(U.mix(U.GREEN, U.TEXT, 0.25), bg or U.PANEL, 4.5)
+  -- 2 ноя: тёмная обводка под линией — поверх светлой волны зелёный терялся
+  set(U.BG)
+  for i = 1, #pts - 1 do
+    local a, b = pts[i], pts[i + 1]
+    gfx.line(a[1], a[2] + 1, b[1], b[2] + 1); gfx.line(a[1], a[2] - 2, b[1], b[2] - 2)
+    gfx.line(a[1] + 1, a[2], b[1] + 1, b[2]); gfx.line(a[1] - 1, a[2] - 1, b[1] - 1, b[2] - 1)
+  end
   set(c)
   for i = 1, #pts - 1 do
     local a, b = pts[i], pts[i + 1]
@@ -1319,6 +1326,7 @@ function D.adsr_line(pts, bg, hot_i)
   local r = math.max(3, math.floor((D.L_rh or 16) / 4))
   for i = 2, #pts - 1 do
     local x, y = pts[i][1], pts[i][2]
+    set(U.BG); gfx.triangle(x, y - r - 1, x + r + 1, y, x, y + r + 1, x - r - 1, y)
     set(i == hot_i and U.AMBER or c)
     gfx.triangle(x, y - r, x + r, y, x, y + r, x - r, y)
     if i ~= hot_i then set(bg or U.PANEL); gfx.triangle(x, y - r + 2, x + r - 2, y, x, y + r - 2, x - r + 2, y) end
