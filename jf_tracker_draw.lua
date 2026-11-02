@@ -627,7 +627,11 @@ function D.layout(snap, state, nregions)
   L.rg_w = (state.ruler == false) and 0 or (2 * (L.th + 6) + L.pad + 2)   -- +2: зазор от разделителя матрицы
   -- 10 окт: линейка прыжков по строкам (relativenumber Vim) — колонка на 2 цифры
   -- левее полосы регионов; регионы сдвигаются на неё
-  L.jl_w = state.rowjumps and (ms('99') + L.pad + 2) or 0
+  -- 2 ноя: у курсора — его номер строки (как number + relativenumber в Vim): ширина — под номер последней строки проекта
+  if state.rowjumps then
+    local nrow = math.floor(reaper.GetProjectLength(0) * reaper.Master_GetTempo() / 60 * (state.lpb or 4)) + (D.ROW_BASE or 1)
+    L.jl_w = ms(('9'):rep(math.max(2, #tostring(nrow)))) + L.pad + 2
+  else L.jl_w = 0 end
   L.ruler_w = L.jl_w + L.rg_w
   -- линейка таймлайна между полосами регионов и номерами (3 окт, опция tlruler): метки REAPER
   -- на долях — beats (такт.доля), time (время), both
@@ -10481,6 +10485,7 @@ function D.frame(L, snap, rows, state, info)
       local d = cr and (r.row - cr)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
+        if math.abs(d) < 0.5 then lab = ('%d'):format(math.floor(r.row + 0.5) + (D.ROW_BASE or 1)) end   -- 2 ноя: у курсора — номер его строки, не 0
         text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
