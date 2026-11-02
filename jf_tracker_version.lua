@@ -968,7 +968,7 @@ V.TUTORIAL = {
   '6. Two modes. Like Vim, jf_tracker works in modes: NORMAL - keys move, edit, run commands (j moves, x deletes); INSERT - keys write notes on the cursor row. i enters INSERT (as in Vim), Esc leaves it; Esc also enters it - a habit kept from Renoise (with the keyboard on, i is a note). The word at the bottom says which.',
   '7. Write notes. m - the keyboard on / off (on: it has priority over Vim keys). The top row q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p plays C .. E, z / x - octave; Esc - INSERT, where the keys write; Esc - back. With the keyboard off everything is plain Vim (i - INSERT).',
   '8. Pick a sound. The lib on the right: j k - select; Opt+J / K switch sounds. Shift+note only plays.',
-  '9. Slice a break. Select a sample, the item tab on top: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT q writes the whole sample, the next keys its slices: 2 w 3 e = slices 1 2 3 4 (the note is the pitch, Sxx - the slice; Option + key - the pitch of the last slice).',
+  '9. Slice a break. The item tab (Ctrl+W i) shows the picked sample: s opens the slice menu - s8 = eight equal slices, st = by transients, sd = remove. In INSERT 1 f1 2 f2 ... write the slices, Ctrl+Shift+1 the whole sample.',
   '10. Edit like text. x - delete, dw / d3j / dG - delete with a motion, yy p - copy, u - undo, . - repeat the last edit.',
   '11. Select. v - block, V - rows; then d y M (mute) or :interp vol to ramp the volumes.',
   '12. Commands. : opens the command line - :arp up 2, :legato, :macro, :pt, :big, :wave back; Tab completes.',
