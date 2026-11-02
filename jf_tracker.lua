@@ -19152,6 +19152,7 @@ local function hint_go(t)
   elseif t.kind == 'dbpar' then ctx.set_focus('dsp'); ctx.db_ops.add(d, true)                                                                   -- = под узлом
   elseif t.kind == 'mixmode' then ctx.master_meter_menu()
   elseif t.kind == 'poolbsync' then ctx.bsync_toggle()
+  elseif t.kind == 'poolfind' then ctx.set_focus('inst'); ctx.inst_find()   -- 2 ноя
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
   elseif t.kind == 'poolkit' then ctx.set_focus('inst'); ctx.kit_menu()

@@ -6524,9 +6524,18 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   end
   -- сортировка — строкой заголовков колонок под шапкой (3 окт), не кнопкой
   local sbx = ix + w - L.pad
-  local fw = ms('find') + 2 * L.pad
-  local fx = sbx - fw - L.pad
-  hbtn(fx, fw, 'find', false, U.GREY, 'poolfind')
+  -- 2 ноя: find — слева, «/ find»: / янтарём (клавиша поиска в lib); справа от load — пресет, дальше sort / bsync
+  local fw = ms('/ find') + 2 * L.pad
+  local fx = sbx + L.pad          -- справа больше нет: следующая кнопка встаёт у края
+  do
+    local fx0 = ix + L.pad
+    local hot = mx >= fx0 and mx < fx0 + fw and my >= by0 and my < by0 + L.rh
+    set(hot and D.CURROW or U.BG); gfx.rect(fx0, by0, fw, L.rh, 1)
+    set(U.LINE); gfx.rect(fx0, by0, fw, L.rh, 0)
+    text(fx0 + L.pad, iy + 3, '/', U.AMBER); text(fx0 + L.pad + ms('/ '), iy + 3, 'find', hot and U.TEXT or U.GREY)
+    if hot then hover.poolfind = true end
+    hint('poolfind', fx0, by0, fw, L.rh, true)
+  end
   -- 11 окт: save — в меню kit (одно место); sort — выпадашка (не перебор по кругу: положений больше двух)
   -- bsync: beatsync выбранного инструмента — длина под N долей темпа в месте
   -- каждой ноты; горит, когда включён
@@ -6544,7 +6553,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local aw = ms('<') + 2
     -- 11 окт: load — слева от пресета: выпадашка китов, кит ДОБАВЛЯЕТСЯ в lib
     local lw3 = ms('load') + 2 * L.pad
-    local lx3 = ix + L.pad
+    local lx3 = ix + L.pad + fw + L.pad   -- 2 ноя: после «/ find»
     hbtn(lx3, lw3, 'load', false, U.CYAN, 'poolload')
     local room = bx2 - L.pad - (lx3 + lw3 + L.pad)
     local ptw = math.min(ms('< ' .. nm .. ' >') + L.pad, room)
