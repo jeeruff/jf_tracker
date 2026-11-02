@@ -33,14 +33,11 @@ rm -f "$ITCH"/jf_tracker-*.zip
 cat > "$ITCH/READ ME FIRST.txt" <<EOF
 jf_tracker $V - a tracker core for REAPER with modules around it: Vim keys, built like Emacs. Free to use, PolyForm Shield 1.0.0 (no competing products).
 
-INSTALL WITH REAPACK (recommended, updates included)
-1. REAPER: Extensions - ReaPack - Import repositories, paste:
-   https://github.com/jeeruff/jf_tracker-release/raw/main/index.xml
-2. Extensions - ReaPack - Browse packages: install jf_tracker and jf_tracker effects.
-New versions arrive with ReaPack - Synchronize packages.
-
-BY HAND
-Unzip jf_tracker-$V.zip. The README inside explains where the files go.
+INSTALL
+Unzip jf_tracker-$V.zip. The README inside explains where the files go:
+the jf_tracker folder into REAPER's Scripts folder, effects/ into Effects,
+then Actions - Load ReaScript - jf_tracker.lua.
+New versions are posted on this itch.io page.
 
 Needs REAPER 7, SWS and js_ReaScriptAPI (both through ReaPack). Tested on macOS.
 
