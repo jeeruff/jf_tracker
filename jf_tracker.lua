@@ -1245,7 +1245,11 @@ ctx = {
   -- всплывашки на модулях; повтор — выключить. :tutorial text — текстом
   tutorial = function(text)
     if text then OPT.open_about(function() return { title = 'tutorial', text = VER.TUTORIAL } end); return end
-    if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off' else OPT.tour.start(); ctx.tour_help(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward; the help tab shows the keys of the focused module' end
+    if OPT.tour.active then OPT.tour.stop(); vim.msg = 'tour off'; return end
+    -- 2 ноя: тур — в новой пустой вкладке, чтобы не запороть проект пользователя
+    local _, pn = reaper.EnumProjects(-1, '')
+    if (pn or '') ~= '' or reaper.CountTracks(0) > 0 then reaper.Main_OnCommand(40859, 0); model.invalidate() end
+    do OPT.tour.start(); ctx.tour_help(); vim.msg = 'tour: do what the bubble says - < > in the main module step back / forward; the help tab shows the keys of the focused module' end
   end,
   -- MIDI-нота слайса зоны (4 окт): выученные пэды — их нота + (k - 1), иначе от C4
   slice_note = function(zone)
@@ -25462,7 +25466,7 @@ local function frame()
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
     if OPT.tour.want_focus then ctx.set_focus(OPT.tour.want_focus); OPT.tour.want_focus = nil end
-    OPT.tour.tick({ focus = state.focus, hints = HN.active or false, hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil, tk = (cur_col() or {}).track,
+    OPT.tour.tick({ focus = state.focus, hints = HN.active or false, hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil, tk = (cur_col() or {}).track, ntr = reaper.CountTracks(0),
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end

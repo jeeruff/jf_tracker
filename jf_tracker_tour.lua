@@ -12,6 +12,12 @@ local T = { active = false, step = 1, ok = false, ok_t = 0, hover = nil }
 
 T.STEPS = {
   -- 2 ноя: у шага — короткое объяснение (text) и шаги «нажмите …» (todo), звёздочками, как в справке
+  -- 2 ноя: тур идёт в новой пустой вкладке (main открывает её, если в текущей есть треки или файл) — первый трек tt
+  { mod = 'tracker', focus = 'tracker', title = 'A clean project',
+    ticks = { function() return true end, function(e, b) return (e.ntr or 0) > (b.ntr or 0) end },
+    text = 'The tour works in a new empty project tab, so your own project stays as it was - its tab is still open in REAPER. An empty project has no tracks yet.',
+    todo = { 'A new empty tab is open.', 'Press t t - a new track appears.' },
+    check = function(e, b) return (e.ntr or 0) > (b.ntr or 0) end },
   -- 5 окт: сначала философия (почему jf), потом hjkl, потом f — куда угодно
   { mod = 'tracker', focus = 'tracker', title = 'Why jf',
     ticks = { function() return true end, function(e, b) return e.row ~= b.row end },
