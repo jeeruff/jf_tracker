@@ -680,6 +680,8 @@ function O.draw(L, W, H)
   local rh = L.rh
   local n = #O.items
   local lw, vw = L.cw * 22, L.cw * 12
+  -- 2 ноя: колонка подписи — по самой длинной подписи (не уже 22 знаков, не шире 34): справа место было, а подписи резались
+  for _, it in ipairs(O.items) do if it.label then lw = math.max(lw, math.min(L.cw * 34, U.measure(it.label) + 2 * L.pad)) end end
   local dw = 0
   for _, it in ipairs(O.items) do
     if it.kind == 'cycle' and not it.dropdown then   -- 20 окт: dropdown — значение и «v», ширину не раздувает
