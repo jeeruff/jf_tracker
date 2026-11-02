@@ -404,6 +404,8 @@ function D.panes_layout(state, L, nregions, ncols)
   M.minh = function(id)
     -- 1 ноя: минимум item (все параметры сэмпла) снят — он держал высоту всего нижнего стека (dsp, options …); свойства — своя панель
     if id == 'mixer' then return 8 * L.rh end           -- 11 окт: фейдер и кнопки читаемы
+    -- 2 ноя: нижний стек (dsp, automation, item …) — не ниже 200 px: уже бессмысленно
+    if id == 'dsp' or id == 'automation' or id == 'sample' or id == 'macros' or id == 'midi' or id == 'options' or id == 'retro' then return 200 end
   end
   M.avail = function(id)
     local p = D.panes.BY[id]
