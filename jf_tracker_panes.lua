@@ -50,7 +50,7 @@ PN.PANELS = {
   { id = 'help',       label = 'help',       key = '?', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
-  { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right' },   -- 9 окт: проекты — своя панель (был режим браузера)
+  { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right', avail = 'dev' },   -- 2 ноя: в релизе нет   -- 9 окт: проекты — своя панель (был режим браузера)
   { id = 'dsp',        label = 'dsp',        key = 'd', hint = 'dsp',     side = 'bottom' },
   { id = 'retro',      label = 'rec',        key = 'r', hint = 'retro',   side = 'top', tab = true },
   { id = 'sample',     label = 'item',       key = 'i', hint = 'sample',  side = 'top', tab = true },
@@ -63,7 +63,7 @@ PN.PANELS = {
   { id = 'master',     label = 'master',     key = 'S', hint = 'master',  side = 'top', tab = true },
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
-  { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true },   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
+  { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true, avail = 'dev' },   -- 2 ноя: в релизе нет (monome)   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
   { id = 'hints',      label = 'hints',      key = 'I', hint = 'hints',   side = 'top' },
   { id = 'manual',     label = 'manual',     key = 'Z', hint = 'help',    side = 'right' },
   { id = 'options',    label = 'options',    key = ',', hint = 'options', side = 'bottom' },   -- 1 ноя: окно Options — панелью (в стеке DSP): клавиши только в фокусе   -- 29 окт: вся справка (была на всё окно)

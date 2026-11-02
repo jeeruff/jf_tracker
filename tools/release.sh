@@ -19,6 +19,9 @@ if git -C "$REL" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "$
 # дерево релиза заново из тега: всё, кроме .git и index.xml
 find "$REL" -mindepth 1 -maxdepth 1 ! -name .git ! -name index.xml -exec rm -rf {} +
 python3 "$DEV/tools/make_index.py" --export "$TAG" "$REL"
+# 2 ноя: jf_slixer — сэмплер трекера, идёт вместе с ним (свой репо): плагин и его два include — в effects/
+EFX="$(cd "$DEV/../.." && pwd)/Effects"
+for f in jf_slixer.jsfx jf_fx_airwindows.jsfx-inc jf_voice.jsfx-inc; do cp "$EFX/$f" "$REL/effects/$f"; done
 git -C "$REL" add -A
 git -C "$REL" commit -qm "jf_tracker $V"
 git -C "$REL" tag "$TAG"
