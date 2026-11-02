@@ -96,6 +96,17 @@ function T.draw_zone(U, L, x, y, w, h, fit)
     bx = bx + bw + 4
   end
   if T.ok then U.text(bx + L.pad, by, fit(T.finished and 'done - well played' or 'ok', x + w - bx - L.pad), U.GREEN) end
+  -- 2 ноя: главы тура списком (вместо быстрых опций): пройденные тусклее, текущая янтарём; щелчок — к главе
+  local cy = by + L.rh + 4
+  T.chap_hot = nil
+  for i, s in ipairs(T.STEPS) do
+    if cy + L.rh > y + h then break end
+    local hot = mx >= x and mx < x + w and my >= cy and my < cy + L.rh
+    if i == T.step then U.set(U.tint(U.AMBER, 0.2)); gfx.rect(x, cy, w, L.rh, 1) elseif hot then U.set(U.tint(U.TEXT, 0.08)); gfx.rect(x, cy, w, L.rh, 1) end
+    U.text(x + L.pad, cy, fit(('%2d. %s'):format(i, s.title), w - 2 * L.pad), i == T.step and U.AMBER or (i < T.step and U.GREY or (hot and U.TEXT or U.TEXT)))
+    if hot then T.hover = 'chap:' .. i end
+    cy = cy + L.rh
+  end
   return T.hover
 end
 

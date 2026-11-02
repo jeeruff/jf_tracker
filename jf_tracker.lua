@@ -26301,7 +26301,7 @@ local function frame()
     U.click = false
   end
   -- 23 окт: зоны цепей рэка — щелчок по полосе зоны (края / скаты / вся), бегунок select в линейке
-  if U.click and hover.zone then
+  if U.click and type(hover.zone) == 'table' then   -- 2 ноя: строковый hover.zone — кнопки тура, не зона рэка
     local hz, t = hover.zone, dsp_target()
     if t then
       local zaddr = hz.zaddr
@@ -27170,6 +27170,8 @@ local function frame()
       click = { t = now2, zone = 'poolbsync' }
     elseif hover.zone then
       if hover.zone == 'prev' then OPT.tour.go(-1) elseif hover.zone == 'next' then OPT.tour.go(1) elseif hover.zone == 'stop' then OPT.tour.stop() end
+      local ch = type(hover.zone) == 'string' and tonumber(hover.zone:match('^chap:(%d+)$'))   -- 2 ноя: глава тура щелчком
+      if ch then OPT.tour.go(ch - OPT.tour.step) end
       click = { t = now2, zone = 'tourzone' }
     elseif hover.poolkit then
       ctx.set_focus('inst'); ctx.kit_menu(); click = { t = now2, zone = 'poolkit' }

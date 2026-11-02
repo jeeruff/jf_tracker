@@ -4338,6 +4338,8 @@ local function draw_ctrl(L, info, H, hover)
     y = y + L.rh + 3
   end
   for gi, g in ipairs(groups) do
+    if g.name == 'quick' and info.ctrl and info.ctrl.tour and info.zone_draw then goto next_group end   -- 2 ноя: тур открыт — вместо быстрых опций его главы
+    do
     local ci = 0
     -- 6 окт: быстрые опции — ширина колонок по самому длинному слову колонки
     -- (одинаковые обрезали performance); не влезает — поровну, как раньше
@@ -4374,6 +4376,8 @@ local function draw_ctrl(L, info, H, hover)
     end
     if ci > 0 then y = y + L.rh end
     if g.name == 'help' then D.ctrl_help_bottom = y + 1 end
+    end
+    ::next_group::
   end
   D.ctrl_need_h = y + 4                              -- 8 окт: своя высота модуля (по содержимому), не высота верхней панели
   -- заметки — всплывашкой от низа кнопок окон (D.notes_popup), тур — в
