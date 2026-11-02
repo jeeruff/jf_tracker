@@ -9504,7 +9504,7 @@ function D.frame(L, snap, rows, state, info)
       local function lab_x(p, d)
         local fx, fw = D.field_rect(p.f.G or L, p.fld)
         if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
-        if p.f.ml or p.f.env then fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0 end
+        if p.f.ml or p.f.env or p.f.folded then fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0 end   -- 2 ноя: и свёрнутая (o / .) — по своей ширине, не по полю ноты трека (цифры съезжали)
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
         return p.f.x + (fx or 0) + math.floor(((fw or 0) - ms(lab)) / 2), ms(lab)
       end
@@ -9518,7 +9518,7 @@ function D.frame(L, snap, rows, state, info)
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
           -- 13 окт: колонки мастера (cmd, visor, огибающие) — поля по своей ширине, не по раскладке трека (цифры налезали)
-          if p.f.ml or p.f.env then
+          if p.f.ml or p.f.env or p.f.folded then
             fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0
           end
           local cx = p.f.x + (fx or 0)
