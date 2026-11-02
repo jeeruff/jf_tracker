@@ -35652,6 +35652,15 @@ end
 ctx.slx_last = ctx.slx_last or {}
 ctx.slx_fx = function(col)
   for _, f in ipairs(col.fx or {}) do if f.view == 'slixer' and not f.container then return f end end
+  -- 2 ноя: slixer внутри свёрнутого / упакованного контейнера — его нет в плоском списке (волна пропадала)
+  local function deep(list, d)
+    for _, k in ipairs(list or {}) do
+      local f = k.entry or k
+      if not f.container and (f.view == 'slixer' or (k.name or f.name or ''):lower():find('slixer', 1, true)) then return f.i and f or k end
+      if d < 4 and f.kids then local r = deep(f.kids, d + 1); if r then return r end end
+    end
+  end
+  for _, f in ipairs(col.fx or {}) do if f.container and f.kids then local r = deep(f.kids, 1); if r then return r end end end
 end
 draw.has_slx = function(col) return ctx.slx_fx(col) ~= nil end
 ctx.slx_wave = function(col, pitch, row)
