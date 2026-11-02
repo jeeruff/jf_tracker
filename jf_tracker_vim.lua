@@ -2223,7 +2223,7 @@ function V.key_impl(c)
       local nr = V.count or 1
       ctx.time_edit('insert', V.cur.fi, ins_at, nr, all)
       V.count = nil
-      V.msg = ('inserted %d empty row(s) %s'):format(nr, all and 'on all tracks' or 'on the track') .. ((ctx.state and ctx.state.view_reg and ctx.state.bsmode ~= 'track') and ' - pattern view: what goes past the pattern end is dropped (as Renoise; zp - project view carries it on)' or '')
+      V.msg = ('inserted %d empty row(s) %s'):format(nr, all and 'on all tracks' or 'on the track') .. ((ctx.state and ctx.state.view_reg and not ctx.state.view_secmode and ctx.state.bsmode ~= 'track') and ' - pattern view: what goes past the pattern end is dropped (as Renoise; zp - project view carries it on)' or '')
       return
     end
   end
