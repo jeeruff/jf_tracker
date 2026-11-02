@@ -10001,7 +10001,8 @@ function D.frame(L, snap, rows, state, info)
       end
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       -- 20 окт: и на долях (строки с точками темнее) — приоритетные прыжки по трекеру (метки раньше кнопок)
-      if (r.bar or r.beat) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
+      -- 2 ноя: метки f — только на ярких линиях: доли, а при плотном зуме (LPB < 4: долей почти каждая строка) — только такты
+      if (r.bar or (r.beat and (state.lpb or 4) >= 4)) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
       -- 1 ноя: свёрнутая папка — полоска у правого края там, где у детей событие (цвет трека ребёнка)
       local fsr = c.fsum and c.fsum[r.row]
       if fsr then
