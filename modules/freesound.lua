@@ -102,7 +102,7 @@ function M.draw(U, L, x, y, w, h, focused)
     S.vcur = S.cur
     if S.cur <= S.scroll then S.scroll = S.cur - 1 elseif S.cur > S.scroll + nv then S.scroll = S.cur - nv end
   end
-  local lenw, metaw = U.measure('00.0s '), math.min(math.floor(w * 0.35), U.measure('w') * 22)
+  local lenw, metaw = U.measure('000.0s  '), math.min(math.floor(w * 0.35), U.measure('w') * 22)
   local click = (gfx.mouse_cap & 1) == 1 and not S.down
   S.down = (gfx.mouse_cap & 1) == 1
   for i = 1, nv do
@@ -116,7 +116,8 @@ function M.draw(U, L, x, y, w, h, focused)
     local cached = FS.exists(FS.file_of(e))
     local nw = w - 2 * L.pad - lenw - metaw
     U.text(x + L.pad, ry + 1, fit((FS.pending(e) and '~ ' or (cached and '+ ' or '  ')) .. e.name, nw), idx == S.cur and U.AMBER or U.TEXT)
-    U.text(x + L.pad + nw, ry + 1, ('%5.1fs'):format(e.len or 0), U.GREY)
+    local ls = ('%.1fs'):format(e.len or 0)
+    U.text(x + L.pad + nw + lenw - U.measure(ls .. '  '), ry + 1, ls, U.GREY)   -- вправо, с зазором до автора
     U.text(x + L.pad + nw + lenw, ry + 1, fit(e.user .. ' ' .. e.lic, metaw), e.lic == 'CC0' and U.GREEN or U.GREY)
     if hot and click then
       local now = A.R.time_precise()
