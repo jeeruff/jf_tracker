@@ -752,7 +752,8 @@ function O.draw(L, W, H)
     U.text(cx + L.pad, by + 2, 'x', hot and U.TEXT or U.GREY)
   end
   local hx = bx + L.pad + U.measure('options') + 3 * L.pad
-  if not O.compact then
+  local hints = not ctx.hints_on or ctx.hints_on()   -- 2 ноя: строка клавиш и подсказка поиска — только при опции hints
+  if not O.compact and hints then
     local hs = #O.tabs > 0 and 'j k: row   Enter / h l: change   Tab: next tab   /: find   z: zoom, tabs   Esc: close' or 'j k: row   Enter / h l: change   /: find   Esc: close'
     local hw = bx + bw - L.pad - hx - U.measure('x') - 3 * L.pad   -- до крестика
     if U.hint_text then U.hint_text(hx, by + 2, hs, hw, U.BG) else U.text(hx, by + 2, ctx.fit(hs, hw), U.GREY) end   -- 15 окт: стандарт подсказок
@@ -790,7 +791,7 @@ function O.draw(L, W, H)
     U.set((O.typing or O.query ~= '') and U.AMBER or U.LINE); gfx.rect(fx, fy, fw, fh - 1, 0)
     local ty3 = fy + math.floor((fh - rh) / 2)
     U.text(fx + L.pad, ty3, fq, (O.typing or O.query ~= '') and U.AMBER or U.GREY)
-    if O.query == '' then
+    if O.query == '' and (hints or O.typing) then
       local gx = fx + L.pad + U.measure(fq) + L.pad
       local hk = O.tab == 'hotkeys'   -- 16 окт: поиск — по своей вкладке
       local ghost = O.typing and (hk and 'a key or a word: dd, macro, slice   Enter: keep   Esc: clear' or 'letters in order: pnc finds pan column, a space splits words   Enter: keep   Esc: clear')
