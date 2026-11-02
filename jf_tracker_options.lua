@@ -257,6 +257,13 @@ function O.wheel(d)
     return
   end
   local it = O.items[O.hover or O.sel]
+  -- 2 ноя: колесо значения не меняет (тогглы и выборы переключались при прокрутке) — только числа над их слайдером;
+  -- остальное — прокрутка
+  if O.masonry_on and not (it and it.kind == 'num' and onval) then
+    O.mscroll = math.max(0, math.min(O.mover or 0, (O.mscroll or 0) - d * 3 * (O.rh or 16)))
+    return
+  end
+  if it and it.kind ~= 'num' then it = nil end
   -- список (хоткеи, действия, полоса прокрутки): колесо листает (5 окт)
   if O.sb_hot or not it or it.kind == 'action' or it.kind == 'text' or it.blockrow then
     local nv = O.nvis or 10
