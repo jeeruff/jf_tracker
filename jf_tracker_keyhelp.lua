@@ -539,7 +539,8 @@ KH.PAGES = {
   map = { title = 'map - the sample map', e = {
     { k = 's', d = 'the sound menu of the sample under the mouse (else the last played): similar, brighter / darker, shorter / longer, sharper / softer, noisier / tonal, louder / quieter - same class, from the fingerprints (:fprint); Enter - into the lib' },
     { k = 'j k l h Enter', d = 'the mini lf on the left: folders of the browser folder (the map shows what the browser has open)' },
-    { k = 'v', d = 'next view: graph (rings of groups) > cards (a grid of sectors) > nebula (one galaxy, groups as rectangular sectors; a click on a sector - its system, galaxy / Esc - back)' },
+    { k = 'v', d = 'next view: graph (rings of groups) > cards (a grid of sectors) > nebula (one galaxy, groups as rectangular sectors; Shift+click on a sector - its system, galaxy / Esc - back)' },
+    { k = 'Shift+click  Cmd+click', t = {}, d = 'on a group: Shift+click - into it (its system in the nebula, a closer zoom in the other views), Esc - back; Cmd+click - its files marked; a plain click only names it' },
     { k = 'r', t = {}, d = 'ξ - a random file: from the group under the mouse, else from all; plays at once' },
     { k = 't', d = 'the next source: files / db / proj / pm' },
     { k = '+ - 0', d = 'zoom in / out / reset (also the wheel; drag - move)' },

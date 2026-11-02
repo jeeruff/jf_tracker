@@ -1558,13 +1558,17 @@ function B.click(what)
     if G and not G.building then G.nodes = G.raw; G.neb, G.gal, G.lab_order, G.tree = nil, nil, nil, nil; B.SM.finish(G) end
     if ctx.msg then ctx.msg('map: ' .. (B.types_key() ~= '' and B.types_key() or 'nothing') .. ' (samples midi rex automation items track templates)') end
   elseif what == 'mapback' then B.mapV.sys = nil; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
-  elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) and B.map_hv and B.map_hv.sector then   -- 27 окт (2): nebula — сектор в систему (на весь вид)
+  -- 2 ноя: Shift+клик — внутрь группы (система / приблизить); обычный клик — выбрать без перехода; Cmd+клик — отметить её файлы
+  elseif what == 'maphub' and ctx.mods and ctx.mods().shift and B.map_hv and B.map_hv.sector then
     B.mapV.sys = B.map_hv.hub.name; B.mapV.zoom, B.mapV.px, B.mapV.py = 1, 0, 0
     if ctx.msg then ctx.msg(('map: %s system - %d file(s); galaxy / Esc - back, r - random from it'):format(B.map_hv.hub.name, B.map_hv.hub.n)) end
-  elseif what == 'maphub' and not (ctx.mods and ctx.mods().shift) then   -- 27 окт (2): клик — приблизить группу; Shift+клик — отметить её файлы
+  elseif what == 'maphub' and ctx.mods and ctx.mods().shift then
     local hb = B.map_hv and B.map_hv.hub
-    if hb then B.mapV.zoom = math.min(8, (B.mapV.zoom or 1) * 2.5); if ctx.msg then ctx.msg(('map: %s - %d file(s); Shift+click marks them, wheel / drag - zoom / move'):format(hb.name, hb.n)) end end
-  elseif what == 'maphub' then   -- 27 окт: Shift+клик по категории — её файлы в отметки (Space — плейлистом, Enter — в lib)
+    if hb then B.mapV.zoom = math.min(8, (B.mapV.zoom or 1) * 2.5); if ctx.msg then ctx.msg(('map: %s - %d file(s); Cmd+click marks them, wheel / drag - zoom / move, Esc - back'):format(hb.name, hb.n)) end end
+  elseif what == 'maphub' and not (ctx.mods and ctx.mods().cmd) then
+    local hb = B.map_hv and B.map_hv.hub
+    if hb and ctx.msg then ctx.msg(('map: %s - %d file(s); Shift+click - into it, Cmd+click - mark its files'):format(hb.name, hb.n)) end
+  elseif what == 'maphub' then   -- 27 окт: Cmd+клик (было Shift) по категории — её файлы в отметки (Space — плейлистом, Enter — в lib)
     local hb = B.map_hv and B.map_hv.hub
     if hb and B.mapG then
       local nn = 0

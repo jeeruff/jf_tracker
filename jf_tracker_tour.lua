@@ -48,7 +48,7 @@ T.STEPS = {
     check = function(e) return e.hydra end },
   -- 27 окт: карта сэмплов — найти звук случайно, а не листая списки
   { mod = 'map', focus = 'map', title = 'Find a sound by chance',
-    text = 'The map pane (a tab next to the browser, Ctrl+W w): every sound file of the browser folder as dots in groups - kick, snare, loop ... v changes the view (graph, cards, nebula - a galaxy with sectors), r or ξ plays a random file, a click on a dot plays it. Go to the map pane.',
+    text = 'The map pane (a tab next to the browser, Ctrl+W w): every sound file of the browser folder as dots in groups - kick, snare, loop ... v changes the view (graph, cards, nebula - a galaxy with sectors), r or ξ plays a random file, a click on a dot plays it, Shift+click on a group goes into it (Esc - back). Go to the map pane.',
     check = function(e) return e.focus == 'map' end },
   { mod = 'ctrl', focus = 'tracker', title = 'Play',
     text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',
