@@ -1700,6 +1700,46 @@ function E.pat_merge(track, lane_idx, rp, re, force)   -- 2 ноя: force (:merg
   R.MIDI_Sort(dst.tk)
   return dst.it
 end
+-- 2 ноя: сыгранное ретро-записью (40211, новый MIDI-айтем made) — на место: тишина до первой ноты срезается; сыгранное
+-- при стопе — на строку курсора t_row, при игре — где играли (at = true); лейн; pats (список {pos, rgnend}) — вливается
+-- в MIDI-клипы задетых паттернов (по клипу на паттерн). → айтем с нотами, at
+function E.retro_settle(tr, made, t_row, lane, pats)
+  local tk = R.GetActiveTake(made)
+  local first
+  if tk then
+    local _, nn = R.MIDI_CountEvts(tk)
+    for k = 0, nn - 1 do
+      local _, _, _, sp = R.MIDI_GetNote(tk, k)
+      local t = R.MIDI_GetProjTimeFromPPQPos(tk, sp)
+      if not first or t < first then first = t end
+    end
+  end
+  local at = math.abs(R.GetMediaItemInfo_Value(made, 'D_POSITION') - t_row) > 0.002
+  if first then
+    local pos = R.GetMediaItemInfo_Value(made, 'D_POSITION')
+    local lead = first - pos
+    if lead > 1e-4 then
+      R.SetMediaItemInfo_Value(made, 'D_POSITION', first)
+      R.SetMediaItemInfo_Value(made, 'D_LENGTH', R.GetMediaItemInfo_Value(made, 'D_LENGTH') - lead)
+      R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + lead)
+    end
+    if not at then R.SetMediaItemInfo_Value(made, 'D_POSITION', t_row) end
+  end
+  if lane and R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then R.SetMediaItemInfo_Value(made, 'I_FIXEDLANE', lane) end
+  if pats then
+    local mp = R.GetMediaItemInfo_Value(made, 'D_POSITION')
+    local me = mp + R.GetMediaItemInfo_Value(made, 'D_LENGTH')
+    local merged
+    for _, rg in ipairs(pats) do
+      if rg.pos < me - 1e-6 and rg.rgnend > mp + 1e-6 then
+        local m = E.pat_merge(tr, lane, rg.pos, rg.rgnend, true)
+        if m and not merged then merged = m end
+      end
+    end
+    if not R.ValidatePtr(made, 'MediaItem*') then made = merged end
+  end
+  return made, at
+end
 local function new_midi_item(track, lane_idx, t)
   local qn = R.TimeMap2_timeToQN(0, t)
   local _, qms, qme = R.TimeMap_QNToMeasures(0, qn)

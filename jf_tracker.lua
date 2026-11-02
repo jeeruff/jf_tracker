@@ -32036,44 +32036,11 @@ ctx.retro_insert = function(as_phrase)
       if not before[it] then made = it end
     end
     if made then
-      local tk = reaper.GetActiveTake(made)
-      local first
-      if tk then
-        local _, nn = reaper.MIDI_CountEvts(tk)
-        for k = 0, nn - 1 do
-          local _, _, _, sp = reaper.MIDI_GetNote(tk, k)
-          local t = reaper.MIDI_GetProjTimeFromPPQPos(tk, sp)
-          if not first or t < first then first = t end
-        end
-      end
-      -- 1 ноя: сыгранное при идущем транспорте REAPER кладёт на его время (не на курсор) — там и оставить;
-      -- сыгранное при стопе приходит к курсору — его ставим на строку курсора, как было
-      ctx.retro_at = math.abs(reaper.GetMediaItemInfo_Value(made, 'D_POSITION') - t_row) > 0.002
-      if first then
-        local pos = reaper.GetMediaItemInfo_Value(made, 'D_POSITION')
-        local lead = first - pos
-        if lead > 1e-4 then   -- тишина до первой ноты — срезать: item начинается с неё
-          reaper.SetMediaItemInfo_Value(made, 'D_POSITION', first)
-          reaper.SetMediaItemInfo_Value(made, 'D_LENGTH', reaper.GetMediaItemInfo_Value(made, 'D_LENGTH') - lead)
-          reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') + lead)
-        end
-        if not ctx.retro_at then reaper.SetMediaItemInfo_Value(made, 'D_POSITION', t_row) end
-      end
-      if f.col.fixed and f.lane and f.lane.idx and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then reaper.SetMediaItemInfo_Value(made, 'I_FIXEDLANE', f.lane.idx) end
-      -- 2 ноя: не свободный клип — сыгранное вливается в MIDI-клипы паттернов, которые оно задело (по клипу на паттерн)
-      if state.patitem ~= false then
-        local mp = reaper.GetMediaItemInfo_Value(made, 'D_POSITION')
-        local me = mp + reaper.GetMediaItemInfo_Value(made, 'D_LENGTH')
-        local lane = (f.col.fixed and f.lane and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2) and f.lane.idx or nil
-        local merged
-        for _, rg in ipairs(seq) do
-          if not rg.gap and not rg.section and rg.pos < me - 1e-6 and rg.rgnend > mp + 1e-6 then
-            local m = edit.pat_merge(tr, lane, rg.pos, rg.rgnend, true)
-            if m and not merged then merged = m end
-          end
-        end
-        if not reaper.ValidatePtr(made, 'MediaItem*') then made = merged end   -- влилось в клип паттерна
-      end
+      -- 2 ноя: обработка сыгранного — edit.retro_settle (тест: tests/live_retro.lua)
+      local lane = (f.col.fixed and f.lane and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2) and f.lane.idx or nil
+      local pats = {}
+      for _, rg in ipairs(seq) do if not rg.gap and not rg.section then pats[#pats + 1] = { pos = rg.pos, rgnend = rg.rgnend } end end
+      made, ctx.retro_at = edit.retro_settle(tr, made, t_row, lane, state.patitem ~= false and pats or nil)
     end
     for i = 0, reaper.CountTracks(0) - 1 do reaper.SetTrackSelected(reaper.GetTrack(0, i), false) end
     for _, t in ipairs(sel) do reaper.SetTrackSelected(t, true) end
