@@ -9503,7 +9503,7 @@ function D.frame(L, snap, rows, state, info)
         local xf = small(bx, ay, ms('autoarm all') + 4 <= bw and 'autoarm all' or (ms('autoarm') + 4 <= bw and 'autoarm' or 'arm'), all and 'off' or 'on', all, 'mautoarm')   -- 22 окт: autoarm all — флаг всем трекам
         -- 19 окт: fold быстрых нот — в строке autoarm справа (статус объясняет)
         -- 31 окт: подпись fast+ (было fold — путалось со сворачиванием треков za / zM)
-        local fl = (xf + ms('fast+') + 2 <= bx + bw) and 'fast+' or ((xf + ms('f+') + 2 <= bx + bw) and 'f+' or nil)
+        local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)   -- 2 ноя: снова fold (просьба)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
       else
         local xa = D.cn_r1x
@@ -10505,7 +10505,7 @@ function D.frame(L, snap, rows, state, info)
         set(c); gfx.rect(laneR, y0, 3, y1 - y0, 1)
         set(bgc); gfx.rect(laneR + 3, y0, L.th + 2, y1 - y0, 1)
         if rg.r0 >= row0 then set(c); gfx.rect(laneR, y0, L.th + 5, 1, 1) end
-        if y1 - y0 > L.th and state.rgnames ~= false then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
+        if y1 - y0 > L.th and state.rgnames ~= false and rg.r0 >= row0 then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
       end
     end
     local mks = {}
