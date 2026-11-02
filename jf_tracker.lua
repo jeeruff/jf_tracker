@@ -1330,6 +1330,22 @@ ctx = {
     if not lv then return math.min(L and L.MAXFX or 4, state.fxcols or 0) end
     return math.max(0, math.min(L and L.MAXFX or 4, lv - 3))
   end,
+  -- 2 ноя: ревизия колонок — vol и delay тоже «колонки эффектов»: Ctrl+Opt+= / − шагает по полям трека курсора
+  -- vol → delay → команда 1..4 (−: обратно, до одной ноты). Opt+Shift+L / H — вся ширина (и полоска, и подколонки нот)
+  fx_field_step = function(col, d)
+    if not (col and col.guid) then return end
+    local maxlv = 3 + (L and L.MAXFX or 4)
+    local cur = (state.wlevel and state.wlevel[col.guid]) or state.wzlevel or (3 + math.min(L and L.MAXFX or 4, state.fxcols or 0))
+    if state.folds[col.guid] then cur = state.folds[col.guid] == 'mini' and 0 or 1 end
+    local n = math.max(1, math.min(maxlv, cur + d))
+    state.wlevel = state.wlevel or {}
+    state.wlevel[col.guid] = n
+    state.folds[col.guid] = nil
+    relayout()
+    local NAMES = { 'note only', 'note + vol', 'note + vol + delay' }
+    vim.msg = ('%s: %s  (Ctrl+Opt+= / - one field; Opt+Shift+L / H - the whole width)'):format(col.name ~= '' and col.name or 'track',
+      NAMES[n] or ('vol + delay + %d command column(s)'):format(n - 3))
+  end,
   fx_cols_step = function(col, d)
     if not (col and col.guid) then return end
     local maxfx = L and L.MAXFX or 4
@@ -30779,7 +30795,7 @@ local function frame()
     -- 31 окт: Ctrl+Opt+H / L в трекере — колонок команд fx у трека курсора меньше / больше
     if m.ctrl and m.alt and not m.cmd and not busy and state.focus == 'tracker' and (vim.cur.field or 1) >= 4 and (c == 8 or c == 12 or c == 104 or c == 108) then   -- на колонке fx (иначе — playrate инструмента)
       local f0 = L and L.flat and L.flat[vim.cur.fi]
-      if f0 and f0.col then ctx.fx_cols_step(f0.col, (c == 8 or c == 104) and -1 or 1) end
+      if f0 and f0.col then ctx.fx_field_step(f0.col, (c == 8 or c == 104) and -1 or 1) end
       c = 0
     end
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
@@ -31030,7 +31046,7 @@ local function frame()
     local f = L.flat and L.flat[vim.cur.fi]
     local fld = vim.cur.field or 1
     if ctx.mods().ctrl then
-      if f and f.col and fld < 4 then ctx.fx_cols_step(f.col, d); model.invalidate(); c = 0 end
+      if f and f.col and fld < 4 then ctx.fx_field_step(f.col, d); model.invalidate(); c = 0 end
     elseif f and f.col and f.lane then   -- 29 окт: и в INSERT с пианино (- = в frow — ноты, но Opt+- / Opt+= — колонки нот)
       local ln = f.lane
       local n = math.max(1, #(ln.subs or {}), (state.subs_min or {})[f.col.guid .. ':' .. tostring(ln.idx)] or 0)
