@@ -31210,9 +31210,13 @@ local function frame()
     -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
     ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
     vim.count, ctx.glide_unit = nil, nil
-    do   -- 2 ноя: метки сначала модулю в фокусе
+    do   -- 2 ноя: метки сначала модулю под мышью (только что крутил / двигал его), иначе — в фокусе
       local id = state.focus == 'top' and state.toptab or (state.focus == 'insert' and 'tracker') or state.focus
       local cell = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
+      local mx, my = gfx.mouse_x, gfx.mouse_y
+      for _, c2 in pairs(L and L.pn and L.pn.by_panel or {}) do
+        if c2.x and mx >= c2.x and mx < c2.x + c2.w and my >= c2.y and my < c2.y + c2.h then cell = c2; break end
+      end
       HN.focus_rect = cell and { x = cell.x, y = cell.y, w = cell.w, h = cell.h } or nil
     end
     if HN.start() then vim.msg = ctx.glide and ('hints: a dB mark glides the fader in %d %s, Esc'):format(ctx.glide.n, ctx.glide.unit) or 'hints: type label, Esc' else vim.msg = 'no targets' end
