@@ -836,6 +836,7 @@ KH.PAGES = {
     { k = 'S', d = 'snap: the stroke goes by grid cells (on) or by rows (off); the grid - [ ] or the buttons [ 1/4 ] in the header (a click on the value - the list)' },
     { k = 'Space (list)', d = 'in the curve list (Cmd+H): the curve into the stack - the canvas splits into lanes, one per marked curve under the active one (4-5 fit); Space again - out; Shift+click does the same. Other curves are not drawn behind (option curves behind)' },   -- 2 ноя
     { k = 'z, z.', d = 'grid finer / coarser (as [ ])' },
+    { k = 'wheel  z0', d = 'zoom the canvas at the mouse (trackpad pinch / scroll), sideways - scroll; a frame on the envelope column in the tracker shows the visible part; z0 - the whole span (option curve zoom)' },
     { k = 'H L  drag', d = 'select rows from the cursor (Shift+h / l, or drag with cur on empty space); then d y p, Esc drops it' },
     { k = 'zg', d = 'the grid list: even (1/192 .. 1/2) or uneven - p = a cell per pattern, s = per section; { } go cell to cell, [ ] back to even' },
     { k = 'zp', d = 'the whole project / back to the span (the bar at the cursor, the region, the time selection) - automation and modulation over the song' },

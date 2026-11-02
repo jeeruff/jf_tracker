@@ -1336,6 +1336,23 @@ function D.adsr_line(pts, bg, hot_i)
   end
 end
 
+  -- 2 ноя: зум холста кривых — рамка вокруг видимой его части на колонке этой огибающей (MIDI-лейна)
+function D.acv_frame(L, info, rows)
+  local vb = info.acv_box and info.acv_box()
+  if vb and #rows > 0 then
+    local row0 = rows[1].row
+    for _, f in ipairs(L.flat or {}) do
+      if f.x and ((vb.env and f.env and f.env.env == vb.env) or (vb.ml and f.ml == vb.ml)) then
+        local ya = L.body_y + math.max(-1, vb.r0 - row0) * L.rh
+        local yb = L.body_y + math.min(#rows + 1, vb.r1 - row0) * L.rh
+        if yb > L.body_y and ya < L.body_y + #rows * L.rh then
+          ya, yb = math.max(L.body_y, ya), math.min(L.body_y + #rows * L.rh - 1, yb)
+          set(U.AMBER); gfx.rect(f.x - 1, ya, (f.w or L.cw * 3) + 1, math.max(2, yb - ya), 0)
+        end
+      end
+    end
+  end
+end
 -- 21 окт: обрезка — мемо (ширина → строка → результат, сброс по объёму и при смене шрифта) и старт с оценки
 -- по пропорции ширин: было по символу с конца, подстрока на каждый шаг — сотни строк мусора на длинной подписи
 local FITC, FITN, FITS, FITF = {}, 0, nil, nil
@@ -10581,6 +10598,7 @@ function D.frame(L, snap, rows, state, info)
     end
     if mx >= rx0 + L.jl_w and mx < rx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
+  D.acv_frame(L, info, rows)   -- 2 ноя: рамка видимого на холсте кривых (своя функция: здесь предел локалей)
   for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
     set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
     text(p[1] + 1, p[4], fit(p[5], p[3] - 1), p[6] and U.AMBER or U.TEXT)

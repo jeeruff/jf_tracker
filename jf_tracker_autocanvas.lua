@@ -296,6 +296,7 @@ function ACV.key(c, st, mods)
     if ch == ',' or ch == '.' then   -- 2 ноя: z, z. — сетка мельче / крупнее (как [ ])
       return ACV.key((ch == ',') and ('['):byte() or (']'):byte(), st, mods)
     end
+    if ch == '0' then ACV.zv = nil; return true end   -- 2 ноя: z0 — весь отрезок (зум снят)
     if ch == 'g' then return { op = 'gridmenu' } end   -- 2 ноя: zg — сетка (и паттерны / секции / весь отрезок)
     if ch == 'h' then ACV.showhidden = not ACV.showhidden; ACV.tree_gen = (ACV.tree_gen or 0) + 1; return true end   -- 31 окт: zh — скрытые кривые
     if c == 27 then return true end
@@ -453,6 +454,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local nr = math.max(1, r1 - r0)
   ACV.row = math.max(r0, math.min(r1 - 1, ACV.row))
   local act = curves[ACV.cur]
+  -- 2 ноя: что видно на холсте — рамкой на колонке этой огибающей в трекере (при зуме)
+  ACV.vbox = ACV.zv and act and { r0 = span.r0, r1 = span.r1, env = act.e and act.e.env, ml = act.f and act.f.ml, t = reaper.time_precise() } or nil
   local function rx(row) return gx + math.floor((row - r0) / nr * gw + 0.5) end
   local function vy(v) return gy + gh - 2 - math.floor(clamp01(v) * (gh - 4) + 0.5) end
   ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr }   -- 30 окт: для рисования пальцем (CONTROL)

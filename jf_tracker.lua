@@ -246,7 +246,8 @@ local state = {
   offrel = tonumber(reaper.GetExtState(EXT, 'offrel')) or 30,
   notetube = reaper.GetExtState(EXT, 'notetube') ~= '0',
   contedge = (function() local v = reaper.GetExtState(EXT, 'contedge'); return v ~= '' and v or 'grey' end)(),   -- 2 ноя: края контейнера DSP
-  acvbehind = reaper.GetExtState(EXT, 'acvbehind') == '1',   -- 2 ноя: холст кривых — прочие кривые фоном (по умолчанию нет)   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
+  acvbehind = reaper.GetExtState(EXT, 'acvbehind') == '1',
+  acvzoom = reaper.GetExtState(EXT, 'acvzoom') ~= '0',   -- 2 ноя: зум холста кривых колесом / трекпадом и рамка видимого на лейне   -- 2 ноя: холст кривых — прочие кривые фоном (по умолчанию нет)   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -13375,6 +13376,7 @@ ctx = {
       flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
+      { key = 'acvzoom', label = 'curve zoom', kind = 'toggle', desc = 'the curve canvas zooms with the wheel / trackpad at the mouse (sideways - scroll, z0 - the whole span); a frame on the envelope column in the tracker shows what the canvas shows', get = function() return state.acvzoom end, set = function(v) state.acvzoom = v; reaper.SetExtState(EXT, 'acvzoom', v and '1' or '0', true); if not v then ctx.ACV.zv = nil end end },
       { key = 'acvbehind', label = 'curves behind', kind = 'toggle', desc = 'the curve canvas draws the other curves of the list dimmed behind the active one; off (default) - only the active one and the ones marked into the stack (Space in the list, Shift+click), each in its own lane', get = function() return state.acvbehind end, set = function(v) state.acvbehind = v; reaper.SetExtState(EXT, 'acvbehind', v and '1' or '0', true) end },
       { key = 'contedge', label = 'container edge', kind = 'cycle', values = { 'grey', 'hazard' }, desc = 'the edges of a container in DSP: grey - a soft striped band (default), hazard - yellow / black', get = function() return state.contedge end, set = function(v) state.contedge = v; reaper.SetExtState(EXT, 'contedge', v, true) end },
       { key = 'notetube', label = 'note tube', kind = 'toggle', desc = 'a sounding MIDI note is drawn as a hollow tube (| |) down to its end ===; off - one | per row', get = function() return state.notetube end, set = function(v) state.notetube = v; reaper.SetExtState(EXT, 'notetube', v and '1' or '0', true) end },
@@ -13400,7 +13402,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -17019,6 +17021,15 @@ ctx.acv_span = function()
   end
   local r0 = math.floor(model.row_of_time(t0, state.lpb) + 0.5)
   local r1 = math.max(r0 + 1, math.floor(model.row_of_time(t1, state.lpb) + 0.5))
+  -- 2 ноя: зум холста (колесо / трекпад, опция curve zoom) — окно ACV.zv = { доля от, доля до } внутри отрезка
+  local zv = state.acvzoom ~= false and ctx.ACV.zv
+  if zv then
+    local a = math.floor(r0 + (r1 - r0) * zv[1] + 0.5)
+    local b = math.max(a + 1, math.floor(r0 + (r1 - r0) * zv[2] + 0.5))
+    r0, r1 = a, b
+    t0, t1 = edit.row_time(r0, state.lpb, 0), edit.row_time(r1, state.lpb, 0)
+    label = (label or '') .. ' (zoom)'
+  end
   local sp = { r0 = r0, r1 = r1, t0 = t0, t1 = t1, lpb = state.lpb, label = label or '', sc = reaper.GetProjectStateChangeCount(0),
     bps = reaper.Master_GetTempo() / 60, row_of = function(t) return model.row_of_time(t, state.lpb) end,
     time = function(r) return edit.row_time(r, state.lpb, 0) end }
@@ -24507,7 +24518,8 @@ local function frame()
     ut_draw = function(Lx, x, y, w, h, foc, hv) ctx.ut_draw(Lx, x, y, w, h, foc, hv) end,   -- 15 окт: дерево undo
     act_draw = function(Lx, x, y, w, h, foc, hv) ctx.act_draw(Lx, x, y, w, h, foc, hv) end,   -- 16 окт: панель actions
     help_draw = function(Lx, x, y, w, h, foc, hv) ctx.help_draw(Lx, x, y, w, h, foc, hv) end,   -- 17 окт: панель help
-    hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,   -- 28 окт: панель hints
+    hints_draw = function(Lx, x, y, w, h, foc, hv) ctx.hints_draw(Lx, x, y, w, h, foc, hv) end,
+    acv_box = function() local b = ctx.ACV and ctx.ACV.vbox; if b and state.acvzoom ~= false and reaper.time_precise() - b.t < 1 then return b end end,   -- 2 ноя   -- 28 окт: панель hints
     console_draw = function(Lx, x, y, w, h, foc) return ctx.CON.draw(U, Lx, x, y, w, h, foc, ctx.fit) end,   -- 28 окт: консоль
     opt_draw = function(Lx, x, y, w, h, foc) return ctx.opt_pane_draw(x, y, w, h, foc) end,
     manual_draw = function(Lx, x, y, w, h) if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, DIR .. '/jf_tracker_help.html') end; return ctx.DOC.draw(Lx, x, y, w, h) end,   -- 29 окт: справка панелью
@@ -30048,6 +30060,29 @@ local function frame()
     SL.entry = SL.entry or hover.sample.e
     SL.vol_step(gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
+  end
+  -- 2 ноя: холст кривых — колесо / щипок трекпада: зум у мыши, вбок — прокрутка (опция curve zoom)
+  do
+    local A, g = ctx.ACV, ctx.ACV and ctx.ACV.geo
+    local mx2, my2 = gfx.mouse_x, gfx.mouse_y
+    if (gfx.mouse_wheel ~= 0 or gfx.mouse_hwheel ~= 0) and state.acvzoom ~= false and state.top and state.toptab == 'automation' and mod_pane == 'curve'
+       and g and mx2 >= g.gx and mx2 < g.gx + g.gw and my2 >= g.gy and my2 < g.gy + g.gh then
+      local z = A.zv or { 0, 1 }
+      local w = z[2] - z[1]
+      local fx = (mx2 - g.gx) / math.max(1, g.gw)
+      local c = z[1] + fx * w
+      if gfx.mouse_wheel ~= 0 then
+        local nw = math.max(1 / 512, math.min(1, w * (1 - gfx.mouse_wheel / 600)))
+        z = { c - fx * nw, c + (1 - fx) * nw }
+      end
+      if gfx.mouse_hwheel ~= 0 then local d = -gfx.mouse_hwheel / 1200 * w; z = { z[1] + d, z[2] + d } end
+      local nw = z[2] - z[1]
+      if z[1] < 0 then z = { 0, nw } end
+      if z[2] > 1 then z = { 1 - nw, 1 } end
+      A.zv = (nw < 0.999) and { math.max(0, z[1]), math.min(1, z[2]) } or nil
+      vim.msg = A.zv and ('curve zoom x%.1f - wheel: zoom, sideways: scroll, z0: whole span'):format(1 / nw) or 'curve: the whole span'
+      gfx.mouse_wheel, gfx.mouse_hwheel = 0, 0
+    end
   end
   if gfx.mouse_wheel ~= 0 and hover.lfogen and hover.lfogen.field then   -- 31 окт: панель lfogen
     LG.sel = hover.lfogen.field
