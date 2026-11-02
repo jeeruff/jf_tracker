@@ -3026,7 +3026,21 @@ function V.key_impl(c)
         elseif ctx.region_rows then r0, r1 = ctx.region_rows() end
         V.count = nil
         if not r0 then V.op = nil; V.msg = sec and 'no section here' or 'no pattern here'; finish_move(); return end
-        local t = { fi = V.cur.fi, row = (c == ('p'):byte() or c == ('s'):byte()) and r0 or r1, linewise = true }
+        local first = c == ('p'):byte() or c == ('s'):byte()
+        local t = { fi = V.cur.fi, row = first and r0 or r1, linewise = true }
+        -- 2 ноя: уже на начале (gp) / конце (gP) — к началу предыдущего / концу следующего паттерна (секции)
+        if not V.op and t.row == V.cur.row then
+          local probe = first and r0 - 1 or r1 + 1
+          local a, b
+          for _ = 1, 4096 do   -- пустые строки между паттернами пропускаются
+            if probe < 0 then break end
+            if sec then if ctx.section_rows then a, b = ctx.section_rows(probe) end elseif ctx.region_rows then a, b = ctx.region_rows(probe) end
+            if a then break end
+            probe = probe + (first and -1 or 1)
+          end
+          if a then t.row = first and a or b
+          else V.msg = first and ('no %s before this one'):format(sec and 'section' or 'pattern') or ('no %s after this one'):format(sec and 'section' or 'pattern') end
+        end
         if V.op then
           local f0, f1, q0, q1 = range_or_event(V.op, t)
           local e = apply(V.op, f0, f1, q0, q1); V.op = nil; if e then finish_edit() else finish_move() end

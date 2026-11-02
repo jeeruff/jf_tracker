@@ -3183,8 +3183,8 @@ ctx = {
   slice_by_click = function() return state.slicemk or 'double' end,   -- 10 окт: опция slice by click                            -- подписи слайсов в слайсере (4 окт)
   slice1_on = function() return state.slice1 or keys.frow() end,   -- 16 окт: frow — клавиша 1 = слайс 1 всегда, весь сэмпл — `
   slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 - ((state.slice1 or keys.frow()) and 1 or 0) end,   -- 15 окт: slice1 — q = слайс 1   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
-  region_rows = function()
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+  region_rows = function(row)   -- 2 ноя: row — паттерн другой строки (gp на начале — предыдущий)
+    local rg = alias.region_at(regions, edit.row_time(row or vim.cur.row, state.lpb, 0))
     if not rg then return nil end
     return math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6) - 1, rg
   end,

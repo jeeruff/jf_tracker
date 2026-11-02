@@ -95,7 +95,7 @@ KH.PAGES = {
     { k = 'W B', d = 'next / previous event on ANY track - a note, an item, an automation point, a lane event (w b - the cursor track only)' },
     { k = 'env: w b e dd y p', d = 'envelope points are events: motions, delete / yank / paste points (value + shape)', t = {} },
     { k = 'gg G', d = 'first row / last row (option gg proj/pat relative: in the pattern view - of the cursor pattern)' },
-    { k = 'gp gP  gs gS', t = { 'gp', 'gP', 'gs', 'gS' }, d = 'go to the start / the last row of the pattern under the cursor, of its section; with an operator - a motion (dgP deletes to the pattern end)' },
+    { k = 'gp gP  gs gS', t = { 'gp', 'gP', 'gs', 'gS' }, d = 'go to the start / the last row of the pattern under the cursor, of its section (already there - the previous / next one); with an operator - a motion (dgP deletes to the pattern end)' },
     { k = 'Esc', d = 'smart: while playing - stop, the cursor on the play position (Space - stop and back); stopped - toggles INSERT (as the edit mode in Renoise); options Esc stops playback, Esc mode = vim - only back to NORMAL' },
     { k = 'Ctrl+O / Ctrl+I', d = 'jumps: back / forward to where you were before a jump (f label, harpoon, gg, G)' },
     { k = "'b", d = "back where the cursor just was - before the last jump, click or module change (any module: tracker, matrix, DSP); 'b again - return; plain j k steps do not count" },
