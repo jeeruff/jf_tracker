@@ -32060,6 +32060,20 @@ ctx.retro_insert = function(as_phrase)
         if not ctx.retro_at then reaper.SetMediaItemInfo_Value(made, 'D_POSITION', t_row) end
       end
       if f.col.fixed and f.lane and f.lane.idx and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 then reaper.SetMediaItemInfo_Value(made, 'I_FIXEDLANE', f.lane.idx) end
+      -- 2 ноя: не свободный клип — сыгранное вливается в MIDI-клипы паттернов, которые оно задело (по клипу на паттерн)
+      if state.patitem ~= false then
+        local mp = reaper.GetMediaItemInfo_Value(made, 'D_POSITION')
+        local me = mp + reaper.GetMediaItemInfo_Value(made, 'D_LENGTH')
+        local lane = (f.col.fixed and f.lane and reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2) and f.lane.idx or nil
+        local merged
+        for _, rg in ipairs(seq) do
+          if not rg.gap and not rg.section and rg.pos < me - 1e-6 and rg.rgnend > mp + 1e-6 then
+            local m = edit.pat_merge(tr, lane, rg.pos, rg.rgnend, true)
+            if m and not merged then merged = m end
+          end
+        end
+        if not reaper.ValidatePtr(made, 'MediaItem*') then made = merged end   -- влилось в клип паттерна
+      end
     end
     for i = 0, reaper.CountTracks(0) - 1 do reaper.SetTrackSelected(reaper.GetTrack(0, i), false) end
     for _, t in ipairs(sel) do reaper.SetTrackSelected(t, true) end
