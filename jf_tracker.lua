@@ -14440,6 +14440,14 @@ ctx = {
   end,
   pool_select = pool_select,
   browse = function(path) B.init(ctx, path or B.root); state.side = true end,
+  -- 2 ноя: :freesound слова — поиск во вкладке fs браузера; :freesound key <ключ> — ключ API (ExtState)
+  freesound = function(arg)
+    local k = arg:match('^key%s+(%S+)')
+    if k then B.FS.set_key(k); vim.msg = 'freesound: key saved - :freesound <words> to search'; return end
+    state.side = true; ctx.relayout(); ctx.set_focus('browser')
+    B.fs_search(arg)
+    if arg == '' then B.start_find() end
+  end,
   -- файл → депо трека курсора (зона после маркера =LIB на самом треке)
   -- Opt+Enter в браузере (7 окт): файл — новым слайсом выбранного инструмента
   lib_append_slice = function(path)

@@ -536,6 +536,11 @@ only bus 1; a track that also has a MIDI instrument will hear them too.</p>
 double click — into the lib of the cursor track, <kbd>Cmd</kbd>+<kbd>Enter</kbd> — replace the sample of the selected sound
 everywhere, drag — onto a track. <kbd>/</kbd> searches right in the list (fzf syntax). <code>play</code> listens to the selected
 row, <code>keys</code> lets the note keys play it at their pitch. <kbd>'</kbd><kbd>1</kbd>…<kbd>'</kbd><kbd>0</kbd> go to a folder bookmark, <kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>0</kbd> set it.</p>
+<p>The <code>fs</code> tab searches <a href="https://freesound.org">freesound.org</a>: <code>:freesound key &lt;key&gt;</code> once
+(a free API key from freesound.org/apiv2/apply), then <kbd>/</kbd> words <kbd>Enter</kbd> or <code>:freesound words</code>.
+<code>&lt;10s</code> <code>&gt;2s</code> limit the length, <code>cc0</code> keeps only CC0 sounds. <kbd>j</kbd> <kbd>k</kbd> / <kbd>Space</kbd>
+listen (the preview, mp3, is downloaded on the first listen), <kbd>Enter</kbd> — into the lib. The files and
+<code>CREDITS.txt</code> (author, license, link of each) are in <code>Data/jf_tracker_freesound</code>: a CC BY sound needs its author in your credits.</p>
 <p>The <code>pm</code> pane (development builds only) looks inside other REAPER projects: the folders and <code>.rpp</code> files from your default project
 path (or the project index of jf_pm, if it is installed). <kbd>Enter</kbd> on a project shows its tracks, samples, regions and
 markers; <kbd>Enter</kbd> or a drag on a track inserts it into this project with its items, FX and envelopes, on a region —

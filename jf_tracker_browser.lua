@@ -24,6 +24,8 @@ local TX = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf
 local B = {}
 local R = reaper
 local ctx
+local FS = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_freesound.lua')   -- 2 ноя: вкладка fs — freesound.org
+B.FS = FS
 
 B.root = nil
 B.path = nil
@@ -1458,12 +1460,25 @@ B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
   if m == 'map' then if ctx.pane_focus then ctx.pane_focus('map') end; return end   -- 27 окт (3): карта — своя панель
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' and m ~= 'fs' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
   B.pm_scroll.v = 0
   if m == 'presets' then B.prdir = nil end
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) elseif m == 'recent' then B.recent_list() else B.set_all(B.read_pm()) end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) elseif m == 'recent' then B.recent_list() elseif m == 'fs' then B.set_all(B.fs_list()) else B.set_all(B.read_pm()) end
+end
+-- 2 ноя: freesound — результаты поиска строками; файл (превью mp3) качается, когда строку слушают или берут в lib
+function B.fs_list()
+  local out = {}
+  for _, h in ipairs(FS.results) do
+    out[#out + 1] = { name = h.name, fs = h, len = h.len, path = FS.file_of(h), meta = h.user .. '  ' .. h.lic }
+  end
+  return out
+end
+function B.fs_search(q)
+  B.set_mode('fs')
+  if q and q ~= '' and FS.search(q) and ctx.msg then ctx.msg('freesound: searching "' .. q .. '" ...') end
+  if FS.err and ctx.msg then ctx.msg(FS.err) end
 end
 
 -- кнопки шапки: files | db | size | hide
@@ -1472,7 +1487,7 @@ function B.click(what)
   if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'map' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'map' or what == 'fx' or what == 'fs' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'drum' then B.drum = not B.drum; if ctx.drum_audition_toggle then ctx.drum_audition_toggle(B.drum) end
@@ -1691,6 +1706,11 @@ end
 function B.enter()
   local e = B.entries[B.cur]
   if not e then return end
+  if e.fs then   -- 2 ноя: freesound — скачать превью и в lib
+    if not FS.exists(e.path) and ctx.msg then ctx.msg('freesound: downloading ' .. e.name .. ' ...') end
+    FS.fetch(e.fs, function(p) ctx.add_to_depot(p) end)
+    return
+  end
   if e.bak then   -- 17 окт: бэкап — открыть (REAPER спросит, сохранить ли текущий)
     R.Main_openProject(e.path); if ctx.msg then ctx.msg('opened ' .. e.name .. ' - File > Save as to keep it as the project') end; return
   end
@@ -1718,6 +1738,11 @@ end
 -- путь для прослушивания строки (nil — нечего слушать)
 function B.preview_path(e)
   if not e or e.dir or e.db or e.trk or e.rgn or e.mark or e.empty then return nil end
+  if e.fs then   -- 2 ноя: freesound — есть на диске → слушаем; нет — качаем и играем, если строка ещё под курсором
+    if FS.exists(e.path) then return e.path end
+    FS.fetch(e.fs, function(p) if B.entries[B.cur] == e and ctx.preview_file then ctx.preview_file(p) end end)
+    return nil
+  end
   if (e.name or ''):lower():match('%.xrni$') or (e.name or ''):lower():match('%.sfz$') then return nil end   -- инструмент (архив / текст SFZ), не звук
   if (e.name or ''):lower():match('%.jfcurve$') then return nil end    -- кривая — не звук
   if e.other then return nil end                                      -- не звук (*.*): не слушаем
@@ -1757,6 +1782,11 @@ end
 function B.describe(idx)
   local e = B.entries[idx]
   if not e then return '' end
+  if e.fs then
+    local h = e.fs
+    return ('%s by %s, %s, %.1f s%s - Space / j k: listen (downloads the preview), Enter: to the lib; tags: %s'):format(h.name, h.user, h.lic, h.len or 0,
+      FS.pending(h) and ' (downloading)' or '', table.concat(h.tags, ' '):sub(1, 80))
+  end
   if e.bak then return e.name .. ' - an autosave of this project; Enter / double click: open it (REAPER asks to save the current one)' end
   if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
   if e.dir then return '' end                                       -- 5 окт: без имени / пути папки
@@ -1870,7 +1900,12 @@ function B.key(c)
   if B.filtering then
     -- набор запроса: символы сужают список (fzf), стрелки ходят по результатам,
     -- Enter — закончить набор (результаты остаются), Esc — сбросить, BS — стереть
+    if B.mode == 'fs' and c ~= 27 and c ~= 13 and c ~= 1685026670 and c ~= 30064 then   -- 2 ноя: freesound — набор запроса без сужения списка
+      if c == 8 then B.filter = TX.bs(B.filter) elseif TX.char(c) then B.filter = B.filter .. TX.char(c) else return false end
+      return true
+    end
     if c == 27 then B.filtering = false; B.filter = ''; B.set_all(B.all)
+    elseif c == 13 and B.mode == 'fs' then B.filtering = false; local q = B.filter; B.filter = ''; B.fs_search(q)
     elseif c == 13 then B.filtering = false; if B.filter_due then B.filter_due = nil; B.set_all(B.all) end
     elseif c == 1685026670 then B.cur = math.min(#B.entries, B.cur + 1)
     elseif c == 30064 then B.cur = math.max(1, B.cur - 1)
@@ -2076,6 +2111,11 @@ function B.draw(U, L, x, y, w, h)
   if B.filter_due and R.time_precise and R.time_precise() >= B.filter_due then B.filter_due = nil; B.set_all(B.all) end
   B.pl_tick()   -- 27 окт: плейлист отмеченных — следующий файл по концу
   B.hear_tick()   -- 27 окт: прозвучавшее — в recent   -- 19 окт: поиск после паузы набора
+  if next(FS.jobs) then   -- 2 ноя: freesound — пришёл ответ / файл
+    local e0 = FS.err
+    if FS.tick() and B.mode == 'fs' then B.cur = 1; B.set_all(B.fs_list()) end
+    if FS.err and FS.err ~= e0 and ctx.msg then ctx.msg(FS.err) end
+  end
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)          -- левая граница — общая линия сайдбара (своя давала двойную, 3 окт)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local hover
@@ -2096,7 +2136,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets', 'fs' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fs' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fs', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fs' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
@@ -2167,6 +2207,11 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
+  elseif B.mode == 'fs' then   -- 2 ноя: freesound
+    if FS.key() == '' then where = 'freesound: no API key - get a free one at freesound.org/apiv2/apply, then :freesound key <key>'
+    elseif FS.busy then where = ('freesound: searching "%s" ...'):format(FS.query)
+    elseif FS.err then where = FS.err
+    else where = FS.query == '' and 'freesound: / words, Enter - search (<10s >2s cc0 filter); j k listen, Enter - to the lib' or ('freesound "%s": %d of %d; credits - Data/jf_tracker_freesound/CREDITS.txt'):format(FS.query, #FS.results, FS.count or 0) end
   elseif B.mode == 'recent' then where = 'zoxide: folders you go to most, then files played lately (Enter - go / to lib, m - mark, zi - all folders)'   -- 27 окт; 28 окт: zoxide
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
