@@ -246,7 +246,8 @@ local state = {
   notetube = reaper.GetExtState(EXT, 'notetube') ~= '0',
   contedge = (function() local v = reaper.GetExtState(EXT, 'contedge'); return v ~= '' and v or 'grey' end)(),   -- 2 ноя: края контейнера DSP
   acvbehind = reaper.GetExtState(EXT, 'acvbehind') == '1',
-  acvzoom = reaper.GetExtState(EXT, 'acvzoom') ~= '0',   -- 2 ноя: зум холста кривых колесом / трекпадом и рамка видимого на лейне   -- 2 ноя: холст кривых — прочие кривые фоном (по умолчанию нет)   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
+  acvzoom = reaper.GetExtState(EXT, 'acvzoom') ~= '0',
+  fxguiauto = reaper.GetExtState(EXT, 'fxguiauto') == '1',   -- 2 ноя: плагины в DSP — сразу родным окном   -- 2 ноя: зум холста кривых колесом / трекпадом и рамка видимого на лейне   -- 2 ноя: холст кривых — прочие кривые фоном (по умолчанию нет)   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -13368,6 +13369,7 @@ ctx = {
       flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
+      { key = 'fxguiauto', label = 'fx as gui', kind = 'toggle', desc = 'VST / AU / CLAP modules in DSP open as their own plugin window over the block (as the gui button); JSFX, containers and slixer keep the tracker view; gui on a module overrides it for that one', get = function() return state.fxguiauto end, set = function(v) state.fxguiauto = v; reaper.SetExtState(EXT, 'fxguiauto', v and '1' or '0', true) end },
       { key = 'acvzoom', label = 'curve zoom', kind = 'toggle', desc = 'the curve canvas zooms with the wheel / trackpad at the mouse (sideways - scroll, z0 - the whole span); a frame on the envelope column in the tracker shows what the canvas shows', get = function() return state.acvzoom end, set = function(v) state.acvzoom = v; reaper.SetExtState(EXT, 'acvzoom', v and '1' or '0', true); if not v then ctx.ACV.zv = nil end end },
       { key = 'acvbehind', label = 'curves behind', kind = 'toggle', desc = 'the curve canvas draws the other curves of the list dimmed behind the active one; off (default) - only the active one and the ones marked into the stack (Space in the list, Shift+click), each in its own lane', get = function() return state.acvbehind end, set = function(v) state.acvbehind = v; reaper.SetExtState(EXT, 'acvbehind', v and '1' or '0', true) end },
       { key = 'contedge', label = 'container edge', kind = 'cycle', values = { 'grey', 'hazard' }, desc = 'the edges of a container in DSP: grey - a soft striped band (default), hazard - yellow / black', get = function() return state.contedge end, set = function(v) state.contedge = v; reaper.SetExtState(EXT, 'contedge', v, true) end },
@@ -13397,7 +13399,7 @@ ctx = {
       { 'cursor and editing', { 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
-      { 'headers and mixer', { 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
+      { 'headers and mixer', { 'contedge', 'fxguiauto', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'fxbenter', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
@@ -20603,6 +20605,7 @@ function ctx.fxgui_toggle(f)
   draw.fxgui = draw.fxgui or {}
   local on = not draw.fxgui[f.fguid]
   draw.fxgui[f.fguid] = on or nil
+  ctx.fxgui_user = ctx.fxgui_user or {}; ctx.fxgui_user[f.fguid] = on   -- 2 ноя: выбор руками важнее опции fx as gui
   if not on then
     local t = dsp_target()
     if t and t.col and t.col.track then
@@ -20620,14 +20623,40 @@ function ctx.fxgui_cmd()
   if not f then vim.msg = 'gui: select an fx in DSP first'; return end
   ctx.fxgui_toggle(f)
 end
+-- 2 ноя: опция fx as gui — VST / AU / CLAP-модули DSP сразу родным окном поверх блока (JSFX, контейнеры, slixer — как были);
+-- выключил кнопкой gui — этот эффект больше сам не открывается (ctx.fxgui_user)
+function ctx.fxgui_auto()
+  if not (state.fxguiauto and reaper.JS_Window_SetPosition) then return end
+  local t = dsp_target()
+  local tr = t and not t.take and t.col and t.col.track
+  if not tr then return end
+  draw.fxgui = draw.fxgui or {}
+  ctx.fxgui_user, ctx.fxgui_type = ctx.fxgui_user or {}, ctx.fxgui_type or {}
+  for _, f in ipairs(t.fx or {}) do
+    if not f.container and not f.inner and f.view ~= 'slixer' then
+      local guid = f.fguid or reaper.TrackFX_GetFXGUID(tr, f.fx or f.i)
+      if guid and ctx.fxgui_user[guid] == nil and not draw.fxgui[guid] then
+        local ty = ctx.fxgui_type[guid]
+        if ty == nil then local ok, v = reaper.TrackFX_GetNamedConfigParm(tr, f.fx or f.i, 'fx_type'); ty = ok and v or ''; ctx.fxgui_type[guid] = ty end
+        if ty:match('^VST') or ty:match('^AU') or ty:match('^CLAP') or ty:match('^LV2') then f.fguid = guid; draw.fxgui[guid] = true end
+      end
+    end
+  end
+end
 function ctx.fxgui_tick()
+  ctx.fxgui_auto()
   if not (draw.fxgui and next(draw.fxgui) and reaper.JS_Window_SetPosition) then return end
   local t = dsp_target()
   local tr = t and not t.take and t.col and t.col.track
   ctx.fxgui_open = ctx.fxgui_open or {}
   local O = ctx.fxgui_open
+  ctx.fxgui_last = ctx.fxgui_last or {}
+  local now = reaper.time_precise()
   for guid in pairs(draw.fxgui) do
+    -- 2 ноя: панель DSP рисуется не каждый кадр (буфер) — прямоугольник блока держится 0.5 с; иначе окно
+    -- закрывалось / открывалось по кадрам (phatfx, Massive X мигали и срывались в параметры)
     local r = draw.fxgui_rect and draw.fxgui_rect[guid]
+    if r then ctx.fxgui_last[guid] = { r = r, t = now } elseif ctx.fxgui_last[guid] and now - ctx.fxgui_last[guid].t < 0.5 then r = ctx.fxgui_last[guid].r end
     local show = tr and r and r.vis and state.dsp ~= false and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
