@@ -6,6 +6,8 @@ modules around it.
 This is my first big release. The whole thing is hugely experimental and made
 for me - I'm sharing it because why not.
 
+[README по-русски](README.ru.md)
+
 ## How it started
 
 I just wanted to slice items in REAPER. REAPER on its own is already a great
