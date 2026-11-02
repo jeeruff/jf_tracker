@@ -243,7 +243,8 @@ local state = {
   endglyph = (function() local v = reaper.GetExtState(EXT, 'endglyph'); return v ~= '' and v or '===' end)(),   -- 2 ноя: знак конца ноты
   freeglyph = (function() local v = reaper.GetExtState(EXT, 'freeglyph'); return v ~= '' and v or 'OFF' end)(),   -- 2 ноя: знак свободного OFF
   offrel = tonumber(reaper.GetExtState(EXT, 'offrel')) or 30,
-  notetube = reaper.GetExtState(EXT, 'notetube') ~= '0',   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
+  notetube = reaper.GetExtState(EXT, 'notetube') ~= '0',
+  acvbehind = reaper.GetExtState(EXT, 'acvbehind') == '1',   -- 2 ноя: холст кривых — прочие кривые фоном (по умолчанию нет)   -- 2 ноя: продолжение ноты — полая трубка | |   -- 2 ноя: OFF на аудио — fade-out release, мс
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
   ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
@@ -13353,6 +13354,7 @@ ctx = {
       flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
+      { key = 'acvbehind', label = 'curve: other curves behind', kind = 'toggle', desc = 'the curve canvas draws the other curves of the list dimmed behind the active one; off (default) - only the active one and the ones marked into the stack (Space in the list, Shift+click), each in its own lane', get = function() return state.acvbehind end, set = function(v) state.acvbehind = v; reaper.SetExtState(EXT, 'acvbehind', v and '1' or '0', true) end },
       { key = 'notetube', label = 'note tube', kind = 'toggle', desc = 'a sounding MIDI note is drawn as a hollow tube (| |) down to its end ===; off - one | per row', get = function() return state.notetube end, set = function(v) state.notetube = v; reaper.SetExtState(EXT, 'notetube', v and '1' or '0', true) end },
       { key = 'endglyph', label = 'end of note', kind = 'cycle', values = { '===', '---', 'OFF', '|' }, desc = 'how the end of a note (note-off, the sound releases) is shown: === (IT, default), ---, OFF (Renoise), |', get = function() return state.endglyph end, set = function(v) state.endglyph = v; reaper.SetExtState(EXT, 'endglyph', v, true); relayout() end },
       { key = 'freeglyph', label = 'free OFF', kind = 'cycle', values = { 'OFF', '===', '^^^' }, desc = 'how a free-standing OFF is shown (no note before it on the row: all notes off of the track)', get = function() return state.freeglyph end, set = function(v) state.freeglyph = v; reaper.SetExtState(EXT, 'freeglyph', v, true); relayout() end },
@@ -13376,7 +13378,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -17255,7 +17257,7 @@ ctx.acv_zone_step = function(dir)
   if dir == 'l' and not ACV.lfoc and ACV.has_tree then
     ACV.lfoc = true; ACV.lsel = 1
     for i, r in ipairs(ctx.acv_tree(ctx.acv_curves(ctx.acv_span()))) do if r.i == ACV.cur then ACV.lsel = i end end
-    vim.msg = 'curve list: j k rows, l / Enter open a folder or take a curve, h close, Cmd+L / Esc - the canvas'
+    vim.msg = 'curve list: j k rows, l / Enter open a folder or take a curve, Space - into the stack (lanes), h close, Cmd+L / Esc - the canvas'
     return true
   elseif dir == 'r' and ACV.lfoc then ACV.lfoc = nil; vim.msg = 'curve: the canvas'; return true end
   ACV.lfoc = nil   -- уходим в другую панель — список отпускает клавиши
@@ -17307,6 +17309,12 @@ ctx.acv_key = function(c)
     elseif r and r.i and (ch == 'l' or c == 13 or c == 1919379572) then
       ACV.cur = r.i; vim.msg = 'curve: ' .. (curves[r.i].name or '?')
       if c == 13 then ACV.lfoc = nil end
+    elseif r and r.i and (c == 32 or ch == 'v') then   -- 2 ноя: Space / v — кривая в стопку (дорожки друг под другом), ещё раз — вон
+      local k = ACV.mkey(curves[r.i])
+      if k then ACV.multi[k] = not ACV.multi[k] or nil end
+      local n = 0; for _ in pairs(ACV.multi) do n = n + 1 end
+      vim.msg = ('curve stack: %d marked - each its own lane under the active one (Space again - out)'):format(n)
+      ACV.lsel = math.min(#rows, ACV.lsel + 1)
     end
     return true
   end

@@ -597,7 +597,8 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
     ACV.geo = { gx = gx, gy = gy, gw = gw, gh = gh, r0 = r0, nr = nr }
     U.text(gx + 3, gy + 1, ctx.fit(act.name or '?', gw - 6), U.AMBER)
   else
-    for i, cv in ipairs(curves) do if i ~= ACV.cur then trace(i, U.mix(cv.rgb or U.GREEN, U.BG, 0.5), 1) end end
+    -- 2 ноя: прочие кривые фоном — только по опции (отвлекали); стопка — Space в списке / Shift+щелчок
+    if ctx.state and ctx.state.acvbehind then for i, cv in ipairs(curves) do if i ~= ACV.cur then trace(i, U.mix(cv.rgb or U.GREEN, U.BG, 0.5), 1) end end end
   end
   -- полоса модуляции активной LFO / ACS кривой — вокруг её базы
   if (act.kind == 'lfo' or act.kind == 'acs') and act.mod then
