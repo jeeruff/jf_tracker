@@ -33,6 +33,7 @@ KH.PAGES = {
   -- первая страница (3 окт): что это и почему так близко к REAPER
   intro = { title = 'jf_tracker - what it is', e = {
     { k = 'idea', t = {}, d = 'build a whole track from the keyboard in one window: patterns, their order, sounds; mixing later in REAPER on the same tracks' },
+    { k = 'shape', t = {}, d = 'Vim keys, Emacs build: a small core (the view of the project, one writer to REAPER, the key grammar) and modules around it - DSP, slicer, matrix, browsers, curve, harmonizer ...; each a pane with its own keys and help (F1 here: what is under the cursor); your own modules plug in (API.md)' },
     { k = 'native', t = {}, d = 'the tracker is a view, REAPER is the engine: tracks, items, MIDI, regions, envelopes, FX - no format of its own' },
     { k = 'why', t = {}, d = 'nothing to export or lose: close the window and the project plays and edits as usual; tempo map, routing, render, other scripts keep working; every edit is one REAPER undo step' },
     { k = 'lib', t = {}, d = 'the sounds you play (right panel): every audio item of the project, one entry per sound; library entries sit on their track after the =LIB marker' },

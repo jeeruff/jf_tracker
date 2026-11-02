@@ -1,6 +1,6 @@
 # jf_tracker
 
-A tracker view of REAPER with a Vim layer.
+A tracker core for REAPER with modules around it: Vim keys, built like Emacs.
 
 I waited for someone to build a tracker for REAPER. More than seven years later
 it was time to do it myself. A tracker lets your hands leave the mouse alone
@@ -12,6 +12,12 @@ and type the notes that the keyboard can type anyway.
 - **Vim is the foundation.** Modes, operators + motions (`dw`, `d3j`, `yy p`),
   counts, registers, the `.` repeat and the `:` command line drive every
   module. The mouse is optional.
+- **Emacs is the shape.** A small core - the tracker view of the project, one
+  module that writes to REAPER, the key grammar - and everything else is a
+  module around it: DSP, slicer, matrix, browsers, curve canvas, harmonizer,
+  humanizer ... Each is a pane with its own keys and its own help, and your own
+  modules plug in the same way ([API.md](API.md)). Vim for the hands, Emacs for
+  the build - and Emacs has just turned 50.
 - **Native REAPER.** Tracks, items, MIDI, regions, envelopes and FX stay plain
   REAPER. Close the window and the project plays on. Every edit is one undo
   step.
