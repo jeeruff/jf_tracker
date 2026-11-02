@@ -9,6 +9,7 @@ M.help = {
   { k = '/  Enter', d = 'type words, Enter searches freesound.org (<10s >2s - length, cc0 - only CC0 sounds)' },
   { k = 'j k  g G', d = 'move; the sound under the cursor plays (its mp3 preview is downloaded on the first listen)' },
   { k = 'Space', d = 'listen again' },
+  { k = 'wave', d = 'the wave of the sound at the bottom: click - play from there, drag - scrub' },
   { k = 'Enter  l', d = 'into the lib of the cursor track (the marked ones, if any - each downloaded, in the order marked)' },
   { k = 'm  u', d = 'mark / unmark the row and step down (as in lf); u - unmark all' },
   { k = 'v', d = 'mark from here: then j k mark the rows passed, v again - stop' },
@@ -168,10 +169,19 @@ function M.draw(U, L, x, y, w, h, focused)
         if b - a < 0.03 then a, b = -0.015, 0.015 end
         gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
       end
+      -- щелчок / протяжка по волне — играть с этого места (плейхед ведётся мышью)
+      local onw = mx >= wx and mx < wx + ww and my >= wy and my < wy + wh
+      if (gfx.mouse_cap & 1) == 1 and (S.wdrag or (onw and not S.down)) then
+        S.wdrag = true
+        local fr = math.max(0, math.min(1, (mx - wx) / ww))
+        if not S.wfr or math.abs(fr - S.wfr) * ww >= 3 then S.wfr = fr; A.preview_from(p, fr) end
+      elseif (gfx.mouse_cap & 1) == 0 then S.wdrag, S.wfr = nil, nil end
       local pos, len, path = A.preview_pos()
       if pos and len and len > 0 and path == p then
-        U.set(U.AMBER); gfx.rect(wx + math.floor(math.min(1, pos / len) * (ww - 1)), wy + 1, 1, wh - 2, 1)
+        local px = wx + math.floor(math.min(1, pos / len) * (ww - 1))
+        U.set(U.mix and U.mix(U.AMBER, U.TEXT, 0.35) or U.AMBER); gfx.rect(px - 1, wy + 1, 3, wh - 2, 1)   -- ярче и шире: 3 px
       end
+      if onw and not S.wdrag then U.set(U.TEXT); gfx.a = 0.25; gfx.rect(mx, wy + 1, 1, wh - 2, 1); gfx.a = 1 end   -- куда встанет щелчок
     elseif e then
       U.text(wx + L.pad, cy - math.floor(L.rh / 2), fit(FS.pending(e) and 'downloading ...' or 'j k / Space - listen, the wave comes with it', ww - 2 * L.pad), U.DIM or U.GREY)
     end
@@ -184,8 +194,7 @@ function M.draw(U, L, x, y, w, h, focused)
     if S.cur <= S.scroll then S.scroll = S.cur - 1 elseif S.cur > S.scroll + nv then S.scroll = S.cur - nv end
   end
   local lenw, metaw = U.measure('000.0s  '), math.min(math.floor(w * 0.35), U.measure('w') * 22)
-  local click = (gfx.mouse_cap & 1) == 1 and not S.down
-  S.down = (gfx.mouse_cap & 1) == 1
+  local click = (gfx.mouse_cap & 1) == 1 and not S.down and not S.wdrag
   for i = 1, nv do
     local idx = S.scroll + i
     local e = FS.results[idx]
@@ -208,6 +217,7 @@ function M.draw(U, L, x, y, w, h, focused)
       S.lastclick = now
     end
   end
+  S.down = (gfx.mouse_cap & 1) == 1
   if inside and gfx.mouse_wheel ~= 0 then
     S.scroll = math.max(0, math.min(math.max(0, #FS.results - nv), S.scroll + (gfx.mouse_wheel > 0 and -3 or 3))); gfx.mouse_wheel = 0
     if S.scroll >= #FS.results - nv then more() end   -- докрутили до конца — следующая страница

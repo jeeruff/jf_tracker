@@ -32227,7 +32227,8 @@ ctx.cm_get = function(id)
       msg = function(s) vim.msg = s end, preview_file = function(p) ctx.preview_file(p) end, add_to_depot = function(p) ctx.add_to_depot(p) end,
       fit = function(s, w) return draw.fit(s, w) end, focus = function(f) ctx.set_focus(f) end,
       peaks = function(p, n) return ctx.file_peaks and ctx.file_peaks(p, n) end, preview_pos = function() if ctx.preview_pos then return ctx.preview_pos() end end,
-      menu = function(title, items) vim.open_hydra({ title = title, items = items }) end })
+      menu = function(title, items) vim.open_hydra({ title = title, items = items }) end,
+      preview_from = function(p, frac) ctx.preview_from(p, frac) end })
     if not ok then vim.msg = 'module ' .. id .. ': ' .. tostring(err); draw.CM[id] = nil; return nil end
   end
   return cm
