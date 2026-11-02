@@ -132,6 +132,11 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
   if gpick then A.grid = gpick; press = false end
   -- clear envelope (6 окт): все точки пула долой
   local ex0 = gx2 + 3 * L.pad
+  -- 2 ноя: чья это автоматизация — трек / параметр (эффект), номер item и пул: строкой слева над кнопками
+  do
+    local who = A.who(t)
+    if who ~= '' then U.text(x + L.pad, y, fit(who, math.max(0, ex0 - x - 2 * L.pad)), U.TEXT) end
+  end
   local cpick, ex1 = buttons(U, L, ex0, by, { { 'clear', 'clear' }, { 'save', 'save' }, { 'load', 'load' } }, nil, mx, my, press)
   -- скобка над группой: ┌── envelope ──┐ (линия с усами, подпись посередине)
   do
@@ -412,6 +417,17 @@ local PROPS = {
   { k = 'D_BASELINE', label = 'baseline', min = 0, max = 1 },
   { k = 'D_AMPLITUDE', label = 'amplitude', min = -1, max = 1 },
 }
+-- 2 ноя: подпись автоматизации: «трек / параметр / эффект · item N · pool P» (take: «item / параметр»)
+function A.who(t)
+  if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then return '' end
+  local _, en = R.GetEnvelopeName(t.env)
+  if t.take then return (t.label or '') ~= '' and t.label or ('take / ' .. (en or '?')) end
+  local tr = R.Envelope_GetParentTrack and R.Envelope_GetParentTrack(t.env)
+  local tn = ''
+  if tr and R.ValidatePtr(tr, 'MediaTrack*') then local _, nm = R.GetTrackName(tr); tn = nm or '' end
+  local pool = R.GetSetAutomationItemInfo(t.env, t.idx, 'D_POOL_ID', 0, false) or -1
+  return ('%s / %s  -  item %d  pool %d'):format(tn, en or '?', (t.idx or 0) + 1, math.floor(pool))
+end
 function A.props(U, L, x, y, w, h, t, fit)
   if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then return nil end
   if t.take then                                            -- огибающая take: свойств automation item нет
@@ -425,7 +441,7 @@ function A.props(U, L, x, y, w, h, t, fit)
   local pos, one, len = A.span(t)
   local mx, my, cap = gfx.mouse_x, gfx.mouse_y, gfx.mouse_cap
   U.set(U.LINE); gfx.rect(x - 2, y, 1, h, 1)
-  U.text(x + L.pad, y, fit('item properties', w - L.pad), U.GREY)
+  do local _, en = R.GetEnvelopeName(t.env); U.text(x + L.pad, y, fit((en and en ~= '') and en or 'item properties', w - L.pad), U.AMBER) end   -- 2 ноя: имя параметра вместо «item properties»
   local lw = U.measure('amplitude ') + L.pad
   local hover
   for i, p in ipairs(PROPS) do
