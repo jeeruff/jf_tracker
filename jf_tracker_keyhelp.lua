@@ -318,7 +318,7 @@ KH.PAGES = {
     { k = 'qwerty: z x', t = { 'z', 'x' }, d = 'octave down / up' },
     { k = 'vel  human', d = 'under the keyboard: vel - a slider of the inserted velocity (drag); in the step block human - every inserted note a little different: timing +-10 ms, pitch +-8 cents, velocity +-12 / volume +-1 dB at 100 % (click: 0 / 25 / 50 / 100 %)' },
     { k = 'qwerty: c C', t = { 'c', 'C' }, d = 'velocity -8 / +8' },
-    { k = 'qwerty: , .', t = { ',', '.' }, d = 'instrument previous / next' },
+    { k = '.', d = 'repeat the last edit (as in NORMAL); the instrument - Opt+J / K' },
     { k = 'qwerty: ;', t = { ';' }, d = 'the whole sample at the cursor' },
     { k = 'qwerty: a', t = { 'a' }, d = 'step auto: jump past the inserted item' },
     { k = 's', d = 'select from here (visual; the edit returns to INSERT); Shift+hjkl extends' },
@@ -953,7 +953,7 @@ KH.BARS = {
   renderer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'toggle' }, { '0', 'defaults' }, { 'Enter', 'bounce' }, { 'Esc', 'back' }, { 'f', 'jump' } },
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' } },
-  insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { ', .', 'inst' }, { 'a', 'step auto' },
+  insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { '.', 'repeat' }, { 'Opt+J K', 'inst' }, { 'a', 'step auto' },
              { 'd', 'delete' }, { 'Opt+note', 'beside' }, { 'Shift+note', 'listen' }, { 'Esc', 'normal' } },
   -- 14 окт: keys renoise — ноты двумя рядами, октава [ ], громкость { } (z x c — ноты)
   -- 16 окт: раскладка frow — ноты цифрами и F-рядом, октава [ ], громкость { }

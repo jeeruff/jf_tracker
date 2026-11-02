@@ -1843,8 +1843,8 @@ local function keys_control(c)
   elseif ch == 'x' then V.octave = math.min(8, V.octave + 1); return true
   elseif ch == 'c' then V.vel = math.max(1, (V.vel or 100) - 8); V.msg = 'velocity ' .. V.vel; return true
   elseif ch == 'C' then V.vel = math.min(127, (V.vel or 100) + 8); V.msg = 'velocity ' .. V.vel; return true
-  elseif ch == ',' then ctx.pool_select(V.inst - 1); return true
-  elseif ch == '.' then ctx.pool_select(V.inst + 1); return true
+  -- 2 ноя: . — повтор последней правки, как в NORMAL / Vim; инструмент — Opt+J / K (, свободна)
+  elseif ch == '.' then return ins_as_normal(c) or true
   elseif ch == ';' then                                       -- целый сэмпл (материнский item), 4 окт
     if ctx.insert_whole then ctx.insert_whole() end   -- 10 окт: INSERT пишет всегда (INSERT KEYS слит с INSERT)
     return true

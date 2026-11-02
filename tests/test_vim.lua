@@ -594,8 +594,7 @@ keysin('z');  eq('KEYS z → octave down', V.octave, 4)
 keysin('c');  eq('KEYS c → vel -8', V.vel, 92)
 keysin('C');  eq('KEYS C → vel +8', V.vel, 100)
 keysin('c'); V.cur.row = 4; keysin('q'); eq('note carries vel', last(), 'ins:trA@4:60:1'); eq('vel 92 used', V.vel, 92); V.vel = 100
-keysin('.');  eq('KEYS . → next instrument', last(), 'pool:2')
-keysin(',');  eq('KEYS , → prev instrument', last(), 'pool:1')
+keysin('.');  eq('KEYS . is the repeat, not the instrument', last() ~= 'pool:2', true); eq('KEYS . stays in INSERT', V.mode, 'insert')   -- 2 ноя
 keysin('a');  eq('KEYS a → step auto', V.step_auto, true); keysin('a')
 V.cur.row = 0; keysin('dd'); eq('INSERT dd deletes the event (and moves the subcolumn below up)', had('delete:kick'), true); eq('back in INSERT after dd', V.mode, 'insert')
 V.cur.row = 0; local nc0 = #calls; keysin('d3'); eq('INSERT d3 waits (no note)', #calls, nc0); keysin('w'); eq('d3w → back in INSERT', V.mode, 'insert'); eq('d3w did not insert a note', (last():find('^ins:') == nil), true)
