@@ -964,7 +964,7 @@ V.TUTORIAL = {
   '2. Why jf. Index fingers on f and j - the two keys with bumps: hands on the home row. Every module answers to letters, the mouse is optional.',
   '3. Move. h j k l - cursor, gg / G - start / end, { } - bars. Tab - next module (matrix, top, lib, browser, DSP).',
   '4. Jump anywhere. f puts two-letter labels on everything on screen - type the two letters of a label (for example x x) and you are there.',
-  '5. Panes and tracks. Opt+H / Opt+L - the previous / next track (channel); Cmd+h j k l - the focus to the pane on the left, below, above, on the right.',
+  '5. Panes and tracks. t t once more - a second track; Opt+H / Opt+L - the previous / next track (channel); Cmd+h j k l - the focus to the pane on the left, below, above, on the right.',
   '6. Two modes. Like Vim, jf_tracker works in modes: NORMAL - keys move, edit, run commands (j moves, x deletes); INSERT - keys write notes on the cursor row. i enters INSERT (as in Vim), Esc leaves it; Esc also enters it - a habit kept from Renoise (with the keyboard on, i is a note). The word at the bottom says which.',
   '7. Write notes. m - the keyboard on / off (on: it has priority over Vim keys). The top row q 2 w 3 e r 5 t 6 y 7 u i 9 o 0 p plays C .. E, z / x - octave; Esc - INSERT, where the keys write; Esc - back. With the keyboard off everything is plain Vim (i - INSERT).',
   '8. Pick a sound. The lib on the right: j k - select; Opt+J / K switch sounds. Shift+note only plays.',
