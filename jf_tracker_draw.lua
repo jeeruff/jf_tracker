@@ -5508,6 +5508,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   for _, g in ipairs(D.transport_groups(c, L)) do by_id[g[1][1][1]] = g end
   local order = {}
   local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
+  addg('step')   -- 2 ноя: блок step / LPB — раньше блока курсора (поменяны местами)
   -- 16 окт: где курсор — у клавиатуры (был модлайн): трек, ниже колонка и строка
   do
     local vc = info.vcur
@@ -5521,12 +5522,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local lw = math.max(ms(fit(l1, 14 * L.cw)), cl + ms(fname), cl + ms(l2), 10 * L.cw)
       order[#order + 1] = { w = lw, draw = function(gx)
         text(gx, ly, fit(l1, lw), U.TEXT)
-        text(gx, ly + L.rh, 'col', U.GREY); text(gx + cl, ly + L.rh, fit(fname, lw - cl), fcol or U.TEXT)   -- 18 окт: цветом колонки
-        if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + cl, ly + 2 * L.rh, l2, U.TEXT) end
+        -- 2 ноя: row — второй строкой, col — самой нижней (была пустой, на уровне listen)
+        text(gx, ly + L.rh, 'row', U.GREY); text(gx + cl, ly + L.rh, l2, U.TEXT)
+        local cy = ly + ((h >= 4 * L.rh) and 3 or 2) * L.rh
+        if h >= 3 * L.rh then text(gx, cy, 'col', U.GREY); text(gx + cl, cy, fit(fname, lw - cl), fcol or U.TEXT) end   -- 18 окт: цветом колонки
       end }
     end
   end
-  addg('step')
   addg('listen')   -- 12 окт: step / sel / line
   order[#order + 1] = { w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
