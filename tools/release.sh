@@ -31,7 +31,7 @@ mkdir -p "$ITCH"
 rm -f "$ITCH"/jf_tracker-*.zip
 ( cd "$REL" && git archive --format=zip --prefix=jf_tracker/ -o "$ITCH/jf_tracker-$V.zip" "$TAG" )
 cat > "$ITCH/READ ME FIRST.txt" <<EOF
-jf_tracker $V - a tracker view of REAPER with Vim keys. Free to use, PolyForm Shield 1.0.0 (no competing products).
+jf_tracker $V - a tracker core for REAPER with modules around it: Vim keys, built like Emacs. Free to use, PolyForm Shield 1.0.0 (no competing products).
 
 INSTALL WITH REAPACK (recommended, updates included)
 1. REAPER: Extensions - ReaPack - Import repositories, paste:

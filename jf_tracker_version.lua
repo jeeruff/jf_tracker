@@ -1,9 +1,26 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.9.0'
-V.DATE = '2026-10-28'
+V.VERSION = '0.9.1'
+V.DATE = '2026-11-02'
 V.CHANGES = {
+  { v = '0.9.1', d = '2026-11-02', items = {
+    'microtones as MPE: a microtonal note gets its own MIDI channel 2-16 and a pitch bend (range 48), Surge XT MPE switched on by itself, old MTS sysex migrated; the note column widens only on lanes that use microtones',
+    'note ends: === (end of note, the sound releases), OFF (free OFF), ^^^ (cut: CC120 for MIDI, no fade for audio) - glyphs are options (=== --- OFF |_| |); a sounding note drawn as a | | tube; OFF on audio ends the item with a release fade',
+    'one MIDI clip per pattern: notes, retro record (R) and paste go into the clip of their pattern; hard edges split a clip at a pattern edge instead of cutting its notes off; :mergeclips also on tracks with audio',
+    'Backspace / Opt+Backspace follow the view: the pattern (zp), the section (zs) or the whole track',
+    'gn / gN - next / previous pattern on the same row; gp / gP at the pattern edge step to the neighbour; zW - zoom on the item under the cursor (wave view moved to zvw); zA - hide the empty columns and lanes of every track',
+    'columns: Ctrl+Opt += / - reveal or hide the fields of the cursor track one by one (vol, delay, commands 1..4), Opt+Shift+L / H the whole width, Opt+= / - note subcolumns; a toggles all automation of the cursor track',
+    'help knows where you are: a \'here\' block for the wave, note, vol, delay, command, envelope or MIDI lane under the cursor; user DSP modules carry their own help (help: in dspmods_user.txt, see API.md)',
+    'API.md: the bridge for external tools and LLMs, and your own DSP modules',
+    'curve canvas: zoom with the wheel / trackpad (a frame on the envelope column shows the visible part), Space in the list stacks curves into lanes, Shift+h l / drag select rows, Opt+drag bends a segment, grid per pattern / section (zg, z, z.)',
+    'DSP: h l always move between effects, values with + - / Ctrl+A X / a number; option fx as gui (plugin windows over their block, no flicker); cutoff coloured orange; soft grey container edges (hazard as an option)',
+    'keyboard as its own pane (keys), under the browser by default; fx browser follows the folder under the cursor (as lf); lib find on the left (/ find)',
+    'f labels go to the focused module first, beats only from LPB 4; INSERT . repeats the last edit; row zoom keeps the cursor centred',
+    'slixer: the wave shows without opening its window; the slicer ruler counts tracker rows; the item wave is cached',
+    'smaller: thin mixer strips show abbreviated fx names, options wheel only scrolls, swing no longer shifts its neighbours, bottom panes keep 200 px, mode words in every script',
+    'cleanup: matrix clips, clipkb, sketchpad and the session zone removed with their leftovers',
+  } },
   { v = '0.9.0', d = '2026-10-28', items = {
     'map pane: the sample map of a folder or the project sources - graph (dots sized by bytes, rings = groups by name words / subfolder), cards (Chladni figures, playing cards), nebula / galaxy, sand and tree views; no file limit (scanned over frames, index on disk, quiet daily change check), follows the browser folder, ξ random, play history with a path line, marked files, file menu, rough sound analysis (loudness, brightness, length) for sizes and order',
     'panes: drag a tab or a whole pane by its tab row (edges split, the middle stacks), PANE s / v / T show where the panel goes, Cmd+arrows like Cmd+hjkl, grips move only their own edge and stop at the neighbour minimum, snap pane lines option, tabs a-z by default, pane colours (off / colours / shades with a hue slider)',
