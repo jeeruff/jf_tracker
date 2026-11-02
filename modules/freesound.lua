@@ -30,6 +30,28 @@ function M.init(api)
   M.FS = FS
 end
 function M.typing() return S.typing end
+-- 2 ноя: источник карты (панель map, вкладка freesound): результаты поиска точками, группы — по тегам
+M.map = {
+  key = function() return ('%s|%s|%d'):format(FS.query, FS.sort, #FS.results) end,
+  list = function()
+    local out, qw = {}, {}
+    for w in FS.query:lower():gmatch('%w+') do qw[w] = true end
+    for _, h in ipairs(FS.results) do
+      local sub = h.user
+      for _, t in ipairs(h.tags) do if not qw[t:lower()] then sub = t; break end end   -- первый тег не из запроса
+      out[#out + 1] = { path = FS.file_of(h), name = h.name, sub = sub }
+    end
+    return out
+  end,
+  -- путь из карты, файла ещё нет — скачать и потом fn(path); true — взялись
+  need = function(path, fn)
+    if FS.exists(path) then return false end
+    for _, h in ipairs(FS.results) do
+      if FS.file_of(h) == path then FS.fetch(h, fn); A.msg('freesound: downloading ' .. h.name .. ' ...'); return true end
+    end
+    return false
+  end,
+}
 function M.paste(t) if S.typing then S.q = S.q .. t end end   -- Cmd+V в строке запроса
 
 local more

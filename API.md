@@ -184,5 +184,8 @@ for a wave n pixels wide), `preview_pos()` (`pos, len, path` of what plays now),
 items `{ key = 'a', label = 'text', fn = function() end }`). `U` gives the theme colours
 (`U.TEXT U.GREY U.AMBER U.GREEN U.RED U.BG U.PANEL`), `U.set(col)`, `U.text(x, y, s, col)`,
 `U.measure(s)`; `L.rh` is the row height, `L.pad` the padding. Clicks: read `gfx.mouse_x`,
-`gfx.mouse_y`, `gfx.mouse_cap` in `draw`. An error in a module shows in the status line
+`gfx.mouse_y`, `gfx.mouse_cap` in `draw`. A module may also give the map pane a source: `M.map = { key = fn, list = fn, need = fn }` -
+`key()` changes when the list changes, `list()` returns `{ path, name, sub }` (sub - the group),
+`need(path, fn)` downloads a file that is not on disk yet and calls `fn(path)` (true - it took it).
+An error in a module shows in the status line
 and does not stop the tracker. See `modules/freesound.lua` for a full one.
