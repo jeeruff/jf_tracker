@@ -240,7 +240,6 @@ local state = {
   keymark = flag('keymark', true),     -- 21 окт: ноты вне лада (:key) — красноватые
   keysnap = flag('keysnap', false),
   chordlead = flag('chordlead', true), -- 21 окт: аккорд пишется с голосоведением от прошлого аккорда трека (:chord lead)    -- 21 окт: набор в ладу — клавиша вне лада к ближайшей ступени   -- 21 окт: колонка аккордов мастера (видна и без аккордов)
-  offit = flag('offit', false),   -- 31 окт: свободный OFF как ^^^ (Impulse Tracker); 2 ноя: заменено freeglyph
   endglyph = (function() local v = reaper.GetExtState(EXT, 'endglyph'); return v ~= '' and v or '===' end)(),   -- 2 ноя: знак конца ноты
   freeglyph = (function() local v = reaper.GetExtState(EXT, 'freeglyph'); return v ~= '' and v or 'OFF' end)(),   -- 2 ноя: знак свободного OFF
   offrel = tonumber(reaper.GetExtState(EXT, 'offrel')) or 30,
@@ -687,7 +686,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'offit', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3770,18 +3769,6 @@ ctx = {
     for i, g in ipairs(L.flat) do if g.col == col and not g.env and not g.ml then vim.cur.fi = i; break end end
     vim.msg = (col.name ~= '' and col.name or 'track') .. ': automation ' .. (cur and 'hidden (envelopes + MIDI lanes)' or 'shown') .. '  (a again)'
   end,
-  envs_folded = function()
-    local f = L and L.flat and L.flat[vim.cur.fi]
-    local col = f and f.col
-    if not (col and col.guid) then return false end
-    local folded = state.folds[col.guid]
-    local narrow = (state.wlevel and state.wlevel[col.guid]) or state.wzlevel
-    if not (folded or narrow) or state.trackenvs[col.guid] == true then return false end   -- уже показана — a как раньше
-    if folded then ctx.fold(col, false) end
-    state.trackenvs[col.guid] = true
-    vim.msg = (col.name or 'track') .. ': its automation shown (a again - envelopes of all tracks)'
-    return true
-  end,
   -- кнопка A в шапке — только этот трек
   toggle_track_envs = function(col)
     local cur = state.trackenvs[col.guid]; if cur == nil then cur = state.envs end
@@ -4532,24 +4519,6 @@ ctx = {
       if reaper.time_precise() - t0 > budget then return end
     end
     FB.presets = J.out; FB.pjob = nil; FB.gen = FB.gen + 1
-  end,
-  fx_presets_build = function()
-    local dir = reaper.GetResourcePath() .. '/presets'
-    local files = {}
-    local i = 0
-    while true do
-      local fn = reaper.EnumerateFiles(dir, i)
-      if not fn then break end
-      if fn:match('%.ini$') then
-        local fh = io.open(dir .. '/' .. fn, 'r')
-        if fh then files[#files + 1] = { name = fn, text = fh:read('a') or '' }; fh:close() end
-      end
-      i = i + 1
-      if i > 5000 then break end
-    end
-    FB.presets = FB.PI.build(files, FB.list)
-    FB.gen = FB.gen + 1
-    return #FB.presets, #files
   end,
   fx_list = function()
     local items = {}

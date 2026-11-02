@@ -5004,25 +5004,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     D.draw_mode(L, x + L.pad, ly + math.floor((math.min(h, 3 * L.rh) - 2 * L.th) / 2) - 2, 3 * res, info.status_left)
     x = x + res + 3 * L.pad; w = w - res - 3 * L.pad
   end
-  -- big status (5 окт): левая треть — режим крупно (две строки высотой),
-  -- клавиатура и транспорт — правее; мелкий статус — строкой под ними
   local cc = info and info.ctrl or {}
-  -- big status ОТКЛЮЧЁН (5 окт): не хватало места остальному транспорту; код оставлен
-  --[==[
-  if cc.bigstatus and st and w > 60 * L.cw then
-    -- ширина — по тексту (5 окт: треть была многовато), не больше трети;
-    -- INSERT — красным
-    local s = ((st[1] or ''):match('^[^|]*') or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-    local room = math.floor(w / 3) - 3 * L.pad
-    while s ~= '' and D.big_measure(s, 2) > room do s = s:sub(1, -2) end
-    local third = (s ~= '' and D.big_measure(s, 2) or 0) + 3 * L.pad
-    local ins = info and info.vmode == 'insert'
-    if s ~= '' then D.big_text(x + L.pad, ly, s, ins and U.RED or U.AMBER, 2) end
-    set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(x + third - L.pad, ly + 1, 1, 2 * L.rh - 2, 1)
-    x, w = x + third, w - third
-    st.big = true
-  end
-  --]==]
   -- 2 ноя: клавиатура (oct / клавиши / vel) — блоком слева от транспорта, не первой: D.kbd_block рисует её с x,
   -- возвращает правый край; ширина — пробным проходом за экраном (без меток f и наведения)
   D.kbd_block = function(x)
