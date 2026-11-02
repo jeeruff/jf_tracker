@@ -4982,7 +4982,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     st.big = true
   end
   --]==]
-  local tx = x + L.pad
+  -- 2 ноя: клавиатура (oct / клавиши / vel) — блоком слева от транспорта, не первой: D.kbd_block рисует её с x,
+  -- возвращает правый край; ширина — пробным проходом за экраном (без меток f и наведения)
+  D.kbd_block = function(x)
+    local tx = x + L.pad
   if p then
     local dim = p.active == false
     local lbl = ('oct %d'):format(p.octave or 4)
@@ -5143,10 +5146,22 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.strip_cols[#D.strip_cols + 1] = { x + L.pad, tx - L.pad, (p.ins and { { nk, 'notes' }, { ok2, 'oct' } }) or { { ok2, 'oct' }, { 'm', 'keys' } } }
     end
   end
+    return tx
+  end
+  local tx = x + L.pad
+  D.kbd_w = 0
+  if p then
+    local h0, ns, o1, o2, o3 = D.hint, #D.strip_cols, out.white, out.black, out.letters
+    D.hint = nil
+    D.kbd_w = D.kbd_block(-100000) - (-100000 + L.pad)
+    D.hint = h0; for k = #D.strip_cols, ns + 1, -1 do D.strip_cols[k] = nil end
+    out.white, out.black, out.letters = o1, o2, o3
+  end
   -- полоса транспорта (5 окт): от детального к общему — клавиатура, шаг
   -- (step / inst / vel / pitch), кнопки транспорта, время и BPM, LPB / sig /
   -- доли / metro, запись; тоглы — у самого правого края. Блоки слева
   -- направо, что не влезло — не рисуется (без наложений)
+  if not info then if p then D.kbd_block(x) end; return out end   -- без транспорта (тест, узкая полоса) — клавиатура на старом месте
   local tw = x + w - L.pad - tx
   if tw <= 0 or not info then return out end
   local c = info.ctrl or {}
@@ -5528,6 +5543,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   addg('step')
   addg('listen')   -- 12 окт: step / sel / line
+  if D.kbd_w > 0 then order[#order + 1] = { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } end
   order[#order + 1] = { w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
