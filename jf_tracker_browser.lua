@@ -62,6 +62,7 @@ B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or f
 B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '0')
 -- sync (3 окт): пока проект играет, прослушивание файла стартует с начала следующего такта
 B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
+B.pvitem = R.GetExtState and R.GetExtState('jf_tracker', 'pvitem') == '1'   -- 2 ноя: прослушанное — во вкладку item (по умолчанию нет: казалось, что сэмпл уже взят)
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 -- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
 B.wscroll = not (R.GetExtState and R.GetExtState('jf_tracker', 'brwscroll') == '0')
@@ -1484,6 +1485,10 @@ function B.click(what)
     B.via_track = not B.via_track
     if R.SetExtState then R.SetExtState('jf_tracker', 'brtrack', B.via_track and '1' or '0', true) end
     if ctx.msg then ctx.msg(B.via_track and 'listen through the selected track (its FX)' or 'listen direct (no track FX)') end
+  elseif what == 'pvitem' then   -- 2 ноя: прослушанный файл — ещё и во вкладку item
+    B.pvitem = not B.pvitem
+    if R.SetExtState then R.SetExtState('jf_tracker', 'pvitem', B.pvitem and '1' or '0', true) end
+    if ctx.msg then ctx.msg(B.pvitem and 'item: the file you listen to opens in the item tab' or 'item off: listening does not touch the item tab') end
   elseif what == 'sync' then
     B.sync = not B.sync
     if R.SetExtState then R.SetExtState('jf_tracker', 'brsync', B.sync and '1' or '0', true) end
@@ -1986,7 +1991,7 @@ function B.player_block(U, L, x, y, w, h, btn, opts)
     local by = y + h - L.rh - 2
     local bx = x + L.pad + 2
     for _, b in ipairs({ { 'wave', 'wave', B.wave },   -- 11 окт: find — слева от стрелок < > (на виду), здесь не дублируется
-                         { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { 'scroll', 'wscroll', B.wscroll }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
+                         { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { 'scroll', 'wscroll', B.wscroll }, { 'item', 'pvitem', B.pvitem }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
     end

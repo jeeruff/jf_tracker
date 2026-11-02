@@ -15134,8 +15134,8 @@ ctx = {
   preview_file = function(path, sec)
     local c = cur_col()
     PV.sync = B.sync; PV.file(ctx.preview_track(), path, sec)   -- без лимита: файл целиком, следующий выбор останавливает
-    -- проигрываемый файл сразу открывается в сэмпл-модуле
-    if state.top and SL.open_file then
+    -- проигрываемый файл сразу открывается в сэмпл-модуле — 2 ноя: только с кнопкой item плеера (по умолчанию нет)
+    if B.pvitem and state.top and SL.open_file then
       if state.toptab ~= 'sample' then state.toptab = 'sample' end
       SL.open_file(path, c and c.track)
     end
