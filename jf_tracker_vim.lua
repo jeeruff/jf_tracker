@@ -3074,6 +3074,33 @@ function V.key_impl(c)
         end
         ensure_visible(); return
       end
+      -- 2 ноя: gn / gN — следующий / предыдущий паттерн, та же строка внутри него (3gn — через три)
+      if (c == ('n'):byte() or c == ('N'):byte()) and ctx.region_rows then
+        local k, dir = V.count or 1, c == ('n'):byte() and 1 or -1
+        V.count = nil
+        local r0, r1 = ctx.region_rows()
+        if not r0 then V.msg = 'gn: no pattern here'; finish_move(); return end
+        local off, row = V.cur.row - r0, V.cur.row
+        local a, b = r0, r1
+        for _ = 1, k do
+          local probe, na, nb = dir > 0 and b + 1 or a - 1
+          for _ = 1, 4096 do
+            if probe < 0 then break end
+            na, nb = ctx.region_rows(probe)
+            if na then break end
+            probe = probe + dir
+          end
+          if not na then break end
+          a, b = na, nb
+        end
+        if a == r0 then V.msg = dir > 0 and 'gn: no pattern after this one' or 'gN: no pattern before this one'
+        else
+          if ctx.jump_mark then ctx.jump_mark() end
+          V.cur.row = math.min(b, a + off)
+          if a + off > b then V.msg = 'pattern shorter - its last row' end
+        end
+        finish_move(); ensure_visible(); return
+      end
       if c == ('w'):byte() then
         -- gw (4 окт): событие под курсором меняется местами с N-м вперёд в
         -- этой колонке (3gw — с третьим)
@@ -4479,7 +4506,7 @@ local PENDING_HINT = {
   d = 'd: d rows of this subcolumn out, below moves up (3dd; dD - whole track, dl - all tracks) | w clear the row, nothing moves | W clear the row, all tracks | i whole item | c column values (field - pattern) | C the whole column (field - the whole track) | t remove time selection | r track in region | R region, all tracks | T whole track, all regions | a all... (e l j k h) | p to the pattern start | P to the pattern end | Space up to the pause | S all of the selected tracks | j k rows | G to end | gg to start | } { bar | $ fields | 3w count | Esc',
   y = 'y: y rows | c the field column (pattern) | w event | j k rows | G to end | gg to start | } { bar | 3j count | Esc',
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
-  g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
+  g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | n N next / prev pattern (same row) | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
   z = 'z: a fold | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
