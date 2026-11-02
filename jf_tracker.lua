@@ -33389,6 +33389,45 @@ end
 -- autozoom выключается (он держит трек курсора широким)
 -- 31 окт: второе zw подряд — slim: у каждого трека столько колонок команд, сколько занято (самая длинная строка
 -- команд его нот), трек без событий — компактно (нота + волна); третье — снова поровну
+-- 2 ноя: zA — во всех треках убрать пустое: колонки (delay, команды), лишние подколонки нот, огибающие и MIDI-лейны
+-- без событий (у трека без автоматизации — вся автоматизация). Ещё раз — всё как было
+ctx.hide_empty = function()
+  if ctx.he_back then
+    local b = ctx.he_back; ctx.he_back = nil
+    state.wlevel, state.subs_min, state.trackenvs, state.folds = b.wlevel, b.subs_min, b.trackenvs, b.folds
+    relayout(); vim.msg = 'zA: empty columns and lanes back'; return
+  end
+  local function cp(t) local o = {}; for k, v in pairs(t or {}) do o[k] = v end; return o end
+  ctx.he_back = { wlevel = cp(state.wlevel), subs_min = cp(state.subs_min), trackenvs = cp(state.trackenvs), folds = cp(state.folds) }
+  state.wlevel, state.subs_min, state.trackenvs = state.wlevel or {}, state.subs_min or {}, state.trackenvs or {}
+  local maxfx, n = L and L.MAXFX or 4, 0
+  for _, col in ipairs(snap and snap.cols or {}) do
+    if not col.master and col.guid then
+      local used, any, dly = 0, false, false
+      for _, ln in ipairs(col.lanes or {}) do
+        state.subs_min[col.guid .. ':' .. tostring(ln.idx)] = nil
+        for _, sub in ipairs(ln.subs or {}) do
+          for _, c in pairs(sub) do
+            if type(c) == 'table' then
+              if c.kind == 'midi' or c.kind == 'audio' then any = true; used = math.max(used, #(c.fx or {})); if (c.delay or 0) > 0 then dly = true end end
+              if c.fx and c.kind == 'cont' then used = math.max(used, #c.fx) end
+            end
+          end
+        end
+      end
+      state.wlevel[col.guid] = not any and 1 or (used > 0 and (3 + math.min(maxfx, used))) or (dly and 3 or 2)
+      local auto = false
+      for _, e in ipairs(col.envs or {}) do
+        if e.env and reaper.ValidatePtr(e.env, 'TrackEnvelope*') and (reaper.CountEnvelopePoints(e.env) > 1 or reaper.CountAutomationItems(e.env) > 0) then auto = true; break end
+      end
+      for _, ml in ipairs(col.mlanes or {}) do if ml.ev and next(ml.ev) then auto = true; break end end
+      state.trackenvs[col.guid] = auto
+      n = n + 1
+    end
+  end
+  relayout()
+  vim.msg = ('zA: %d tracks - empty columns and lanes hidden (zA again - back)'):format(n)
+end
 ctx.fit_slim = function()
   state.autozoom = nil
   state.wlevel = state.wlevel or {}

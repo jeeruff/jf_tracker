@@ -3168,6 +3168,7 @@ function V.key_impl(c)
         -- 2 ноя: после z> z< — дальше > < без z, пока не нажата другая клавиша (. , не трогаем: в Vim это повторы)
         V.zrep = true; V.zrep_all = c == ('>'):byte() or c == ('<'):byte()
         if V.zrep_all then V.msg = (V.msg or '') .. '  (> < again - more, without z)' end
+      elseif c == ('A'):byte() then if ctx.hide_empty then ctx.hide_empty() end   -- 2 ноя: zA — пустые колонки и лейны всех треков
       elseif c == ('F'):byte() then   -- 1 ноя: zF (было zM, 7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
         local any = false
         for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
@@ -4508,7 +4509,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | n N next / prev pattern (same row) | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold | A hide empty (all) | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | m minimize the pane | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',
