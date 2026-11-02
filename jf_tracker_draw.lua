@@ -9961,10 +9961,9 @@ function D.frame(L, snap, rows, state, info)
     -- 1 ноя: имя паттерна у стыка — на последней строке уходящего и на первой строке следующего (в полосе регионов)
     if L.rg_w > 0 and not L.ruler_right and not r.clip then
       local pn = (patb[r.row] and patb[r.row].nxt) or (patb[r.row + 1] and patb[r.row + 1].prv)
-      if pn then
-        local px, pw = tx0 + L.jl_w + 3, L.rg_w - 5
-        set(U.BG); gfx.rect(px, y + 1, pw, L.rh - 2, 1)
-        text(px + 1, ty, fit(pn, pw - 1), is_cur_row and U.AMBER or U.TEXT)
+      if pn then   -- 2 ноя: рисуются после полосы регионов (её подложка их закрашивала) — D.pat_names ниже
+        D.pat_names = D.pat_names or {}
+        D.pat_names[#D.pat_names + 1] = { tx0 + L.jl_w + 3, y, L.rg_w - 5, ty, pn, is_cur_row }
       end
     end
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
@@ -10524,6 +10523,11 @@ function D.frame(L, snap, rows, state, info)
     end
     if mx >= rx0 + L.jl_w and mx < rx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
+  for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
+    set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
+    text(p[1] + 1, p[4], fit(p[5], p[3] - 1), p[6] and U.AMBER or U.TEXT)
+  end
+  D.pat_names = nil
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
   -- уголке с именем, на линейке и в матрице
   if L.ruler_w > 0 and info.ruler and #rows > 0 and state.rgbar ~= false then

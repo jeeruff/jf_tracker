@@ -2471,7 +2471,7 @@ function V.key_impl(c)
       local hx = (c < 256) and string.char(c):upper() or ''
       if c == BS or c == DEL then ctx.ml_del(mlf, V.cur.row); V.hexbuf = nil; return end
       if c == 13 and not V.hexbuf and ctx.lane_menu and ctx.lane_menu() then return end   -- 31 окт: Enter — что вставить
-      if ml.kind == 'cc' or ml.kind == 'pc' then
+      if ml.kind == 'cc' or ml.kind == 'pc' or ml.kind == 'at' or ml.kind == 'pat' then   -- 2 ноя: и AT / PAT (цифры пропадали)
         local v, raw = num_key(c)
         if v == 'wait' then return end
         if v then
@@ -2480,6 +2480,13 @@ function V.key_impl(c)
         end
       end
       V.hexbuf = nil                                 -- 11 окт: недобранное число не держит клавиши
+      -- 2 ноя: не значение — клавиша NORMAL (0 $ w b dd yy …), потом снова INSERT, как на огибающей (0 молчал)
+      if c ~= ESC and c < 256 and string.char(c):match('[%w%$%^]') then
+        V.mode = 'normal'
+        local r = V.key_impl(c)
+        if V.mode == 'normal' then if V.pending or V.op then V.back_insert = true else V.mode = 'insert' end end
+        return r
+      end
       keys_control(c); return
     end
     local env = env_of(V.cur.fi)
