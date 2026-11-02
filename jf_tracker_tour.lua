@@ -11,50 +11,65 @@
 local T = { active = false, step = 1, ok = false, ok_t = 0, hover = nil }
 
 T.STEPS = {
+  -- 2 ноя: у шага — короткое объяснение (text) и шаги «нажмите …» (todo), звёздочками, как в справке
   -- 5 окт: сначала философия (почему jf), потом hjkl, потом f — куда угодно
   { mod = 'tracker', focus = 'tracker', title = 'Why jf',
-    text = 'Put your index fingers on f and j - the two keys with bumps. That is the name: jf = hands on the home row. Every module answers to letters, the mouse is optional. Press j.',
+    text = 'Your index fingers rest on f and j - the two keys with bumps. That is the name: jf = hands on the home row. Every module answers to letters, the mouse is optional.',
+    todo = { 'Put your fingers on f and j.', 'Press j - the cursor goes one row down.' },
     check = function(e, b) return e.row ~= b.row end },
   { mod = 'tracker', focus = 'tracker', title = 'Move',
-    text = 'h j k l move the cursor, gg / G - start / end, { } - bars. Try h and l: the cursor walks across the columns.',
+    text = 'h j k l move the cursor: left, down, up, right. gg - the start, G - the end, { } - a bar back / on.',
+    todo = { 'Press l a few times - the cursor walks right across the columns.', 'Press h to come back.' },
     check = function(e, b) return e.fi ~= b.fi end },
   { mod = 'tracker', focus = 'tracker', title = 'Jump anywhere',
-    text = 'f puts two-letter labels on everything on screen: any module, button or bar. Type its two letters and you are there. Press f, then type the letters of a label, for example x x.',
+    text = 'f puts two-letter labels on everything on screen - any module, button or bar line. Type the two letters of a label and you are there.',
+    todo = { 'Press f - yellow labels appear.', 'Type the two letters of any label (for example a a).' },
     check = function(e, b) return e.hj ~= b.hj end },
-  -- 1 ноя: режимы — отдельным шагом, до записи нот (пользователь: объяснить, что трекер работает в разных режимах)
+  -- 1 ноя: режимы — отдельным шагом, до записи нот
   { mod = 'tracker', focus = 'tracker', title = 'Two modes: NORMAL and INSERT',
-    text = 'jf_tracker works in modes, like Vim. NORMAL (where you start) - keys move, edit and run commands: j moves, x deletes. INSERT - the keys write notes on the cursor row. i enters INSERT, as in Vim; Esc leaves it. Esc also enters it - a habit kept from Renoise (and with the keyboard on, i is a note, so Esc is the way in). The word at the bottom says which mode. Press i or Esc (INSERT, red cursor), then Esc (NORMAL).',
+    text = 'jf_tracker works in modes, like Vim. NORMAL (where you start): keys move and edit - j moves, x deletes. INSERT: keys write notes. The big word at the bottom left says which mode you are in.',
+    todo = { 'Press i - the word says INSERT, the cursor turns red.', 'Press Esc - back to NORMAL.', '(Esc also enters INSERT - a habit kept from Renoise; with the keyboard on, i is a note, so then use Esc.)' },
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'tracker', focus = 'tracker', title = 'Write notes',
-    text = 'In INSERT the keyboard writes: 1 f1 2 f2 3 ... are notes, [ ] - octave (layout qwerty: q 2 w 3 e ..., z / x); m turns the keyboard off and on. Press i (or Esc) for INSERT, write a few notes, then press Esc to leave INSERT.',
+    text = 'In INSERT the keyboard writes notes. Layout frow: 1 f1 2 f2 3 ... are the notes, [ ] the octave. Layout qwerty: q 2 w 3 e ..., z / x the octave. m turns the note keyboard off and on.',
+    todo = { 'Press i to enter INSERT.', 'Press a few note keys - notes appear and the cursor moves on.', 'Press Esc to leave INSERT.' },
     check = function(e, b, s) if e.mode == 'insert' and e.change ~= b.change then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'inst', focus = 'inst', title = 'Pick a sound',
-    text = 'The lib: every sample of the project. j / k pick a sound (from the tracker ( ) or Opt+J / K do the same). Pick another sound.',
+    text = 'The lib on the right holds every sound of the project. The note keys write the sound picked here. From the tracker Opt+J / Opt+K pick the previous / next sound.',
+    todo = { 'Press j or k - another sound is picked.' },
     check = function(e, b) return e.inst ~= b.inst end },
   { mod = 'top', focus = 'top', title = 'Slice a break',
-    text = 'The item tab shows the selected sample: s opens the slice menu - s8 = eight slices, st = transients; in INSERT the note keys write its slices: 1 = slice 1, f1 = slice 2, 2 = slice 3 ...; ` in NORMAL plays the whole sample (:whole writes it). Open the item tab (Enter in the lib, or Ctrl+W g i).',
+    text = 'The item tab shows the picked sample. s opens the slice menu: s8 - eight equal slices, st - at the transients. In INSERT the note keys then write the slices: 1 = slice 1, f1 = slice 2, 2 = slice 3 ... Ctrl+Shift+1 writes the whole sample.',
+    todo = { 'In the lib press Enter on a sample (or Ctrl+W g i) - the item tab opens.' },
     check = function(e) return e.toptab == 'sample' end },
   { mod = 'tracker', focus = 'tracker', title = 'Edit like text',
-    text = 'x deletes, dw / d3j / dG delete with a motion, yy p copy, u undo, . repeats. Make any edit.',
+    text = 'Edits work like in a text editor. x deletes, dw / d3j delete with a motion, yy copies the row, p pastes, u undoes, . repeats the last edit.',
+    todo = { 'Put the cursor on a note and press x - it is gone.', 'Press u - it is back.' },
     check = function(e, b) return e.change ~= b.change end },
   { mod = 'tracker', focus = 'tracker', title = 'Select',
-    text = 'v selects a block, V whole rows; then d y M, or :interp vol to ramp the volumes. Press v.',
+    text = 'v starts a block selection, V selects whole rows. Then d deletes it, y copies it, :interp vol ramps the volumes in it.',
+    todo = { 'Press v.', 'Press j a few times - the block grows.', 'Press Esc to drop it.' },
     check = function(e) return e.mode == 'visual' or e.mode == 'vline' end },
   { mod = 'tracker', focus = 'tracker', title = 'Commands',
-    text = ': opens the command line - :arp up 2, :legato, :macro, :pt, :big; Tab completes. Press :',
+    text = ': opens the command line: :arp up 2, :legato, :macro, :pt, :big ... Tab completes a command name.',
+    todo = { 'Press : (Shift+;).', 'Type ar and press Tab - it completes to arp.', 'Press Esc to close it.' },
     check = function(e) return e.mode == 'cmd' end },
-  { mod = 'tracker', focus = 'tracker', title = 'Leader menu',
-    text = '\\ opens the menu of what is under the cursor, like the right click; \\\\ (twice) - the main menu of everything (v view, P project, o options). Press \\',
+  { mod = 'tracker', focus = 'tracker', title = 'Menus',
+    text = '\\ opens the menu of what is under the cursor - the same as the right click. \\ twice opens the main menu of everything (v view, P project, o options). Every item has its letter.',
+    todo = { 'Press \\ - the menu of the cursor cell opens.', 'Press Esc to close it.' },
     check = function(e) return e.hydra end },
   -- 27 окт: карта сэмплов — найти звук случайно, а не листая списки
   { mod = 'map', focus = 'map', title = 'Find a sound by chance',
-    text = 'The map pane (a tab next to the browser, Ctrl+W w): every sound file of the browser folder as dots in groups - kick, snare, loop ... v changes the view (graph, cards, nebula - a galaxy with sectors), r or ξ plays a random file, a click on a dot plays it, Shift+click on a group goes into it (Esc - back). Go to the map pane.',
+    text = 'The map pane shows every sound file of the browser folder as dots in groups - kick, snare, loop ... A click on a dot plays it, r plays a random one, v changes the view, Shift+click on a group goes into it (Esc - back).',
+    todo = { 'Press Ctrl+W, then g, then w - the map pane gets the focus.', 'Click a few dots, or press r.' },
     check = function(e) return e.focus == 'map' end },
   { mod = 'ctrl', focus = 'tracker', title = 'Play',
-    text = 'Space - play / stop, F - follow the playhead. It is all plain REAPER: close the window and the tracks, items and MIDI stay. Press Space.',
+    text = 'Space plays and stops. It is all plain REAPER underneath: close the tracker window and the tracks, items and MIDI stay and play.',
+    todo = { 'Press Space - it plays.', 'Press Space again to stop.' },
     check = function(e) return e.playing end },
   { mod = 'dsp', focus = 'tracker', title = 'Help',
-    text = 'the help button - the whole help, / searches it; the help button of the main module shows the keys of the focused module, live. Press F1',
+    text = 'F1 opens the whole help: sections on the left, / finds anything. ? shows the keys of the module you are in, and the help pane follows the focus.',
+    todo = { 'Press F1 - the help opens.', 'Press F1 again to close it.' },
     check = function(e) return e.khelp_big end },
 }
 
@@ -117,19 +132,32 @@ function T.draw_bubble(U, L, rects, W, H, fit)
   local r = rects[st.mod] or rects.tracker
   if not r then return end
   local bw = math.min(math.max(L.cw * 30, math.floor(r[3] * 0.6)), W - 2 * L.pad)
-  local lines, cur = {}, ''
-  for word in st.text:gmatch('%S+') do
-    local try = cur == '' and word or (cur .. ' ' .. word)
-    if U.measure(try) > bw - 2 * L.pad and cur ~= '' then lines[#lines + 1] = cur; cur = word else cur = try end
+  -- 2 ноя: объяснение, потом шаги звёздочками (* Press i ...), перенос с отступом под звёздочкой
+  local lines = {}
+  local function wrap(txt, first, rest, col)
+    local cur, pre = '', first
+    for word in txt:gmatch('%S+') do
+      local try = cur == '' and word or (cur .. ' ' .. word)
+      if U.measure(pre .. try) > bw - 2 * L.pad and cur ~= '' then lines[#lines + 1] = { pre .. cur, col }; cur, pre = word, rest else cur = try end
+    end
+    if cur ~= '' then lines[#lines + 1] = { pre .. cur, col } end
   end
-  if cur ~= '' then lines[#lines + 1] = cur end
+  wrap(st.text, '', '', U.TEXT)
+  if st.todo then
+    lines[#lines + 1] = { '', U.TEXT }
+    for _, d in ipairs(st.todo) do wrap(d, '* ', '  ', d:sub(1, 1) == '(' and U.GREY or U.TEXT) end
+  end
   local bh = (#lines + 1) * L.rh + 2 * L.pad
   local bx = math.max(L.pad, math.min(W - bw - L.pad, r[1] + math.floor((r[3] - bw) / 2)))
   local by = math.max(2, math.min(H - bh - 2, r[2] + math.floor((r[4] - bh) / 2)))
   U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
   U.set(T.ok and U.GREEN or U.AMBER); gfx.rect(bx, by, bw, bh, 0); gfx.rect(bx + 1, by + 1, bw - 2, bh - 2, 0)
   U.text(bx + L.pad, by + L.pad, fit(('%d. %s%s'):format(T.step, st.title, T.ok and '  - ok' or ''), bw - 2 * L.pad), T.ok and U.GREEN or U.AMBER)
-  for i, l in ipairs(lines) do U.text(bx + L.pad, by + L.pad + i * L.rh, l, U.TEXT) end
+  for i, l in ipairs(lines) do
+    local yy = by + L.pad + i * L.rh
+    if l[1]:sub(1, 2) == '* ' then U.text(bx + L.pad, yy, '*', U.AMBER); U.text(bx + L.pad + U.measure('* '), yy, l[1]:sub(3), l[2])
+    else U.text(bx + L.pad, yy, l[1], l[2]) end
+  end
 end
 
 return T
