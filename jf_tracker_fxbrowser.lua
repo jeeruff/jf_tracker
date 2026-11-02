@@ -348,10 +348,13 @@ function FB.key(c, mods)
       local i = FB.tree_cur
       repeat i = i + d until not rows[i] or not rows[i].hdr
       if rows[i] then FB.tree_cur = i end
+      -- 2 ноя: как в lf — справа сразу то, что в папке под курсором (опция fx browser: Enter opens a folder — ждать Enter)
+      local r = rows[FB.tree_cur]
+      if not FB.enter_wait and r and r.node then FB.node = r.node; FB.cur = 1; FB.scroll = 0; skip_hdr(1) end
     end
     if ch == 'j' or c == DOWN then if tree then tstep(1) else FB.cur = math.min(math.max(1, n), FB.cur + 1); skip_hdr(1) end; return true end
     if ch == 'k' or c == UP then if tree then tstep(-1) else FB.cur = math.max(1, FB.cur - 1); skip_hdr(-1) end; return true end
-    if ch == 'G' then if tree then FB.tree_cur = #rows else FB.cur = math.max(1, n); skip_hdr(-1) end; return true end
+    if ch == 'G' then if tree then FB.tree_cur = #rows + 1; tstep(-1) else FB.cur = math.max(1, n); skip_hdr(-1) end; return true end
     if (ch == 'h' or c == 1818584692) and FB.tree_on then FB.col = 1; return true end
     if (ch == 'l' or c == 1919379572) and FB.tree_on then FB.col = 2; return true end
     if ch == '*' then FB.toggle_fav(FB.selected()); return true end
