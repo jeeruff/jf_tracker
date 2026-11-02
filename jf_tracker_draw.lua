@@ -432,8 +432,8 @@ function D.layout(snap, state, nregions)
   L.pad = ms(' ')
   if L.pad < 2 then L.pad = math.max(3, math.floor(ms('W') / 2)) end
   L.cw = ms('W')
-  L.w_note = ms(D.micro and 'C#4^^' or 'C#4')   -- 16 окт: микротоны — метка ^ / v после октавы (2 знака)
-  EMPTY[1] = D.micro and '.....' or '...'
+  L.w_note = ms('C#4')   -- 2 ноя: место под метку микротона (^^) — только у лейна, где микротоны есть (L.microG)
+  EMPTY[1] = '...'
   L.w_vol = ms('FF')
   L.w_del = ms('FF')
   L.w_fx = ms('0UFF')                -- 12 окт: код из двух символов, как в Renoise
@@ -499,6 +499,23 @@ function D.layout(snap, state, nregions)
   -- сдвинуты на его ширину; у остальных лейнов места не резервируется
   L.w_tfx = ms('φ') + 2   -- 31 окт: знак take FX — одна буква φ (было «fx» в рамке у каждой ноты — пестрило)
   L.GTc = setmetatable({}, { __mode = 'k' })
+  -- 2 ноя: лейн с микротонами — поле ноты шире на «^^», всё правее сдвигается (у остальных лейнов — узко)
+  L.GMc = setmetatable({}, { __mode = 'k' })
+  function L.microG(G)
+    G = G or L
+    if G.micro_w or G.wave_only then return G end
+    local k = L.GMc[G]
+    if k then return k end
+    local s0, d = G.x_note, ms('^^')
+    local function sh(v) if v and v > s0 then return v + d end return v end
+    local fx2 = {}
+    for n, v in ipairs(G.x_fx or {}) do fx2[n] = sh(v) end
+    k = setmetatable({ micro_w = true, w_note = (G.w_note or L.w_note) + d, x_inst = G.x_inst and sh(G.x_inst) or G.x_inst, x_slc = G.x_slc and sh(G.x_slc) or G.x_slc,
+      x_vol = sh(G.x_vol), x_pan = G.x_pan and sh(G.x_pan) or G.x_pan, x_fx = fx2, x_del = sh(G.x_del), x_fold = G.x_fold and sh(G.x_fold) or G.x_fold,
+      x_tfx = G.x_tfx, sub_w = (G.sub_w or 0) + d }, { __index = G })
+    L.GMc[G] = k
+    return k
+  end
   function L.tfxG(G)
     G = G or L
     if not G.x_inst or G.notes_only or G.narrow or G.wave_only then return G end
@@ -973,6 +990,7 @@ function D.layout(snap, state, nregions)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
+          if lane.has_micro then G = L.microG(G) end   -- 2 ноя: шире — только этот лейн
           -- 21 окт: волна — только когда есть что показать (аудио в лейне или кит с сэмплами); tw — выбор трека (D.wave_pref:
           -- true / false / nil = авто). Пул lib общий на все треки — по нему не судить (так колонка не уходила никогда)
           if not narrow then
@@ -2358,7 +2376,7 @@ local FXG = { ['0M'] = 'RN_VOL', ['0I'] = 'RN_VOL', ['0O'] = 'RN_VOL', SI = 'RN_
   ['0U'] = 'RN_PITCH', ['0D'] = 'RN_PITCH', ['0G'] = 'RN_PITCH', ['0V'] = 'RN_PITCH', ['0A'] = 'RN_PITCH', SF = 'RN_PITCH', SB = 'RN_GLOBAL' }
 D.fx_slots, D.fx_dim = {}, {}   -- 12 окт: слоты команд строки продолжения (переиспользуются, без аллокаций в кадре)
 D.FX_COL = setmetatable({}, { __index = function(_, k) return FXG[k] and D[FXG[k]] end })
-local function empty_text(fld) return fld <= 3 and EMPTY[fld] or '....' end
+local function empty_text(fld, G) if fld == 1 and G and G.micro_w then return '.....' end; return fld <= 3 and EMPTY[fld] or '....' end
 
 -- 18 окт: цвет поля (как у его значения): громкость, delay, команды, слайс, пан; нота и инструмент — текстом (nil)
 function D.field_rgb(fld)
@@ -2457,7 +2475,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     draw_inst()
     for fld = 1, nf do
       local fx = D.field_rect(L, fld)
-      text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
+      text(x + fx, ty, empty_text(fld, L), c(fld, D.EMPTY))
     end
     return
   end
@@ -2529,7 +2547,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     local muted = cell.muted
     local offkey = D.key_pcs and cell.pitch and not cell.video and not D.key_pcs[math.floor(cell.pitch + 0.5) % 12]   -- 21 окт: нота вне лада (:key mark)
     text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))))   -- видео-событие (9 окт)
-    if cell.micro and D.micro and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
+    if cell.micro and L.micro_w and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
     elseif cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.RN_DELAY))
@@ -2583,7 +2601,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
         local skip = (fld == 2 and cell.vol ~= nil) or (fld >= 4 and slot[fld - 3])
         if not skip then
           local fx = D.field_rect(L, fld)
-          text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY_UNDER))
+          text(x + fx, ty, empty_text(fld, L), c(fld, D.EMPTY_UNDER))
         end
       end
       -- точка огибающей громкости take на этой строке (5 окт)
@@ -2610,7 +2628,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       text(x + L.x_note, ty, body, c(1, D.CONT))
       for fld = 2, nf do
         local fx = D.field_rect(L, fld)
-        text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
+        text(x + fx, ty, empty_text(fld, L), c(fld, D.EMPTY))
       end
     end
   end

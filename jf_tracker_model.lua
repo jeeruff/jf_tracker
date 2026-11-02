@@ -395,6 +395,7 @@ local function place(lane, r0, r1, head, cont, tail, e1)
   end
   if not sub then sub = {}; lane.subs[#lane.subs + 1] = sub end
   sub[r0] = head
+  if head.micro then lane.has_micro = true end   -- 2 ноя: шире колонка нот — только у этого лейна
   local rf = head.rowfx                -- 12 окт: команды своих строк внутри ноты
   local run = M.run_start(head.fx, rf) -- 12 окт: действующие команды (бледно на строках, где своей нет)
   for r = r0 + 1, r1 - 1 do sub[r] = { kind = 'cont', of = head, i = r - r0, fx = rf and rf[r - r0] }; if run then sub[r].run = M.run_step(run, sub[r].fx) end end
