@@ -29334,7 +29334,7 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then
       SL.mouse_move(hover.sample and hover.sample.frac)
       if SL.drag.kind == 'out' and SL.drag.active then
-        state.status = (hover.fi and hover.row) and ('drop selection → %s @ %04d'):format(hover.col and hover.col.name or '', hover.row.row) or 'drag selection - drop on a track (mother + slice in the row) or on the lib (mother + slice)'
+        state.status = (hover.fi and hover.row) and ('drop selection → %s @ %04d'):format(hover.col and hover.col.name or '', hover.row.row) or 'drag selection - drop on a track (mother + slice in the row) or on the lib (the span as a new sound)'
       end
     else
       local d = SL.mouse_up()
@@ -29343,8 +29343,12 @@ local function frame()
       local ir = draw.module_rects and draw.module_rects.inst
       local on_lib = hover.pool or (ir and gfx.mouse_x >= ir[1] and gfx.mouse_x < ir[1] + ir[3] and gfx.mouse_y >= ir[2] and gfx.mouse_y < ir[2] + ir[4])
       if d and d.kind == 'out' and d.active and on_lib then
+        -- 2 ноя: на lib — выделенный кусок новым звуком (как D), не мать целиком + слайс
         local a, b = SL.span()
-        if a then ctx.drop_span_slice(nil, nil, SL.entry, a, b) end
+        local c = cur_col()
+        if not a then
+        elseif not c or c.master then vim.msg = 'drop: put the cursor on a track first - the lib is the lib of the cursor track'
+        else ctx.depot_span(SL.entry, a, b) end
       elseif d and d.kind == 'out' and d.active and hover.fi and hover.row then
         local a, b = SL.span()
         if a then ctx.drop_span_slice(hover.fi, hover.row.row, SL.entry, a, b) end
