@@ -164,7 +164,7 @@ A custom module is one Lua file that becomes a pane of its own. jf_tracker loads
 The file returns a table:
 
 ```lua
-local M = { id = 'hello', label = 'hello', key = 'h', side = 'right',
+local M = { id = 'hello', label = 'hello', letter = 'h', side = 'right',   -- letter: Ctrl+W c h
   about = 'one line for the hints pane',
   help = { { k = 'j k', d = 'move' }, { k = 'Esc', d = 'back to the tracker' } } }
 function M.init(api) M.api = api end            -- once, when first shown

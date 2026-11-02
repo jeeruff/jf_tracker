@@ -63,8 +63,8 @@ for _, cmd in ipairs({ DIR .. '/modules', reaper.GetResourcePath() .. '/Data/jf_
     i = i + 1
     if fn:match('%.lua$') then
       local ok, cm = pcall(dofile, cmd .. '/' .. fn)
-      if ok and type(cm) == 'table' and cm.id and cm.key and cm.draw
-        and draw.panes.register_custom({ id = cm.id, label = cm.label or cm.id, key = cm.key, hint = cm.id, side = cm.side or 'right' }) then draw.CM[cm.id] = cm end
+      if ok and type(cm) == 'table' and type(cm.id) == 'string' and type(cm.letter) == 'string' and cm.draw   -- letter — буква после Ctrl+W c (key — обработчик клавиш)
+        and draw.panes.register_custom({ id = cm.id, label = cm.label or cm.id, key = cm.letter, hint = cm.id, side = cm.side or 'right' }) then draw.CM[cm.id] = cm end
     end
   end
 end

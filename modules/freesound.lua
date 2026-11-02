@@ -1,9 +1,9 @@
 -- modules/freesound.lua (2 ноя) — custom-модуль: поиск звуков на freesound.org (Ctrl+W c f, :freesound).
 -- Custom-модуль = файл в jf_tracker/modules/ или Data/jf_tracker_modules/, возвращает таблицу:
---   id, label, key (буква после Ctrl+W c), side, help (строки справки { k, d }),
+--   id, label, letter (буква после Ctrl+W c), side, help (строки справки { k, d }),
 --   init(api), draw(U, L, x, y, w, h, focused), key(c, mods) → true, если съел, typing() → идёт набор.
 -- api: R, dir, msg(s), preview_file(path), add_to_depot(path), fit(s, w), focus(id).
-local M = { id = 'freesound', label = 'freesound', key = 'f', side = 'right' }
+local M = { id = 'freesound', label = 'freesound', letter = 'f', side = 'right' }
 M.about = 'Sounds from freesound.org: type words, the results play as you move, Enter puts one into the lib. Every download keeps its author and license in CREDITS.txt.'
 M.help = {
   { k = '/  Enter', d = 'type words, Enter searches freesound.org (<10s >2s - length, cc0 - only CC0 sounds)' },
