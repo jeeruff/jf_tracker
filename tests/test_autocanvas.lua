@@ -175,5 +175,20 @@ do
   local nrow = 0; for _ in pairs(sr2) do nrow = nrow + 1 end
   eq('shape cycle 8 rows: 2 cycles x 8 points', nrow, 16); ACV.cycle = 4
 end
+-- 2 ноя: неровная сетка — паттерны / секции / весь отрезок
+do
+  ACV.marks = { { row = 16, kind = 'pat' }, { row = 40, kind = 'sec' }, { row = 52, kind = 'pat' } }
+  ACV.sr0, ACV.sr1, ACV.snap = 0, 64, true
+  ACV.gmode = 'pat'
+  local a, b = ACV.cell_at(20); eq('pat cell of row 20', a .. '-' .. b, '16-40')
+  eq('pat cellw at 45', ACV.cellw(45), 12)
+  local r = ACV.at({ gx = 0, gy = 0, gw = 64, gh = 100, r0 = 0, nr = 64 }, 30.5, 50); eq('at snaps to the pattern start', r, 16)
+  local sr = ACV.span_rows(0, 0, 63, 1, {}); local k = 0; for _ in pairs(sr) do k = k + 1 end; eq('stroke: a point per pattern', k, 4)
+  ACV.gmode = 'sec'; a, b = ACV.cell_at(20); eq('sec cell of row 20', a .. '-' .. b, '0-40')
+  ACV.gmode = 'all'; a, b = ACV.cell_at(50); eq('all: one cell', a .. '-' .. b, '0-64')
+  ACV.row = 20; ACV.gmode = 'pat'; ACV.key(string.byte('}'), { r0 = 0, r1 = 64 }); eq('} to the next pattern', ACV.row, 40)
+  ACV.key(string.byte('{'), { r0 = 0, r1 = 64 }); eq('{ back to the cell start', ACV.row, 16)
+  ACV.gmode, ACV.marks = nil, nil
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)

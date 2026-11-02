@@ -38,13 +38,44 @@ function ACV.shape_stroke(ra, rb, v)
   for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.cycle, v, ACV.seed)) do out[p.row] = p.v end
   return out, a, b
 end
+-- 2 ноя: сетка неровными клетками — ACV.gmode: 'pat' (паттерн = клетка), 'sec' (секция), 'all' (весь отрезок одной клеткой);
+-- nil — ровная ACV.grid строк. Границы — из span.marks (ACV.marks, ставят draw и main), края отрезка ACV.sr0 / ACV.sr1
+ACV.gmode = nil
+function ACV.cells()
+  local r0, r1 = ACV.sr0 or 0, ACV.sr1 or 1
+  local set, out = { [r0] = true }, { r0 }
+  if ACV.gmode ~= 'all' then
+    for _, mk in ipairs(ACV.marks or {}) do
+      local r = mk.row
+      if (ACV.gmode == 'pat' or mk.kind == 'sec') and r > r0 + 1e-6 and r < r1 - 1e-6 and not set[r] then set[r] = true; out[#out + 1] = r end
+    end
+  end
+  table.sort(out)
+  out[#out + 1] = r1
+  return out
+end
+-- клетка, в которой строка row: начало, конец
+function ACV.cell_at(row)
+  if not ACV.gmode then
+    local g = ACV.grid; local r0 = ACV.sr0 or 0
+    local a = r0 + math.floor((row - r0) / g + 1e-9) * g
+    return a, a + g
+  end
+  local c = ACV.cells()
+  for i = #c - 1, 1, -1 do if row >= c[i] - 1e-9 then return c[i], c[i + 1] end end
+  return c[1], c[2]
+end
+-- ширина клетки у строки (шаг мазка, хвост заливки); без snap — строка
+function ACV.cellw(row) if not ACV.snap then return 1 end; local a, b = ACV.cell_at(row or ACV.row); return math.max(ACV.gmode and 1 or 0.125, b - a) end
+ACV.GMODES = { pat = 'pattern', sec = 'section', all = 'all' }
 ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { x0, y0, x1, y1 } — пиксели: нажатие → мышь (инструмент line) }
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
 function ACV.at(g, mx, my, smooth)
   local row = g.r0 + (mx - g.gx) / math.max(1, g.gw) * g.nr
   row = math.max(g.r0, math.min(g.r0 + g.nr - 1e-6, row))
   -- 30 окт: сетка бывает мельче строки (1/2 … 1/8) — точки между строками; без snap — целые строки
-  if ACV.snap then local st = ACV.grid; row = g.r0 + math.floor((row - g.r0) / st + 1e-9) * st elseif not smooth then row = math.floor(row) end   -- 31 окт: smooth — без snap точка тянется плавно, не по строкам
+  if ACV.snap and ACV.gmode then row = (ACV.cell_at(row))   -- 2 ноя: клетка паттерна / секции
+  elseif ACV.snap then local st = ACV.grid; row = g.r0 + math.floor((row - g.r0) / st + 1e-9) * st elseif not smooth then row = math.floor(row) end   -- 31 окт: smooth — без snap точка тянется плавно, не по строкам
   local v = 1 - (my - g.gy - 2) / math.max(1, g.gh - 4)
   return row, clamp01(v)
 end
@@ -52,6 +83,15 @@ end
 function ACV.span_rows(ra, va, rb, vb, out, erase)
   local st = ACV.snap and ACV.grid or 1
   if rb < ra then ra, rb, va, vb = rb, ra, vb, va end
+  if ACV.snap and ACV.gmode then   -- 2 ноя: по началам неровных клеток
+    for _, r in ipairs(ACV.cells()) do
+      if r >= ra - 1e-9 and r <= rb + 1e-9 then
+        local f = rb > ra and (r - ra) / (rb - ra) or 0
+        if erase then out[r] = false else out[r] = va + (vb - va) * f end
+      end
+    end
+    return out
+  end
   local n = 0
   for r = ra, rb, st do
     local f = rb > ra and (r - ra) / (rb - ra) or 0
@@ -158,9 +198,11 @@ function ACV.range(st, snap)
   local r0, r1 = st.r0 or 0, st.r1 or (ACV.row + 1)
   if ACV.anchor then
     local a, b = math.min(ACV.anchor, ACV.row), math.max(ACV.anchor, ACV.row) + 1
-    if snap then local g = math.max(1, ACV.grid); b = a + math.ceil((b - a) / g) * g end   -- заливка — целыми клетками (форма не сжимается в хвост)
+    if snap and ACV.gmode then a = (ACV.cell_at(a)); b = select(2, ACV.cell_at(b - 1))
+    elseif snap then local g = math.max(1, ACV.grid); b = a + math.ceil((b - a) / g) * g end   -- заливка — целыми клетками (форма не сжимается в хвост)
     return math.max(r0, a), math.min(r1, b)
   end
+  if ACV.gmode then local a, b = ACV.cell_at(ACV.row); return math.max(r0, a), math.min(r1, b) end
   local g = math.max(1, ACV.grid)
   local a = r0 + math.floor((ACV.row - r0) / g) * g
   return a, math.min(r1, a + g)
@@ -253,11 +295,12 @@ function ACV.key(c, st, mods)
   if ACV.zpend then
     ACV.zpend = nil
     if ch == 'p' then ACV.proj = not ACV.proj; return true end
+    if ch == 'g' then return { op = 'gridmenu' } end   -- 2 ноя: zg — сетка (и паттерны / секции / весь отрезок)
     if ch == 'h' then ACV.showhidden = not ACV.showhidden; ACV.tree_gen = (ACV.tree_gen or 0) + 1; return true end   -- 31 окт: zh — скрытые кривые
     if c == 27 then return true end
     return false
   end
-  if ch == 'z' then ACV.zpend = true; return true end
+  if ch == 'z' then ACV.zpend = true; return true end   -- 2 ноя: список — which-key curve_z
   -- 31 окт: как в трекере — dd / dw удалить точку (выделение v — все в нём; пусто — следующую), yy / y — копировать,
   -- p — вставить с курсора; рисование мышью — i (было d)
   if ACV.dpend then
@@ -289,6 +332,10 @@ function ACV.key(c, st, mods)
     return { op = 'leave' }
   elseif ch == 'h' or c == 1818584692 then ACV.row = ACV.row - 1; clamp_row(); return true
   elseif ch == 'l' or c == 1919379572 then ACV.row = ACV.row + 1; clamp_row(); return true
+  elseif (ch == '{' or ch == '}') and ACV.gmode then   -- 2 ноя: к соседней границе клетки
+    local a, b = ACV.cell_at(ACV.row)
+    if ch == '}' then ACV.row = b elseif ACV.row > a + 1e-9 then ACV.row = a else ACV.row = (ACV.cell_at(a - 1)) end
+    clamp_row(); return true
   elseif ch == '{' then ACV.row = ACV.row - math.max(1, ACV.grid); clamp_row(); return true   -- 15 окт: клетка — { } (L P — страницы, как в подсказке)
   elseif ch == '}' then ACV.row = ACV.row + math.max(1, ACV.grid); clamp_row(); return true
   elseif ch == 'g' then ACV.row = r0; return true
@@ -300,6 +347,7 @@ function ACV.key(c, st, mods)
   elseif ch == 'v' then ACV.anchor = ACV.anchor and nil or ACV.row; return true
   elseif ch == '[' or ch == ']' then
     if lfo then return { op = 'lfo', key = 'lfo.speed', mul = ch == '[' and 0.5 or 2 } end
+    if ACV.gmode then ACV.gmode = nil; return true end   -- 2 ноя: из сетки паттернов — к ровной
     local g = ACV.grid
     -- 30 окт: мельче строки — до 1/8 строки (точки между строками огибающей)
     if ch == '[' then g = g > 1 and g // 2 or math.max(0.125, g / 2) else g = math.min((st.lpb or 4) * 4, g * 2) end
@@ -397,6 +445,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   local gx, gy, gw, gh = x + lay.gx, y + lay.gy, lay.gw, lay.gh
   if gw < 10 or gh < 10 then return nil end
   local r0, r1 = span.r0, span.r1
+  ACV.marks, ACV.sr0, ACV.sr1 = span.marks, r0, r1
   local nr = math.max(1, r1 - r0)
   ACV.row = math.max(r0, math.min(r1 - 1, ACV.row))
   local act = curves[ACV.cur]
@@ -412,7 +461,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   -- 31 окт: snap и сетка — первыми (слева), потом инструменты и формы
   tb[#tb + 1] = { lab = 'snap', snap = true, on = ACV.snap }
   tb[#tb + 1] = { lab = '[', grid = -1 }
-  tb[#tb + 1] = { lab = ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
+  tb[#tb + 1] = { lab = ACV.gmode and ACV.GMODES[ACV.gmode] or ACV.grid_label(ACV.grid, span.lpb), grid = 0 }
   tb[#tb + 1] = { lab = ']', grid = 1 }
   for i, t in ipairs(ACV.TOOLS) do tb[#tb + 1] = { lab = t[2], tool = t[1], on = ACV.tool == t[1], gap = i == 1 } end
   -- 30 окт: формы — все кнопками в ряд (выбор формы = инструмент shape); не влезает — одна кнопка со списком
@@ -466,7 +515,7 @@ function ACV.draw(Lx, x, y, w, h, curves, span, focused)
   U.set(U.BG); gfx.rect(gx, gy, gw, gh, 1)
   -- сетка: клетки тускло, такты ярче; уровни 25 / 50 / 75
   local bar = (span.lpb or 4) * 4
-  local g = math.max(1, ACV.grid)
+  local g = ACV.gmode and bar or math.max(1, ACV.grid)   -- 2 ноя: сетка паттернов — клетки = границы ниже, ровные — только такты
   local dense = gw / nr * g < 3                                  -- проект целиком: клетки сливаются — только такты
   for row = r0, r1 - 1 do
     local d = row - r0

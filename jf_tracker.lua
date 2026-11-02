@@ -17248,6 +17248,18 @@ ctx.acv_zone_step = function(dir)
   ACV.lfoc = nil   -- уходим в другую панель — список отпускает клавиши
   return false
 end
+-- сетка холста: ровная (доля такта) или неровная — 2 ноя: паттерн / секция / весь отрезок одной клеткой (кнопка сетки, zg)
+ctx.acv_grid_menu = function()
+  local A = ctx.ACV
+  local items, bar = {}, state.lpb * 4
+  for _, x in ipairs({ { 'a', 'all', 'all: the whole span is one cell' }, { 'p', 'pat', 'pattern: one cell per pattern (uneven)' }, { 's', 'sec', 'section: one cell per section' } }) do
+    items[#items + 1] = { key = x[1], label = x[3] .. (A.gmode == x[2] and '  *' or ''), fn = function() A.gmode = x[2]; A.snap = true; vim.msg = 'canvas grid: ' .. x[3] .. ' ({ } - cell to cell, [ ] - back to even)' end }
+  end
+  for i, g in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32 }) do   -- 30 окт: и мельче строки
+    if g <= bar then items[#items + 1] = { key = tostring(i), label = A.grid_label(g, state.lpb) .. ((not A.gmode and A.grid == g) and '  *' or ''), fn = function() A.grid = g; A.gmode = nil end } end
+  end
+  vim.open_hydra({ title = 'canvas grid ([ ] - finer / coarser)', items = items })
+end
 ctx.acv_key = function(c)
   -- 31 окт: x над строкой списка кривых — убрать кривую из списка (скрыть; zh — показать скрытые), не удаляя огибающую
   if c == 120 and lfo_hover and lfo_hover.lenv then
@@ -17286,7 +17298,9 @@ ctx.acv_key = function(c)
     return true
   end
   if c == 117 then edit.undo(); vim.msg = 'undo'; return true elseif c == 18 then edit.redo(); vim.msg = 'redo'; return true end   -- u / Ctrl+R — как везде
+  ACV.marks, ACV.sr0, ACV.sr1 = sp.marks, sp.r0, sp.r1   -- 2 ноя: клетки неровной сетки
   local r = ACV.key(c, { r0 = sp.r0, r1 = sp.r1, lpb = state.lpb, ncurves = #curves, kind = act and act.kind }, m)
+  if type(r) == 'table' and r.op == 'gridmenu' then ctx.acv_grid_menu(); return true end
   if r == true then
     if ACV.row ~= vim.cur.row then vim.cur.row = ACV.row; ctx.acv_row_seen = ACV.row; vim.ensure_visible() end
     local a2 = curves[ACV.cur]
@@ -18190,7 +18204,7 @@ ctx.acv_do = function(op, sp, curves)
     local lo, hi, n = math.huge, -math.huge, 0
     for r in pairs(op.rows) do lo = math.min(lo, r); hi = math.max(hi, r); n = n + 1 end
     if act.kind == 'vel' then ctx.acv_vel_put(act, sp, op, lo, hi); return end
-    local step = ACV.snap and ACV.grid or 1
+    local step = ACV.cellw(hi)   -- 2 ноя: клетка бывает неровной (паттерн)
     if act.kind == 'ml' then
       -- MIDI-лейн — значение на строку: доли строки (сетка мельче строки) — последнее в строке
       local map, keys = {}, {}
@@ -25155,6 +25169,7 @@ local function frame()
       or (ctx.hp_pend and MX.WK.get("'"))
       or (SL.active and SL.pend_z and MX.WK.get('item_z'))   -- 24 окт: z во вкладке item
       or (state.focus == 'browser' and B.zpend and MX.WK.get('browser_z'))   -- 28 окт: z в браузере
+      or (ctx.ACV and ctx.ACV.zpend and MX.WK.get('curve_z'))   -- 2 ноя: z на холсте кривых
       or (state.focus == 'dsp' and state.dsp_zs and MX.WK.get('dsp_zs')) or (state.focus == 'dsp' and state.dsp_z and MX.WK.get('dsp_z')) or (state.focus == 'dsp' and DK.pending and MX.WK.get('dsp_' .. DK.pending)) or nil
     if wk then
       local lines = {}
@@ -27159,13 +27174,7 @@ local function frame()
       end
       if lfo_hover.tbsnap then A.snap = not A.snap; vim.msg = 'snap (S): ' .. (A.snap and 'the stroke goes by grid cells' or 'off - by rows') end
       if lfo_hover.tbgrid == -1 or lfo_hover.tbgrid == 1 then ctx.acv_key(lfo_hover.tbgrid < 0 and 91 or 93)
-      elseif lfo_hover.tbgrid == 0 then
-        local items, bar = {}, state.lpb * 4
-        for i, g in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32 }) do   -- 30 окт: и мельче строки
-          if g <= bar then items[#items + 1] = { key = tostring(i), label = A.grid_label(g, state.lpb) .. (A.grid == g and '  *' or ''), fn = function() A.grid = g end } end
-        end
-        vim.open_hydra({ title = 'canvas grid ([ ] - finer / coarser)', items = items })
-      end
+      elseif lfo_hover.tbgrid == 0 then ctx.acv_grid_menu() end
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
         if lfo_hover.geo and A.tool ~= 'shape' and ctx.mods().alt and ctx.acv_bend_start(lfo_hover.geo, dbl and click.zone == 'lfo' and click.mx and math.abs(click.mx - gfx.mouse_x) + math.abs(click.my - gfx.mouse_y) < 8) then   -- 2 ноя: Opt — изгиб отрезка
@@ -29274,7 +29283,7 @@ local function frame()
     local g = d.geo
     local dr = (gfx.mouse_x - d.mx0) / math.max(1, g.gw) * g.nr
     local dv = -(gfx.mouse_y - d.my0) / math.max(1, g.gh - 4)
-    if A.snap and (d.h == 'move' or d.h == 'l' or d.h == 'r') then dr = math.floor(dr / A.grid + 0.5) * A.grid end
+    if A.snap and (d.h == 'move' or d.h == 'l' or d.h == 'r') then local st = A.gmode and 1 or A.grid; dr = math.floor(dr / st + 0.5) * st end
     if d.h == 'l' or d.h == 'r' then dv = 0 elseif d.h ~= 'move' then dr = 0 end
     if gfx.mouse_cap & 1 == 1 then
       A.xprev = A.xform(d.pts, d.box, d.h, dr, dv)
@@ -29348,7 +29357,7 @@ local function frame()
   if ctx.acv_mdrag and ctx.acv_mdrag.tool == 'sel' then   -- 31 окт: рамка строк
     local d, A = ctx.acv_mdrag, ctx.ACV
     local r = A.at(d.geo, gfx.mouse_x, gfx.mouse_y)
-    local st = A.snap and A.grid or 1
+    local st = A.cellw(r)
     A.sel = { a = math.min(d.r_s, r), b = math.max(d.r_s, r) + st }
     if gfx.mouse_cap & 1 ~= 1 then
       ctx.acv_mdrag = nil
