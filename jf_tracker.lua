@@ -15344,6 +15344,11 @@ ctx = {
           { key = 'N', label = 'new project in a new tab', fn = function() reaper.Main_OnCommand(40859, 0); model.invalidate() end },
           { key = 'm', label = 'project notes', fn = function()
               if state.notes_open then ctx.notes_target('project') else NT.target = 'project'; ctx.notes_toggle() end end },
+          -- 2 ноя: b — бэкапы (автосохранения .rpp-bak) списком в браузере: вкладка proj, новые сверху
+          { key = 'b', label = 'backups: open the list in the browser', fn = function()
+              state.side = true; ctx.relayout(); ctx.set_focus('browser'); B.set_mode('proj')
+              local n = 0; for _, e in ipairs(B.all or {}) do if e.bak then n = n + 1 end end
+              vim.msg = n > 0 and (n .. ' backups, newest first: Enter opens one (REAPER asks to save the current)') or 'no backups of this project yet' end },
           { key = 'c', label = 'notes of the item under the cursor', fn = function()
               if state.notes_open then ctx.notes_target('context') else NT.target = 'context'; ctx.notes_toggle() end end },
           { key = 'M', label = 'dev notes: what to check (with debug on)', fn = function()
