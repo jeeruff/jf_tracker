@@ -25457,7 +25457,7 @@ local function frame()
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
     if OPT.tour.want_focus then ctx.set_focus(OPT.tour.want_focus); OPT.tour.want_focus = nil end
-    OPT.tour.tick({ focus = state.focus, hints = HN.active or false, hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil,
+    OPT.tour.tick({ focus = state.focus, hints = HN.active or false, hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil, tk = (cur_col() or {}).track,
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)
   end

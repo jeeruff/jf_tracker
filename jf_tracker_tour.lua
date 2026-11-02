@@ -28,6 +28,12 @@ T.STEPS = {
     text = 'f puts two-letter labels on everything on screen - any module, button or bar line. Type the two letters of a label and you are there.',
     todo = { 'Press f - yellow labels appear.', 'Type the two letters of any label (for example a a).' },
     check = function(e, b) return e.hj ~= b.hj end },
+  -- 2 ноя: панели и каналы — сразу после f
+  { mod = 'tracker', focus = 'tracker', title = 'Panes and tracks',
+    ticks = { function(e, b) return e.tk ~= b.tk end, function(e, b) return e.focus ~= b.focus end, function(e, b, s) return s.t2 and e.focus == 'tracker' end },
+    text = 'Opt+H / Opt+L go to the previous / next track (channel). Cmd+h j k l move the focus to the pane on the left, below, above, on the right - the framed pane gets the keys.',
+    todo = { 'Press Opt+L - the cursor goes to the next track.', 'Press Cmd+l (or Cmd+j) - the focus goes to another pane.', 'Press Cmd+h (or Cmd+k) to come back to the tracker.' },
+    check = function(e, b) return e.tk ~= b.tk end },
   -- 1 ноя: режимы — отдельным шагом, до записи нот
   { mod = 'tracker', focus = 'tracker', title = 'Two modes: NORMAL and INSERT',
     ticks = { function(e) return e.mode == 'insert' end, function(e, b, s) return s.t1 and e.mode == 'normal' end, function(e, b, s) return s.t2 end },
@@ -70,7 +76,7 @@ T.STEPS = {
     todo = { 'Press \\ - the menu of the cursor cell opens.', 'Press Esc to close it.' },
     check = function(e) return e.hydra end },
   -- 27 окт: карта сэмплов — найти звук случайно, а не листая списки
-  { mod = 'map', focus = 'map', title = 'Find a sound by chance',
+  { mod = 'map', focus = 'tracker', title = 'Find a sound by chance',
     ticks = { function(e) return e.focus == 'map' end, function(e, b, s) return true end },
     text = 'The map pane shows every sound file of the browser folder as dots in groups - kick, snare, loop ... A click on a dot plays it, r plays a random one, v changes the view, Shift+click on a group goes into it (Esc - back).',
     todo = { 'Press Ctrl+W, then g, then w - the map pane gets the focus.', 'Click a few dots, or press r.' },
@@ -87,11 +93,11 @@ T.STEPS = {
     check = function(e) return e.khelp_big end },
 }
 
-function T.start() T.active, T.step, T.base, T.state, T.ok, T.finished = true, 1, nil, {}, false, false; T.want_focus = T.STEPS[1].focus end
+function T.start() T.active, T.step, T.base, T.state, T.ok, T.finished, T.hold = true, 1, nil, {}, false, false, false; T.want_focus = T.STEPS[1].focus end
 function T.stop() T.active = false end
 function T.go(d)
   T.step = math.max(1, math.min(#T.STEPS, T.step + d))
-  T.base, T.state, T.ok = nil, {}, false
+  T.base, T.state, T.ok, T.hold = nil, {}, false, false
   T.want_focus = T.STEPS[T.step].focus        -- main переводит фокус (5 окт)
 end
 
@@ -99,6 +105,7 @@ end
 function T.tick(env, now)
   if not T.active then return end
   local st = T.STEPS[T.step]
+  local fresh = not T.base
   if not T.base then T.base = env end
   -- 2 ноя: пункты шага отмечаются по очереди (s.t1, s.t2 …): следующий — только после предыдущего
   local S = T.state
@@ -111,7 +118,9 @@ function T.tick(env, now)
   end
   local all = st.ticks and S['t' .. #st.ticks]
   if not T.ok and (all or (not st.ticks and st.check(env, T.base, S))) then T.ok, T.ok_t = true, now end
-  if T.ok and now - T.ok_t > 0.8 then
+  -- 2 ноя: шаг, уже выполненный в первом кадре (назад на «Slice a break» — вкладка item уже открыта), не уходит сам вперёд
+  if T.ok and fresh then T.hold = true end
+  if T.ok and not T.hold and now - T.ok_t > 0.8 then
     if T.step < #T.STEPS then T.go(1) else T.ok = true; T.finished = true end
   end
 end
