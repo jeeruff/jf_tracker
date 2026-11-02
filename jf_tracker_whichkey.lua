@@ -29,7 +29,7 @@ local T = {
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },
         { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
-        { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'c', 'hide' }, { 'Space', 'next layout' }, { 'u', 'undo' } },
+        { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'q', 'hide' }, { 'c + key', 'custom modules (c f freesound)' }, { 'Space', 'next layout' }, { 'u', 'undo' } },
         panels = true },   -- 16 окт: клавиши панелей — из реестра панелей (main), по алфавиту, буква подсвечена
   ["'"] = { title = "' - harpoon (pinned places)", items = { { 'a', 'pin here: track row / matrix cell / DSP param' }, { '1..9', 'jump (focus goes there)' }, { "'", 'list by module (fzf)' }, { 'b', 'back where the cursor just was (again - return)' }, { 'd', 'unpin this place' } } },
   T = { title = 'Opt+T - take (the note under the cursor)', items = { { 'f', 'add take fx (fzf)' }, { 'o', 'its take fx chain in DSP' } } },

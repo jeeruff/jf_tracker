@@ -54,6 +54,20 @@ U.vbar_impl = function(...) return draw.vbar(...) end   -- 15 окт: одна �
 draw.arr = dofile(DIR .. '/jf_tracker_arr.lua')           -- аранжировки = наборы играющих лейнов (9 окт)
 draw.llm = dofile(DIR .. '/jf_tracker_llm.lua')         -- 10 окт: мост к модели / MCP (ExtState llm_in → файл ответа)
 draw.panes = dofile(DIR .. '/jf_tracker_panes.lua')     -- раскладка окна как tmux / zellij (9 окт); полем draw: предел локальных
+-- 2 ноя: custom-модули — файлы modules/*.lua (свои, в комплекте) и Data/jf_tracker_modules/*.lua (извне); панели до раскладки
+draw.CM = {}
+for _, cmd in ipairs({ DIR .. '/modules', reaper.GetResourcePath() .. '/Data/jf_tracker_modules' }) do
+  local i = 0
+  while true do
+    local fn = reaper.EnumerateFiles(cmd, i); if not fn then break end
+    i = i + 1
+    if fn:match('%.lua$') then
+      local ok, cm = pcall(dofile, cmd .. '/' .. fn)
+      if ok and type(cm) == 'table' and cm.id and cm.key and cm.draw
+        and draw.panes.register_custom({ id = cm.id, label = cm.label or cm.id, key = cm.key, hint = cm.id, side = cm.side or 'right' }) then draw.CM[cm.id] = cm end
+    end
+  end
+end
 local keys = dofile(DIR .. '/jf_tracker_keys.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
 local vim = dofile(DIR .. '/jf_tracker_vim.lua')
@@ -6136,6 +6150,13 @@ ctx = {
     if pend then
       local tgt = PN.BYKEY[ch]
       if c == 27 then vim.msg = '-- PANE --'; return end
+      if pend == 'c' then   -- 2 ноя: c + буква — custom-модуль (modules/): показать и фокус
+        local cid = PN.CBYKEY[ch]
+        if not cid then vim.msg = 'pane: no custom module on ' .. ch; return end
+        if not PN.visible(m, cid) then ctx.pane_do(function() return PN.show(m, cid) end) end
+        ctx.pane_focus(cid)
+        return
+      end
       if not tgt then vim.msg = 'pane: no panel on ' .. ch; return end
       if pend == 'g' then
         if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
@@ -6160,8 +6181,8 @@ ctx = {
       local o, a = L.pn.order, PN.active_of(m, id)
       for i, x in ipairs(o) do if x == a then ctx.pane_focus(o[(i - 1 + (ch == 'w' and 1 or -1)) % #o + 1]); break end end
     elseif ch:match('^[1-9]$') then ctx.pane_focus(L.pn.order[tonumber(ch)])
-    elseif ch == 'g' or ch == 's' or ch == 'v' or ch == 'T' or ch == 'X' then
-      ctx.pn_pend = ch; vim.msg = '-- PANE -- ' .. ch .. ' + panel letter'
+    elseif ch == 'g' or ch == 's' or ch == 'v' or ch == 'T' or ch == 'X' or ch == 'c' then
+      ctx.pn_pend = ch; vim.msg = '-- PANE -- ' .. ch .. (ch == 'c' and ' + custom module letter' or ' + panel letter')
     elseif not ctx.PANE_CMD[ch] and PN.BYKEY[ch] then   -- 1 ноя: буква панели — сразу к ней (меню это и обещало), как g + буква
       local tgt = PN.BYKEY[ch]
       if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
@@ -6174,7 +6195,7 @@ ctx = {
     elseif ch == '>' or ch == '<' then ctx.pane_do(function() return PN.resize(m, id, 'h', ch == '>' and 0.03 or -0.03) end)
     elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
     elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
-    elseif ch == 'c' or ch == 'q' then
+    elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
       if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker') end
     elseif ch == ' ' then
       ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
@@ -14441,12 +14462,16 @@ ctx = {
   pool_select = pool_select,
   browse = function(path) B.init(ctx, path or B.root); state.side = true end,
   -- 2 ноя: :freesound слова — поиск во вкладке fs браузера; :freesound key <ключ> — ключ API (ExtState)
+  -- 2 ноя (2): freesound — custom-модуль (modules/freesound.lua), своя панель (Ctrl+W c f)
   freesound = function(arg)
+    local cm = ctx.cm_get('freesound')
+    if not cm then vim.msg = 'freesound: modules/freesound.lua is missing'; return end
     local k = arg:match('^key%s+(%S+)')
-    if k then B.FS.set_key(k); vim.msg = 'freesound: key saved - :freesound <words> to search'; return end
-    state.side = true; ctx.relayout(); ctx.set_focus('browser')
-    B.fs_search(arg)
-    if arg == '' then B.start_find() end
+    if k then cm.FS.set_key(k); vim.msg = 'freesound: key saved - :freesound <words> to search'; return end
+    local PN, m = draw.panes, state.panes
+    if not PN.visible(m, 'freesound') then ctx.pane_do(function() return PN.show(m, 'freesound') end) end
+    ctx.pane_focus('freesound')
+    if arg ~= '' then cm.search(arg) else cm.key(47) end
   end,
   -- файл → депо трека курсора (зона после маркера =LIB на самом треке)
   -- Opt+Enter в браузере (7 окт): файл — новым слайсом выбранного инструмента
@@ -25279,7 +25304,7 @@ local function frame()
   if not mpop then KH.mod_view = nil end
   -- 21 окт: всплывашка у курсора не нужна — список только в панели help (пользователь)   -- 21 окт: держишь модификатор — что он даёт здесь
   if not pop and (state.whichkey or state.pane_mode) then
-    local wk = (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
+    local wk = (state.pane_mode and ctx.pn_pend == 'c' and ctx.cm_wk()) or (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
       or (SL.active and SL.pend_z and MX.WK.get('item_z'))   -- 24 окт: z во вкладке item
@@ -25291,7 +25316,7 @@ local function frame()
       for _, e in ipairs(wk.items) do lines[#lines + 1] = { key = e[1], text = e[2] } end
       if wk.panels then   -- 16 окт: панели по алфавиту строками, буква — янтарём (из реестра: ничего не забыто)
         local list = {}
-        for _, pp in ipairs(draw.panes.PANELS) do if pp.key and (pp.avail ~= 'dev' or state.dev) then list[#list + 1] = pp end end
+        for _, pp in ipairs(draw.panes.PANELS) do if pp.key and not pp.custom and (pp.avail ~= 'dev' or state.dev) then list[#list + 1] = pp end end
         table.sort(list, function(a, b) local ra, rb = vim.key_rank(a.key), vim.key_rank(b.key); if ra ~= rb then return ra < rb end; return a.label:lower() < b.label:lower() end)   -- 28 окт: по клавишам
         -- 16 окт (вечер): строкой на панель — «клавиша  имя» колонкой, как остальной which-key (чипы слипались:
         -- measurestr не считает пробел в конце «a »)
@@ -30805,7 +30830,7 @@ local function frame()
   -- модуля через очередь — yy / dd / p (в VISUAL — y / d); матрица — свои коды блока; набор текста не трогаем
   do
     local m = ctx.mods()
-    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or DK.ins or OPT.active
+    local busy = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing() or state.focus == 'manual' or DK.ins or OPT.active
     -- 31 окт: Ctrl+Opt+H / L в трекере — колонок команд fx у трека курсора меньше / больше
     if m.ctrl and m.alt and not m.cmd and not busy and state.focus == 'tracker' and (vim.cur.field or 1) >= 4 and (c == 8 or c == 12 or c == 104 or c == 108) then   -- на колонке fx (иначе — playrate инструмента)
       local f0 = L and L.flat and L.flat[vim.cur.fi]
@@ -31217,7 +31242,7 @@ local function frame()
   elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли
   elseif c == ('f'):byte() and (vim.mode == 'normal' or vim.mode == 'visual' or vim.mode == 'vline' or ctx.f_in_insert()
-     or (vim.mode == 'insert' and state.focus ~= 'tracker' and not DK.ins and not (state.focus == 'top' and state.toptab == 'sample'))) and not vim.hydra and not vim.picker and not (state.focus == 'browser' and B.filtering) and not (state.focus == 'fxb' and FB.typing) and state.focus ~= 'notes' and state.focus ~= 'console'   -- 21 окт: и в VISUAL; 26 окт: и в browser / fx list (поиск там — /)
+     or (vim.mode == 'insert' and state.focus ~= 'tracker' and not DK.ins and not (state.focus == 'top' and state.toptab == 'sample'))) and not vim.hydra and not vim.picker and not (state.focus == 'browser' and B.filtering) and not (state.focus == 'fxb' and FB.typing) and state.focus ~= 'notes' and state.focus ~= 'console' and not ctx.cm_typing()   -- 21 окт: и в VISUAL; 26 окт: и в browser / fx list (поиск там — /)
      and not vim.pending and not vim.op and not ctx.hp_pend and not (state.focus == 'dsp' and (DK.pending or state.dsp_z)) then   -- 9 окт: префикс ждёт вторую клавишу (a f в DSP) — f его
     -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
     ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
@@ -31244,7 +31269,7 @@ local function frame()
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
   -- только его длина (слайс — свой кусок), через трек курсора
   if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console') then
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing()) then
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
     if e and (e.take or e.src) then ctx.preview_slice(col.track, e, 0, e.len); vim.msg = ('listen %02d %s'):format(vim.inst, e.name)
@@ -31256,7 +31281,7 @@ local function frame()
   -- страницы; иначе нажатая клавиша подсвечивает свою строку справки
   if c > 0 then
     local typing = vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
-      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console'
+      or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing()
     if state.focus == 'manual' and ctx.DOC then   -- 29 окт: панель manual
       local r = ctx.DOC.key(c)
       if r == 'leave' then ctx.set_focus('tracker')
@@ -31308,7 +31333,7 @@ local function frame()
       if vim.picker or vim.hydra then return vim.key(c) end
       -- 5 окт: две гидры — ` главная (у главного модуля слева сверху), \ —
       -- контекст фокуса; в INSERT ` — note-off, поэтому главная — вне INSERT
-      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or state.focus == 'console' or state.focus == 'manual' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
+      local typing = vim.mode == 'cmd' or vim.mode == 'search' or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing() or state.focus == 'manual' or (B.filtering and state.focus == 'browser') or state.focus == 'fxb'
       -- 6 окт: главное меню — \ (` больше не меню; в INSERT ` — note-off)
       local m0 = ctx.mods()
       if not typing and (c == 47 or c == 31) and m0.ctrl then ctx.fx_search_global(); return end          -- Ctrl+/ — эффекты
@@ -31317,7 +31342,7 @@ local function frame()
       -- 15 окт: Esc в любом модуле сбрасывает недонабранное трекера (счётчик, ожидающую клавишу) — не висит тегом у курсора
       if c == 27 and state.focus ~= 'tracker' and (vim.count or vim.pending or vim.mlpend) then vim.count, vim.pending, vim.mlpend = nil, nil, nil end
       -- \ (5 окт): контекстное меню выбранного в модуле — как правая кнопка
-      if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and state.focus ~= 'console' and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if c == 92 and state.focus ~= 'tracker' and state.focus ~= 'notes' and state.focus ~= 'console' and not ctx.cm_typing() and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
         ctx.context_here(); return                       -- 10 окт: \ в модуле — его быстрое меню, в нём \ — главное
       end
       -- 26 окт: стрелки = h j k l во всех модулях (Shift — H J K L, как Shift+hjkl), без Ctrl / Cmd / Opt;
@@ -31570,6 +31595,12 @@ local function frame()
       elseif state.focus == 'tracks' then   -- 11 окт: Track Manager
         if not draw.TL.typing and (vim.mode == 'cmd' or vim.mode == 'search') then return vim.key(c) end
         if not ctx.tlist_key(c) then return vim.key(c) end
+      elseif draw.CM[state.focus] then   -- 2 ноя: custom-модуль — свои клавиши; Esc (не в наборе) — в трекер
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local cm = ctx.cm_get(state.focus)
+        local busy = cm and cm.typing and cm.typing()
+        if c == 27 and not busy then ctx.set_focus('tracker')
+        elseif not (cm and cm.key and cm.key(c, ctx.mods and ctx.mods() or {})) then return vim.key(c) end
       elseif state.focus == 'console' then   -- 28 окт: консоль Strudel
         local r = ctx.CON.key(c, ctx.mods())
         reaper.SetExtState(EXT, 'con', ('%s|%s|%s'):format(tostring(r), ctx.CON.lines[ctx.CON.l] or '', ctx.CON.log[#ctx.CON.log] and ctx.CON.log[#ctx.CON.log].text or ''), false)   -- тест: строка и ответ
@@ -31808,7 +31839,7 @@ local function frame()
       ctx.last_trace = table.concat(trace, '>')
       -- набранный текст (заметки, командная строка, поиск, пикер) — без самих
       -- символов: в логе только «text», код клавиши скрыт (6 окт)
-      local typing = state.focus == 'notes' or state.focus == 'console' or vim.mode == 'cmd' or vim.mode == 'search' or vim.picker
+      local typing = state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing() or vim.mode == 'cmd' or vim.mode == 'search' or vim.picker
       local lc, lraw = c, c_raw
       if typing and c >= 32 and c < 0x110000 and c ~= 127 then lc, lraw = 0, 0 end
       ctx.dlog(('key %d (raw %d) mode %s%s focus %s%s fi %d row %d field %s%s piano %s pending %s op %s buf %s -> %s @ %s%s'):format(
@@ -32175,6 +32206,45 @@ ctx.pedal_tick = function()
 end
 -- 21 окт: нота в свободном такте (нет паттерна, внутри песни =START..=END) — сначала свободный паттерн на этот такт
 -- (следующая буква с 1, как у длины такта в матрице), потом нота — она в нём
+-- 2 ноя: custom-модули — init по первому показу (api — то, что модулю можно), набор текста — как в консоли
+ctx.CM = draw.CM
+ctx.cm_get = function(id)
+  local cm = draw.CM[id]
+  if cm and not cm.ready then
+    cm.ready = true
+    local ok, err = pcall(cm.init or function() end, { R = reaper, dir = DIR, TX = draw.TX or dofile(DIR .. '/jf_tracker_utf8.lua'),
+      msg = function(s) vim.msg = s end, preview_file = function(p) ctx.preview_file(p) end, add_to_depot = function(p) ctx.add_to_depot(p) end,
+      fit = function(s, w) return draw.fit(s, w) end, focus = function(f) ctx.set_focus(f) end })
+    if not ok then vim.msg = 'module ' .. id .. ': ' .. tostring(err); draw.CM[id] = nil; return nil end
+  end
+  return cm
+end
+ctx.cm_help = function()
+  for cid, cm in pairs(draw.CM) do   -- справка custom-модуля: help (строки { k, d }) → страница help-панели и ?, about → hints
+    if cm.help and not KH.PAGES[cid] then
+      local e = {}
+      for _, r in ipairs(cm.help) do e[#e + 1] = { k = r.k or r[1], d = r.d or r[2] } end
+      KH.PAGES[cid] = { title = (cm.label or cid) .. ' (custom module)', e = e }
+    end
+    if cm.about and draw.panes.ABOUT then draw.panes.ABOUT[cid] = cm.about end
+  end
+end
+ctx.cm_help()
+draw.cm_draw = function(...) return ctx.cm_draw(...) end
+ctx.cm_wk = function()   -- Ctrl+W c: список custom-модулей (буква — имя)
+  local items = {}
+  for _, pp in ipairs(draw.panes.PANELS) do if pp.custom then items[#items + 1] = { pp.key, pp.label } end end
+  table.sort(items, function(a, b) return vim.key_rank(a[1]) < vim.key_rank(b[1]) end)
+  if #items == 0 then items[1] = { '', 'none - put a module file into Data/jf_tracker_modules' } end
+  return { title = 'c - custom modules', items = items }
+end
+ctx.cm_typing = function() local cm = draw.CM[state.focus]; return cm and cm.typing and cm.typing() or false end
+ctx.cm_draw = function(id, Lx, x, y, w, h, foc)
+  local cm = ctx.cm_get(id)
+  if not cm then return end
+  local ok, err = pcall(cm.draw, U, Lx, x, y, w, h, foc)
+  if not ok then vim.msg = 'module ' .. id .. ': ' .. tostring(err) end
+end
 ctx.auto_pattern = function(row)
   local t = edit.row_time(row, state.lpb, 0)
   if alias.region_at(regions, t) then return false end

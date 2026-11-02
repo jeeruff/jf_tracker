@@ -30,7 +30,7 @@ Every new borrowing gets a row here (and a line in NOTICE / README Credits).
 | the monome grid and arc pages | [monome](https://monome.org) | - | idea only | own code |
 | negative harmony; P / R / L chord moves | Ernst Levy (negative harmony, popularised by Jacob Collier); Hugo Riemann and the neo-Riemannian theory | - | idea only | own code |
 | music notation glyphs | SMuFL / Bravura (Steinberg); the score export uses [LilyPond](https://lilypond.org) | - | idea only | own code |
-| the fs tab of the browser | [Freesound API v2](https://freesound.org/docs/api/) (Music Technology Group, UPF) | each sound its own (shown per row, kept in CREDITS.txt) | web API, your own key | own code |
+| the freesound pane (modules/freesound.lua) | [Freesound API v2](https://freesound.org/docs/api/) (Music Technology Group, UPF) | each sound its own (shown per row, kept in CREDITS.txt) | web API, your own key | own code |
 | Bundled sample `samples/amen_8bit.mp3` (the amen pattern re-made in 8-bit, not the original recording) | ["8bit amen break" by D0tDashDialUp on Freesound](https://freesound.org/people/D0tDashDialUp/sounds/626105/) | CC0 1.0 | bundled file (Freesound HQ preview) | unchanged |
 | Bundled fonts (`fonts/`) | see `fonts/README.md` | OFL / MIT / others (`fonts/licenses/`) | bundled files | each keeps its license |
 

@@ -77,6 +77,17 @@ for _, p in ipairs(PN.PANELS) do
   if p.tab then PN.TABS[#PN.TABS + 1] = p.id end
 end
 
+-- 2 ноя: custom-модули (папка modules/ и Data/jf_tracker_modules/) — свои буквы после Ctrl+W c, не в общем списке
+PN.CBYKEY = {}
+function PN.register_custom(p)
+  if PN.BY[p.id] or not p.key then return false end
+  p.custom = true
+  PN.PANELS[#PN.PANELS + 1] = p
+  PN.BY[p.id] = p
+  PN.CBYKEY[p.key] = p.id
+  return true
+end
+
 local function leaf(...) return { panes = { ... }, active = 1 } end
 local function node(ax, fr, ...) return { ax = ax, kids = { ... }, fr = fr } end
 local function is_leaf(n) return n.panes ~= nil end

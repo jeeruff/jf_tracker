@@ -155,3 +155,31 @@ ReaEQ (Cockos)	EQ	2	0:lo freq,1:lo gain,3:b2 freq,4:b2 gain	help:low shelf + one
 The file is read when jf_tracker starts and rewritten (sorted by name) on every
 learn edit. To share a module, share its line; to install one, add the line
 (same name replaces) while the tracker is closed, then start it.
+
+## 4. Custom modules (panes)
+
+A custom module is one Lua file that becomes a pane of its own. jf_tracker loads
+`modules/*.lua` (shipped with it) and `<REAPER resource>/Data/jf_tracker_modules/*.lua`
+(yours) at start. `Ctrl+W c` + its letter shows and focuses it (`c f` - freesound).
+The file returns a table:
+
+```lua
+local M = { id = 'hello', label = 'hello', key = 'h', side = 'right',
+  about = 'one line for the hints pane',
+  help = { { k = 'j k', d = 'move' }, { k = 'Esc', d = 'back to the tracker' } } }
+function M.init(api) M.api = api end            -- once, when first shown
+function M.draw(U, L, x, y, w, h, focused)      -- every frame while visible
+  U.text(x + L.pad, y + 2, 'hello', focused and U.AMBER or U.TEXT)
+end
+function M.key(c, mods) return false end        -- true = the key is used
+function M.typing() return false end            -- true while it takes text (keys skip Vim)
+return M
+```
+
+`api`: `R` (reaper), `dir` (the jf_tracker folder), `TX` (UTF-8 typing helpers),
+`msg(text)` (status line), `preview_file(path)`, `add_to_depot(path)` (into the lib of
+the cursor track), `fit(text, px)`, `focus(id)`. `U` gives the theme colours
+(`U.TEXT U.GREY U.AMBER U.GREEN U.RED U.BG U.PANEL`), `U.set(col)`, `U.text(x, y, s, col)`,
+`U.measure(s)`; `L.rh` is the row height, `L.pad` the padding. Clicks: read `gfx.mouse_x`,
+`gfx.mouse_y`, `gfx.mouse_cap` in `draw`. An error in a module shows in the status line
+and does not stop the tracker. See `modules/freesound.lua` for a full one.

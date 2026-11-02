@@ -7406,6 +7406,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'manual' and info.manual_draw then   -- 29 окт: справка панелью
         local mh = info.manual_draw(L, ct.x, ct.y, ct.w, ct.h)
         if inside and type(mh) == 'table' then for k2, v2 in pairs(mh) do hover[k2] = v2 end end
+      elseif D.CM and D.CM[id] and D.cm_draw then D.cm_draw(id, L, ct.x, ct.y, ct.w, ct.h, foc == id)   -- 2 ноя: custom-модуль (modules/)
       elseif id == 'console' and info.console_draw then   -- 28 окт: консоль Strudel
         info.console_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'console')
       elseif id == 'keys' then   -- 2 ноя: клавиатура панелью (та же отрисовка, что в полосе транспорта)
