@@ -326,6 +326,7 @@ KH.PAGES = {
     { k = 'd', d = 'Vim delete operator (d3w, dd), back to INSERT after' },
     { k = 'qwerty: M S', t = { 'M', 'S' }, d = 'mute / solo the cursor track - on any column, the fx column too (there lowercase s / m start the codes SI ... / 0M)' },
     { k = 'qwerty: f', t = { 'f' }, d = 'next fx field (note > fx1 > fx2 ...)' },
+    { k = '^', d = 'note cut ^^^: the sound stops at once, no release (MIDI - CC120 all sound off on the channel, audio - the item ends with no fade); ` is the note end === (it releases: the synth envelope, audio - the OFF release fade); a free OFF (nothing sounds) shows OFF. Glyphs: options end of note / free OFF' },   -- 2 ноя
     { k = '` ~ C-~', d = 'note-off: ` this subcolumn, ~ (Shift+`) every track (Shift = all tracks, as Shift+BS), Ctrl+~ the whole track; :off / :off all; on the command field ` stops what runs there (dim) - 0D.. -> 0D00' },
     { k = 'Esc', d = 'back to NORMAL' },
     { k = 'Opt+F1 F2', m = 'transpose selection', g = 'transpose', d = 'transpose the selection (else the note of the row) -1 / +1 semitone; Opt+F11 F12 - an octave (as in Renoise)' },

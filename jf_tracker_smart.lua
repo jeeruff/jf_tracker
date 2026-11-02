@@ -250,8 +250,9 @@ function SM.notes(cur, oct, micro)
     end
   end
   while #items % 12 ~= 0 do items[#items + 1] = { label = '', v = nil, dim = true } end
-  items[#items + 1] = { label = 'OFF', v = 'off', tip = 'note off: the sounding note ends in this row' }
+  items[#items + 1] = { label = 'OFF', v = 'off', tip = 'note off: the sounding note ends in this row, its sound releases (===)' }
   items[#items + 1] = { label = '---', v = 'del', tip = 'delete the event of this row' }
+  items[#items + 1] = { label = '^^^', v = 'cut', tip = 'note cut: the sound stops at once, no release (MIDI - CC120 all sound off, audio - no fade); key ^ in INSERT' }   -- 2 ноя
   -- 24 окт: микротоны 72-EDO — ступень 1/6 тона (16.7 ц) от ноты: v3 vv v · ^ ^^ ^3 (выбор — у ноты строки,
   -- панель остаётся открытой); метка как в трекере (C-4^)
   while #items % 12 ~= 0 do items[#items + 1] = { label = '', v = nil, dim = true } end

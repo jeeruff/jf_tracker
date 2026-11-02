@@ -1103,10 +1103,10 @@ function V.note_off_scope(scope)
     for ci, f in pairs(quiet) do
       local here = f.sub and f.sub[V.cur.row]
       if not busy[ci] and not (here and here.of and here.of.stub) then
-        ctx.edit.all_off(f.col.track, f.lane and f.lane.idx or nil, lpb(), V.cur.row); n = n + 1
+        ctx.edit.all_off(f.col.track, f.lane and f.lane.idx or nil, lpb(), V.cur.row, V.off_cut); n = n + 1
       end
     end
-    if #heads > 0 then ctx.edit.note_off(heads, lpb(), V.cur.row) end
+    if #heads > 0 then ctx.edit.note_off(heads, lpb(), V.cur.row, V.off_cut) end
     V.msg = ('OFF on %s: %d note(s) end here, %d free OFF'):format(scope == 'all' and 'all tracks' or 'the track', #heads, n)
     return #heads + n
   end
@@ -1121,7 +1121,7 @@ function V.note_off_scope(scope)
     -- 31 окт: выше — OFF без ноты (all notes off): ` ниже переносит его сюда, как OFF ноты
     if h and h.stub and not (pr0 and (h.row0 or -1) < pr0) and ctx.edit.all_off_del then
       ctx.edit.all_off_del(h)
-      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row, V.off_cut)
       V.msg = ('OFF moved to row %04d (all notes off)'):format(V.cur.row)
       return 1
     end
@@ -1144,18 +1144,18 @@ function V.note_off_scope(scope)
     end
     if found then
       ctx.edit.all_off_del(found)
-      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+      ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row, V.off_cut)
       V.msg = ('OFF moved to row %04d'):format(V.cur.row)
       return 1
     end
   end
   -- 31 окт: ничего не звучит (подколонка) — OFF всё равно ставится: all notes off на трек
   if #heads == 0 and scope == 'sub' and cur and cur.col and not cur.ml and ctx.edit.all_off then
-    ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row)
+    ctx.edit.all_off(cur.col.track, cur.lane and cur.lane.idx or nil, lpb(), V.cur.row, V.off_cut)
     V.msg = 'OFF: all notes off here (stops whatever still sounds on the track)'
     return 1
   end
-  ctx.edit.note_off(heads, lpb(), V.cur.row)          -- пусто — note_off ничего не делает
+  ctx.edit.note_off(heads, lpb(), V.cur.row, V.off_cut)          -- пусто — note_off ничего не делает
   V.msg = ('note off (%s): %d'):format(scope == 'all' and 'all tracks' or (scope == 'track' and 'track' or 'subcolumn'), #heads)
   if #heads == 0 then V.msg = 'note off: nothing sounds here - OFF ends a note playing above this row' end   -- 31 окт
   return #heads
@@ -2694,6 +2694,12 @@ function V.key_impl(c)
       keys_control(c); return
     end
     -- 31 окт: note-off — не нота: работает и при выключенной клавиатуре (без неё ` уходил в NORMAL — педаль / весь сэмпл)
+    -- 2 ноя: ^ — обрыв ^^^ (CC120 / аудио без fade), если ^ не играет ноту раскладки; ` — OFF (release)
+    if c == 94 and not V.plays_note(c) then
+      V.off_cut = true; V.note_off_scope('sub'); V.off_cut = nil
+      V.msg = (V.msg or ''):gsub('OFF', '^^^'):gsub('note off', 'note cut')
+      V.cur.row = V.cur.row + step_rows(); ensure_visible(); return
+    end
     if not V.piano and (c == ('`'):byte() or c == ('~'):byte()) then
       local mods2 = ctx.mods and ctx.mods() or {}
       local tilde = c == ('~'):byte() or mods2.shift
@@ -4795,6 +4801,7 @@ function V.smart()
       end
       if it.v == 'del' then E.delete(hs, lpb())
       elseif it.v == 'off' then E.note_off(V.covering(fi, row), lpb(), row)
+      elseif it.v == 'cut' then E.note_off(V.covering(fi, row), lpb(), row, true)   -- 2 ноя: ^^^
       elseif #hs > 0 then E.set_pitch(hs, lpb(), it.v)
       elseif not vis then
         local lane = f.lane or f.col.lanes[1]

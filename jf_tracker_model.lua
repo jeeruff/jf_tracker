@@ -226,6 +226,7 @@ function M.parse_midi(buf)
   local notes, active = {}, {}
   local soff = nil   -- 19 окт: 0Sxx нот кита — notation-событие «NOTE ch pitch text jf_soff=XX» у ноты
   local tune, pbq
+  local cut120   -- 2 ноя: CC120 (All Sound Off) канала — ^^^: нота, кончающаяся на нём, обрывается без хвоста
   local pos, ppq = 1, 0
   local n = #buf
   while pos <= n do
@@ -247,6 +248,8 @@ function M.parse_midi(buf)
       elseif b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
         local t = M.mts_parse(msg)
         if t then tune = tune or {}; for kk, c in pairs(t) do tune[kk] = { ppq = ppq, c = c } end end
+      elseif st == 0xB0 and pitch == 120 then
+        cut120 = cut120 or {}; cut120[ch * 1e9 + math.floor(ppq + 0.5)] = true
       elseif st == 0xE0 and ch >= 1 then   -- 2 ноя: MPE — bend канала перед его note-on (та же ppq) = микротон ноты
         pbq = pbq or {}; pbq[ch] = { ppq = ppq, v = vel * 128 + pitch }
       elseif st == 0x90 and vel > 0 then
@@ -265,6 +268,12 @@ function M.parse_midi(buf)
     end
   end
   for _, a in pairs(active) do a.ppq_end = ppq; notes[#notes + 1] = a end
+  if cut120 then
+    for _, nt in ipairs(notes) do
+      local e = math.floor(nt.ppq_end + 0.5)
+      if cut120[nt.ch * 1e9 + e] or cut120[nt.ch * 1e9 + e - 1] or cut120[nt.ch * 1e9 + e + 1] then nt.cut = true end
+    end
+  end
   if soff then
     for _, nt in ipairs(notes) do
       local k = nt.ch * 128 + nt.pitch
@@ -575,7 +584,10 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     end
   end
   do local _, g = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false); head.gen = (g ~= nil and g ~= '') or nil end
-  local _, si = place(lane, r0, r1, head, nil, nil, d1 > 0 and d1 or nil)
+  -- 2 ноя: ^^^ аудио — конец айтема без fade, метка P_EXT:jf_cut
+  local atail
+  do local _, ct = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cut', '', false); if ct == '1' then atail = { kind = 'off', of = head, cut = true, explicit = true } end end
+  local _, si = place(lane, r0, r1, head, nil, atail, d1 > 0 and d1 or nil)
   -- огибающая громкости take (5 окт): точки — значениями в колонке vol на
   -- строках продолжения (кроссфейд и ручные рампы видны числами, как в Renoise)
   local env = take and R.GetTakeEnvelopeByName(take, 'Volume')
@@ -717,7 +729,7 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
             end
           end
         end
-        local tail = { kind = 'off', of = head, delay = d1, explicit = nt.rel == M.OFF_REL or nil }   -- 24 окт: явный OFF (обрывает one-shot пэд)
+        local tail = { kind = 'off', of = head, delay = d1, explicit = (nt.rel == M.OFF_REL or nt.cut) or nil, cut = nt.cut }   -- 2 ноя: cut — ^^^   -- 24 окт: явный OFF (обрывает one-shot пэд)
         -- note-off ровно на границе строки — OFF стоит в этой строке с delay 0;
         -- если конец в той же строке, что и начало, OFF не помещается: нота
         -- короче строки, показываем только голову
@@ -736,14 +748,14 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   local _, _, ncc = R.MIDI_CountEvts(take)
   for k = 0, (ncc or 0) - 1 do
     local _, _, _, ppq, cm, _, m2 = R.MIDI_GetCC(take, k)
-    if cm == 0xB0 and m2 == 123 then
+    if cm == 0xB0 and (m2 == 123 or m2 == 120) then   -- 2 ноя: 120 — свободный ^^^ (All Sound Off)
       local q = R.MIDI_GetProjQNFromPPQPos(take, ppq)
       if q >= qn0 - 1e-7 and q < qn1 - 1e-7 then
         local r, d = M.row_of_qn(q, lpb)
         if not lane.subs[1] then lane.subs[1] = {} end
         local s1 = lane.subs[1]
         if not s1[r] then
-          s1[r] = { kind = 'off', explicit = true, alloff = true, delay = d,
+          s1[r] = { kind = 'off', explicit = true, alloff = true, delay = d, cut = m2 == 120 or nil,
             of = { kind = 'midi', stub = true, item = it, take = take, ppq = ppq, row0 = r, rows = 1, pitch = 60, note = '---', vol = '00', delay = 0, ch = 0, fx = {}, muted = true } }
           if lane.last_row == nil or r > lane.last_row then lane.last_row = r end
         end
@@ -2374,7 +2386,7 @@ function M.track_midilanes(tr, lpb, guid)
         local _, _, _, ppq, chanmsg, cch, m2, m3 = R.MIDI_GetCC(tk, k)
         if chanmsg == 0xE0 and mpe and mpe[(cch or 0) .. ':' .. math.floor(ppq + 0.5)] then chanmsg = -1 end
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
-        if chanmsg == 0xB0 and m2 == 123 then   -- 31 окт: all notes off — это OFF в колонке нот, не лейн CC
+        if chanmsg == 0xB0 and (m2 == 123 or m2 == 120) then   -- 31 окт: all notes off — это OFF в колонке нот, не лейн CC; 2 ноя: и 120 (^^^)
         elseif chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)
         elseif chanmsg == 0xC0 then put(lane('pc', 'pc'), row, m2)
         -- 11 окт: aftertouch (канальный / полифонический) и pitch bend — тоже лейны (записывались, но не были видны)

@@ -2525,7 +2525,8 @@ local function draw_cell(L, cell, x, y, ty, inv)
   elseif k == 'off' then
     -- 31 окт: опция IT OFF — свободный OFF (all notes off, без ноты) как ^^^ (note cut Impulse Tracker), конец ноты — OFF
     if cell.clipend then text(x + L.x_note, ty, '===', c(1, U.mix(D.CONT, U.BG, 0.45)))   -- 31 окт: конец клипа (паттерна) — не OFF, тише
-    else text(x + L.x_note, ty, (D.OFF_IT and cell.of and cell.of.stub) and '^^^' or (D.OFF_TXT or 'OFF'), c(1, D.CONT)) end   -- 8 окт: опция note OFF glyph — «|» вместо OFF
+    -- 2 ноя: три знака (опции): конец ноты (release) — === , свободный OFF (ничего не звучит) — OFF, обрыв (cut) — ^^^
+    else text(x + L.x_note, ty, cell.cut and (D.CUT_TXT or '^^^') or ((cell.alloff or (cell.of and cell.of.stub)) and (D.FREE_TXT or 'OFF')) or (D.OFF_TXT or '==='), c(1, D.CONT)) end   -- 8 окт: опция note OFF glyph — «|» вместо OFF
     if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
     if L.narrow or L.notes_only then
     elseif cell.delay and cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.CONT))
@@ -8124,8 +8125,9 @@ function D.frame(L, snap, rows, state, info)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
-  D.OFF_TXT = state.offbar and '|' or 'OFF'
-  D.OFF_IT = state.offit and true or nil
+  D.OFF_TXT = state.offbar and '|' or (state.endglyph or '===')   -- 2 ноя: конец ноты — === (IT), опция end of note
+  D.FREE_TXT = state.freeglyph or 'OFF'                          -- свободный OFF (опция free OFF)
+  D.CUT_TXT = '^^^'
   -- 31 окт: опция INSERT cursor red — в INSERT акцент курсора (ячейка, кромка, плейхед) красный; в конце кадра — обратно
   D.acc_save = nil
   if state.insred and info and info.vmode == 'insert' and D.acc_apply then

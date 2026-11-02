@@ -1479,6 +1479,7 @@ function E.unoff(heads, lpb, end_row)
     if h.kind == 'audio' and h.item then
       local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
       if t > pos + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end   -- только длиннее
+      R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_cut', '', true)   -- 2 ноя: ^^^ снят
     elseif h.kind == 'midi' and h.take then
       local ip = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
       if t > ip + R.GetMediaItemInfo_Value(h.item, 'D_LENGTH') + 1e-6 and R.MIDI_SetItemExtents then
@@ -1492,21 +1493,37 @@ function E.unoff(heads, lpb, end_row)
           R.MIDI_Sort(h.take)
           E.mark_off(h.take, n.ch, n.pitch, ppq, 0)
         else E.mark_off(h.take, n.ch, n.pitch, n.eppq, 0) end   -- снять метку явного OFF
+        E.set_cut120(h.take, n.ch, n.eppq, false)   -- 2 ноя: и ^^^
       end
     end
   end
 end
+-- 2 ноя: ^^^ (cut) у MIDI — CC120 All Sound Off на канале ноты в точке её конца; OFF (release) — без него
+function E.set_cut120(take, ch, ppq, on)
+  local _, _, ncc = R.MIDI_CountEvts(take)
+  for k = ncc - 1, 0, -1 do
+    local _, _, _, cp, cm, cch, m2 = R.MIDI_GetCC(take, k)
+    if cm == 0xB0 and m2 == 120 and cch == ch and math.abs(cp - ppq) <= 1 then R.MIDI_DeleteCC(take, k) end
+  end
+  if on then R.MIDI_InsertCC(take, false, false, ppq, 0xB0, ch, 120, 0) end
+  R.MIDI_Sort(take)
+end
+-- 2 ноя: аудио: OFF — конец айтема с fade-out release (E.OFF_REL_S), ^^^ — без fade, метка P_EXT:jf_cut
+local function audio_end_kind(it, cut)
+  R.SetMediaItemInfo_Value(it, 'D_FADEOUTLEN', cut and 0 or (E.OFF_REL_S or 0.03))
+  R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_cut', cut and '1' or '', true)
+end
 E.on_off = nil   -- 24 окт: main — явный OFF на пэде one-shot: пэд в режим «сам себя» (obey + choke 17)
-function E.note_off(heads, lpb, row)
+function E.note_off(heads, lpb, row, cut)   -- 2 ноя: cut — ^^^ (обрыв без хвоста)
   if #heads == 0 then return end
   local offs = {}
   local t = row_time(row + (E.OFF_END and 1 or 0), lpb, 0)   -- 8 окт: OFF в конце строки — нота звучит и на ней
   local rebuild_after = {}
-  run('note off', function()
+  run(cut and 'note cut ^^^' or 'note off', function()
     for _, h in ipairs(heads) do
       if h.kind == 'audio' then
         local pos = R.GetMediaItemInfo_Value(h.item, 'D_POSITION')
-        if t > pos + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos) end
+        if t > pos + 1e-6 then R.SetMediaItemInfo_Value(h.item, 'D_LENGTH', t - pos); audio_end_kind(h.item, cut) end
       elseif h.kind == 'midi' then
         -- 21 окт: OFF за концом MIDI item (item короче паттерна, напр. после ⌫) — item дотягивается (MIDI_SetItemExtents:
         -- без повтора источника); иначе нота резалась по item, и OFF вставал строкой-двумя выше
@@ -1520,6 +1537,7 @@ function E.note_off(heads, lpb, row)
           if ppq > n.sppq + 1 then
             R.MIDI_SetNote(h.take, i, n.sel, n.muted, n.sppq, ppq, n.ch, n.pitch, n.vel, false)
             E.mark_off(h.take, n.ch, n.pitch, ppq)   -- 24 окт: явный OFF — скорость отпускания 1
+            E.set_cut120(h.take, n.ch, n.eppq, false); E.set_cut120(h.take, n.ch, ppq, cut)   -- 2 ноя: ^^^ — CC120
             offs[#offs + 1] = { track = R.GetMediaItemTake_Track(h.take), pitch = n.pitch }
             -- 28 окт: нота с 0R — исходный конец в P_EXT:jf_rtl; новый OFF — туда же и копии заново (иначе пересборка
             -- возвращала старый конец, OFF не двигался)
@@ -1708,9 +1726,9 @@ end
 
 -- 31 окт: OFF там, где ничего не звучит — CC 123 (all notes off) в MIDI-айтеме строки (нет айтема — новый, как у
 -- ноты): глушит всё, что ещё играет на треке (хвосты slixer thru, ноты из прошлого паттерна)
-function E.all_off(track, lane_idx, lpb, row)
+function E.all_off(track, lane_idx, lpb, row, cut)   -- 2 ноя: cut — свободный ^^^ (CC120 All Sound Off)
   local t = row_time(row, lpb, 0)
-  run('note off (all notes off)', function()
+  run(cut and 'note cut ^^^ (all sound off)' or 'note off (all notes off)', function()
     local it, tk = midi_item_at(track, lane_idx, t)
     if not it then it, tk = new_midi_item(track, lane_idx, t) end
     if not tk then return end
@@ -1728,9 +1746,9 @@ function E.all_off(track, lane_idx, lpb, row)
     end
     for k = ncc - 1, 0, -1 do
       local _, _, _, cp, cm, _, m2 = R.MIDI_GetCC(tk, k)
-      if cm == 0xB0 and m2 == 123 and cp > lo and cp < hi then R.MIDI_DeleteCC(tk, k) end
+      if cm == 0xB0 and (m2 == 123 or m2 == 120) and cp > lo and cp < hi then R.MIDI_DeleteCC(tk, k) end
     end
-    R.MIDI_InsertCC(tk, false, false, ppq, 0xB0, 0, 123, 0)
+    R.MIDI_InsertCC(tk, false, false, ppq, 0xB0, 0, cut and 120 or 123, 0)
     R.MIDI_Sort(tk)
   end)
 end
@@ -1740,7 +1758,7 @@ function E.all_off_del(stub)
     local _, _, ncc = R.MIDI_CountEvts(stub.take)
     for k = ncc - 1, 0, -1 do
       local _, _, _, ppq, cm, _, m2 = R.MIDI_GetCC(stub.take, k)
-      if cm == 0xB0 and m2 == 123 and math.abs(ppq - stub.ppq) < 1 then R.MIDI_DeleteCC(stub.take, k) end
+      if cm == 0xB0 and (m2 == 123 or m2 == 120) and math.abs(ppq - stub.ppq) < 1 then R.MIDI_DeleteCC(stub.take, k) end
     end
   end)
 end
