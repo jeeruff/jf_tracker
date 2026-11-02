@@ -769,6 +769,8 @@ local function set_lpb(n, dir)
   state.lpb = new
   state.row0 = math.floor(q0 * new)
   vim.cur.row = math.floor(qc * new)
+  -- 2 ноя: зум (Opt+Shift+J K, - +, Cmd+колесо) — вокруг курсора: строка курсора в середину экрана, дальше зум от неё
+  if L and L.nrows then state.row0 = math.max(0, vim.cur.row - math.floor(L.nrows / 2)) end
 end
 
 local function select_item_in_reaper(item)
@@ -31092,6 +31094,11 @@ local function frame()
     -- счётчик перед f (8 окт): 2f — фейдер на метку ходом за 2 такта (2,f — доли)
     ctx.glide = vim.count and { n = vim.count, unit = ctx.glide_unit or 'bar' } or nil
     vim.count, ctx.glide_unit = nil, nil
+    do   -- 2 ноя: метки сначала модулю в фокусе
+      local id = state.focus == 'top' and state.toptab or (state.focus == 'insert' and 'tracker') or state.focus
+      local cell = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
+      HN.focus_rect = cell and { x = cell.x, y = cell.y, w = cell.w, h = cell.h } or nil
+    end
     if HN.start() then vim.msg = ctx.glide and ('hints: a dB mark glides the fader in %d %s, Esc'):format(ctx.glide.n, ctx.glide.unit) or 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
   end

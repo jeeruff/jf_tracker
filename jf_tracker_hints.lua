@@ -75,7 +75,16 @@ function H.start(filter)
   -- подписи панелей и вкладок, кнопки получают буквы первыми, массовые
   -- цели — последними (порядок внутри уровня — как рисовались)
   local order = {}
-  for i, t in ipairs(H.targets) do order[i] = { t = t, i = i, lv = H.LEVEL[t.kind] or 2 } end
+  -- 2 ноя: модуль в фокусе (только что открыт / перешли в него) — его цели первыми: короткие буквы и место (H.focus_rect от main)
+  local fr = H.focus_rect
+  for i, t in ipairs(H.targets) do
+    local lv = H.LEVEL[t.kind] or 2
+    if fr then
+      local cx, cy = t.x + (t.w or 0) / 2, t.y + (t.h or 0) / 2
+      if cx >= fr.x and cx < fr.x + fr.w and cy >= fr.y and cy < fr.y + fr.h then lv = lv - 10 end
+    end
+    order[i] = { t = t, i = i, lv = lv }
+  end
   table.sort(order, function(a, b) if a.lv ~= b.lv then return a.lv < b.lv end return a.i < b.i end)
   for _, o in ipairs(order) do
     local t = o.t
