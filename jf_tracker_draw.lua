@@ -2555,15 +2555,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
     if cell.clipend then text(x + L.x_note, ty, '===', c(1, U.mix(D.CONT, U.BG, 0.45)))   -- 31 окт: конец клипа (паттерна) — не OFF, тише
     -- 2 ноя: три знака (опции): конец ноты (release) — === , свободный OFF (ничего не звучит) — OFF, обрыв (cut) — ^^^
     elseif not cell.cut and not (cell.alloff or (cell.of and cell.of.stub)) and (D.OFF_TXT == '|_|' or D.OFF_TXT == '|') then
-      -- 2 ноя: конец трубки: |_| — две линии до середины строки и дно; | — одна линия до середины
-      set(c(1, D.CONT))
-      local t1 = math.max(1, math.floor(ms('C') / 2))
-      local mid = y + math.floor(L.rh / 2)
-      if D.OFF_TXT == '|' then gfx.rect(x + L.x_note + math.floor((L.w_note - 2 * ms('C')) / 2), y, 1, mid - y + 1, 1)
-      else
-        local xa, xb = x + L.x_note + t1, x + L.x_note + L.w_note - t1 - 1 - 2 * ms('C')
-        gfx.rect(xa, y, 1, mid - y + 1, 1); gfx.rect(xb, y, 1, mid - y + 1, 1); gfx.rect(xa, mid, xb - xa + 1, 1, 1)
-      end
+      text(x + L.x_note, ty, D.OFF_TXT == '|' and ' \'' or '|_|', c(1, D.CONT))   -- 2 ноя: символами: |_| — дно трубки, | — конец линии
     else text(x + L.x_note, ty, cell.cut and (D.CUT_TXT or '^^^') or ((cell.alloff or (cell.of and cell.of.stub)) and (D.FREE_TXT or 'OFF')) or (D.OFF_TXT or '==='), c(1, D.CONT)) end   -- 8 окт: опция note OFF glyph — «|» вместо OFF
     if not L.notes_only then text(x + L.x_vol, ty, '..', c(2, D.EMPTY)) end
     if L.narrow or L.notes_only then
@@ -2613,13 +2605,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
       -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько
       -- колонок fx (−+ в шапке); остальные скрыты, как в трекерах
     else
-      if D.OFF_TXT == '|' then   -- 2 ноя: конец «|» — и тело ноты одной линией (по центру ноты C-3)
-        set(c(1, D.CONT)); gfx.rect(x + L.x_note + math.floor((L.w_note - 2 * ms('C')) / 2), y, 1, L.rh, 1)
-      elseif D.TUBE then   -- 2 ноя: полая нота — две линии по краям поля ноты через всю строку (трубка до ===); опция note tube
-        if DCS.inv == 1 then set(D.inv_bg or U.TEXT); gfx.rect(x + L.x_note, y, L.w_note, L.rh, 1) end   -- курсор на поле: заливка, линии фоном
-        set(c(1, D.CONT)); local tx1 = math.max(1, math.floor(ms('C') / 2))
-        gfx.rect(x + L.x_note + tx1, y, 1, L.rh, 1); gfx.rect(x + L.x_note + L.w_note - tx1 - 1 - 2 * ms('C'), y, 1, L.rh, 1)   -- 2 ноя: правый край — на 2 знака левее (по ширине C-3)
-      else text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT)) end
+      -- 2 ноя: только символами (просьба): трубка «| |», режим конца «|» — одна «|» по центру ноты
+      local body = D.OFF_TXT == '|' and ' | ' or (D.TUBE and '| |' or ' | ')
+      text(x + L.x_note, ty, body, c(1, D.CONT))
       for fld = 2, nf do
         local fx = D.field_rect(L, fld)
         text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
