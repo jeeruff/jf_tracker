@@ -1757,7 +1757,11 @@ function B.up()
     return
   end
   if B.mode == 'presets' then
-    if B.prdir then B.prdir = nil; B.cur = 1; B.set_all(B.read_presets()) end
+    if B.prdir then
+      local was = B.prdir
+      B.prdir = nil; B.cur = 1; B.set_all(B.read_presets())
+      for i, e in ipairs(B.entries) do if e.prdir == was then B.cur = i; break end end   -- 2 ноя: как в lf — курсор на папке, из которой вышли
+    end
     return
   end
   if B.mode == 'pm' then
@@ -2267,6 +2271,8 @@ function B.draw(U, L, x, y, w, h)
   -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
   -- 1 ноя: опция browser split — то же, без колонки родителя: список папки | превью того, что под курсором (как lf)
   local two = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
+  -- 2 ноя: пресеты — всегда две колонки, как lf: папки | что в папке под курсором
+  if B.mode == 'presets' and B.filter == '' and not B.filtering and w >= L.cw * 40 then two = true end
   local cols = (B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90) or two
   local pv_x, pv_w
   if cols then
@@ -2350,7 +2356,30 @@ function B.draw(U, L, x, y, w, h)
     local e = B.entries[B.cur]
     B.ncol = nil
     -- 27 окт (3): карты в третьей колонке больше нет — у неё своя панель map (одно место на инструмент)
-    if e and e.dir then
+    if e and e.prdir then   -- 2 ноя: папка пресетов — её пресеты (список читается при смене строки)
+      if not (B.prcol and B.prcol.dir == e.prdir) then
+        local l = {}
+        for _, x in ipairs(ctx.presets_list and ctx.presets_list(e.prdir) or {}) do l[#l + 1] = { name = x.name } end
+        B.prcol = { dir = e.prdir, list = l }
+      end
+      draw_col(U, L, B.prcol.list, pv_x, y, pv_w, h, nil, 'prcol', -1, -1)
+    elseif e and e.preset then   -- 2 ноя: пресет — его эффекты (строки <VST / <AU / <JS / <CLAP шаблона трека)
+      if not (B.prcol and B.prcol.dir == e.path) then
+        local l = {}
+        local f = io.open(e.path or '', 'rb')
+        if f then
+          for ln in f:lines() do
+            local nm = ln:match('^%s*<[A-Z]+3?i? "([^"]+)"')
+            if nm and ln:match('^%s*<[VAJC]') then l[#l + 1] = { name = (nm:gsub('^%u+%d?i?: ', '')) } end
+          end
+          f:close()
+        end
+        B.prcol = { dir = e.path, list = l }
+      end
+      U.text(pv_x + L.pad, y + 1, ctx.fit('fx of ' .. e.name, pv_w - 2 * L.pad), U.DIM)
+      draw_col(U, L, B.prcol.list, pv_x, y + L.rh, pv_w, h - L.rh, nil, 'prcol', -1, -1)
+    elseif e and B.mode == 'presets' then
+    elseif e and e.dir then
       local p = B.full(e)
       B.ncol = { path = p, list = list_dir(p) }
       local hv = draw_col(U, L, B.ncol.list, pv_x, y, pv_w, h, nil, 'ncol', mx, my)
