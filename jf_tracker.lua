@@ -27168,7 +27168,8 @@ local function frame()
       end
       if lfo_hover.curve_t then                        -- 9 окт: щелчок по кривой — курсор трекера туда
         vim.cur.row = math.max(0, math.floor(model.row_of_time(lfo_hover.curve_t, state.lpb) + 0.5)); vim.ensure_visible()
-        if A.tool == 'sel' and lfo_hover.geo and lfo_hover.xh and A.sel then   -- 31 окт: ручка рамки — трансформация
+        if lfo_hover.geo and A.tool ~= 'shape' and ctx.mods().alt and ctx.acv_bend_start(lfo_hover.geo, dbl and click.zone == 'lfo' and click.mx and math.abs(click.mx - gfx.mouse_x) + math.abs(click.my - gfx.mouse_y) < 8) then   -- 2 ноя: Opt — изгиб отрезка
+        elseif A.tool == 'sel' and lfo_hover.geo and lfo_hover.xh and A.sel then   -- 31 окт: ручка рамки — трансформация
           local sp2 = ctx.acv_span(); local act2 = ctx.acv_curves(sp2)[A.cur]
           local pts = A.sel_points(act2, sp2, A.sel.a, A.sel.b)
           local box = A.box_of(pts, A.sel.a, A.sel.b)
@@ -29294,6 +29295,16 @@ local function frame()
     d.mx0, d.my0 = d.mx0 or gfx.mouse_x, d.my0 or gfx.mouse_y
     if not d.go and gfx.mouse_cap & 1 == 1 and math.abs(gfx.mouse_x - d.mx0) + math.abs(gfx.mouse_y - d.my0) > 3 then d.go = true end
     if not d.go and gfx.mouse_cap & 1 == 1 then
+    elseif d.bend and gfx.mouse_cap & 1 == 1 then   -- 2 ноя: изгиб отрезка — вертикаль мыши, Shift — мельче
+      local k = (d.my0 - gfx.mouse_y) / math.max(20, d.geo.gh * (gfx.mouse_cap & 8 == 8 and 2 or 0.5))
+      local ten = math.max(-1, math.min(1, d.ten0 + d.sgn * k))
+      reaper.SetEnvelopePoint(d.env, d.idx, nil, nil, 5, ten, nil, true)
+      d.moved = true
+      ctx.acv_cc = nil; ctx.ACV.cache = nil
+      state.status = ('%s: bend %+d%% (release - written; Opt+double click - straight)'):format(d.name or 'segment', math.floor(d.sgn * ten * 100 + 0.5))
+    elseif d.bend then
+      if d.moved then reaper.Undo_OnStateChange2(0, 'jf_tracker: bend envelope segment'); model.invalidate() end
+      ctx.acv_pdrag = nil
     elseif d.ml and gfx.mouse_cap & 1 == 1 then
       local r, v = ctx.ACV.at(d.geo, gfx.mouse_x, gfx.mouse_y)
       r = math.floor(r + 1e-6)
@@ -33929,6 +33940,32 @@ ctx.mx_sel_rgs = function()
   return #out >= 2 and out or nil
 end
 -- 1 ноя: двойной щелчок по точке огибающей на холсте (±8 px) — удалить её. → true, если удалена
+-- 2 ноя: Opt+тяга по отрезку огибающей — изгиб (форма bezier, tension REAPER): вверх — отрезок выше, вниз — ниже;
+-- Opt+двойной щелчок — снова прямая. Знак tension зависит от направления отрезка — меряется пробой при нажатии
+ctx.acv_bend_start = function(g, dbl)
+  local sp = ctx.acv_span(); local act = ctx.acv_curves(sp)[ctx.ACV.cur]
+  if not (act and act.kind == 'env' and act.write ~= false and act.e and act.e.env) then return false end
+  local env = act.e.env
+  local row = g.r0 + (gfx.mouse_x - g.gx) / math.max(1, g.gw) * g.nr
+  local rf = math.floor(row)
+  local t = sp.time(rf) + (sp.time(rf + 1) - sp.time(rf)) * (row - rf)
+  local i = reaper.GetEnvelopePointByTime(env, t)
+  if not i or i < 0 or i >= reaper.CountEnvelopePoints(env) - 1 then vim.msg = 'bend: Opt+drag between two points'; return true end
+  local _, ta, _, shp, ten = reaper.GetEnvelopePoint(env, i)
+  local _, tb = reaper.GetEnvelopePoint(env, i + 1)
+  if dbl then
+    edit.run('envelope segment straight', function() reaper.SetEnvelopePoint(env, i, nil, nil, 0, 0, nil, true); reaper.Envelope_SortPoints(env) end)
+    ctx.acv_cc = nil; ctx.ACV.cache = nil; model.invalidate()
+    vim.msg = 'segment straight again (Opt+double click; u - undo)'
+    return true
+  end
+  local tm = (ta + tb) / 2
+  local function probe(x) reaper.SetEnvelopePoint(env, i, nil, nil, 5, x, nil, true); local _, v = reaper.Envelope_Evaluate(env, tm, 0, 0); return v or 0 end
+  local up = probe(0.3) >= probe(-0.3)
+  reaper.SetEnvelopePoint(env, i, nil, nil, shp, ten, nil, true)
+  ctx.acv_pdrag = { bend = true, env = env, idx = i, ten0 = shp == 5 and ten or 0, shp0 = shp, sgn = up and 1 or -1, geo = g, name = act.name, mx0 = gfx.mouse_x, my0 = gfx.mouse_y }
+  return true
+end
 ctx.acv_point_del = function(g)
   local sp = ctx.acv_span(); local act = ctx.acv_curves(sp)[ctx.ACV.cur]
   if not (act and act.kind == 'env' and act.write ~= false and act.e and act.e.env) then return false end

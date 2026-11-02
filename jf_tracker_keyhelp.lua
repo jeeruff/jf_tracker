@@ -819,6 +819,7 @@ KH.PAGES = {
     { k = 'v', d = 'anchor: the range from here to the cursor; Esc - off' },
     { k = 'f r R s t q n', d = 'fill the range (or the grid cell under the cursor) with a shape per cell: flat, ramp up, ramp down, sine, triangle, square, noise; the height - the curve value at the cursor (0 - full); n again - another noise' },
     { k = '[ ]', d = 'grid finer / coarser (1/8 row .. a bar; finer than a row - points between the rows of an envelope)' },
+    { k = 'Opt+drag (mouse)', d = 'between two points of an envelope: bend the segment - up / down makes it curve above / below the straight line (Shift - fine); Opt+double click - straight again; one undo' },
     { k = 'Ctrl+Opt (draw / line / erase)', d = 'CONTROL on the canvas: the finger on the trackpad draws the stroke from the canvas cursor (Shift - fine); let Ctrl+Opt go - written, one undo' },
     { k = 'dd dw  yy y  p', d = 'as in the tracker: dd / dw delete the point (with v - every point in it; an empty row - the next one), yy / v … y copy, p paste from the cursor' },
     { k = 'i  D  E', d = 'mouse tools (also buttons in the header): i draw - a pencil, drag draws freely; D line - drag from a point to a point; E erase - drag removes; the same key again - back to cur (a click moves the cursor). Written on release, one undo' },
