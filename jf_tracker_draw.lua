@@ -6963,7 +6963,7 @@ function D.pmark(name)
     local dk = math.max(0, k - pm_k)
     p.kb = p.n == 1 and dk or (p.kb * 0.95 + dk * 0.05)
     if dt > p.max then p.max = dt end
-  elseif name then collectgarbage('stop') end
+  elseif name and D.prof_mem then collectgarbage('stop') end   -- 2 ноя: сборщик стоит только при открытом jftop (с debug кадры дёргались)
   if not name then collectgarbage('restart') end
   pm_name, pm_t, pm_k = name, t, collectgarbage('count')
 end

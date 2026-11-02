@@ -17,6 +17,8 @@
 
 local SELF = debug.getinfo(1, 'S').source:sub(2)
 local DIR = SELF:match('(.*)[/\\]') or '.'
+-- 2 ноя: поколенческий сборщик — мусор кадра (~0.5 МБ) собирается мелко и часто, без пауз на длинных пролётах j k
+collectgarbage('generational')
 local RES = reaper.GetResourcePath()
 local EXT = 'jf_tracker'
 -- 16 окт: опция REAPER «Auto-float newly created FX windows» открывала окно на каждый
@@ -23441,6 +23443,7 @@ local function frame()
   -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
   if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
+  draw.prof_mem = ctx.PERF and ctx.PERF.active and ctx.PERF.jftop or false   -- 2 ноя: КБ по участкам — только в окне jftop
   draw.pmark('snapshot + model rebuild')
   local t_0 = reaper.time_precise()
   -- 28 окт: простой — пропущенный кадр не заливает и не копирует экран: окно держит прошлую картинку (gfx.clear = -1);
