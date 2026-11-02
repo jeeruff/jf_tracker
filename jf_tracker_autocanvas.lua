@@ -38,17 +38,15 @@ function ACV.shape_stroke(ra, rb, v)
   for _, p in ipairs(ACV.shape_points(ACV.shape, a, b, ACV.cycle, v, ACV.seed)) do out[p.row] = p.v end
   return out, a, b
 end
--- 2 ноя: сетка неровными клетками — ACV.gmode: 'pat' (паттерн = клетка), 'sec' (секция), 'all' (весь отрезок одной клеткой);
+-- 2 ноя: сетка неровными клетками — ACV.gmode: 'pat' (паттерн = клетка), 'sec' (секция);
 -- nil — ровная ACV.grid строк. Границы — из span.marks (ACV.marks, ставят draw и main), края отрезка ACV.sr0 / ACV.sr1
 ACV.gmode = nil
 function ACV.cells()
   local r0, r1 = ACV.sr0 or 0, ACV.sr1 or 1
   local set, out = { [r0] = true }, { r0 }
-  if ACV.gmode ~= 'all' then
-    for _, mk in ipairs(ACV.marks or {}) do
-      local r = mk.row
-      if (ACV.gmode == 'pat' or mk.kind == 'sec') and r > r0 + 1e-6 and r < r1 - 1e-6 and not set[r] then set[r] = true; out[#out + 1] = r end
-    end
+  for _, mk in ipairs(ACV.marks or {}) do
+    local r = mk.row
+    if (ACV.gmode == 'pat' or mk.kind == 'sec') and r > r0 + 1e-6 and r < r1 - 1e-6 and not set[r] then set[r] = true; out[#out + 1] = r end
   end
   table.sort(out)
   out[#out + 1] = r1
@@ -67,7 +65,7 @@ function ACV.cell_at(row)
 end
 -- ширина клетки у строки (шаг мазка, хвост заливки); без snap — строка
 function ACV.cellw(row) if not ACV.snap then return 1 end; local a, b = ACV.cell_at(row or ACV.row); return math.max(ACV.gmode and 1 or 0.125, b - a) end
-ACV.GMODES = { pat = 'pattern', sec = 'section', all = 'all' }
+ACV.GMODES = { pat = 'pattern', sec = 'section' }
 ACV.stroke = nil   -- { rows = { [row] = v01 | false }, line = { x0, y0, x1, y1 } — пиксели: нажатие → мышь (инструмент line) }
 -- точка холста → строка (с привязкой к сетке) и значение 0..1; g — геометрия из hover (gx gy gw gh r0 nr)
 function ACV.at(g, mx, my, smooth)

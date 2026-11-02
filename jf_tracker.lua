@@ -17261,11 +17261,11 @@ ctx.acv_zone_step = function(dir)
   ACV.lfoc = nil   -- уходим в другую панель — список отпускает клавиши
   return false
 end
--- сетка холста: ровная (доля такта) или неровная — 2 ноя: паттерн / секция / весь отрезок одной клеткой (кнопка сетки, zg)
+-- сетка холста: ровная (доля такта) или неровная — 2 ноя: паттерн / секция (кнопка сетки, zg); «весь отрезок» убран — смысла нет
 ctx.acv_grid_menu = function()
   local A = ctx.ACV
   local items, bar = {}, state.lpb * 4
-  for _, x in ipairs({ { 'a', 'all', 'all: the whole span is one cell' }, { 'p', 'pat', 'pattern: one cell per pattern (uneven)' }, { 's', 'sec', 'section: one cell per section' } }) do
+  for _, x in ipairs({ { 'p', 'pat', 'pattern: one cell per pattern (uneven)' }, { 's', 'sec', 'section: one cell per section' } }) do
     items[#items + 1] = { key = x[1], label = x[3] .. (A.gmode == x[2] and '  *' or ''), fn = function() A.gmode = x[2]; A.snap = true; vim.msg = 'canvas grid: ' .. x[3] .. ' ({ } - cell to cell, [ ] - back to even)' end }
   end
   for i, g in ipairs({ 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32 }) do   -- 30 окт: и мельче строки

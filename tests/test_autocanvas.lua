@@ -185,7 +185,6 @@ do
   local r = ACV.at({ gx = 0, gy = 0, gw = 64, gh = 100, r0 = 0, nr = 64 }, 30.5, 50); eq('at snaps to the pattern start', r, 16)
   local sr = ACV.span_rows(0, 0, 63, 1, {}); local k = 0; for _ in pairs(sr) do k = k + 1 end; eq('stroke: a point per pattern', k, 4)
   ACV.gmode = 'sec'; a, b = ACV.cell_at(20); eq('sec cell of row 20', a .. '-' .. b, '0-40')
-  ACV.gmode = 'all'; a, b = ACV.cell_at(50); eq('all: one cell', a .. '-' .. b, '0-64')
   ACV.row = 20; ACV.gmode = 'pat'; ACV.key(string.byte('}'), { r0 = 0, r1 = 64 }); eq('} to the next pattern', ACV.row, 40)
   ACV.key(string.byte('{'), { r0 = 0, r1 = 64 }); eq('{ back to the cell start', ACV.row, 16)
   ACV.gmode, ACV.marks = nil, nil
