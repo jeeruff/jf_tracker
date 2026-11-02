@@ -727,7 +727,9 @@ local function relayout()
   if state.autozoom and not state.ptmode then
     state.hscroll = 0
     local f0 = f_old or L.flat[vim.cur.fi]
-    state.az_full = f0 and f0.col and f0.col.guid or nil   -- 20 окт: трек курсора — во всю ширину, остальные ужимаются
+    local azg = f0 and f0.col and f0.col.guid or nil
+    if azg ~= state.az_full then state.az_keep = nil end   -- 2 ноя: курсор ушёл — свёртка za снова не мешает autozoom
+    state.az_full = azg   -- 20 окт: трек курсора — во всю ширину, остальные ужимаются
     -- всегда с полной ширины вниз (место освободилось — треки снова шире)
     state.wzlevel = nil
     L = draw.layout(snap, state, #regions)
@@ -1299,6 +1301,7 @@ ctx = {
   -- развернуть — снять уровень (при общем зуме — полный уровень трека)
   fold = function(col, v)
     state.folds[col.guid] = v or nil
+    state.az_keep = v and col.guid or nil   -- 2 ноя: za на треке курсора — autozoom его не раскрывает, пока курсор на нём
     state.wlevel = state.wlevel or {}
     if v then state.wlevel[col.guid] = v == 'mini' and 0 or 1
     else state.wlevel[col.guid] = state.wzlevel and (3 + math.min(L and L.MAXFX or 4, state.fxcols or 0)) or nil end
