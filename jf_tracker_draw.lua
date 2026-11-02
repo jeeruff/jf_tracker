@@ -1571,7 +1571,19 @@ function D.route_diagram(L, cols, master, x, y, w, h, opts)
       for k, f in ipairs(fxs) do
         local by0 = yb - bh0
         if by0 < dtop then
-          if k > 1 then text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY) end; break   -- 2 ноя: ни один блок не влез — без «+1» (непонятно)
+          if k > 1 then text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY)
+          else   -- 2 ноя: ни один блок не влез — первые буквы эффектов столбиком (RCmp, phtf …), сколько влезет
+            local yy = dtop
+            for kk = k, #fxs do
+              if yy + L.rh > dbot + 1 then break end
+              local nm = (fxs[kk].name or '?'):gsub('^%w+:%s*', '')
+              local nch = math.max(1, math.floor((bw0 - 2) / math.max(1, ms('W'))))
+              local ab = D.RK and D.RK.abbrev and D.RK.abbrev(nm, nch) or nm
+              text(bx0 + 1, yy, fit(ab, bw0 - 2), fxs[kk].enabled == false and U.DIM or U.GREY)
+              yy = yy + L.rh
+            end
+          end
+          break
         end
         local hot = mx >= bx0 and mx < bx0 + bw0 and my >= by0 and my < yb
         if k > 1 then set(U.LINE); gfx.rect(c.x + math.floor(c.w / 2), yb, 1, gap, 1) end     -- провод к прошлому блоку
