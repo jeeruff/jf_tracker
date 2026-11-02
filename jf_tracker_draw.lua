@@ -947,7 +947,7 @@ function D.layout(snap, state, nregions)
       if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then se = false end   -- уровни ширины: огибающие — только у широкого
       if state.ptmode then se = false end
       if se then for _, e in ipairs(col.envs or {}) do seen['e:' .. (e.name or '')] = true end end
-      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then
+      if not hidden and not c.folded and state.midilanes ~= false and (not c.compact or (state.trackenvs and state.trackenvs[col.guid] == true)) and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then
         for _, ml in ipairs(col.mlanes or {}) do seen['m:' .. tostring(ml.key)] = true end
       end
       local rows, any = {}, false
@@ -1040,7 +1040,7 @@ function D.layout(snap, state, nregions)
     end
       -- MIDI-лейны (6 окт, опция midi lanes): узкие колонки после огибающих
       c.mls = {}
-      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then   -- 9 окт: сложенный — в знак, без MIDI-лейнов
+      if not hidden and not c.folded and state.midilanes ~= false and (not c.compact or (state.trackenvs and state.trackenvs[col.guid] == true)) and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then   -- 9 окт: сложенный — в знак, без MIDI-лейнов
         for _, ml in ipairs(col.mlanes or {}) do
           local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms(state.envfmt == 'hex' and 'FF' or '127')) + L.pad + ms('W')
           L.flat[#L.flat + 1] = { ci = ci, col = col, ml = ml, sub = {}, x = vis and lx or nil, w = mw }
@@ -1060,6 +1060,7 @@ function D.layout(snap, state, nregions)
     end
     if vis and c.x and c.x + c.w > L.cols_r - 2 then
       L.cols_cut = true   -- 20 окт: autozoom — не влез целиком
+      c.cut = true        -- 2 ноя: уходит под мастер — правый край шапки (ø ~, значения, a+ −+) не рисуется
       local lim = L.cols_r - 2
       c.w = math.max(0, lim - c.x)
       for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do
@@ -8484,6 +8485,7 @@ function D.frame(L, snap, rows, state, info)
         if b[4] == 'fxen' and (mixcol or x + fxw + L.pad + sro0 > ph_x - L.pad) then
           rest[#rest + 1] = b
         elseif b[4] == 'fxen' then D.hfx_row1 = fxw + 1; hbtn(b, x, by, bwk, bhh, false)
+        elseif (c.cut and (b[4] == 'auto' or b[4] == 'phase')) then
         elseif ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
           rest[#rest + 1] = b
         elseif not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
@@ -8680,7 +8682,7 @@ function D.frame(L, snap, rows, state, info)
         text(sx, sy, label, U.GREY)
         -- 18 окт: панорама — цвет стороны (как в REAPER): левая половина фиолетовая, правая зелёная
         U.dslider(wx0, cy, ww, frac, centered, acc, hot, L.rh, what == 'pan' or what == 'panl' or what == 'panr')   -- 13 окт: ромбик
-        if show_val then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
+        if show_val and not c.cut then text(wx0 + ww + L.pad + vres - ms(val), sy, val, U.GREY) end
         if hot then hover.trs = { col = col, what = what, x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end
         if D.csel_on(col.guid, what) then csel_frame(wx0 - 1, sy + 2, ww + 2, L.rh - 4) end
         hint('trs', wx0, sy, ww, L.rh, { col = col, what = what })
@@ -9222,7 +9224,7 @@ function D.frame(L, snap, rows, state, info)
           end
         end
         local fx0 = ln.x + ln.w - bw2 - 1
-        if li == #c.lanes and fx0 > nx + bw2 + L.pad and not c.master then   -- 17 окт: у мастера колонок эффектов нет (кнопки ложились на cmd / visor); его a+ — ниже
+        if li == #c.lanes and fx0 > nx + bw2 + L.pad and not c.master and not c.cut then   -- 17 окт: у мастера колонок эффектов нет (кнопки ложились на cmd / visor); его a+ — ниже
           pm(fx0, 'fxcolbtn', function(d) hover.fxcolbtn = { d = d, col = col } end)   -- 12 окт: и трек кнопки
           -- 6 окт: лейнов огибающих нет — a+ (добавить лейн автоматизации) левее
           local aw = ms('a+') + 4
