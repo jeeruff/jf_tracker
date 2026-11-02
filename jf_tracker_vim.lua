@@ -1964,6 +1964,17 @@ function V.key_impl(c)
     if hexf then V.hexbuf = nil; return ins_as_normal(c) end
   end
   if c <= 0 then return end
+  -- 2 ноя: после z> z< z. z, — повтор той же клавишей без z (ширина шагами подряд)
+  if V.zrep then
+    V.zrep = nil
+    if V.mode == 'normal' and not V.pending and not V.op and (c == 62 or c == 60 or c == 46 or c == 44) and ctx.width_step then
+      local f0 = flat()[V.cur.fi]
+      local col0 = f0 and f0.col
+      ctx.width_step((c == 62 or c == 46) and 1 or -1, (c == 46 or c == 44) and 'cur' or nil)
+      if col0 then for i, g in ipairs(flat()) do if g.col == col0 then V.cur.fi = i; break end end end
+      clamp_cur(); V.zrep = true; return
+    end
+  end
   local E = ctx.edit
   local st = ctx.state
   local n = V.count or 1
@@ -3121,6 +3132,8 @@ function V.key_impl(c)
         for _ = 1, n do ctx.width_step(d, (c == ('.'):byte() or c == (','):byte()) and 'cur' or nil) end
         if col then for i, g in ipairs(flat()) do if g.col == col then V.cur.fi = i; break end end end
         clamp_cur()
+        V.zrep = true   -- 2 ноя: дальше > < . , — без z, пока не нажата другая клавиша
+        V.msg = (V.msg or '') .. '  (> < . , again - more, without z)'
       elseif c == ('F'):byte() then   -- 1 ноя: zF (было zM, 7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
         local any = false
         for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
