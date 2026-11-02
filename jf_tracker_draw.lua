@@ -13465,11 +13465,13 @@ function D.frame(L, snap, rows, state, info)
     -- наведена мышь, во всю оставшуюся ширину
     -- 15 окт: режим — в полосе трекера (modeline); здесь — то, что после «|» (сообщение), без слова режима
     local left = (info.status_left or ''):match('^[^|]*|(.*)$') or ''   -- «РЕЖИМ | сообщение»: режим — до первой |
-    left = fit((left:gsub('^%s+', '')), sw / 3)
-    key_text(sx + L.pad, sy + 2, left, sw / 3, U.AMBER)
-    local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
+    -- 2 ноя: сообщению — всё, что не занято описанием справа (не меньше трети); пусто справа — вся строка (подсказки z: обрубались)
+    local lw = desc == '' and (sw - 2 * L.pad) or math.max(sw / 3, sw - 2 * L.pad - math.min(ms(desc), sw * 2 / 3) - 4 * L.pad)
+    left = fit((left:gsub('^%s+', '')), lw)
+    key_text(sx + L.pad, sy + 2, left, lw, U.AMBER)
+    local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     D.aw_status = nil                    -- DSP спрятан — строка не залипает
     D.aw_status = nil
     if desc ~= '' then
