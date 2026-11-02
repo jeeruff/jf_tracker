@@ -195,17 +195,16 @@ function DK.key(c, sel, n, np, mods)
   -- 8 окт: режим слайдера параметра (f на параметр / щелчок): h l — значение
   -- (H L крупно), j k — соседний параметр, Esc — обратно к эффектам
   if DK.pslider then
-    if cnt and (ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT) then
-      ctx.dsp_value(sel.fx, sel.param, ((ch == 'h' or ch == 'H' or c == LEFT) and -1 or 1) * cnt, ch == 'H' or ch == 'L'); return true
+    -- 2 ноя: h l — всегда навигация (между эффектами); значение — + - (Shift мелко), Ctrl+A / Ctrl+X, число Enter
+    if cnt and (ch == '+' or ch == '=' or ch == '-' or c == 1 or c == 24) then
+      ctx.dsp_value(sel.fx, sel.param, ((ch == '-' or c == 24) and -1 or 1) * cnt, false); return true
     end
     if c == 27 then
       DK.pslider = nil
       if DK.pads_back then DK.pads_back = nil; DK.pads = true; ctx.msg('pads again: h l j k move'); return true end   -- 19 окт: из параметра пэда — к пэдам
       ctx.msg('DSP: h l - effects again'); return true
     end
-    if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT then
-      ctx.dsp_value(sel.fx, sel.param, (ch == 'h' or ch == 'H' or c == LEFT) and -1 or 1, ch == 'H' or ch == 'L'); return true
-    end
+    if ch == 'h' or ch == 'l' or ch == 'H' or ch == 'L' or c == LEFT or c == RIGHT then DK.pslider = nil end   -- уход на соседний эффект
   end
   if c == 27 then
     if DK.anchor or DK.marks then DK.clear_pick(); return true end

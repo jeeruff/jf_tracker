@@ -606,7 +606,7 @@ KH.PAGES = {
     { k = 'Esc Opt+Tab', d = 'clear search / next tab' },
   } },
   dsp = { title = 'DSP (track fx)', e = {
-    { k = 'N h l  N j k  N Enter', m = 'numbers on a param', d = 'on a parameter (slider): 20 h / l - step x20, 23 j / k - 23 params down / up, 23 Enter - set it to 23 in its units (Hz, dB, %), 023 Enter - 0.23; Esc - cancel the number. The same on the rows of reform / humanizer / bouncer (a number + Enter sets the row, Enter alone - keep / apply / bounce)' },
+    { k = 'N + -  N j k  N Enter', m = 'numbers on a param', d = 'on a parameter (slider): 20 + / - - step x20 (h l stay for moving between effects), 23 j / k - 23 params down / up, 23 Enter - set it to 23 in its units (Hz, dB, %), 023 Enter - 0.23; Esc - cancel the number. The same on the rows of reform / humanizer / bouncer (a number + Enter sets the row, Enter alone - keep / apply / bounce)' },
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
     { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },

@@ -17050,7 +17050,7 @@ ctx.acv_to_dsp = function(env)
   ctx.pane_focus('dsp')
   if k then
     dsp_sel.fx, dsp_sel.param = k, kp; DK.pslider = true
-    vim.msg = ('curve -> DSP: %s / %s (h l - value, Esc - back)'):format(col.fx[k].name or '?', col.fx[k].params[kp].name or '?')
+    vim.msg = ('curve -> DSP: %s / %s (+ - value, h l - effects)'):format(col.fx[k].name or '?', col.fx[k].params[kp].name or '?')
   else vim.msg = 'curve -> DSP: the parameter is not among the shown ones of this plugin' end
 end
 ctx.acv_curves = function(sp)
@@ -19193,7 +19193,7 @@ local function hint_go(t)
     elseif w == 'pauto' then ctx.param_auto_open(d.fx, d.param)   -- 28 окт: f-прыжок на метку ~
     elseif w == 'kview' and d.key then draw.kit_list = draw.kit_list or {}; draw.kit_list[d.key] = d.view end
   elseif t.kind == 'dsp' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = 1
-  elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: h l value (H L coarse), j k next parameter, Esc - back to the effects'
+  elseif t.kind == 'dspparam' then ctx.set_focus('dsp'); dsp_sel.fx = d.fx; dsp_sel.param = d.param; DK.pslider = true; vim.msg = 'DSP parameter: + - value (Shift fine), j k next parameter, h l - effects'
   elseif t.kind == 'browser' then ctx.set_focus('browser'); B.cur = d
   elseif t.kind == 'browserbtn' then B.click(d)
   elseif t.kind == 'sprop' then ctx.set_focus('top'); state.toptab = 'sample'; SPROP.sel = d   -- параметр сэмпла (8 окт: метки были, прыжка не было)
@@ -31607,7 +31607,7 @@ local function frame()
           local ni = cur == 0 and 1 or math.max(1, math.min(#kvis, cur + (down and 1 or -1)))
           dsp_sel.param = kvis[ni]; DK.pslider = true
           local p = f.params[dsp_sel.param]
-          vim.msg = (p and p.name or '') .. '  (h l - value, j k - next, Esc - back)'
+          vim.msg = (p and p.name or '') .. '  (+ - value, j k - next, h l - effects)'
           return
         end
         -- 26 окт: Opt+J / K — пресет модуля под курсором, Opt+H / L — главная папка пресетов (Surge)
