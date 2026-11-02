@@ -29970,7 +29970,7 @@ local function frame()
   if (gfx.mouse_hwheel or 0) ~= 0 then
     local d = gfx.mouse_hwheel > 0 and 1 or -1
     if false then
-    elseif (hover.dsp or hover.dsphsb) and draw.dsp_sb_n then   -- 22 окт: свайп над DSP — цепочка на блок
+    elseif (hover.dsp or hover.dsphsb or wo == 'dsp') and draw.dsp_sb_n then   -- 22 окт: свайп над DSP — цепочка на блок; 2 ноя: и над волной / кнопками модуля (slixer), не только над рамкой
       draw.dsp_px = (draw.dsp_px or 0) + gfx.mouse_hwheel * 0.5; draw.dsp_px_t = nil   -- 22 окт: свайп — по пикселям, за пальцем
     elseif w_trk and not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
