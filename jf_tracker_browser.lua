@@ -2050,7 +2050,7 @@ function B.player_block(U, L, x, y, w, h, btn, opts)
     -- с высотой выбранного файла
     local px0 = x0
     B.pv_cur = path   -- 27 окт: файл плеера (звучит / выбран) — для slixer / drumrs5k
-    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'cell', 'drum', B.drum }, { 'slixer', 'pvslx', false }, { 'drumrs5k', 'pvdrum', false } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end   -- 27 окт: + новый slixer, drumrs5k   -- 24 окт: подпись cell (файл — в выбранную ячейку / пэд)
+    for _, b in ipairs({ { 'play', 'auto', B.auto }, { 'keys', 'keys', B.keys }, { 'slixer', 'pvslx', false }, { 'cell', 'drum', B.drum }, { 'drumrs5k', 'pvdrum', false } }) do px0 = btn(px0, sy, b[1], b[2], b[3]) end   -- 27 окт: + новый slixer, drumrs5k   -- 24 окт: подпись cell (файл — в выбранную ячейку / пэд)
     local lx0 = px0 + L.pad
     local lw, vw = U.measure(lbl) + L.pad, U.measure('-40.0') + L.pad
     local sx0, sw = lx0 + lw, math.max(8, x0 + ww - lx0 - lw - vw)
