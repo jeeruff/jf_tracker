@@ -1465,12 +1465,12 @@ ctx = {
   view_mode = function(m)
     state.view_reg = m ~= 'project'
     state.view_secmode = m == 'section' or nil
-    state.view_sec = nil
+    state.view_sec = nil; state.view_item = nil
     vim.msg = ({ project = 'view: the whole project (zs - the section, zp - the pattern)',
       section = 'view: the section of the cursor (zs again - the whole project, zp - the pattern)',
       pattern = 'view: the pattern of the cursor only (zp again - the whole project, zs - the section)' })[m]
   end,
-  view_cur = function() return not state.view_reg and 'project' or (state.view_secmode and 'section' or 'pattern') end,
+  view_cur = function() return not state.view_reg and 'project' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern') end,
   -- секция курсора: { pos, rgnend, name } или nil
   section_at = function(t)
     for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then return sc end end
@@ -33277,7 +33277,8 @@ ctx.fit_height = function()
   local t0, t1
   local vm = ctx.view_cur()
   if vm == 'section' then local sc = ctx.section_at(edit.row_time(vim.cur.row, state.lpb, 0)); if sc then t0, t1 = sc.pos, sc.rgnend end
-  elseif vm == 'pattern' then local _, _, rg = ctx.region_rows(); if rg then t0, t1 = rg.pos, rg.rgnend end end
+  elseif vm == 'pattern' then local _, _, rg = ctx.region_rows(); if rg then t0, t1 = rg.pos, rg.rgnend end
+  elseif vm == 'item' and state.view_sec then t0, t1 = state.view_sec[1], state.view_sec[2] end
   if not t0 then t0 = model.marker_pos(model.START_MARKER) or 0; t1 = model.marker_pos(model.END_MARKER) or reaper.GetProjectLength(0) end
   local q = reaper.TimeMap2_timeToQN(0, t1) - reaper.TimeMap2_timeToQN(0, t0)
   if q <= 0 or not L then return end
@@ -33334,6 +33335,26 @@ ctx.fit_height = function()
   if vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows then vim.cur.row = state.row0 end
   relayout()
   vim.msg = ('zh: the %s fits - LPB %d (%d rows)'):format(vm, best, math.floor(q * best + 0.5))
+end
+-- 2 ноя: zW — зум на айтем под курсором: вид = его строки, LPB — чтобы влез по высоте; ещё раз — вид и LPB как были
+ctx.view_item = function()
+  if state.view_item then
+    local b = ctx.vi_back or {}
+    ctx.view_mode(b.mode or 'project')
+    if b.lpb and b.lpb ~= state.lpb then set_lpb(b.lpb) end
+    if b.row0 then state.row0 = b.row0 end
+    ctx.vi_back = nil; relayout()
+    vim.msg = 'zW: back to the ' .. (b.mode or 'project') .. ' view'
+    return
+  end
+  local it = ctx.item_at_cursor() or ctx.item_under()
+  if not it then vim.msg = 'zW: no item under the cursor'; return end
+  local p = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+  ctx.vi_back = { mode = ctx.view_cur(), lpb = state.lpb, row0 = state.row0 }
+  state.view_reg = true; state.view_secmode = nil
+  state.view_sec = { p, p + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') }; state.view_item = true
+  ctx.zh_t = nil; ctx.fit_height(); ctx.zh_t = nil
+  vim.msg = vim.msg .. ' - zW again: back'
 end
 -- 31 окт: qtz — квантование входа (record input quantize REAPER) трека курсора: строка INQ чанка трека, сетка —
 -- шаг трекера (1 / LPB доли). Состояние — кэш по треку (чанк не читается каждый кадр)
@@ -36803,7 +36824,7 @@ ctx.sec_insert = function(sc, t, linked)
   return t1
 end
 ctx.sec_show = function(sc)
-  state.view_reg = true; state.view_secmode = true; state.view_sec = { sc.pos, sc.rgnend }   -- 26 окт: = вид section
+  state.view_reg = true; state.view_secmode = true; state.view_sec = { sc.pos, sc.rgnend }; state.view_item = nil   -- 26 окт: = вид section
   local r0 = model.row_of_time(sc.pos, state.lpb)
   vim.cur.row = math.floor(r0 + 0.5); state.row0 = vim.cur.row
   local r1 = model.row_of_time(sc.rgnend, state.lpb)

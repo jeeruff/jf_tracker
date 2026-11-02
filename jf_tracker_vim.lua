@@ -3045,6 +3045,9 @@ function V.key_impl(c)
         return
       end
       V.count = nil; finish_move(); return
+    elseif p == 'zv' then   -- 2 ноя: zv — подменю вида; zvw — вид волны (было zW)
+      if c == ('w'):byte() then if ctx.wave_menu then ctx.wave_menu() end end
+      V.count = nil; finish_move(); return
     elseif p == 'z' then
       local L = ctx.layout()
       -- 10 окт: фокус не в трекере (lib, browser, fx list, macros …) — zz = модуль на всё окно (zoom)
@@ -3060,7 +3063,8 @@ function V.key_impl(c)
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
       elseif c == ('e'):byte() then if ctx.env_view then ctx.env_view() end   -- 12 окт: ze — вид колонки огибающей: значения / кривая
-      elseif c == ('W'):byte() then if ctx.wave_menu then ctx.wave_menu() end   -- 12 окт: вид волны (выпадашка); 31 окт: zW (было zw)
+      elseif c == ('W'):byte() then if ctx.view_item then ctx.view_item() end   -- 2 ноя: zW — зум на айтем под курсором (вид волны — zvw)
+      elseif c == ('v'):byte() then V.pending = 'zv'; return   -- 2 ноя: zv — подменю вида (zvw — вид волны)
       elseif c == ('w'):byte() then if ctx.fit_width then ctx.fit_width() end   -- 31 окт: zw — все треки одной ширины, чтобы влезли
       elseif c == ('l'):byte() then if ctx.lpb_menu then ctx.lpb_menu() end   -- 1 ноя: zl — пресеты LPB (T триоли, D квинтоли)
       elseif c == ('h'):byte() then if ctx.fit_height then ctx.fit_height() end   -- 31 окт: zh — вид (паттерн / секция / проект) по высоте в экран

@@ -31,7 +31,7 @@ function SX.items(v, P)
     {
       -- 26 окт: подписи SLICE нет — и так ясно (кнопки нарезки первые)
       -- 31 окт: setup — как в окне плагина: цвет волны (peaks / brightness / spectral …) — пульт и колонка трекера
-      { kind = 'menu', lab = 'setup', src = 'p', name = 'Waveform colours', items = { 'peaks', 'brightness by frequency', 'line', 'array', 'spectral colours' }, tip = 'setup: waveform colours - plain peaks, dark low / bright high, or spectral hues (the tracker wave column follows)' },
+      { kind = 'menu', lab = 'setup', fixlab = true, src = 'p', name = 'Waveform colours', items = { 'peaks', 'brightness by frequency', 'line', 'array', 'spectral colours' }, tip = 'setup: waveform colours - plain peaks, dark low / bright high, or spectral hues (the tracker wave column follows)' },
       { kind = 'act', lab = 'detect', key = 'd', what = 'detect', tip = 'find transients and cut there; moving sens re-runs it' },
       { kind = 'menu', lab = ({ 'transient', 'equal', 'pitch' })[math.floor(slm + 0.5) + 1], key = 't', src = 'p', name = 'Slice mode', items = { 'transient', 'equal', 'pitch' }, tip = 'slicing mode: transients (sens), equal parts, or pitch changes' },
       { kind = 'val', lab = 'sens', val = ('%.2f'):format(pv('Transient sensitivity') or 0.5), src = 'p', name = 'Transient sensitivity', step = 0.05, lo = 0.05, hi = 1, slider = true, raw = pv('Transient sensitivity') or 0.5, tip = 'transient sensitivity: more - more slices (detect re-runs when you let go)' },
@@ -102,7 +102,8 @@ SX.key_at = key_at
 -- меню — по самому длинному пункту, число — не уже 5 знаков
 local function bw_of(it, ms, pad)
   local lab = it.lab
-  if it.kind == 'menu' and it.items then for _, x in ipairs(it.items) do if ms(x) > ms(lab) then lab = x end end end
+  -- 2 ноя: fixlab — подпись не меняется (setup), по пунктам не растягивать
+  if it.kind == 'menu' and it.items and not it.fixlab then for _, x in ipairs(it.items) do if ms(x) > ms(lab) then lab = x end end end
   local w = ms(lab) + 2 * pad
   if it.key and not key_at(it) then w = w + ms(it.key) + 3 end
   if it.kind == 'val' then w = w + math.max(ms(' ' .. (it.val or '')), ms(' 00.00')) end
