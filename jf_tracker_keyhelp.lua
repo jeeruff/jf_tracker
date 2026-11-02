@@ -200,7 +200,7 @@ KH.PAGES = {
     { k = 'h (wave)', d = 'wave column (wave mode column): h from the note goes into the wave, l back; there s - cut the note at the row, S - a stretch marker at the row start (one in the row - snapped there), x - remove it, J K - pull the hit a row down / up (3J - three); the mouse drags the amber line too' },
     { k = 'R (VISUAL)', d = 'razor edit: the selection (rows x tracks) becomes a REAPER razor area - REAPER razor actions work on it and it shows in the arrange view' },
     { k = 'rip', d = 'ripple editing (REAPER, the transport button: off / per track / all tracks): x on a note deletes it with its rows - what is below moves up (per track - this track, all - every track)' },
-    { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MTS sysex before the notes (MTS-ESP Master on the track before Surge XT), audio items - fractional pitch; Shift - the track' },
+    { k = 'Cmd+F1 F2', d = 'microtone: the selection (else the note of the row) down / up 1/6 tone (72-EDO; marks after the octave: C-4^ C-4^^ C-4^3, v - down); MIDI - MPE: the note on its own channel 2..16 with a pitch bend (range 48; the synth in MPE mode - Surge XT is switched on by itself), audio items - fractional pitch; Shift - the track' },
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern -1 / +1; Shift+F11 F12 - by octave' },
     { k = 'Ctrl+F1 F2', d = 'transpose the whole pattern (every track) -1 / +1; Ctrl+F11 F12 - by octave' },
     { k = 'Ctrl+Shift+F1 F2', d = 'transpose the column (subcolumn) in the pattern -1 / +1; + F11 F12 - by octave' },

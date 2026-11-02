@@ -11889,16 +11889,16 @@ ctx = {
       rows = rb
       for r = row + 1, row + rb - 1 do if #ctx.chord_heads(col, r) > 0 then rows = r - row; break end end
     end
-    -- 16 окт: just во вкладке harm — аккорд в натуральном строе (микротоны 72-EDO), MTS-ESP Master на трек
+    -- 16 окт: just во вкладке harm — аккорд в натуральном строе (микротоны 72-EDO); 2 ноя: MPE, синт трека — в режим MPE
     local jm = MMX.HM.ji and MMX.HM.ji_micro(arg, pitches) or nil
     local mts_new
     edit.run('chord ' .. arg, function()
       if #heads > 0 then edit.delete(heads, state.lpb) end
       for _, p in ipairs(pitches) do edit.insert_note(col.track, nil, state.lpb, row, p, vim.vel or 100, rows, 'midi') end   -- 21 окт: аккорд — MIDI и там, где клипа нет
-      if jm and next(jm) then edit.micro_set_at(col.track, row, state.lpb, jm); mts_new = edit.mts_master(col.track) end
+      if jm and next(jm) then edit.micro_set_at(col.track, row, state.lpb, jm); mts_new = edit.mpe_on(col.track) or 'none' end
     end)
     model.invalidate()
-    vim.msg = ('%s: %s%s at %d, %d row(s) - %s%s'):format(col.name, arg, jm and ' (just)' or '', row, rows, table.concat((function() local t = {} for _, p in ipairs(pitches) do t[#t + 1] = model.note_name(p) .. ((jm and jm[p]) and (jm[p] > 0 and ({ '^', '^^', '^3' })[jm[p]] or ({ 'v', 'vv', 'v3' })[-jm[p]]) or '') end return t end)(), ' '), mts_new and ' + MTS-ESP Master on the track' or '')
+    vim.msg = ('%s: %s%s at %d, %d row(s) - %s%s'):format(col.name, arg, jm and ' (just)' or '', row, rows, table.concat((function() local t = {} for _, p in ipairs(pitches) do t[#t + 1] = model.note_name(p) .. ((jm and jm[p]) and (jm[p] > 0 and ({ '^', '^^', '^3' })[jm[p]] or ({ 'v', 'vv', 'v3' })[-jm[p]]) or '') end return t end)(), ' '), mts_new and edit.mpe_msg(mts_new) or '')
   end,
   fx_stack = function(hover, col, cx, right, y0, avail, force_vert, MAXL)
     local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -21172,12 +21172,12 @@ ctx.tr_ji = function(notes)
       table.insert(groups[k].ps, p)
     end
   end
-  local n, mts = 0, false
+  local n, mts = 0, nil
   edit.run('just intonation', function()
     for _, g in pairs(groups) do
       local sym = #g.ps >= 2 and CHM.name(g.ps) or ctx.chord_sym_at(edit.row_time(g.row, state.lpb, 0))
       local jm = sym and HM.ji_micro(sym, g.ps)
-      if jm and next(jm) then edit.micro_set_at(g.tr, g.row, state.lpb, jm); n = n + 1; mts = edit.mts_master(g.tr) or mts end
+      if jm and next(jm) then edit.micro_set_at(g.tr, g.row, state.lpb, jm); n = n + 1; local st = edit.mpe_on(g.tr) or 'none'; if mts == nil or mts == 'ok' then mts = st end end
     end
   end)
   model.invalidate()

@@ -669,48 +669,14 @@ function E.transpose(heads, lpb, semis, map, label)
   end)
 end
 
--- 16 окт: микротоны (72-EDO, ступень 1/6 тона). MIDI — MTS sysex перед каждым note-on тейка (MTS-ESP Master на
--- треке раздаёт подстройку Surge XT и другим клиентам); у айтема — дробь D_PITCH. E.micro_sync переписывает поток
--- тейка: старые MTS долой, новые — перед нотами (порядок потока = порядок воспроизведения в той же ppq).
--- over — { ['ch:ppq:pitch'] = m } поверх того, что стоит; нет ни одного m ≠ 0 — sysex не пишется вовсе
+-- 16 окт: микротоны (72-EDO, ступень 1/6 тона); у айтема — дробь D_PITCH. 2 ноя: MIDI — MPE (model.micro_rewrite):
+-- нота с микротоном на своём канале 2..16, pitch bend канала перед ней; синту нужен режим MPE (E.mpe_on).
+-- over — { ['ch:ppq:pitch'] = m } поверх того, что стоит
 function E.micro_sync(take, over)
   local ok, buf = R.MIDI_GetAllEvts(take, '')
   if not ok then return end
-  local need = buf:find('\xF0\x7F\x7F\x08\x02', 1, true) ~= nil
-  for _, m in pairs(over or {}) do if m ~= 0 then need = true end end
-  if not need then return end                       -- тейк без микротонов — поток не трогаем
-  local evs, pos, ppq, tune = {}, 1, 0, {}
-  while pos <= #buf do
-    local okp, off, flag, msg, np = pcall(string.unpack, '<i4Bs4', buf, pos)
-    if not okp then break end
-    pos = np; ppq = ppq + off
-    local t = msg:byte(1) == 0xF0 and model.mts_parse(msg)
-    if t then for kk, c in pairs(t) do tune[kk] = c end
-    else
-      local e = { ppq = ppq, flag = flag, msg = msg }
-      local b1 = msg:byte(1) or 0
-      if #msg >= 3 and b1 & 0xF0 == 0x90 and msg:byte(3) > 0 then
-        local key = ('%d:%d:%d'):format(b1 & 0x0F, math.floor(ppq + 0.5), msg:byte(2))
-        local m = over and over[key]
-        if m == nil then m = model.micro_of_cents(tune[msg:byte(2)]) or 0 end
-        e.m = m
-      end
-      evs[#evs + 1] = e
-    end
-  end
-  local any = false
-  for _, e in ipairs(evs) do if e.m and e.m ~= 0 then any = true end end
-  local out, last = {}, 0
-  for _, e in ipairs(evs) do
-    if any and e.m then
-      local key = e.msg:byte(2)
-      out[#out + 1] = string.pack('<i4Bs4', math.floor(e.ppq - last + 0.5), 0, model.mts_bytes(key, key * 100 + e.m * model.MICRO_STEP))
-      last = e.ppq
-    end
-    out[#out + 1] = string.pack('<i4Bs4', math.floor(e.ppq - last + 0.5), e.flag, e.msg)
-    last = e.ppq
-  end
-  R.MIDI_SetAllEvts(take, table.concat(out))
+  local nb = model.micro_rewrite(buf, over)
+  if nb then R.MIDI_SetAllEvts(take, nb); R.MIDI_Sort(take) end
 end
 
 -- 16 окт: микротоны нот, начавшихся в строке row трека (аккорд гармонизатора в натуральном строе):
@@ -734,15 +700,42 @@ function E.micro_set_at(track, row, lpb, pmap)
     end
   end
 end
--- MTS-ESP Master первым на треке (раздаёт подстройку Surge XT и другим клиентам); true — добавлен
-function E.mts_master(track)
-  for k = 0, R.TrackFX_GetCount(track) - 1 do
-    local _, nm = R.TrackFX_GetFXName(track, k, '')
-    if (nm or ''):find('MTS-ESP Master', 1, true) then return false end
+-- 2 ноя: синт трека в режим MPE (микротоны — bend по каналам). Surge XT: флаг mpeEnabled в его состоянии
+-- (base64 в чанке трека, длина та же — меняется одна цифра). → 'on' включён сейчас, 'ok' уже был, nil — синт не узнан
+function E.mpe_on(track)
+  local okc, chunk = R.GetTrackStateChunk(track, '', false)
+  if not okc then return nil end
+  local a = chunk:find('<VST "VST3i: Surge XT', 1, true) or chunk:find('<VST "VSTi: Surge XT', 1, true) or chunk:find('<CLAP "CLAPi: Surge XT', 1, true)
+  if not a then return nil end
+  local head = chunk:find('\n', a, true)
+  local b = chunk:find('\n>', head, true) or #chunk
+  local src, data = {}, {}
+  for ln in chunk:sub(head + 1, b - 1):gmatch('[^\n]+') do
+    src[#src + 1] = ln
+    local t = ln:match('^%s*([%w+/=]+)%s*$')
+    data[#data + 1] = t and model.b64dec(t) or false
   end
-  local fx = R.TrackFX_AddByName(track, 'VST3i: MTS-ESP Master (ODDSound)', false, -1000)
-  if not fx or fx < 0 then fx = R.TrackFX_AddByName(track, 'MTS-ESP Master (ODDSound)', false, -1000) end
-  return fx ~= nil and fx >= 0
+  local parts = {}
+  for _, d in ipairs(data) do if d then parts[#parts + 1] = d end end
+  local all = table.concat(parts)
+  local i = all:find('<mpeEnabled v="', 1, true)
+  if not i then return nil end
+  local j = i + #'<mpeEnabled v="'
+  if all:sub(j, j) == '1' then return 'ok' end
+  all = all:sub(1, j - 1) .. '1' .. all:sub(j + 1)
+  local body, p = {}, 1
+  for k, ln in ipairs(src) do
+    local d = data[k]
+    if d then body[k] = (ln:match('^(%s*)') or '') .. model.b64enc(all:sub(p, p + #d - 1)); p = p + #d
+    else body[k] = ln end
+  end
+  R.SetTrackStateChunk(track, chunk:sub(1, head) .. table.concat(body, '\n') .. chunk:sub(b), false)
+  return 'on'
+end
+-- для сообщений: что с MPE у синта трека (после E.mpe_on)
+function E.mpe_msg(st)
+  if st == 'on' then return ' + MPE turned on in Surge XT' elseif st == 'ok' then return '' end
+  return ' - the synth must be in MPE mode (bend range 48)'
 end
 
 -- сдвиг на d ступеней 1/6 тона; за ±3 — перенос в соседний полутон (C-4^3 + ^ = C#4v^… = C#4vv)

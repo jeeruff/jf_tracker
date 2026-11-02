@@ -4193,18 +4193,18 @@ function V.transpose_scope(scope, d, micro, diat)   -- 16 окт: micro — d с
     V.msg = ('transpose %s %+d degree(s) of %s %s: %d note(s)'):format(V.TSCOPE[scope] or scope, d, ctx.CH_NAMES[r + 1], TH.BY[id].name, #notes)
     return true
   end
-  local mts_new = false
+  local mts_new
   if micro then
     ctx.edit.micro_nudge(notes, lpb(), d)
-    -- 1 ноя: MIDI-ноты слышат микротон только через MTS-ESP — Master на их трек (как just в harm), один раз
+    -- 2 ноя: MIDI-ноты слышат микротон через MPE — синт их трека в режим MPE (Surge XT — сам), один раз на трек
     local seen = {}
     for _, h in ipairs(notes) do
       local tr = h.kind == 'midi' and h.item and reaper.GetMediaItem_Track(h.item)
-      if tr and not seen[tr] then seen[tr] = true; if ctx.edit.mts_master(tr) then mts_new = true end end
+      if tr and not seen[tr] then seen[tr] = true; local st = ctx.edit.mpe_on(tr) or 'none'; if mts_new == nil or mts_new == 'ok' then mts_new = st end end
     end
   else ctx.edit.transpose(notes, lpb(), d) end
   V.last_edit = nil
-  V.msg = ('transpose %s %+d%s: %d note(s)%s'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes, mts_new and ' + MTS-ESP Master on the track' or '')
+  V.msg = ('transpose %s %+d%s: %d note(s)%s'):format(V.TSCOPE[scope] or scope, d, micro and '/6 tone' or '', #notes, mts_new and ctx.edit.mpe_msg(mts_new) or '')
   return true
 end
 -- 26 окт: ноты области (как transpose_scope): sel / col / track / pattern (все треки; строки — то, что видно)
@@ -4241,7 +4241,7 @@ function V.transpose_smart(scope)
   for _, d in ipairs({ -36, -24, -12, 12, 24, 36 }) do items[#items + 1] = { label = ('oct %+d'):format(d // 12), v = d, tip = ('%s %+d octave(s)'):format(V.TSCOPE[scope], d // 12) } end
   for _, d in ipairs({ -3, -2, -1, 1, 2, 3 }) do items[#items + 1] = { label = ('deg %+d'):format(d), v = 'deg:' .. d, tip = ('%s %+d degree(s) of the key (harmonizer / :key)'):format(V.TSCOPE[scope], d) } end
   items[#items + 1] = { label = 'to chord', v = 'chord', tip = 'every note to the nearest tone of the chord of its row (chord column of the master, :chord read / hear)' }
-  items[#items + 1] = { label = 'just', v = 'ji', tip = 'just intonation: the chord of every hit gets its microtones (72-EDO, MTS-ESP Master on the track)' }
+  items[#items + 1] = { label = 'just', v = 'ji', tip = 'just intonation: the chord of every hit gets its microtones (72-EDO, MPE: the synth in MPE mode)' }
   items[#items + 1] = { label = 'micro -', v = 'micro:-1', tip = '1/6 tone down' }
   items[#items + 1] = { label = 'micro +', v = 'micro:1', tip = '1/6 tone up' }
   while #items % 12 ~= 0 do items[#items + 1] = { label = '', dim = true } end
@@ -4273,7 +4273,7 @@ function V.tr_apply(scope, v)
   end
   if v == 'ji' then
     local n, mts = ctx.tr_ji(notes)
-    V.msg = ('just: %d hit(s) in just intonation%s'):format(n, mts and ' + MTS-ESP Master on the track' or '')
+    V.msg = ('just: %d hit(s) in just intonation%s'):format(n, mts and ctx.edit.mpe_msg(mts) or '')
     return true
   end
   return false

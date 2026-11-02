@@ -44,7 +44,124 @@ function M.micro_tag(m)
   local a = math.abs(m)
   return (m > 0 and '^' or 'v') .. (a == 2 and (m > 0 and '^' or 'v') or (a == 3 and '3' or ''))
 end
+-- 2 ноя: микротон MIDI-ноты — MPE: своя нота на своём канале 2..16 и pitch bend этого канала перед note-on
+-- (MTS SysEx не применял никто: MTS-ESP Master его не принимает, Surge XT тоже — проверено рендером).
+-- Диапазон bend членов MPE-зоны по стандарту 48 полутонов (Surge XT, Vital и др. по умолчанию)
+M.MPE_RANGE = 48
+-- base64 (чанки VST3 в RPP: строки — независимые куски base64)
+local B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+function M.b64dec(t)
+  local map = {}
+  for i = 1, 64 do map[B64:byte(i)] = i - 1 end
+  local out, bits, nb = {}, 0, 0
+  for i = 1, #t do
+    local v = map[t:byte(i)]
+    if v then bits = (bits << 6) | v; nb = nb + 6; if nb >= 8 then nb = nb - 8; out[#out + 1] = string.char((bits >> nb) & 255) end end
+  end
+  return table.concat(out)
+end
+function M.b64enc(d)
+  local out = {}
+  for i = 1, #d, 3 do
+    local a, b, c = d:byte(i, i + 2)
+    local n = (a << 16) | ((b or 0) << 8) | (c or 0)
+    out[#out + 1] = B64:sub((n >> 18) + 1, (n >> 18) + 1) .. B64:sub(((n >> 12) & 63) + 1, ((n >> 12) & 63) + 1)
+      .. (b and B64:sub(((n >> 6) & 63) + 1, ((n >> 6) & 63) + 1) or '=') .. (c and B64:sub((n & 63) + 1, (n & 63) + 1) or '=')
+  end
+  return table.concat(out)
+end
+function M.mpe_bend(cents) return math.max(0, math.min(16383, 8192 + math.floor(cents / (M.MPE_RANGE * 100) * 8192 + 0.5))) end
+function M.mpe_cents(v) return (v - 8192) / 8192 * M.MPE_RANGE * 100 end
+-- поток тейка (MIDI_GetAllEvts) → новый поток с микротонами по MPE | nil (менять нечего).
+-- over = { ['ch:ppq:pitch'] = m } — микротоны поверх стоящих (ключ — канал и ppq ДО перезаписи).
+-- Свои bend — на канале ≥ 2 в той же ppq прямо перед note-on того же канала: снимаются и пишутся заново;
+-- старые MTS sysex — читаются (миграция) и убираются. Нота с микротоном уходит на свободный канал 2..16
+-- (давно освободившийся — меньше задевает хвосты), перед каждой нотой каналов 2..16 — её bend (0 — центр):
+-- старт воспроизведения с середины не наследует чужой изгиб
+function M.micro_rewrite(buf, over)
+  local evs, pos, ppq, tune = {}, 1, 0, {}
+  local dropped = false
+  while pos <= #buf do
+    local okp, off, flag, msg, np = pcall(string.unpack, '<i4Bs4', buf, pos)
+    if not okp then break end
+    pos = np; ppq = ppq + off
+    local t = msg:byte(1) == 0xF0 and M.mts_parse(msg)
+    if t then for kk, c in pairs(t) do tune[kk] = c end; dropped = true
+    else evs[#evs + 1] = { ppq = ppq, flag = flag, msg = msg } end
+  end
+  -- свои bend: канал ≥ 2, следом в той же ppq note-on того же канала
+  local notes, act = {}, {}
+  for i, e in ipairs(evs) do
+    local b1 = e.msg:byte(1) or 0
+    local st, ch = b1 & 0xF0, b1 & 0x0F
+    if st == 0xE0 and ch >= 1 and #e.msg >= 3 then
+      for j = i + 1, #evs do
+        local f = evs[j]
+        if f.ppq ~= e.ppq then break end
+        local c1 = f.msg:byte(1) or 0
+        if c1 == (0x90 | ch) and #f.msg >= 3 and f.msg:byte(3) > 0 then e.ours = true; f.bend = e.msg:byte(3) * 128 + e.msg:byte(2); break end
+      end
+      if e.ours then dropped = true end
+    elseif st == 0x90 and #e.msg >= 3 and e.msg:byte(3) > 0 then
+      local p = e.msg:byte(2)
+      local key = ('%d:%d:%d'):format(ch, math.floor(e.ppq + 0.5), p)
+      local m = over and over[key]
+      if m == nil then m = M.micro_of_cents(e.bend and M.mpe_cents(e.bend) or tune[p]) or 0 end
+      local a = act[ch * 128 + p]
+      if a then a.e1 = e.ppq end
+      local n = { on = e, ch = ch, s = e.ppq, e1 = math.huge, m = m }
+      notes[#notes + 1] = n; act[ch * 128 + p] = n
+    elseif (st == 0x80 or st == 0x90) and #e.msg >= 3 then
+      local a = act[ch * 128 + e.msg:byte(2)]
+      if a then a.off = e; a.e1 = e.ppq; act[ch * 128 + e.msg:byte(2)] = nil end
+    end
+  end
+  local any = false
+  for _, n in ipairs(notes) do if n.m ~= 0 then any = true end end
+  if not any and not dropped then return nil end
+  if any then
+    -- занятость каналов: ноты без микротона стоят где стоят; с микротоном — свободный канал 2..16
+    local busy = {}
+    for c = 0, 15 do busy[c] = {} end
+    for _, n in ipairs(notes) do if n.m == 0 then local b = busy[n.ch]; b[#b + 1] = n end end
+    local function free(c, n)
+      for _, o in ipairs(busy[c]) do if o ~= n and o.s < n.e1 and n.s < o.e1 then return false end end
+      return true
+    end
+    local lastend = {}
+    for _, n in ipairs(notes) do
+      if n.m ~= 0 then
+        local c = (n.ch >= 1 and free(n.ch, n)) and n.ch or nil
+        if not c then
+          for k = 1, 15 do if free(k, n) and (not c or (lastend[k] or -1) < (lastend[c] or -1)) then c = k end end
+        end
+        c = c or (n.ch >= 1 and n.ch or 1)
+        n.ch = c; local b = busy[c]; b[#b + 1] = n
+        lastend[c] = math.max(lastend[c] or -1, n.e1 == math.huge and n.s or n.e1)
+      end
+    end
+  end
+  local out, last = {}, 0
+  local function put(ppq2, flag, msg) out[#out + 1] = string.pack('<i4Bs4', math.floor(ppq2 - last + 0.5), flag, msg); last = ppq2 end
+  local byon = {}
+  for _, n in ipairs(notes) do byon[n.on] = n end
+  local byoff = {}
+  for _, n in ipairs(notes) do if n.off then byoff[n.off] = n end end
+  for _, e in ipairs(evs) do
+    if not e.ours then
+      local n = byon[e]
+      local msg = e.msg
+      if n then
+        msg = string.char(0x90 | n.ch) .. msg:sub(2)
+        if any and n.ch >= 1 then local v = M.mpe_bend(n.m * M.MICRO_STEP); put(e.ppq, 0, string.char(0xE0 | n.ch, v & 127, v >> 7)) end
+      elseif byoff[e] then msg = string.char((msg:byte(1) & 0xF0) | byoff[e].ch) .. msg:sub(2) end
+      put(e.ppq, e.flag, msg)
+    end
+  end
+  return table.concat(out)
+end
 -- MTS: real-time single note tuning change (F0 7F 7F 08 02 prog n [kk xx yy zz] F7); центы ноты kk
+-- (2 ноя: только чтение старых тейков — пишется MPE)
 function M.mts_bytes(key, cents)
   local c = math.max(0, math.min(12799.99, cents))
   local xx = math.floor(c / 100)
@@ -108,7 +225,7 @@ end
 function M.parse_midi(buf)
   local notes, active = {}, {}
   local soff = nil   -- 19 окт: 0Sxx нот кита — notation-событие «NOTE ch pitch text jf_soff=XX» у ноты
-  local tune
+  local tune, pbq
   local pos, ppq = 1, 0
   local n = #buf
   while pos <= n do
@@ -130,13 +247,17 @@ function M.parse_midi(buf)
       elseif b1 == 0xF0 then   -- 16 окт: MTS — подстройка следующих нот этой клавиши
         local t = M.mts_parse(msg)
         if t then tune = tune or {}; for kk, c in pairs(t) do tune[kk] = { ppq = ppq, c = c } end end
+      elseif st == 0xE0 and ch >= 1 then   -- 2 ноя: MPE — bend канала перед его note-on (та же ppq) = микротон ноты
+        pbq = pbq or {}; pbq[ch] = { ppq = ppq, v = vel * 128 + pitch }
       elseif st == 0x90 and vel > 0 then
         -- две ноты одной высоты на одном канале одновременно невозможны:
         -- повторный note-on закрывает предыдущую
         local a = active[key]
         if a then a.ppq_end = ppq; notes[#notes + 1] = a end
         local tu = tune and tune[pitch]
-        active[key] = { ppq = ppq, pitch = pitch, vel = vel, ch = ch, muted = (flag & 2) == 2, cents = tu and tu.ppq >= ppq - 4 and tu.c or nil }
+        local pb = pbq and pbq[ch]
+        local cents = (pb and pb.ppq == ppq and math.abs(M.mpe_cents(pb.v)) >= 1) and M.mpe_cents(pb.v) or (tu and tu.ppq >= ppq - 4 and tu.c or nil)
+        active[key] = { ppq = ppq, pitch = pitch, vel = vel, ch = ch, muted = (flag & 2) == 2, cents = cents }
       elseif st == 0x80 or (st == 0x90 and vel == 0) then
         local a = active[key]
         if a then a.ppq_end = ppq; a.rel = st == 0x80 and vel or 0; notes[#notes + 1] = a; active[key] = nil end   -- 24 окт: rel 1 — явный OFF трекера
@@ -2243,9 +2364,15 @@ function M.track_midilanes(tr, lpb, guid)
     local it = R.GetTrackMediaItem(tr, i)
     local tk = R.GetActiveTake(it)
     if tk and R.TakeIsMIDI(tk) then
-      local _, _, ccn, txn = R.MIDI_CountEvts(tk)
+      local _, nnn, ccn, txn = R.MIDI_CountEvts(tk)
+      local mpe   -- 2 ноя: bend микротона (MPE, канал ≥ 2 в ppq своей ноты) — не лейн PB
+      for k = 0, (nnn or 0) - 1 do
+        local _, _, _, sp, _, nch = R.MIDI_GetNote(tk, k)
+        if nch and nch >= 1 then mpe = mpe or {}; mpe[nch .. ':' .. math.floor(sp + 0.5)] = true end
+      end
       for k = 0, (ccn or 0) - 1 do
-        local _, _, _, ppq, chanmsg, _, m2, m3 = R.MIDI_GetCC(tk, k)
+        local _, _, _, ppq, chanmsg, cch, m2, m3 = R.MIDI_GetCC(tk, k)
+        if chanmsg == 0xE0 and mpe and mpe[(cch or 0) .. ':' .. math.floor(ppq + 0.5)] then chanmsg = -1 end
         local row = math.floor(M.row_of_time(R.MIDI_GetProjTimeFromPPQPos(tk, ppq), lpb) + 1e-6)
         if chanmsg == 0xB0 and m2 == 123 then   -- 31 окт: all notes off — это OFF в колонке нот, не лейн CC
         elseif chanmsg == 0xB0 then put(lane('cc' .. m2, 'cc', m2), row, m3)

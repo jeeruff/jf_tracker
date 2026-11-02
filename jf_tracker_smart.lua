@@ -258,7 +258,7 @@ function SM.notes(cur, oct, micro)
   for m = -3, 3 do
     local lb = m == 0 and '0' or ((m > 0 and '^' or 'v') .. (math.abs(m) == 2 and (m > 0 and '^' or 'v') or (math.abs(m) == 3 and '3' or '')))
     items[#items + 1] = { label = lb, v = { micro = m }, on = (micro or 0) == m and cur ~= nil,
-                          tip = m == 0 and 'microtone off: the note in 12-EDO' or ('%+.1f cents (%+d/6 tone, 72-EDO; MTS for Surge XT / MTS-ESP)'):format(m * 100 / 6, m) }
+                          tip = m == 0 and 'microtone off: the note in 12-EDO' or ('%+.1f cents (%+d/6 tone, 72-EDO; MPE pitch bend, the synth in MPE mode)'):format(m * 100 / 6, m) }
   end
   local sel
   for i, it in ipairs(items) do if it.v == (cur or ((oct or 4) + 1) * 12) then sel = i end end
