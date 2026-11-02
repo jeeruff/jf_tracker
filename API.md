@@ -119,7 +119,7 @@ containers).
 **File:** `Data/jf_tracker/dspmods_user.txt`, one plugin per line, tab-separated:
 
 ```
-name<TAB>title<TAB>cols<TAB>index:label,index:label,...[<TAB>xy:X:Y]
+name<TAB>title<TAB>cols<TAB>index:label,index:label,...[<TAB>xy:X:Y][<TAB>help:TEXT]
 ```
 
 - `name` - the FX name as REAPER shows it, without the `VST: ` / `JS: ` /
@@ -131,11 +131,25 @@ name<TAB>title<TAB>cols<TAB>index:label,index:label,...[<TAB>xy:X:Y]
   uses the plugin's own name. Labels cannot contain `,` `:` or tabs;
 - `xy:X:Y` - optional: parameter indices for the X and Y axes of an XY pad
   (shown in the first column).
+- `help:TEXT` - optional: the help of your module. When the module is selected
+  in the DSP panel, the help pane (and `?`) shows it on top, tagged `module`,
+  above the general DSP keys. `|` separates the lines; a line `key = what it
+  does` becomes a key and its description, any other line is plain text. Learn
+  keeps the field; edit it by hand. Say what the module is for first, then the
+  knobs and keys that are not obvious:
+
+  ```
+  help:a tape echo with wow = what it is|time = delay in beats (synced)|fb = feedback; over 100 % it runs away|J K = preset (DSP keys)
+  ```
+
+The tracker does the same for its own places: in the tracker the help pane
+starts with what you can do with the thing under the cursor (the wave, a note,
+its volume / delay / command, an envelope, a MIDI lane), then every key.
 
 Example:
 
 ```
-ReaEQ (Cockos)	EQ	2	0:lo freq,1:lo gain,3:b2 freq,4:b2 gain
+ReaEQ (Cockos)	EQ	2	0:lo freq,1:lo gain,3:b2 freq,4:b2 gain	help:low shelf + one band = what it is|lo = the shelf|b2 = the band
 ```
 
 The file is read when jf_tracker starts and rewritten (sorted by name) on every

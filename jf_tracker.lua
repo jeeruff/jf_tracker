@@ -616,6 +616,7 @@ local function umod_load()
       -- XY-пэд (5 окт): пятое поле «xy:X:Y» — номера параметров плагина
       local xx, yy = line:match('\txy:(%-?%d+):(%-?%d+)')
       if xx then m.xy_x, m.xy_y = tonumber(xx), tonumber(yy) end
+      m.help = line:match('\thelp:([^\t]*)')   -- 2 ноя: справка модуля: «клавиша = что делает|…», в панели help сверху
       for i, lab in list:gmatch('(%d+):([^,]*)') do m.params[#m.params + 1] = { i = tonumber(i), label = lab ~= '' and lab or nil } end
       t[name] = m
     end
@@ -636,7 +637,8 @@ local function umod_save(t)
     local parts = {}
     for _, p in ipairs(m.params) do parts[#parts + 1] = p.i .. ':' .. (p.label or ''):gsub('[,:\t\n]', ' ') end
     local xy = (m.xy_x and m.xy_y) and ('\txy:%d:%d'):format(m.xy_x, m.xy_y) or ''
-    f:write(('%s\t%s\t%d\t%s%s\n'):format(k, (m.title or ''):gsub('[\t\n]', ' '), m.cols or 2, table.concat(parts, ','), xy))
+    local hl = m.help and ('\thelp:' .. m.help:gsub('[\t\n]', ' ')) or ''
+    f:write(('%s\t%s\t%d\t%s%s%s\n'):format(k, (m.title or ''):gsub('[\t\n]', ' '), m.cols or 2, table.concat(parts, ','), xy, hl))
   end
   f:close()
   return true
@@ -20636,6 +20638,37 @@ end
 -- macOS — мёртвые клавиши (символ не приходит), поэтому физическая клавиша читается раз в кадр (JS_VKeys_GetState),
 -- только пока Opt зажат и в фокусе модуль slixer; Opt+J K — по-прежнему пресет
 -- 28 окт: модуль под курсором DSP — slixer / контейнер: своя страница справки и строка клавиш
+-- 2 ноя: место под курсором для справки: поле трекера (wave / note / vol … / env / lane) или справка своего
+-- DSP-модуля (поле help: в dspmods_user.txt) — таблица { title, e }
+function ctx.help_here()
+  local f = state.focus
+  if f == 'tracker' then
+    local fl = L and L.flat and L.flat[vim.cur.fi]
+    if not fl then return nil end
+    local sub = vim.cur.sub
+    if sub == 'wave' or sub == 'inst' or sub == 'pan' then return sub end
+    if fl.env then return 'env' end
+    if fl.ml then return 'lane' end
+    local n = vim.cur.field or 1
+    return n == 1 and 'note' or n == 2 and 'vol' or n == 3 and 'delay' or 'cmd'
+  elseif f == 'dsp' then
+    local t = dsp_target()
+    local fx = t and t.fx and t.fx[dsp_sel.fx]
+    local um = fx and not fx.container and model.user_mods[ctx.dsp_fxshort(t, fx)]
+    if um and um.help then
+      if not um.help_t then
+        local e = {}
+        for ln in (um.help .. '|'):gmatch('([^|]*)|') do
+          local k, d = ln:match('^%s*(.-)%s+=%s+(.-)%s*$')
+          if k and k ~= '' then e[#e + 1] = { k = k, d = d } elseif ln:match('%S') then e[#e + 1] = { k = '', d = ln } end
+        end
+        um.help_t = { title = (um.title or ctx.dsp_fxshort(t, fx)) .. ' (your module)', e = e }
+      end
+      return um.help_t
+    end
+  end
+  return nil
+end
 function ctx.dsp_kind()
   local t = dsp_target()
   local f = t and t.fx and t.fx[dsp_sel.fx]
@@ -23366,6 +23399,7 @@ local function frame()
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.panes_ui and state.khelp then state.khelp = false end   -- 18 окт: старая справка на месте DSP при панелях — никогда
   if (state.khelp or ctx.help_pane_on()) and (state.focus ~= 'dsp' or state.panes_ui) and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
+  if state.khelp or ctx.help_pane_on() then KH.here = ctx.help_here() end   -- 2 ноя: «где я» — сверху справки
   -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
   if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля

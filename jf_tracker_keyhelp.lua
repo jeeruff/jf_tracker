@@ -1219,16 +1219,89 @@ end
 
 -- строки к показу: { page=, i=, e=, tag= }; с поиском — все страницы,
 -- текущая первой; без поиска — только текущая
+-- 2 ноя: «где я» — сверху страницы то, что можно сделать с тем, что под курсором (main кладёт KH.here: ключ KH.HERE
+-- или таблицу { title, e } — справка своего DSP-модуля, поле help: в dspmods_user.txt); строки помечены именем места
+KH.HERE = {
+  wave = { title = 'the wave of an audio note', e = {
+    { k = 'S Enter', d = 'a stretch marker at the start of the row (one already in the row - snapped onto the row)' },
+    { k = 'x', d = 'remove the stretch marker of the row' },
+    { k = 'J K', d = 'pull the hit of the row a row down / up (3J - three): the audio stretches between the markers' },
+    { k = 's', d = 'cut the note at the row (two items, the slice keeps playing)' },
+    { k = 'Tab Shift+Tab', d = 'next / previous hit: a stretch marker or a note start' },
+    { k = '\\q \\Q', d = 'q - the nearest peak onto the row grid; Q - pick a peak, j k to a row, Enter moves it there' },
+    { k = 'l', d = 'back to the note field' },
+    { k = 'zW', d = 'zoom on this item: only its rows, LPB to fit; again - back' },
+    { k = 'zvw', d = 'wave view: own column / in the note field / item background / off' } } },
+  note = { title = 'a note', e = {
+    { k = 'i', d = 'INSERT: type notes (q2w3e ...), the step moves the cursor' },
+    { k = 'x  dd', d = 'delete the note / the row (the rows below move up)' },
+    { k = 'Enter', d = 'the smart panel: notes, chords, microtones of the field' },
+    { k = 'Ctrl+A Ctrl+X', d = 'the note +1 / -1 semitone' },
+    { k = 'Cmd+F1 F2', d = 'microtone down / up 1/6 tone (MPE for MIDI, fractional pitch for audio)' },
+    { k = 'Shift+T', d = 'the transposer: semitones, octaves, degrees, to the chord, just intonation' },
+    { k = 's', d = 'split the note at the row' },
+    { k = 'h', d = 'audio note: into its wave (stretch markers)' },
+    { k = 'ze', d = 'the window of the instrument of the track' },
+    { k = 'yy p', d = 'copy rows / paste' } } },
+  inst = { title = 'the instrument of a note', e = {
+    { k = 'Enter', d = 'the instruments of the lib to pick from' },
+    { k = '( )', d = 'instrument previous / next' },
+    { k = 'Ctrl+A Ctrl+X', d = 'the next / previous instrument' } } },
+  vol = { title = 'the volume of a note', e = {
+    { k = 'Ctrl+A Ctrl+X', d = 'volume +1 / -1 (3 Ctrl+A - by three)' },
+    { k = 'x', d = 'clear the value - the note stays' },
+    { k = 'v', d = 'VISUAL on this field only; Cmd+I interpolates from the first value to the last' },
+    { k = 'yc', d = 'copy this column of the pattern; p - into the notes from the cursor' },
+    { k = 'dc', d = 'clear this column in the pattern' } } },
+  pan = { title = 'the pan of an audio note', e = {
+    { k = 'Ctrl+A Ctrl+X', d = 'pan right / left (00 left, 80 centre, FF right)' },
+    { k = 'x', d = 'centre' } } },
+  delay = { title = 'the delay of a note (a 256th of a row)', e = {
+    { k = 'Ctrl+A Ctrl+X', d = 'later / earlier' },
+    { k = 'x', d = 'delay 0 - onto the row' },
+    { k = 'Q', d = 'VISUAL: quantize - every note onto its nearest row' },
+    { k = 'v Cmd+I', d = 'VISUAL on this field, interpolate (a strum, a swing ramp)' } } },
+  cmd = { title = 'a command of a note (0M volume, 0P pan, 0R retrig, 09 offset ...)', e = {
+    { k = 'Enter', d = 'the commands to pick from (fzf), on top - the parameter selected in DSP' },
+    { k = 'Ctrl+A Ctrl+X', d = 'the value +1 / -1' },
+    { k = 'x  dw', d = 'remove the command of the row' },
+    { k = ':fxcmd', d = 'your own command: XX drives a parameter of an effect of the track' },
+    { k = 'Ctrl+Opt+- =', d = 'fewer / more command columns' } } },
+  env = { title = 'automation (an envelope column)', e = {
+    { k = 'i', d = 'INSERT: type values (00..FF), the point lands on the row' },
+    { k = 'Enter', d = 'what to insert: a value, a shape, curves of the selection (VISUAL)' },
+    { k = 'w b e', d = 'next / previous point' },
+    { k = 'x  dw', d = 'remove the point of the row' },
+    { k = 'dc dC', d = 'clear the column / remove the column itself' },
+    { k = 'Ctrl+A Ctrl+X', d = 'the value +1 / -1' },
+    { k = 'l (shape field)', d = 'the shape of the segment: lin sqr slo fas fae bez' },
+    { k = 'Ctrl+Opt', d = 'CONTROL: one big slider of the value of the row' },
+    { k = 'ze', d = 'the effect and the parameter this envelope drives' },
+    { k = 'A  Opt+A', d = 'another parameter / the last touched one as a column' } } },
+  lane = { title = 'a MIDI lane (CC / pitch bend / program change)', e = {
+    { k = 'i', d = 'INSERT: type the value of the row' },
+    { k = 'Enter', d = 'what to insert' },
+    { k = 'x  dw', d = 'remove the event of the row' },
+    { k = 'Ctrl+A Ctrl+X', d = 'the value +1 / -1 (an empty row gets the value above first)' },
+    { k = 'Ctrl+Opt', d = 'CONTROL: one big slider of the value' } } },
+}
 function KH.rows()
   local out = {}
   if KH.query == '' then
     -- 21 окт: без поиска — список страницы один раз (был новый на каждый кадр)
     local P = KH.PAGES[KH.page] or KH.PAGES.tracker
+    local H = type(KH.here) == 'table' and KH.here or KH.HERE[KH.here or '']
+    local key = KH.page .. '@' .. tostring(H and (H.title or '') or '')
     KH.rows_c = KH.rows_c or {}
-    local rc = KH.rows_c[KH.page]
-    if rc and rc.n == #P.e then return rc.rows end
+    local rc = KH.rows_c[key]
+    if rc and rc.n == #P.e and rc.h == H then return rc.rows end
+    if H then
+      local tag = type(KH.here) == 'string' and KH.here or 'module'
+      out[1] = { page = 'here', i = 0, e = { k = 'here', d = H.title }, tag = tag }
+      for i, e in ipairs(H.e) do out[#out + 1] = { page = 'here', i = i, e = e, tag = tag } end
+    end
     for i, e in ipairs(P.e) do out[#out + 1] = { page = KH.page, i = i, e = e } end
-    KH.rows_c[KH.page] = { n = #P.e, rows = out }
+    KH.rows_c[key] = { n = #P.e, rows = out, h = H }
     return out
   end
   local function add(pg)
