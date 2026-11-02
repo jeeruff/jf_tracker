@@ -4935,7 +4935,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   g[#g + 1] = { { tg('follow', 'follow', c.follow) },
                 { tg('lock', 'lock', c.lock), tg('fixed', 'fixed', c.fixed),
                   { 'xfade', c.xfade and ('auto x-fade %dms'):format(c.xfade_ms or 10) or 'auto x-fade off', c.xfade and U.CYAN or U.GREY } } }
-  g[#g + 1] = { { { 'swing', c.swing_on and (c.swing_txt or 'swing') or 'swing', c.swing_on and U.CYAN or U.GREY } },   -- 15 окт: выкл — просто «swing» серым
+  g[#g + 1] = { { { 'swing', c.swing_on and (c.swing_txt or 'swing') or 'swing', c.swing_on and U.CYAN or U.GREY, res = 'swing -100% 1/16' } },   -- 2 ноя: место под самую длинную подпись — слайдер и metro не прыгают   -- 15 окт: выкл — просто «swing» серым
                 { { 'swingbar', '', nil, slider = { v = c.swing_amt or 0 } } } }
   return g
 end
