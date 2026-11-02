@@ -31872,8 +31872,19 @@ ctx.opt_zmenu = function(c)
   if ch == 'z' then ctx.zz_zoom()
   elseif ch == 'x' then
     local cl = L and L.pn and L.pn.by_panel and L.pn.by_panel['options']
-    if OPT.tall then PN.resize(m, 'options', 'v', -OPT.tall); OPT.tall = nil; vim.msg = 'options: back to their height'
-    elseif cl then local d = math.max(0, (gfx.h * 0.75 - cl.h) / math.max(1, gfx.h)); if d > 0 and PN.resize(m, 'options', 'v', d) then OPT.tall = d; vim.msg = 'options: taller (zx again - back)' end end
+    -- 2 ноя: тянуть ручку над панелью (как zX у dsp): PN.resize считал долю от окна, а делил родитель — росла на чуть-чуть
+    local g0
+    for _, g in ipairs(cl and L.pn.grips or {}) do
+      if g.ax == 'v' and math.abs((g.y + g.h / 2) - cl.y) <= 6 and g.x < cl.x + cl.w and g.x + g.w > cl.x then g0 = g; break end
+    end
+    if not cl or not g0 then vim.msg = 'zx: nothing above the options to move'
+    else
+      local want = OPT.tall or math.floor(gfx.h * 0.75)
+      if OPT.tall then want = OPT.tall; OPT.tall = nil else OPT.tall = cl.h end
+      local delta = (cl.y + cl.h - want) - (g0.y + g0.h / 2)
+      PN.drag_grip(m, L.pn, g0, delta)
+      vim.msg = OPT.tall and 'options: taller (zx again - back)' or 'options: back to their height'
+    end
     relayout()
   elseif keys[ch] then OPT.set_tab(keys[ch]); vim.msg = 'options: ' .. keys[ch]
   else vim.msg = '' end
