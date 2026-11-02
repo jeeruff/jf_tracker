@@ -148,6 +148,7 @@ local function reset()
     preview = function(tr, p) calls[#calls + 1] = 'prev:' .. tostring(p) end,
     mac_panel = function(n) calls[#calls + 1] = 'macpanel'; V.pending = '@'; V.count = (n or 1) > 1 and n or nil end,   -- 16 окт: как панель — следующая клавиша выбирает
     toggle_envs = function() calls[#calls + 1] = 'envs' end,
+    track_auto_toggle = function() calls[#calls + 1] = 'trackauto' end,
     loop = function(w, n) calls[#calls + 1] = 'loop:' .. tostring(w) .. ':' .. tostring(n) end,
     automation_picker = function()
       V.open_picker('auto', { { label = 'track: volume' }, { label = 'ReaEQ / Gain' }, { label = 'ReaComp / Threshold' } },
@@ -511,7 +512,7 @@ cmd_down = false
 
 -- ── a / A: огибающие и fzf ────────────────────────────────────────────────
 reset()
-keysin('a');  eq('a toggles envelopes', last(), 'envs'); eq('a not insert', V.mode, 'normal')
+keysin('a');  eq('a toggles the automation of the track', last(), 'trackauto'); eq('a not insert', V.mode, 'normal')
 keysin('A');  eq('A opens picker', V.picker and V.picker.title, 'auto'); eq('all items', #V.picker.matches, 3)
 keysin('thr'); eq('fuzzy filters', #V.picker.matches, 1); eq('match', V.picker.matches[1].label, 'ReaComp / Threshold')
 local pp2 = V.popup(); eq('picker popup', pp2 and pp2.kind, 'picker')

@@ -3730,6 +3730,20 @@ ctx = {
   end,
   toggle_envs = function() state.envs = not state.envs; state.trackenvs = {}; vim.msg = 'envelopes ' .. (state.envs and 'on' or 'off') .. ' (all tracks)' end,
   -- 24 окт: a на сложенном треке — раскрыть его и показать его огибающие (не переключать у всех); true — сделано
+  -- 2 ноя: a — тоггл всей автоматизации трека курсора: огибающие (и эффектов) + MIDI-лейны; все треки — кнопка envs
+  track_auto_toggle = function()
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local col = f and f.col
+    if not (col and col.guid) then return end
+    local cur = state.trackenvs[col.guid]; if cur == nil then cur = state.envs end
+    if cur ~= false and (f.env or f.ml) then cur = true end
+    state.trackenvs[col.guid] = not cur
+    if not cur and state.folds[col.guid] then ctx.fold(col, false) end
+    for i, g in ipairs(L.flat) do if g.col == col and not g.env and not g.ml then vim.cur.fi = i; break end end
+    relayout()
+    for i, g in ipairs(L.flat) do if g.col == col and not g.env and not g.ml then vim.cur.fi = i; break end end
+    vim.msg = (col.name ~= '' and col.name or 'track') .. ': automation ' .. (cur and 'hidden (envelopes + MIDI lanes)' or 'shown') .. '  (a again)'
+  end,
   envs_folded = function()
     local f = L and L.flat and L.flat[vim.cur.fi]
     local col = f and f.col

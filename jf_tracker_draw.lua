@@ -943,11 +943,11 @@ function D.layout(snap, state, nregions)
       local seen = {}
       local se = state.trackenvs and state.trackenvs[col.guid]
       if se == nil then se = state.envs end
-      if c.compact then se = true end
+      if c.compact and se ~= false then se = true end
       if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then se = false end   -- уровни ширины: огибающие — только у широкого
       if state.ptmode then se = false end
       if se then for _, e in ipairs(col.envs or {}) do seen['e:' .. (e.name or '')] = true end end
-      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode then
+      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then
         for _, ml in ipairs(col.mlanes or {}) do seen['m:' .. tostring(ml.key)] = true end
       end
       local rows, any = {}, false
@@ -1021,7 +1021,7 @@ function D.layout(snap, state, nregions)
       end
       local show_env = state.trackenvs and state.trackenvs[col.guid]
       if show_env == nil then show_env = state.envs end
-      if c.compact then show_env = true end         -- свёрнутый: автоматизация видна всегда, схемой
+      if c.compact and show_env ~= false then show_env = true end         -- свёрнутый: автоматизация видна, схемой; 2 ноя: a выключил — нет
       -- уровни: автоматизация — последней, когда колонка шире 50 знаков; 24 окт: a на треке (огибающие трека явно вкл.) — видна всегда
       if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw end
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
@@ -1040,7 +1040,7 @@ function D.layout(snap, state, nregions)
     end
       -- MIDI-лейны (6 окт, опция midi lanes): узкие колонки после огибающих
       c.mls = {}
-      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode then   -- 9 окт: сложенный — в знак, без MIDI-лейнов
+      if not hidden and not c.folded and state.midilanes ~= false and not c.compact and not state.ptmode and not (state.trackenvs and state.trackenvs[col.guid] == false) then   -- 9 окт: сложенный — в знак, без MIDI-лейнов
         for _, ml in ipairs(col.mlanes or {}) do
           local mw = L.pad + ((ml.kind == 'tx') and ms('WWWWW') or ms(state.envfmt == 'hex' and 'FF' or '127')) + L.pad + ms('W')
           L.flat[#L.flat + 1] = { ci = ci, col = col, ml = ml, sub = {}, x = vis and lx or nil, w = mw }
