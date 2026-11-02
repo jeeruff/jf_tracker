@@ -26,7 +26,7 @@ T.STEPS = {
     text = 'jf_tracker works in modes, like Vim. NORMAL (where you start) - keys move, edit and run commands: j moves, x deletes. INSERT - the keys write notes on the cursor row. i enters INSERT, as in Vim; Esc leaves it. Esc also enters it - a habit kept from Renoise (and with the keyboard on, i is a note, so Esc is the way in). The word at the bottom says which mode. Press i or Esc (INSERT, red cursor), then Esc (NORMAL).',
     check = function(e, b, s) if e.mode == 'insert' then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'tracker', focus = 'tracker', title = 'Write notes',
-    text = 'In INSERT the keyboard writes: 1 f1 2 f2 3 ... are notes, [ ] - octave (layout qwerty: q 2 w 3 e ..., z / x); m turns the keyboard off and on. Press Esc, write a few notes, Esc again.',
+    text = 'In INSERT the keyboard writes: 1 f1 2 f2 3 ... are notes, [ ] - octave (layout qwerty: q 2 w 3 e ..., z / x); m turns the keyboard off and on. Press i (or Esc) for INSERT, write a few notes, then press Esc to leave INSERT.',
     check = function(e, b, s) if e.mode == 'insert' and e.change ~= b.change then s.seen = true end; return s.seen and e.mode == 'normal' end },
   { mod = 'inst', focus = 'inst', title = 'Pick a sound',
     text = 'The lib: every sample of the project. j / k pick a sound (from the tracker ( ) or Opt+J / K do the same). Pick another sound.',
