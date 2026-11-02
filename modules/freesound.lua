@@ -95,9 +95,36 @@ function M.draw(U, L, x, y, w, h, focused)
   elseif FS.query == '' then st = '/ words, Enter - search; <10s >2s cc0 filter'
   else st = ('%d-%d of %d   n N - pages'):format(((FS.page or 1) - 1) * FS.PAGE + math.min(1, #FS.results), ((FS.page or 1) - 1) * FS.PAGE + #FS.results, FS.count or 0) end
   U.text(x + L.pad, sy, fit(st, w - 2 * L.pad), FS.err and (U.RED or U.AMBER) or U.GREY)
+  -- волна выбранного звука внизу (когда превью скачано), позиция прослушивания — линией
+  local wh = math.max(2 * L.rh, math.min(6 * L.rh, math.floor(h * 0.22)))
+  local wy = y + h - wh - 2
+  do
+    local e = FS.results[S.cur]
+    local wx, ww = x + L.pad, w - 2 * L.pad
+    U.set(U.BG); gfx.rect(wx, wy, ww, wh, 1)
+    U.set(U.LINE or U.GREY); gfx.rect(wx, wy, ww, wh, 0)
+    local p = e and FS.file_of(e)
+    local pk = p and FS.exists(p) and ww > 8 and A.peaks(p, ww)
+    local cy, hh = wy + math.floor(wh / 2), math.floor(wh / 2) - 2
+    if pk and (pk.n or 0) > 0 then
+      U.set(U.mix and U.mix(U.TEXT, U.CYAN, 0.4) or U.CYAN)
+      for px = 0, ww - 1 do
+        local i = math.floor(px * pk.n / ww) + 1
+        local a, b = pk.min[i] or 0, pk.max[i] or 0
+        if b - a < 0.03 then a, b = -0.015, 0.015 end
+        gfx.line(wx + px, cy - b * hh, wx + px, cy - a * hh)
+      end
+      local pos, len, path = A.preview_pos()
+      if pos and len and len > 0 and path == p then
+        U.set(U.AMBER); gfx.rect(wx + math.floor(math.min(1, pos / len) * (ww - 1)), wy + 1, 1, wh - 2, 1)
+      end
+    elseif e then
+      U.text(wx + L.pad, cy - math.floor(L.rh / 2), fit(FS.pending(e) and 'downloading ...' or 'j k / Space - listen, the wave comes with it', ww - 2 * L.pad), U.DIM or U.GREY)
+    end
+  end
   -- список
   local ly = sy + L.rh + 4
-  local nv = math.max(1, math.floor((y + h - ly) / L.rh))
+  local nv = math.max(1, math.floor((wy - 4 - ly) / L.rh))
   if S.cur ~= S.vcur then   -- курсор сдвинулся — список за ним (колесо листает само)
     S.vcur = S.cur
     if S.cur <= S.scroll then S.scroll = S.cur - 1 elseif S.cur > S.scroll + nv then S.scroll = S.cur - nv end
