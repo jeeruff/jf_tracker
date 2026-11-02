@@ -34244,7 +34244,7 @@ ctx.merge_clips = function()
         if not rg.gap and not rg.section then
           for l = 0, lanes - 1 do
             local before = reaper.CountTrackMediaItems(tr)
-            if edit.pat_merge(tr, fm and l or nil, rg.pos, rg.rgnend) then n = n + (before - reaper.CountTrackMediaItems(tr)) end
+            if edit.pat_merge(tr, fm and l or nil, rg.pos, rg.rgnend, true) then n = n + math.max(0, before - reaper.CountTrackMediaItems(tr)) end
           end
         end
       end

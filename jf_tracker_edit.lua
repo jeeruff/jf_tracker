@@ -1655,9 +1655,21 @@ function E.midi_looping(it, tk)
   if isqn then local q0 = R.TimeMap2_timeToQN(0, pos); sl = R.TimeMap2_QNToTime(0, q0 + sl) - pos end
   return len > (sl or len) * 1.001 + 1e-4
 end
-function E.pat_merge(track, lane_idx, rp, re)
+function E.pat_merge(track, lane_idx, rp, re, force)   -- 2 ноя: force (:mergeclips) — аудио мимо, клипы через границу режутся
   if not R.MIDI_SetItemExtents then return nil end
   local fm = R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2
+  if force then
+    for i = R.CountTrackMediaItems(track) - 1, 0, -1 do
+      local o = R.GetTrackMediaItem(track, i)
+      local otk = R.GetActiveTake(o)
+      if otk and R.TakeIsMIDI(otk) and not E.midi_looping(o, otk) then
+        local op = R.GetMediaItemInfo_Value(o, 'D_POSITION')
+        local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
+        if op < rp - 1e-6 and oe > rp + 1e-6 then local rgt = R.SplitMediaItem(o, rp); if rgt then o, op = rgt, rp end end
+        if op < re - 1e-6 and oe > re + 1e-6 then R.SplitMediaItem(o, re) end
+      end
+    end
+  end
   local list = {}
   for i = 0, R.CountTrackMediaItems(track) - 1 do
     local o = R.GetTrackMediaItem(track, i)
@@ -1666,8 +1678,9 @@ function E.pat_merge(track, lane_idx, rp, re)
       local oe = op + R.GetMediaItemInfo_Value(o, 'D_LENGTH')
       if op < re - 1e-6 and oe > rp + 1e-6 then
         local otk = R.GetActiveTake(o)
-        if not (otk and R.TakeIsMIDI(otk) and op >= rp - 1e-6 and oe <= re + 1e-6 and not E.midi_looping(o, otk)) then return nil end
-        list[#list + 1] = { it = o, tk = otk, pos = op }
+        local ok = otk and R.TakeIsMIDI(otk) and op >= rp - 1e-6 and oe <= re + 1e-6 and not E.midi_looping(o, otk)
+        if ok then list[#list + 1] = { it = o, tk = otk, pos = op }
+        elseif not force then return nil end   -- force: аудио и лупы остаются как есть
       end
     end
   end
