@@ -17,8 +17,7 @@
 
 local SELF = debug.getinfo(1, 'S').source:sub(2)
 local DIR = SELF:match('(.*)[/\\]') or '.'
--- 2 ноя: поколенческий сборщик — мусор кадра (~0.5 МБ) собирается мелко и часто, без пауз на длинных пролётах j k
-collectgarbage('generational')
+-- 2 ноя: поколенческий сборщик снят — слабые кэши (пики волн) чистились до использования, волна пропадала
 local RES = reaper.GetResourcePath()
 local EXT = 'jf_tracker'
 -- 16 окт: опция REAPER «Auto-float newly created FX windows» открывала окно на каждый

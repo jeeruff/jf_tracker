@@ -349,6 +349,10 @@ function M.env_rows(tr, lpb)
     local env = R.GetTrackEnvelope(tr, i)
     local _, name = R.GetEnvelopeName(env, '')
     local rows, any = {}, false
+    -- 2 ноя: выключенная (bypass) огибающая не звучит и колонкой не показывается — и «~» не ставит
+    local act = true
+    if R.BR_EnvAlloc then local be = R.BR_EnvAlloc(env, false); if be then act = R.BR_EnvGetProperties(be); R.BR_EnvFree(be, false) end end
+    if not act then goto next_env end
     for k = 0, math.min(R.CountEnvelopePoints(env), M.ENVMARK_MAX) - 1 do
       local _, t = R.GetEnvelopePoint(env, k)
       rows[M.row_of_qn(R.TimeMap2_timeToQN(0, t), lpb)] = true; any = true
@@ -362,6 +366,7 @@ function M.env_rows(tr, lpb)
       any = true
     end
     if any then out[#out + 1] = { key = 'e:' .. (name or ''), rows = rows } end
+    ::next_env::
   end
   return #out > 0 and out or nil
 end
@@ -2506,7 +2511,7 @@ function M.track_envs(tr, lpb)
       if be then
         local active, visible, _, _, _, _, a, b = R.BR_EnvGetProperties(be)
         R.BR_EnvFree(be, false)
-        vis = active and visible
+        vis = active   -- 2 ноя: и огибающая, спрятанная в REAPER (лейн скрыт), — колонка: она звучит; иначе «~» без колонки
         -- 13 окт: темп мастера — колонка всегда (REAPER прячет огибающую темпа, когда маркеры темпа ставят из API)
         if active and (name or ''):lower():find('tempo') then vis = true end
         if a and b and b > a then mn, mx = a, b end
