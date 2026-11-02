@@ -2575,7 +2575,11 @@ local function draw_cell(L, cell, x, y, ty, inv)
       -- 6 окт: команды не переносятся на строки ниже — видно столько, сколько
       -- колонок fx (−+ в шапке); остальные скрыты, как в трекерах
     else
-      text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT))
+      if D.TUBE then   -- 2 ноя: полая нота — две линии по краям поля ноты через всю строку (трубка до ===); опция note tube
+        if DCS.inv == 1 then set(D.inv_bg or U.TEXT); gfx.rect(x + L.x_note, y, L.w_note, L.rh, 1) end   -- курсор на поле: заливка, линии фоном
+        set(c(1, D.CONT)); local tx1 = math.max(1, math.floor(ms('C') / 2))
+        gfx.rect(x + L.x_note + tx1, y, 1, L.rh, 1); gfx.rect(x + L.x_note + L.w_note - tx1 - 1, y, 1, L.rh, 1)
+      else text(x + L.x_note + (L.w_note - ms('|')) / 2, ty, '|', c(1, D.CONT)) end
       for fld = 2, nf do
         local fx = D.field_rect(L, fld)
         text(x + fx, ty, empty_text(fld), c(fld, D.EMPTY))
@@ -8126,7 +8130,8 @@ function D.frame(L, snap, rows, state, info)
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or (state.endglyph or '===')   -- 2 ноя: конец ноты — === (IT), опция end of note
-  D.FREE_TXT = state.freeglyph or 'OFF'                          -- свободный OFF (опция free OFF)
+  D.FREE_TXT = state.freeglyph or 'OFF'
+  D.TUBE = state.notetube ~= false   -- 2 ноя: полая нота (по умолчанию вкл)                          -- свободный OFF (опция free OFF)
   D.CUT_TXT = '^^^'
   -- 31 окт: опция INSERT cursor red — в INSERT акцент курсора (ячейка, кромка, плейхед) красный; в конце кадра — обратно
   D.acc_save = nil
