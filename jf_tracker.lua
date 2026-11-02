@@ -23419,7 +23419,11 @@ local function frame()
   -- справка следит за модулем в фокусе (пока её не листают стрелками)
   if state.panes_ui and state.khelp then state.khelp = false end   -- 18 окт: старая справка на месте DSP при панелях — никогда
   if (state.khelp or ctx.help_pane_on()) and (state.focus ~= 'dsp' or state.panes_ui) and state.focus ~= 'help' then KH.pinned = false; KH.page = ctx.help_page() end   -- 17 окт: и панель help
-  if state.khelp or ctx.help_pane_on() then KH.here = ctx.help_here() end   -- 2 ноя: «где я» — сверху справки
+  if state.khelp or ctx.help_pane_on() then KH.here = ctx.help_here() end
+  if ctx.AIE then   -- 2 ноя: редактор automation item не рисовался прошлый кадр — его курсор (карандаш / ластик) вернуть
+    if ctx.AIE.cursor and not ctx.AIE.drawn then gfx.setcursor(32512); ctx.AIE.cursor = nil end
+    ctx.AIE.drawn = false
+  end   -- 2 ноя: «где я» — сверху справки
   -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
   if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля

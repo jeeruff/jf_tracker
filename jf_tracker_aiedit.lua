@@ -114,6 +114,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
   local press = cap & 1 == 1 and A.prev & 1 == 0
   local rpress = cap & 2 == 2 and A.prev & 2 == 0
   A.prev = cap
+  A.drawn = true   -- 2 ноя: main сбрасывает курсор мыши, если вкладка не рисовалась (карандаш застревал)
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then
     U.text(x + L.pad, y, fit('automation item: none open - double click an automation item in the automation list (lib), or an item on an envelope column of the tracker', w - 2 * L.pad), U.GREY)
