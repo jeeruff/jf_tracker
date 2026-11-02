@@ -116,7 +116,7 @@ function A.draw(U, L, x, y, w, h, t, fit, row_time, row_of, lanes)
   A.prev = cap
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   if not (t and t.env and R.ValidatePtr(t.env, 'TrackEnvelope*')) then
-    U.text(x + L.pad, y, fit('automation item: double click one in the automation list of the slices module', w - 2 * L.pad), U.GREY)
+    U.text(x + L.pad, y, fit('automation item: none open - double click an automation item in the automation list (lib), or an item on an envelope column of the tracker', w - 2 * L.pad), U.GREY)
     return nil
   end
   -- строка инструментов и сетки

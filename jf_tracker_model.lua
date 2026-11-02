@@ -748,7 +748,10 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   local _, _, ncc = R.MIDI_CountEvts(take)
   for k = 0, (ncc or 0) - 1 do
     local _, _, _, ppq, cm, _, m2 = R.MIDI_GetCC(take, k)
-    if cm == 0xB0 and (m2 == 123 or m2 == 120) then   -- 2 ноя: 120 — свободный ^^^ (All Sound Off)
+    -- 2 ноя: CC120 в конце ноты (её ^^^) — часть ноты, не свободный OFF: иначе ^^^ рисовался дважды
+    local own = false
+    if cm == 0xB0 and m2 == 120 then for _, nt in ipairs(notes or {}) do if nt.cut and math.abs((nt.ppq_end or -1e9) - ppq) <= 1 then own = true; break end end end
+    if cm == 0xB0 and (m2 == 123 or m2 == 120) and not own then   -- 2 ноя: 120 — свободный ^^^ (All Sound Off)
       local q = R.MIDI_GetProjQNFromPPQPos(take, ppq)
       if q >= qn0 - 1e-7 and q < qn1 - 1e-7 then
         local r, d = M.row_of_qn(q, lpb)

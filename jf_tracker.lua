@@ -15768,7 +15768,7 @@ ctx.inner_tab_cycle = function(dir)
     vim.msg = 'lib: ' .. state.libtab .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
   elseif f == 'top' and state.toptab == 'automation' then
-    local P = state.ai_edit and { 'curve', 'ai', 'mod', 'params' } or { 'curve', 'mod', 'params' }   -- 31 окт: по алфавиту подписей
+    local P = { 'curve', 'ai', 'mod', 'params' }   -- 2 ноя: item всегда   -- 31 окт: по алфавиту подписей
     mod_pane = nxt(P, mod_pane)
     vim.msg = 'automation: ' .. (mod_pane == 'ai' and 'item' or mod_pane) .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
@@ -24622,16 +24622,16 @@ local function frame()
         return nil
       end
       if not wide then
-        pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })
+        pages(x, { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } })
         y, h = y + Lx.rh + 2, h - Lx.rh - 2
         return left(x, y, w, h)
       end
       if mod_pane == 'mod' then   -- 18 окт: матрица модуляции — во всю ширину (без колонки формы)
-        pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })
+        pages(x, { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } })
         return left(x, y + Lx.rh + 2, w, h - Lx.rh - 2)
       end
       -- 31 окт: генератор кривых — панель lfogen (Ctrl+W g G), вкладка — во всю ширину
-      pages(x, state.ai_edit and { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } } or { { 'curve', 'curve' }, { 'mod', 'mod' }, { 'params', 'params' } })   -- 9 окт: curve — кривая целиком; 18 окт: mod
+      pages(x, { { 'curve', 'curve' }, { 'item', 'ai' }, { 'mod', 'mod' }, { 'params', 'params' } })   -- 9 окт: curve — кривая целиком; 18 окт: mod
       return left(x, y + Lx.rh + 2, w, h - Lx.rh - 2)
     end,
     -- 12 окт: вкладка modulation — нативная матрица REAPER (LFO / ACS / link) во всю ширину
