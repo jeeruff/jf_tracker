@@ -16,7 +16,8 @@ T.STEPS = {
   { mod = 'tracker', focus = 'tracker', title = 'A clean project',
     ticks = { function() return true end, function(e, b) return (e.ntr or 0) > (b.ntr or 0) end },
     text = 'The tour works in a new empty project tab, so your own project stays as it was - its tab is still open in REAPER. An empty project has no tracks yet.',
-    todo = { 'A new empty tab is open.', 'Press t t - a new track appears.' },
+    todo = { 'A new empty tab is open.', 'Press t t - a new track appears; the tour puts a break (amen_8bit) into its lib.' },
+    give = 'amen',
     check = function(e, b) return (e.ntr or 0) > (b.ntr or 0) end },
   -- 5 окт: сначала философия (почему jf), потом hjkl, потом f — куда угодно
   { mod = 'tracker', focus = 'tracker', title = 'Why jf',
@@ -126,6 +127,7 @@ function T.tick(env, now)
     end
   end
   local all = st.ticks and S['t' .. #st.ticks]
+  if all and st.give and not S.given then S.given = true; T.want_give = st.give end   -- 2 ноя: main кладёт звук в lib (шаг 1 — амен)
   if not T.ok and (all or (not st.ticks and st.check(env, T.base, S))) then T.ok, T.ok_t = true, now end
   -- 2 ноя: шаг, уже выполненный в первом кадре (назад на «Slice a break» — вкладка item уже открыта), не уходит сам вперёд
   if T.ok and fresh then T.hold = true end

@@ -25466,6 +25466,7 @@ local function frame()
   if OPT.tour.active then
     -- шаг сам ставит фокус на модуль, где он работает (5 окт)
     if OPT.tour.want_focus then ctx.set_focus(OPT.tour.want_focus); OPT.tour.want_focus = nil end
+    if OPT.tour.want_give == 'amen' then OPT.tour.want_give = nil; ctx.add_to_depot(DIR .. '/samples/amen_8bit.mp3') end   -- 2 ноя: тур — брейк в lib нового трека
     OPT.tour.tick({ focus = state.focus, hints = HN.active or false, hj = state.hjumps or 0, fi = vim.cur.fi, row = vim.cur.row, mode = vim.mode, inst = vim.inst, toptab = state.top and state.toptab or nil, tk = (cur_col() or {}).track, ntr = reaper.CountTracks(0),
       hydra = vim.hydra ~= nil, playing = reaper.GetPlayState() & 1 == 1, khelp = state.khelp, khelp_big = state.khelp_big, change = reaper.GetProjectStateChangeCount(0) }, reaper.time_precise())
     OPT.tour.draw_bubble(U, L, draw.module_rects or {}, L.win_w, gfx.h, ctx.fit)

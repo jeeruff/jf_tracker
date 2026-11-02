@@ -2858,6 +2858,11 @@ end
 -- Колонка MIDI (есть MIDI-item на строке или трек без аудио) → нота длиной
 -- len_rows. Иначе — копия item из DEPOT (instrument = item депо) с
 -- D_PITCH = pitch − BASE_NOTE; длина item — как у образца.
+-- 2 ноя: нота встанет? (сэмпл / плагин или MIDI-клип в строке) — до неё ничего не создавать (паттерн в свободном такте)
+function E.note_source_ok(track, lane_idx, lpb, row, depot_item)
+  if depot_item then return true end
+  return midi_item_at(track, lane_idx, E.swing_time(row, lpb)) ~= nil
+end
 function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_item, force_audio)
   local force_midi = depot_item == 'midi'                 -- 9 окт: выбран плагин-инструмент — нота MIDI
   if force_midi then depot_item = nil end
