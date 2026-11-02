@@ -102,8 +102,8 @@ In short:
 | Keys | What they do |
 | --- | --- |
 | `h j k l`, `gg` / `G`, `{ }` | Move: by cell, to the start / end, by bar. |
-| `i` | INSERT: the keyboard writes notes. `q 2 w 3 e r 5 t …` write notes, `z` / `x` change the octave. |
-| `Esc` | Toggles INSERT, as in Renoise. |
+| `i` | INSERT, as in Vim: the keyboard writes notes. `q 2 w 3 e r 5 t …` write notes, `z` / `x` change the octave. |
+| `Esc` | Leaves INSERT. It also enters it - a habit kept from Renoise (with the keyboard on, `i` is a note, so `Esc` is the way in). |
 | `x`, `dw`, `yy p`, `u`, `.` | Delete, delete with a motion, copy and paste, undo, repeat. |
 | `v` / `V` | Select a block / whole rows. |
 | `:` | The command line. Tab completes. |
