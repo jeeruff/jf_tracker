@@ -35,7 +35,7 @@ T.STEPS = {
     todo = { 'Press f - yellow labels appear.', 'Type the two letters of any label (for example a a).' },
     check = function(e, b) return e.hj ~= b.hj end },
   -- 2 ноя: панели и каналы — сразу после f
-  { mod = 'tracker', focus = 'tracker', title = 'Panes and tracks',
+  { mod = 'tracker', focus = 'tracker', title = 'Panes and tracks', roam = true,
     ticks = { function(e, b) return e.tk ~= b.tk end, function(e, b) return e.focus ~= b.focus end, function(e, b, s) return s.t2 and e.focus == 'tracker' end },
     text = 'Opt+H / Opt+L go to the previous / next track (channel). Cmd+h j k l move the focus to the pane on the left, below, above, on the right - the framed pane gets the keys.',
     todo = { 'Press Opt+L - the cursor goes to the next track.', 'Press Cmd+l (or Cmd+j) - the focus goes to another pane.', 'Press Cmd+h (or Cmd+k) to come back to the tracker.' },
@@ -82,7 +82,7 @@ T.STEPS = {
     todo = { 'Press \\ - the menu of the cursor cell opens.', 'Press Esc to close it.' },
     check = function(e) return e.hydra end },
   -- 27 окт: карта сэмплов — найти звук случайно, а не листая списки
-  { mod = 'map', focus = 'tracker', title = 'Find a sound by chance',
+  { mod = 'map', focus = 'tracker', title = 'Find a sound by chance', roam = true,
     ticks = { function(e) return e.focus == 'map' end, function(e, b, s) return true end },
     text = 'The map pane shows every sound file of the browser folder as dots in groups - kick, snare, loop ... A click on a dot plays it, r plays a random one, v changes the view, Shift+click on a group goes into it (Esc - back).',
     todo = { 'Press Ctrl+W, then g, then w - the map pane gets the focus.', 'Click a few dots, or press r.' },
@@ -112,6 +112,7 @@ function T.tick(env, now)
   if not T.active then return end
   local st = T.STEPS[T.step]
   local fresh = not T.base
+  T.focus_now = env.focus
   if not T.base then T.base = env end
   -- 2 ноя: пункты шага отмечаются по очереди (s.t1, s.t2 …): следующий — только после предыдущего
   local S = T.state
@@ -182,6 +183,12 @@ function T.draw_bubble(U, L, rects, W, H, fit)
     if cur ~= '' then lines[#lines + 1] = { pre .. cur, col } end
   end
   wrap(st.text, '', '', U.TEXT)
+  -- 2 ноя: фокус ушёл в другой модуль (щелчок мимо) — клавиши шага туда не дойдут: сказать, как вернуться
+  if not T.ok and not st.roam and st.focus and T.focus_now and T.focus_now ~= st.focus then
+    lines[#lines + 1] = { '', U.TEXT }
+    local NM = { inst = 'the lib', top = 'the top panel', fxb = 'the fx list', browser = 'the browser', tracker = 'the tracker', map = 'the map' }
+    wrap(('The keys go to %s now. Click %s, or press Cmd+h j k l to get there.'):format(NM[T.focus_now] or T.focus_now, NM[st.focus] or st.focus), '! ', '  ', U.RED or U.AMBER)
+  end
   if st.todo then
     lines[#lines + 1] = { '', U.TEXT }
     for k, d in ipairs(st.todo) do
