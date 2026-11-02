@@ -6,6 +6,14 @@ I waited for someone to build a tracker for REAPER. More than seven years later
 it was time to do it myself. A tracker lets your hands leave the mouse alone
 and type the notes that the keyboard can type anyway.
 
+**A word first.** This is my first big release, and the whole thing is hugely
+experimental and made for me - I share it simply because why not. I vibe-coded
+it with an AI assistant and I am not afraid to say so: I am a professional
+musician, I play in an orchestra, there is no time left to learn programming,
+and programmers would hardly have built what I kept asking for. I made it
+because I wanted it. And it is a nod to chmaha, whose plugins were removed
+from the repository.
+
 - **Why jf.** These are my initials and short nick, and `j` and `f` are also
   the keys under your index fingers on the home row. The tracker is meant to
   be played from the keyboard.
