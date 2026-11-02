@@ -5940,6 +5940,8 @@ local function hazard(x, y, h, right, col, L)
   local st = math.max(3, bw - 1)
   local P, c = 2 * st, bw - 1
   local dark = { 0.06, 0.06, 0.05 }
+  -- 2 ноя: опция container edge = grey (по умолчанию) — та же полоса серым по фону панели, мягко; hazard — жёлтая
+  if D.CONT_EDGE ~= 'hazard' then col, dark = U.mix(U.LINE, U.PANEL, 0.35), U.mix(U.LINE, U.PANEL, 0.75) end
   if HZ.bw ~= bw then HZ.bw, HZ.cols, HZ.n = bw, {}, 0; gfx.setimgdim(83, -1, -1); gfx.setimgdim(83, bw * 8, P) end
   local key = ('%.3f %.3f %.3f'):format(col[1], col[2], col[3])
   local ci = HZ.cols[key]
@@ -8175,6 +8177,7 @@ function D.frame(L, snap, rows, state, info)
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
   D.OFF_TXT = state.offbar and '|' or (state.endglyph or '===')   -- 2 ноя: конец ноты — === (IT), опция end of note
   D.FREE_TXT = state.freeglyph or 'OFF'
+  D.CONT_EDGE = state.contedge or 'grey'
   D.TUBE = state.notetube ~= false   -- 2 ноя: полая нота (по умолчанию вкл)                          -- свободный OFF (опция free OFF)
   D.CUT_TXT = '^^^'
   -- 31 окт: опция INSERT cursor red — в INSERT акцент курсора (ячейка, кромка, плейхед) красный; в конце кадра — обратно
