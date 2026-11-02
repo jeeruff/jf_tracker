@@ -1571,7 +1571,7 @@ function D.route_diagram(L, cols, master, x, y, w, h, opts)
       for k, f in ipairs(fxs) do
         local by0 = yb - bh0
         if by0 < dtop then
-          text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY); break
+          if k > 1 then text(bx0 + 2, dtop, fit(('+%d'):format(#fxs - k + 1), bw0 - 4), U.GREY) end; break   -- 2 ноя: ни один блок не влез — без «+1» (непонятно)
         end
         local hot = mx >= bx0 and mx < bx0 + bw0 and my >= by0 and my < yb
         if k > 1 then set(U.LINE); gfx.rect(c.x + math.floor(c.w / 2), yb, 1, gap, 1) end     -- провод к прошлому блоку
