@@ -125,6 +125,9 @@ In short:
 | `Space` | Play / stop. |
 | `?` | The keys of the focused module. |
 
+To drive the tracker from other programs or LLMs, or to write your own DSP
+modules, see [API.md](API.md).
+
 ## Credits
 
 Thanks to my friends and teachers, in particular **Esa Ruoho (Lackluster)**.
