@@ -5130,6 +5130,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if off == last then return U.mix(base, U.AMBER, 0.35) end
         return base
       end
+      local bwq, bhq = math.max(3, math.min(kw - 2, math.max(ms('W') + 2, math.floor(kw * 0.6)))), math.floor(kh * 0.6)
+      -- 2 ноя: клавиши под мышью — щелчок играет ноту (main: hover.pkey = смещение от C октавы)
+      if mx >= kx and mx < kx + #D.PIANO_WHITE * kw and my >= ky and my < ky + kh then
+        local hit
+        if my < ky + bhq then for _, k in ipairs(D.PIANO_BLACK) do local bx = kx + k[3] * kw - math.floor(bwq / 2) - 1; if mx >= bx and mx < bx + bwq then hit = k[1] end end end
+        if not hit then local wi = math.floor((mx - kx) / kw) + 1; hit = D.PIANO_WHITE[wi] and D.PIANO_WHITE[wi][1] end
+        if hit then hover.pkey = hit end
+      end
       for i, k in ipairs(D.PIANO_WHITE) do
         local bx = kx + (i - 1) * kw
         set(key_fill(k[1], white_c)); gfx.rect(bx, ky, kw - 1, kh, 1)

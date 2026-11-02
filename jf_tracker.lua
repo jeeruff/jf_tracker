@@ -24231,7 +24231,7 @@ local function frame()
       -- в другом модуле — без подсветки нажатий, полоса блёклая; m off
       -- (6 окт) — клавиатура не прячется, тоже блёклая
       -- 24 окт: и в DSP — там цифры при включённой клавиатуре тоже играют ноты (казалось, что она выключена)
-      local kfocus = state.focus == 'tracker' or state.focus == 'dsp' or (state.focus == 'top' and state.toptab == 'sample')
+      local kfocus = state.focus == 'tracker' or state.focus == 'dsp' or state.focus == 'keys' or (state.focus == 'top' and state.toptab == 'sample')   -- 2 ноя: и панель keys (щелчок по ней не гасит клавиатуру)
       local active = state.piano_show and kfocus
       local held = {}
       -- 15 окт: клавиши играют ноты (INSERT или слой пианино) — нажатая подсвечивает клавиатуру: краем глаза видно, что идут ноты, не команды
@@ -27152,6 +27152,16 @@ local function frame()
       ctx.set_focus('inst')
       state.poolprev = not state.poolprev; vim.msg = 'play on select ' .. (state.poolprev and 'on' or 'off')
       click = { t = now2, zone = 'prevbtn' }
+    elseif hover.pkey and ctx.preview then   -- 2 ноя: щелчок по клавише панели keys / полосы — нота инструмента трека курсора
+      local f = L and L.flat and L.flat[vim.cur.fi]
+      local pitch = (vim.octave + 1) * 12 + hover.pkey
+      if f and f.col and f.col.track then
+        local inst = f.col.pool and f.col.pool[vim.inst]
+        ctx.preview(f.col.track, pitch, (ctx.inst_src and ctx.inst_src(f.col, inst)) or (inst and inst.item), vim.cur.row, 1)
+        vim.piano_last = hover.pkey
+        vim.msg = ('keys: %s (octave %d - z x / [ ])'):format(model.note_name and model.note_name(pitch) or tostring(pitch), vim.octave)
+      end
+      click = { t = now2, zone = 'pkey' }
     elseif hover.poolfind then
       ctx.set_focus('inst'); ctx.inst_find()
       click = { t = now2, zone = 'poolfind' }
