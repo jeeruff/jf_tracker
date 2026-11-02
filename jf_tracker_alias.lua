@@ -217,7 +217,19 @@ function A.trim(regions, only, dry)
       if pos >= rg.pos - EPS and pos < rg.rgnend - EPS and (not cut or rg.rgnend < cut) then cut = rg.rgnend end
     end
     if cut then
-      if fin > cut + EPS then if not dry then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut - pos) end; n = n + 1 end
+      if fin > cut + EPS then
+        -- 2 ноя: MIDI-клип через границу паттерна — РАЗРЕЗ, а не укорачивание: ноты за границей — содержимое
+        -- следующего паттерна (укорачивание прятало их — после вставки строки «ноты C1 удалились»)
+        local tk = R.GetActiveTake(it)
+        local nxr = regs[k + 1]
+        if tk and R.TakeIsMIDI(tk) and nxr and math.abs(nxr.pos - cut) < 1e-3 and depth < 64 then
+          if dry then n = n + 1; return end
+          local right = R.SplitMediaItem(it, cut)
+          if right then n = n + 1; fix(right, cut, fin, depth + 1) end
+          return
+        end
+        if not dry then R.SetMediaItemInfo_Value(it, 'D_LENGTH', cut - pos) end; n = n + 1
+      end
       return
     end
     -- вне регионов: входит в следующий из-за его начала — разрезать на границе
