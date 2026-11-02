@@ -997,6 +997,37 @@ function S.zero_cross(e, te)
   return i and (te - span / 2 + (i - 1) / n * span) or nil
 end
 
+-- 2 ноя: волна вкладки item — картинкой S.WAVE_IMG: рисуется заново только когда поменялись пики / окно / размер /
+-- цвет / зона, иначе один blit (было ~800 gfx.line за кадр — главная цена панели item в jftop).
+-- wave_cached(...) = true — картинка готова и выведена; false — нарисуй в неё (S.wc_x / wc_cy — начало в картинке),
+-- потом S.wave_done() выводит её
+S.WAVE_IMG = 796
+function S.wave_cached(kind, pk, e, x, wy, w, wh, va, vb, base, z0, z1, zc, bg, inv)
+  S.wc_x, S.wc_cy, S.wc_dx = nil, nil, nil
+  if w < 2 or wh < 2 then return false end
+  local key = table.concat({ kind, tostring(pk), pk.n, tostring(e.item or e.path), w, wh, ('%.6f %.6f'):format(va, vb),
+    base[1], base[2], base[3], z0 or '', z1 or '', zc and (zc[1] .. zc[2] .. zc[3]) or '', e.muted and 1 or 0, bg[1], bg[2], bg[3], inv and 1 or 0 }, '|')
+  S.wc_pos = { x, wy, w, wh }
+  if S.wc_key == key then gfx.blit(S.WAVE_IMG, 1, 0, 0, 0, w, wh, x, wy, w, wh); return true end
+  S.wc_key = key
+  S.wc_prev_dest = gfx.dest
+  if S.wc_w ~= w or S.wc_h ~= wh then gfx.setimgdim(S.WAVE_IMG, -1, -1); gfx.setimgdim(S.WAVE_IMG, w, wh); S.wc_w, S.wc_h = w, wh end
+  gfx.dest = S.WAVE_IMG
+  gfx.mode = 0
+  gfx.set(bg[1], bg[2], bg[3], 1); gfx.rect(0, 0, w, wh, 1)   -- фон панели (и светлый блок зоны при waveinv) — в картинке
+  if inv and z0 and z1 then gfx.set(inv[1], inv[2], inv[3], 1); gfx.rect(z0, 0, math.max(1, z1 - z0), wh, 1) end
+  gfx.set(base[1], base[2], base[3], 1)
+  S.wc_x, S.wc_cy, S.wc_dx = 0, wh / 2, x
+  return false
+end
+function S.wave_done()
+  if not S.wc_x then return end
+  gfx.dest = S.wc_prev_dest or -1
+  local p = S.wc_pos
+  gfx.blit(S.WAVE_IMG, 1, 0, 0, 0, p[3], p[4], p[1], p[2], p[3], p[4])
+  S.wc_x, S.wc_cy, S.wc_dx = nil, nil, nil
+end
+
 -- zone = { a, b, inst } — играемая зона (секунды e) выбранного инструмента,
 -- когда e — его исходник (слайс/кусок показывается на фоне целого сэмпла)
 function S.draw_in(U, L, x, y, w, h, e, track, zone)
@@ -1258,7 +1289,9 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     U.text(x + 4, wy + 2, 'spectrogram: no audio to read (wav files and lib items)', U.GREY)
   elseif S.view == 'spec' and ctx.peaks then
     local pk = ctx.peaks(e, ntot, true)
-    if pk and pk.n > 0 then
+    if pk and pk.n > 0 and S.wave_cached('s', pk, e, x, wy, w, wh, va, vb, base, nil, nil, nil, U.PANEL) then
+    elseif pk and pk.n > 0 then
+      local x, cy = S.wc_x or x, S.wc_cy or cy
       for px = 0, w - 1 do
         local idx = idx_of(px, pk.n)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
@@ -1268,6 +1301,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         gfx.set(cc[1], cc[2], cc[3], 1)
         gfx.line(x + px, cy - b * hh, x + px, cy - a * hh)
       end
+      S.wave_done()
     else gfx.line(x, cy, x + w, cy) end
   elseif env and env.n > 0 then
     for px = 0, w - 1 do
@@ -1281,8 +1315,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
   else
     local pk = ctx.peaks and ctx.peaks(e, ntot)
-    S.dbg = ('sample w=%d src=%s len=%.3f rate=%.2f offs=%.3f pk=%s guid=%s'):format(w, tostring(e.src), e.len or -1, e.rate or -1, e.offs or -1, pk and pk.n or 'nil', tostring(e.guid))
-    if pk and pk.n > 0 then
+    if pk and pk.n > 0 and S.wave_cached('p', pk, e, x, wy, w, wh, va, vb, base, zx0 and (zx0 - x), zx1 and (zx1 - x), zcol, U.PANEL,
+      (zx0 and ctx.state and ctx.state.waveinv) and U.mix(base, U.BG, 0.15) or nil) then
+    elseif pk and pk.n > 0 then
+      local x, cy = S.wc_x or x, S.wc_cy or cy
+      local zx0, zx1 = zx0 and (zx0 - (S.wc_dx or 0)), zx1 and (zx1 - (S.wc_dx or 0))
       for px = 0, w - 1 do
         local idx = idx_of(px, pk.n)
         local a, b = pk.min[idx] or 0, pk.max[idx] or 0
@@ -1292,6 +1329,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         gfx.line(x + px, cy - b * hh, x + px, cy - a * hh)
       end
       U.set(base)
+      S.wave_done()
     else gfx.line(x, cy, x + w, cy) end
   end
   -- позиция проигрывания файла из браузера (превью) и на большой волне (2 окт)
