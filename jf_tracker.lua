@@ -23852,8 +23852,6 @@ local function frame()
     local G = B.mapG
     -- обход папок — 3 мс за тик (раз в жизни папки), чтение индекса — 1 мс ×3
     if G.building then B.SM.scan(G, 0.003) elseif G.sizing ~= false then if B.SM.size_tick(G, 0.001) == true then G.sizing = false end end
-    -- 28 окт: вид cloud — грубый анализ частот фоном: каждый 3-й тик два ещё не слышанных файла (шагом по списку,
-    -- чтобы облако заполнялось равномерно); группы и облако пересобираются по мере (B.an_tick, раз в 1.5 с)
     -- 1 ноя: :fprint — отпечатки всех файлов индекса карты по порядку (пропуская готовые), прогресс в статусе
     if not G.building and B.fp_on and B.an_tick then
       local N = #G.nodes
@@ -23868,22 +23866,6 @@ local function frame()
       if not okt then B.an_err = et end   -- 1 ноя: ошибка анализа — видна (молча стоял)
       if B.fp_ptr >= N and #B.an_q == 0 then B.fp_on = false; vim.msg = ('fprint: done - %d files of the map index'):format(N)
       elseif reaper.time_precise() - (B.fp_msg_t or 0) > 0.5 then B.fp_msg_t = reaper.time_precise(); state.status = ('fprint: %d / %d files%s%s (peaks build in the background; :fprint again - stop)'):format(B.fp_ptr - #B.an_q, N, (B.an_skip or 0) > 0 and (', ' .. B.an_skip .. ' skipped (no peaks)') or '', B.an_err and (' - error: ' .. tostring(B.an_err)) or '') end
-    end
-    if not G.building and B.mapV and B.mapV.style == 'cloud' and B.an_tick then
-      ctx.cl_tick = (ctx.cl_tick or 0) + 1
-      if #B.an_q >= 12 and ctx.cl_tick % 60 == 0 then local old = table.remove(B.an_q, 1); if old then B.an_qs[old] = nil end end   -- застрявший (пики не строятся) — вон
-      if ctx.cl_tick % 3 == 0 and #G.nodes > 0 and #B.an_q < 12 then   -- очередь не растёт, пока пики строятся
-        local N = #G.nodes
-        G.cl_ptr = G.cl_ptr or 0
-        local pushed, tries = 0, 0
-        while pushed < 2 and tries < 50 do
-          G.cl_ptr = (G.cl_ptr + 7919) % N
-          local n = G.nodes[G.cl_ptr + 1]
-          if n and not B.SM.AN[n.path] then B.an_push(n.path); pushed = pushed + 1 end
-          tries = tries + 1
-        end
-        pcall(B.an_tick, G)
-      end
     end
   end
   if ctx.con_after then local okc, ec = pcall(ctx.con_tick); if not okc then ctx.con_after = nil; vim.msg = 'console: ' .. tostring(ec) end end   -- 28 окт

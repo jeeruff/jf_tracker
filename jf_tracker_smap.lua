@@ -1200,89 +1200,6 @@ function SM.sand_grain(n)
   local dark = 0.15 + 0.55 * low - 0.35 * short                   -- низкие темнее, короткие ярче
   return size, a, math.max(0, math.min(0.85, dark))
 end
--- 28 окт: cloud — облако зон: по X файлы в порядке «похожих имён» (нормализованное имя: без цифр, расширения,
--- знаков — соседи по алфавиту = похожие), с псевдослучайным разбросом по хэшу; по Y — яркость (SM.AN b: яркие
--- сверху, низкие снизу; не прослушанные — серой полосой посередине), форма — эллипс. Рисуется сеткой клеток
--- (зоны, не точки): цвет — средняя яркость клетки, плотность — число файлов; раскладка и картинка — только при
--- смене данных (G.ver, число проанализированных), кадр — одна копия из буфера
-SM.CLOUD_CELL = 6
-local function cl_hash(sname)
-  local h = 5381
-  for i = 1, #sname do h = (h * 33 + sname:byte(i)) % 2147483647 end
-  return (h % 100003) / 100003
-end
-local function cl_key(name)
-  return ((name or ''):lower():gsub('%.%w+$', ''):gsub('[%d_%-%.%s%(%)%[%]]+', ' '):gsub('^%s+', ''))
-end
-function SM.cloud_colour(U, b)
-  -- низ — фиолетово-синий, середина — зелёный, верх — жёлто-белый
-  if b < 0.33 then return U.mix({ 0.35, 0.25, 0.85 }, { 0.15, 0.6, 0.9 }, b / 0.33) end
-  if b < 0.66 then return U.mix({ 0.15, 0.6, 0.9 }, { 0.3, 0.85, 0.35 }, (b - 0.33) / 0.33) end
-  return U.mix({ 0.3, 0.85, 0.35 }, { 1, 0.95, 0.55 }, (b - 0.66) / 0.34)
-end
-function SM.cloud_layout(G, gw, gh)
-  -- пересборка — на каждые 200 новых прослушанных файлов (190 тыс. файлов — ~0.2 с; не на каждый)
-  local key = G.ver .. ':' .. math.floor((SM.an_n or 0) / 200) .. ':' .. gw .. 'x' .. gh
-  if G.cloud and G.cloud.key == key then return G.cloud end
-  if not G.cl_order or G.cl_ver ~= G.ver then
-    local ord = {}
-    for i, n in ipairs(G.nodes) do n.cl_k = n.cl_k or cl_key(n.name); n.cl_h = n.cl_h or cl_hash(n.name or ''); ord[i] = n end
-    table.sort(ord, function(p, q) if p.cl_k ~= q.cl_k then return p.cl_k < q.cl_k end; return (p.name or '') < (q.name or '') end)
-    G.cl_order, G.cl_ver = ord, G.ver
-  end
-  local ord, N = G.cl_order, #G.cl_order
-  local cnt, sumb, nan, first = {}, {}, {}, {}
-  local maxc = 1
-  for r, n in ipairs(ord) do
-    local u = (r - 0.5) / math.max(1, N)
-    local a = SM.AN[n.path]
-    local v = a and (1 - a.b) or (0.42 + 0.16 * n.cl_h)   -- 0 — верх (ярко)
-    -- разброс: по хэшу имени, сильнее у края облака
-    local j = (n.cl_h - 0.5)
-    local vy = math.max(0, math.min(1, v + j * 0.10))
-    local half = math.sqrt(math.max(0, 1 - (2 * vy - 1) ^ 2)) * 0.48 + 0.02   -- эллипс: у краёв по Y — уже
-    local ux = 0.5 + (u - 0.5) * 2 * half + j * 0.05
-    local cx = math.max(0, math.min(gw - 1, math.floor(ux * gw)))
-    local cy = math.max(0, math.min(gh - 1, math.floor(vy * gh)))
-    local k = cy * gw + cx + 1
-    cnt[k] = (cnt[k] or 0) + 1
-    if a then sumb[k] = (sumb[k] or 0) + a.b; nan[k] = (nan[k] or 0) + 1 end
-    if not first[k] then first[k] = n end
-    if cnt[k] > maxc then maxc = cnt[k] end
-  end
-  G.cloud = { key = key, gw = gw, gh = gh, cnt = cnt, sumb = sumb, nan = nan, first = first, maxc = maxc }
-  return G.cloud
-end
-function SM.draw_cloud(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  local cs = SM.CLOUD_CELL
-  local top = y + L.rh + 4
-  local hh = h - L.rh - 6 - L.rh
-  local gw, gh = math.max(4, math.floor(w / cs)), math.max(4, math.floor(hh / cs))
-  local C = SM.cloud_layout(G, gw, gh)
-  local x0 = x + math.floor((w - gw * cs) / 2)
-  local lg = math.log(C.maxc + 1)
-  SM.buffered(G, ('cloud|%d|%d|%d|%d|%s'):format(x, top, w, hh, C.key), x, top, w, hh, U, function()
-    for k, c in pairs(C.cnt) do
-      local cy = (k - 1) // gw
-      local cx = (k - 1) % gw
-      local b = C.nan[k] and (C.sumb[k] / C.nan[k]) or nil
-      local d = 0.25 + 0.75 * math.log(c + 1) / lg
-      local rgb = b and SM.cloud_colour(U, b) or U.mix(U.BG, U.GREY, 0.8)
-      U.set(U.mix(U.BG, rgb, d)); gfx.rect(x0 - x + cx * cs, cy * cs, cs - 1, cs - 1, 1)
-    end
-  end)
-  U.text(x + L.pad, top + 1, 'bright', U.GREY)
-  U.text(x + L.pad, top + gh * cs - L.rh, 'low', U.GREY)
-  if inside and mx >= x0 and mx < x0 + gw * cs and my >= top and my < top + gh * cs then
-    local k = math.floor((my - top) / cs) * gw + math.floor((mx - x0) / cs) + 1
-    local n = C.first[k]
-    if n then
-      U.set(U.AMBER); gfx.rect(x0 + ((k - 1) % gw) * cs - 1, top + ((k - 1) // gw) * cs - 1, cs + 1, cs + 1, 0)
-      return { node = n, px = mx, py = my, info = ('%d file(s) here%s'):format(C.cnt[k], C.nan[k] and ('  bright %.0f%%'):format(C.sumb[k] / C.nan[k] * 100) or '  (not heard yet)') }
-    end
-  end
-  return nil
-end
 function SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   local top = y + L.rh + 4
   local hs = G.hubs
@@ -1411,8 +1328,6 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     hv = SM.draw_nebula(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'spore' then   -- 31 окт: был sand
     hv = SM.draw_sand(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
-  elseif V.style == 'cloud' then
-    hv = SM.draw_cloud(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'tree' and SM.TREE_ON then   -- 27 окт: скрыт; SM.TREE_ON = true — вернуть
     hv = SM.draw_tree(U, L, G, x, y, w, h, V, playing, fit, col, mx, my, inside)
   elseif V.style == 'cards' then
@@ -1565,7 +1480,7 @@ function SM.draw(U, L, G, x, y, w, h, V, playing, fit)
     local bx, by = x + L.pad, y + 2
     local cur = V.style or 'graph'
     local bw = 0
-    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'spore', 'cloud', 'ξ' }) do   -- 28 окт: cloud   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
+    for _, nm in ipairs({ 'graph', 'cards', 'nebula', 'spore', 'ξ' }) do   -- 2 ноя: cloud убран   -- 27 окт: tree скрыт (пользователь: «жесть»), код SM.draw_tree остаётся   -- ξ — случайная величина: случайный сэмпл
       local tw = U.measure(nm) + 2 * L.pad
       local on = nm == cur
       local hot = mx >= bx and mx < bx + tw and my >= by and my < by + L.rh

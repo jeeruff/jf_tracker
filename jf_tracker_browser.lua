@@ -312,6 +312,7 @@ end
 
 -- ── 27 окт: КАРТА папки (jf_tracker_smap): граф пересобирается при смене папки; вид (зум, сдвиг) — общий ──
 B.mapV = { zoom = 1, px = 0, py = 0, grav = 0.5, dim = 0.5, style = R.GetExtState and R.GetExtState('jf_tracker', 'mapstyle') ~= '' and R.GetExtState('jf_tracker', 'mapstyle') or 'graph' }   -- 27 окт: вид помнится
+if B.mapV.style == 'cloud' then B.mapV.style = 'graph' end   -- 2 ноя: вид cloud убран
 -- 27 окт: подвкладки карты — что раскладывать: files (папка браузера), db (база / все базы), proj (источники проекта), pm (проекты jf_pm)
 B.map_src = 'files'
 B.MAP_SRCS = { 'files', 'db', 'proj', 'pm' }
