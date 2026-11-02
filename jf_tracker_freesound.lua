@@ -83,7 +83,10 @@ function FS.urlenc(s)
 end
 
 -- запрос: слова + фильтры как в списке браузера: <10s >2s — длина, cc0 — только CC0
-function FS.build_url(q, key, page)
+FS.SORTS = { { 'score', 'relevance' }, { 'downloads_desc', 'most downloaded' }, { 'rating_desc', 'best rated' }, { 'created_desc', 'newest' },
+  { 'duration_asc', 'shortest' }, { 'duration_desc', 'longest' } }
+FS.sort = 'score'
+function FS.build_url(q, key, page, sort)
   local words, filt = {}, {}
   local lo, hi
   for t in q:gmatch('%S+') do
@@ -96,6 +99,7 @@ function FS.build_url(q, key, page)
   local u = FS.API .. '?query=' .. FS.urlenc(table.concat(words, ' ')) .. '&fields=' .. FS.FIELDS .. '&page_size=' .. FS.PAGE
   if #filt > 0 then u = u .. '&filter=' .. FS.urlenc(table.concat(filt, ' ')) end
   if page and page > 1 then u = u .. '&page=' .. page end
+  if sort and sort ~= 'score' then u = u .. '&sort=' .. sort end
   return u .. '&token=' .. FS.urlenc(key or '')
 end
 
@@ -141,14 +145,15 @@ local function curl(url, out, flag, fail)
   R.ExecProcess(cmd, -1)
 end
 
-function FS.search(q, page)
+-- append — следующая страница дописывается к списку (прокрутка за конец)
+function FS.search(q, page, append)
   local key = FS.key()
   if key == '' then FS.err = 'no API key: get one at freesound.org/apiv2/apply, then :freesound key <key>'; return false end
   R.RecursiveCreateDirectory(FS.dir(), 0)
   local out, flag = FS.dir() .. '/search.json', FS.dir() .. '/search.done'
-  FS.query, FS.page, FS.err, FS.busy = q, page or 1, nil, true
+  FS.query, FS.page, FS.err, FS.busy, FS.append = q, page or 1, nil, true, append
   FS.jobs.search = { out = out, flag = flag, t0 = R.time_precise() }
-  curl(FS.build_url(q, key, page), out, flag, false)
+  curl(FS.build_url(q, key, page, FS.sort), out, flag, false)
   return true
 end
 
@@ -184,7 +189,10 @@ function FS.tick()
         local f = io.open(j.out, 'rb'); local txt = f and f:read('a') or ''; if f then f:close() end
         local res, err, n = FS.parse(txt)
         FS.busy = false
-        if res then FS.results, FS.count = res, n else FS.results, FS.err = {}, err end
+        if res and FS.append then for _, h in ipairs(res) do FS.results[#FS.results + 1] = h end; FS.count = n
+        elseif res then FS.results, FS.count = res, n
+        else if not FS.append then FS.results = {} end; FS.err = err end
+        FS.append = nil
         got = true
       else
         if exists(j.out) then

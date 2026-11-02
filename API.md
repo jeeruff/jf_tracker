@@ -180,7 +180,8 @@ return M
 `api`: `R` (reaper), `dir` (the jf_tracker folder), `TX` (UTF-8 typing helpers),
 `msg(text)` (status line), `preview_file(path)`, `add_to_depot(path)` (into the lib of
 the cursor track), `fit(text, px)`, `focus(id)`, `peaks(path, n)` (`{ n, min = {}, max = {} }`
-for a wave n pixels wide), `preview_pos()` (`pos, len, path` of what plays now). `U` gives the theme colours
+for a wave n pixels wide), `preview_pos()` (`pos, len, path` of what plays now), `menu(title, items)` (a letter menu:
+items `{ key = 'a', label = 'text', fn = function() end }`). `U` gives the theme colours
 (`U.TEXT U.GREY U.AMBER U.GREEN U.RED U.BG U.PANEL`), `U.set(col)`, `U.text(x, y, s, col)`,
 `U.measure(s)`; `L.rh` is the row height, `L.pad` the padding. Clicks: read `gfx.mouse_x`,
 `gfx.mouse_y`, `gfx.mouse_cap` in `draw`. An error in a module shows in the status line
