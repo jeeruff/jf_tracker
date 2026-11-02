@@ -34,7 +34,7 @@ function H.reset()
 end
 
 H.ALT = { dspbtn = true }
-H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1, dspbtn = 1,
+H.LEVEL = { ptab = 1, tab = 1, viewbtn = 1, header = 1, ctrl = 1, btn = 1, mxbtn = 1, dsptarget = 1, dsprouting = 1, dspbtn = 1, slx = 1,   -- 2 ноя: кнопки пульта slixer — как кнопки
             note = 0, beat = 0, bar = 0,   -- 20 окт: прыжки по трекеру — ноты, доли, такты — первыми буквами
             mx = 3, trsmark = 3, sess = 3, mxname = 3, mxdur = 3, fxbrow = 3 }
 function H.add(kind, x, y, w, h, data)
@@ -85,6 +85,8 @@ function H.start(filter)
     local free = false
     -- 11 окт: узкие кнопки вплотную (шапка эффекта DSP) — метка может встать строкой выше / ниже
     local spots = H.ALT[t.kind] and { { t.x, t.y }, { t.x, t.y - lh }, { t.x, t.y + lh } } or { { t.x, t.y } }
+    -- 2 ноя: широкая цель (кнопка пульта slixer, строка) — занято слева, метка встаёт внутри правее / у правого края
+    if (t.w or 0) >= 3 * lw then spots[#spots + 1] = { t.x + lw + 1, t.y }; spots[#spots + 1] = { t.x + t.w - lw, t.y } end
     if k < max then
       for _, sp in ipairs(spots) do
         local ok = true
