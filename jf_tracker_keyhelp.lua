@@ -542,7 +542,7 @@ KH.PAGES = {
     { k = 'v', d = 'next view: graph (rings of groups) > cards (a grid of sectors) > nebula (one galaxy, groups as rectangular sectors; Shift+click on a sector - its system, galaxy / Esc - back)' },
     { k = 'Shift+click  Cmd+click', t = {}, d = 'on a group: Shift+click - into it (its system in the nebula, a closer zoom in the other views), Esc - back; Cmd+click - its files marked; a plain click only names it' },
     { k = 'r', t = {}, d = 'ξ - a random file: from the group under the mouse, else from all; plays at once' },
-    { k = 't', d = 'the next source: files / db / proj / pm' },
+    { k = 't', d = 'the next source: files / db / proj' },
     { k = '+ - 0', d = 'zoom in / out / reset (also the wheel; drag - move)' },
     { k = 'history', t = {}, d = 'the right panel, top: the files played from the map, newest on top (a click plays again); the dot just played is bright, then dark for 10 plays, then brightens back - a line joins them (options > modules > map)' },
     { k = 'drag', t = {}, d = 'hold the mouse on a dot and move: every file the mouse passes plays and lands in the history (a path)' },
