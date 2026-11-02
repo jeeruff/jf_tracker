@@ -5013,11 +5013,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       text(x + L.pad, vy, vl, vhot and U.AMBER or (dim and U.GREY or U.AMBER))
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
-      local bx = x + L.pad + vw + L.pad + 2
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
       local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      -- 2 ноя: слайдер + $pt + ped — ровно под клавишами: от первой белой (после колёс pitch / mod) до последней
+      local k0 = kx + ((info and info.wheels) and (2 * (math.max(6, math.floor(L.cw * 0.9)) + L.pad) + L.pad) or 0)
+      local bx = math.max(k0, x + L.pad + vw + L.pad + 2)
       -- 19 окт: слайдер + $pt + pedal — в ширину клавиатуры (слайдер масштабируется), дальше не лезут (там row / col)
-      local kr = kx + #D.PIANO_WHITE * kwv - 1
+      local kr = k0 + #D.PIANO_WHITE * kwv - 1
       local tail = (ms('$pt') + 2 * L.pad) + 2 + (ms('ped') + 2 * L.pad) + L.pad   -- 19 окт: ped — короче, vel длиннее
       local bw = math.max(L.cw, kr - bx - tail)   -- 1 ноя: узкая клавиатура (шрифт x2) — слайдер короче, ped не пропадает
       local bhot = mx >= bx - 2 and mx < bx + bw + 2 and my >= vy and my < vy + L.rh
@@ -5572,18 +5574,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
-  local function divider(at) set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(at, ly + 1, 1, 2 * L.rh - 2, 1) end
   for i, b in ipairs(order) do
     local start = cx + (i > 1 and sep or 0)
     if start + b.w > limit then break end
-    if i > 1 then divider(cx + math.floor(sep / 2) - 1) end
+    -- 2 ноя: без разделителей | между блоками (просьба): промежутки и так видны
     b.draw(start, b.w)
     cx = start + b.w
   end
   -- тоглы — у правого края
   if last and right - last.w >= cx + sep then
     local lx = right - last.w
-    divider(lx - math.floor(sep / 2) - 1)
     last.draw(lx, last.w)
   end
   -- 15 окт: режим — модлайном в поле трекера (D.draw_mode), в полосе его нет
