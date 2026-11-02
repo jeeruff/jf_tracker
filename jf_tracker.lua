@@ -17482,7 +17482,7 @@ ctx.ctl_acv = function(SG)
     SG.r, SG.v, SG.moved = r, v, true
   end
   A.row = math.max(g.r0, math.floor(r)); vim.cur.row = A.row; ctx.acv_row_seen = A.row
-  state.status = ('-- CONTROL --  %s with the finger: row %s  %d%%   (Shift fine; let Ctrl+Opt go - written)'):format(SG.tool, tostring(r), math.floor(v * 100 + 0.5))
+  ctx.cm_seen = reaper.time_precise(); state.status = ('-- CONTROL --  %s with the finger: row %s  %d%%   (Shift fine; let Ctrl+Opt go - written)'):format(SG.tool, tostring(r), math.floor(v * 100 + 0.5))
 end
 ctx.ctl_lane = function(SG)
   local fl = SG.lane
@@ -17511,7 +17511,7 @@ ctx.ctl_lane = function(SG)
   U.set(U.AMBER); gfx.rect(bx, by, math.max(1, math.floor(bw * SG.v + 0.5)), bh - rh, 1)
   if fl.ml and fl.ml.kind == 'pb' then U.set(U.TEXT); gfx.rect(bx + math.floor(bw * 64 / 127), by, 1, bh - rh, 1) end   -- центр бенда
   draw.big_text(bx, by + bh - rh + 2, valtxt, U.TEXT, Z)
-  state.status = ('-- CONTROL --  %s row %d: %s   (sideways - value, Shift fine; let Ctrl+Opt go - written)'):format(name, SG.row, valtxt)
+  ctx.cm_seen = reaper.time_precise(); state.status = ('-- CONTROL --  %s row %d: %s   (sideways - value, Shift fine; let Ctrl+Opt go - written)'):format(name, SG.row, valtxt)
 end
 ctx.ctl_lane_write = function(SG)
   local fl = SG.lane
@@ -24050,6 +24050,7 @@ local function frame()
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свой режим клавиатуры: patternkb (ноты — паттерны) в трекере
   if state.viper then left = 'VIPER ' .. left end   -- 29 окт
+  if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
   end
@@ -26793,11 +26794,11 @@ local function frame()
           OZ.tx(dx0 + L.pad, dy0 + 1, OZ.fit(desc, dw - 2 * L.pad), U.AMBER)
           OZ.tx(dx0 + L.pad, dy0 + 1 + OZ.rh, OZ.fit(('%d / %d  %s, Shift fine'):format(k, n, how), dw - 2 * L.pad), U.GREY)
           end
-          state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Ctrl+Opt go - done)'):format(cur.name or '?', k, n,
+          ctx.cm_seen = reaper.time_precise(); state.status = ('-- CONTROL --  %s  %d / %d  %s   (%s, Shift fine; let Ctrl+Opt go - done)'):format(cur.name or '?', k, n,
             ts[1] and ctx.cm_io.show(ts[1]) or '', how)
         end
       else
-        state.status = '-- CONTROL --  no sliders on the screen'
+        ctx.cm_seen = reaper.time_precise(); state.status = '-- CONTROL --  no sliders on the screen'
       end
       end
       U.click, U.rclick = false, false
