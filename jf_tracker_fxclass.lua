@@ -18,7 +18,7 @@
 
 local FC = {}
 
-FC.CATS = { 'gain', 'filter', 'time', 'pitch', 'mix', 'dyn', 'stereo', 'mod', 'mode', 'other' }
+FC.CATS = { 'gain', 'cutoff', 'filter', 'time', 'pitch', 'mix', 'dyn', 'stereo', 'mod', 'mode', 'other' }
 
 local WORDS = {
   gain = { 'gain', 'volume', 'vol', 'level', 'output', 'out', 'input', 'makeup', 'trim', 'amp', 'loud' },
@@ -34,7 +34,7 @@ local WORD_CAT = {}
 for cat, list in pairs(WORDS) do for _, w in ipairs(list) do WORD_CAT[w] = WORD_CAT[w] or cat end end
 
 -- важность для автомодуля: чем больше, тем раньше
-local RANK = { gain = 90, mix = 85, filter = 80, dyn = 70, time = 60, pitch = 55, mod = 50, stereo = 45, mode = 30, other = 10 }
+local RANK = { gain = 90, mix = 85, cutoff = 82, filter = 80, dyn = 70, time = 60, pitch = 55, mod = 50, stereo = 45, mode = 30, other = 10 }
 local WORD_RANK = { cutoff = 12, reso = 8, resonance = 8, mix = 10, wet = 9, gain = 10, output = 9, threshold = 9, ratio = 6,
   attack = 6, release = 5, drive = 8, freq = 5, frequency = 5, decay = 4, time = 4, feedback = 4, size = 4, width = 3 }
 
@@ -82,8 +82,16 @@ local function words_of(s)
 end
 
 -- категория: units — текст значения («-6.0 dB», «1200 Hz»), kind — slider / toggle / steps
+-- 2 ноя: cutoff — самый частый параметр, своя категория (цвет оранжевый): «cutoff», «cut», «filter freq», «flt cut»
+function FC.is_cutoff(name)
+  local n = (name or ''):lower()
+  if n:find('cutoff') or n:find('cut%-off') then return true end
+  for _, w in ipairs(words_of(n)) do if w == 'cut' then return not n:find('low cut') and not n:find('high cut') and not n:find('lo cut') and not n:find('hi cut') end end
+  return (n:find('filter') or n:find('flt')) and (n:find('freq') ~= nil) or false
+end
 function FC.class(name, units, kind)
   if kind == 'toggle' or kind == 'steps' then return 'mode' end
+  if FC.is_cutoff(name) then return 'cutoff' end
   local u = (units or ''):lower()
   if u:find('db') then return 'gain' end
   if u:find('%d%s*k?hz') then

@@ -2884,8 +2884,9 @@ D.draw_analyzer = draw_analyzer
 
 -- цвета категорий параметров DSP (3 окт): от палитры темы, читаемые на фоне
 function D.cat_colour(cat)
-  local c = ({ gain = U.GREEN, filter = U.CYAN, time = U.AMBER, mix = U.GREY, dyn = U.RED,
-               pitch = U.mix(U.RED, U.CYAN, 0.5), stereo = U.mix(U.GREEN, U.CYAN, 0.5), mod = U.mix(U.AMBER, U.RED, 0.5) })[cat]
+  -- 2 ноя: cutoff — оранжевый (самый частый параметр виден сразу)
+  local c = ({ gain = U.GREEN, cutoff = { 1.0, 0.52, 0.08 }, filter = U.CYAN, time = U.AMBER, mix = U.GREY, dyn = U.RED,
+               pitch = U.mix(U.RED, U.CYAN, 0.5), stereo = U.mix(U.GREEN, U.CYAN, 0.5), mod = U.mix(U.GREEN, U.AMBER, 0.5) })[cat]   -- mod — оливковый: оранжевый занят cutoff
   return c and U.readable(c, U.BG, 2.5) or nil
 end
 
