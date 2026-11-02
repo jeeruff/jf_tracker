@@ -24,6 +24,7 @@ function M.init(api)
   M.FS = FS
 end
 function M.typing() return S.typing end
+function M.paste(t) if S.typing then S.q = S.q .. t end end   -- Cmd+V в строке запроса
 
 local function play_cur()
   local h = FS.results[S.cur]

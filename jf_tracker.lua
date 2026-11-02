@@ -30837,6 +30837,17 @@ local function frame()
       if f0 and f0.col then ctx.fx_field_step(f0.col, (c == 8 or c == 104) and -1 or 1) end
       c = 0
     end
+    -- 2 ноя: Cmd+V в наборе текста — вставить буфер обмена (SWS CF_GetClipboard): командная строка, поиск, фильтр браузера, custom-модуль
+    if m.cmd and not m.ctrl and not m.alt and busy and (c == 22 or c == 118) and reaper.CF_GetClipboard and not vim.prompt then
+      local okc, clip = pcall(reaper.CF_GetClipboard, '')
+      clip = okc and type(clip) == 'string' and clip:gsub('[\r\n]+', ' ') or ''
+      local cm = draw.CM[state.focus]
+      if clip == '' then
+      elseif vim.mode == 'cmd' then vim.cmdline = (vim.cmdline or '') .. clip; vim.cmd_cycle = nil; c = 0
+      elseif vim.mode == 'search' then vim.searchline = (vim.searchline or '') .. clip; c = 0
+      elseif ctx.cm_typing() and cm and cm.paste then cm.paste(clip); c = 0
+      elseif B.filtering and state.focus == 'browser' then B.filter = B.filter .. clip; B.refilter_soon(); c = 0 end
+    end
     if m.cmd and not m.ctrl and not m.alt and not busy and c ~= 0 then
       local what = (c == 3 or c == 99) and 'y' or ((c == 24 or c == 120) and 'd' or ((c == 22 or c == 118) and 'p' or nil))
       -- 31 окт: Cmd+A — выделить всё видимое в модуле в фокусе (macOS шлёт тот же код 1, что Ctrl+A — тот остаётся +1)

@@ -173,6 +173,7 @@ function M.draw(U, L, x, y, w, h, focused)      -- every frame while visible
 end
 function M.key(c, mods) return false end        -- true = the key is used
 function M.typing() return false end            -- true while it takes text (keys skip Vim)
+function M.paste(text) end                      -- optional: Cmd+V while typing
 return M
 ```
 
