@@ -2800,6 +2800,7 @@ function V.key_impl(c)
       end
       local lane = f0.lane or f0.col.lanes[1]
       E.beside = how == 'beside' or (f0.pan and not (ctx.mono_on and ctx.mono_on(f0.col))) or false   -- 3 ноя: вид пана — рядом (z1 — режет)
+      if f0.pan and ctx.pan_here and how ~= 'beside' then local hh = ctx.pan_here(f0); if #hh > 0 then E.keep_empty = true; E.delete(hh, lpb()); E.keep_empty = nil end end   -- на ноте — замена
       -- шаг auto (3 окт): следующий слайс — ровно в конец предыдущего (строка +
       -- задержка xx/256), амен сшивается без щелей; курсор там, где кончился слайс
       local sx = V.stitch
@@ -2886,6 +2887,8 @@ function V.key_impl(c)
         -- (резать — только трек на моно, z1)
         if f.pan and not (ctx.mono_on and ctx.mono_on(f.col)) then beside = true end
         E.beside = beside
+        -- 3 ноя: курсор на ноте (её позиция) — набор заменяет её; остальные звучат дальше
+        if f.pan and ctx.pan_here then local hh = ctx.pan_here(f); if #hh > 0 then E.keep_empty = true; E.delete(hh, lpb()); E.keep_empty = nil end end
         if not beside then
           local cell = f.sub and f.sub[V.cur.row]
           if cell and cell.kind == 'cont' and cell.of then

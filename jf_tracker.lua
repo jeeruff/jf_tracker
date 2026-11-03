@@ -32310,6 +32310,15 @@ ctx.pan_view_all = function()
   relayout()
   vim.msg = all and 'pan view off on every track' or ('pan view on %d tracks (zvP again - off, zvp - one track)'):format(#cols)
 end
+-- 3 ноя: головы нот в позиции курсора вида пана (строка курсора) — набор их заменяет
+ctx.pan_here = function(f)
+  local n = state.pann
+  local p = vim.cur.ppos or (n + 1) // 2
+  local out = {}
+  for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not it.cont then out[#out + 1] = it.head end end
+  ctx.pan_repl = out[1] and draw.PV.cell_pan(out[1]) or nil   -- новая нота получит точный пан заменённой
+  return out
+end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end
   local PV, n = draw.PV, state.pann
@@ -32413,12 +32422,14 @@ ctx.pan_frame = function()
   if pp and snap and reaper.GetProjectStateChangeCount(0) ~= pp.sc and pp.n >= 3 then   -- правка была и снимок пересобран (кадр-другой)
     ctx.pan_pend = nil
     local mid = (draw.PANN + 1) // 2
-    if pp.pos == mid then return end
+    local exact = ctx.pan_repl; ctx.pan_repl = nil
+    if pp.pos == mid and not exact then return end
     for _, col in ipairs(snap.cols or {}) do
       if col.guid == pp.guid then
         local heads = {}
         for _, it in ipairs(draw.PV.row(col, pp.row, draw.PANN)) do if not it.cont and it.pos == mid then heads[#heads + 1] = it.head end end
-        ctx.pan_set(heads, pp.pos)
+        if exact then if #heads > 0 then edit.set_fx(heads, state.lpb, '0P', draw.PV.pan_hex(exact)); model.invalidate() end
+        else ctx.pan_set(heads, pp.pos) end
       end
     end
   end
