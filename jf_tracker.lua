@@ -32316,6 +32316,19 @@ ctx.pan_set = function(heads, pos)
   edit.set_fx(heads, state.lpb, '0P', PV.pan_hex(PV.pan_of(pos, n)))
   model.invalidate()
 end
+-- 3 ноя: следующее / прошлое событие канала в виде пана: по строке, потом по строкам; → row, pos или nil
+ctx.pan_next = function(col, row, pos, dir, n)
+  local last = (snap and snap.last_row) or (row + 4096)
+  local function heads(r) local t = {}; for _, it in ipairs(draw.PV.row(col, r, n)) do if not it.cont then t[#t + 1] = it.pos end end; table.sort(t); return t end
+  if dir > 0 then
+    for _, ps in ipairs(heads(row)) do if ps > pos then return row, ps end end
+    for rr = row + 1, last do local t = heads(rr); if t[1] then return rr, t[1] end end
+  else
+    local t = heads(row)
+    for i = #t, 1, -1 do if t[i] < pos then return row, t[i] end end
+    for rr = row - 1, 0, -1 do local t2 = heads(rr); if t2[#t2] then return rr, t2[#t2] end end
+  end
+end
 ctx.pan_key = function(c, m)
   local f = L and L.flat and L.flat[vim.cur.fi]
   if not (f and f.pan) or m.cmd or m.ctrl or m.alt then return false end
@@ -32326,10 +32339,22 @@ ctx.pan_key = function(c, m)
   local cnt = tonumber(vim.count) or 1
   -- 3 ноя: dw / x — нота в позиции курсора (голова или её продолжение), не вся строка; dw всегда удаляет
   if (vim.pending == 'd' and c == 119) or (not vim.pending and vim.mode == 'normal' and c == 120) then
+    -- нота в позиции; пусто — следующее событие (как w), 3dw — три
     local heads, seen = {}, {}
-    for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
+    local r, q = vim.cur.row, p
+    for k = 1, (c == 119 and cnt or 1) do
+      local got = false
+      for _, it in ipairs(draw.PV.row(f.col, r, n)) do if it.pos == q and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head; got = true end end
+      if not got and c == 119 then
+        local r2, q2 = ctx.pan_next(f.col, r, q, 1, n)
+        if not r2 then break end
+        r, q = r2, q2
+        for _, it in ipairs(draw.PV.row(f.col, r, n)) do if it.pos == q and not it.cont and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
+      end
+      if k < cnt then local r2, q2 = ctx.pan_next(f.col, r, q, 1, n); if not r2 then break end; r, q = r2, q2 end
+    end
     vim.pending, vim.count = nil, nil
-    if #heads == 0 then vim.msg = 'pan view: no note here'; return true end
+    if #heads == 0 then vim.msg = 'pan view: no note here or after'; return true end
     edit.delete(heads, state.lpb); model.invalidate()
     return true
   end
@@ -32344,24 +32369,8 @@ ctx.pan_key = function(c, m)
   if c == 104 or c == 1818584692 then if p > 1 then vim.cur.ppos = math.max(1, p - cnt); vim.count = nil; return true end; return false end   -- h ←: 3h — три позиции; за краем — поле слева
   if c == 108 or c == 1919379572 then if p < n then vim.cur.ppos = math.min(n, p + cnt); vim.count = nil; return true end; return false end
   if c == 119 or c == 98 then   -- 3 ноя: w b — следующее / прошлое событие канала (по строке, потом по строкам), с курсором на его позиции
-    local last = (snap and snap.last_row) or (vim.cur.row + 4096)
-    local function heads(r) local t = {}; for _, it in ipairs(draw.PV.row(f.col, r, n)) do if not it.cont then t[#t + 1] = it.pos end end; table.sort(t); return t end
     local r, q = vim.cur.row, p
-    for _ = 1, cnt do
-      local found
-      if c == 119 then
-        for _, ps in ipairs(heads(r)) do if ps > q then found = { r, ps }; break end end
-        local rr = r + 1
-        while not found and rr <= last do local t = heads(rr); if t[1] then found = { rr, t[1] } end; rr = rr + 1 end
-      else
-        local t = heads(r)
-        for i = #t, 1, -1 do if t[i] < q then found = { r, t[i] }; break end end
-        local rr = r - 1
-        while not found and rr >= 0 do local t2 = heads(rr); if t2[#t2] then found = { rr, t2[#t2] } end; rr = rr - 1 end
-      end
-      if not found then break end
-      r, q = found[1], found[2]
-    end
+    for _ = 1, cnt do local r2, q2 = ctx.pan_next(f.col, r, q, c == 119 and 1 or -1, n); if not r2 then break end; r, q = r2, q2 end
     vim.count = nil
     if r == vim.cur.row and q == p then vim.msg = c == 119 and 'pan view: no event after this' or 'pan view: no event before this'; return true end
     vim.cur.row, vim.cur.ppos = r, q
