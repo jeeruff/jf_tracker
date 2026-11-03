@@ -32336,6 +32336,11 @@ ctx.pan_key = function(c, m)
   local n = state.pann
   local mid = (n + 1) // 2
   local p = vim.cur.ppos or mid
+  -- 3 ноя: в NORMAL цифры — счётчик и при KEYS (40l = R40); ноты — в INSERT
+  if vim.mode == 'normal' and not vim.pending and c >= 48 and c <= 57 and not (c == 48 and not vim.count) then
+    vim.count = (tonumber(vim.count) or 0) * 10 + (c - 48); vim.msg = tostring(vim.count)
+    return true
+  end
   local cnt = tonumber(vim.count) or 1
   -- 3 ноя: dw / x — нота в позиции курсора (голова или её продолжение), не вся строка; dw всегда удаляет
   if (vim.pending == 'd' and c == 119) or (not vim.pending and vim.mode == 'normal' and c == 120) then
