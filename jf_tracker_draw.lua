@@ -2655,11 +2655,12 @@ D.PANN = 17
 function D.pan_wave(L, h, row, gx, y, cw, oncur)
   local total = math.max(1, math.floor((h.rows_f or h.rows or 1) * L.rh + 0.5))
   local off = math.floor((h.start_f or 0) * L.rh + 0.5)
-  local pk = get_peaks(h, math.min(total, 8192))
+  local pk = get_peaks(h, math.min(total, 8192), true)   -- 3 ноя: спектральные пики (тот же кеш, цвет — частота)
   if not pk or (pk.n or 0) == 0 then return false end
   local i = row - (h.row0 or row)
-  local cx, hw = gx + cw / 2, cw / 2
+  local cx, hw = gx + cw / 2, cw * 1.5   -- три клетки вокруг позиции: видно, что это волна
   local scale = pk.n / total
+  local mute = oncur or h.muted
   set(oncur and U.BG or (h.muted and U.mix(U.GREY, U.BG, 0.5) or U.mix(U.TEXT, U.BG, 0.3)))
   for py = 0, L.rh - 1 do
     local q = i * L.rh + py - off
@@ -2667,6 +2668,8 @@ function D.pan_wave(L, h, row, gx, y, cw, oncur)
     local idx = math.floor(q * scale) + 1
     if q >= 0 and idx <= pk.n then
       local mx, mn = math.min(1, pk.max[idx] or 0), math.max(-1, pk.min[idx] or 0)
+      mx = mx > 0 and mx ^ 0.6 or -((-mx) ^ 0.6); mn = mn > 0 and mn ^ 0.6 or -((-mn) ^ 0.6)   -- тихое не ниткой (как колонка волны)
+      if pk.spec and not mute then set(spec_colour(pk.spec[idx])) end
       local xa, xb = cx + mn * hw, cx + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
