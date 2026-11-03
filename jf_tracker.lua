@@ -32312,6 +32312,16 @@ ctx.pan_key = function(c, m)
   local mid = (n + 1) // 2
   local p = vim.cur.ppos or mid
   local cnt = tonumber(vim.count) or 1
+  -- 3 ноя: dw / x — нота в позиции курсора (голова или её продолжение), не вся строка; dw всегда удаляет
+  if (vim.pending == 'd' and c == 119) or (not vim.pending and vim.mode == 'normal' and c == 120) then
+    local heads, seen = {}, {}
+    for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
+    vim.pending, vim.count = nil, nil
+    if #heads == 0 then vim.msg = 'pan view: no note here'; return true end
+    edit.delete(heads, state.lpb); model.invalidate()
+    return true
+  end
+  if vim.pending then return false end   -- другие префиксы (g, z, d + движение) — Vim
   -- 3 ноя: со счётчиком h l — пан в процентах: 20h = L20, 100l = R100 (позиция ближайшая к нему)
   if vim.count and (c == 104 or c == 108 or c == 1818584692 or c == 1919379572) then
     local pc = math.min(100, cnt)
