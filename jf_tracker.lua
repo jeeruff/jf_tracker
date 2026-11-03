@@ -32298,6 +32298,18 @@ ctx.pan_res = function(d)
   vim.msg = ('pan view: %d positions (Shift+Opt+H coarser / L finer)'):format(n)
   return true
 end
+-- 3 ноя: zvP — вид пана у всех треков (все уже в нём — обратно у всех); zvp — у одного
+ctx.pan_view_all = function()
+  local cols, all = {}, true
+  for _, c in ipairs(snap and snap.cols or {}) do if c.track and not c.master then cols[#cols + 1] = c; if state.folds[c.guid] ~= 'pan' then all = false end end end
+  for _, c in ipairs(cols) do
+    state.folds[c.guid] = (not all) and 'pan' or nil
+    if state.wlevel then state.wlevel[c.guid] = nil end
+  end
+  vim.cur.ppos = nil
+  relayout()
+  vim.msg = all and 'pan view off on every track' or ('pan view on %d tracks (zvP again - off, zvp - one track)'):format(#cols)
+end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end
   local PV, n = draw.PV, state.pann

@@ -2651,6 +2651,29 @@ end
 -- продолжение — «|»; курсор — позиция D.pan_cur у трека курсора
 D.PV = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_panview.lua')
 D.PANN = 17
+-- волна айтема в ячейке позиции: время вниз (строка row от начала айтема), амплитуда — вширь клетки; true — нарисовал
+function D.pan_wave(L, h, row, gx, y, cw, oncur)
+  local total = math.max(1, math.floor((h.rows_f or h.rows or 1) * L.rh + 0.5))
+  local off = math.floor((h.start_f or 0) * L.rh + 0.5)
+  local pk = get_peaks(h, math.min(total, 8192))
+  if not pk or (pk.n or 0) == 0 then return false end
+  local i = row - (h.row0 or row)
+  local cx, hw = gx + cw / 2, cw / 2
+  local scale = pk.n / total
+  set(oncur and U.BG or (h.muted and U.mix(U.GREY, U.BG, 0.5) or U.mix(U.TEXT, U.BG, 0.3)))
+  for py = 0, L.rh - 1 do
+    local q = i * L.rh + py - off
+    if q >= total then break end
+    local idx = math.floor(q * scale) + 1
+    if q >= 0 and idx <= pk.n then
+      local mx, mn = math.min(1, pk.max[idx] or 0), math.max(-1, pk.min[idx] or 0)
+      local xa, xb = cx + mn * hw, cx + mx * hw
+      if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
+      gfx.line(xa, y + py, xb, y + py)
+    end
+  end
+  return true
+end
 function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
   local n = D.PANN
   local cw = L.cw
@@ -2666,8 +2689,10 @@ function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
     local colr = h.muted and U.GREY or (h.kind == 'midi' and U.CYAN or U.TEXT)
     local gx = x0 + (it.pos - 1) * cw
     if it.pos == cur then set(D.inv_bg or U.TEXT); gfx.rect(gx, y, cw, L.rh, 1); colr = U.BG end
+    -- 3 ноя: аудио — узкая волна айтема в своей позиции по всем его строкам (серая); голова — буква поверх
+    local wv = h.kind == 'audio' and get_peaks and D.pan_wave(L, h, row, gx, y, cw, it.pos == cur)
     if not it.cont then set(it.pos == cur and (D.inv_bg or U.TEXT) or U.BG); gfx.rect(gx, y + 1, cw, L.rh - 2, 1) end
-    text(gx, ty, it.cont and '|' or D.PV.glyph(h), it.cont and (it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) or colr)
+    if not (it.cont and wv) then text(gx, ty, it.cont and '|' or D.PV.glyph(h), it.cont and (it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) or colr) end
   end
 end
 
