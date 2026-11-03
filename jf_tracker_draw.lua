@@ -2651,6 +2651,12 @@ end
 -- продолжение — «|»; курсор — позиция D.pan_cur у трека курсора
 D.PV = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_panview.lua')
 D.PANN = 17
+-- метка линейки прыжков над позицией: одна цифра — единицы шагов, на десятке — цифра десятков (её красят ярче)
+function D.pan_lab(d)
+  d = math.floor(math.abs(d) + 0.5)
+  if d > 0 and d % 10 == 0 then return tostring((d // 10) % 10) end
+  return tostring(d % 10)
+end
 function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
   local n = D.PANN
   local cw = L.cw
@@ -9539,7 +9545,7 @@ function D.frame(L, snap, rows, state, info)
         if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
         if p.f.ml or p.f.env or p.f.folded then fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0 end   -- 2 ноя: и свёрнутая (o / .) — по своей ширине, не по полю ноты трека (цифры съезжали)
         if p.fld == 'pan' then fw = L.cw; fx = math.floor(((p.f.w or 0) - D.PANN * L.cw) / 2) + (p.pp - 1) * L.cw end   -- 3 ноя: позиция вида пана
-        local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
+        local lab = p.fld == 'pan' and D.pan_lab(d) or ('%d'):format(math.floor(math.abs(d) + 0.5))
         return p.f.x + (fx or 0) + math.floor(((fw or 0) - ms(lab)) / 2), ms(lab)
       end
       -- 13 окт: «0» курсора — главное: соседние метки, налезающие на него, не рисуются
@@ -9547,7 +9553,7 @@ function D.frame(L, snap, rows, state, info)
       for _, p in ipairs(pos) do if cur_i and p.i == cur_i then local lx, lw = lab_x(p, 0); c0, c1 = lx - 1, lx + lw + 1 end end
       for _, p in ipairs(pos) do
         local d = cur_i and (p.i - cur_i) or nil
-        if d and d ~= 0 and c0 then local lx, lw = lab_x(p, d); if lx < c1 and lx + lw > c0 then d = nil end end
+        if d and d ~= 0 and c0 and p.fld ~= 'pan' then local lx, lw = lab_x(p, d); if lx < c1 and lx + lw > c0 then d = nil end end   -- 3 ноя: позиции пана — вплотную, все
         if d then
           local fx, fw = D.field_rect(p.f.G or L, p.fld)
           if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
@@ -9557,10 +9563,12 @@ function D.frame(L, snap, rows, state, info)
           end
           if p.fld == 'pan' then fw = L.cw; fx = math.floor(((p.f.w or 0) - D.PANN * L.cw) / 2) + (p.pp - 1) * L.cw end
           local cx = p.f.x + (fx or 0)
-          local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
+          local pl = p.fld == 'pan'
+          local lab = pl and D.pan_lab(d) or ('%d'):format(math.floor(math.abs(d) + 0.5))
           local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
-          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= ((p.f.x < L.cols_r) and L.cols_r or W) and (lx > last_r + 1 or d == 0) then   -- 21 окт: поле трека у мастера — не дальше его границы
-            text(lx, jy, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
+          if ms(lab) <= (fw or 0) + 2 and cx >= tx0 and cx + (fw or 0) <= ((p.f.x < L.cols_r) and L.cols_r or W) and (lx > last_r + 1 or d == 0 or pl) then   -- 21 окт: поле трека у мастера — не дальше его границы
+            local ten = pl and d ~= 0 and math.abs(d) % 10 == 0   -- 3 ноя: десяток — цифра десятков, ярче (линейка)
+            text(lx, jy, lab, d == 0 and U.AMBER or (ten and (d < 0 and U.CYAN or U.TEXT)) or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))   -- 0 — ячейка курсора
             last_r = lx + ms(lab)
           end
         end
