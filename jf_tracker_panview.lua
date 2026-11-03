@@ -55,4 +55,19 @@ function PV.glyph(c)
   return s == '#' and l:lower() or l:upper()
 end
 
+-- 3 ноя: подпись головы: обычно имя ноты C-4 (3 символа, по центру позиции) и метка микротона ^ v ^^ (рядом, место не держим);
+-- поле сжато до PV.COMPACT позиций и уже — одна буква (PV.glyph)
+PV.COMPACT = 13
+function PV.micro_tag(m)
+  if not m or m == 0 then return '' end
+  local a = math.abs(m)
+  return (m > 0 and '^' or 'v') .. (a == 2 and (m > 0 and '^' or 'v') or (a == 3 and '3' or ''))
+end
+function PV.label(c, n)
+  if (n or PV.N) <= PV.COMPACT then return PV.glyph(c) end
+  local nm = c and c.note or ''
+  if nm == '' then return 'o' end
+  return nm .. PV.micro_tag(c.micro)
+end
+
 return PV

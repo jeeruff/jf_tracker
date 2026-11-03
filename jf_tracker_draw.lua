@@ -2694,8 +2694,15 @@ function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
     if it.pos == cur then set(D.inv_bg or U.TEXT); gfx.rect(gx, y, cw, L.rh, 1); colr = U.BG end
     -- 3 ноя: аудио — узкая волна айтема в своей позиции по всем его строкам (серая); голова — буква поверх
     local wv = h.kind == 'audio' and get_peaks and D.pan_wave(L, h, row, gx, y, cw, it.pos == cur)
-    if not it.cont then set(it.pos == cur and (D.inv_bg or U.TEXT) or U.BG); gfx.rect(gx, y + 1, cw, L.rh - 2, 1) end
-    if not (it.cont and wv) then text(gx, ty, it.cont and '|' or D.PV.glyph(h), it.cont and (it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) or colr) end
+    if it.cont then
+      if not wv then text(gx, ty, '|', it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) end
+    else   -- 3 ноя: голова — C-4 по центру позиции (сжатое поле — буква), под ней фон / курсор
+      local lab = D.PV.label(h, n)
+      local lw = ms(lab)
+      local lx = math.max(x, math.min(x + w - lw, gx + math.floor((cw - lw) / 2)))
+      set(it.pos == cur and (D.inv_bg or U.TEXT) or U.BG); gfx.rect(lx - 1, y + 1, lw + 2, L.rh - 2, 1)
+      text(lx, ty, lab, colr)
+    end
   end
 end
 
