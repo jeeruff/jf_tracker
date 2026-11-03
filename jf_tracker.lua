@@ -615,7 +615,7 @@ local garden = { f = nil, planted = 0 }
 local function garden_load()
   local _, txt = reaper.GetProjExtState(0, 'jf_tracker', 'garden')
   garden.f = (txt and txt ~= '' and ORCA.parse(txt)) or ORCA.new(32, 8)
-  if not (txt and txt ~= '') then garden.f.on = false end
+  if garden.f and not (txt and txt ~= '') then garden.f.on = false end   -- 3 ноя: в релизе Orca нет (заглушка, f = nil) — падал запуск
 end
 local function garden_save() if garden.f then reaper.SetProjExtState(0, 'jf_tracker', 'garden', ORCA.serialize(garden.f)) end end
 garden_load()
