@@ -8373,7 +8373,7 @@ function D.frame(L, snap, rows, state, info)
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
     ncol = U.readable(ncol, nbg, 4.5)
-    if c.folded and not c.chord then   -- 26 окт: лейн аккордов широкий — обычная шапка и полоса микшера, не свёрнутая
+    if c.folded and not c.chord and not c.pan then   -- 26 окт: лейн аккордов широкий — обычная шапка и полоса микшера, не свёрнутая
       -- свёрнут в полоску (4 окт): имя вертикально во всю высоту шапки
       hset(rbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)
       -- 9 окт: в микшере у полоски — фейдер в знак шириной (метр + риска
@@ -8407,7 +8407,7 @@ function D.frame(L, snap, rows, state, info)
         D.big_text(c.x + L.pad + indent, hy - HX + 1, s, ncol, k)
       else
         local amw = 0
-        if not c.folded and c.w - 2 * L.pad - indent > ms('www') + 4 + 3 * L.cw then amw = D.amode_tag(L, c.x + c.w - L.pad, hy - HX + 1 + math.floor(HX / 2), col, hover, mx, my) end   -- 31 окт
+        if (not c.folded or c.pan) and c.w - 2 * L.pad - indent > ms('www') + 4 + 3 * L.cw then amw = D.amode_tag(L, c.x + c.w - L.pad, hy - HX + 1 + math.floor(HX / 2), col, hover, mx, my) end   -- 31 окт
         text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent - (amw > 0 and amw + 2 or 0)), ncol)
       end
     else
@@ -8439,9 +8439,9 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
-    if col.rgb and mode == 'line' and not c.folded and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
+    if col.rgb and mode == 'line' and (not c.folded or c.pan) and not c.master then rawset_col(col.rgb); gfx.rect(c.x + 1 + indent, hy + L.rh - 1, c.w - 2 - indent, 2, 1) end
     -- 9 окт: полосы отступа вложенного трека нет (лишний серый разделитель) — вложенность видна по отступу имени
-    if col.sel and not c.folded then set(U.CYAN); gfx.rect(c.x + 1, hy - HX, c.w - 1, L.rh + HX, 0) end   -- 1 ноя: рамка — и по крупному имени (big trackname)   -- выделен в REAPER (Option+цифра)
+    if col.sel and (not c.folded or c.pan) then set(U.CYAN); gfx.rect(c.x + 1, hy - HX, c.w - 1, L.rh + HX, 0) end   -- 1 ноя: рамка — и по крупному имени (big trackname)   -- выделен в REAPER (Option+цифра)
     -- 30 окт: мастер — курсор на его колонке (или выделен в REAPER): рамка имени, как у выделенного трека
     if c.master then
       local vcm = info.vcur and L.flat and L.flat[info.vcur.fi]
@@ -8451,7 +8451,7 @@ function D.frame(L, snap, rows, state, info)
     end
     if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
-    if not c.folded or c.chord then   -- 26 окт: и лейн аккордов (у него своя полоса микшера, кнопки)
+    if not c.folded or c.chord or c.pan then   -- 26 окт: и лейн аккордов (у него своя полоса микшера, кнопки)
       local by = hy + L.rh + 1
       local bx = c.x + L.pad + indent
       -- A — индикатор автоматизации: есть огибающие у трека; залит, когда
@@ -10542,7 +10542,7 @@ function D.frame(L, snap, rows, state, info)
     local by = L.body_y + L.nrows * rh
     local cwm = math.max(3, L.cw - 1)
     for _, c in ipairs(L.cols) do
-      if c.x and (not c.folded or c.chord) then
+      if c.x and (not c.folded or c.chord or c.pan) then
         local pl, pr = info.peaks(c.col)
         for k, v in ipairs({ pl or 0, pr or 0 }) do
           v = math.min(1, math.max(0, v))
@@ -10572,7 +10572,7 @@ function D.frame(L, snap, rows, state, info)
     local by = L.body_y + L.nrows * L.rh
     local hh = math.floor(L.body_h * 0.575)
     for _, c in ipairs(L.cols) do
-      if c.x and (not c.folded or c.chord) and c.col and not c.col.master then
+      if c.x and (not c.folded or c.chord or c.pan) and c.col and not c.col.master then
         local age, vel = info.midi_in_age(c.col)
         local DEC = 0.4
         if age and age < DEC then
