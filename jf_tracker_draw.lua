@@ -9491,7 +9491,15 @@ function D.frame(L, snap, rows, state, info)
       for fi, f in ipairs(L.flat) do
         local G = f.G or L
         local inst_ok = not (f.env or f.folded) and G.x_inst and true or false   -- 21 окт: и свёрнутый MIDI (GCM: нота | инстр. | vol) — курсор туда ходит   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
-        for _, fld in ipairs(vo(fi)) do
+        if f.pan then   -- 3 ноя: вид пана — каждая позиция поля шаг (l / h ходят по ним)
+          local cp = D.pan_cur or (D.PANN + 1) // 2
+          for i = 1, D.PANN do
+            idx = idx + 1
+            if fi == vc.fi and i == cp then cur_i = idx end
+            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'pan', pp = i } end
+          end
+        end
+        for _, fld in ipairs(f.pan and {} or vo(fi)) do
           -- 16 окт: колонка волны — шаг перед нотой (h с ноты, l из соседней подколонки встают на неё)
           if fld == 1 and (G.w_wave or 0) > 0 and not (f.env or f.folded or f.ml) then   -- 22 окт: и у узкой (уровень «нота», GC) — волна там есть
             idx = idx + 1
@@ -9530,6 +9538,7 @@ function D.frame(L, snap, rows, state, info)
         local fx, fw = D.field_rect(p.f.G or L, p.fld)
         if p.half then fw = ms('00'); if p.half == 'val' then fx = (fx or 0) + fw end end
         if p.f.ml or p.f.env or p.f.folded then fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0 end   -- 2 ноя: и свёрнутая (o / .) — по своей ширине, не по полю ноты трека (цифры съезжали)
+        if p.fld == 'pan' then fw = L.cw; fx = math.floor(((p.f.w or 0) - D.PANN * L.cw) / 2) + (p.pp - 1) * L.cw end   -- 3 ноя: позиция вида пана
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
         return p.f.x + (fx or 0) + math.floor(((fw or 0) - ms(lab)) / 2), ms(lab)
       end
@@ -9546,6 +9555,7 @@ function D.frame(L, snap, rows, state, info)
           if p.f.ml or p.f.env or p.f.folded then
             fw = math.floor((p.f.w or 0) / (p.half and 2 or 1)); fx = (p.half == 'val') and fw or 0
           end
+          if p.fld == 'pan' then fw = L.cw; fx = math.floor(((p.f.w or 0) - D.PANN * L.cw) / 2) + (p.pp - 1) * L.cw end
           local cx = p.f.x + (fx or 0)
           local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))
           local lx = cx + math.floor(((fw or 0) - ms(lab)) / 2)
