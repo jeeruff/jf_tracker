@@ -81,7 +81,9 @@ function H.start(filter)
     local lv = H.LEVEL[t.kind] or 2
     if fr then
       local cx, cy = t.x + (t.w or 0) / 2, t.y + (t.h or 0) / 2
+      local pr = H.prev_rect
       if cx >= fr.x and cx < fr.x + fr.w and cy >= fr.y and cy < fr.y + fr.h then lv = lv - 10
+      elseif pr and cx >= pr.x and cx < pr.x + pr.w and cy >= pr.y and cy < pr.y + pr.h then lv = lv - 5   -- 3 ноя: прошлый модуль — следом
       elseif lv <= 0 or lv >= 3 then lv = 50 end   -- 2 ноя: массовые метки (строки, клетки) чужого модуля — в самый конец: не съедают буквы
     end
     order[i] = { t = t, i = i, lv = lv }

@@ -2134,34 +2134,8 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, y, '*', 'mkdir', false)
       bx = btn(bx, y, 'find', 'find', B.filtering or B.filter ~= '')   -- 11 окт: поиск — на виду, справа от * (новая папка)
       if wrap_marks then bx = B.draw_marks(btn, bx, y, U) end
-      if B.filter == '' and not B.filtering then
-        local parts = B.path_parts(B.path)
-        -- влезают последние сегменты; срезанное начало — «..»
-        local avail = x + w - L.pad - bx
-        local sep = U.measure('/')
-        local first, used = #parts + 1, 0
-        for i = #parts, 1, -1 do
-          local wi = U.measure(parts[i].label) + (i > 2 and sep or 0)
-          if used + wi > avail - U.measure('..') then break end
-          used = used + wi; first = i
-        end
-        B.crumbs = {}
-        local cx = bx
-        if first > 1 then U.text(cx, y + 1, '..', U.DIM); cx = cx + U.measure('..') end
-        for i = first, #parts do
-          local pt = parts[i]
-          if i > 2 and i > first then U.text(cx, y + 1, '/', U.DIM); cx = cx + sep end   -- после корня «/» свой слэш не нужен
-          local wi = U.measure(pt.label)
-          local hot = mx >= cx and mx < cx + wi and my >= y and my < y + L.rh
-          local last = i == #parts
-          U.text(cx, y + 1, pt.label, hot and U.AMBER or (last and U.TEXT or U.CYAN))
-          B.crumbs[i] = pt
-          if hot then hover = 'crumb' .. i end
-          if ctx.hint then ctx.hint('browserbtn', cx, y, wi, L.rh, 'crumb' .. i) end
-          cx = cx + wi
-        end
-        y = y + L.rh + 2; h = h - L.rh - 2
-      end
+      -- 3 ноя: путь — одной строкой ниже («где я»), кликабельный и с метками f; здесь его копии нет
+      if B.filter == '' and not B.filtering then y = y + L.rh + 2; h = h - L.rh - 2 end
     end
     if bx > x + L.pad + 2 and (B.filter ~= '' or B.filtering) then
       -- 17 окт: поиск — своей строкой под кнопками (было в той же, после закладок — резался)
@@ -2206,17 +2180,41 @@ function B.draw(U, L, x, y, w, h)
     local full = B.path or '/'
     local home = os.getenv('HOME') or ''
     if home ~= '' and full:sub(1, #home) == home then full = '~' .. full:sub(#home + 1) end
-    local head, tail = full:match('^(.*/)([^/]+)$')
-    head, tail = head or '', tail or full
-    if B.filter ~= '' or B.filtering then tail = tail .. '  /' .. B.filter .. (B.filtering and '_' or '') .. ('  %d'):format(#B.entries) end
-    if #B.entries == 0 and B.filter == '' then tail = tail .. '   (empty folder - h / BS up)' end
-    local tx, avail = x + L.pad, w - 2 * L.pad
-    local tw = U.measure(tail)
-    if tw < avail then
-      local hs = ctx.fit(head, avail - tw)
-      U.text(tx, y + 1, hs, U.GREY); tx = tx + U.measure(hs)
+    -- 3 ноя: сегменты пути — щелчок / метка f ведут в эту папку (~ — домашняя); не влезло — начало «..»
+    local parts = B.path_parts(B.path or '/')
+    local segs = {}
+    for k, pt in ipairs(parts) do
+      if home ~= '' and pt.path == home then segs = { { label = '~', path = pt.path, i = k } }
+      elseif k > 1 or #parts == 1 then segs[#segs + 1] = { label = pt.label, path = pt.path, i = k } end
     end
-    U.text(tx, y + 1, ctx.fit(tail, x + w - L.pad - tx), B.filtering and U.AMBER or U.CYAN)
+    if #segs == 0 then segs[1] = { label = '/', path = '/', i = 1 } end
+    local extra = ''
+    if B.filter ~= '' or B.filtering then extra = '  /' .. B.filter .. (B.filtering and '_' or '') .. ('  %d'):format(#B.entries) end
+    if #B.entries == 0 and B.filter == '' then extra = extra .. '   (empty folder - h / BS up)' end
+    local sep = U.measure('/')
+    local avail = w - 2 * L.pad - U.measure(extra)
+    local first, used = #segs + 1, 0
+    for k = #segs, 1, -1 do
+      local wk = U.measure(segs[k].label) + (k > 1 and sep or 0)
+      if used + wk > avail - U.measure('..') and k < #segs then break end
+      used = used + wk; first = k
+    end
+    local tx = x + L.pad
+    B.crumbs = {}
+    if first > 1 then U.text(tx, y + 1, '..', U.DIM); tx = tx + U.measure('..') end
+    for k = first, #segs do
+      local sg = segs[k]
+      if k > 1 and not (k == first and first > 1) then U.text(tx, y + 1, '/', U.DIM); tx = tx + sep end
+      local last = k == #segs
+      local wk = math.min(U.measure(sg.label), x + w - L.pad - tx)
+      local hot = mx >= tx and mx < tx + wk and my >= y and my < y + L.rh
+      U.text(tx, y + 1, ctx.fit(sg.label, wk), hot and U.AMBER or (last and U.CYAN or U.GREY))
+      B.crumbs[sg.i] = { label = sg.label, path = sg.path }
+      if hot then hover = 'crumb' .. sg.i end
+      if ctx.hint and not last then ctx.hint('browserbtn', tx, y, wk, L.rh, 'crumb' .. sg.i) end
+      tx = tx + wk
+    end
+    if extra ~= '' then U.text(tx, y + 1, ctx.fit(extra, x + w - L.pad - tx), B.filtering and U.AMBER or U.GREY) end
     U.set(U.LINE); gfx.rect(x, y + L.rh, w, 1, 1)
     y = y + L.rh + 2; h = h - L.rh - 2
   end

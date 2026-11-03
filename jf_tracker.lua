@@ -15243,6 +15243,7 @@ ctx = {
   end,
   set_focus = function(f)
     if f ~= 'fxb' then ctx.fxb_pad = nil end
+    if f ~= state.focus then ctx.focus_prev = state.focus == 'top' and state.toptab or state.focus end   -- 3 ноя: прошлый модуль — вторая очередь меток f
     -- 24 окт: опция slicer keys on — фокус в слайсере (вкладка item / slices): клавиатура (m) сама вкл, ушёл — как была
     do
       local sl = f == 'slices' or f == 'sprops' or f == 'sample' or (f == 'top' and state.toptab == 'sample')
@@ -31274,6 +31275,9 @@ local function frame()
         if c2.x and mx >= c2.x and mx < c2.x + c2.w and my >= c2.y and my < c2.y + c2.h then cell = c2; break end
       end
       HN.focus_rect = cell and { x = cell.x, y = cell.y, w = cell.w, h = cell.h } or nil
+      -- 3 ноя: вторая очередь — модуль, где фокус был перед этим (последний открытый)
+      local pc = ctx.focus_prev and L and L.pn and L.pn.by_panel and L.pn.by_panel[ctx.focus_prev]
+      HN.prev_rect = (pc and pc ~= cell and pc.x) and { x = pc.x, y = pc.y, w = pc.w, h = pc.h } or nil
     end
     if HN.start() then vim.msg = ctx.glide and ('hints: a dB mark glides the fader in %d %s, Esc'):format(ctx.glide.n, ctx.glide.unit) or 'hints: type label, Esc' else vim.msg = 'no targets' end
     c = 0
