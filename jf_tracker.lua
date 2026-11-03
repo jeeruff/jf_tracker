@@ -32397,6 +32397,22 @@ ctx.pan_frame = function()
     end
   end
 end
+-- 3 ноя: view браузера — вид списка: волны у строк, стиль пиков, нормализация, ширина колонки волн
+ctx.spec_colour = function(sp) return draw.spec_colour and draw.spec_colour(sp) or U.CYAN end
+ctx.browser_view_menu = function()
+  local v = B.pv
+  local function set(fn) return function() fn(); B.pv_save(); ctx.browser_view_menu() end end
+  local function now(c) return c and '  (now)' or '' end
+  vim.open_hydra({ title = 'browser view', items = {
+    { key = 'w', label = 'waves at every row: ' .. (v.many and 'on' or 'off (one big wave)'), fn = set(function() v.many = not v.many end) },
+    { key = 'p', label = 'peaks: min .. max' .. now(v.style == 'peaks'), fn = set(function() v.style = 'peaks' end) },
+    { key = 'r', label = 'rectified: the level up from the bottom' .. now(v.style == 'rect'), fn = set(function() v.style = 'rect' end) },
+    { key = 'c', label = 'colour by spectrum (dark - low, bright - high)' .. now(v.style == 'spectral'), fn = set(function() v.style = 'spectral' end) },
+    { key = 'n', label = 'normalize each wave: ' .. (v.norm and 'on' or 'off'), fn = set(function() v.norm = not v.norm end) },
+    { key = '-', label = ('waves column narrower (%d %%)'):format(v.colw), fn = set(function() v.colw = math.max(20, v.colw - 6) end) },
+    { key = '=', label = 'waves column wider', fn = set(function() v.colw = math.min(70, v.colw + 6) end) },
+  } })
+end
 ctx.auto_pattern = function(row)
   local t = edit.row_time(row, state.lpb, 0)
   if alias.region_at(regions, t) then return false end

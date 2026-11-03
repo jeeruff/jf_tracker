@@ -62,7 +62,19 @@ B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or f
 B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '0')
 -- sync (3 окт): пока проект играет, прослушивание файла стартует с начала следующего такта
 B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
-B.pvmany = true   -- 3 ноя: у каждой строки своя маленькая волна (files, zoxide, db, proj); вид с одной большой волной закомментирован (кнопка view ниже)
+-- 3 ноя: вид списка (кнопка view): волны у строк, стиль пиков, нормализация, ширина колонки волн — Data ExtState pvview
+B.pv = { many = true, style = 'peaks', norm = false, colw = 42 }
+do
+  local raw = R.GetExtState and R.GetExtState('jf_tracker', 'pvview') or ''
+  for k, v in raw:gmatch('(%w+)=([%w]+)') do
+    if k == 'many' or k == 'norm' then B.pv[k] = v == '1' elseif k == 'colw' then B.pv.colw = tonumber(v) or 42 elseif k == 'style' then B.pv.style = v end
+  end
+end
+function B.pv_save()
+  local v = B.pv
+  if R.SetExtState then R.SetExtState('jf_tracker', 'pvview', ('many=%s;style=%s;norm=%s;colw=%d'):format(v.many and '1' or '0', v.style, v.norm and '1' or '0', v.colw), true) end
+end
+B.pvmany = B.pv.many
 B.pvitem = R.GetExtState and R.GetExtState('jf_tracker', 'pvitem') == '1'   -- 2 ноя: прослушанное — во вкладку item (по умолчанию нет: казалось, что сэмпл уже взят)
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 -- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
@@ -1485,10 +1497,7 @@ function B.click(what)
     B.via_track = not B.via_track
     if R.SetExtState then R.SetExtState('jf_tracker', 'brtrack', B.via_track and '1' or '0', true) end
     if ctx.msg then ctx.msg(B.via_track and 'listen through the selected track (its FX)' or 'listen direct (no track FX)') end
-  elseif what == 'pvmany' then   -- 3 ноя: view — маленькие волны у строк
-    B.pvmany = not B.pvmany
-    if R.SetExtState then R.SetExtState('jf_tracker', 'pvmany', B.pvmany and '1' or '0', true) end
-    if ctx.msg then ctx.msg(B.pvmany and 'view: a small wave at every row' or 'view: one big wave of the row under the cursor') end
+  elseif what == 'pvview' then if ctx.browser_view_menu then ctx.browser_view_menu() end   -- 3 ноя: меню вида списка
   elseif what == 'pvitem' then   -- 2 ноя: прослушанный файл — ещё и во вкладку item
     B.pvitem = not B.pvitem
     if R.SetExtState then R.SetExtState('jf_tracker', 'pvitem', B.pvitem and '1' or '0', true) end
@@ -2110,10 +2119,10 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
     -- 3 ноя: справа — view: маленькие волны у каждой строки вместо одной большой
-    -- if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then
-    --   local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
-    --   if vx > bx then btn(vx, y, 'view', 'pvmany', B.pvmany) end
-    -- end
+    if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then   -- 3 ноя: view — меню вида списка
+      local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
+      if vx > bx then btn(vx, y, 'view', 'pvview', false) end
+    end
     if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
       B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
       return hover
@@ -2233,9 +2242,10 @@ function B.draw(U, L, x, y, w, h)
   end
   -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
   -- 1 ноя: опция browser split — то же, без колонки родителя: список папки | превью того, что под курсором (как lf)
+  B.pvmany = B.pv.many
   local many = B.pvmany and (B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj') and w >= L.cw * 30
   local many_x, many_w
-  if many then many_w = math.floor(w * 0.42); many_x = x + w - many_w; w = w - many_w - 2 end   -- 3 ноя: колонка маленьких волн справа
+  if many then many_w = math.floor(w * (B.pv.colw or 42) / 100); many_x = x + w - many_w; w = w - many_w - 2 end   -- 3 ноя: колонка маленьких волн справа
   local two = not many and B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
   -- 2 ноя: пресеты — всегда две колонки, как lf: папки | что в папке под курсором
   if B.mode == 'presets' and B.filter == '' and not B.filtering and w >= L.cw * 40 then two = true end
@@ -2327,14 +2337,20 @@ function B.draw(U, L, x, y, w, h)
       if not e then break end
       local pth = not e.dir and B.preview_path(e)
       local ry = y + (i - 1) * L.rh
-      local pk = pth and ctx.file_peaks and ctx.file_peaks(pth, many_w - 2 * L.pad)
+      local st = B.pv.style
+      local pk = pth and ctx.file_peaks and ctx.file_peaks(pth, many_w - 2 * L.pad, nil, nil, st == 'spectral' or nil)
       if pk and (pk.n or 0) > 0 then
-        local cy, hh = ry + math.floor(L.rh / 2), math.floor(L.rh / 2) - 1
+        local top = st == 'rect'   -- выпрямленная: |пик| от низа строки вверх
+        local cy, hh = top and (ry + L.rh - 1) or (ry + math.floor(L.rh / 2)), top and (L.rh - 2) or (math.floor(L.rh / 2) - 1)
+        local g = 1
+        if B.pv.norm then local m = 0.001; for k = 1, pk.n do m = math.max(m, math.abs(pk.max[k] or 0), math.abs(pk.min[k] or 0)) end; g = 1 / m end
         U.set(idx == B.cur and wcol or wdim)
         for px = 0, many_w - 2 * L.pad - 1 do
           local k = math.floor(px * pk.n / (many_w - 2 * L.pad)) + 1
-          local a, b = pk.min[k] or 0, pk.max[k] or 0
-          if b - a > 0.03 then gfx.line(many_x + L.pad + px, cy - b * hh, many_x + L.pad + px, cy - a * hh) end
+          local a, b = (pk.min[k] or 0) * g, (pk.max[k] or 0) * g
+          if st == 'spectral' and pk.spec and ctx.spec_colour then local sc = ctx.spec_colour(pk.spec[k]); U.set(idx == B.cur and sc or U.mix(sc, U.BG, 0.4)) end
+          if top then local v = math.min(1, math.max(math.abs(a), math.abs(b))); if v > 0.015 then gfx.line(many_x + L.pad + px, cy, many_x + L.pad + px, cy - v * hh) end
+          elseif b - a > 0.03 then gfx.line(many_x + L.pad + px, cy - math.min(1, b) * hh, many_x + L.pad + px, cy - math.max(-1, a) * hh) end
         end
       end
     end
