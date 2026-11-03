@@ -10160,9 +10160,11 @@ function D.frame(L, snap, rows, state, info)
             if inv then
               D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE   -- 28 окт: акцент — у курсора в фокусе (D.CURCELL), вне фокуса — тусклый
               local G, folded, inv_f, fw0, half = f.G or L, c.folded, inv, f.w, D.fx_half
+              local panv = c.pan
               D.cur_box = function()
                 set(D.inv_bg)
-                if folded then gfx.rect(x, y, fw0, L.rh, 1)
+                if panv then   -- 2 ноя: вид пана — курсор только на своей позиции (рисует D.draw_pan_cell), не на всё поле
+                elseif folded then gfx.rect(x, y, fw0, L.rh, 1)
                 elseif half then   -- 12 окт: половина поля команды
                   local fx = D.field_rect(G, inv_f); local w2 = ms('00')
                   if half == 'val' then gfx.rect(x + fx + w2 - 1, y, w2 + 2, L.rh, 1) else gfx.rect(x + fx - 1, y, w2 + 1, L.rh, 1) end
