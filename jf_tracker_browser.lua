@@ -62,6 +62,7 @@ B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or f
 B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '0')
 -- sync (3 окт): пока проект играет, прослушивание файла стартует с начала следующего такта
 B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
+B.pvmany = R.GetExtState and R.GetExtState('jf_tracker', 'pvmany') == '1'   -- 3 ноя: view — у каждой строки своя маленькая волна (files, zoxide, db, proj)
 B.pvitem = R.GetExtState and R.GetExtState('jf_tracker', 'pvitem') == '1'   -- 2 ноя: прослушанное — во вкладку item (по умолчанию нет: казалось, что сэмпл уже взят)
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 -- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
@@ -1485,6 +1486,10 @@ function B.click(what)
     B.via_track = not B.via_track
     if R.SetExtState then R.SetExtState('jf_tracker', 'brtrack', B.via_track and '1' or '0', true) end
     if ctx.msg then ctx.msg(B.via_track and 'listen through the selected track (its FX)' or 'listen direct (no track FX)') end
+  elseif what == 'pvmany' then   -- 3 ноя: view — маленькие волны у строк
+    B.pvmany = not B.pvmany
+    if R.SetExtState then R.SetExtState('jf_tracker', 'pvmany', B.pvmany and '1' or '0', true) end
+    if ctx.msg then ctx.msg(B.pvmany and 'view: a small wave at every row' or 'view: one big wave of the row under the cursor') end
   elseif what == 'pvitem' then   -- 2 ноя: прослушанный файл — ещё и во вкладку item
     B.pvitem = not B.pvitem
     if R.SetExtState then R.SetExtState('jf_tracker', 'pvitem', B.pvitem and '1' or '0', true) end
@@ -2109,6 +2114,11 @@ function B.draw(U, L, x, y, w, h)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
+    -- 3 ноя: справа — view: маленькие волны у каждой строки вместо одной большой
+    if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then
+      local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
+      if vx > bx then btn(vx, y, 'view', 'pvmany', B.pvmany) end
+    end
     if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
       B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
       return hover
@@ -2228,10 +2238,13 @@ function B.draw(U, L, x, y, w, h)
   end
   -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
   -- 1 ноя: опция browser split — то же, без колонки родителя: список папки | превью того, что под курсором (как lf)
-  local two = B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
+  local many = B.pvmany and (B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj') and w >= L.cw * 30
+  local many_x, many_w
+  if many then many_w = math.floor(w * 0.42); many_x = x + w - many_w; w = w - many_w - 2 end   -- 3 ноя: колонка маленьких волн справа
+  local two = not many and B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
   -- 2 ноя: пресеты — всегда две колонки, как lf: папки | что в папке под курсором
   if B.mode == 'presets' and B.filter == '' and not B.filtering and w >= L.cw * 40 then two = true end
-  local cols = (B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90) or two
+  local cols = (not many and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 90) or two
   local pv_x, pv_w
   if cols then
     local pw, cw0 = math.floor(w * 0.22), math.floor(w * 0.36)
@@ -2309,6 +2322,28 @@ function B.draw(U, L, x, y, w, h)
   end
   B.scroll = draw_range(x, w, 1, #B.entries, 'scroll')
   if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end
+  -- 3 ноя: view — у каждой видимой строки её волна (тем же кешем пиков, что большая); строка курсора ярче
+  if many then
+    U.set(U.LINE); gfx.rect(many_x - 1, y, 1, nvis * L.rh, 1)
+    local wcol, wdim = U.mix(U.TEXT, U.CYAN, 0.4), U.mix(U.mix(U.TEXT, U.CYAN, 0.4), U.BG, 0.45)
+    for i = 1, nvis do
+      local idx = (B.scroll or 0) + i
+      local e = B.entries[idx]
+      if not e then break end
+      local pth = not e.dir and B.preview_path(e)
+      local ry = y + (i - 1) * L.rh
+      local pk = pth and ctx.file_peaks and ctx.file_peaks(pth, many_w - 2 * L.pad)
+      if pk and (pk.n or 0) > 0 then
+        local cy, hh = ry + math.floor(L.rh / 2), math.floor(L.rh / 2) - 1
+        U.set(idx == B.cur and wcol or wdim)
+        for px = 0, many_w - 2 * L.pad - 1 do
+          local k = math.floor(px * pk.n / (many_w - 2 * L.pad)) + 1
+          local a, b = pk.min[k] or 0, pk.max[k] or 0
+          if b - a > 0.03 then gfx.line(many_x + L.pad + px, cy - b * hh, many_x + L.pad + px, cy - a * hh) end
+        end
+      end
+    end
+  end
   -- 27 окт: третья колонка — что под курсором: папка — её содержимое (щелчок — туда), файл — крупная волна и сведения
   if cols then
     local e = B.entries[B.cur]
