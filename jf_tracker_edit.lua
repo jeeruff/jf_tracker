@@ -2375,10 +2375,10 @@ local function finish_insert(track, lane_idx, it)
   if E.mono_on(track) and not E.beside then E.mono_cut_at(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION')) end
   if not E.beside and not E.xfade.on then cut_covering(track, lane_idx, R.GetMediaItemInfo_Value(it, 'D_POSITION'), it) end
   xfade_join(track, lane_idx, it)
-  if E.legato_auto(track) then E.legato(track, lane_idx) end   -- трек в легато: держится при вставке
+  if E.legato_auto(track) and not E.beside then E.legato(track, lane_idx) end   -- трек в легато: держится при вставке; 3 ноя: нота рядом (вид пана, Option) — соседей не трогает
   -- 13 окт: шаг legato (кнопка в блоке step) — новая нота и та, что перед ней, дотягиваются
   -- до следующей без растяжки (дальше звучит луп инструмента)
-  if E.step_legato then
+  if E.step_legato and not E.beside then   -- 3 ноя: рядом — звучащие играют до своего конца (кнопка legato их обрезала)
     local p = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     local best
     for i = 0, R.CountTrackMediaItems(track) - 1 do
