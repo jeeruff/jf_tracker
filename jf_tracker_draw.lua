@@ -10198,7 +10198,7 @@ function D.frame(L, snap, rows, state, info)
       -- подсказка-прыжок: одна на такт в колонке трека (не на каждое событие)
       -- 20 окт: и на долях (строки с точками темнее) — приоритетные прыжки по трекеру (метки раньше кнопок)
       -- 2 ноя: метки f — только на ярких линиях: доли, а при плотном зуме (LPB < 4: долей почти каждая строка) — только такты
-      if (r.bar or (r.beat and (state.lpb or 4) >= 4)) and not r.clip and c.lanes[1] then hint(r.bar and 'bar' or 'beat', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
+      if r.bar and not r.clip and c.lanes[1] then hint('bar', c.x + 1, y, c.w - 2, L.rh, { fi = c.lanes[1].f0, row = r.row }) end
       -- 1 ноя: свёрнутая папка — полоска у правого края там, где у детей событие (цвет трека ребёнка)
       local fsr = c.fsum and c.fsum[r.row]
       if fsr then
@@ -10458,7 +10458,7 @@ function D.frame(L, snap, rows, state, info)
     for i, r in ipairs(rows) do
       local y = L.body_y + (i - 1) * L.rh
       if y >= by0 and y + L.rh <= by1 and not r.clip then
-        local line = r.bar or r.beat
+        local line = r.bar   -- 3 ноя: только такты (на долях при LPB 1 метка была на каждой строке)
         for _, c in ipairs(L.cols) do
           if c.x and not c.folded then
             for _, ln in ipairs(c.lanes or {}) do
