@@ -32321,6 +32321,13 @@ ctx.pan_key = function(c, m)
   local mid = (n + 1) // 2
   local p = vim.cur.ppos or mid
   local cnt = tonumber(vim.count) or 1
+  -- 3 ноя: со счётчиком h l — пан в процентах: 20h = L20, 100l = R100 (позиция ближайшая к нему)
+  if vim.count and (c == 104 or c == 108 or c == 1818584692 or c == 1919379572) then
+    local pc = math.min(100, cnt)
+    vim.cur.ppos = draw.PV.pos_of(((c == 104 or c == 1818584692) and -pc or pc) / 100, n); vim.count = nil
+    vim.msg = ('pan view: %s%d'):format((c == 104 or c == 1818584692) and 'L' or 'R', pc)
+    return true
+  end
   if c == 104 or c == 1818584692 then if p > 1 then vim.cur.ppos = math.max(1, p - cnt); vim.count = nil; return true end; return false end   -- h ←: 3h — три позиции; за краем — поле слева
   if c == 108 or c == 1919379572 then if p < n then vim.cur.ppos = math.min(n, p + cnt); vim.count = nil; return true end; return false end
   if c == 119 or c == 98 then   -- 3 ноя: w b — следующее / прошлое событие канала (по строке, потом по строкам), с курсором на его позиции
@@ -32352,6 +32359,12 @@ ctx.pan_key = function(c, m)
     local heads, seen = {}, {}
     for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
     if #heads == 0 then vim.msg = 'pan view: no note here - h l to the note first'; return true end
+    if vim.count then   -- 20H = нота точно на L20, 100L = R100
+      local pc = math.min(100, cnt) * (c == 72 and -1 or 1)
+      edit.set_fx(heads, state.lpb, '0P', draw.PV.pan_hex(pc / 100)); model.invalidate()
+      vim.cur.ppos = draw.PV.pos_of(pc / 100, n); vim.count = nil
+      return true
+    end
     local np = math.max(1, math.min(n, p + (c == 72 and -1 or 1)))
     ctx.pan_set(heads, np); vim.cur.ppos = np
     return true
