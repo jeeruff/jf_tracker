@@ -133,7 +133,7 @@ function FS.set_key(k) R.SetExtState('jf_tracker', 'fskey', k or '', true) end
 local function safe(s) return (s:gsub('[^%w%-%._ ]', '_'):gsub('%s+', ' '):sub(1, 60)) end
 function FS.file_of(h)
   local base = safe((h.name or ''):gsub('%.[%w]+$', ''))
-  return ('%s/%d %s.mp3'):format(FS.dir(), h.id or 0, base)
+  return ('%s/%s/%d %s.mp3'):format(FS.dir(), safe(h.user or 'unknown'), h.id or 0, base)   -- 3 ноя: по папкам авторов
 end
 local function exists(p) local f = io.open(p, 'rb'); if f then f:close(); return true end; return false end
 FS.exists = exists
@@ -164,7 +164,7 @@ function FS.fetch(h, then_fn)
   if not h.mp3 then FS.err = 'freesound: no preview for ' .. (h.name or '?'); return nil end
   local j = FS.jobs['d' .. h.id]
   if j then j.then_fn = then_fn; return nil end
-  R.RecursiveCreateDirectory(FS.dir(), 0)
+  R.RecursiveCreateDirectory(p:match('^(.*)/[^/]+$') or FS.dir(), 0)
   local part, flag = p .. '.part', p .. '.done'
   FS.jobs['d' .. h.id] = { out = part, flag = flag, final = p, h = h, then_fn = then_fn, t0 = R.time_precise() }
   curl(h.mp3, part, flag, true)

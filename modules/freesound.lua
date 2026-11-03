@@ -7,22 +7,24 @@ local M = { id = 'freesound', label = 'freesound', letter = 'f', side = 'right' 
 M.about = 'Sounds from freesound.org: type words, the results play as you move, Enter puts one into the lib. Every download keeps its author and license in CREDITS.txt.'
 M.help = {
   { k = '/  Enter', d = 'type words, Enter searches freesound.org (<10s >2s - length, cc0 - only CC0 sounds)' },
-  { k = 'j k  g G', d = 'move; the sound under the cursor plays (its mp3 preview is downloaded on the first listen)' },
+  { k = 'two columns', d = 'as in lf: authors are folders on the left, the sounds of the author under the cursor on the right; l - into the folder, h - back' },
+  { k = 'j k  g G', d = 'move; in the sounds the one under the cursor plays (its mp3 preview is downloaded on the first listen)' },
   { k = 'Space', d = 'listen again' },
   { k = 'wave', d = 'the wave of the sound at the bottom: click - play from there, drag - scrub' },
-  { k = 'Enter  l', d = 'into the lib of the cursor track (the marked ones, if any - each downloaded, in the order marked)' },
-  { k = 'm  u', d = 'mark / unmark the row and step down (as in lf); u - unmark all' },
+  { k = 'Enter  l', d = 'author - into it; sound - into the lib of the cursor track (the marked ones, if any - each downloaded, in the order marked)' },
+  { k = 'm  u', d = 'mark / unmark the row and step down (as in lf; on an author - all its sounds); u - unmark all' },
   { k = 'v', d = 'mark from here: then j k mark the rows passed, v again - stop' },
-  { k = 'h', d = 'back to the previous search' },
+  { k = 'h', d = 'out of the author; on the authors - back to the previous search' },
   { k = 's', d = 'sort: relevance, most downloaded, best rated, newest, shortest, longest (a menu)' },
   { k = 'n  G', d = 'the next page is added at the end; j past the last row loads it too' },
   { k = '5j 3k', d = 'counts, as in Vim' },
   { k = ':freesound key K', d = 'your free API key once (freesound.org/apiv2/apply); :freesound words - search from anywhere' },
-  { k = 'credits', d = 'author, license, link of every downloaded file: Data/jf_tracker_freesound/CREDITS.txt (CC BY needs the author)' },
+  { k = 'credits', d = 'the files lie in Data/jf_tracker_freesound/<author>/; author, license, link of each - CREDITS.txt there (CC BY needs the author)' },
   { k = 'Esc', d = 'back to the tracker' },
 }
 local A, FS
-local S = { cur = 1, scroll = 0, typing = false, q = '', last = nil, down = false, lastclick = 0, marks = {}, order = {}, hist = {} }
+-- 3 ноя: как lf — S.lv 'a' (авторы, слева) / 'f' (звуки автора, справа); S.ac — курсор авторов, S.cur — звуков
+local S = { lv = 'a', ac = 1, cur = 1, ascroll = 0, scroll = 0, typing = false, q = '', down = false, lastclick = 0, marks = {}, order = {}, hist = {} }
 
 function M.init(api)
   A = api
@@ -32,11 +34,29 @@ end
 function M.typing() return S.typing end
 function M.paste(t) if S.typing then S.q = S.q .. t end end   -- Cmd+V в строке запроса
 
+-- авторы по порядку первого появления в результатах (релевантность / сортировка сохраняются)
+local GK, GR
+local function groups()
+  local k = ('%s|%s|%d'):format(FS.query, FS.sort, #FS.results)
+  if k == GK then return GR end
+  local by, out = {}, {}
+  for _, h in ipairs(FS.results) do
+    local g = by[h.user]
+    if not g then g = { user = h.user, list = {} }; by[h.user] = g; out[#out + 1] = g end
+    g.list[#g.list + 1] = h
+  end
+  GK, GR = k, out
+  return out
+end
+local function author() return groups()[S.ac] end
+local function files() local g = author(); return g and g.list or {} end
+local function cur_file() return S.lv == 'f' and files()[S.cur] or nil end
+
 local more
 local function play_cur()
-  local h = FS.results[S.cur]
+  local h = cur_file()
   if not h then return end
-  local p = FS.fetch(h, function(path) if FS.results[S.cur] == h then A.preview_file(path) end end)
+  local p = FS.fetch(h, function(path) if cur_file() == h then A.preview_file(path) end end)
   if p then A.preview_file(p) elseif not FS.err then A.msg('freesound: downloading ' .. h.name .. ' ...') end
 end
 local function mark(h, on)
@@ -48,7 +68,13 @@ local function mark(h, on)
     for i, o in ipairs(S.order) do if o.id == h.id then table.remove(S.order, i); break end end
   end
 end
-function more()   -- следующая страница — в конец списка
+local function mark_author(g)   -- автор — все его звуки (все отмечены — снять)
+  if not g then return end
+  local all = true
+  for _, h in ipairs(g.list) do if not S.marks[h.id] then all = false end end
+  for _, h in ipairs(g.list) do mark(h, not all) end
+end
+function more()   -- следующая страница — в конец списка (авторы дополняются)
   if FS.busy or #FS.results >= (FS.count or 0) or S.q == '' then return end
   if FS.search(S.q, (FS.page or 1) + 1, true) then A.msg('freesound: more results ...') end
 end
@@ -60,24 +86,32 @@ local function to_lib()
     A.msg(('freesound: %d marked into the lib (downloading)'):format(#list))
     return
   end
-  local h = FS.results[S.cur]
+  local h = cur_file()
   if not h then return end
   if not FS.exists(FS.file_of(h)) then A.msg('freesound: downloading ' .. h.name .. ' ...') end
   FS.fetch(h, function(path) A.add_to_depot(path) end)
 end
+local function enter() if author() then S.lv, S.cur, S.scroll, S.vcur = 'f', 1, 0, nil; play_cur() end end
+local function leave() S.lv, S.vis = 'a', nil end
 local function move(n)
+  if S.lv == 'a' then
+    local na = #groups()
+    S.ac = math.max(1, math.min(na, S.ac + n))
+    if S.ac + n > na then more() end   -- за последним автором — догрузить
+    return
+  end
+  local list = files()
   local c0 = S.cur
-  local c = math.max(1, math.min(#FS.results, S.cur + n))
-  if S.vis then for i = math.min(c0, c), math.max(c0, c) do mark(FS.results[i], true) end end
+  local c = math.max(1, math.min(#list, S.cur + n))
+  if S.vis then for i = math.min(c0, c), math.max(c0, c) do mark(list[i], true) end end
   if c ~= S.cur then S.cur = c; play_cur() end
-  if S.cur + n > #FS.results then more() end   -- за последней строкой — догрузить
 end
 function M.search(q, keep_hist)
   q = q or S.q
   if q == '' then return end
   if not keep_hist and FS.query ~= '' and FS.query ~= q then S.hist[#S.hist + 1] = FS.query end
   S.q = q
-  S.cur, S.scroll, S.vcur = 1, 0, nil
+  S.lv, S.ac, S.cur, S.ascroll, S.scroll, S.vcur, S.avcur = 'a', 1, 1, 0, 0, nil, nil
   if FS.search(S.q) then A.msg('freesound: searching "' .. S.q .. '" ...') elseif FS.err then A.msg(FS.err) end
 end
 local function sort_menu()
@@ -106,37 +140,66 @@ function M.key(c)
   local had = S.count ~= nil
   S.count = nil
   if c == 27 and (had or S.vis) then S.vis = nil; return true end
+  local fl = S.lv == 'f'
   if ch == '/' then S.typing = true; S.q = ''
   elseif ch == 'j' or c == 1685026670 then move(n)
   elseif ch == 'k' or c == 30064 then move(-n)
-  elseif ch == 'g' then S.cur = 1; play_cur()
-  elseif ch == 'G' then S.cur = had and math.max(1, math.min(#FS.results, n)) or math.max(1, #FS.results); play_cur()
-  elseif ch == ' ' then play_cur()
-  elseif c == 13 or ch == 'l' then to_lib()
-  elseif ch == 'm' then for _ = 1, n do mark(FS.results[S.cur]); if S.cur < #FS.results then S.cur = S.cur + 1 end end
+  elseif ch == 'g' then if fl then S.cur = 1; play_cur() else S.ac = 1 end
+  elseif ch == 'G' then
+    if fl then local nn = #files(); S.cur = had and math.max(1, math.min(nn, n)) or math.max(1, nn); play_cur()
+    else local na = #groups(); S.ac = had and math.max(1, math.min(na, n)) or math.max(1, na) end
+  elseif ch == ' ' then if fl then play_cur() else enter() end
+  elseif c == 13 or ch == 'l' or c == 1919379572 then if fl or #S.order > 0 then to_lib() else enter() end
+  elseif ch == 'h' or c == 8 or c == 1818584692 then
+    if fl then leave() else local q = table.remove(S.hist); if q then M.search(q, true) end end
+  elseif ch == 'm' then
+    for _ = 1, n do
+      if fl then local list = files(); mark(list[S.cur]); if S.cur < #list then S.cur = S.cur + 1 end
+      else mark_author(author()); if S.ac < #groups() then S.ac = S.ac + 1 end end
+    end
   elseif ch == 'u' then S.marks, S.order = {}, {}; A.msg('freesound: marks cleared')
-  elseif ch == 'v' then S.vis = not S.vis; if S.vis then mark(FS.results[S.cur], true); A.msg('freesound: marking - j k, v or Esc to stop') end
-  elseif ch == 'h' or c == 8 then local q = table.remove(S.hist); if q then M.search(q, true) end
+  elseif ch == 'v' then if fl then S.vis = not S.vis; if S.vis then mark(cur_file(), true); A.msg('freesound: marking - j k, v or Esc to stop') end end
   elseif ch == 's' then sort_menu()
   elseif ch == 'n' then more()
   else return false end
   return true
 end
 
+-- колонка строк: rows (список), cur, скролл в S[sk]; row(e, x, ry, w, sel) рисует строку; возвращает индекс под щелчком
+local function column(U, L, x, y, w, h, rows, cur, sk, vk, active, row, click, inside, my)
+  local nv = math.max(1, math.floor(h / L.rh))
+  if cur ~= S[vk] then   -- курсор сдвинулся — список за ним (колесо листает само)
+    S[vk] = cur
+    if cur <= S[sk] then S[sk] = cur - 1 elseif cur > S[sk] + nv then S[sk] = cur - nv end
+  end
+  S[sk] = math.max(0, math.min(math.max(0, #rows - nv), S[sk]))
+  local hit
+  for i = 1, nv do
+    local idx = S[sk] + i
+    local e = rows[idx]
+    if not e then break end
+    local ry = y + (i - 1) * L.rh
+    local hot = inside and my >= ry and my < ry + L.rh
+    if idx == cur and cur > 0 then U.set(U.tint(U.AMBER, active and 0.25 or 0.12)); gfx.rect(x, ry, w, L.rh, 1)
+    elseif hot then U.set(U.tint(U.TEXT, 0.06)); gfx.rect(x, ry, w, L.rh, 1) end
+    row(e, x, ry, w, idx == cur and cur > 0)
+    if hot and click then hit = idx end
+  end
+  return hit, nv
+end
+
 function M.draw(U, L, x, y, w, h, focused)
   if next(FS.jobs) then
     local e0 = FS.err
     local app = FS.append
-    if FS.tick() and not app then S.cur, S.vcur = 1, nil end
+    if FS.tick() and not app then S.lv, S.ac, S.cur, S.vcur, S.avcur = 'a', 1, 1, nil, nil end
     if FS.err and FS.err ~= e0 then A.msg(FS.err) end
   end
   local fit = A.fit
   local mx, my = gfx.mouse_x, gfx.mouse_y
-  local inside = mx >= x and mx < x + w and my >= y and my < y + h
   -- строка запроса
   local qy = y + 2
-  local qtxt = '/' .. S.q .. (S.typing and '_' or '')
-  U.text(x + L.pad, qy, fit(qtxt, w - 2 * L.pad), S.typing and U.AMBER or (S.q ~= '' and U.TEXT or U.GREY))
+  U.text(x + L.pad, qy, fit('/' .. S.q .. (S.typing and '_' or ''), w - 2 * L.pad), S.typing and U.AMBER or (S.q ~= '' and U.TEXT or U.GREY))
   -- состояние
   local sy = qy + L.rh
   local st
@@ -147,14 +210,14 @@ function M.draw(U, L, x, y, w, h, focused)
   else
     local sn = 'relevance'
     for _, so in ipairs(FS.SORTS) do if so[1] == FS.sort then sn = so[2] end end
-    st = ('%d of %d   s: %s%s%s'):format(#FS.results, FS.count or 0, sn, #S.order > 0 and ('   marked ' .. #S.order) or '', S.vis and '   -- MARK --' or '')
+    st = ('%d of %d, %d authors   s: %s%s%s'):format(#FS.results, FS.count or 0, #groups(), sn, #S.order > 0 and ('   marked ' .. #S.order) or '', S.vis and '   -- MARK --' or '')
   end
   U.text(x + L.pad, sy, fit(st, w - 2 * L.pad), FS.err and (U.RED or U.AMBER) or U.GREY)
   -- волна выбранного звука внизу (когда превью скачано), позиция прослушивания — линией
   local wh = math.max(2 * L.rh, math.min(6 * L.rh, math.floor(h * 0.22)))
   local wy = y + h - wh - 2
   do
-    local e = FS.results[S.cur]
+    local e = cur_file()
     local wx, ww = x + L.pad, w - 2 * L.pad
     U.set(U.BG); gfx.rect(wx, wy, ww, wh, 1)
     U.set(U.LINE or U.GREY); gfx.rect(wx, wy, ww, wh, 0)
@@ -184,43 +247,49 @@ function M.draw(U, L, x, y, w, h, focused)
       if onw and not S.wdrag then U.set(U.TEXT); gfx.a = 0.25; gfx.rect(mx, wy + 1, 1, wh - 2, 1); gfx.a = 1 end   -- куда встанет щелчок
     elseif e then
       U.text(wx + L.pad, cy - math.floor(L.rh / 2), fit(FS.pending(e) and 'downloading ...' or 'j k / Space - listen, the wave comes with it', ww - 2 * L.pad), U.DIM or U.GREY)
+    elseif author() then
+      U.text(wx + L.pad, cy - math.floor(L.rh / 2), fit('l - into ' .. author().user .. ', the sounds play as you move', ww - 2 * L.pad), U.DIM or U.GREY)
     end
   end
-  -- список
+  -- две колонки, как lf: авторы | звуки автора под курсором
   local ly = sy + L.rh + 4
-  local nv = math.max(1, math.floor((wy - 4 - ly) / L.rh))
-  if S.cur ~= S.vcur then   -- курсор сдвинулся — список за ним (колесо листает само)
-    S.vcur = S.cur
-    if S.cur <= S.scroll then S.scroll = S.cur - 1 elseif S.cur > S.scroll + nv then S.scroll = S.cur - nv end
-  end
-  local lenw, metaw = U.measure('000.0s  '), math.min(math.floor(w * 0.35), U.measure('w') * 22)
+  local lh = wy - 4 - ly
+  local aw = math.max(U.measure('w') * 12, math.floor(w * 0.36))
+  local fx, fw = x + aw + 1, w - aw - 1
+  U.set(U.LINE or U.GREY); gfx.rect(x + aw, ly, 1, lh, 1)
   local click = (gfx.mouse_cap & 1) == 1 and not S.down and not S.wdrag
-  for i = 1, nv do
-    local idx = S.scroll + i
-    local e = FS.results[idx]
-    if not e then break end
-    local ry = ly + (i - 1) * L.rh
-    local hot = inside and my >= ry and my < ry + L.rh
-    if idx == S.cur then U.set(U.tint(U.AMBER, focused and 0.25 or 0.12)); gfx.rect(x, ry, w, L.rh, 1)
-    elseif hot then U.set(U.tint(U.TEXT, 0.06)); gfx.rect(x, ry, w, L.rh, 1) end
-    local cached = FS.exists(FS.file_of(e))
-    local nw = w - 2 * L.pad - lenw - metaw
+  local ina = mx >= x and mx < x + aw and my >= ly and my < ly + lh
+  local inf = mx >= fx and mx < fx + fw and my >= ly and my < ly + lh
+  local G = groups()
+  local ha, nva = column(U, L, x, ly, aw, lh, G, S.ac, 'ascroll', 'avcur', S.lv == 'a' and focused, function(g, rx, ry, rw, sel)
+    local nm = 0; for _, hh in ipairs(g.list) do if S.marks[hh.id] then nm = nm + 1 end end
+    local cnt = (nm > 0 and (nm .. '/') or '') .. #g.list
+    U.text(rx + L.pad, ry + 1, fit('/' .. g.user, rw - 2 * L.pad - U.measure(cnt .. ' ')), sel and U.AMBER or (nm > 0 and (U.CYAN or U.TEXT) or U.TEXT))
+    U.text(rx + rw - L.pad - U.measure(cnt), ry + 1, cnt, U.GREY)
+  end, click, ina, my)
+  local lenw = U.measure('000.0s ')
+  local licw = U.measure('CC BY-NC ')
+  local hf = column(U, L, fx, ly, fw, lh, files(), S.lv == 'f' and S.cur or 0, 'scroll', 'vcur', S.lv == 'f' and focused, function(e, rx, ry, rw, sel)
+    local nw = rw - 2 * L.pad - lenw - licw
     local mk = S.marks[e.id]
-    if mk then U.set(U.tint(U.CYAN or U.AMBER, 0.18)); gfx.rect(x, ry, w, L.rh, 1) end
-    U.text(x + L.pad, ry + 1, fit((FS.pending(e) and '~ ' or (cached and '+ ' or '  ')) .. e.name, nw), idx == S.cur and U.AMBER or (mk and (U.CYAN or U.TEXT) or U.TEXT))
+    if mk then U.set(U.tint(U.CYAN or U.AMBER, 0.18)); gfx.rect(rx, ry, rw, L.rh, 1) end
+    local cached = FS.exists(FS.file_of(e))
+    U.text(rx + L.pad, ry + 1, fit((FS.pending(e) and '~ ' or (cached and '+ ' or '  ')) .. e.name, nw), sel and U.AMBER or (mk and (U.CYAN or U.TEXT) or (S.lv == 'f' and U.TEXT or U.GREY)))
     local ls = ('%.1fs'):format(e.len or 0)
-    U.text(x + L.pad + nw + lenw - U.measure(ls .. '  '), ry + 1, ls, U.GREY)   -- вправо, с зазором до автора
-    U.text(x + L.pad + nw + lenw, ry + 1, fit(e.user .. ' ' .. e.lic, metaw), e.lic == 'CC0' and U.GREEN or U.GREY)
-    if hot and click then
-      local now = A.R.time_precise()
-      if S.cur == idx and now - S.lastclick < 0.35 then to_lib() else S.cur = idx; play_cur() end
-      S.lastclick = now
-    end
+    U.text(rx + L.pad + nw + lenw - U.measure(ls .. ' '), ry + 1, ls, U.GREY)
+    U.text(rx + rw - L.pad - licw, ry + 1, fit(e.lic, licw), e.lic == 'CC0' and U.GREEN or U.GREY)
+  end, click, inf, my)
+  if ha then S.ac, S.lv = ha, 'a' end
+  if hf then
+    local now = A.R.time_precise()
+    if S.lv == 'f' and S.cur == hf and now - S.lastclick < 0.35 then to_lib() else S.lv, S.cur = 'f', hf; play_cur() end
+    S.lastclick = now
   end
   S.down = (gfx.mouse_cap & 1) == 1
-  if inside and gfx.mouse_wheel ~= 0 then
-    S.scroll = math.max(0, math.min(math.max(0, #FS.results - nv), S.scroll + (gfx.mouse_wheel > 0 and -3 or 3))); gfx.mouse_wheel = 0
-    if S.scroll >= #FS.results - nv then more() end   -- докрутили до конца — следующая страница
+  if gfx.mouse_wheel ~= 0 and (ina or inf) then
+    local d = gfx.mouse_wheel > 0 and -3 or 3
+    gfx.mouse_wheel = 0
+    if ina then S.ascroll = S.ascroll + d; if S.ascroll >= #G - nva then more() end else S.scroll = S.scroll + d end
   end
 end
 
