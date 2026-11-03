@@ -32241,18 +32241,6 @@ ctx.cm_get = function(id)
   end
   return cm
 end
-ctx.cm_maps = function()   -- custom-модуль с полем map — источник карты (вкладка с его именем)
-  for cid, cm in pairs(draw.CM) do
-    if type(cm.map) == 'table' and not B.map_ext[cm.label or cid] then
-      local nm = cm.label or cid
-      local function m() local c = ctx.cm_get(cid); return c and c.map end
-      B.map_ext[nm] = { key = function() local x = m(); return x and x.key() or '' end, list = function() local x = m(); return x and x.list() or {} end,
-        need = function(p, fn) local x = m(); return x and x.need and x.need(p, fn) or false end }
-      B.MAP_SRCS[#B.MAP_SRCS + 1] = nm
-    end
-  end
-end
-ctx.cm_maps()
 ctx.cm_help = function()
   for cid, cm in pairs(draw.CM) do   -- справка custom-модуля: help (строки { k, d }) → страница help-панели и ?, about → hints
     if cm.help and not KH.PAGES[cid] then

@@ -317,12 +317,6 @@ if B.mapV.style == 'cloud' then B.mapV.style = 'graph' end   -- 2 ноя: вид
 -- 27 окт: подвкладки карты — что раскладывать: files (папка браузера), db (база / все базы), proj (источники проекта), pm (проекты jf_pm)
 B.map_src = 'files'
 B.MAP_SRCS = { 'files', 'db', 'proj' }   -- 2 ноя: pm убран из карты
-B.map_ext = {}   -- 2 ноя: источники custom-модулей (имя → { key, list, need }), main добавляет их имена в MAP_SRCS
--- файл источника-модуля ещё не скачан — модуль качает и зовёт fn(path); true — взялся
-function B.ext_need(path, fn)
-  for _, mx in pairs(B.map_ext) do if mx.need and mx.need(path, fn) then return true end end
-  return false
-end
 -- ключ (дёшево, каждый кадр) и список файлов (только при смене ключа) для источника
 local function map_source()
   local src = B.map_src
@@ -340,9 +334,6 @@ local function map_source()
       for _, e in ipairs(B.read_proj()) do out[#out + 1] = { path = e.path, name = e.name, sub = e.track } end
       return out
     end
-  elseif B.map_ext[src] then
-    local mx = B.map_ext[src]
-    return src .. ':' .. mx.key(), function() return mx.list() end
   elseif src == 'pm' then
     local list = B.read_pm()
     return 'pm:' .. #list, function()
@@ -529,7 +520,6 @@ function B.hist_load()
 end
 function B.map_play(path, name, keep)
   if not path then return end
-  if B.ext_need(path, function(p) B.map_play(p, name, keep) end) then return end   -- 2 ноя: freesound — сначала скачать
   if B.an_push then B.an_push(path) end   -- 27 окт (9): сыгранное — в анализ
   B.map_step = B.map_step + 1
   local kept = false
@@ -867,8 +857,7 @@ end
 function B.mk_to_lib(i)
   local o = (B.sel_order or {})[i]
   if not (o and o.full) then return end
-  if B.ext_need(o.full, function(p) ctx.add_to_depot(p) end) then
-  elseif ctx.add_to_depot then ctx.add_to_depot(o.full) end
+  if ctx.add_to_depot then ctx.add_to_depot(o.full) end
   B.map_mark(o.full, o.e and o.e.name, true)
 end
 -- строка marked под мышью, иначе последняя щёлкнутая
