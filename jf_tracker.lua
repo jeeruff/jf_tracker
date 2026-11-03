@@ -31290,7 +31290,7 @@ local function frame()
   end
   -- Shift+1 (!) — прослушать выбранный инструмент из любого модуля (2 окт);
   -- только его длина (слайс — свой кусок), через трек курсора
-  if c == 33 and not HN.active and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering
+  if c == 33 and not HN.active and not vim.pending and not vim.op and not (vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or B.filtering   -- 3 ноя: префикс ждёт (z!) — ! его
       or (state.focus == 'top' and state.toptab == 'garden' and GD.page == 'orca') or state.focus == 'fxb' or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing()) then
     local col = cur_col()
     local e = col and (col.pool or {})[vim.inst]
