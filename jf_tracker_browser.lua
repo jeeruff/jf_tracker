@@ -62,7 +62,7 @@ B.all_files = R.GetExtState and R.GetExtState('jf_tracker', 'brall') == '1' or f
 B.via_track = not (R.GetExtState and R.GetExtState('jf_tracker', 'brtrack') == '0')
 -- sync (3 окт): пока проект играет, прослушивание файла стартует с начала следующего такта
 B.sync = R.GetExtState and R.GetExtState('jf_tracker', 'brsync') == '1'
-B.pvmany = R.GetExtState and R.GetExtState('jf_tracker', 'pvmany') == '1'   -- 3 ноя: view — у каждой строки своя маленькая волна (files, zoxide, db, proj)
+B.pvmany = true   -- 3 ноя: у каждой строки своя маленькая волна (files, zoxide, db, proj); вид с одной большой волной закомментирован (кнопка view ниже)
 B.pvitem = R.GetExtState and R.GetExtState('jf_tracker', 'pvitem') == '1'   -- 2 ноя: прослушанное — во вкладку item (по умолчанию нет: казалось, что сэмпл уже взят)
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 -- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
@@ -2110,10 +2110,10 @@ function B.draw(U, L, x, y, w, h)
       bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
     -- 3 ноя: справа — view: маленькие волны у каждой строки вместо одной большой
-    if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then
-      local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
-      if vx > bx then btn(vx, y, 'view', 'pvmany', B.pvmany) end
-    end
+    -- if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then
+    --   local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
+    --   if vx > bx then btn(vx, y, 'view', 'pvmany', B.pvmany) end
+    -- end
     if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
       B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
       return hover
@@ -2316,7 +2316,7 @@ function B.draw(U, L, x, y, w, h)
     return sc
   end
   B.scroll = draw_range(x, w, 1, #B.entries, 'scroll')
-  if ctx.vbar then ctx.vbar('browser', x + w - 2, y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end
+  if ctx.vbar then ctx.vbar('browser', many and (many_x + many_w - 2) or (x + w - 2), y, 2, nvis * L.rh, B.scroll, nvis, #B.entries) end   -- 3 ноя: с волнами — у правого края
   -- 3 ноя: view — у каждой видимой строки её волна (тем же кешем пиков, что большая); строка курсора ярче
   if many then
     U.set(U.LINE); gfx.rect(many_x - 1, y, 1, nvis * L.rh, 1)
