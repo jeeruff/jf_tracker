@@ -20,3 +20,7 @@ licences of the icon sets merged into every file: `licenses/NerdFonts-icon-licen
 
 The BigBlue Terminal files are shared under the same licence, CC BY-SA 4.0
 (ShareAlike): keep this attribution when you pass them on.
+
+Trimmed (3 Nov 2026): the Nerd Font icon glyphs (Private Use Area U+E000-F8FF and above U+F0000) are removed
+with fonttools pyftsubset; every other character, the names and the hinting are kept. The tracker uses letters,
+not icons, and the icons also covered the SMuFL music signs (U+E000...). Licences are unchanged (licenses/).
