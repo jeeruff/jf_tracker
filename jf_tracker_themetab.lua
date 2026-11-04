@@ -86,10 +86,10 @@ local function font_img(fonts, pw, ph)
     if f.face then
       gfx.setfont(9, f.face, f.size); C(U.TEXT)
       gfx.x, gfx.y = 4, y + math.floor((ph - gfx.texth) / 2)
-      gfx.drawstr(f.key .. '   C-4 01 7F  Abc 0123')
+      gfx.drawstr(f.key .. '  C-4 01 7F')   -- 4 ноя: короче — в плитку влезает без обрезки (было … Abc 0123)
     else
       gfx.setfont(ctx.font_id())
-      ctx.text(4, y + math.floor((ph - ctx.L().rh) / 2), f.key .. '   C-4 01 7F  REAPER bitmap', U.TEXT)
+      ctx.text(4, y + math.floor((ph - ctx.L().rh) / 2), f.key .. '  C-4 01 7F', U.TEXT)
     end
   end
   gfx.setfont(ctx.font_id()); gfx.dest = d0

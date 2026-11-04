@@ -313,6 +313,7 @@ local function measure_raw(str)
     mcache[str] = w
     return w
   end
+  if D.ttf then gfx.setfont(D.font_id) end   -- 4 ноя: TTF — мерить основным шрифтом (не тем, что оставил чужой setfont)
   return gfx.measurestr(str)
 end
 D.reset_measure = function() mcache, mcount = {}, 0 end
@@ -1216,6 +1217,9 @@ local function text(x, y, s, col, bg)
   if bg then col, bg = mono(col), mono(bg) else col = mono_text(col) end   -- с подложкой (курсор) — без порога
   y = y + D.SPACE
   if D.SCALE == 1 then
+    -- 4 ноя: TTF рисует текущим шрифтом gfx — выставить основной: чужой setfont (слот 3 мелкий, 8 keycast, 9 превью)
+    -- без возврата делал мелкими подписи опций (заголовок, вкладки, рамки)
+    if D.ttf then gfx.setfont(D.font_id) end
     -- ×1: прямой drawstr; в гибриде глифы — через сегменты (иначе битмап
     -- рисовал байты иконки как 3 лишних символа, и ширина не сходилась с ms)
     if D.hybrid and s:find('[\128-\255]') then
