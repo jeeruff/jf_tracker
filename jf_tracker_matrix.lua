@@ -1170,7 +1170,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'o' then ctx.slot_new('empty', false)
   elseif ch == 'O' then ctx.slot_new('empty', true)
   elseif ch == 'p' then ctx.slot_new('put', false)
-  elseif ch == 'P' then ctx.slot_new('alias')   -- 4 ноя: P — pooled (связанный повтор: MIDI pooled, айтемы в группе; было A / c); вставить до — меню slot
+  elseif ch == 'P' then ctx.slot_new('pooled')   -- 4 ноя: P — pooled (связанный повтор: MIDI pooled, айтемы в группе; было A / c); вставить до — меню slot
   elseif ch == 'U' then if ctx.slot_unique then ctx.slot_unique() end   -- make unique
   elseif ch == 'x' then ctx.mx_block('cut')
   elseif ch == 'n' then ctx.mx_name_prompt()

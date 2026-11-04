@@ -5230,7 +5230,7 @@ ctx = {
           -- раньше повтор вставлялся ПЕРЕД тактом и всё сдвигалось, а ноты такта оставались рядом
           if math.abs((p.src.rgnend - p.src.pos) - (slot.rgnend - slot.pos)) < 1e-3 then ctx.bar_link(slot, p.src); return end
           local n
-          ctx.slot_op('matrix put ' .. p.name, function() n = alias.put_alias(p.src, slot.pos) end)
+          ctx.slot_op('matrix put ' .. p.name, function() n = alias.put_pooled(p.src, slot.pos) end)
           vim.msg = ('free bar %d: %s - %d item(s), linked (U - make unique)'):format(MX.cur.ri, p.name, n or 0)
         elseif alias.set_slot(regions, slot, p) then
           vim.msg = ('slot %d → %02d %s'):format(MX.cur.ri, p.num, p.name)
@@ -5269,7 +5269,7 @@ ctx = {
     end
     local len = p.src.rgnend - p.src.pos
     ctx.slot_op('matrix ' .. p.name .. ' into a free bar', function()
-      alias.put_alias(p.src, slot.pos)
+      alias.put_pooled(p.src, slot.pos)
       if empty then alias.delete_slot({ gap = true, pos = slot.pos + len, rgnend = slot.rgnend + len }) end
     end)
     vim.msg = ('bar %d → %02d %s%s'):format(MX.cur.ri, p.num, p.name, empty and '' or ' (the bar had items - it stays after)')
@@ -9294,7 +9294,7 @@ ctx = {
           n = alias.cells_paste(seq, snap, ri, ci, clip, true)
         end)
         ctx.mx_refresh()
-        vim.msg = ('%s slot %d: the cell of %s (alias, %d item(s))'):format(col.name, ri, items[1] and it.label or '', n)
+        vim.msg = ('%s slot %d: the cell of %s (pooled, %d item(s))'):format(col.name, ri, items[1] and it.label or '', n)
       end })
   end,
   -- 18 окт: превью паттерна на треке для выпадашки клетки: время слева направо; аудио — волна куска,
@@ -9788,7 +9788,7 @@ ctx = {
     -- clone (dup) — независимая копия с новым именем
     if kind == 'dup' then kind = 'clone' end
     local alias_src
-    if kind == 'alias' and not rg.gap then alias_src = rg end
+    if kind == 'pooled' and not rg.gap then alias_src = rg end   -- 4 ноя: pooled (было 'alias')
     if kind == 'put' then
       local reg = state.mx_reg
       if not reg then vim.msg = 'matrix register empty (yy / dd / Ctrl+C)'; return end
@@ -9801,7 +9801,7 @@ ctx = {
     if alias_src then
       local t = before and rg.pos or rg.rgnend
       local n = 0
-      ctx.slot_op('matrix repeat ' .. alias_src.name, function() n = alias.put_alias(alias_src, t) end)
+      ctx.slot_op('matrix repeat ' .. alias_src.name, function() n = alias.put_pooled(alias_src, t) end)
       MX.goto_cell(seq, snap, before and ri or ri + 1, MX.cur.ci)
       vim.msg = ('pooled "%s": %d item(s), linked - MIDI pooled, items grouped (yp: a free copy, U: unpool)'):format(alias_src.name, n)
       return
@@ -13459,9 +13459,9 @@ ctx = {
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
-      flag('autosync', 'auto sync aliases', 'edits in a pattern copy to its aliases (same region name)'),
+      flag('autosync', 'auto sync pooled', 'edits in a pattern copy to its pooled repeats (same region name)'),
       { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
-      { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on: after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, aliases copy exactly what is seen; off (default): a note started in a pattern rings on into the next one (as in Renoise), BS / delete keep its real end; the matrix trim button still cuts by hand', get = function() return state.hardedges == true end, set = function(v) state.hardedges = v end },
+      { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on: after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, pooled repeats copy exactly what is seen; off (default): a note started in a pattern rings on into the next one (as in Renoise), BS / delete keep its real end; the matrix trim button still cuts by hand', get = function() return state.hardedges == true end, set = function(v) state.hardedges = v end },
       flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
@@ -13943,7 +13943,7 @@ ctx = {
   region_btn = function(what)
     local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'cursor is not inside a region'; return end
-    if what == 'alias' or what == 'clone' or what == 'unique' then
+    if what == 'pooled' or what == 'clone' or what == 'unique' then
       for i, r in ipairs(seq) do
         if not r.gap and r.idx == rg.idx then
           MX.cur.ri = i
@@ -19399,7 +19399,7 @@ function region_actions(rg)
     { 'next pattern', key = '>', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
     { 'previous pattern', key = '<', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
     { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
-    { 'pooled: linked repeat (P in the matrix)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
+    { 'pooled: linked repeat (P in the matrix)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('pooled') end },
     { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
@@ -25765,18 +25765,18 @@ local function frame()
   elseif hover.viewbtn == 'fith' then state.status = 'H (zh): the ' .. ctx.view_cur() .. ' fits the screen by height (LPB)'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': notes shorter than a row (fast rolls, flams) do not get their own extra column - they show as a + next to the note of their row; off - each gets a column. Not the folding of tracks (za / zM). Click - ' .. (state.foldfast and 'off' or 'on')
-  elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, alias, clone, /2 x2, length ...; also \\ p)'
+  elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, pooled, clone, /2 x2, length ...; also \\ p)'
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
   elseif hover.viewbtn == 'autozoom' then state.status = 'autozoom: the cursor track full width, the others by themselves - the widest at which all tracks fit, down to note + wave; off - the width of Cmd+wheel again'
   elseif hover.viewbtn == 'markers' then state.status = 'markers: what the tracker and the matrix show of the REAPER markers and regions - click: the list'
   elseif hover.viewbtn then state.status = ({ reg = 'pattern: view only the pattern of the cursor (the playing one with follow) - zp; transpose (F1 F2) takes what you see', sec = 'section: view the section of the cursor (intro, hook ...) - zs; transpose takes what you see', all = 'project: view the whole project - zp / zs back; transpose takes the whole track' })[hover.viewbtn] or ''
-  elseif hover.rgbtn then state.status = ({ clear = 'clr: clear the pattern - every event on every track (click twice)', half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', alias = 'alias: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (A in the matrix; U makes it unique)', clone = 'dup: an exact copy of the pattern right after it, a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
+  elseif hover.rgbtn then state.status = ({ clear = 'clr: clear the pattern - every event on every track (click twice)', half = 'region length / 2 (later regions and items move back)', double = 'region length x 2 (later regions and items move on)', pooled = 'pooled: the pattern repeated to the right, linked - same name, MIDI pooled, items grouped, edits in one change all (P in the matrix; U unpools)', clone = 'dup: an exact copy of the pattern right after it, a new name, not linked (C / D in the matrix)' })[hover.rgbtn]
   elseif hover.dsptrkname then state.status = ctx.hover_tip_dsptrk
   elseif hover.tlist_tip then state.status = 'tracks: ' .. hover.tlist_tip .. ' - click toggles, drag down the column sets the same, header - whole column'
   elseif hover.rglen then state.status = 'cursor region length in steps - < > or wheel: +-1 step, click the number: a list of lengths; later regions and items ripple (:len N)'
-  elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (aliases; Option - unique copies)'
+  elseif hover.matrix and hover.matrix.cellrep then state.status = 'cell edge - drag down / up: repeat this cell into the next slots (pooled; Option - unique copies)'
   elseif hover.matrix and hover.matrix.name then state.status = 'region name - click: select slot, dblclick: rename (:name text, n)'
-  elseif hover.matrix and hover.matrix.secloop then state.status = 'section ' .. (hover.matrix.secloop.name or '') .. (hover.matrix.secedge and (' - drag: its ' .. (hover.matrix.secedge == 'top' and 'start' or 'end') .. ' by slots') or ' - click: select its slots, dblclick: loop, Cmd+dblclick: launch (quantized), rclick: menu, drag: move (Opt - copy, Cmd - alias)')
+  elseif hover.matrix and hover.matrix.secloop then state.status = 'section ' .. (hover.matrix.secloop.name or '') .. (hover.matrix.secedge and (' - drag: its ' .. (hover.matrix.secedge == 'top' and 'start' or 'end') .. ' by slots') or ' - click: select its slots, dblclick: loop, Cmd+dblclick: launch (quantized), rclick: menu, drag: move (Opt - copy, Cmd - pooled)')
   elseif hover.matrix and hover.matrix.tsel then state.status = 'loop zone - double-click: loop this slot, drag: several slots, Cmd+click: pick slots (the loop jumps between them), Shift+click: extend'
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
@@ -25980,7 +25980,7 @@ local function frame()
     else state.status = e and (('inst %02d: %s%s%s - click: select (Option+click: focus), dblclick or click the waveform: item tab, drag: reorder'):format(hover.pool.i, e.name, e.depot and ' (library)' or '', (e.tracks and #e.tracks > 0) and ('  @ ' .. table.concat(e.tracks, ', ')) or '  (not used yet)')) or ''
     end
   elseif hover.matrix and hover.matrix.btn then
-    state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (z f)', sync = 'sync pattern aliases with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
+    state.status = ({ zoom = 'matrix zoom: schema / detail = tall rows, item colours, envelopes (z)', fill = 'fill matrix cells (z f)', sync = 'sync pooled patterns with regions (:sync)', trim = 'cut items to region bounds - strict patterns (t, :trim; auto with :autosync)' })[hover.matrix.btn] or hover.matrix.btn
   elseif hover.matrix and hover.matrix.ri then
     local slot = seq[hover.matrix.ri]
     local pname = slot and (slot.name ~= '' and slot.name or ('#' .. slot.idx)) or ''
@@ -26124,11 +26124,11 @@ local function frame()
       local ri = hover.matrix and hover.matrix.ri
       if ri and (ri - r.last) * r.dir > 0 and r.clip then
         local n = 0
-        edit.run(r.linked and 'matrix repeat cell (alias)' or 'matrix repeat cell (copy)', function()
+        edit.run(r.linked and 'matrix repeat cell (pooled)' or 'matrix repeat cell (copy)', function()
           for k = r.last + r.dir, ri, r.dir do if seq[k] then n = n + alias.cells_paste(seq, snap, k, r.ci, r.clip, r.linked) end end
         end)
         r.last = ri; r.n = (r.n or 0) + n; model.invalidate()
-        vim.msg = ('cell repeated to slot %d (%s)'):format(ri, r.linked and 'aliases' or 'unique copies')
+        vim.msg = ('cell repeated to slot %d (%s)'):format(ri, r.linked and 'pooled' or 'unique copies')
       end
     else ctx.mx_rep = nil end
   end
@@ -29977,9 +29977,9 @@ local function frame()
       if sp.active then
         sp.to = MX.row_at(gfx.mouse_y)
         local m = ctx.mods()
-        sp.how = sp.edge and 'edge' or (m.alt and 'copy' or (m.cmd and 'alias' or 'move'))
+        sp.how = sp.edge and 'edge' or (m.alt and 'copy' or (m.cmd and 'pooled' or 'move'))
         state.status = sp.edge and ('section ' .. (sp.sc.name or '') .. ': ' .. (sp.edge == 'top' and 'start' or 'end') .. ' to slot ' .. tostring(sp.to or '-'))
-          or ('section ' .. (sp.sc.name or '') .. ': ' .. ({ move = 'move', copy = 'copy (Opt)', alias = 'linked copy (Cmd)' })[sp.how] .. ' before slot ' .. tostring(sp.to or '-') .. '  (Opt - copy, Cmd - alias)')
+          or ('section ' .. (sp.sc.name or '') .. ': ' .. ({ move = 'move', copy = 'copy (Opt)', pooled = 'pooled copy (Cmd)' })[sp.how] .. ' before slot ' .. tostring(sp.to or '-') .. '  (Opt - copy, Cmd - pooled)')
       end
     else
       ctx.sec_press, MX.sec_drag = nil, nil
@@ -33277,7 +33277,7 @@ ctx.pads_write = function()
   ctx.slot_op('pads: write the played order', function()
     for _, nm in ipairs(names) do
       local src = by[nm]
-      if src then alias.put_alias(src, t); t = t + (src.rgnend - src.pos); n = n + 1 end
+      if src then alias.put_pooled(src, t); t = t + (src.rgnend - src.pos); n = n + 1 end
     end
   end)
   model.invalidate(); regions = model.regions(state.lpb)
@@ -35420,7 +35420,7 @@ ctx.pl_write = function(at, sec, steps0)
     for _, st in ipairs(steps) do
       local rg = st.rg
       local full = rg.rgnend - rg.pos
-      alias.put_alias(rg, t)
+      alias.put_pooled(rg, t)
       local nt = t + full
       if not ctx.PL.whole(st) then
         local a = (st.from > 0 and edit.row_time(rg.r0 + st.from, state.lpb, 0) or rg.pos) - rg.pos
@@ -37663,7 +37663,7 @@ ctx.sec_insert = function(sc, t, linked)
     if linked then
       local src = e.rg
       if shift > 0 then src = setmetatable({ pos = e.rg.pos + shift, rgnend = e.rg.rgnend + shift }, { __index = e.rg }) end
-      alias.put_alias(src, t1)
+      alias.put_pooled(src, t1)
     else
       local sl = snaps[k]
       if sl then sl.name = alias.free_name(regions, sl.name); alias.put_slot(snap, t1, sl) end
@@ -37700,7 +37700,7 @@ ctx.sec_resize = function(sc, edge, ri)
   ctx.mx_refresh()
   vim.msg = ('section %s: %s now at slot %d'):format(sc.name or '', edge == 'top' and 'start' or 'end', ri)
 end
--- how: 'move' | 'copy' | 'alias'; ri — вставить перед этим слотом
+-- how: 'move' | 'copy' | 'pooled'; ri — вставить перед этим слотом
 ctx.sec_move = function(sc, ri, how)
   local rg = seq[ri]
   if not rg then vim.msg = 'section: drop it on a slot'; return end
@@ -37715,11 +37715,11 @@ ctx.sec_move = function(sc, ri, how)
   else
     local nm = ctx.sec_free_name(sc.name)
     ctx.slot_op('section ' .. how .. ' ' .. (sc.name or ''), function()
-      local t1 = ctx.sec_insert(sc, t, how == 'alias')
+      local t1 = ctx.sec_insert(sc, t, how == 'pooled')
       reaper.AddProjectMarker2(0, true, t, t1, nm, -1, sc.color or 0)
     end)
     ctx.mx_refresh()
-    vim.msg = ('section %s %s at slot %d as %s'):format(sc.name or '', how == 'alias' and 'linked (alias)' or 'copied', ri, nm)
+    vim.msg = ('section %s %s at slot %d as %s'):format(sc.name or '', how == 'pooled' and 'pooled' or 'copied', ri, nm)
   end
 end
 -- 18 окт: vim.open_prompt — выпадашка, не строка команды: заголовок и варианты по команде, выбор выполняет «pre значение»
@@ -37787,7 +37787,7 @@ ctx.sec_cmd = function(arg)
   if w == 'launch' then ctx.sec_launch(sc) elseif w == 'show' then ctx.sec_show(sc) elseif w == 'repeat' then ctx.sec_repeat(sc, true) elseif w == 'copy' then ctx.sec_repeat(sc, false)
   elseif w == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend)
   elseif w == 'name' then ctx.sec_rename(sc) elseif w == 'del' then ctx.sec_remove(sc) elseif w == 'delall' then ctx.sec_remove_all(sc)   -- 21 окт: из подменю s
-  elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif w == 'aliasto' and n then ctx.sec_move(sc, n, 'alias')
+  elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif (w == 'pooledto' or w == 'aliasto') and n then ctx.sec_move(sc, n, 'pooled')
   else ctx.sec_menu(sc) end
 end
 -- 18 окт: запуск секции: играет — первый её слот в очередь матрицы (прыжок на границе играющего паттерна), луп — на секцию;
@@ -37968,7 +37968,7 @@ ctx.unstack = function()
     for k = #stack, 1, -1 do
       local st = stack[k]
       reaper.DeleteProjectMarker(0, st.dup.idx, true)
-      alias.put_alias(st.src, st.src.rgnend)
+      alias.put_pooled(st.src, st.src.rgnend)
       n = n + 1
     end
   end)

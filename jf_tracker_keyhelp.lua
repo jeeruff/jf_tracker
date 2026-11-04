@@ -370,7 +370,7 @@ KH.PAGES = {
     { k = 'yy', m = 'yank slot', g = 'slot', d = 'yank slot into register', t = { 'yy', 'y' } },
     { k = 'yp', m = 'duplicate: free copy', g = 'slot', d = 'duplicate: an exact copy with a new name, not linked (button cln) - like Renoise', t = { 'yp' } },
     { k = 'p', m = 'put after', g = 'slot', d = 'put the register after (cells: paste at cursor); before - the menu slot > b' },
-    { k = 'P', m = 'pooled: linked repeat', g = 'slot', d = 'pooled (was alias, A): the slot repeated linked - same pattern, MIDI pooled and items grouped, edits in one change all (button als; also p of a yanked slot whose pattern still exists)' },
+    { k = 'P', m = 'pooled: linked repeat', g = 'slot', d = 'pooled (was alias): the slot repeated linked - same pattern, MIDI pooled and items grouped, edits in one change all (button als; also p of a yanked slot whose pattern still exists)' },
     { k = 'U', m = 'unpool: unlink repeat', g = 'slot', d = 'unpool: unlink the repeat under the cursor - new name, own MIDI pool, no group' },
     { k = 'x', m = 'cut cell', g = 'block', d = 'cut cell (or block) to clipboard' },
     { k = 'n', m = 'rename region', g = 'slot', d = 'rename region' },

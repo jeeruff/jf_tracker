@@ -670,7 +670,7 @@ end
 
 -- связанный повтор (dup, 3 окт): регион src повторяется в t — то же имя,
 -- items связаны (пул MIDI + группа); всё после t едет на длину
-function A.put_alias(src, t)
+function A.put_pooled(src, t)
   local len = src.rgnend - src.pos
   local s0 = src.pos
   A.open_time(t, len)
