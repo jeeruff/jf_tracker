@@ -14007,8 +14007,8 @@ ctx = {
       local ri = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
       if ri >= 0 and ri < 4096 then
         local ch = ri & 1023
-        il = reaper.GetInputActivityLevel(ch) or 0
-        ir = (ri & 1024 ~= 0) and (reaper.GetInputActivityLevel(ch + 1) or 0) or il
+        il = ctx.in_level(ch)   -- 4 ноя: было без перевода из dB — вход в DSP молчал
+        ir = (ri & 1024 ~= 0) and ctx.in_level(ch + 1) or il
       end
     elseif reaper.GetPlayState() & 1 == 1 then
       if not D.acc then D.acc = reaper.CreateTrackAudioAccessor(tr) end
@@ -22608,6 +22608,8 @@ end
 
 -- пик-метры треков: Track_GetPeakInfo раз в кадр на трек
 local peak_cache = {}
+-- 4 ноя: GetInputActivityLevel отдаёт dB (-150 — тишина), не 0..1 (замер в живом REAPER) → амплитуда
+ctx.in_level = function(ch) local db = reaper.GetInputActivityLevel(ch) or -150; return db > -149 and 10 ^ (db / 20) or 0 end
 local function track_peaks(col)
   local v = peak_cache[col]
   if not v then
@@ -22615,6 +22617,29 @@ local function track_peaks(col)
     peak_cache[col] = v
   end
   return v[1], v[2]
+end
+-- 4 ноя: метр микшера — все каналы выхода трека (I_NCHAN) и, если трек взведён на аудиовход, вход
+-- (GetInputActivityLevel по каналам входа: моно 1, стерео 2, мультиканальный — по числу каналов трека); раз в кадр
+ctx.meter_cache = {}
+ctx.track_meter = function(col)
+  local v = ctx.meter_cache[col]
+  if v then return v.out, v.inp end
+  local tr = col.track
+  v = { out = {} }
+  if tr and reaper.ValidatePtr(tr, 'MediaTrack*') then
+    local nch = col.master and 2 or math.max(1, math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_NCHAN')))
+    for ch = 0, nch - 1 do v.out[ch + 1] = reaper.Track_GetPeakInfo(tr, ch) end
+    if not col.master and reaper.GetMediaTrackInfo_Value(tr, 'I_RECARM') == 1 then
+      local ri = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT'))
+      if ri >= 0 and ri < 4096 then
+        local n = (ri & 2048 ~= 0) and nch or ((ri & 1024 ~= 0) and 2 or 1)
+        v.inp = {}
+        for k = 0, n - 1 do v.inp[k + 1] = ctx.in_level((ri & 1023) + k) end
+      end
+    end
+  end
+  ctx.meter_cache[col] = v
+  return v.out, v.inp
 end
 
 -- клик / колесо по контролу верхней панели
@@ -23692,7 +23717,7 @@ local function frame()
       end
     end
   end
-  peak_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
+  peak_cache = {}; ctx.meter_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
   local is_playing = playing()
   -- упреждение курсора (3 окт, опция cursor lead): позиция читается в начале
   -- тика defer, а на экран кадр попадает позже (~полкадра при 30 Гц) — курсор
@@ -24528,7 +24553,7 @@ local function frame()
       ctx.PERF.reset = ctx.PERF.reset or function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
       ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit)
     end,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,

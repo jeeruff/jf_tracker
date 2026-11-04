@@ -9129,7 +9129,7 @@ function D.frame(L, snap, rows, state, info)
         -- (Track_GetPeakHoldDB, как в микшере REAPER: те же цифры, тот же
         -- сброс; щелчок по числу — hover.mixpk — чистит оба)
         local hold = D.mix_hold[col.guid]
-        if not hold then hold = { { db = -150, t = 0 }, { db = -150, t = 0 } }; D.mix_hold[col.guid] = hold end
+        if not hold then hold = {}; D.mix_hold[col.guid] = hold end
         hold.max = -150
         if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
           for ch = 0, 1 do hold.max = math.max(hold.max, reaper.Track_GetPeakHoldDB(col.track, ch, false) * 100) end
@@ -9145,23 +9145,40 @@ function D.frame(L, snap, rows, state, info)
         if not col.solo and not col.master then
           for _, c2 in ipairs(L.cols or {}) do if c2.col and c2.col.solo then muted_by_solo = true; break end end
         end
-        for k2 = 1, 2 do
-          local pk = 0
-          if info.peaks then local pl, pr = info.peaks(col); pk = (k2 == 1 and pl or pr) or 0 end
-          local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
-          local hk = hold[k2]
-          if pdb >= hk.db then hk.db, hk.t = pdb, now
-          elseif now - hk.t > 1.5 then hk.db = math.max(pdb, hk.db - 20 * (now - hk.t - 1.5)) end
-          local mx0 = bx0 + 4 + (k2 - 1) * (mw + 2)
-          set(U.mix(dark, U.TEXT, 0.12)); gfx.rect(mx0, ty0, mw, th, 0)
-          if pdb > -60 then
-            local function seg(d0, d1, c3) local ya, yb = ypos(math.min(pdb, d1)), ypos(d0); if yb > ya then set(muted_by_solo and U.mix(c3, dark, 0.55) or c3); gfx.rect(mx0 + 1, ya, mw - 2, yb - ya, 1) end end
-            seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
+        -- 4 ноя: сдвоенный метр — трек взведён на аудиовход: слева вход (что заходит), справа выход (что выходит
+        -- из канала), между ними красная черта; каналов сколько есть: 1-2 — столбики в рамках, больше — тонкие линии
+        local outs, inps
+        if info.meter then outs, inps = info.meter(col) end
+        if not outs then local pl, pr = 0, 0; if info.peaks then pl, pr = info.peaks(col) end; outs = { pl or 0, pr or 0 } end
+        local ax0, aw0 = bx0 + 4, 2 * mw + 2
+        local groups = inps and { { inps, 'i', ax0, math.floor((aw0 - 3) / 2) }, { outs, 'o', ax0 + aw0 - math.floor((aw0 - 3) / 2), math.floor((aw0 - 3) / 2) } } or { { outs, 'o', ax0, aw0 } }
+        if inps then set(U.mix(U.RED, dark, 0.35)); gfx.rect(ax0 + math.floor((aw0 - 3) / 2) + 1, ty0, 1, th, 1) end
+        for _, gp in ipairs(groups) do
+          local vals, tag, gx, gw = gp[1], gp[2], gp[3], gp[4]
+          local n = math.max(1, #vals)
+          local gap = (gw + 1) / n >= 3 and 1 or 0
+          for k2 = 1, n do
+            local pk = vals[k2] or 0
+            local pdb = pk > 1e-6 and 20 * math.log(pk, 10) or -150
+            local hk = hold[tag .. k2]
+            if not hk then hk = { db = -150, t = 0 }; hold[tag .. k2] = hk end
+            if pdb >= hk.db then hk.db, hk.t = pdb, now
+            elseif now - hk.t > 1.5 then hk.db = math.max(pdb, hk.db - 20 * (now - hk.t - 1.5)) end
+            local xa, xb = gx + math.floor((k2 - 1) * (gw + gap) / n), gx + math.floor(k2 * (gw + gap) / n) - gap
+            local bw2 = math.max(1, xb - xa)
+            local framed = n <= 2 and bw2 >= 4   -- 1-2 канала — в рамке, как было; много — тонкие линии без рамок
+            local ix, iw = framed and xa + 1 or xa, framed and bw2 - 2 or bw2
+            if framed then set(U.mix(dark, U.TEXT, 0.12)); gfx.rect(xa, ty0, bw2, th, 0) end
+            local dim = muted_by_solo and tag == 'o'
+            if pdb > -60 then
+              local function seg(d0, d1, c3) local ya, yb = ypos(math.min(pdb, d1)), ypos(d0); if yb > ya then set(dim and U.mix(c3, dark, 0.55) or c3); gfx.rect(ix, ya, iw, yb - ya, 1) end end
+              seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
+            end
+            if hk.db > -60 then
+              set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)); gfx.rect(ix, ypos(hk.db), iw, 1, 1)
+            end
+            if hold.clip and tag == 'o' then set(U.RED); gfx.rect(ix, ty0 - 2, iw, 1, 1); gfx.rect(ix, ty0 - 4, iw, 1, 1) end
           end
-          if hk.db > -60 then
-            set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)); gfx.rect(mx0 + 1, ypos(hk.db), mw - 2, 1, 1)
-          end
-          if hold.clip then set(U.RED); gfx.rect(mx0 + 1, ty0 - 2, mw - 2, 1, 1); gfx.rect(mx0 + 1, ty0 - 4, mw - 2, 1, 1) end
         end
         if muted_by_solo then
           local sw2 = D.small_measure('s!')
