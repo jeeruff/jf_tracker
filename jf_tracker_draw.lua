@@ -6670,6 +6670,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local lw3 = ms('load') + 2 * L.pad
     local lx3 = ix + L.pad + fw + L.pad   -- 2 ноя: после «/ find»
     hbtn(lx3, lw3, 'load', false, U.CYAN, 'poolload')
+    -- 4 ноя: layer — слой (¥) выбранному инструменту: другой звук lib звучит с ним одной нотой (= L)
+    local lw4 = ms('layer') + 2 * L.pad
+    local lx4 = lx3 + lw3 + L.pad
+    if lx4 + lw4 + L.pad < bx2 then hbtn(lx4, lw4, 'layer', false, U.CYAN, 'poollayer'); lx3, lw3 = lx4, lw4 end
     local room = bx2 - L.pad - (lx3 + lw3 + L.pad)
     local ptw = math.min(ms('< ' .. nm .. ' >') + L.pad, room)
     if ptw > ms('<>') + ms('pre') then

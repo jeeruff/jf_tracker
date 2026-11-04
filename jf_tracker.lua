@@ -19226,6 +19226,7 @@ local function hint_go(t)
   elseif t.kind == 'poolsortcol' then state.poolsort = (d == 'index') and (state.poolsort == 'track' and 'mark' or 'track') or d
   elseif t.kind == 'poolsort' then ctx.set_focus('inst'); ctx.sort_menu()
   elseif t.kind == 'poolkit' then ctx.set_focus('inst'); ctx.kit_menu()
+  elseif t.kind == 'poollayer' then ctx.set_focus('inst'); ctx.inst_layer_pick()
   elseif t.kind == 'poolpprev' or t.kind == 'poolpnext' then ctx.set_focus('inst'); ctx.libp_step(t.kind == 'poolpnext' and 1 or -1)
   elseif t.kind == 'samplenorm' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.normalize(e.item); vim.msg = 'normalized (peak 0 dB)' end
   elseif t.kind == 'samplevol' then local e = SL.entry or (cur_col() and cur_col().pool[vim.inst]); if e and e.item then edit.item_vol(e.item, 0); e.vol = 1; vim.msg = 'vol 0 dB' end
@@ -25734,6 +25735,7 @@ local function frame()
       or (file and ('swap: play the selected sample with ' .. file .. ' in all its notes (slices too) - click again later to go back') or 'swap: select an audio file in the browser first, then click')
   elseif hover.insprevbtn then state.status = 'insert: play the sample when a note is inserted - ' .. (state.preview and 'on' or 'off') .. ' (Shift+note always just plays)'
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
+  elseif hover.poollayer then state.status = 'layer (L): another lib sound plays together with the selected one on one note (a ¥ instrument; its layers in the lib folder)'
   elseif hover.poolload then state.status = 'load: kits - the samples of a kit are ADDED to the lib (the preset < > replaces the whole lib)'
   elseif hover.poolsort then state.status = 'lib order: ' .. (state.poolsort or 'track') .. ' - click: the list (track / name / len / marks / type), or click a column head; numbers stay'
   elseif hover.caption then state.status = ({
@@ -27259,6 +27261,8 @@ local function frame()
       click = { t = now2, zone = 'poolsort' }
     elseif hover.poolload then
       ctx.set_focus('inst'); ctx.kit_add_menu(); click = { t = now2, zone = 'poolload' }
+    elseif hover.poollayer then   -- 4 ноя: кнопка layer (= L в lib)
+      ctx.set_focus('inst'); ctx.inst_layer_pick(); click = { t = now2, zone = 'poollayer' }
     elseif hover.garden then
       ctx.set_focus('top')
       if hover.garden.ri then
