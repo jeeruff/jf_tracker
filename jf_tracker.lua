@@ -32333,6 +32333,14 @@ ctx.pan_here = function(f)
   ctx.pan_repl = out[1] and draw.PV.cell_pan(out[1]) or nil   -- новая нота получит точный пан заменённой
   return out
 end
+-- 4 ноя: ноты в позиции курсора вида пана (голова или продолжение) — для правок края (Ctrl+Shift+H J K L)
+ctx.pan_cover = function(f)
+  local n = state.pann
+  local p = vim.cur.ppos or (n + 1) // 2
+  local out, seen = {}, {}
+  for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; out[#out + 1] = it.head end end
+  return out
+end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end
   local PV, n = draw.PV, state.pann

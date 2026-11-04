@@ -1165,6 +1165,9 @@ end
 -- что звучит за концом сэмпла — по лупу инструмента. По сетке строк, один undo
 function V.note_edge(edge, d)
   local hs = V.covering(V.cur.fi, V.cur.row)
+  local fp = flat()[V.cur.fi]
+  if fp and fp.pan and ctx.pan_cover then hs = ctx.pan_cover(fp) end   -- 4 ноя: вид пана — только нота в позиции курсора
+  local follow = false
   local n = 0
   local L = lpb()
   for _, h in ipairs(hs) do
@@ -1178,10 +1181,12 @@ function V.note_edge(edge, d)
         ctx.edit.item_drag_begin('note ' .. edge)
         ctx.edit.item_drag_to(it, edge, t)
         n = n + 1
+        if edge == 'start' and h.row0 == V.cur.row then follow = true end   -- курсор на начале — едет за ним
       end
     end
   end
   ctx.edit.item_drag_end()
+  if follow then V.cur.row = math.max(0, V.cur.row + d); ensure_visible() end
   V.msg = n > 0 and ('note %s %s %d row(s) (Ctrl+Shift+J K - the end, H L - the start)'):format(edge, d > 0 and 'later by' or 'earlier by', math.abs(d))
           or 'note edge: no audio note under the cursor (MIDI notes: drag)'
 end
