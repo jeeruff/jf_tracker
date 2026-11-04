@@ -234,8 +234,8 @@ function O.key(c)
   if c == 27 or ch == 'q' then O.close()
   elseif ch == 'j' or c == 1685026670 then O.sel = math.min(n, O.sel + 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel < n do O.sel = O.sel + 1 end; O.block_follow = true
   elseif ch == 'k' or c == 30064 then O.sel = math.max(1, O.sel - 1); while O.items[O.sel] and O.items[O.sel].sep and O.sel > 1 do O.sel = O.sel - 1 end; O.block_follow = true
-  elseif ch == 'g' then O.sel = 1
-  elseif ch == 'G' then O.sel = n
+  elseif ch == 'g' then O.sel = 1; while O.items[O.sel] and O.items[O.sel].sep and O.sel < n do O.sel = O.sel + 1 end; O.mscroll = 0; O.block_follow = true   -- 4 ноя: заголовок раздела — не строка, к первой настройке
+  elseif ch == 'G' then O.sel = n; while O.items[O.sel] and O.items[O.sel].sep and O.sel > 1 do O.sel = O.sel - 1 end; O.block_follow = true
   elseif c == 13 or ch == ' ' then O.adjust(it, 0)
   -- 6 окт: h l — шаг, Shift (H L) — мелкий шаг (десятая)
   elseif ch == 'l' or ch == 'L' or ch == '+' or ch == '=' or c == 1919379572 then O.adjust(it, (shift or ch == 'L') and 0.1 or 1)
