@@ -17027,7 +17027,7 @@ ctx.clip_draw = function(Lx, x, y, w, h, foc, hv)
       U.set(hot and U.AMBER or U.LINE); gfx.rect(bx, y, bw, Lx.rh - 1, 0)
       U.text(bx + Lx.pad, y, b[1], hot and U.AMBER or U.TEXT)
       if hot then ctx.cb_hot = b end
-      bx = bx + bw + 2
+      bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
     end
     local sreg = CB.hist[CB.sel] and CB.hist[CB.sel].reg
     local wh = math.min(6 * Lx.rh, math.floor(h / 3))
@@ -18962,7 +18962,7 @@ ctx.act_draw = function(Lx, x, y, w, h, foc, hv)
     U.set(on and U.AMBER or U.LINE); gfx.rect(tx, y, tw, rh - 1, 0)
     U.text(tx + pad, y, s.label, on and U.AMBER or U.TEXT)
     if hot and press then AC.down = true; AC.sec, AC.gi, AC.sel, AC.scroll = i, 1, 1, 0; ctx.set_focus('actions') end
-    tx = tx + tw + 2
+    tx = tx + tw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   -- поиск
   local fy = y + rh + 2
@@ -24720,7 +24720,7 @@ local function frame()
           U.set(on and U.AMBER or U.LINE); gfx.rect(bx, y, bw, Lx.rh, 0)
           U.text(bx + Lx.pad, y + 1, b[1], on and U.AMBER or U.GREY)
           if hot then lfo_hover = { pane = b[2] } end
-          bx = bx + bw + 2
+          bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
         end
       end
       local function left(lx, ly, lw2, lh)
@@ -35449,7 +35449,7 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
       U.text(bx + Lx.pad, y, b, hot and U.AMBER or U.TEXT)
       if hot then hv.patbtn = b end
       if ctx.hint then ctx.hint('patbtn', bx, y, bw, Lx.rh - 1, { b = b }) end
-      bx = bx + bw + 2
+      bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
     end
     local n = ctx.pat_nsel()
     if n > 0 and bx + U.measure(' 99 sel') < x + w then U.text(bx + Lx.pad, y, n .. ' sel', U.CYAN) end
@@ -36697,7 +36697,7 @@ ctx.spl_src_draw = function(Lx, x, y, w)
     U.set(on and U.AMBER or U.mix(c, U.PANEL, 0.4)); gfx.rect(bx, y, bw, Lx.rh, 0)
     U.text(bx + Lx.pad, y + 1, s2.name, on and U.AMBER or (hot and U.TEXT or U.GREY))
     if hot then hv.splsrc = k end
-    bx = bx + bw + 2
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   return hv
 end
@@ -36737,7 +36737,7 @@ ctx.spl_draw = function(Lx, x, y, w)
     U.set(c); gfx.rect(bx, y, bw, Lx.rh, 0)
     U.text(bx + Lx.pad, y + 1, lab, hot and U.AMBER or U.TEXT)
     if hot then hv.splword = k end
-    bx = bx + bw + 2
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   local cx = x + w - tail + 6
   for _, b in ipairs({ { '>', 'play' }, { 'x', 'clear' } }) do

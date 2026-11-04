@@ -3454,7 +3454,7 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
     if hot then
       if b[6] then hover.trkio = { col = col, what = b[4] } else hover.btn = { col = col, what = b[4] } end
     end
-    bx = bx + bw + 1
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   yy = yy + L.rh
   -- слайдеры громкости и панорамы (как в шапке)
@@ -3763,7 +3763,7 @@ local function btn_row(L, x, w, yy, list, hover, col, enabled)
     text(bx + L.pad, yy, b[2], enabled and ((hb or b[4]) and U.AMBER or (b[3] and U.TEXT or U.GREY)) or U.DIM)
     if hb then hover.trkmod = { col = col, what = b[1], tab = b[5], v = b[5] } end
     hint('trkmod', bx, yy, bw, L.rh, { what = b[1], tab = b[5], v = b[5] })
-    bx = bx + bw + 2
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   return yy + L.rh
 end
@@ -3772,7 +3772,7 @@ local function btn_rows_n(L, x, w, list)
   for n, b in ipairs(list) do
     local bw = ms(b[2]) + 2 * L.pad
     if bx + bw > x + w - L.pad and n > 1 then rows = rows + 1; bx = x + L.pad end
-    bx = bx + bw + 2
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   return rows
 end
@@ -4505,7 +4505,7 @@ local function draw_topbar(L, info)
     text(tx + L.pad, 3, lbl, on and (t == 'retro' and U.TEXT or acc) or (t == 'retro' and D.ARM or U.GREY))
     if hot then hover.tab = t end
     hint('tab', tx, 2, tw, L.rh, t)
-    tx = tx + tw + 2
+    tx = tx + tw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   -- режим анализатора (scope / spec / sgram) — для вкладок scope и master, как
   -- переключатель режима пиков в REAPER
@@ -4645,7 +4645,7 @@ local function draw_topbar(L, info)
         text(bx + L.pad, y + 1, label, on and U.AMBER or (hot and U.TEXT or U.GREY))
         if hot then hover.retrobtn = what end
         hint('retrobtn', bx, y, bw, L.rh, what)
-        bx = bx + bw + 2
+        bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
       end
       btn('<', 'prev'); 
       text(bx, y + 1, fit((c and c.col.name or '?') .. ' #' .. tostring(c and c.slot or '?'), L.cw * 10), U.AMBER); bx = bx + L.cw * 10 + 2
@@ -5478,7 +5478,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
-      bx = bx + bw + 2
+      bx = bx + bw + 2   -- кнопки транспорта — группой (ширина btot — с 2)
     end
     -- 11 окт: full — строка кнопок под транспортом (|<< freeze · slow >>| dub), колонка в колонку
     if c.tpfull then
@@ -5518,7 +5518,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tw, L.rh, b[1])
         end
-        sx = sx + tw + 2
+        sx = sx + tw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
       end
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
@@ -5614,7 +5614,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       else text(bx + math.floor((bw - tws[i]) / 2), by + 1, b[2], hot and U.AMBER or (b[4] or b[3] or U.TEXT)) end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
-      bx = bx + bw + 2
+      bx = bx + bw + 2   -- кнопки транспорта — группой (ширина btot — с 2)
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
   end

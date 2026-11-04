@@ -751,7 +751,7 @@ function B.map_ship(U, L, x, y, w, h)
     U.set(hot and U.AMBER or edge); gfx.rect(tx, sy, tw, rh, 0)
     U.text(tx + L.pad, sy, lab, hot and U.AMBER or U.TEXT)
     if hot then hv = id end
-    tx = tx + tw + 2
+    tx = tx + tw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   U.set(U.BG); gfx.rect(tx - 2, sy, U.measure('000 marked') + 4, rh, 1)
   U.text(tx, sy, ('%d marked'):format(#list), U.AMBER); tx = tx + U.measure('000 marked') + 4
@@ -846,7 +846,7 @@ function B.map_side(U, L, x, y, w, h)
         U.set(hot and U.AMBER or U.LINE); gfx.rect(tx, y2 + 2, bw, L.rh - 1, 0)
         U.text(tx + L.pad, y2 + 2, b[1], hot and U.AMBER or U.TEXT)
         if hot then hv = b[2] end
-        tx = tx + bw + 2
+        tx = tx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
       end
     end
   end
@@ -2131,7 +2131,7 @@ function B.draw(U, L, x, y, w, h)
     U.text(bx + L.pad, by + 1, label, on and U.AMBER or (hot and U.TEXT or (tc or U.GREY)))
     if hot then hover = what end
     if ctx.hint then ctx.hint('browserbtn', bx, by, bw, L.rh, what) end
-    return bx + bw + 1   -- 31 окт: кнопки встык (был зазор в pad)
+    return bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   local wrap_marks = false
   do

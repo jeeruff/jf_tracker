@@ -346,7 +346,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if hot then hover.btn = b[1] end
     MX.btn_xy = MX.btn_xy or {}; MX.btn_xy[b[1]] = { bx, by + L.rh + 1 }   -- 18 окт: меню кнопки (z → view) выпадает от неё
     if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, b[1]) end
-    bx = bx + bw + 1   -- 31 окт: кнопки встык (был зазор в pad)
+    bx = bx + bw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
   end
   return by + L.rh - y0
   end
