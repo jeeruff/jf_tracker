@@ -9011,12 +9011,8 @@ function D.frame(L, snap, rows, state, info)
           -- 4 ноя: блок фейдера — всегда слева и не шире полей нота + vol + delay первой подколонки;
           -- эффекты — сразу за ним (линия на конце delay), без центровки по дальней вертикали
           local ln1 = c.lanes[1]
-          local f1 = ln1 and L.flat[ln1.f0]
-          local G1 = (f1 and f1.G) or L
           if ln1 and not c.compact then
-            local span = (G1.x_del or L.x_del) + (G1.w_del or L.w_del) - (G1.x_note or L.x_note)
-            fx_w = math.max(fx_w, math.min(span - colw - L.pad, lw1 - 2 * L.pad - colw))
-            need = sx + fx_w + colw + L.pad
+            -- 4 ноя (2): фейдер не растягивается — у всех каналов одной ширины (как самый узкий); эффекты сразу за кнопками
             cand(need, D.EMPTY)
           end
           for li, ln in ipairs(c.lanes) do
@@ -9042,6 +9038,7 @@ function D.frame(L, snap, rows, state, info)
         local fh = (und > 0 and not (c.master and not side)) and (H - und * L.rh) or H
         -- 16 окт: как в микшере REAPER — запись (o) под фейдером, размером с кноб панорамы; фейдер короче
         local rec_d = (mixcol and not compact) and math.min(2 * L.rh - 2, fx_w) or 0
+        local fbox_y   -- 4 ноя (2): верх коробки фейдера — столбик кнопок m s ø fx /// от него, на уровне фейдера
         if compact then D.mini_strip(col, sx, fx_w, y1, y1 + fh - 2, info, hover, mx, my, L) else
         local vtxt = db <= -60 and '-inf' or ('%+.1f'):format(db)
         if ms(vtxt) > fx_w then vtxt = db <= -60 and '-' or ('%+.0f'):format(db) end   -- 9 окт: узко — без десятых
@@ -9108,6 +9105,7 @@ function D.frame(L, snap, rows, state, info)
         local wrow = (not bigf and state.panknob ~= false and col.panmode ~= 6) and L.rh or 0   -- 18 окт: строка width над паном
         local ty0, ty1 = y1 + 4 * L.rh + 7 + wrow, y1 + fh - 4 - (rec_d > 0 and (rec_d + 4) or 0)   -- строка над метром — макс. пик
         local th = math.max(8, ty1 - ty0)
+        fbox_y = ty0 - 6
         -- тёмная коробка, внутри метр как в DSP (две полоски L R в рамках),
         -- шкала dB слева (+6 0 -6 -12 -24 -48), ручка [-] поверх;
         -- клавиатура — метка f → k j
@@ -9299,12 +9297,18 @@ function D.frame(L, snap, rows, state, info)
         if mixcol then
           -- 16 окт: раскладка как в микшере REAPER — сверху m s ~ ø sro, внизу под фейдером (o) запись, рядом i
           local colx = sx + fx_w + 2 + (lufs_w > 0 and lufs_w + 2 or 0)
+          local sc = D.sro_col
+          local cy0 = y1
+          if fbox_y then   -- не влезает до записи (o) — поднять, но не выше полосы
+            local need_h = 4 * (D.mcb_h + 2) + (sc and sc.rhh or 0)
+            local lim = (rec_d and rec_d > 0) and (y1 + fh - rec_d - 5) or (y1 + fh - 2)
+            cy0 = math.max(y1, math.min(fbox_y, lim - need_h))
+          end
           for k, li in ipairs({ 3, 4, 6, 5 }) do
             local b = labels[li]
-            hbtn(b, colx, y1 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h, false)
+            hbtn(b, colx, cy0 + (k - 1) * (D.mcb_h + 2) + 1, D.mcb_w, D.mcb_h, false)
           end
-          local sc = D.sro_col
-          if sc then sc.draw(colx, y1 + 4 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
+          if sc then sc.draw(colx, cy0 + 4 * (D.mcb_h + 2) + 1, D.mcb_w, sc.rhh, sc.vert) end
           if rec_d and rec_d > 0 then
             local ry = y1 + fh - rec_d - 3
             local rb = setmetatable({ cap = true }, { __index = labels[1] })
