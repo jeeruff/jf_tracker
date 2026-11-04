@@ -30350,7 +30350,7 @@ local function frame()
   if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
     elseif OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c)   -- 1 ноя: z в панели опций — своё z-меню
-    else OPT.key(c) end
+    else ctx.opt_key(c) end
     c = 0
   end
   -- 28 окт: Ctrl+- с клавиатуры не доходит до gfx.getchar (Ctrl+= доходит, логика шага верна — проверено инъекцией):
@@ -31114,7 +31114,7 @@ local function frame()
     c = 0
   end
   if ctx.opt_k() and c ~= 0 and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- сюда — клавиши инъекции тестов (читаются позже верхнего перехвата)
-    if OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c) else OPT.key(c) end
+    if OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c) else ctx.opt_key(c) end
     c = 0
   end
   if draw.notepop and c ~= 0 then ctx.notepop_key(c); c = 0 end   -- 1 ноя: клавиатура ноты — h l полутон, j k октава, имя D5 / C#3, Enter, Esc
@@ -32402,6 +32402,20 @@ ctx.mod_arrows = function()
   if m.l then tag(x + w + 2, y, lab('l', m.l)) end
   if m.k then tag(x, y - h - 1, lab('k', m.k)) end
   if m.j then tag(x, y + h + 1, lab('j', m.j)) end
+end
+-- 4 ноя: g в окне / панели опций — префикс, как в трекере: gg — первая настройка, gt — меню модулей, gT — вкладки проекта
+ctx.opt_key = function(c)
+  if OPT.typing or OPT.numbuf or OPT.page == 'about' then OPT.key(c); return end
+  if ctx.opt_gpend then
+    ctx.opt_gpend = nil
+    if c == 103 then OPT.key(103)
+    elseif c == 116 then ctx.tab_menu()
+    elseif c == 84 then ctx.project_menu()
+    elseif c ~= 27 then OPT.key(c) end
+    return
+  end
+  if c == 103 then ctx.opt_gpend = true; vim.msg = 'g: g - the first setting, t - go to module'; return end
+  OPT.key(c)
 end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end
