@@ -9156,11 +9156,20 @@ function D.frame(L, snap, rows, state, info)
         local hold = D.mix_hold[col.guid]
         if not hold then hold = {}; D.mix_hold[col.guid] = hold end
         hold.max = -150
+        local now = reaper.time_precise()
         if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
           for ch = 0, 1 do hold.max = math.max(hold.max, reaper.Track_GetPeakHoldDB(col.track, ch, false) * 100) end
+          -- 4 ноя: declip — удержание пика (число над метром и клип) само сбрасывается через N с после последнего
+          -- подъёма (опция declip, умолчание 10 с; off — как в REAPER, до щелчка). Нативный сброс — Track_GetPeakHoldDB(…, true)
+          local dc = tonumber(state.declip) or 10
+          if hold.max > (hold.pmax or -150) + 0.05 then hold.pt = now end
+          hold.pmax = hold.max
+          if dc > 0 and hold.max > -150 and hold.pt and now - hold.pt > dc then
+            for ch = 0, 1 do reaper.Track_GetPeakHoldDB(col.track, ch, true) end
+            hold.max, hold.pmax, hold.pt = -150, -150, nil
+          end
         end
         hold.clip = hold.max > 0
-        local now = reaper.time_precise()
         -- 4 ноя: fader style apart — метр слева, справа своя дорожка фейдера (ручка не ложится на метр)
         local fcap = D.fadercap or 'apart'
         local flw = fcap == 'apart' and math.max(5, math.floor(bw0 * 0.3)) or 0
@@ -9209,7 +9218,8 @@ function D.frame(L, snap, rows, state, info)
               else set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)) end
               gfx.rect(ix, ypos(hk.db), iw, 1, 1)
             end
-            if hold.clip and tag == 'o' then set(U.RED); gfx.rect(ix, ty0 - 2, iw, 1, 1); gfx.rect(ix, ty0 - 4, iw, 1, 1) end
+            if hold.clip and tag == 'o' and state.clipmark then set(U.RED);   -- 4 ноя: отдельный индикатор клипа — опция clip marks (умолчание off; число пика и так красное)
+              gfx.rect(ix, ty0 - 2, iw, 1, 1); gfx.rect(ix, ty0 - 4, iw, 1, 1) end
           end
         end
         if muted_by_solo then
