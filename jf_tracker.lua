@@ -32387,6 +32387,13 @@ ctx.pan_key = function(c, m)
     return true
   end
   if vim.pending then return false end   -- другие префиксы (g, z, d + движение) — Vim
+  if c == 115 and vim.mode == 'normal' then   -- 4 ноя: s — разрез только ноты в позиции курсора (не всех, что звучат в строке)
+    local heads, seen = {}, {}
+    for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; heads[#heads + 1] = it.head end end
+    if #heads == 0 then vim.msg = 'pan view: no note here to cut'; return true end
+    edit.split(heads, state.lpb, vim.cur.row); model.invalidate()
+    return true
+  end
   -- 3 ноя: со счётчиком h l — пан в процентах: 20h = L20, 100l = R100 (позиция ближайшая к нему)
   if vim.count and (c == 104 or c == 108 or c == 1818584692 or c == 1919379572) then
     local pc = math.min(100, cnt)
