@@ -25716,7 +25716,7 @@ local function frame()
     local pn = hover.matrix.palname
     local nt = ctx.pat_note(pn.name)
     state.status = pn.name .. (nt ~= '' and (' - ' .. nt) or '') .. '  |  hold: listen to the pattern, dblclick: its note (:pnote text)'
-  elseif hover.matrix and hover.matrix.patbtn then state.status = ({ menu = 'patterns menu (m, rclick on a pattern): listen, go, glue, split, copy, rename, note, chain, remove, select', glue = 'glue (J): the selected patterns become one where they play right after each other in the song', split = 'split (s): in half / 3 / 4 / bars / at the tracker cursor - in every place of the song', copy = 'copy: a free duplicate after the first place of the pattern', name = 'rename (r): every place of the pattern' })[hover.matrix.patbtn] or ''
+  elseif hover.matrix and hover.matrix.patbtn then state.status = ({ menu = 'patterns menu (m, rclick on a pattern): listen, go, glue, split, copy, rename, note, chain, remove, select', glue = 'glue (J): the selected patterns become one where they play right after each other in the song', split = 'split (s): in half / 3 / 4 / bars / at the tracker cursor - in every place of the song', copy = 'copy: a free duplicate after the first place of the pattern', name = 'rename (r): every place of the pattern', patternize = 'patternize the empty parts: tracks without patterns get patterns (by bars, markers ...)' })[hover.matrix.patbtn] or ''
   elseif hover.matrix and hover.matrix.patrow and ctx.pat_status then state.status = ctx.pat_status .. '  (click - listen, double - go there, Shift+click - select, rclick - menu)'   -- 19 окт: сетка patterns
   elseif hover.matrix and hover.matrix.palcell then state.status = hover.matrix.palcell.p.name .. '-' .. hover.matrix.palcell.ci .. ': hold - listen to this track of the pattern (solo)'
   elseif hover.matrix and hover.matrix.sig then state.status = 'time signature at the region start - click: change for this pattern (:sig N/D here)'
@@ -35509,7 +35509,7 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   -- 27 окт: ряд команд над кубиками: menu glue split copy name, справа — сколько выбрано
   do
     local bx = x
-    for _, b in ipairs({ 'menu', 'glue', 'split', 'copy', 'name' }) do
+    for _, b in ipairs({ 'menu', 'glue', 'split', 'copy', 'name', 'patternize' }) do   -- 4 ноя: + patternize
       local bw = U.measure(b) + 2 * Lx.pad
       if bx + bw > x + w then break end
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
@@ -36596,7 +36596,8 @@ ctx.pat_menu = function()
 end
 ctx.pat_btn = function(b)
   if b == 'menu' then ctx.pat_menu() elseif b == 'glue' then ctx.pat_glue() elseif b == 'split' then ctx.pat_split_menu()
-  elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename() end
+  elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename()
+  elseif b == 'patternize' then ctx.mx_menu('pz') end
 end
 -- 19 окт: блок над матрицей: кубики паттернов на всю ширину + строка chain (двойной щелчок по кубику — в цепь,
 -- > — слушать цепь, имя секции — выпадашкой, render — в матрицу перед слотом курсора, x — очистить)
@@ -37867,6 +37868,13 @@ ctx.mx_menu = function(pick)
     { key = 'h', label = 'codes: to hex (A12 -> AC)', fn = function() ctx.codes_convert('hex') end },
     { key = 'd', label = 'codes: to decimal (AC -> A12)', fn = function() ctx.codes_convert('dec') end },
   }
+  if pick == 'pz' then   -- 4 ноя: кнопка patternize панели patterns — сразу это подменю
+    local pz = {}
+    for _, it in ipairs(items) do if it.label:find('^patternize') then pz[#pz + 1] = it end end
+    vim.open_hydra({ title = 'patternize the empty parts', items = pz })
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    return true
+  end
   if pick then for _, it in ipairs(items) do if it.key == pick then it.fn(); return true end end; return false end
   -- 25 окт: меню матрицы — все её команды (кроме вида: это view / z), подменю по смыслу; пункт = клавиша матрицы,
   -- она и выполняется (ctx.keyq — как с клавиатуры, фокус в матрице), в подписи — сама клавиша
