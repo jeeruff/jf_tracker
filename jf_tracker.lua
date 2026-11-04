@@ -35654,7 +35654,25 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
     if ctx.hint and cl.code then ctx.hint('patcube', cx, cy, cw - 1, ch - 1, { i = cl.i, fixed = cl.code:lower() }) end   -- 19 окт: f a1 — прыжок к паттерну
     ::pcell_next::
   end
-  if #list == 0 then U.text(x + Lx.pad, y + Lx.rh, 'no patterns yet - n in the matrix names a bar', U.DIM) end
+  if #list == 0 then   -- 4 ноя: паттернов нет — посередине кнопка patternize (надпись налезала на кубики)
+    local b, sub = 'patternize', 'or n in the matrix names a bar'
+    local bw = U.measure(b) + 2 * Lx.pad
+    local sw = math.min(w - 2 * Lx.pad, U.measure(sub))
+    local boxw = math.min(w, math.max(bw, sw) + 4 * Lx.pad)
+    local boxh = 2 * Lx.rh + 3 * Lx.pad
+    local bx0 = x + math.floor((w - boxw) / 2)
+    local by0 = y + math.max(0, math.floor((h - boxh) / 2))
+    U.set(U.BG); gfx.rect(bx0, by0, boxw, boxh, 1)
+    U.set(U.LINE); gfx.rect(bx0, by0, boxw, boxh, 0)
+    local bx, by = x + math.floor((w - bw) / 2), by0 + Lx.pad
+    local hot = mx >= bx and mx < bx + bw and my >= by and my < by + Lx.rh
+    U.set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(bx, by, bw, Lx.rh - 1, 1)
+    U.set(hot and U.AMBER or U.CYAN); gfx.rect(bx, by, bw, Lx.rh - 1, 0)
+    U.text(bx + Lx.pad, by, b, hot and U.AMBER or U.TEXT)
+    if hot then hv.patbtn = b end
+    if ctx.hint then ctx.hint('patbtn', bx, by, bw, Lx.rh - 1, { b = b }) end
+    U.text(x + math.floor((w - sw) / 2), by + Lx.rh + Lx.pad, ctx.fit(sub, sw), U.DIM)
+  end
   -- в статус: выбранный / под мышью — сколько раз и на каких тактах
   local si = hv.patrow or (state.focus == 'patterns' and MX.pl_sel) or nil
   local sp = si and list[si]
