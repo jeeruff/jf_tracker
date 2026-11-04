@@ -603,7 +603,7 @@ KH.PAGES = {
     { k = 'Space v  Cmd+click  Shift+click', d = 'mark several effects (numbered in the order of marking; Shift+click - a range); Enter / a adds them all in that order, one undo; Esc - unmark' },
     { k = '/', d = "find (fzf): words, ^start, end$, 'exact, !not; Enter adds what is found, Esc clears; under the plugins - presets N: your saved presets and the factory ones REAPER has seen (~), Enter - the plugin with that preset" },
     { k = 'j k h l', m = 'move / tree', d = 'move in the list; h l - the tree of groups on the left (as REAPER: all, favorites, recent, instruments, types, categories, developers) and the list, Enter on the tree - that group', t = { 'j', 'k', 'h', 'l' } },
-    { k = 'Tab', d = 'the next zone: find (/) - the list on the right - the folders on the left - find; Shift+Tab back' },
+    { k = 'Tab', d = 'the next tab of the pane (browser clipboard fx help undo), Shift+Tab back; the list and the folders - h l, find - /' },
     { k = 'gt gT', d = 'go to a module / a project tab (as everywhere)' },
     { k = '*', d = 'favourite on / off' },
     { k = 'x', d = 'exclude from search: on a plugin - it, on a folder of the tree (developer, category, type) - all of it; x again - back (x before the name, dim; in its own folder it stays)' },
