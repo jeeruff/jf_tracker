@@ -12,6 +12,7 @@ V.CHANGES = {
     'patterns: a patternize button (regions as patterns, or as sections with patterns every N bars); pattern codes - renumber in order (A1 B1 C1 ...)',
     'tracker: a view button top left (rulers, the tracker, the screen); zT zooms the track, zt is the Vim row-to-top; th tH tU hide / show hidden / unhide a track; note columns left, command columns right',
     'browser: tabs in one order everywhere (db fav files fx libs pm proj recent), Tab in the fx list goes to the next tab; CONTROL is one mode (Ctrl+Opt, Shift - fine) and takes only what is on screen',
+    'tracks: narrowing all tracks goes step by step (the widest first, folded ones stay); a wide track shows cut at the edge, the track scrollbar is also under the mixer and scrolls past it',
     'fixes: plugin windows over DSP stay put and leave with it, the master clip resets, small labels with TTF fonts, the matrix crash on start',
   } },
   { v = '0.9.2', d = '2026-11-04', items = {
