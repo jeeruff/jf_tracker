@@ -6028,12 +6028,12 @@ function D.draw_mixsnaps(L, info, hover)
   -- кнопки: new prev next up down sws (+ filter, если блок фильтра не влезает)
   -- 30 окт: фильтр SWS и опции — только кнопкой filter (меню) рядом с sws; место под таблицей — списку и XY
   -- 4 ноя: declip — кнопкой здесь же (горит — пики / клипы сами сбрасываются через N с; опция declip — секунды)
-  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' }, { 'declip', 'declip' } }
+  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' }, { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' } }   -- 4 ноя: sends — полоса посылов вкл / выкл, router — большой роутер (zR)
   local bx = x
   for _, b in ipairs(B) do
     local bw = ms(b[1]) + 2 * L.pad
     if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
-    bx = bx + btn(bx, yy, b[1], b[2] == 'declip' and info.declip_on, false, { what = b[2] }) + 2
+    bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on), false, { what = b[2] }) + 2
   end
   yy = yy + rh + 2
   -- таблица

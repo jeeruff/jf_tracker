@@ -2309,6 +2309,11 @@ ctx = {
   msn_cmd = function(k) local id = reaper.NamedCommandLookup('_SWSSNAPSHOT_' .. k); if id ~= 0 then reaper.Main_OnCommand(id, 0) end; ctx.msn_c = nil end,
   -- what: new / recall / save / del / prev / next / up / down / mode / tog / opt / prompt / win / filtermenu / xyc
   mixsnap_do = function(what, arg)
+    if what == 'sends' then   -- 4 ноя: кнопка sends — полоса посылов микшера (опция mixer routing)
+      state.mixroute = state.mixroute == false; relayout()
+      vim.msg = 'mixer sends strip: ' .. (state.mixroute and 'on (hidden while no track has a send)' or 'off'); return
+    end
+    if what == 'router' then if ctx.router_big then ctx.router_big() end; return end   -- 4 ноя: кнопка router = zR
     if what == 'declip' then   -- 4 ноя: кнопка declip микшера — вкл / выкл (секунды — опция declip)
       local v = tonumber(state.declip) or 10
       if v > 0 then state.declip_last = v; state.declip = 0 else state.declip = state.declip_last or 10 end
@@ -24622,7 +24627,7 @@ local function frame()
       ctx.PERF.reset = ctx.PERF.reset or function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
       ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit)
     end,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, declip_on = (tonumber(state.declip) or 10) > 0, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, declip_on = (tonumber(state.declip) or 10) > 0, mixroute_on = state.mixroute ~= false, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -26025,6 +26030,8 @@ local function frame()
       or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
+  elseif hover.mixsnap and hover.mixsnap.what == 'sends' then state.status = 'sends: the strip of sends over the mixer (each send by name, wires to where it goes) - click: on / off'
+  elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the big router over the whole window - every track, its sends and receives (zR)'
   elseif hover.mixsnap and hover.mixsnap.what == 'declip' then state.status = ('declip %s: peaks and clips of every track reset by themselves %d s after the last new peak - click: on / off (the seconds - options, declip)'):format((tonumber(state.declip) or 10) > 0 and 'on' or 'off', state.declip_last or (tonumber(state.declip) or 10) > 0 and (tonumber(state.declip) or 10) or 10)
   elseif hover.mixsnap and hover.mixsnap.what == 'xyc' then state.status = 'XY corner: click - recall (empty - menu), Shift+click - save the mix now, right click - a snapshot from the list or clear'
   elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph the mix between the corners: what the snapshot filter takes (volume, pan, mute, solo, sends, fx) - one undo'
