@@ -966,6 +966,14 @@ function D.layout(snap, state, nregions)
     local fs = state.folds[col.guid]
     -- уровень ширины (7 окт): задан — колонка по нему, свёртка za не действует
     local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
+    -- 4 ноя: общий уровень (Opt+Cmd+гор. колесо) — потолок, не замена: ужимает только треки шире него; свёрнутые (za)
+    -- и узкие по своему уровню остаются, пока потолок не опустится до них (было: все разом на один уровень, свёрнутые
+    -- расширялись — переход «средние → все маленькие» скачком)
+    if lvl and state.wzlevel and not state.ptmode then
+      local own = state.wlevel and state.wlevel[col.guid]
+      local nat = own or (fs == 'mini' and 0) or (fs == true and 1) or nil
+      lvl = nat and math.min(nat, state.wzlevel) or state.wzlevel
+    end
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать
     if azc then lvl = nil; if fs ~= 'chord' and fs ~= 'pan' then fs = nil end end

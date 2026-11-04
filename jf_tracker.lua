@@ -20243,6 +20243,19 @@ function ctx.width_step(d, which)
   end
   -- 7 окт: по одному полю за шаг (уровни 0..MAXLVL), от полной ширины
   local cur = state.wzlevel or full
+  -- 4 ноя: первый шаг сужения — от настоящей ширины самого широкого видимого трека (колонки нот сверх эффектов —
+  -- уровни выше full), по колонке за шаг; было: сразу с full — многоколоночные теряли все колонки нот одним шагом
+  if not state.wzlevel and d < 0 then
+    local need = full
+    for _, c2 in ipairs(L.cols or {}) do
+      if c2.x and not c2.folded and not c2.compact then
+        local ns = 1
+        for _, ln in ipairs(c2.lanes or {}) do ns = math.max(ns, ln.nsub or 1) end
+        if ns > 1 then need = math.max(need, 3 + (L.MAXFX or 4) + ns - 1) end
+      end
+    end
+    cur = math.min(L.MAXLVL or 10, need)
+  end
   local nl = cur + d                                         -- d > 0 — шире
   if nl > (L.MAXLVL or 10) then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека
   state.wzlevel = nl
