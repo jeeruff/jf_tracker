@@ -1471,12 +1471,31 @@ B.fx_draw, B.fx_hover = nil, nil
 function B.set_mode(m)
   if m == 'fx' and B.fx_draw then B.mode = 'fx'; return end
   if m == 'map' then if ctx.pane_focus then ctx.pane_focus('map') end; return end   -- 27 окт (3): карта — своя панель
-  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' then return end
+  if m ~= 'files' and m ~= 'db' and m ~= 'pm' and m ~= 'proj' and m ~= 'libs' and m ~= 'presets' and m ~= 'recent' and m ~= 'rprj' then return end
   B.mode = m; B.cur = 1; B.filter = ''; B.filtering = false
   B.pmproj, B.pmdir = nil, nil
   B.pm_scroll.v = 0
   if m == 'presets' then B.prdir = nil end
-  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) elseif m == 'recent' then B.recent_list() else B.set_all(B.read_pm()) end
+  if m == 'files' then B.refresh() elseif m == 'db' then B.refresh_db() elseif m == 'proj' then B.set_all(B.read_proj()) elseif m == 'libs' then B.set_all(B.read_kits()) elseif m == 'presets' then B.set_all(B.read_presets()) elseif m == 'recent' then B.recent_list() elseif m == 'rprj' then B.set_all(B.read_rprj()) else B.set_all(B.read_pm()) end
+end
+-- 4 ноя: недавние проекты REAPER (reaper.ini [Recent], как File > Recent projects): новые сверху, нет файла — не показываем
+function B.read_rprj()
+  local out, list = {}, {}
+  local f = R.get_ini_file and io.open(R.get_ini_file(), 'r')
+  if f then
+    local inside = false
+    for ln in f:lines() do
+      if ln:match('^%[') then inside = ln == '[Recent]'
+      elseif inside then local n, pth = ln:match('^recent(%d+)=(.+)$'); if n then list[#list + 1] = { n = tonumber(n), p = pth } end end
+    end
+    f:close()
+  end
+  table.sort(list, function(a, b) return a.n > b.n end)
+  for _, e in ipairs(list) do
+    if R.file_exists(e.p) then out[#out + 1] = { name = e.p:match('([^/]+)$') or e.p, path = e.p, rpp = true, meta = (e.p:match('(.*)/[^/]+$') or ''):match('([^/]+)$') } end
+  end
+  if #out == 0 then out[1] = { name = '(no recent projects)', empty = true } end
+  return out
 end
 
 -- кнопки шапки: files | db | size | hide
@@ -1485,7 +1504,7 @@ function B.click(what)
   if B.pmpane and B.mode == 'pm' and (what == 'files' or what == 'db' or what == 'proj' or what == 'libs') and ctx.browser_from_pm then
     ctx.browser_from_pm(what); return
   end
-  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'map' or what == 'fx' then B.set_mode(what)
+  if what == 'files' or what == 'db' or what == 'pm' or what == 'proj' or what == 'libs' or what == 'presets' or what == 'recent' or what == 'map' or what == 'fx' or what == 'rprj' then B.set_mode(what)
   elseif what == 'auto' then B.auto = not B.auto
   elseif what == 'keys' then B.keys = not B.keys
   elseif what == 'drum' then B.drum = not B.drum; if ctx.drum_audition_toggle then ctx.drum_audition_toggle(B.drum) end
@@ -1705,6 +1724,11 @@ end
 function B.enter()
   local e = B.entries[B.cur]
   if not e then return end
+  if e.rpp then   -- 4 ноя: недавний проект — открыть (Shift+Enter — в новой вкладке; REAPER спросит про текущий)
+    if ctx.mods and ctx.mods().shift then R.Main_OnCommand(40859, 0) end
+    R.Main_openProject(e.path); if ctx.msg then ctx.msg('opened ' .. e.name) end
+    return
+  end
   if e.bak then   -- 17 окт: бэкап — открыть (REAPER спросит, сохранить ли текущий)
     R.Main_openProject(e.path); if ctx.msg then ctx.msg('opened ' .. e.name .. ' - File > Save as to keep it as the project') end; return
   end
@@ -1731,7 +1755,7 @@ end
 
 -- путь для прослушивания строки (nil — нечего слушать)
 function B.preview_path(e)
-  if not e or e.dir or e.db or e.trk or e.rgn or e.mark or e.empty then return nil end
+  if not e or e.dir or e.db or e.trk or e.rgn or e.mark or e.empty or e.rpp then return nil end   -- 4 ноя: проект не слушаем
   if (e.name or ''):lower():match('%.xrni$') or (e.name or ''):lower():match('%.sfz$') then return nil end   -- инструмент (архив / текст SFZ), не звук
   if (e.name or ''):lower():match('%.jfcurve$') then return nil end    -- кривая — не звук
   if e.other then return nil end                                      -- не звук (*.*): не слушаем
@@ -1775,6 +1799,7 @@ end
 function B.describe(idx)
   local e = B.entries[idx]
   if not e then return '' end
+  if e.rpp then return e.path .. ' - Enter: open it (REAPER asks to save the current one), Shift+Enter: in a new tab' end
   if e.bak then return e.name .. ' - an autosave of this project; Enter / double click: open it (REAPER asks to save the current one)' end
   if e.db then return ('database %s (%s) - Enter: open'):format(e.name, e.file) end
   if e.dir then return '' end                                       -- 5 окт: без имени / пути папки
@@ -1931,7 +1956,7 @@ function B.key(c)
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
   elseif ch == '/' then B.start_find()                           -- поиск прямо в списке (2 окт); 26 окт: f — прыжок по меткам, как в других модулях
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'libs', libs = 'presets', presets = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'rprj', rprj = 'libs', libs = 'presets', presets = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -2114,9 +2139,9 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'rprj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
-      bx = btn(bx, y, t == 'recent' and 'zoxide' or t, t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
+      bx = btn(bx, y, t == 'recent' and 'zoxide' or (t == 'rprj' and 'recent' or t), t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
     -- 3 ноя: справа — view: маленькие волны у каждой строки вместо одной большой
     if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then   -- 3 ноя: view — меню вида списка
@@ -2164,6 +2189,7 @@ function B.draw(U, L, x, y, w, h)
   local where
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
+  elseif B.mode == 'rprj' then where = 'recent projects of REAPER, newest first: Enter - open, Shift+Enter - in a new tab'
   elseif B.mode == 'recent' then where = 'zoxide: folders you go to most, then files played lately (Enter - go / to lib, m - mark, zi - all folders)'   -- 27 окт; 28 окт: zoxide
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
