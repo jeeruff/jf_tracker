@@ -7200,6 +7200,26 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
   local ks = info.kslider
   local kd = w | 1
+  local bh = L and (L.rh - 2) or 0
+  -- 4 ноя: эффекты — сверху полосы, над кнобом (там место), хоть по строчке на эффект (мелким шрифтом, имя без типа и производителя), пока фейдеру
+  -- остаётся 3 строки над M S R; выключенный — тускло; щелчок — как по эффекту в шапке трека (hover.hdrfx)
+  if L and not col.master and col.fx and #col.fx > 0 then
+    local rowh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2)
+    local room = (y1 - y0) - (w | 1) - 2 - 3 * (bh + 2) - 3 * L.rh - 2   -- кноб, M S R и 3 строки фейдера остаются
+    local nfx = math.min(#col.fx, math.max(0, math.floor(room / rowh)))
+    for k = 1, nfx do
+      local f = col.fx[k]
+      local nm = (f.name or ''):gsub('^%w+i?:%s*', ''):gsub('%s*%b()%s*$', '')
+      while nm ~= '' and D.small_measure(nm) > w - 2 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
+      local ry = y0 + (k - 1) * rowh
+      local hot = mx >= x and mx < x + w and my >= ry and my < ry + rowh
+      if hot then set(D.CURROW); gfx.rect(x, ry, w, rowh, 1) end
+      D.small_text(x + 1, ry, nm, hot and U.AMBER or (f.enabled == false and U.DIM or U.CYAN))
+      if hot then hover.hdrfx = { col = col, k = k, it = { name = f.name, off = f.enabled == false, k = k, i = f.i } } end
+    end
+    if nfx < #col.fx and nfx > 0 then D.small_text(x + w - D.small_measure('+') - 1, y0 + (nfx - 1) * rowh, '+', U.GREY) end
+    if nfx > 0 then y0 = y0 + nfx * rowh + 2 end
+  end
   if y1 - y0 >= kd + 14 then
     local r = kd >> 1
     local cx, cy = x + r, y0 + r
@@ -7221,7 +7241,6 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
     y0 = y0 + kd + 2
   end
   -- 11 окт: M S R внизу, если над ними остаётся фейдер от 3 строк
-  local bh = L and (L.rh - 2) or 0
   if L and y1 - y0 >= 3 * (bh + 2) + 3 * L.rh then
     local bs = { { 'M', col.muted, U.AMBER, 'mute' }, { 'S', col.solo, U.GREEN, 'solo' }, { 'R', col.armed, D.ARM, 'arm' } }
     local by = y1 - 3 * (bh + 2) + 2
