@@ -406,6 +406,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     U.set((ed or hot) and U.AMBER or U.LINE); gfx.rect(fx, y, fw, L.rh, 0)
     U.text(fx + math.floor((fw - U.measure(val)) / 2), y + 1, val, ed and U.AMBER or c)   -- значение — посередине ячейки
     if hot then hover.btn = which == 'start' and 'mkstart' or 'mkend' end
+    if ctx.hint then ctx.hint('mxbtn', fx, y, fw, L.rh, which == 'start' and 'mkstart' or 'mkend') end   -- 4 ноя: метка f — ввод такта маркера
     U.set(U.PANEL); gfx.rect(lx - 2, y, U.measure(mk.name) + 4, L.rh, 1)
     U.text(lx, y + 1, mk.name, c)
   end
