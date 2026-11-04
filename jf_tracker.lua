@@ -32396,6 +32396,22 @@ ctx.pan_key = function(c, m)
   end
   if c == 104 or c == 1818584692 then if p > 1 then vim.cur.ppos = math.max(1, p - cnt); vim.count = nil; return true end; return false end   -- h ←: 3h — три позиции; за краем — поле слева
   if c == 108 or c == 1919379572 then if p < n then vim.cur.ppos = math.min(n, p + cnt); vim.count = nil; return true end; return false end
+  if c == 87 or c == 66 then   -- 4 ноя: W B — по строке к следующей / прошлой ноте или её волне (голова или продолжение), горизонтально
+    local occ = {}
+    for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do occ[it.pos] = true end
+    local q = p
+    for _ = 1, cnt do
+      local nq
+      if c == 87 then for i = q + 1, n do if occ[i] then nq = i; break end end
+      else for i = q - 1, 1, -1 do if occ[i] then nq = i; break end end end
+      if not nq then break end
+      q = nq
+    end
+    vim.count = nil
+    if q == p then vim.msg = c == 87 and 'pan view: nothing to the right on this row' or 'pan view: nothing to the left on this row'; return true end
+    vim.cur.ppos = q
+    return true
+  end
   if c == 119 or c == 98 then   -- 3 ноя: w b — следующее / прошлое событие канала (по строке, потом по строкам), с курсором на его позиции
     local r, q = vim.cur.row, p
     for _ = 1, cnt do local r2, q2 = ctx.pan_next(f.col, r, q, c == 119 and 1 or -1, n); if not r2 then break end; r, q = r2, q2 end
