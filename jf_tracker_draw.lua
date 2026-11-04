@@ -6166,11 +6166,11 @@ function D.draw_mixsnaps(L, info, hover)
     for _, b in ipairs(B) do
       local bw = ms(b[1]) + 2 * L.pad
       if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
-      bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on) or (b[2] == 'router' and info.mixrouter), false, { what = b[2] }) + 2
+      bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on) or (b[2] == 'router' and info.mixrouter) or (b[2] == 'trnames' and info.mixvnames), false, { what = b[2] }) + 2
     end
     yy = yy + rh
   end
-  row_of({ { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' } })
+  row_of({ { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' }, { 'trnames', 'trnames' }, { 'view', 'mixview' } })
   set(U.LINE); gfx.rect(x, yy + 1, w, 1, 1)
   yy = yy + 4
   text(x + 2, yy, fit('snapshots', w - 4), U.GREY); yy = yy + rh   -- 4 ноя: подпись блока снапшотов
@@ -7356,7 +7356,7 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   -- 4 ноя (2): имя трека над эффектами (в роутере оно в его шапке) — мелко, с полоской цвета трека
   -- 4 ноя (2): вертикально, шрифтом трекера (масштаб как у всего); высота — по самому длинному имени всех узких
   -- полос (с прошлого кадра), не больше четверти полосы — кнобы и фейдеры на одной линии
-  if L and L.mix_bottom and not col.master and not info.mixrouter then
+  if L and L.mix_bottom and not col.master and not info.mixrouter and info.mixvnames ~= false then
     if col.rgb then set(col.rgb); gfx.rect(x, y0, w, 2, 1) end
     local nm = (col.folder and '- ' or '') .. (col.name ~= '' and col.name or '-')
     local cap = math.max(L.rh, math.floor((y1 - y0) / 4))
