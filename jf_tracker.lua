@@ -15451,8 +15451,8 @@ ctx = {
           { key = 'o', label = 'options', fn = function() ctx.options() end },
           -- 9 окт: a — аранжировки (наборы играющих лейнов); about — \ A
           { key = 'a', label = 'arrangement' .. (ctx.arr_name() and (': ' .. ctx.arr_name()) or '') .. ' …', sub = function() return { title = 'arrangement', items = {
-              { key = 'n', label = 'new, empty: every track gets an empty lane (r renames)', fn = function() ctx.arr('new') end },
-              { key = 'r', label = 'rename the current one', fn = function() ctx.arr_rename_prompt() end },
+              { key = 'o', label = 'new, empty: every track gets an empty lane (n names it)', fn = function() ctx.arr('new') end },
+              { key = 'n', label = 'name the current one', fn = function() ctx.arr_rename_prompt() end },
               { key = 'y', label = 'duplicate the current one', fn = function() ctx.arr('dup') end },
               { key = 'd', label = 'delete the current one (asks; lanes stay)', fn = function() ctx.arr('del') end },
               { key = 'l', label = 'next  (> in the matrix)', fn = function() ctx.arr('next') end },
@@ -19357,19 +19357,20 @@ function region_actions(rg)
     { 'queue after current (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
     { 'jump here now', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
     { 'mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
-    { 'next pattern (>)', key = 'n', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
-    { 'back: previous pattern (<)', key = 'b', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
+    { 'next pattern', key = '>', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
+    { 'previous pattern', key = '<', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
     { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
     { 'alias: linked repeat (A)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
     { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
     { 'resync copies: this pattern to its repeats', key = 'r', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },   -- 21 окт: r (s — секции)
+    -- 4 ноя: одно правило на меню: n — имя, d — удалить, s — разрезать, o — новое, < > — соседний
     -- 27 окт: команды панели patterns — для паттернов выделенных слотов (блок), иначе этого
     { 'glue: the selected slots in a row - one pattern', key = 'g', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_glue() end },
-    { 'knife: split ... (half / 3 / 4 / bars / at the cursor)', key = 'k', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_split_menu() end },
-    { 'edit the name (every place)', key = 'e', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_rename() end },
-    { 'wipe from the song (every place, the time closes)', key = 'w', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_remove() end },
+    { 'split ... (half / 3 / 4 / bars / at the cursor)', key = 's', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_split_menu() end },
+    { 'name (every place)', key = 'n', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_rename() end },
+    { 'delete from the song (every place, the time closes)', key = 'd', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_remove() end },
     -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
     { 'half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
     { 'x2: double the length', key = 'x', g = 'length', fn = function() ctx.region_btn('double') end },
@@ -19377,14 +19378,14 @@ function region_actions(rg)
     { 'matrix zoom (z)', key = 'z', g = 'view', fn = ctx.mx_zoom },
     -- 18 окт: секции — своим подменю (создать из выделенных слотов / time selection, меню секции этого слота)
     -- 21 окт: s — подменю секций целиком: новая (из слотов / выделения времени) и все команды секции этого слота
-    { 'new: from selected slots', key = 'n', g = 'section', fn = function() vim.open_prompt('section ', '') end },
+    { 'new: from selected slots', key = 'o', g = 'section', fn = function() vim.open_prompt('section ', '') end },
     { 'new: from time selection (Tr)', key = 't', g = 'section', fn = function() ctx.tsel_section() end },
     { 'duplicate (new patterns)', key = 'd', g = 'section', fn = function() ctx.sec_cmd('copy') end },
     { 'duplicate linked (same patterns)', key = 'l', g = 'section', fn = function() ctx.sec_cmd('repeat') end },
     { 'launch (quantized)', key = 'q', g = 'section', fn = function() ctx.sec_cmd('launch') end },
     { 'show in the tracker', key = 's', g = 'section', fn = function() ctx.sec_cmd('show') end },
     { 'loop it', key = 'o', g = 'section', fn = function() ctx.sec_cmd('loop') end },
-    { 'rename', key = 'r', g = 'section', fn = function() ctx.sec_cmd('name') end },
+    { 'name', key = 'n', g = 'section', fn = function() ctx.sec_cmd('name') end },
     { 'remove the section (patterns stay)', key = 'x', g = 'section', fn = function() ctx.sec_cmd('del') end },
     { 'remove the section and its patterns', key = 'X', g = 'section', fn = function() ctx.sec_cmd('delall') end },
   }
