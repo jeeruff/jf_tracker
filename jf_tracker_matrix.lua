@@ -413,6 +413,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   local mk_start = marks.start or { name = '=START', bar = '--', missing = true }
   local mk_stop = marks.stop or { name = '=END', bar = '--', missing = true }
   local show_mk = not (ctx and ctx.state and ctx.state.mxmarks == false)   -- 10 окт: s/e выключена — без строк маркеров
+  if not (marks.start or marks.stop) then show_mk = false end   -- 4 ноя: маркеров нет — и строк нет (пустые «=START --» путали; :start / :end ставят)
   if show_mk then mark_row(mk_start, top, 'start'); top = top + L.rh end
   -- колонки по горизонтали (5 окт): сколько влезает, прокрутка MX.hs за
   -- курсором; полоса снизу, если не все
