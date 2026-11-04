@@ -11490,7 +11490,7 @@ ctx = {
   libp_step = function(d)
     local col = cur_col(); if not col then return end
     local list = edit.lib_presets()
-    if #list == 0 then vim.msg = 'no lib presets yet - click the preset name: save'; return end
+    if #list == 0 then vim.msg = 'no lib presets yet - in the browser libs tab \\s (or :libsave name) saves the lib of the cursor track'; return end
     local cur = edit.lib_preset_name(col.track)
     local k = 0
     for i, e in ipairs(list) do if e.name == cur then k = i end end
@@ -15857,9 +15857,11 @@ ctx.inner_tab_cycle = function(dir)
   end
   local f = state.focus
   if f == 'browser' and B.mode ~= 'fx' then
-    local L0 = B.pmpane and { 'files', 'recent', 'db', 'proj', 'libs', 'presets' } or { 'files', 'recent', 'db', 'pm', 'proj', 'libs', 'presets' }   -- 27 окт: recent (map — своя панель)
+    local L0 = {}   -- 4 ноя: порядок как нарисован (B.tab_list), без fx (у неё свой список)
+    for _, t in ipairs(B.tab_list()) do if t ~= 'fx' then L0[#L0 + 1] = t end end
+    if #L0 == 0 then return false end
     local m = nxt(L0, B.mode)
-    B.click(m); vim.msg = 'browser: ' .. m .. '  (Opt+Tab / Opt+Shift+Tab)'
+    B.click(m); vim.msg = 'browser: ' .. B.tab_label(m) .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
   elseif f == 'inst' and state.libtabs then
     state.libtab = nxt({ 'audio', 'instruments', 'automation', 'midi' }, state.libtab)
@@ -20097,6 +20099,10 @@ function ctx.context_items(hover)
     local e = type(hover.browser) == 'number' and B.entries[hover.browser] or B.entries[B.cur]
     local file = (type(hover.browser) == 'string' and B.map_file_of and B.map_file_of(hover.browser))
       or (e and not (e.dir or e.pm or e.trk or e.rgn or e.kit or e.other or e.db or e.empty or e.mark) and B.full(e)) or nil   -- 27 окт: и файл карты (точка, история, корабль)
+    -- 4 ноя: вкладка libs — \s сохраняет lib трека курсора пресетом (:libsave имя)
+    if B.mode == 'libs' then
+      add('Save the lib of the cursor track as a preset (:libsave name)', function() ctx.kit_save_prompt() end, 's')
+    end
     if file then
       local nm = file:match('[^/]+$') or file
       if hover.browser == 'maphub' then vim.msg = 'group: the last played file of it - ' .. nm end   -- 27 окт (7): меню карточки

@@ -1385,6 +1385,18 @@ function B.pm_open(e)
   return true
 end
 
+-- 4 ноя: подвкладки браузера — один список: рисунок, Opt+Tab и t идут в одном порядке (по алфавиту подписей);
+-- presets убраны, recent (папки + прослушанные) подписан fav, rprj — recent (проекты REAPER)
+B.TAB_LABEL = { recent = 'fav', rprj = 'recent' }
+function B.tab_label(t) return B.TAB_LABEL[t] or t end
+function B.tab_list()
+  if B.pmpane and B.mode == 'pm' then return {} end
+  local out = {}
+  for _, t in ipairs({ 'db', 'recent', 'files', 'fx', 'libs', 'pm', 'proj', 'rprj' }) do
+    if not ((t == 'fx' and not (B.fx_draw and not B.panes and not B.pmpane)) or (t == 'pm' and B.pmpane)) then out[#out + 1] = t end
+  end
+  return out
+end
 function B.refresh_pm()
   local pr = B.pmproj
   if not pr then B.set_all(B.read_pm()); return end
@@ -1404,7 +1416,7 @@ function B.read_kits()
   local out = {}
   -- 11 окт: пресеты lib (jf_libs + прежние jf_kits) — Enter заменяет lib трека курсора
   for _, e in ipairs(ctx.lib_presets and ctx.lib_presets() or {}) do out[#out + 1] = { name = e.name, path = e.path, kit = true } end
-  if #out == 0 then out[1] = { name = '(no lib presets yet - the preset name in the lib header: save)', kit = false, dir = false, empty = true } end
+  if #out == 0 then out[1] = { name = '(no lib presets yet - \\s or :libsave name saves the lib of the cursor track)', kit = false, dir = false, empty = true } end
   return out
 end
 
@@ -1860,7 +1872,13 @@ function B.add_recent(path)
   local fn = rfile()
   local f = fn and io.open(fn, 'w')
   if f then f:write(table.concat(rc, '\n'), '\n'); f:close() end
-  if B.mode == 'recent' and not B.pl then B.recent_list() end
+  -- 4 ноя: во вкладке fav сыгранное из списка не прыгает наверх (курсор и порядок на месте) — список
+  -- перестраивается, только если файла в нём ещё нет; порядок обновится при входе во вкладку
+  if B.mode == 'recent' and not B.pl and not B.recent_shown(path) then B.recent_list() end
+end
+function B.recent_shown(path)
+  for _, e in ipairs(B.all or {}) do if e.path == path and not e.zdir then return true end end
+  return false
 end
 -- 28 окт: вкладка zoxide (была recent): сверху лучшие папки zoxide (Enter — туда, во вкладку files), ниже —
 -- недавно прослушанные файлы
@@ -1955,7 +1973,11 @@ function B.key(c)
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
   elseif ch == '/' then B.start_find()                           -- поиск прямо в списке (2 окт); 26 окт: f — прыжок по меткам, как в других модулях
-  elseif ch == 't' then B.set_mode(({ db = 'files', files = 'libs', libs = (B.pmpane and 'presets' or 'pm'), pm = 'presets', presets = 'proj', proj = 'rprj', rprj = 'recent', recent = 'db' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then   -- 4 ноя: по B.tab_list (как нарисовано)
+    local lst, i = {}, 0
+    for _, t in ipairs(B.tab_list()) do if t ~= 'fx' then lst[#lst + 1] = t end end
+    for k, t in ipairs(lst) do if t == B.mode then i = k end end
+    if #lst > 0 then B.set_mode(lst[i % #lst + 1]) end
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -2027,6 +2049,11 @@ function B.player_block(U, L, x, y, w, h, btn, opts)
                          { 'track', 'track', B.via_track }, { 'sync', 'sync', B.sync }, { 'item', 'pvitem', B.pvitem }, { '*.*', 'allfiles', B.all_files }, { '.*', 'hidden', B.hidden } }) do
       if bx + U.measure(b[1]) + 2 * L.pad > x + w then break end
       bx = btn(bx, by, b[1], b[2], b[3])
+    end
+    -- 4 ноя: view (вид списка) — в самом низу справа (было в строке вкладок)
+    if opts.view then
+      local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
+      if vx > bx then btn(vx, by, 'view', 'pvview', false) end
     end
     h = h - L.rh - 4
   end
@@ -2138,14 +2165,9 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'db', 'files', 'libs', 'presets', 'proj', 'rprj', 'recent' }) or B.panes and { 'db', 'files', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' } or (B.fx_draw and { 'db', 'files', 'fx', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' } or { 'db', 'files', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' })) do   -- 4 ноя: по алфавиту подписей (db files fx libs pm presets proj recent zoxide)   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
-      if bx + U.measure(t) + 2 * L.pad > x + w then break end
-      bx = btn(bx, y, t == 'recent' and 'zoxide' or (t == 'rprj' and 'recent' or t), t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
-    end
-    -- 3 ноя: справа — view: маленькие волны у каждой строки вместо одной большой
-    if B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' then   -- 3 ноя: view — меню вида списка
-      local vx = x + w - L.pad - U.measure('view') - 2 * L.pad - 1
-      if vx > bx then btn(vx, y, 'view', 'pvview', false) end
+    for _, t in ipairs(B.tab_list()) do   -- 4 ноя: один список (B.tab_list) — по алфавиту подписей: db fav files fx libs pm proj recent
+      if bx + U.measure(B.tab_label(t)) + 2 * L.pad > x + w then break end
+      bx = btn(bx, y, B.tab_label(t), t, B.mode == t)
     end
     if B.mode == 'fx' and B.fx_draw then           -- вкладка fx: под строкой вкладок — список эффектов
       B.fx_hover = B.fx_draw(x, y + L.rh + 3, w, h - L.rh - 3)
@@ -2159,7 +2181,7 @@ function B.draw(U, L, x, y, w, h)
   end
   do   -- 27 окт (7): плеер — B.player_block (его же зовёт панель map)
     local hv
-    h, hv = B.player_block(U, L, x, y, w, h, btn, { buttons = not (B.pmpane and B.mode == 'pm') })
+    h, hv = B.player_block(U, L, x, y, w, h, btn, { buttons = not (B.pmpane and B.mode == 'pm'), view = B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj' })
     if hv then hover = hv end
   end
   y = y + L.rh + 2; h = h - L.rh - 2
@@ -2189,7 +2211,7 @@ function B.draw(U, L, x, y, w, h)
   if B.mode == 'files' then local rel = B.path:sub(#B.root + 2); where = rel ~= '' and rel or '/'
   elseif B.mode == 'proj' then where = ('project: %d sources'):format(#B.all)
   elseif B.mode == 'rprj' then where = 'recent projects of REAPER, newest first: Enter - open, Shift+Enter - in a new tab'
-  elseif B.mode == 'recent' then where = 'zoxide: folders you go to most, then files played lately (Enter - go / to lib, m - mark, zi - all folders)'   -- 27 окт; 28 окт: zoxide
+  elseif B.mode == 'recent' then where = 'fav: folders you go to most, then files played lately (Enter - go / to lib, m - mark, zi - all folders)'   -- 27 окт; 28 окт: zoxide
   elseif B.mode == 'pm' then where = B.pmproj and ('@' .. (B.pmproj.e.name or '') .. (B.pmdir and ('/' .. B.pmdir) or '')) or (B.pm_folders and ('projects: ' .. (B.pmfolder or '')) or ('jf_pm: %d projects'):format(#B.all))
   else where = B.db and ('db ' .. B.db.name) or 'databases' end
   if B.filter ~= '' or B.filtering then
