@@ -25511,6 +25511,7 @@ local function frame()
       U.text(lx + L.pad, ly + 1, lab, U.AMBER)
     end
   end
+  ctx.mod_arrows()   -- 4 ноя: держишь модификатор — у курсора стрелки h j k l с тем, что они сделают
   ctx.pan_frame()   -- 2 ноя: вид пана — позиция курсора для отрисовки, пан только что набранной ноты
   -- тур tutorial (4 окт): проверка действия шага и всплывашка на его модуле
   if OPT.tour.active then
@@ -32340,6 +32341,39 @@ ctx.pan_cover = function(f)
   local out, seen = {}, {}
   for _, it in ipairs(draw.PV.row(f.col, vim.cur.row, n)) do if it.pos == p and not seen[it.head] then seen[it.head] = true; out[#out + 1] = it.head end end
   return out
+end
+-- 4 ноя: стрелки модификаторов у курсора трекера: сочетание (биты mouse_cap) → что делают h l j k с ним
+ctx.MOD_ARROWS = {
+  [8 | 16] = { h = 'narrower', l = 'wider', j = 'LPB +', k = 'LPB -' },             -- Shift+Opt
+  [8 | 32] = { h = 'start earlier', l = 'start later', j = 'end later', k = 'end earlier' },   -- Ctrl+Shift
+  [16] = { h = 'track', l = 'track', j = 'inst -', k = 'inst +' },                  -- Opt
+  [4] = { h = 'pane', l = 'pane', j = 'pane', k = 'pane' },                         -- Cmd
+  [8] = { h = 'select', l = 'select', j = 'select', k = 'select' },                 -- Shift
+  [4 | 8] = { h = 'move pane', l = 'move pane', j = 'move pane', k = 'move pane' }, -- Cmd+Shift
+  [16 | 32] = { h = 'rate slower', l = 'rate faster', j = 'repeat down' },          -- Ctrl+Opt
+}
+ctx.MOD_ARROWS_PAN = {   -- в виде пана
+  [8 | 16] = { h = 'coarser', l = 'finer', j = 'LPB +', k = 'LPB -' },
+  [8] = { h = 'note <', l = 'note >', j = 'select', k = 'select' },
+}
+ctx.mod_arrows = function()
+  local r = draw.cur_rect; draw.cur_rect = nil
+  if not (r and ctx.mod_t0 and ctx.mod_sig) or state.focus ~= 'tracker' or vim.picker or vim.hydra then return end
+  if reaper.time_precise() - ctx.mod_t0 < 0.12 then return end   -- быстрое сочетание с клавишей — не мигать
+  local m = (r.pan and ctx.MOD_ARROWS_PAN[ctx.mod_sig]) or ctx.MOD_ARROWS[ctx.mod_sig]
+  if not m then return end
+  local x, y, w, h = r[1], r[2], r[3], r[4]
+  local function tag(tx, ty, s)
+    local tw = U.measure(s) + 2 * L.pad
+    tx = math.max(0, math.min(gfx.w - tw, tx))
+    U.set(U.BG); gfx.rect(tx, ty, tw, h, 1)
+    U.set(U.AMBER); gfx.rect(tx, ty, tw, h, 0)
+    U.text(tx + L.pad, ty, s, U.AMBER)
+  end
+  if m.h then local s = m.h .. ' <h'; tag(x - U.measure(s) - 2 * L.pad - 2, y, s) end
+  if m.l then tag(x + w + 2, y, 'l> ' .. m.l) end
+  if m.k then tag(x, y - h - 1, 'k ' .. m.k) end
+  if m.j then tag(x, y + h + 1, 'j ' .. m.j) end
 end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end

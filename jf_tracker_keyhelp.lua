@@ -301,7 +301,7 @@ KH.PAGES = {
     { k = '\\\\q \\\\Q', t = {}, d = 'context menu on a sample: q - the nearest peak onto the row grid; Q - pick the peak, j k to a row, Enter moves it there (stretch marker)' },
     { k = 'vol xx', t = {}, d = 'on any row inside a sample (INSERT, vol field): a point of its take volume envelope - ramps by values, as in Renoise; x-fade by vol writes its ramps the same way (options: x-fade by)' },
     { k = '/ in a name', d = 'renaming a track, instrument, item or region: / lists common names (your SWS auto-colour rules + kick, pad, bell, texture ...), type to filter' },
-    { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - the help pane lists what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere' },
+    { k = 'hold Shift / Ctrl / Opt / Cmd', t = {}, m = 'what a modifier does', d = 'hold a modifier (or two) half a second, no key - the help pane lists what Shift / Ctrl / Opt / Cmd + ... do here, then everywhere; at the cursor tags show what h l j k do with it (Opt+Shift: narrower <h  l> wider, k LPB -, j LPB +)' },
     { k = 'F2', d = 'back to the tracker from anywhere (closes the routing diagram, big router / chain); the item tab is in the F4 circle' },
     { k = 'F3', d = 'mixer on / off (in its routing strip Option+click on a routing name or a wire removes it)' },
     { k = 'F4', d = 'the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)' },
