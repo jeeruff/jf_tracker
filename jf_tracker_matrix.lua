@@ -548,7 +548,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
-    local rgn = rg.gap and (orphan and 'unnamed - n' or 'bar') or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
+    local rgn = rg.gap and (orphan and 'unnamed - n' or '') or   -- 4 ноя: свободный такт — пустая строка, как в трекере (было «bar») (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (orphan and U.AMBER or (rg.gap and U.DIM or lc)))
     -- 17 окт: pads вкл — клавиша паттерна справа у имени (запись — красным)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
@@ -675,7 +675,11 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
           vb.x0 = math.min(vb.x0, x); vb.x1 = math.max(vb.x1, x + L.mx_cell_w); vb.y0 = math.min(vb.y0, y0); vb.y1 = math.max(vb.y1, math.max(y0 + 2, y1))
         end
       end
-      U.set(U.DIM); MX.box(x + 1, y + 1, L.mx_cell_w - 2, rh - 2)
+      -- 4 ноя: как в трекере — пустая клетка точками, без рамки; с событиями — схема (ниже)
+      if #(g.ev or {}) == 0 and not g.envs and not g.envsrc then
+        local dt = ('.'):rep(math.max(1, math.min(3, math.floor((L.mx_cell_w - 4) / math.max(1, U.measure('.'))))))
+        U.text(x + math.floor((L.mx_cell_w - U.measure(dt)) / 2), y + math.floor((rh - L.rh) / 2) + 1, dt, U.DIM)
+      end
       -- 21 окт: нота через границу паттерна — янтарный уголок: внизу справа — уходит в следующий, вверху слева — пришла из прошлого
       if g.xout then U.set(U.AMBER); gfx.triangle(x + L.mx_cell_w - 2, y + rh - 2, x + L.mx_cell_w - 7, y + rh - 2, x + L.mx_cell_w - 2, y + rh - 7) end
       if g.xin then U.set(U.AMBER); gfx.triangle(x + 1, y + 1, x + 6, y + 1, x + 1, y + 6) end
@@ -1069,6 +1073,7 @@ function MX.key(c, regions, snap)
     local right, left = ch == 'l' or c == 1919379572, ch == 'h' or c == 1818584692
     -- 25 окт: и темп, и размер — по порядку на экране (MX.subs из отрисовки), не мимо них
     local subs = MX.subs or { 'len' }
+    if regions[MX.cur.ri] and regions[MX.cur.ri].gap then subs = { 'len' } end   -- 4 ноя: у свободного такта темпа и размера не видно — курсор туда не уходит (пропадал)
     local idx
     for k, sb in ipairs(subs) do if sb == MX.cur.sub then idx = k end end
     if right then
@@ -1095,7 +1100,7 @@ function MX.key(c, regions, snap)
       MX.lenbuf = nil
     end
   end
-  if MX.cur.ci == 1 and (ch == 'h' or c == 1818584692) and not MX.fold and not MX.count then MX.goto_cell(regions, snap, MX.cur.ri, 0); local sb = MX.subs or { 'len' }; MX.cur.sub = sb[#sb]; return true end
+  if MX.cur.ci == 1 and (ch == 'h' or c == 1818584692) and not MX.fold and not MX.count then MX.goto_cell(regions, snap, MX.cur.ri, 0); local sb = (regions[MX.cur.ri] and regions[MX.cur.ri].gap) and { 'len' } or MX.subs or { 'len' }; MX.cur.sub = sb[#sb]; return true end
   -- 12 окт: на номере паттерна (точки .. / <01>) цифры — сам номер, как поле ввода трекера (не счётчик);
   -- ввод кончается сам, когда следующая цифра уже не даст существующий номер
   if MX.cur.ci == -1 and ch:match('^%d$') and ctx.slot_pattern_num then
