@@ -90,6 +90,19 @@ eq('codes: coded names untouched', m['AB'], nil)
 local cnt = 0; for _ in pairs(m) do cnt = cnt + 1 end
 eq('codes: aliases (same name) - one code', cnt, 1)
 
+-- 4 ноя: перенумеровать по порядку
+do
+  local Q = { rg(1, 'A1', 0, 1), rg(2, 'B4 x', 1, 2), rg(3, 'C2', 2, 3), rg(7, '', 3, 4), rg(5, 'D7', 4, 5), rg(6, 'B4 x', 5, 6), rg(8, 'C3', 6, 7), rg(9, 'intro', 7, 8) }
+  local m = S.renumber(Q)
+  eq('renumber: A1 stays', m[1], nil); eq('renumber: B4 x -> B1 x', m[2], 'B1 x'); eq('renumber: C2 -> C1', m[3], 'C1')
+  eq('renumber: unnamed -> D1', m[7], 'D1'); eq('renumber: D7 -> E1', m[5], 'E1'); eq('renumber: repeat B4 x -> B1 x', m[6], 'B1 x')
+  eq('renumber: C3 -> C2 (same family)', m[8], 'C2'); eq('renumber: intro -> F1 intro', m[9], 'F1 intro')
+  local big = {}
+  for k = 1, 28 do big[k] = rg(k, '', k, k + 1) end
+  local mb = S.renumber(big)
+  eq('renumber: 26th -> Z1', mb[26], 'Z1'); eq('renumber: 27th -> Z2', mb[27], 'Z2'); eq('renumber: 28th -> Z3', mb[28], 'Z3')
+end
+
 -- 17 окт: сценарии вечера — секция drop над A1..D1 (:section drop), вставка A2..D2 за ней, зона session
 do
   local R2 = { rg(1, 'A1', 0, 1), rg(2, 'B1', 1, 2), rg(3, 'C1', 2, 3), rg(4, 'D1', 3, 4), rg(6, 'drop', 0, 4), rg(5, '=SESSION', 4.3, 8) }

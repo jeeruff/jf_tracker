@@ -37968,6 +37968,7 @@ ctx.mx_menu = function(pick)
     { key = 'c', label = 'codes: old names get codes (intro -> C1 intro)', fn = function() ctx.codes_convert('codes') end },
     { key = 'h', label = 'codes: to hex (A12 -> AC)', fn = function() ctx.codes_convert('hex') end },
     { key = 'd', label = 'codes: to decimal (AC -> A12)', fn = function() ctx.codes_convert('dec') end },
+    { key = 'r', label = 'codes: renumber in order (A1 B4 C2 #1 D7 -> A1 B1 C1 D1 E1)', fn = function() ctx.codes_convert('seq') end },
   }
   if pick == 'pz' then   -- 4 ноя: кнопка patternize панели patterns — сразу это подменю
     local pz = {}
@@ -38021,14 +38022,16 @@ ctx.mx_menu = function(pick)
 end
 -- 12 окт: переименовать паттерны по коду (все регионы с этим именем — алиасы — вместе), один undo
 ctx.codes_convert = function(how)
-  local map = model.SEC.convert(regions, how)
+  local map, byidx = {}, nil
+  if how == 'seq' then byidx = model.SEC.renumber(regions) else map = model.SEC.convert(regions, how) end   -- 4 ноя: seq — по порядку, по номеру региона
   local n = 0
   edit.run('pattern codes: ' .. how, function()
     local i = 0
     while true do
       local ret, isr, pos, e, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
       if not ret or ret == 0 then break end
-      if isr and map[nm] then reaper.SetProjectMarkerByIndex(0, i, true, pos, e, idx, map[nm], col); n = n + 1 end
+      local nn = isr and (byidx and byidx[idx] or map[nm])
+      if nn then reaper.SetProjectMarkerByIndex(0, i, true, pos, e, idx, nn, col); n = n + 1 end
       i = i + 1
     end
   end)
@@ -38046,7 +38049,7 @@ ctx.drumstr_cmd = function(arg)
 end
 ctx.codes_cmd = function(arg)
   local a = (arg or ''):match('%S+') or ''
-  if a == 'codes' or a == 'hex' or a == 'dec' then ctx.codes_convert(a) else vim.msg = ':codes codes|hex|dec - old names get codes / codes to hex (AF) / to decimal (A15)' end
+  if a == 'codes' or a == 'hex' or a == 'dec' or a == 'seq' then ctx.codes_convert(a) else vim.msg = ':codes codes|hex|dec|seq - old names get codes / codes to hex (AF) / to decimal (A15) / renumber in order (A1 B1 C1 …)' end
 end
 ctx.patternize_cmd = function(arg)
   local a = (arg or ''):match('%S+') or ''

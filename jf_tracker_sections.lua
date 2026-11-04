@@ -85,6 +85,34 @@ function S.convert(pats, how)
   return map
 end
 
+-- 4 ноя: перенумеровать паттерны по порядку (pats — по pos, без секций): семейства — буквы A B C … в порядке
+-- первого появления, варианты внутри — 1 2 3 …; безымянный регион и имя без кода — своё семейство (одинаковые
+-- имена — один код, имя остаётся после кода). A1 B4 C2 #1 D7 → A1 B1 C1 D1 E1. → { [idx региона] = новое имя }
+function S.renumber(pats, style)
+  local fam, nfam, out = {}, 0, {}
+  local function letter(k) return string.char(64 + k) end
+  for _, r in ipairs(pats) do
+    local nm = r.name or ''
+    if not r.lib and not r.session and not nm:match('^=') then
+      local l, n, rest = S.code_of(nm)
+      local fk, vk = l and ('L' .. l) or ('N' .. (nm ~= '' and nm or ('#' .. tostring(r.idx)))), l and n or 1
+      if not l then rest = nm end
+      local f = fam[fk]
+      if not f then   -- после Z — все в Z, варианты дальше по счёту
+        nfam = nfam + 1
+        f = nfam <= 26 and { l = letter(nfam), v = {}, nv = 0 } or fam.Z or { l = 'Z', v = {}, nv = 0 }
+        if nfam >= 26 then fam.Z = f end
+        fam[fk] = f
+      end
+      vk = fk .. '|' .. tostring(vk)
+      if not f.v[vk] then f.nv = f.nv + 1; f.v[vk] = f.nv end
+      local nn = S.fmt(f.l, f.v[vk], style) .. (rest ~= '' and (' ' .. rest) or '')
+      if nn ~= nm then out[r.idx] = nn end
+    end
+  end
+  return out
+end
+
 local function inside(a, b) return a ~= b and a.pos >= b.pos - EPS and a.rgnend <= b.rgnend + EPS and a.rgnend - a.pos < b.rgnend - b.pos - EPS end
 
 -- regions (по pos) → паттерны, секции. Служебные (lib / session / =имена) остаются паттернами как есть.

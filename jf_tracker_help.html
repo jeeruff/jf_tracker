@@ -376,7 +376,7 @@ typed on a free bar makes a pattern there. A region without a code over other re
 first and last pattern after every edit. Old names keep working as patterns. Codes are two characters by default
 (<code>A1</code> … <code>A9</code>, <code>AA</code> … <code>AF</code>, the variant a hex digit); option <i>pattern codes</i> = dec makes
 <code>A10</code>, <code>A11</code>; both kinds are read. The matrix <b>menu</b> converts: <kbd>c</kbd> old names get codes,
-<kbd>h</kbd> / <kbd>d</kbd> codes to hex / decimal (<code>:codes codes|hex|dec</code>).</p>
+<kbd>h</kbd> / <kbd>d</kbd> codes to hex / decimal, <kbd>r</kbd> renumber in order: <code>A1 B4 C2 #1 D7</code> → <code>A1 B1 C1 D1 E1</code>, variants of a letter stay together (<code>:codes codes|hex|dec|seq</code>).</p>
 <table>
 <tr><td><kbd>Space</kbd> on a slot</td><td>queue it: it starts at the end of the playing one (live); the button <code>space: play</code> makes it a plain play / stop, as in the tracker</td></tr>
 <tr><td><kbd>o</kbd> <kbd>O</kbd> <kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd></td><td>new slot after / before, delete, copy, paste: slots edit like Vim lines</td></tr>
