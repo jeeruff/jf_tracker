@@ -7249,6 +7249,7 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   end
   set(U.readable(U.GREY, dark, 3)); gfx.rect(x + 1, yp(0), 2, 1, 1)                        -- риска 0 dB
   set(U.readable((hotf or kon) and U.AMBER or U.TEXT, dark, 4)); gfx.rect(x + 1, yp(db) - 1, w - 2, 3, 1)
+  if D.slr and not col.master then D.slr[#D.slr + 1] = { g = 'mix', ori = 'v', col = col, trk = 'vol', name = col.name or '', x = x, y = y0, w = w, h = th } end   -- 4 ноя: CONTROL — и узкие полосы (брался только мастер)
   if hotf then hover.trs = { col = col, what = 'vol', vert = true, y0 = y1 - 2, h = th - 4, sv = math.max(0, math.min(1, (y1 - 2 - my) / math.max(1, th - 4))) } end
   if D.csel_on(col.guid, 'vol') then csel_frame(x, y0, w, th) end
   hint('trs', x, y0, w, th, { col = col, what = 'vol' })
