@@ -3194,7 +3194,7 @@ function V.key_impl(c)
       elseif c == ('l'):byte() then if ctx.lpb_menu then ctx.lpb_menu() end   -- 1 ноя: zl — пресеты LPB (T триоли, D квинтоли)
       elseif c == ('h'):byte() then if ctx.fit_height then ctx.fit_height() end   -- 31 окт: zh — вид (паттерн / секция / проект) по высоте в экран
       elseif c == ('Z'):byte() then if ctx.fixed_toggle then ctx.fixed_toggle() end   -- 12 окт: zZ — фиксированный курсор (zz — один раз в центр, zZ — всегда)
-      elseif c == ('t'):byte() then st.row0 = math.max(0, V.cur.row)   -- 12 окт: zt — снова Vim: строка курсора наверх (транспозиция — Opt/Shift/Ctrl+F1 F2, меню)
+      elseif c == ('t'):byte() then if ctx.zoom_track then ctx.zoom_track() end   -- 4 ноя: zt — зум трека (все его события, остальные свёрнуты); строка наверх — zb / zz
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
         local f = flat()[V.cur.fi]

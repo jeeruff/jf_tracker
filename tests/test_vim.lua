@@ -233,7 +233,7 @@ V.cur.fi, V.cur.row = 1, 8; keysin('w'); eq('w → next event of the track (@16)
 -- прокрутка держит курсор
 V.cur.fi = 1; V.cur.row = 0; state.row0 = 0
 keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
-keysin('zt');  eq('zt: cursor row to the top (Vim, 12 окт)', state.row0, 20)
+keysin('zt');  eq('zt: zoom the track (4 ноя), not the Vim scroll', V.pending, nil)
 keysin(':transpose\r'); eq(':transpose opens the transpose popup', (last() or ''):match('^smart:transpose') ~= nil, true)
 SMART_P.on_pick({ v = 3 }); eq('popup +3 transposes the note of the row', (last() or ''):match('^transpose:.*:%+3$') ~= nil or (last() or ''):match('^smart') ~= nil, true)
 V.cur.row = 20

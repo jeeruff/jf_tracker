@@ -33901,6 +33901,30 @@ ctx.fit_slim = function()
   relayout()
   vim.msg = ('zw slim: %d tracks - only the command columns in use, empty tracks compact (zw - even again)'):format(nslim)
 end
+-- 4 ноя: zt — зум трека: трек курсора во всю ширину со всеми событиями (колонки нот, команды, автоматизация, MIDI-лейны),
+-- остальные — свёрнуты полоской (события видны точками, контекст); ещё раз — как было
+ctx.zoom_track = function()
+  local function copy(t) local o = {}; for k, v in pairs(t or {}) do o[k] = v end; return o end
+  local zt = ctx.zt_saved
+  if zt then
+    ctx.zt_saved = nil
+    for _, c in ipairs(snap.cols) do ctx.fold(c, zt.folds[c.guid]) end
+    state.wlevel, state.trackenvs, state.hscroll = zt.wlevel, zt.trackenvs, zt.hscroll
+    relayout(); vim.msg = 'zt: back'
+    return
+  end
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  local cur = f and f.col
+  if not cur then vim.msg = 'zt: no track under the cursor'; return end
+  ctx.zt_saved = { folds = copy(state.folds), wlevel = copy(state.wlevel), trackenvs = state.trackenvs and copy(state.trackenvs) or nil, hscroll = state.hscroll }
+  for _, c in ipairs(snap.cols) do ctx.fold(c, c.guid ~= cur.guid or nil) end
+  state.wlevel = state.wlevel or {}
+  state.wlevel[cur.guid] = L.MAXLVL or 10
+  state.trackenvs = state.trackenvs or {}
+  state.trackenvs[cur.guid] = true
+  relayout()
+  vim.msg = 'zt: ' .. (cur.name or 'track') .. ' - all its events, the others folded (zt again - back)'
+end
 ctx.fit_width = function()
   local now = reaper.time_precise()
   if ctx.zw_t and now - ctx.zw_t < 8 and ctx.zw_mode == 'even' then ctx.zw_t, ctx.zw_mode = now, 'slim'; return ctx.fit_slim() end
