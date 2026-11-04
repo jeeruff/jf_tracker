@@ -19642,7 +19642,9 @@ local function context_menu(hover, anchor)
     if k then G.used[k] = true; G[#G + 1] = { key = k, label = label, fn = fn, hk = (hk ~= k) and hk or nil } end   -- 21 окт: хоткей — колонкой
   end
   local function pick_key(want, label)
-    local k = want and not used[want] and want or nil
+    -- 4 ноя: ? держится в запасе от авто-букв, но пункт, который просит ? сам (manual), его получает (был a)
+    local k = want and (not used[want] or (want == '?' and used['?'] == true and not used['?taken'])) and want or nil
+    if k == '?' then used['?taken'] = true end
     if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
     if not k then for ch in ('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):gmatch('.') do if not used[ch] then k = ch; break end end end
     if k then used[k] = true end
