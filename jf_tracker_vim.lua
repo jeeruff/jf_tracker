@@ -158,12 +158,10 @@ end
 -- Визуальный порядок полей (просьба 1 окт): нота, vol, fx1..n, delay.
 -- Номера полей логические (1 нота, 2 vol, 3 delay, 4+ fx) — меняется
 -- только обход h/l и $; draw кладёт x_fx перед x_del тем же порядком.
-local function vorder(fi)
+local function vorder(fi)   -- 4 ноя: delay теперь сразу за vol (draw f3741ff): нота, vol, delay, fx1..n
   local nf = nfields(fi)
-  local o = { 1 }
-  if nf >= 2 then o[#o + 1] = 2 end
-  for k = 4, nf do o[#o + 1] = k end
-  if nf >= 3 then o[#o + 1] = 3 end
+  local o = {}
+  for k = 1, nf do o[k] = k end
   return o
 end
 local function vpos(fi, fld)
@@ -174,8 +172,53 @@ function V.last_field(fi) local o = vorder(fi); return o[#o] end
 V.vorder = vorder                    -- 10 окт: линейка прыжков по ячейкам (порядок полей, как ходит l)
 
 -- шаг по полям: через границу подколонки
+-- 4 ноя: лейн, где команды подколонок стоят блоком справа от всех нот (draw: f.fxx) — шаги по x на экране
+local function fld_x(G, fld)
+  if fld == 1 then return G.x_note or 0 elseif fld == 2 then return G.x_vol or 0 elseif fld == 3 then return G.x_del or 0 end
+  return (G.x_fx and G.x_fx[fld - 3]) or G.x_del or 0
+end
+local function lane_seq(fi)
+  local F = flat(); local f = F[fi]
+  if not (f and f.lf0) then return nil end
+  local a, b = f.lf0, f.lf0
+  while F[b + 1] and F[b + 1].lf0 == a do b = b + 1 end
+  local any = false
+  for i = a, b do if F[i].fxx then any = true end end
+  if not any then return nil end
+  local seq = {}
+  for i = a, b do for _, fl in ipairs(vorder(i)) do seq[#seq + 1] = { fi = i, fld = fl, k = (F[i].sx or 0) + fld_x(F[i].G or {}, fl) } end end
+  table.sort(seq, function(p, q) return p.k < q.k end)
+  return seq, a, b
+end
 local function step_field(dir, n)
   local fi, fld = V.cur.fi, V.cur.field or 1
+  if lane_seq(fi) or (fi + dir >= 1 and lane_seq(fi + dir)) then
+    for _ = 1, n do
+      local seq, a, b = lane_seq(fi)
+      local moved = false
+      if seq then
+        local i = 1
+        for j, p in ipairs(seq) do if p.fi == fi and p.fld == fld then i = j end end
+        i = i + dir
+        if seq[i] then fi, fld = seq[i].fi, seq[i].fld; moved = true
+        else fi = dir > 0 and b or a end
+      end
+      if not moved then
+        local o = vorder(fi)
+        local p = vpos(fi, fld) + dir
+        if seq or p < 1 or p > #o then
+          local nfi = fi + dir
+          if nfi >= 1 and nfi <= nflat() then
+            fi = nfi
+            local s2 = lane_seq(fi)
+            if s2 then local e = dir > 0 and s2[1] or s2[#s2]; fi, fld = e.fi, e.fld
+            else local o2 = vorder(fi); fld = dir > 0 and o2[1] or o2[#o2] end
+          end
+        else fld = o[p] end
+      end
+    end
+    return fi, fld
+  end
   local pos = vpos(fi, fld)
   for _ = 1, n do
     pos = pos + dir

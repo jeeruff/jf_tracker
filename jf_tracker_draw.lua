@@ -549,6 +549,22 @@ function D.layout(snap, state, nregions)
     cache[G] = k
     return k
   end
+  -- 4 ноя: команды подколонки — отдельным блоком справа от всех колонок нот лейна. off — сдвиг блока
+  -- от начала подколонки; «+ ~» (x_fold) встаёт сразу за delay; sub_w — только часть ноты
+  L.GSc = setmetatable({}, { __mode = 'k' })
+  function L.splitG(G, off)
+    local byG = L.GSc[G] or {}
+    L.GSc[G] = byG
+    if byG[off] then return byG[off] end
+    local a = G.x_fx[1]
+    local fx_end = G.x_fx[#G.x_fx] + L.w_fx + L.pad
+    local foldw = G.x_fold and (G.sub_w - fx_end) or 0
+    local fx2 = {}
+    for n, v in ipairs(G.x_fx) do fx2[n] = v - a + off end
+    local k = setmetatable({ x_fx = fx2, x_fold = G.x_fold and (a - L.pad + 1) or G.x_fold, sub_w = a + foldw, fx_off = off }, { __index = G })
+    byG[off] = k
+    return k
+  end
   -- 21 окт: чистый MIDI-трек (ни аудио в лейне, ни сэмплов в lib, не кит) — без колонки волны: поля левее на её ширину
   L.GWc = setmetatable({}, { __mode = 'k' })
   function L.nowaveG(G)
@@ -985,8 +1001,10 @@ function D.layout(snap, state, nregions)
         if lvl and lvl > 3 + L.MAXFX and li == 1 then nsub = math.max(nsub, 1 + lvl - 3 - L.MAXFX) end   -- шире всех fx — подколонки нот
         local ln = { lane = lane, x = lx, nsub = nsub, f0 = #L.flat + 1, sx = {} }
         local off = 0
+        local parts = {}
         for si = 1, nsub do
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
+          if narrow and lvl == L.MAXLVL and not c.compact then narrow = false end   -- 4 ноя: самый широкий уровень колеса — у каждой колонки нот свои поля и эффекты (MPE)
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
@@ -1027,13 +1045,34 @@ function D.layout(snap, state, nregions)
               wave = state.wavemode == 'column' and 'spec' or 'peaks', x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
             G = L.GW[ww]
           end
-          local sw = G and G.sub_w or L.sub_w
-          ln.sx[si] = off
-          L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
-                                  x = vis and (lx + off) or nil, w = sw, narrow = narrow or nil, G = G,
-                                  compact = c.compact or nil }
-          off = off + sw
+          parts[si] = { G = G or L, narrow = narrow }
         end
+        -- 4 ноя: как в Renoise — все колонки нот слева, эффекты справа: у подколонки с командами часть
+        -- «нота … delay» стоит среди нот, её команды — блоком после всех нот (в том же порядке колонок)
+        local split = nsub > 1
+        local fxtot = 0
+        for si = 1, nsub do
+          local G = parts[si].G
+          local fp = (split and (G.nfx or 0) > 0 and G.x_fx and G.x_fx[1]) and (G.x_fx[#G.x_fx] + L.w_fx + L.pad - G.x_fx[1]) or 0
+          parts[si].fp = fp
+          parts[si].np = (G.sub_w or L.sub_w) - fp
+          off = off + parts[si].np
+          fxtot = fxtot + fp
+        end
+        local nx, fxo = 0, off
+        ln.fx0 = fxtot > 0 and fxo or nil
+        for si = 1, nsub do
+          local pt = parts[si]
+          local G = pt.G
+          if pt.fp > 0 then G = L.splitG(G, fxo - nx); fxo = fxo + pt.fp end
+          ln.sx[si] = nx
+          L.flat[#L.flat + 1] = { ci = ci, col = col, lane = lane, li = li, si = si, sub = lane.subs[si] or {},
+                                  x = vis and (lx + nx) or nil, w = pt.np, narrow = pt.narrow or nil, G = G,
+                                  compact = c.compact or nil, sx = nx, lf0 = ln.f0,
+                                  fxx = pt.fp > 0 and G.fx_off or nil, fxw = pt.fp > 0 and pt.fp or nil }
+          nx = nx + pt.np
+        end
+        off = nx + fxtot
         ln.w = off
         c.lanes[#c.lanes + 1] = ln
         lx = lx + ln.w + 1
@@ -9566,6 +9605,8 @@ function D.frame(L, snap, rows, state, info)
     if vc and vo and L.flat then
       local idx, cur_i = 0, nil
       local pos = {}
+      local all = {}   -- 4 ноя: все шаги (и вне экрана) — для порядка по экрану в лейнах с блоком команд справа
+      local function rec(e) all[#all + 1] = e; if e.f.x then pos[#pos + 1] = e end end
       for fi, f in ipairs(L.flat) do
         local G = f.G or L
         local inst_ok = not (f.env or f.folded) and G.x_inst and true or false   -- 21 окт: и свёрнутый MIDI (GCM: нота | инстр. | vol) — курсор туда ходит   -- 11 окт: x_inst = false у узких подколонок (false ~= nil давало шаг в невидимое поле)
@@ -9574,7 +9615,7 @@ function D.frame(L, snap, rows, state, info)
           for i = 1, D.PANN do
             idx = idx + 1
             if fi == vc.fi and i == cp then cur_i = idx end
-            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'pan', pp = i } end
+            rec({ i = idx, f = f, fld = 'pan', pp = i })
           end
         end
         for _, fld in ipairs(f.pan and {} or vo(fi)) do
@@ -9582,32 +9623,56 @@ function D.frame(L, snap, rows, state, info)
           if fld == 1 and (G.w_wave or 0) > 0 and not (f.env or f.folded or f.ml) then   -- 22 окт: и у узкой (уровень «нота», GC) — волна там есть
             idx = idx + 1
             if fi == vc.fi and vc.sub == 'wave' then cur_i = idx end
-            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'wave' } end
+            rec({ i = idx, f = f, fld = 'wave' })
           end
           idx = idx + 1
           local half = type(fld) == 'number' and fld >= 4 and not (f.env or f.compact or f.folded)   -- 12 окт: поле команды — два шага (код | значение)
           if fi == vc.fi and fld == (vc.field or 1) and vc.sub ~= 'inst' and vc.sub ~= 'slc' and vc.sub ~= 'pan' and vc.sub ~= 'wave' and not (half and vc.sub == 'val') then cur_i = idx end
-          if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = half and 'code' or nil } end
+          rec({ i = idx, f = f, fld = fld, half = half and 'code' or nil })
           if half then
             idx = idx + 1
             if fi == vc.fi and fld == vc.field and vc.sub == 'val' then cur_i = idx end
-            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = fld, half = 'val' } end
+            rec({ i = idx, f = f, fld = fld, half = 'val' })
           end
           if fld == 2 and (f.G or L).x_pan and not (f.env or f.compact or f.folded) then   -- 14 окт: подполе пана — шаг
             idx = idx + 1
             if fi == vc.fi and vc.field == 2 and vc.sub == 'pan' then cur_i = idx end
-            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'pan' } end
+            rec({ i = idx, f = f, fld = 'pan' })
           end
           if fld == 1 and inst_ok then          -- подполе инструмента — тоже шаг (10 окт)
             idx = idx + 1
             if fi == vc.fi and vc.sub == 'inst' then cur_i = idx end
-            if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'inst' } end
+            rec({ i = idx, f = f, fld = 'inst' })
             if G.x_slc and not G.notes_only then   -- 11 окт: и подполе слайса — шаг
               idx = idx + 1
               if fi == vc.fi and vc.sub == 'slc' then cur_i = idx end
-              if f.x then pos[#pos + 1] = { i = idx, f = f, fld = 'slc' } end
+              rec({ i = idx, f = f, fld = 'slc' })
             end
           end
+        end
+      end
+      do   -- 4 ноя: лейн с командами справа — номера шагов по x на экране (как ходит l), внутри диапазона лейна
+        local groups = {}
+        for _, e in ipairs(all) do
+          local f = e.f
+          if f.lf0 and L.flat[f.lf0] and (function() for k = f.lf0, #L.flat do local g = L.flat[k]; if g.lf0 ~= f.lf0 then break end; if g.fxx then return true end end end)() then
+            local G = f.G or L
+            local fx0, _ = D.field_rect(G, e.fld)
+            e.key = (f.sx or 0) + (fx0 or 0) + (e.half == 'val' and 0.5 or 0)
+            groups[f.lf0] = groups[f.lf0] or {}
+            table.insert(groups[f.lf0], e)
+          end
+        end
+        local remap = {}
+        for _, g in pairs(groups) do
+          local lo = math.huge
+          for _, e in ipairs(g) do lo = math.min(lo, e.i) end
+          table.sort(g, function(p, q) return p.key < q.key end)
+          for r, e in ipairs(g) do remap[e.i] = lo + r - 1 end
+        end
+        if next(remap) then
+          if cur_i and remap[cur_i] then cur_i = remap[cur_i] end
+          for _, e in ipairs(all) do if remap[e.i] then e.i = remap[e.i] end end
         end
       end
       D.jr_master_d = cur_i and (idx + 1 - cur_i) or nil   -- 20 окт: шагов l до сложенного мастера (за последней ячейкой)
@@ -10076,7 +10141,7 @@ function D.frame(L, snap, rows, state, info)
           if vis.field and not f.env and not f.ml then   -- 19 окт: v на поле — только оно
             local fx2, fw2 = D.field_rect(f.G or L, vis.field)
             if fx2 then gfx.rect(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0, 1) end
-          else gfx.rect(f.x, y0, f.w, y1 - y0, 1) end
+          else gfx.rect(f.x, y0, f.w, y1 - y0, 1); if f.fxx then gfx.rect(f.x + f.fxx, y0, f.fxw, y1 - y0, 1) end end   -- 4 ноя: и блок команд
         end
       end
       gfx.a = 1
@@ -10348,7 +10413,7 @@ function D.frame(L, snap, rows, state, info)
               D.typed_at = { x = x + fx, y = y, ty = ty, w = fw, s = '[' .. info.typed .. '_]' }   -- 15 окт: прямо на ячейке курсора
             end
             D.cur_box = nil; D.fx_half = nil
-            if in_body and mx >= x and mx < x + f.w then
+            if in_body and ((mx >= x and mx < x + f.w) or (f.fxx and mx >= x + f.fxx and mx < x + f.fxx + f.fxw)) then   -- 4 ноя: и блок команд справа
               hover.fi = fi; hover.cell = cell; hover.col = c.col
               -- 19 окт: колонки команд — по геометрии этой подколонки (у трека их бывает больше общего L.nfx);
               -- промежуток между полями — ближайшее (щелчок по пустой ячейке ставит курсор в её поле)
@@ -10523,7 +10588,7 @@ function D.frame(L, snap, rows, state, info)
                   local fxs = cell and (cell.fx or (cell.kind == 'cont' and cell.fx)) or nil
                   for k = 1, (G.nfx or L.nfx) do
                     local fxx = (G.x_fx or L.x_fx)[k]
-                    if fxx and fxx < (f.w or L.sub_w) and (line or (fxs and fxs[k])) then hint('cell', f.x + fxx, y, L.w_fx, L.rh, { fi = fi, row = r.row, field = 3 + k }) end
+                    if fxx and (fxx < (f.w or L.sub_w) or f.fxx) and (line or (fxs and fxs[k])) then hint('cell', f.x + fxx, y, L.w_fx, L.rh, { fi = fi, row = r.row, field = 3 + k }) end
                   end
                 end
               end
@@ -10720,6 +10785,7 @@ function D.frame(L, snap, rows, state, info)
     for li, ln in ipairs(c.lanes) do
       if li > 1 then vl(ln.x - 1, U.DIM) end
       for si = 2, ln.nsub do vl(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), D.EMPTY) end
+      if ln.fx0 then vl(ln.x + ln.fx0, D.EMPTY) end   -- 4 ноя: граница «ноты | команды»
     end
     for _, ev in ipairs(c.envs) do vl(ev.x - 1, U.DIM) end
     for _, m in ipairs(c.mls or {}) do vl(m.x - 1, U.DIM) end
