@@ -7206,7 +7206,9 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   if L and not col.master and col.fx and #col.fx > 0 then
     local rowh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2)
     local room = (y1 - y0) - (w | 1) - 2 - 3 * (bh + 2) - 3 * L.rh - 2   -- кноб, M S R и 3 строки фейдера остаются
-    local nfx = math.min(#col.fx, math.max(0, math.floor(room / rowh)))
+    local fit = math.max(0, math.floor(room / rowh))
+    D.mini_fxn_next = math.max(D.mini_fxn_next or 0, math.min(#col.fx, fit))
+    local nfx = math.min(#col.fx, fit)
     for k = 1, nfx do
       local f = col.fx[k]
       local nm = (f.name or ''):gsub('^%w+i?:%s*', ''):gsub('%s*%b()%s*$', '')
@@ -7218,7 +7220,11 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
       if hot then hover.hdrfx = { col = col, k = k, it = { name = f.name, off = f.enabled == false, k = k, i = f.i } } end
     end
     if nfx < #col.fx and nfx > 0 then D.small_text(x + w - D.small_measure('+') - 1, y0 + (nfx - 1) * rowh, '+', U.GREY) end
-    if nfx > 0 then y0 = y0 + nfx * rowh + 2 end
+  end
+  -- 4 ноя: место под эффекты — одно на все узкие полосы (по самой загруженной): кнобы и фейдеры на одной линии
+  if L and not col.master then
+    local res = math.min(D.mini_fxn or 0, math.max(0, math.floor(((y1 - y0) - (w | 1) - 2 - 3 * (bh + 2) - 3 * L.rh - 2) / math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2))))
+    if res > 0 then y0 = y0 + res * math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2) + 2 end
   end
   if y1 - y0 >= kd + 14 then
     local r = kd >> 1
@@ -8401,6 +8407,7 @@ function D.frame(L, snap, rows, state, info)
   end
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
+  D.mini_fxn, D.mini_fxn_next = D.mini_fxn_next, nil   -- 4 ноя: узкие полосы — строк эффектов у всех поровну (наибольшее с прошлого кадра)
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w
@@ -8516,7 +8523,7 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       local nmh = (fy0 and not L.mix_bottom) and (fy0 - 4 - (hy + 2)) or (L.header_h - 5 - HX)
-      D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, col.name ~= '' and col.name or '-', U.readable(ncol, rbg, 4.5), rbg, true)
+      D.vtext(c.x + math.floor((c.w - L.th) / 2), hy + 2, nmh, nm, U.readable(ncol, rbg, 4.5), rbg, true)   -- 4 ноя: и свёрнутая — со знаком папки - / >
       if fy0 and fy1 - fy0 >= 12 then D.mini_strip(col, c.x + 2, c.w - 3, fy0, fy1, info, hover, mx, my, L) end   -- 11 окт: + мини-кноб панорамы
     elseif not c.master then
       -- 20 окт: big trackname — крупно (x1.5 / x2), по ширине колонки
