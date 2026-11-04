@@ -9171,15 +9171,7 @@ function D.frame(L, snap, rows, state, info)
         local now = reaper.time_precise()
         if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then
           for ch = 0, 1 do hold.max = math.max(hold.max, reaper.Track_GetPeakHoldDB(col.track, ch, false) * 100) end
-          -- 4 ноя: declip — удержание пика (число над метром и клип) само сбрасывается через N с после последнего
-          -- подъёма (опция declip, умолчание 10 с; off — как в REAPER, до щелчка). Нативный сброс — Track_GetPeakHoldDB(…, true)
-          local dc = tonumber(state.declip) or 10
-          if hold.max > (hold.pmax or -150) + 0.05 then hold.pt = now end
-          hold.pmax = hold.max
-          if dc > 0 and hold.max > -150 and hold.pt and now - hold.pt > dc then
-            for ch = 0, 1 do reaper.Track_GetPeakHoldDB(col.track, ch, true) end
-            hold.max, hold.pmax, hold.pt = -150, -150, nil
-          end
+          -- 4 ноя: declip — в главном цикле (ctx.declip_tick: все треки и мастер, не только нарисованные)
         end
         hold.clip = hold.max > 0
         -- 4 ноя: fader style apart — метр слева, справа своя дорожка фейдера (ручка не ложится на метр)
@@ -9268,7 +9260,9 @@ function D.frame(L, snap, rows, state, info)
           if ms(ptxt) > bw0 then ptxt = ('%+.0f'):format(hold.max) end                 -- 9 окт: не вылезать за коробку
           if ms(ptxt) <= bw0 then text(bx0 + math.floor((bw0 - ms(ptxt)) / 2), pty, ptxt, hold.clip and U.readable(U.RED, rbg, 3) or U.readable(U.GREY, rbg, 3)) end
         end
-        if mx >= bx0 and mx < bx0 + bw0 and my >= pty and my < ty0 - 6 then hover.mixpk = col.track end
+        local pkx0, pkx1 = bx0, bx0 + bw0
+        if lufs_w > 0 then pkx0, pkx1 = bx0 - 2 - lufs_w, bx0 + bw0 + 2 + lufs_w end   -- 4 ноя: у мастера числа L R над столбиками LUFS — щелчок и там
+        if mx >= pkx0 and mx < pkx1 and my >= pty and my < ty0 - 6 then hover.mixpk = col.track end
         local last_ly
         for _, m in ipairs(state.dbmarks ~= false and { 6, 0, -6, -12, -24, -48 } or {}) do   -- быстрая опция dB marks
           local yy = ypos(m)

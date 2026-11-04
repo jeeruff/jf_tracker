@@ -22661,6 +22661,29 @@ end
 -- 4 ноя: метр микшера — все каналы выхода трека (I_NCHAN) и, если трек взведён на аудиовход, вход
 -- (GetInputActivityLevel по каналам входа: моно 1, стерео 2, мультиканальный — по числу каналов трека); раз в кадр
 ctx.meter_cache = {}
+-- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
+-- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
+ctx.declip = { t = 0, hold = {} }
+ctx.declip_tick = function()
+  local dc = tonumber(state.declip) or 10
+  local now = reaper.time_precise()
+  local D = ctx.declip
+  if dc <= 0 or now - D.t < 0.25 then return end
+  D.t = now
+  local function one(tr)
+    local m = math.max(reaper.Track_GetPeakHoldDB(tr, 0, false), reaper.Track_GetPeakHoldDB(tr, 1, false)) * 100
+    local h = D.hold[tr]
+    if not h then h = { m = -150 }; D.hold[tr] = h end
+    if m > h.m + 0.05 then h.t = now end
+    h.m = m
+    if m > -150 and h.t and now - h.t > dc then
+      for _, ch in ipairs({ 0, 1, 1024, 1025 }) do reaper.Track_GetPeakHoldDB(tr, ch, true) end
+      h.m, h.t = -150, nil
+    end
+  end
+  one(reaper.GetMasterTrack(0))
+  for i = 0, reaper.CountTracks(0) - 1 do one(reaper.GetTrack(0, i)) end
+end
 ctx.track_meter = function(col)
   local v = ctx.meter_cache[col]
   if v then return v.out, v.inp end
@@ -23757,7 +23780,7 @@ local function frame()
       end
     end
   end
-  peak_cache = {}; ctx.meter_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
+  ctx.declip_tick(); peak_cache = {}; ctx.meter_cache = {}; scope_cache = {}; spec_cache = {}; fxv_cache = {}; view_cache = {}   -- env_cache — по ключу состояния (env_values)
   local is_playing = playing()
   -- упреждение курсора (3 окт, опция cursor lead): позиция читается в начале
   -- тика defer, а на экран кадр попадает позже (~полкадра при 30 Гц) — курсор
