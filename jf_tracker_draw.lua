@@ -9084,7 +9084,10 @@ function D.frame(L, snap, rows, state, info)
         end
         hold.clip = hold.max > 0
         local now = reaper.time_precise()
-        local mw = math.max(2, math.floor((bw0 - 10) / 2))
+        -- 4 ноя: fader style apart — метр слева, справа своя дорожка фейдера (ручка не ложится на метр)
+        local fcap = D.fadercap or 'line'
+        local flw = fcap == 'apart' and math.max(5, math.floor(bw0 * 0.3)) or 0
+        local mw = math.max(2, math.floor((bw0 - 10 - flw) / 2))
         -- 22 окт: где-то solo — у остальных каналов метр тусклее и маленькая яркая s! (их не слышно)
         local muted_by_solo = false
         if not col.solo and not col.master then
@@ -9210,7 +9213,16 @@ function D.frame(L, snap, rows, state, info)
         -- ручка: 11 окт — просто риска «__» во всю коробку (была колпачком в рамке)
         local hy2 = ypos(db)
         local hc = U.readable((hot or kon) and U.AMBER or U.TEXT, dark, 4)
-        set(hc); gfx.rect(bx0 + 1, hy2, bw0 - 2, 2, 1)
+        set(hc)
+        if fcap == '==' then gfx.rect(bx0 + 1, hy2 - 2, bw0 - 2, 1, 1); gfx.rect(bx0 + 1, hy2 + 1, bw0 - 2, 1, 1)   -- две риски, просвет на уровне
+        elseif fcap == '[-]' then   -- колпачок в скобках: рамка 7 px и риска в середине
+          gfx.rect(bx0 + 1, hy2 - 3, bw0 - 2, 7, 0); gfx.rect(bx0 + 3, hy2, bw0 - 6, 1, 1)
+        elseif fcap == 'apart' then   -- своя дорожка справа от метра: линия-паз и колпачок
+          local fx0 = bx0 + bw0 - flw - 2
+          set(U.mix(U.TEXT, dark, 0.7)); gfx.rect(fx0 + math.floor(flw / 2), ty0, 1, th, 1)
+          set(hc); gfx.rect(fx0, hy2 - 3, flw, 7, 1)
+          set(dark); gfx.rect(fx0 + 1, hy2, flw - 2, 1, 1)
+        else gfx.rect(bx0 + 1, hy2, bw0 - 2, 2, 1) end
         if hot then hover.trs = { col = col, what = 'vol', vert = true, y0 = ty0 + th, h = th, sv = math.max(0, math.min(1, (ty0 + th - my) / math.max(1, th))) } end
         if D.csel_on(col.guid, 'vol') then csel_frame(bx0, ty0, bw0, th) end
         hint('trs', bx0, ty0, bw0, th, { col = col, what = 'vol' })
