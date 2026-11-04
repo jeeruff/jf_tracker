@@ -33097,6 +33097,81 @@ ctx.patternize = function(cuts, how)
   ctx.mx_refresh()
   vim.msg = n > 0 and ('patternize %s: %d pattern(s) A1… (empty spans only; Cmd+Z back)'):format(how, n) or ('patternize %s: nothing to do - the project is already patterns'):format(how)
 end
+-- 4 ноя: кнопка patternize — есть регионы без кода: спросить, как их взять. r — сами регионы паттернами (коды A1 B1 …,
+-- старое имя остатком); 1 2 4 8 16 — регионы секциями (имя остаётся, безымянные — part N), внутри — паттерны по N тактов
+-- (у каждой секции своя буква: A1 A2 …, B1 B2 …); o — прежнее меню (такты без секций, айтемы, маркеры)
+ctx.free_regions = function()
+  local out, i = {}, 0
+  while true do
+    local ret, isr, pos, e, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+    if not ret or ret == 0 then break end
+    if isr and not model.SEC.code_of(nm or '') and not (nm or ''):match('^=') and not (nm or ''):match('^v:') and not (nm or ''):match('^ch:') then
+      out[#out + 1] = { i = i, pos = pos, e = e, name = nm or '', idx = idx, col = col }
+    end
+    i = i + 1
+  end
+  return out
+end
+ctx.patternize_ask = function()
+  local fr = ctx.free_regions()
+  if #fr == 0 then return ctx.mx_menu('pz') end
+  local ch = { { key = 'c', label = 'cancel', fn = function() vim.msg = 'patternize: cancelled' end } }
+  for _, nb in ipairs({ 1, 2, 4, 8, 16 }) do
+    ch[#ch + 1] = { key = nb == 16 and '6' or tostring(nb), label = ('regions as sections, patterns every %d bar%s in them'):format(nb, nb > 1 and 's' or ''), fn = function() ctx.regions_as_sections(nb) end }
+  end
+  ch[#ch + 1] = { key = 'o', label = 'other ways: bars without sections, items, markers …', fn = function() ctx.mx_menu('pz') end }
+  ch[#ch + 1] = { key = 'r', label = 'regions as patterns (codes A1 B1 …, the old name stays after the code)', fn = function() ctx.regions_as_patterns() end }
+  OPT.ask.open(('patternize: %d region(s) without a pattern code'):format(#fr), 'take them as patterns, or as sections with patterns every N bars inside?', ch)
+end
+ctx.regions_as_patterns = function()
+  local fr = ctx.free_regions()
+  local taken = {}
+  for _, r in ipairs(regions) do if model.SEC.code_of(r.name) then taken[#taken + 1] = { name = r.name } end end
+  local byname, n = {}, 0
+  edit.run('patternize: regions as patterns', function()
+    for _, r in ipairs(fr) do
+      local code = r.name ~= '' and byname[r.name]   -- одинаковые имена (повторы) — один код
+      if not code then code = model.SEC.next_family(taken); taken[#taken + 1] = { name = code }; if r.name ~= '' then byname[r.name] = code end end
+      reaper.SetProjectMarkerByIndex(0, r.i, true, r.pos, r.e, r.idx, code .. (r.name ~= '' and (' ' .. r.name) or ''), r.col); n = n + 1
+    end
+  end)
+  model.invalidate(); regions = model.regions(state.lpb); ctx.mx_refresh()
+  vim.msg = ('patternize: %d region(s) are patterns now (Cmd+Z back)'):format(n)
+end
+ctx.regions_as_sections = function(nb)
+  local fr = ctx.free_regions()
+  local taken, coded = {}, {}
+  for _, r in ipairs(regions) do if model.SEC.code_of(r.name) then taken[#taken + 1] = { name = r.name }; coded[#coded + 1] = { r.pos, r.rgnend } end end
+  local function covered(a, b) for _, sp in ipairs(coded) do if a < sp[2] - 1e-6 and b > sp[1] + 1e-6 then return true end end end
+  local np, k = 0, 0
+  edit.run(('patternize: sections, %d bars'):format(nb), function()
+    for _, r in ipairs(fr) do
+      if r.name == '' then   -- секция держится за имя: безымянный регион — part N
+        k = k + 1
+        reaper.SetProjectMarkerByIndex(0, r.i, true, r.pos, r.e, r.idx, 'part ' .. k, r.col)
+      end
+      local fam = model.SEC.next_family(taken)
+      local l = model.SEC.code_of(fam)
+      local v = 0
+      local _, m = reaper.TimeMap2_timeToBeats(0, r.pos)
+      local a = r.pos
+      while a < r.e - 1e-3 do
+        m = m + nb
+        local b = math.min(r.e, reaper.TimeMap2_beatsToTime(0, 0, m))
+        if b <= a + 1e-6 then break end
+        if not covered(a, b) then
+          v = v + 1
+          local code = model.SEC.fmt(l, v)
+          taken[#taken + 1] = { name = code }
+          reaper.AddProjectMarker2(0, true, a, b, code, -1, 0); np = np + 1
+        end
+        a = b
+      end
+    end
+  end)
+  model.invalidate(); regions = model.regions(state.lpb); ctx.mx_refresh()
+  vim.msg = ('patternize: %d section(s), %d pattern(s) every %d bar(s) (Cmd+Z back)'):format(#fr, np, nb)
+end
 -- 17 окт: pads (MPC): паттерны на нотных клавишах. :pads — вкл / выкл, :pads quant | sudden — режим,
 -- :pads rec — запись порядка сыгранных; ещё раз :pads rec — дописать его в конец песни (связанные повторы)
 MX.vismetro = true   -- 19 окт: визуальный метроном матрицы всегда (кнопка убрана)   -- 18 окт: метроном в клетках матрицы (кнопка vismetro)
@@ -36597,7 +36672,7 @@ end
 ctx.pat_btn = function(b)
   if b == 'menu' then ctx.pat_menu() elseif b == 'glue' then ctx.pat_glue() elseif b == 'split' then ctx.pat_split_menu()
   elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename()
-  elseif b == 'patternize' then ctx.mx_menu('pz') end
+  elseif b == 'patternize' then ctx.patternize_ask() end
 end
 -- 19 окт: блок над матрицей: кубики паттернов на всю ширину + строка chain (двойной щелчок по кубику — в цепь,
 -- > — слушать цепь, имя секции — выпадашкой, render — в матрицу перед слотом курсора, x — очистить)
