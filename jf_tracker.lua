@@ -20677,6 +20677,7 @@ function ctx.fxgui_restore(guid, hwnd)
   local sz = ctx.fxgui_size and ctx.fxgui_size[guid]
   if not (hwnd and sz and reaper.JS_Window_SetPosition) then return end
   if reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'CAPTION,SYSMENU') end
+  if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd, 'NOTOPMOST') end   -- 4 ноя: обычное окно снова
   reaper.JS_Window_SetPosition(hwnd, sz[1], sz[2], sz[3], sz[4])
   ctx.fxgui_size[guid] = nil
 end
@@ -20738,7 +20739,11 @@ function ctx.fxgui_tick()
     -- 2 ноя: панель DSP рисуется не каждый кадр (буфер) — прямоугольник блока держится 0.5 с; иначе окно
     -- закрывалось / открывалось по кадрам (phatfx, Massive X мигали и срывались в параметры)
     local r = draw.fxgui_rect and draw.fxgui_rect[guid]
-    if r then ctx.fxgui_last[guid] = { r = r, t = now } elseif ctx.fxgui_last[guid] and now - ctx.fxgui_last[guid].t < 0.5 then r = ctx.fxgui_last[guid].r end
+    -- 4 ноя: панель из буфера могла не перерисовываться дольше 0.5 с (окно открывалось на полсекунды и пропадало, кнопка
+    -- gui горела): прошлый прямоугольник действует, пока DSP не перерисован без этого блока (номер перерисовки D.fxgui_gen)
+    local lst = ctx.fxgui_last[guid]
+    if r then ctx.fxgui_last[guid] = { r = r, t = now, gen = draw.fxgui_gen }
+    elseif lst and (lst.gen == draw.fxgui_gen or now - lst.t < 0.5) then r = lst.r end
     local show = tr and r and r.vis and state.dsp ~= false and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
@@ -20765,6 +20770,9 @@ function ctx.fxgui_tick()
             if okr then ctx.fxgui_size[guid] = { l, tt, rr - l, math.abs(bb - tt) } end
           end
           if reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'POPUP') end
+          -- 4 ноя: трекер на весь экран (уровень плавающих окон) вставал поверх плагина, как только брал фокус: окно
+          -- открывалось на полсекунды и уходило под него (видно в списке окон: jf_tracker выше). TOPMOST — над трекером
+          if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd, 'TOPMOST') end
           o = { hwnd = hwnd }; O[guid] = o
         end
         if o.key ~= key then

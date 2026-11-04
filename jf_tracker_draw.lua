@@ -11314,6 +11314,7 @@ function D.frame(L, snap, rows, state, info)
     D.cst, D.info = {}, info
     D.rack_plus = {}
     D.fxgui_rect = {}   -- 27 окт: блоки с окном плагина поверх (gui) — заново каждый кадр
+    D.fxgui_gen = (D.fxgui_gen or 0) + 1   -- 4 ноя: номер перерисовки DSP — без неё прямоугольник прошлой остаётся в силе
     D.dsp_sel_rect = nil
     D.sel_i = fxs[sel.fx or 0] and fxs[sel.fx or 0].i or nil   -- 24 окт: выбранный модуль — подложкой в списке цепей
     D.dsp_selk = sel.fx   -- 28 окт: мини-роутер — выбранный узел
