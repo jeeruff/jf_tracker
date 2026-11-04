@@ -2090,18 +2090,24 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
   local lane = 4
   local nl = 0
   for _, w in ipairs(wires) do if w.dst then nl = nl + 1 end end
-  local whh = math.min(math.floor(h * 0.45), 6 + math.min(nl, 12) * lane + L.rh)   -- зона проводов (и подписи out)
-  local sy0, sy1 = y0 + 3, y0 + h - whh                                              -- зона стопок
+  -- 4 ноя (3): перевёрнуто — сверху кабели, снизу (у фейдеров) стопки устройств, растут вверх
+  local whh = math.min(math.floor(h * 0.5), 6 + math.min(nl, 12) * lane)
   local rowh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 3)
-  local bot = {}                                                                     -- низ стопки канала
+  local hwh = 0
+  for _, w in ipairs(wires) do if w.kind == 'hw' then hwh = rowh; break end end
+  local sy0, sy1 = y0 + whh + 2, y0 + h - 2 - hwh                                    -- зона стопок (низ — у фейдеров)
+  local top = {}                                                                     -- верх стопки канала (куда входят кабели)
   for _, c in ipairs(cols) do
     local col = c.col
     set(U.LINE); gfx.rect(c.x, y0, 1, h, 1)
     local bx, bw = c.x + 2, c.w - 4
-    local yy = sy0
     local nfx = #(col.fx or {})
-    local cap = math.max(0, math.floor((sy1 - sy0 - 2) / rowh))
-    for k = 1, math.min(nfx, cap) do
+    local cap = math.max(0, math.floor((sy1 - sy0) / rowh))
+    local n = math.min(nfx, cap)
+    local yy = sy1 - n * rowh
+    top[c] = n > 0 and yy or (sy1 - rowh)
+    if n == 0 then set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(c.x + math.floor(c.w / 2), sy1 - rowh, 1, rowh, 1) end
+    for k = 1, n do
       local f = col.fx[k]
       local more = k == cap and nfx > cap
       local nm = more and ('+' .. (nfx - cap + 1)) or (f.name or ''):gsub('^%w+i?:%s*', ''):gsub('%s*%b()%s*$', '')
@@ -2112,22 +2118,17 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
       set(hot and U.AMBER or (off and U.DIM or U.mix(U.CYAN, U.PANEL, 0.4))); gfx.rect(bx, yy, bw, rowh - 1, 0)
       D.small_text(bx + 2, yy + 1, nm, hot and U.AMBER or (off and U.DIM or U.TEXT))
       if hot and not more then hover.hdrfx = { col = col, k = k, it = { name = f.name, off = off, k = k, i = f.i } } end
-      -- провод цепи между устройствами — сверху вниз
       yy = yy + rowh
-      if k < math.min(nfx, cap) then set(U.mix(U.CYAN, U.PANEL, 0.5)); gfx.rect(c.x + math.floor(c.w / 2), yy - 1, 1, 1, 1) end
     end
-    if nfx == 0 then set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(c.x + math.floor(c.w / 2), sy0, 1, rowh, 1); yy = sy0 + rowh end
-    bot[c] = yy
   end
-  -- провода
-  local wy0 = sy1 + 2
+  -- кабели: дорожки сверху
   local whot
   local li = 0
   for k, w in ipairs(wires) do
     if w.dst then
       li = li + 1
-      w.y = wy0 + 2 + ((li - 1) % 12) * lane
-      w.x, w.tx = w.src.x + math.floor(w.src.w / 2) - 1 + (k % 3), w.dst.x + math.floor(w.dst.w / 2) + 1
+      w.y = y0 + 2 + ((li - 1) % 12) * lane
+      w.x, w.tx = w.src.x + math.floor(w.src.w / 2) - 2 + (k % 3), w.dst.x + math.floor(w.dst.w / 2) + 1
       local near = (my >= w.y - 1 and my <= w.y + 2 and mx >= math.min(w.x, w.tx) - 1 and mx <= math.max(w.x, w.tx) + 2)
       if near then whot = k end
     end
@@ -2141,10 +2142,10 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
       if w.kind == 'folder' then cc = U.mix(cc, U.PANEL, 0.55) end
       if w.e.mute then cc = U.mix(cc, U.PANEL, 0.75) end
       set(hot and U.AMBER or cc)
-      gfx.rect(w.x, bot[c], 2, w.y - bot[c] + 2, 1)                                 -- вниз из стопки
-      gfx.rect(math.min(w.x, w.tx), w.y, math.abs(w.tx - w.x) + 2, 2, 1)            -- к получателю
-      gfx.rect(w.tx, bot[w.dst], 2, w.y - bot[w.dst] + 2, 1)                         -- вверх в его стопку
-      gfx.rect(w.tx - 2, bot[w.dst], 6, 2, 1)                                        -- засечка входа
+      gfx.rect(w.x, w.y, 2, top[c] - w.y, 1)                                         -- вверх из стопки
+      gfx.rect(math.min(w.x, w.tx), w.y, math.abs(w.tx - w.x) + 2, 2, 1)             -- к получателю
+      gfx.rect(w.tx, w.y, 2, top[w.dst] - w.y, 1)                                     -- вниз в его стопку
+      gfx.rect(w.tx - 2, top[w.dst] - 2, 6, 2, 1)                                     -- засечка входа
       if hot then hover.btn = { col = c.col, what = 'route', send = w.e } end
     elseif w.kind == 'hw' then
       local lb = w.e.name
