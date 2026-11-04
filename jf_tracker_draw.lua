@@ -9177,7 +9177,7 @@ function D.frame(L, snap, rows, state, info)
         if not outs then local pl, pr = 0, 0; if info.peaks then pl, pr = info.peaks(col) end; outs = { pl or 0, pr or 0 } end
         local ax0, aw0 = bx0 + 4, 2 * mw + 2
         local groups = inps and { { inps, 'i', ax0, math.floor((aw0 - 3) / 2) }, { outs, 'o', ax0 + aw0 - math.floor((aw0 - 3) / 2), math.floor((aw0 - 3) / 2) } } or { { outs, 'o', ax0, aw0 } }
-        if inps then set(U.mix(U.RED, dark, 0.35)); gfx.rect(ax0 + math.floor((aw0 - 3) / 2) + 1, ty0, 1, th, 1) end
+        -- 4 ноя (3): без красной черты между входом и выходом — вход и так красный
         for _, gp in ipairs(groups) do
           local vals, tag, gx, gw = gp[1], gp[2], gp[3], gp[4]
           local n = math.max(1, #vals)
@@ -9191,7 +9191,7 @@ function D.frame(L, snap, rows, state, info)
             elseif now - hk.t > 1.5 then hk.db = math.max(pdb, hk.db - 20 * (now - hk.t - 1.5)) end
             local xa, xb = gx + math.floor((k2 - 1) * (gw + gap) / n), gx + math.floor(k2 * (gw + gap) / n) - gap
             local bw2 = math.max(1, xb - xa)
-            local framed = n <= 2 and bw2 >= 4   -- 1-2 канала — в рамке, как было; много — тонкие линии без рамок
+            local framed = false   -- 4 ноя (3): минималистичнее — без серых рамок у столбиков (было: 1-2 канала в рамке)
             local ix, iw = framed and xa + 1 or xa, framed and bw2 - 2 or bw2
             if framed then set(U.mix(dark, U.TEXT, 0.12)); gfx.rect(xa, ty0, bw2, th, 0) end
             local dim = muted_by_solo and tag == 'o'
