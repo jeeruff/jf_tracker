@@ -730,7 +730,7 @@ function D.layout(snap, state, nregions)
   L.mix_rows = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 0
   -- 9 окт: схема маршрутизации — полосой в верху нижнего микшера (опция mixroute)
   L.route_h = (L.mix_bottom and state.mixroute ~= false) and (D.rt_need or (3 * ms('W') + 16)) or 0
-  if L.mix_bottom and state.mixrouter then L.route_h = math.floor(L.mix_rows * L.rh / 2) end   -- 4 ноя: роутер микшера — верхняя половина
+  if L.mix_bottom and state.mixrouter then L.route_h = math.floor(L.mix_rows * L.rh * (tonumber(state.mixrouter_frac) or 0.5)) end   -- 4 ноя: роутер микшера — верхняя половина
   L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4 + L.route_h) or 0
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   -- 11 окт: +1 строка уголка — кнопка markers под регионом; кнопки лейнов
@@ -876,7 +876,7 @@ function D.layout(snap, state, nregions)
     L.mix_pane = mxr or nil
     if mxr then
       L.route_h = math.min(L.route_h, math.max(0, mxr.h - 6 * L.rh))
-      if state.mixrouter then L.route_h = math.floor((mxr.h - 4) / 2) end   -- 4 ноя: роутер микшера — половина панели, фейдеры — нижняя
+      if state.mixrouter then L.route_h = math.floor((mxr.h - 4) * (tonumber(state.mixrouter_frac) or 0.5)) end   -- 4 ноя: доля — тянуть линию под роутером   -- 4 ноя: роутер микшера — половина панели, фейдеры — нижняя
       L.mix_y, L.mix_h = mxr.y, mxr.h
       L.mix_rows = math.max(4, math.floor((mxr.h - 4 - L.route_h) / L.rh))
       L.route_y = L.mix_y
@@ -2156,7 +2156,15 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
     end
   end
   if whot then local w = wires[whot]; hover.mixrt = w end
-  set(D.SEP); gfx.rect(x0, y0 + h - 1, x1 - x0, 1, 1)
+  -- 4 ноя (5): линия под роутером — только под колонками (не под XY слева); она же ручка: тянуть — доля роутер / фейдеры
+  local cx0, cx1 = x1, x0
+  for _, c in ipairs(cols) do cx0 = math.min(cx0, c.x); cx1 = math.max(cx1, c.x + c.w) end
+  if cx1 > cx0 then
+    local ly = y0 + h - 1
+    local shot = my >= ly - 3 and my <= ly + 3 and mx >= cx0 and mx < cx1
+    set(shot and U.AMBER or D.SEP); gfx.rect(cx0, ly - (shot and 1 or 0), cx1 - cx0, shot and 3 or 1, 1)
+    if shot then hover.mixrtsplit = true end
+  end
 end
 function D.route_strip(L, info, hover, x0, x1)
   local y0, h = L.route_y, L.route_h

@@ -300,7 +300,8 @@ local state = {
   faderfocus = flag('faderfocus', true),          -- микшер: щелчок по фейдеру / кнобу — курсор трекера на канал (9 окт)
   dbmarks = flag('dbmarks', true),
   clipmark = flag('clipmark', false),             -- 4 ноя: микшер — красные == клипа над метром (умолчание off)
-  declip = tonumber(reaper.GetExtState(EXT, 'declip')) or 10,   -- 4 ноя: сброс удержания пика / клипа через N с (0 — off)
+  declip = tonumber(reaper.GetExtState(EXT, 'declip')) or 10,
+  mixrouter_frac = tonumber(reaper.GetExtState(EXT, 'mixrouter_frac')) or 0.5,   -- 4 ноя: доля роутера в микшере   -- 4 ноя: сброс удержания пика / клипа через N с (0 — off)
   panknob = flag('panknob', true),                -- микшер: пан кнобом при узком фейдере (9 окт)             -- микшер: широкий фейдер с подписями dB (9 окт; в pt-mode всегда)
   mixer = flag('mixer', false),                    -- шапки развёрнуты в микшер (8 окт)             -- параметры TCP под своими эффектами в строке effects (8 окт)
   fxrow = flag('fxrow', false),                   -- строка эффектов и сендов под шапками (кнопка effects, 7 окт)
@@ -717,7 +718,7 @@ local function save_win()
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
-  S('declip', tostring(state.declip or 10))
+  S('declip', tostring(state.declip or 10)); S('mixrouter_frac', tostring(state.mixrouter_frac or 0.5))
   S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('framefx', state.framefx or ''); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode2', state.bsmode or 'view'); S('foldfast2', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option')
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
@@ -26044,6 +26045,7 @@ local function frame()
       or 'item end - drag: trim (inside) or extend (past the right edge, up to the file end); all notes of the instrument, one undo'
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
+  elseif hover.mixrtsplit then state.status = 'router / faders: drag - how much of the mixer the router takes'
   elseif hover.mixsnap and hover.mixsnap.what == 'sends' then state.status = 'sends: the strip of sends over the mixer (each send by name, wires to where it goes) - click: on / off'
   elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the mixer split in half - the devices of every channel and wires where the sound goes (sends, folders, outs), small faders below; click: on / off'
   elseif hover.mixsnap and hover.mixsnap.what == 'declip' then state.status = ('declip %s: peaks and clips of every track reset by themselves %d s after the last new peak - click: on / off (the seconds - options, declip)'):format((tonumber(state.declip) or 10) > 0 and 'on' or 'off', state.declip_last or (tonumber(state.declip) or 10) > 0 and (tonumber(state.declip) or 10) or 10)
@@ -27915,6 +27917,7 @@ local function frame()
     elseif hover.trkmod then   -- 22 окт: мини-панель mod · auto
       ctx.trkmod_do(hover.trkmod)
       click = { t = now2, zone = 'trkmod' }
+    elseif hover.mixrtsplit then ctx.mrs_drag = true   -- 4 ноя: линия под роутером микшера — тянуть долю
     elseif hover.mixsnap then   -- 22 окт: снапшоты SWS в микшере (как окно SWS): строка — вызвать, Cmd — записать поверх, Alt — удалить
       local h, m = hover.mixsnap, ctx.mods()
       if h.what == 'row' then ctx.mixsnap_do(m.alt and 'del' or (m.cmd and 'save' or 'recall'), h.i)
@@ -29896,6 +29899,15 @@ local function frame()
       if fxa then fxa.SetParamNormalized(d.track, d.id, d.pi, d.orig) end
       ctx.pm_test = nil
     end
+  end
+  if ctx.mrs_drag then   -- 4 ноя: доля роутер / фейдеры в микшере
+    if gfx.mouse_cap & 1 == 1 then
+      local y0, h = L.route_y or L.mix_y, (L.mix_pane and L.mix_pane.h) or L.mix_h
+      if y0 and h and h > 0 then
+        local f = math.max(0.15, math.min(0.85, (gfx.mouse_y - y0) / h))
+        if math.abs(f - (tonumber(state.mixrouter_frac) or 0.5)) > 0.004 then state.mixrouter_frac = f; relayout() end
+      end
+    else ctx.mrs_drag = nil end
   end
   if trs_drag then
     if gfx.mouse_cap & 1 == 1 then
