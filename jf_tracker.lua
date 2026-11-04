@@ -5203,8 +5203,10 @@ ctx = {
     local slot = seq[MX.cur.ri]
     if not slot then return end
     local list = model.patterns(regions)
-    if #list == 0 then vim.msg = 'no patterns yet - n names this bar, + adds one'; return end
+    if #list == 0 and not slot.gap then vim.msg = 'no patterns yet - n names this bar, + adds one'; return end
     local items, sel = {}, 1
+    -- 4 ноя: свободный такт — первым пунктом новый пустой паттерн (следующая буква), дальше повторы готовых
+    if slot.gap then items[1] = { label = '+ new pattern', v = 'new', tip = 'an empty pattern of its own on this bar (the next letter: B1, C1 ...)' } end
     for _, p in ipairs(list) do
       if not p.name:match('^=') and not (p.src and p.src.session) then   -- 18 окт: служебные (=SESSION …) — не паттерны
         items[#items + 1] = { label = ('%02d %s'):format(p.num, p.name), v = p, tip = ('%s - %d slot(s)'):format(p.name, p.n or 0) }
@@ -5214,8 +5216,9 @@ ctx = {
     -- 18 окт: у строки слота, не в углу
     local ry = MX.row_y and MX.row_y[MX.cur.ri]
     if ry then ctx.smart_at = { x = (MX.cur_rect and MX.cur_rect.x) or 40, y = ry + L.rh + 2, top = ry } end
-    ctx.smart_open({ title = (slot.gap and 'free bar %d: put a pattern here (linked repeat)' or 'slot %d: its pattern'):format(MX.cur.ri) .. ' (Enter)',
+    ctx.smart_open({ title = (slot.gap and 'free bar %d: a new pattern or a linked repeat' or 'slot %d: its pattern'):format(MX.cur.ri) .. ' (Enter)',
       items = items, cols = 1, sel = sel, on_pick = function(it)
+        if it.v == 'new' then ctx.auto_pattern(math.floor(model.row_of_time(slot.pos, state.lpb) + 0.5)); vim.msg = ctx.auto_pat_msg or 'new pattern'; return end
         local p = it.v
         if slot.gap then
           if not (p.src and p.src.rgnend) then vim.msg = 'pattern without a region'; return end
