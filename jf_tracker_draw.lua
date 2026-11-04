@@ -10155,14 +10155,16 @@ function D.frame(L, snap, rows, state, info)
         if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — меню вида
       else
         local xw = bx + btn(bx, yz, (ms('autozoom') + ms('WH') + 8 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
-        if xw + ms('WH') + 6 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yz, 'H', 'viewbtn', 'fith') end   -- 31 окт: W H — справа от autozoom
+        if xw + ms('WH') + 6 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; xw = xw + btn(xw, yz, 'H', 'viewbtn', 'fith') + 2 end   -- 31 окт: W H — справа от autozoom
+        local vdone = false
+        local own = yz + L.rh <= y4 - L.rh   -- markers своей строкой (иначе mark справа в этой же)
+        if xw + ms('view') + 2 <= bx + bw - (own and 0 or (ms('mark') + 4)) then btn(xw, yz, 'view', 'viewbtn', 'viewmenu'); vdone = true end   -- 4 ноя: view — сразу за W H
         if yz + L.rh <= y4 - L.rh then
-          local mkl = (ms('markers') + ms('view') + 6 <= bw) and 'markers' or 'mark'
+          local mkl = (ms('markers') + ms('view') + 6 <= bw or vdone) and 'markers' or 'mark'
           local xm = bx + btn(bx, yz + L.rh, mkl, 'viewbtn', 'markers') + 2
-          if xm + ms('view') + 2 <= bx + bw then btn(bx + bw - ms('view') - 2, yz + L.rh, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — справа от markers
+          if not vdone and xm + ms('view') + 2 <= bx + bw then btn(bx + bw - ms('view') - 2, yz + L.rh, 'view', 'viewbtn', 'viewmenu') end   -- запасное место — у markers
         else
           btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers')
-          if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yz, 'view', 'viewbtn', 'viewmenu') end
         end   -- 31 окт: короче — zoom / mark (не az mk)
       end
     else
