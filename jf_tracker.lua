@@ -32378,7 +32378,7 @@ ctx.MOD_ARROWS_PAN = {   -- в виде пана
 }
 ctx.mod_arrows = function()
   local r = draw.cur_rect; draw.cur_rect = nil
-  if not (r and ctx.mod_t0 and ctx.mod_sig) or state.focus ~= 'tracker' or vim.picker or vim.hydra then return end
+  if not (r and ctx.mod_t0 and ctx.mod_sig) or not state.hints or state.focus ~= 'tracker' or vim.picker or vim.hydra then return end   -- 4 ноя: только с hints
   if reaper.time_precise() - ctx.mod_t0 < 0.12 then return end   -- быстрое сочетание с клавишей — не мигать
   local m = (r.pan and ctx.MOD_ARROWS_PAN[ctx.mod_sig]) or ctx.MOD_ARROWS[ctx.mod_sig]
   if not m then return end
@@ -32390,10 +32390,13 @@ ctx.mod_arrows = function()
     U.set(U.AMBER); gfx.rect(tx, ty, tw, h, 0)
     U.text(tx + L.pad, ty, s, U.AMBER)
   end
-  if m.h then local s = m.h .. ' <h'; tag(x - U.measure(s) - 2 * L.pad - 2, y, s) end
-  if m.l then tag(x + w + 2, y, 'l> ' .. m.l) end
-  if m.k then tag(x, y - h - 1, 'k ' .. m.k) end
-  if m.j then tag(x, y + h + 1, 'j ' .. m.j) end
+  -- подписи — только когда видна справка (панель help); иначе одни буквы
+  local cap = (state.panes and draw.panes.visible(state.panes, 'help')) or state.khelp
+  local function lab(k, t, left) if not cap then return left and ('<' .. k) or (k == 'l' and 'l>' or k) end; return left and (t .. ' <' .. k) or ((k == 'l' and 'l> ' or (k .. ' ')) .. t) end
+  if m.h then local s = lab('h', m.h, true); tag(x - U.measure(s) - 2 * L.pad - 2, y, s) end
+  if m.l then tag(x + w + 2, y, lab('l', m.l)) end
+  if m.k then tag(x, y - h - 1, lab('k', m.k)) end
+  if m.j then tag(x, y + h + 1, lab('j', m.j)) end
 end
 ctx.pan_set = function(heads, pos)
   if #heads == 0 then return end
