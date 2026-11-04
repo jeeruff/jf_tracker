@@ -688,7 +688,11 @@ local function save_win()
   local d, x, y = gfx.dock(-1, 0, 0, 0, 0)
   local S = function(k, v) reaper.SetExtState(EXT, k, tostring(v), true) end
   -- PT-mode не сохраняется (3 окт): пишется раскладка, бывшая до него
-  if state.ptmode and state.pt_saved then for k, v in pairs(state.pt_saved) do state[k] = v end; state.ptmode = false end
+  if state.ptmode and state.pt_saved then
+    for k, v in pairs(state.pt_saved) do if k ~= 'panes' then state[k] = v end end
+    if state.pt_saved.panes and draw.panes.decode then local m = draw.panes.decode(state.pt_saved.panes); if m then state.panes = m end end   -- 4 ноя: дерево до PT-mode
+    state.ptmode = false
+  end
   -- 1 ноя: OG / PT-mode прячут панели (dsp, fx, automation …) — на диск пишется дерево ДО режима (иначе :reload делал урезанное постоянным)
   if state.og and state.og_back and state.og_back.panes and draw.panes.decode then
     local m = draw.panes.decode(state.og_back.panes); if m then state.panes = m end
@@ -12332,11 +12336,17 @@ ctx = {
   end,
   -- 31 окт: PT-mode = ProTracker, OG-mode слит в него (одна концепция: свобода в ограничениях): 4 канала track1..4
   -- (OG: создаются с инструментами og channel N, видны только они), 31 сэмпл, паттерн 64 строки, шрифт x2, панели — нужные
+  PT_PANES = 'v[0.16:scopes*|0.84:h[0.72:tracker*|0.28:v[0.45:inst*|0.3:browser*|0.25:arranger*]]]',
   pt_toggle = function()
     local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions', 'ttf', 'ttfcustom', 'ttfpx' }
     if state.ptmode then
       if state.og then ctx.og_toggle() end
       for _, k in ipairs(K) do state[k] = state.pt_saved and state.pt_saved[k] end
+      -- 4 ноя: раскладка панелей — как была до PT-mode
+      if state.pt_saved and state.pt_saved.panes and draw.panes.decode then
+        local v = state.panes and state.panes.v or 0
+        state.panes = draw.panes.decode(state.pt_saved.panes); state.panes.v = v + 1; relayout()
+      end
       state.ptmode, state.pt_saved = false, nil
       draw.set_font(state); model.invalidate()
       if state.focus ~= 'tracker' then ctx.set_focus('tracker') end
@@ -12344,6 +12354,13 @@ ctx = {
     else
       state.pt_saved = {}
       for _, k in ipairs(K) do state.pt_saved[k] = state[k] end
+      -- 4 ноя: своя раскладка — только то, что нужно для трека: скопы сверху, 4 канала, справа сэмплы (lib),
+      -- браузер (загрузить сэмпл) и порядок песни (arranger); остальное спрятано, :pt снова — всё назад
+      if state.panes and draw.panes.encode then
+        state.pt_saved.panes = draw.panes.encode(state.panes)
+        local v = state.panes.v or 0
+        state.panes = draw.panes.decode(ctx.PT_PANES); state.panes.v = v + 1; relayout()
+      end
       if not state.og then ctx.og_toggle(false, true) end   -- каналы track1..4 пустые (аудио-айтемы, без слайсера и эффектов), панели
       state.top, state.toptab, state.dsp, state.side, state.mx_hidden = true, 'scopes', false, false, true
       state.fixed, state.meters, state.meterstyle, state.khelp = true, true, 'pt', false
