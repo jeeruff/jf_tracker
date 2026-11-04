@@ -214,7 +214,7 @@ local state = {
             reaper.GetExtState(EXT, 'ogch4') ~= '' and reaper.GetExtState(EXT, 'ogch4') or 'surge' },
   ogfont = reaper.GetExtState(EXT, 'ogfont') == '1',   -- 31 окт: перетаскивание модуля — перенос (Opt — копия)
   dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
-  jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
+  jogdir = reaper.GetExtState(EXT) == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
   slidezero = reaper.GetExtState(EXT, 'slidezero') == 'stop' and 'stop' or 'repeat',   -- 30 окт: 00 у 0U / 0D
@@ -13262,7 +13262,6 @@ ctx = {
       { key = 'ogch4', label = 'og channel 4', kind = 'cycle', dropdown = true, values = { 'slixer', 'drumrs5k', 'grain', 'surge', 'empty' }, desc = 'the instrument of track4 when OG-mode makes it: a jf instrument, any plugin, or a track template (click - the list)', get = function() return ctx.og_label(state.og_ch[4]) end, set = function(v) state.og_ch[4] = v; reaper.SetExtState(EXT, 'ogch4', v, true) end, pick = function() ctx.og_pick(4) end },
       { key = 'dspmove', label = 'drag moves fx', kind = 'toggle', desc = 'DSP: dragging a module moves it, Opt - copy (default; REAPER copies out of a container); off - dragging copies, Opt moves', get = function() return state.dspmove end, set = function(v) state.dspmove = v; reaper.SetExtState(EXT, 'dspmove', v and 'on' or 'off', true) end },
       { key = 'dspauto', label = 'dsp follows cursor', kind = 'toggle', desc = 'the bottom tabs follow the tracker cursor: a track with an instrument plugin - dsp; an envelope lane drawn as a graph (narrow) - dsp on its effect; a lane with numbers - nothing (Enter / double click - its curve); off - the tabs stay where you put them', get = function() return state.dspauto end, set = function(v) state.dspauto = v; reaper.SetExtState(EXT, 'dspauto', v and 'on' or 'off', true) end },
-      { key = 'jogdir', label = 'jog direction', kind = 'cycle', values = { 'invert', 'normal' }, desc = 'CONTROL JOG (Ctrl+Opt+Shift on an automation lane): invert - the finger up goes to the next steps (down the tracker); normal - the finger down does', get = function() return state.jogdir end, set = function(v) state.jogdir = v; reaper.SetExtState(EXT, 'jogdir', v, true) end },
       { key = 'slidemode', label = 'pitch slide style', kind = 'cycle', values = { 'renoise', 'ft2', 'it', 'pt' }, desc = '0U / 0D: renoise - xx/16 semitone per row; ft2 (FastTracker 2) and it (Schism / Impulse Tracker, linear slides) - xx/16 semitone per tick, speed - 1 ticks a row; pt (ProTracker) - Amiga period -/+ xx per tick, the step depends on the note. A new note always starts at its own pitch', get = function() return state.slidemode end, set = function(v) state.slidemode = v; reaper.SetExtState(EXT, 'slidemode', v, true); edit.cmds.MODE = v; vim.msg = 'pitch slide style: ' .. v .. ' (0U / 0D are rewritten at their next edit)' end },
       { key = 'slidespeed', label = 'slide speed (ticks)', kind = 'cycle', values = { 6, 3, 4, 5, 8, 12 }, desc = 'ticks a row for the ft2 / it / pt slide styles (the tracker speed; 6 by default, the slide runs speed - 1 ticks)', get = function() return state.slidespeed end, set = function(v) state.slidespeed = tonumber(v) or 6; reaper.SetExtState(EXT, 'slidespeed', tostring(state.slidespeed), true); edit.cmds.SPEED = state.slidespeed end },
       { key = 'slidezero', label = 'slide 00', kind = 'cycle', values = { 'repeat', 'stop' }, desc = '0U00 / 0D00: repeat - the last value of the command again (as in Renoise, FT2, Schism); stop - the slide stops there', get = function() return state.slidezero end, set = function(v) state.slidezero = v; reaper.SetExtState(EXT, 'slidezero', v, true); edit.cmds.ZERO = v end },
@@ -13460,7 +13459,7 @@ ctx = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
       { 'cursor and editing', { 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
-      { 'control mode', { 'ctlmap', 'ctlx2', 'jogdir' } },   -- 27 окт: свой отдел
+      { 'control mode', { 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'fxguiauto', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
@@ -17443,7 +17442,10 @@ end
 ctx.ctl_lane_start = function()
   -- 30 окт: фокус на холсте curve, инструмент draw / line / erase — палец по трекпаду рисует мазок от курсора холста
   local A = ctx.ACV
-  if state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and A and A.tool ~= 'cur' and A.tool ~= 'sel' and A.geo then
+  -- 4 ноя: WYSIWYG — только когда мышь над этим холстом / колонкой курсора (иначе — слайдеры под мышью)
+  local function over(x, y, w, h) return gfx.mouse_x >= x and gfx.mouse_x < x + w and gfx.mouse_y >= y and gfx.mouse_y < y + h end
+  if state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and A and A.tool ~= 'cur' and A.tool ~= 'sel' and A.geo
+    and over(A.geo.gx, A.geo.gy, A.geo.gw, A.geo.gh) then
     local g = A.geo
     local sp = ctx.acv_span()
     local act = ctx.acv_curves(sp)[A.cur]
@@ -17463,6 +17465,7 @@ ctx.ctl_lane_start = function()
   if state.focus ~= 'tracker' then return nil end
   local fl = L and L.flat and L.flat[vim.cur.fi]
   if not fl then return nil end
+  if not (fl.x and over(fl.x, L.body_y or 0, fl.w or 0, L.body_h or gfx.h)) then return nil end
   local row = vim.cur.row
   local v
   if fl.env and fl.env.env then v = edit.env_value(fl.env, edit.row_time(row, state.lpb, 0))
@@ -17473,11 +17476,6 @@ ctx.ctl_lane_start = function()
     v = (v or (ml.kind == 'pb' and 64 or 0)) / 127
   else return nil end
   v = math.max(0, math.min(1, v or 0))
-  -- 30 окт: + Shift — джог: вертикаль — шаг (строка), горизонталь — значение шага; перо несёт значение дальше
-  if gfx.mouse_cap & 8 == 8 then
-    local sx, sy = reaper.GetMousePosition()
-    return { jog = true, lane = fl, row = row, v = v, map = { [row] = v }, sx = sx, sy = sy, acc = 0 }
-  end
   return { lane = fl, row = row, v = v, x0 = gfx.mouse_x }
 end
 -- 31 окт: относительный сдвиг мыши; курсор назад — только у края экрана (перенос каждый кадр глушил движение)
@@ -26658,8 +26656,7 @@ local function frame()
     local sl_mods = gfx.mouse_cap & 52 == 48 and not ctx.im
     if sl_mods then ctx.sl_g0 = ctx.sl_g0 or { gfx.mouse_x, gfx.mouse_y } else ctx.sl_g0 = nil end
     -- JOG (+ Shift, курсор трекера на автоматизации) — сразу, без порога: Ctrl+Opt+Shift клавиш почти нет, без движения не пишет
-    local jog_now = sl_mods and gfx.mouse_cap & 8 == 8 and state.focus == 'tracker' and (function()
-      local f = L and L.flat and L.flat[vim.cur.fi]; return f and ((f.env and f.env.env) or (f.ml and f.ml.kind ~= 'tx')) and true or false end)()
+    local jog_now = false   -- 4 ноя: Shift в CONTROL — только мелкий шаг (отдельного JOG больше нет: один режим)
     local sl_raw = sl_mods and (ctx.sl ~= nil or jog_now or math.abs(gfx.mouse_x - ctx.sl_g0[1]) + math.abs(gfx.mouse_y - ctx.sl_g0[2]) > 6)
     if not (ctx.sl and ctx.sl.jog) then draw.jog = nil end   -- столбики JOG — только пока он идёт
     sl_raw = sl_raw and not (ctx.drum_pad_glide and not ctx.sl)   -- 19 окт: над пэдами Ctrl+Cmd — тачпад-пэды, не CONTROL
@@ -26671,10 +26668,17 @@ local function frame()
       if SG and SG.acv then ctx.ctl_acv(SG) elseif SG and SG.jog then ctx.ctl_jog(SG) elseif SG and SG.lane then ctx.ctl_lane(SG) else
       if not SG then
         local best, bd
+        -- 4 ноя: WYSIWYG — только слайдеры той панели, над которой мышь (микшер — когда он виден и мышь на нём)
+        local pcell
+        local lay = state.panes and draw.pn_lay
+        if lay and lay.cells then for _, c in ipairs(lay.cells) do if draw.panes.inr(c, gfx.mouse_x, gfx.mouse_y) then pcell = c; break end end end
+        local function here(r) return not pcell or draw.panes.inr(pcell, r.x + r.w / 2, r.y + r.h / 2) end
         for _, r in ipairs(draw.slr or {}) do
-          local ddx = math.max(r.x - gfx.mouse_x, 0, gfx.mouse_x - (r.x + r.w))
-          local ddy = math.max(r.y - gfx.mouse_y, 0, gfx.mouse_y - (r.y + r.h))
-          if not bd or ddx * ddx + ddy * ddy < bd then best, bd = r, ddx * ddx + ddy * ddy end
+          if here(r) then
+            local ddx = math.max(r.x - gfx.mouse_x, 0, gfx.mouse_x - (r.x + r.w))
+            local ddy = math.max(r.y - gfx.mouse_y, 0, gfx.mouse_y - (r.y + r.h))
+            if not bd or ddx * ddx + ddy * ddy < bd then best, bd = r, ddx * ddx + ddy * ddy end
+          end
         end
         SG = { none = true }
         -- 22 окт: семья слайдера — DSP / микшер / один трек (громкость, пан, ширина и параметры шапки)
@@ -26690,7 +26694,7 @@ local function frame()
         if best and bd > (4 * L.rh) ^ 2 and hc and hc.guid then
           local want, b2, d2 = 'col:' .. tostring(hc.guid)
           for _, r in ipairs(draw.slr or {}) do
-            if fam(r) == want then
+            if fam(r) == want and here(r) then
               local ddx = math.max(r.x - gfx.mouse_x, 0, gfx.mouse_x - (r.x + r.w))
               local ddy = math.max(r.y - gfx.mouse_y, 0, gfx.mouse_y - (r.y + r.h))
               if not d2 or ddx * ddx + ddy * ddy < d2 then b2, d2 = r, ddx * ddx + ddy * ddy end
@@ -26719,7 +26723,7 @@ local function frame()
           if ori ~= 'xy' then
             local cand = {}
             for _, r in ipairs(draw.slr) do
-              if r ~= best and not r.xy and (r.ori or 'h') == ori and fam(r) == bf then
+              if r ~= best and not r.xy and (r.ori or 'h') == ori and fam(r) == bf and here(r) then
                 local cx, cy = r.x + r.w / 2, r.y + r.h / 2
                 cand[#cand + 1] = { r = r, d = (cx - gfx.mouse_x) ^ 2 + (cy - gfx.mouse_y) ^ 2 }
               end
@@ -26787,8 +26791,10 @@ local function frame()
         local k = SG.sel or SG.k0 or 1
         if SG.ori ~= 'xy' then
           -- от точки нажатия: шаг выбора — доля окна на слайдер (весь трекпад — все n), старт — ближайший
-          local pos, pos0, span = vert and SG.mx or SG.my, vert and SG.px0 or SG.py0, vert and gfx.w or gfx.h
-          local stepx = math.max(L.rh * 2, span / math.max(1, n) / 2)
+          -- 4 ноя: шаг — доля всплывашки (карта тачпада), не окна
+          local pw0 = SG.pop and (vert and SG.pop.w or SG.pop.h) or (vert and gfx.w or gfx.h) / 2
+          local pos, pos0, span = vert and SG.mx or SG.my, vert and SG.px0 or SG.py0, pw0
+          local stepx = math.max(L.rh * 2, span / math.max(1, n))
           k = math.max(1, math.min(n, (SG.k0 or 1) + math.floor((pos - pos0) / stepx + 0.5)))
         end
         if k ~= SG.sel then SG.sel = k; SG.ax, SG.ay, SG.live = SG.mx, SG.my, false end
@@ -26828,13 +26834,26 @@ local function frame()
         -- от группы не зависит (узкий микшер — она прыгала и меняла размер при каждом выборе)
         if not SG.pop then
           local TPA = 1.6
-          local ph = math.floor(math.max(6 * L.rh, math.min(gfx.h * 0.4, gfx.w * 0.5 / TPA)))
+          -- вмещает много, но не на весь экран; ось выбора — карта тачпада: стартовая полоса — под пальцем
+          local ph = math.floor(math.max(6 * L.rh, math.min(gfx.h * 0.35, gfx.w * 0.4 / TPA)))
           local pw = math.min(gfx.w, math.floor(ph * TPA))
           local foot = 2 * OZ.rh + 2
-          local px = math.max(0, math.min(gfx.w - pw, math.floor(SG.px0 - pw / 2)))
-          local py = SG.py0 - ph - foot - 2 * L.rh
-          if py < 0 then py = SG.py0 + 2 * L.rh end
-          SG.pop = { x = px, y = math.max(0, math.min(gfx.h - ph - foot, py)), w = pw, h = ph }
+          local nn, k0 = math.max(1, #SG.list), SG.k0 or 1
+          local px, py
+          if SG.ori == 'v' then
+            px = math.floor(SG.px0 - (k0 - 0.5) * pw / nn)
+            py = SG.py0 - ph - foot - 2 * L.rh
+            if py < 0 then py = SG.py0 + 2 * L.rh end
+          elseif SG.ori == 'xy' then
+            px = math.floor(SG.px0 - pw / 2)
+            py = SG.py0 - ph - foot - 2 * L.rh
+            if py < 0 then py = SG.py0 + 2 * L.rh end
+          else
+            py = math.floor(SG.py0 - (k0 - 0.5) * ph / nn)
+            px = SG.px0 + 3 * L.rh
+            if px + pw > gfx.w then px = SG.px0 - pw - 3 * L.rh end
+          end
+          SG.pop = { x = math.max(0, math.min(gfx.w - pw, px)), y = math.max(0, math.min(gfx.h - ph - foot, py)), w = pw, h = ph }
         end
         if SG.ori == 'xy' then
           local P = SG.pop

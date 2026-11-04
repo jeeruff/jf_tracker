@@ -7206,7 +7206,10 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
     set((khot or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 0)
     local a = (frac - 0.5) * 1.5 * math.pi
     set(U.readable((khot or kon) and U.AMBER or U.TEXT, kdark, 7))
-    gfx.rect(cx + math.floor(math.sin(a) * (r - 2) + 0.5), cy - math.floor(math.cos(a) * (r - 2) + 0.5), 1, 1, 1)
+    do   -- 4 ноя: точка пана — как у мастера (крупнее пикселя), от размера кноба
+      local dr = math.max(1, math.floor(r / 5 + 0.5))
+      gfx.circle(cx + math.floor(math.sin(a) * (r - dr - 2) + 0.5), cy - math.floor(math.cos(a) * (r - dr - 2) + 0.5), dr, 1, 1)
+    end
     if khot then hover.trs = { col = col, what = 'pan', knob = true, sv = frac } end
     if D.csel_on(col.guid, 'pan') then csel_frame(x - 1, y0 - 1, kd + 2, kd + 2) end
     hint('trs', x, y0, kd, kd, { col = col, what = 'pan' })
