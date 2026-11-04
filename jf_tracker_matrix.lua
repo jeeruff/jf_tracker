@@ -801,7 +801,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       local sw = MX.sec_w or 0
       if sw > 0 and ndraw > 0 then
         local y0, y1 = top, top + ndraw * rh
-        U.set(U.tint(U.LINE, 0.25)); gfx.rect(2, y0 + 1, sw - 2, y1 - y0 - 2, 1)
+        if MX.has_sec or (ctx.state and ctx.state.hints) then U.set(U.tint(U.LINE, 0.25)); gfx.rect(2, y0 + 1, sw - 2, y1 - y0 - 2, 1) end   -- 4 ноя: без секций — полосы нет (только с hints, с подсказкой)
         -- 4 ноя: пустая полоса секций — подсказка только с hints и понятным текстом (было «Tr - a section»)
         if not MX.has_sec and ctx.vtext and ctx.state and ctx.state.hints and y1 - y0 > L.th * 6 then
           ctx.vtext(2 + math.floor((sw - 2 - L.th) / 2), y0 + 3, y1 - y0 - 6, 'sections: T r - from the time selection', U.DIM, U.tint(U.LINE, 0.25), true)

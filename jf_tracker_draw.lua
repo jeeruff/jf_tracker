@@ -5635,13 +5635,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local kbd = info.focus == 'ctrl' and info.ctrl_sel == b[1]
       if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(bx - 2, ly, b.w + 4, 2 * L.rh, 1) end
       D.ctrl_rect = D.ctrl_rect or {}; D.ctrl_rect[b[1]] = { bx, ly + L.rh, b.w, L.rh }
-      D.big_text(bx, ly + (BKT == 1 and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT)
+      D.big_text(bx, ly + ((BKT == 1 and not D.sig_stack) and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT)   -- 4 ноя: стопкой — время в первой строке
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
       bx = bx + b.w + 3 * L.pad
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
-    if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, ly + 2 * L.rh + 2 - (L.tp_cut or 0)) end
+    if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, D.sig_stack and (ly + L.rh) or (ly + 2 * L.rh + 2 - (L.tp_cut or 0))) end   -- 4 ноя: стопкой — metro, ниже swing
     if c.tpfull and D.swing_line then local sw0 = group_w(D.sig_line) + 3 * L.pad; draw_group(D.swing_line, bx0 + sw0, bigw - sw0, ly + 2 * L.rh + 2) end   -- 15 окт: swing — в строку с метрономом
   end
   -- порядок блоков
@@ -5669,7 +5669,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   end
   addg('step')
   addg('listen')   -- 12 окт: step / sel / line
-  if D.kbd_w > 0 and not (L.pn and L.pn.by_panel and L.pn.by_panel.keys) then order[#order + 1] = { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } end
+  -- 4 ноя: клавиатура — сразу справа от слова режима (как было), опция keys in transport — и при панели keys
+  if D.kbd_w > 0 and (D.tpkeys or not (L.pn and L.pn.by_panel and L.pn.by_panel.keys)) then table.insert(order, 1, { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end
   order[#order + 1] = { w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
@@ -5681,7 +5682,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     bt.bres = 15   -- 25 окт: место под 15 долей заранее — длинный размер не двигает соседей
     -- 25 окт: swing — слева от metro (размер — крупно справа от BPM, как BPM по опции)
     local sw = by_id.swing
-    D.sig_line = sw and { { sw[1][1], sw[2][1], mt, bt } } or { { mt, bt } }
+    D.sig_stack = BKT == 1 and h >= 3 * L.rh   -- 4 ноя: мелкое время — стопкой: время / metro / swing (влезает в три строки)
+    if D.sig_stack then D.sig_line = sw and { { mt, bt }, { sw[1][1], sw[2][1] } } or { { mt, bt } }
+    else D.sig_line = sw and { { sw[1][1], sw[2][1], mt, bt } } or { { mt, bt } } end
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
@@ -5689,12 +5692,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 15 окт: swing — в строку с метрономом, только если влезает в ширину BPM; иначе — у правого края, как раньше
   if D.swing_line and group_w(D.sig_line) + 3 * L.pad + group_w(D.swing_line) > bigw then D.swing_line = nil end
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
-  if big then order[#order + 1] = { w = bigw2, draw = draw_big } else addg('play') end
+  local bigblk = big and { w = bigw2, draw = draw_big } or nil
+  if big and not D.sig_stack then order[#order + 1] = bigblk elseif not big then addg('play') end   -- 4 ноя: стопкой — у правого края (под мастером)
   if not D.rate_line then addg('rate') end         -- 11 окт: скорость проекта (15 окт: full — под кнопками)
   if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
   if not (c.tpfull and c.tptext) then addg('punch') end   -- 9 окт: LPB — в блоке step (15 окт: full — под rec)
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
-  local last = (by_id.swing and not D.swing_line and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
+  local last = (by_id.swing and not D.swing_line and not D.sig_stack and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
+  if D.sig_stack and bigblk then last = bigblk end
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
