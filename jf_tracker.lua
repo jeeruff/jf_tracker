@@ -214,7 +214,7 @@ local state = {
             reaper.GetExtState(EXT, 'ogch4') ~= '' and reaper.GetExtState(EXT, 'ogch4') or 'surge' },
   ogfont = reaper.GetExtState(EXT, 'ogfont') == '1',   -- 31 окт: перетаскивание модуля — перенос (Opt — копия)
   dspauto = reaper.GetExtState(EXT, 'dspauto') ~= 'off',   -- 31 окт: нижняя вкладка идёт за курсором (dsp на треке с инструментом)
-  jogdir = reaper.GetExtState(EXT) == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
+  jogdir = reaper.GetExtState(EXT, 'jogdir') == 'normal' and 'normal' or 'invert',   -- 30 окт: JOG — палец вверх: дальше (invert) / назад (normal)
   slidemode = (function() local v = reaper.GetExtState(EXT, 'slidemode'); return (v == 'ft2' or v == 'it' or v == 'pt') and v or 'renoise' end)(),   -- 30 окт: стиль 0U / 0D
   slidespeed = tonumber(reaper.GetExtState(EXT, 'slidespeed')) or 6,   -- 30 окт: тиков в строке (speed) для ft2 / it / pt
   slidezero = reaper.GetExtState(EXT, 'slidezero') == 'stop' and 'stop' or 'repeat',   -- 30 окт: 00 у 0U / 0D
