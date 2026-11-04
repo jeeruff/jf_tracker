@@ -22694,6 +22694,13 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 4 ноя: прокрутка треков руками (колесо, скроллбар) — курсор левее начала прокрутки переезжает на первый трек справа
+-- от неё; иначе «трек курсора всегда на экране» возвращал прокрутку к нему (широкий трек — дальше не прокрутить)
+ctx.hs_cursor = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if not (f and f.ci and state.hscroll and f.ci < state.hscroll) then return end
+  for i, g in ipairs(L.flat) do if g.ci and g.ci >= state.hscroll then vim.cur.fi = i; return end end
+end
 -- 4 ноя: кнопка view в углу трекера — всё про вид мышью: линейки, курсор и строки, что показано; опции те же, что в окне
 -- (переключение — сразу, меню остаётся открытым через повторный показ); all options — окно опций
 ctx.VIEW_GROUPS = {
@@ -27968,6 +27975,7 @@ local function frame()
       else
         local b = math.max(0, math.min(L.hs_n - 1, L.hs_before + hover.hsb.dir * hover.hsb.page))
         state.hscroll = L.hs_list[b + 1] or state.hscroll
+        ctx.hs_cursor()
       end
       click = { t = now2, zone = 'hsb' }
     elseif hover.trkmod then   -- 22 окт: мини-панель mod · auto
@@ -29721,6 +29729,7 @@ local function frame()
       local b = d.b0 + math.floor((gfx.mouse_x - d.x0) / math.max(1, d.w) * d.n + 0.5)
       b = math.max(0, math.min(L.hs_n - 1, b))
       state.hscroll = L.hs_list[b + 1] or state.hscroll
+      ctx.hs_cursor()
     else draw.hsb_drag = nil end
   end
   if ctx.acv_xdrag then   -- 31 окт: трансформация выделения холста ручкой рамки
@@ -30482,6 +30491,7 @@ local function frame()
     elseif w_trk and not hover.dsp and not hover.browser and not hover.fxb then
       local b = math.max(0, math.min(math.max(0, (L.hs_n or 1) - 1), (L.hs_before or 0) + d))
       state.hscroll = (L.hs_list and L.hs_list[b + 1]) or state.hscroll
+      ctx.hs_cursor()
     end
     gfx.mouse_hwheel = 0
   end
@@ -30500,6 +30510,7 @@ local function frame()
     elseif not w_trk then   -- 21 окт: другой модуль под мышью — трекер не листается
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
+      ctx.hs_cursor()
     else
       if state.fixed then vim.cur.row = math.max(0, vim.cur.row + step) else state.row0 = math.max(0, state.row0 + step) end
     end
