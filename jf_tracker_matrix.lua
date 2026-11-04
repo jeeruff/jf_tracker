@@ -1171,7 +1171,7 @@ function MX.key(c, regions, snap)
   elseif ch == 'O' then ctx.slot_new('empty', true)
   elseif ch == 'p' then ctx.slot_new('put', false)
   elseif ch == 'P' then ctx.slot_new('put', true)
-  elseif ch == 'A' then ctx.slot_new('alias')                       -- alias: связанный повтор
+  elseif ch == 'c' then ctx.slot_new('alias')                       -- alias: связанный повтор (4 ноя: c — clone, было A; A — нет)
   elseif ch == 'U' then if ctx.slot_unique then ctx.slot_unique() end   -- make unique
   elseif ch == 'x' then ctx.mx_block('cut')
   elseif ch == 'n' then ctx.mx_name_prompt()

@@ -19399,7 +19399,7 @@ function region_actions(rg)
     { 'next pattern', key = '>', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
     { 'previous pattern', key = '<', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
     { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
-    { 'alias: linked repeat (A)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
+    { 'alias: linked repeat (c)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('alias') end },
     { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
     { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
@@ -31580,16 +31580,16 @@ local function frame()
         if ch == 's' then ctx.pat_split_menu(); return end
         if ch == 'r' then ctx.pat_rename(); return end
         if ch == 'm' then ctx.pat_menu(); return end
-        if ch == 'C' then ctx.arranger_open(true); return end   -- 19 окт вечер: chain — набрать; 31 окт: в панели arranger
+        if ch == 'a' then ctx.arranger_open(true); return end   -- 19 окт вечер: chain — набрать; 31 окт: в панели arranger; 4 ноя: a (было C)
         return vim.key(c)
       elseif state.focus == 'matrix' and #seq > 0 then
         -- командная строка (:name / :len после + n =) — клавиши идут в vim, не в матрицу (ревью 1 окт)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if MX.spl_focus and ctx.spl_kb(c) then return end   -- 19 окт: строка секций плейлиста с клавиатуры
-        if c == ('C'):byte() and not MX.pending then ctx.arranger_open(true); return end   -- 19 окт: C — набрать chain; 31 окт: панель arranger
+        if c == ('a'):byte() and not MX.pending then ctx.arranger_open(true); return end   -- 19 окт: набрать chain; 31 окт: панель arranger; 4 ноя: a — arranger (было C)
         if c == ('s'):byte() and not MX.pending then ctx.mx_sec_menu(); return end   -- 21 окт: s — подменю секций
         if c == ('S'):byte() and not MX.pending then   -- 19 окт: строка секций над плейлистом; 21 окт: S (song) — s отдан подменю секций
-          ctx.arranger_open(); vim.msg = 'arranger: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, C - chain, Esc - back'; return
+          ctx.arranger_open(); vim.msg = 'arranger: h l - a section, Enter adds it (3 Enter - three times), x - the last one off, Space plays, a - chain, Esc - back'; return
         end
         if not MX.key(c, seq, snap) then return vim.key(c) end
       elseif state.focus == 'browser' and (state.side or state.panes_ui) then
@@ -38047,7 +38047,7 @@ ctx.mx_menu = function(pick)
       F('j', 'duplicate the slot below, muted tracks empty (Ctrl+Down)', function() ctx.slot_new('clone_nomute', false) end),
       F('k', 'duplicate the slot above, muted tracks empty (Ctrl+Up)', function() ctx.slot_new('clone_nomute', true) end),
       K('y', 'yank slot', 'yy'), K('p', 'put after', 'p'), K('P', 'put before', 'P'),
-      K('u', 'duplicate: a free copy', 'yp'), K('A', 'alias: a linked repeat', 'A'), K('U', 'unique: unlink the repeat', 'U'),
+      K('u', 'duplicate: a free copy', 'yp'), K('c', 'alias: a linked repeat (clone)', 'c'), K('U', 'unique: unlink the repeat', 'U'),
       K('n', 'rename the region', 'n'), K('=', 'type the length (N steps, Ns, Nb)', '='),
       K('[', 'length -1 bar', '['), K(']', 'length +1 bar', ']'), K('{', 'length -1 step', '{'), K('}', 'length +1 step', '}'),
       F('h', 'previous pattern of the slot (Ctrl+Shift+h)', function() ctx.slot_cycle(MX.cur.ri, -1) end),
@@ -38061,7 +38061,7 @@ ctx.mx_menu = function(pick)
     { key = 's', label = 'section …  (s)', fn = function() ctx.set_focus('matrix'); ctx.mx_sec_menu() end },
     { key = 'T', label = 'section from the time selection  (Tr)', fn = keys('Tr') },
     { key = 'g', label = 'song / chain …', sub = function() return { title = 'matrix: song / chain', items = {
-      K('S', 'song: the section row above the playlist', 'S'), K('C', 'seq: type the order (A1 A1 B1x2 …)', 'C'),
+      K('S', 'song: the section row above the playlist', 'S'), K('a', 'arranger: type the order (A1 A1 B1x2 …)', 'a'),
       F('p', 'playlist as text (:pl)', function() vim.run_cmd('pl') end),
       F('u', 'unstack: patterns at one place play one after the other', function() ctx.unstack() end),
     } } end },
