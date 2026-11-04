@@ -6027,15 +6027,22 @@ function D.draw_mixsnaps(L, info, hover)
   local yy = y0
   -- кнопки: new prev next up down sws (+ filter, если блок фильтра не влезает)
   -- 30 окт: фильтр SWS и опции — только кнопкой filter (меню) рядом с sws; место под таблицей — списку и XY
-  -- 4 ноя: declip — кнопкой здесь же (горит — пики / клипы сами сбрасываются через N с; опция declip — секунды)
-  local B = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' }, { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' } }   -- 4 ноя: sends — полоса посылов вкл / выкл, router — большой роутер (zR)
-  local bx = x
-  for _, b in ipairs(B) do
-    local bw = ms(b[1]) + 2 * L.pad
-    if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
-    bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on), false, { what = b[2] }) + 2
+  -- 4 ноя: сверху — управление микшером (declip, sends, router), под линией — снапшоты (new prev next up down sws filter)
+  local function row_of(B)
+    local bx = x
+    for _, b in ipairs(B) do
+      local bw = ms(b[1]) + 2 * L.pad
+      if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
+      bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on), false, { what = b[2] }) + 2
+    end
+    yy = yy + rh
   end
-  yy = yy + rh + 2
+  row_of({ { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' } })
+  set(U.LINE); gfx.rect(x, yy + 1, w, 1, 1)
+  yy = yy + 4
+  text(x + 2, yy, fit('snapshots', w - 4), U.GREY); yy = yy + rh   -- 4 ноя: подпись блока снапшотов
+  row_of({ { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' } })
+  yy = yy + 2
   -- таблица
   local nw = ms('12') + L.pad
   local tw = ms('00:00:00') + L.pad
