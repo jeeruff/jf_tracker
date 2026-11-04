@@ -2313,7 +2313,10 @@ ctx = {
       state.mixroute = state.mixroute == false; relayout()
       vim.msg = 'mixer sends strip: ' .. (state.mixroute and 'on (hidden while no track has a send)' or 'off'); return
     end
-    if what == 'router' then if ctx.router_big then ctx.router_big() end; return end   -- 4 ноя: кнопка router = zR
+    if what == 'router' then   -- 4 ноя: кнопка router — схема маршрутизации всех треков (как routing у мастера; zR — роутер эффектов трека)
+      state.routeview = not state.routeview or nil
+      vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'; return
+    end
     if what == 'declip' then   -- 4 ноя: кнопка declip микшера — вкл / выкл (секунды — опция declip)
       local v = tonumber(state.declip) or 10
       if v > 0 then state.declip_last = v; state.declip = 0 else state.declip = state.declip_last or 10 end
@@ -20795,7 +20798,11 @@ function ctx.fxgui_tick()
     local lst = ctx.fxgui_last[guid]
     if r then ctx.fxgui_last[guid] = { r = r, t = now, gen = draw.fxgui_gen }
     elseif lst and (lst.gen == draw.fxgui_gen or now - lst.t < 0.5) then r = lst.r end
-    local show = tr and r and r.vis and state.dsp ~= false and r.w > 40 and r.h > 40
+    -- 4 ноя: и только когда DSP на экране — не big router / схема маршрутизации / большие справка и pm, панель не спрятана
+    -- (номер перерисовки не меняется, когда DSP не рисуется вовсе — прямоугольник держался, окно висело поверх)
+    local dsp_on = not state.router_big and not state.routeview and not state.khelp_big and not state.pm_big
+      and not (state.panes_ui and state.panes and draw.panes.visible and not draw.panes.visible(state.panes, 'dsp'))
+    local show = tr and r and r.vis and state.dsp ~= false and dsp_on and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
       if reaper.TrackFX_GetFXGUID(tr, r.fi) ~= guid then show = false end
@@ -26031,7 +26038,7 @@ local function frame()
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.mixsnap and hover.mixsnap.what == 'sends' then state.status = 'sends: the strip of sends over the mixer (each send by name, wires to where it goes) - click: on / off'
-  elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the big router over the whole window - every track, its sends and receives (zR)'
+  elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the routing of all tracks - sends, receives, outputs (Esc back); the fx router of one track is zR'
   elseif hover.mixsnap and hover.mixsnap.what == 'declip' then state.status = ('declip %s: peaks and clips of every track reset by themselves %d s after the last new peak - click: on / off (the seconds - options, declip)'):format((tonumber(state.declip) or 10) > 0 and 'on' or 'off', state.declip_last or (tonumber(state.declip) or 10) > 0 and (tonumber(state.declip) or 10) or 10)
   elseif hover.mixsnap and hover.mixsnap.what == 'xyc' then state.status = 'XY corner: click - recall (empty - menu), Shift+click - save the mix now, right click - a snapshot from the list or clear'
   elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph the mix between the corners: what the snapshot filter takes (volume, pan, mute, solo, sends, fx) - one undo'
