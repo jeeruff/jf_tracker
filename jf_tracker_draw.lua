@@ -5292,7 +5292,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if tw <= 0 or not info then return out end
   local c = info.ctrl or {}
   local function cell_hot(cx, cy, cw, ch) return mx >= cx and mx < cx + cw and my >= cy and my < cy + ch end
-  local gap, sep = 2 * L.pad, 3 * L.pad
+  local gap, sep = L.pad + 2, 2 * L.pad   -- 4 ноя: плотнее (было 2 и 3 pad) — место на транспорте
   -- 12 окт: it.res — самая длинная подпись этой ячейки (step 1 → step auto): место заранее, соседи не прыгают
   -- 15 окт: it.big — крупно (×2, как BPM) на две строки; it.w — пустое место заданной ширины
   local function cw_of(it)
@@ -5300,7 +5300,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     if it.w then return it.w end
     return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (math.max(it.beats.num, it.bres or 0) * (math.max(4, L.rh - 6) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
-  local function gap_of(g) return g.boxed and (gap + 6) or gap end
+  local function gap_of(g) return g.boxed and (gap + 3) or gap end
   -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
   local function br_l(g) return g.bracket and (L.th + 8) or 0 end
   local function group_w(g)
