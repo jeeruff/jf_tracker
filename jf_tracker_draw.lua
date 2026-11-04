@@ -9197,10 +9197,17 @@ function D.frame(L, snap, rows, state, info)
             local dim = muted_by_solo and tag == 'o'
             if pdb > -60 then
               local function seg(d0, d1, c3) local ya, yb = ypos(math.min(pdb, d1)), ypos(d0); if yb > ya then set(dim and U.mix(c3, dark, 0.55) or c3); gfx.rect(ix, ya, iw, yb - ya, 1) end end
-              seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
+              -- 4 ноя (2): вход — всегда красный (тусклый → красный → светлый за 0 dB), чтобы не путать с выходом
+              if tag == 'i' then
+                seg(-60, -6, U.mix(U.RED, dark, 0.35)); if pdb > -6 then seg(-6, 0, U.RED) end; if pdb > 0 then seg(0, 12, U.mix(U.RED, U.TEXT, 0.5)) end
+              else
+                seg(-60, -6, U.GREEN); if pdb > -6 then seg(-6, 0, U.AMBER) end; if pdb > 0 then seg(0, 12, U.RED) end
+              end
             end
             if hk.db > -60 then
-              set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)); gfx.rect(ix, ypos(hk.db), iw, 1, 1)
+              if tag == 'i' then set(hk.db > 0 and U.mix(U.RED, U.TEXT, 0.5) or U.RED)
+              else set(hk.db > 0 and U.RED or (hk.db > -6 and U.AMBER or U.GREEN)) end
+              gfx.rect(ix, ypos(hk.db), iw, 1, 1)
             end
             if hold.clip and tag == 'o' then set(U.RED); gfx.rect(ix, ty0 - 2, iw, 1, 1); gfx.rect(ix, ty0 - 4, iw, 1, 1) end
           end
