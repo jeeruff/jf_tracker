@@ -9101,12 +9101,23 @@ function D.frame(L, snap, rows, state, info)
           local ks = info.kslider
           local kon = ks and ks.col and ks.col.guid == col.guid and (ks.what == 'pan' or ks.what == 'width')
           local function ang(p) return math.max(-1, math.min(1, p)) * 0.75 * math.pi end   -- -135° … +135°, 0 — верх
+          -- 4 ноя (2): кольцо — сплошной полосой из четырёхугольников (было: gfx.arc по радиусам — щели, рябь);
+          -- под ней тусклая дорожка на весь ход -135°..+135°
+          local function band(b1, b2, r0, r1)
+            local n = math.max(2, math.ceil((b2 - b1) / 0.09))
+            for k = 0, n - 1 do
+              local t0, t1 = b1 + (b2 - b1) * k / n, b1 + (b2 - b1) * (k + 1) / n
+              local s0, c0, s1, c1 = math.sin(t0), math.cos(t0), math.sin(t1), math.cos(t1)
+              gfx.triangle(cx + s0 * r0, cy - c0 * r0, cx + s0 * r1, cy - c0 * r1, cx + s1 * r1, cy - c1 * r1, cx + s1 * r0, cy - c1 * r0)
+            end
+          end
           set(kdark); gfx.circle(cx, cy, r, 1, 1)
-          set(zone == 'width' and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 1)
+          local ro, rin = r - 1, r - rt
+          set(U.mix(kdark, U.LINE, 0.45)); band(ang(-1), ang(1), rin, ro)
           local a1, a2 = ang(pv - math.abs(wv)), ang(pv + math.abs(wv))
-          if a2 - a1 < 0.08 then a1, a2 = ang(pv) - 0.04, ang(pv) + 0.04 end
-          set(wv < 0 and U.RED or (zone == 'width' and U.AMBER or U.CYAN))
-          for k = 1, rt do gfx.arc(cx, cy, r - k, a1, a2, 1) end
+          if a2 - a1 < 0.1 then a1, a2 = ang(pv) - 0.05, ang(pv) + 0.05 end
+          set(wv < 0 and U.RED or (zone == 'width' and U.AMBER or U.CYAN)); band(a1, a2, rin, ro)
+          if zone == 'width' then set(U.AMBER); gfx.circle(cx, cy, r, 0, 1) end
           set(U.mix(kdark, U.BG, 0.5)); gfx.circle(cx, cy, ri, 1, 1)
           set((zone == 'pan' or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, ri, 0, 1)
           local pr = math.max(1, math.floor(ri / 5))
