@@ -951,7 +951,7 @@ function D.layout(snap, state, nregions)
       end
     end
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
-      or (state.thide ~= nil and state.thide[col.guid] == true)                 -- 11 окт: скрыт в track list
+      or (state.thide ~= nil and state.thide[col.guid] == true and not state.thide_show)   -- 11 окт: скрыт в track list; 4 ноя: tH — видны все (скрытые тусклым именем)
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.cols_r and not L.hs_cut   -- 17 окт: после не влезшего — не показывать
     -- PT-mode (3 окт): ровно 4 канала от прокрутки
@@ -8475,6 +8475,7 @@ function D.frame(L, snap, rows, state, info)
     -- на светлой заливке — тёмным (контраст по яркости фона)
     local ncol = col.muted and U.GREY or ((col.depth or 0) > 0 and U.mix(U.TEXT, U.GREY, 0.4) or U.TEXT)
     ncol = U.readable(ncol, nbg, 4.5)
+    if state.thide_show and state.thide and state.thide[col.guid] then ncol = U.mix(ncol, nbg, 0.6) end   -- 4 ноя: tH — скрытый трек тусклым именем
     if c.folded and not c.chord and not c.pan then   -- 26 окт: лейн аккордов широкий — обычная шапка и полоса микшера, не свёрнутая
       -- свёрнут в полоску (4 окт): имя вертикально во всю высоту шапки
       hset(rbg); gfx.rect(c.x + 1, hy, c.w - 1, nh, 1)

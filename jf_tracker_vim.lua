@@ -3314,6 +3314,9 @@ function V.key_impl(c)
         elseif ch == 'c' and ctx.track_colour then ctx.track_colour()
         elseif ch == 'm' and ctx.track_toggle then ctx.track_toggle('mute')   -- 21 окт: tm — mute трека курсора
         elseif ch == 'u' and ctx.unsolo_all then ctx.unsolo_all()          -- 21 окт: tu — снять все соло и mute
+        elseif ch == 'h' and ctx.track_hide then ctx.track_hide()                  -- 4 ноя: th — скрыть трек в трекере
+        elseif ch == 'H' and ctx.track_show_hidden then ctx.track_show_hidden()    -- 4 ноя: tH — показать скрытые
+        elseif ch == 'U' and ctx.track_unhide then ctx.track_unhide()              -- 4 ноя: tU — вернуть
         elseif ch == 'a' and ctx.rec_arm then ctx.rec_arm(V.count)   -- 16 окт: 6ta — шесть треков от курсора
         elseif ch == 'A' and ctx.autoarm_all then ctx.autoarm_all()   -- 20 окт: tA — autoarm всех треков (кнопка autoarm)
         elseif ch == 'i' and ctx.input_picker and col then ctx.input_picker(col)

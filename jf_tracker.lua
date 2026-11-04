@@ -6499,6 +6499,35 @@ ctx = {
   -- 11 окт: кнопка markers в уголке — показ маркеров и регионов (вкл / выкл, отметка on)
   -- 11 окт: track list — go: курсор на трек (скрытый — показать; за прокруткой — прокрутить),
   -- fold: свернуть / развернуть папку, hide: скрыть / показать в трекере
+  -- 4 ноя: th — скрыть трек курсора в трекере (в REAPER он остаётся); tH — показать скрытые (тусклым именем) / снова
+  -- спрятать; tU — вернуть трек курсора (если он скрытый, при tH), иначе вернуть все
+  track_hide = function()
+    local col = cur_col()
+    if not col then return end
+    state.thide = state.thide or {}
+    state.thide[col.guid] = true
+    relayout()
+    local n = 0; for _ in pairs(state.thide) do n = n + 1 end
+    vim.msg = ('hidden in the tracker: %s (%d hidden; tH - show them, tU - unhide)'):format(col.name or '', n)
+  end,
+  track_show_hidden = function()
+    state.thide_show = not state.thide_show
+    relayout()
+    local n = 0; for _ in pairs(state.thide or {}) do n = n + 1 end
+    vim.msg = state.thide_show and ('hidden tracks shown, dim names (%d) - tU on one unhides it, tH again - hide them'):format(n) or 'hidden tracks hidden again'
+  end,
+  track_unhide = function()
+    local col = cur_col()
+    state.thide = state.thide or {}
+    if col and state.thide[col.guid] then
+      state.thide[col.guid] = nil; vim.msg = 'unhidden: ' .. (col.name or '')
+    else
+      local n = 0; for _ in pairs(state.thide) do n = n + 1 end
+      state.thide = {}; vim.msg = n > 0 and ('unhidden: all %d track(s)'):format(n) or 'no hidden tracks'
+    end
+    if not next(state.thide) then state.thide_show = nil end
+    relayout()
+  end,
   tlist_do = function(ci, what)
     local col = snap and snap.cols[ci]
     if not col then return end
