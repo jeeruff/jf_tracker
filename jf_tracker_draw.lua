@@ -8939,9 +8939,7 @@ function D.frame(L, snap, rows, state, info)
         -- одной ширины фейдер и кноб одинаковые (полосы отступа больше нет)
         local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + D.FADER_W(L))   -- 9 окт: 3 знака (метки -12 / -48), было 5 — на x2 слишком широко
         -- 4 ноя: расширение до delay откатено — кнопки m s ø fx выпадали из полосы; ширина как 9 окт
-        -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
-        -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
-        -- с кнобом — посередине своей части. Нет подходящей линии — как было
+        -- 9 окт: линия «фейдер | эффекты»; 4 ноя: фейдер слева, линия — сразу за блоком (см. ниже)
         local sx = c.x + L.pad
         -- 10 окт: у мастера по тонкому столбику громкости (LUFS) слева и справа от фейдера
         -- 10 окт: пропорции мастера — столбики LUFS втрое шире прежних, коробка
@@ -8965,13 +8963,23 @@ function D.frame(L, snap, rows, state, info)
         if not c.master then
           local need = sx + fx_w + colw + L.pad
           local function cand(x, cl) if x >= need and c.x + c.w - 2 - (x + 2) >= 5 * L.cw and (not sepx or x < sepx) then sepx, sepc = x, cl end end
+          -- 4 ноя: блок фейдера — всегда слева и не шире полей нота + vol + delay первой подколонки;
+          -- эффекты — сразу за ним (линия на конце delay), без центровки по дальней вертикали
+          local ln1 = c.lanes[1]
+          local f1 = ln1 and L.flat[ln1.f0]
+          local G1 = (f1 and f1.G) or L
+          if ln1 and not c.compact then
+            local span = (G1.x_del or L.x_del) + (G1.w_del or L.w_del) - (G1.x_note or L.x_note)
+            fx_w = math.max(fx_w, math.min(span - colw - L.pad, lw1 - 2 * L.pad - colw))
+            need = sx + fx_w + colw + L.pad
+            cand(need, D.EMPTY)
+          end
           for li, ln in ipairs(c.lanes) do
             if li > 1 then cand(ln.x - 1, U.DIM) end
             for si = 2, ln.nsub or 1 do cand(ln.x + (ln.sx and ln.sx[si] or (si - 1) * L.sub_w), D.EMPTY) end
           end
           for _, ev in ipairs(c.envs) do cand(ev.x - 1, U.DIM) end
           for _, m in ipairs(c.mls or {}) do cand(m.x - 1, U.DIM) end
-          if sepx then sx = c.x + 1 + math.floor((sepx - c.x - 1 - fx_w - colw) / 2) end
         end
         -- эффекты сбоку, если влезают 5 знаков — тогда фейдер на всю высоту
         -- полосы; иначе под ним 3 строки эффектов. Высота фейдера при этом
