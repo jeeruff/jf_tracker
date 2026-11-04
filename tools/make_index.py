@@ -23,7 +23,7 @@ NAME = 'jf_tracker'
 RAW = 'https://github.com/jeeruff/jf_tracker-release/raw'
 BASE = None   # 4 ноя: --gate — ссылки через гейт jeeruff.com/jf_tracker/r/<ключ>/ (воркер подставит {{BASE}})
 # not shipped: development files
-SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$|AGENTS\.md$|ARCHITECTURE\.md$|PLAN_[A-Z]+\.md$|help/[^/]*private_tmp[^/]*$|jf_tracker_pm\.lua$|jf_tracker_orca\.lua$|daemon_tracker\.lua$)')  # 28 окт: планы, заметки агентов, карта архитектуры — только dev  # pm-карточки и демон jf_grid — только dev
+SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$|AGENTS\.md$|ARCHITECTURE\.md$|PLAN_[A-Z]+\.md$|VIM_KEYS\.md$|help/[^/]*private_tmp[^/]*$|jf_tracker_pm\.lua$|jf_tracker_orca\.lua$|daemon_tracker\.lua$)')  # 28 окт: планы, заметки агентов, карта архитектуры — только dev  # pm-карточки и демон jf_grid — только dev
 
 
 def git(*a, raw=False):
