@@ -2078,13 +2078,15 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
     end
   end
   -- 4 ноя (2): шапка — имя трека и полоска его цвета над стопкой
-  local hdr = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 4)
+  -- 4 ноя (4): имена вертикально, шрифтом трекера (масштаб — как у всего); шапка — по самому длинному, не выше трети
+  local longest = 0
+  for _, c in ipairs(cols) do longest = math.max(longest, ms((c.col.folder and '- ' or '') .. (c.col.name ~= '' and c.col.name or '-'))) end
+  local hdr = math.max(L.rh, math.min(longest + 6, math.floor(h / 3)))
   for _, c in ipairs(cols) do
     local col = c.col
     if col.rgb then set(col.rgb); gfx.rect(c.x + 1, y0 + 1, c.w - 1, 2, 1) end
     local nm = (col.folder and '- ' or '') .. (col.name ~= '' and col.name or '-')
-    while nm ~= '' and D.small_measure(nm) > c.w - 3 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
-    D.small_text(c.x + 2, y0 + 3, nm, U.TEXT)
+    if c.w >= L.th then D.vtext(c.x + math.floor((c.w - L.th) / 2), y0 + 4, hdr - 4, nm, U.TEXT, U.PANEL, true) end
   end
   y0, h = y0 + hdr + 2, h - hdr - 2
   local lane = 4
