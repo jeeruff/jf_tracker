@@ -12323,7 +12323,7 @@ ctx = {
     -- 31 окт: панели — только нужные для трека: трекер, матрица, паттерны, main, help, lib, browser, fx, dsp, automation, item
     if state.panes and PN.hide then
       local KEEP = { tracker = true, matrix = true, patterns = true, ctrl = true, help = true, inst = true, browser = true, fxb = true, dsp = true, automation = true, sample = true }
-      if pt then KEEP.fxb, KEEP.dsp, KEEP.automation = nil, nil, nil end   -- ProTracker: сэмплы айтемами, без эффектов
+      if pt then KEEP = { tracker = true, scopes = true, inst = true, browser = true, arranger = true } end   -- 4 ноя: ProTracker — раскладка ctx.PT_PANES (скопы, каналы, сэмплы, браузер, порядок песни)
       for _, p in ipairs(PN.PANELS) do if not KEEP[p.id] and PN.visible(state.panes, p.id) then PN.hide(state.panes, p.id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
