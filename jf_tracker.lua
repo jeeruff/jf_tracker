@@ -31153,7 +31153,7 @@ local function frame()
     local f = L.flat and L.flat[vim.cur.fi]
     local fld = vim.cur.field or 1
     if ctx.mods().ctrl then
-      if f and f.col and fld < 4 then ctx.fx_field_step(f.col, d); model.invalidate(); c = 0 end
+      if f and f.col and fld < 4 then ctx.fx_cols_step(f.col, d); model.invalidate(); c = 0 end   -- 4 ноя: колонки эффектов трека + / − (было — поля по одному)
     elseif f and f.col and f.lane then   -- 29 окт: и в INSERT с пианино (- = в frow — ноты, но Opt+- / Opt+= — колонки нот)
       local ln = f.lane
       local n = math.max(1, #(ln.subs or {}), (state.subs_min or {})[f.col.guid .. ':' .. tostring(ln.idx)] or 0)
