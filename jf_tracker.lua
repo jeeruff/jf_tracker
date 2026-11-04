@@ -25533,6 +25533,12 @@ local function frame()
     end
   end
   draw.tpkeys = state.tpkeys
+  do   -- 4 ноя: самая ранняя строка курсора: паттерн или =START до начала проекта — туда можно (строки выше 1.1)
+    local t0 = 0
+    for _, rg in ipairs(regions or {}) do if rg.pos < t0 then t0 = rg.pos end end
+    local sp = model.marker_pos(model.START_MARKER); if sp and sp < t0 then t0 = sp end
+    vim.min_row = t0 < 0 and math.floor(model.row_of_time(t0, state.lpb) + 1e-6) or 0
+  end
   OPT.SBW = draw.SBW   -- 4 ноя: полосы окна опций — той же толщины
   ctx.mod_arrows()   -- 4 ноя: держишь модификатор — у курсора стрелки h j k l с тем, что они сделают
   ctx.pan_frame()   -- 2 ноя: вид пана — позиция курсора для отрисовки, пан только что набранной ноты

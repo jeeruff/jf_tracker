@@ -150,7 +150,7 @@ local function clamp_cur()
   if n == 0 then V.cur.fi = 1 else
     if V.cur.fi < 1 then V.cur.fi = 1 elseif V.cur.fi > n then V.cur.fi = n end
   end
-  if V.cur.row < 0 then V.cur.row = 0 end
+  if V.cur.row < (V.min_row or 0) then V.cur.row = V.min_row or 0 end   -- 4 ноя: выше 1.1 — до начала самого раннего паттерна / =START (время до 0)
   local nf = nfields()
   if not V.cur.field or V.cur.field < 1 then V.cur.field = 1 elseif V.cur.field > nf then V.cur.field = nf end
 end
@@ -581,7 +581,7 @@ function motion(c, n, op)
   local last = ctx.snap().last_row or 0
   local L = ctx.layout()
   if c == ('j'):byte() or c == DOWN then return { fi = cur.fi, row = cur.row + n, linewise = true }
-  elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(0, cur.row - n), linewise = true }
+  elseif c == ('k'):byte() or c == UP then return { fi = cur.fi, row = math.max(V.min_row or 0, cur.row - n), linewise = true }
   -- 16 окт: колонка волны (режим column) — подполе слева от ноты: h с ноты — в волну, l — назад на ноту
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and (cur.field or 1) == 1 and not cur.sub and V.wave_field_ok() then
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'wave' }
@@ -764,9 +764,9 @@ function motion(c, n, op)
     end
     return { fi = cur.fi, row = math.max(0, r), linewise = true }
   elseif c == ctrl('d') then return { fi = cur.fi, row = cur.row + math.floor(L.nrows / 2), linewise = true }
-  elseif c == ctrl('u') then return { fi = cur.fi, row = math.max(0, cur.row - math.floor(L.nrows / 2)), linewise = true }
+  elseif c == ctrl('u') then return { fi = cur.fi, row = math.max(V.min_row or 0, cur.row - math.floor(L.nrows / 2)), linewise = true }
   elseif c == ctrl('f') or c == PGDN then return { fi = cur.fi, row = cur.row + L.nrows, linewise = true }
-  elseif c == ctrl('b') or c == PGUP then return { fi = cur.fi, row = math.max(0, cur.row - L.nrows), linewise = true }
+  elseif c == ctrl('b') or c == PGUP then return { fi = cur.fi, row = math.max(V.min_row or 0, cur.row - L.nrows), linewise = true }
   elseif c == HOME then return { fi = cur.fi, row = 0, linewise = true }
   elseif c == END then return { fi = cur.fi, row = last, linewise = true }
   elseif c == ('$'):byte() then return { fi = nflat(), row = cur.row, field = V.last_field(nflat()) }
