@@ -1956,7 +1956,7 @@ function B.key(c)
   elseif ch == 'H' then B.history(-1)
   elseif ch == 'L' then B.history(1)
   elseif ch == '/' then B.start_find()                           -- поиск прямо в списке (2 окт); 26 окт: f — прыжок по меткам, как в других модулях
-  elseif ch == 't' then B.set_mode(({ files = 'db', db = (B.pmpane and 'proj' or 'pm'), pm = 'proj', proj = 'rprj', rprj = 'libs', libs = 'presets', presets = 'files' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
+  elseif ch == 't' then B.set_mode(({ db = 'files', files = 'libs', libs = (B.pmpane and 'presets' or 'pm'), pm = 'presets', presets = 'proj', proj = 'rprj', rprj = 'recent', recent = 'db' })[B.mode] or 'files')   -- 9 окт: в панелях pm — своя панель
   elseif ch == 'p' then B.click('auto')
   elseif ch == 'o' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_open_project then ctx.pm_open_project(e.path, e.name) end
   elseif ch == 'T' then local e = B.entries[B.cur]; if e and e.pm and ctx.pm_tags then ctx.pm_tags(e) end        -- теги jf_pm
@@ -2139,7 +2139,7 @@ function B.draw(U, L, x, y, w, h)
     local bx = x + L.pad + 2
     -- 9 окт: панели — pm и fx отдельными панелями, у браузера только файлы
     -- 9 окт: опция pm as a pane — pm своей панелью; иначе вкладка браузера (fx — отдельной панелью)
-    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'files', 'recent', 'db', 'proj', 'rprj', 'libs', 'presets' }) or B.panes and { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets' } or (B.fx_draw and { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets', 'fx' } or { 'files', 'recent', 'db', 'pm', 'proj', 'rprj', 'libs', 'presets' })) do   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
+    for _, t in ipairs(B.pmpane and (B.mode == 'pm' and {} or { 'db', 'files', 'libs', 'presets', 'proj', 'rprj', 'recent' }) or B.panes and { 'db', 'files', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' } or (B.fx_draw and { 'db', 'files', 'fx', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' } or { 'db', 'files', 'libs', 'pm', 'presets', 'proj', 'rprj', 'recent' })) do   -- 4 ноя: по алфавиту подписей (db files fx libs pm presets proj recent zoxide)   -- 27 окт: recent — прослушанные (> 0.5 с или 2+ раза)
       if bx + U.measure(t) + 2 * L.pad > x + w then break end
       bx = btn(bx, y, t == 'recent' and 'zoxide' or (t == 'rprj' and 'recent' or t), t, B.mode == t)   -- 28 окт: recent → zoxide (папки + прослушанные)
     end
