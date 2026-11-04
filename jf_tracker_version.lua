@@ -1,9 +1,19 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.9.2'
+V.VERSION = '0.9.3'
 V.DATE = '2026-11-04'
 V.CHANGES = {
+  { v = '0.9.3', d = '2026-11-04', items = {
+    'mixer router (router button): the mixer split in half - every channel with its devices next to the fader and cables in the colour of the track: sends, folders, hardware outs; drag the line to share the height',
+    'mixer: armed tracks show a split meter - the input (red) and what goes out, every channel of the track; declip resets peaks and clips by itself; sends / router / declip buttons; one pan / width knob (disc - pan, ring - width)',
+    'narrow mixer strips: the track name and its effects on top, knobs and faders in one line',
+    'matrix: repeats are pooled now (P, U unpool - REAPER pooling); a - new slot with its name, c - change the pattern of the slot, A - the region playlist pane (seq, song playlist, arrangements)',
+    'patterns: a patternize button (regions as patterns, or as sections with patterns every N bars); pattern codes - renumber in order (A1 B1 C1 ...)',
+    'tracker: a view button top left (rulers, the tracker, the screen); zT zooms the track, zt is the Vim row-to-top; th tH tU hide / show hidden / unhide a track; note columns left, command columns right',
+    'browser: tabs in one order everywhere (db fav files fx libs pm proj recent), Tab in the fx list goes to the next tab; CONTROL is one mode (Ctrl+Opt, Shift - fine) and takes only what is on screen',
+    'fixes: plugin windows over DSP stay put and leave with it, the master clip resets, small labels with TTF fonts, the matrix crash on start',
+  } },
   { v = '0.9.2', d = '2026-11-04', items = {
     'fix: 0.9.1 crashed on start (jf_tracker.lua:618) - thanks for the report',
     'pan view (zvp, zvP - every track): the track as a stereo field of 5..65 positions, notes at their pan, audio as a narrow spectral wave; h l, 20h = L20, H L move the note, w b dw x; typing goes beside (on a note - replaces it)',
