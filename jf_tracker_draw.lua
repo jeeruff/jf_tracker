@@ -10235,7 +10235,15 @@ function D.frame(L, snap, rows, state, info)
             -- ячейка курсора (4 окт): подложка — ПОВЕРХ волны ячейки, под текстом;
             -- draw_cell зовёт D.cur_box сразу после волны (волна фоном её закрашивала)
             if inv then
-              D.cur_rect = { x, y, f.w or L.sub_w, L.rh, pan = c.pan }   -- 4 ноя: где курсор — стрелки модификаторов (main)
+              -- 4 ноя: где курсор — стрелки модификаторов (main): позиция пана / поле, не вся подколонка
+              if c.pan then
+                local cwp = L.cw
+                D.cur_rect = { x + math.floor(((f.w or 0) - D.PANN * cwp) / 2) + ((D.pan_cur or (D.PANN + 1) // 2) - 1) * cwp, y, cwp, L.rh, pan = true }
+              elseif c.folded or f.env or f.ml then D.cur_rect = { x, y, f.w or L.sub_w, L.rh }
+              else
+                local fx0, fw0 = D.field_rect(f.G or L, inv)
+                D.cur_rect = { x + (fx0 or 0) - 1, y, (fw0 or f.w or L.sub_w) + 2, L.rh }
+              end
               D.inv_bg = info.focus == 'tracker' and D.CURCELL or U.LINE   -- 28 окт: акцент — у курсора в фокусе (D.CURCELL), вне фокуса — тусклый
               local G, folded, inv_f, fw0, half = f.G or L, c.folded, inv, f.w, D.fx_half
               local panv = c.pan
