@@ -471,6 +471,7 @@ local state = {
   view_reg = flag('viewreg', false),
   view_secmode = flag('viewsec', false),   -- 26 окт: вид — секция курсора (zs); с view_reg — project / section / pattern            -- вид: только регион курсора (reg) / весь трек (all)                   -- строка подсказок под каждым модулем                       -- браузер эффектов слева в DSP-панели           -- копия файлов браузера в папку проекта               -- вертикальная линейка тактов слева в матрице                 -- контекстная справка в нижней панели (?)                     -- нижняя DSP-панель (FX трека)
   fcollapse = {},                               -- guid папки → свёрнута
+  fkids = {},                                   -- 4 ноя: guid папки → дети узкими полосками (zk), папка широкая
   thide = {},                                   -- 11 окт: guid → скрыт в трекере (track list, ПКМ)
 }
 state.panes_ui = flag('panes_ui', true)           -- 9 окт: раскладка панелями tmux / zellij (по умолчанию; выкл — прежний вид)
@@ -522,6 +523,7 @@ for g in tostring(ext('folds', '')):gmatch('[^,]+') do
   if id then state.folds[id] = (m == 'm') and 'mini' or (m == 'p' and 'pan') or true end   -- 2 ноя: =p — вид пана
 end
 for g in tostring(ext('fcollapse', '')):gmatch('[^,]+') do state.fcollapse[g] = true end
+for g in tostring(ext('fkids', '')):gmatch('[^,]+') do state.fkids[g] = true end
 for g in tostring(ext('thide', '')):gmatch('[^,]+') do state.thide[g] = true end
 for g, m in tostring(ext('pitchmodes', '')):gmatch('([^,=]+)=([^,]+)') do state.pitchmodes[g] = m end
 
@@ -734,6 +736,7 @@ local function save_win()
   local fc = {}
   for g, v in pairs(state.fcollapse) do if v then fc[#fc + 1] = g end end
   S('fcollapse', table.concat(fc, ','))
+  do local fk = {}; for g, v in pairs(state.fkids or {}) do if v then fk[#fk + 1] = g end end; S('fkids', table.concat(fk, ',')) end
   do local th = {}; for g, v in pairs(state.thide or {}) do if v then th[#th + 1] = g end end; S('thide', table.concat(th, ',')) end
   S('browse', B.root or '')
 end
@@ -1418,6 +1421,21 @@ ctx = {
     if not target or not target.folder then vim.msg = 'not in a folder'; return end
     state.fcollapse[target.guid] = (not state.fcollapse[target.guid]) or nil
     vim.msg = (state.fcollapse[target.guid] and 'collapsed ' or 'expanded ') .. target.name
+  end,
+  -- 4 ноя: zk — промежуточное: папка широкая, её дети узкими полосками (свёрнута — раскрыть так); ещё раз — как были
+  fold_kids = function(col)
+    local target = col
+    if col and not col.folder then
+      for i = (function() for k, c in ipairs(snap.cols) do if c == col then return k end end end)() or 1, 1, -1 do
+        local c = snap.cols[i]
+        if c.folder and (c.depth or 0) < (col.depth or 0) then target = c; break end
+      end
+    end
+    if not target or not target.folder then vim.msg = 'not in a folder'; return end
+    state.fkids = state.fkids or {}
+    state.fkids[target.guid] = (not state.fkids[target.guid]) or nil
+    if state.fkids[target.guid] then state.fcollapse[target.guid] = nil end
+    vim.msg = target.name .. ': ' .. (state.fkids[target.guid] and 'children narrow (zk again - as they were, zf - collapse)' or 'children as they were')
   end,
   -- запись (этап 8): punch по региону курсора, режимы записи, lanes трека
   punch = function()

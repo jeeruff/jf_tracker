@@ -3209,6 +3209,9 @@ function V.key_impl(c)
       elseif c == ('f'):byte() then
         local f = flat()[V.cur.fi]
         if f and ctx.fold_folder then ctx.fold_folder(f.col); ctx.relayout() end
+      elseif c == ('k'):byte() then   -- 4 ноя: zk — дети папки узкими полосками, папка широкая
+        local f = flat()[V.cur.fi]
+        if f and ctx.fold_kids then ctx.fold_kids(f.col); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
       elseif c == ('C'):byte() then   -- 1 ноя: zC — цепь monitor FX (мастер; полоска в символ — z!)
         if ctx.mfx_open then ctx.mfx_open() end
       elseif c == ('!'):byte() then

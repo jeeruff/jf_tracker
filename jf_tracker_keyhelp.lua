@@ -155,6 +155,7 @@ KH.PAGES = {
     { k = 'H J K L', d = 'select: visual block from here, Shift+hjkl extends it (tracks: Option+h l)' },
     { k = 'zA', d = 'every track: empty columns (delay, commands), extra note subcolumns, envelopes and MIDI lanes with nothing in them - hidden; again - all back' },
     { k = 'za zF', d = 'fold track: wave + notes, envelopes as a thin line / zF all <-> open all (:fold, :unfold)' },
+    { k = 'zf zk', d = 'folder: zf collapse <-> open; zk - the folder wide, its children narrow strips (= before the name; again - back)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },
     { k = 'Ctrl+Cmd+F12', d = 'restart the tracker from its files (as :reload) - after an update, no REAPER restart' },
     { k = 'zf zF', d = 'DSP: fold the module under the cursor into a narrow strip (x B on top, its name vertically; zf again or a click on the name - unfold) / fold all modules (all folded - unfold all)' },

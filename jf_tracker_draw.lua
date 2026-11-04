@@ -938,6 +938,7 @@ function D.layout(snap, state, nregions)
   local cx = L.matrix_w + L.label_w
   local first = state.hscroll or 1
   local hide_below = nil          -- глубина свёрнутой папки: дети не показываются
+  local kids_below = nil          -- 4 ноя: глубина папки с узкими детьми (zk)
   local fold_c = nil              -- 1 ноя: колонка свёрнутой папки — сводка событий детей (fsum) и их число (fn)
   for ci, col in ipairs(snap.cols) do
     local depth = col.depth or 0
@@ -956,6 +957,10 @@ function D.layout(snap, state, nregions)
     local hidden = (hide_below ~= nil and depth > hide_below) or (state.mxonly ~= nil and not state.mxonly[col.guid])   -- 9 окт: sel матрицы
       or (state.thide ~= nil and state.thide[col.guid] == true and not state.thide_show)   -- 11 окт: скрыт в track list; 4 ноя: tH — видны все (скрытые тусклым именем)
     if not hidden and col.folder and state.fcollapse and state.fcollapse[col.guid] then hide_below = depth end
+    -- 4 ноя: zk — дети папки узкими полосками (свой уровень ширины трека — главнее)
+    if kids_below and depth <= kids_below then kids_below = nil end
+    local kid_narrow = kids_below ~= nil and depth > kids_below and not hidden
+    if not hidden and not kid_narrow and col.folder and state.fkids and state.fkids[col.guid] and not (state.fcollapse and state.fcollapse[col.guid]) then kids_below = depth end
     local vis = (not hidden) and ci >= first and cx < L.cols_r and not L.hs_cut   -- 17 окт: после не влезшего — не показывать
     -- PT-mode (3 окт): ровно 4 канала от прокрутки
     if state.ptmode and not hidden and ci >= first then
@@ -964,6 +969,7 @@ function D.layout(snap, state, nregions)
     end
     -- fold: true — компактный вид (волна + нота), 'mini' — полоска в символ (прежний fold)
     local fs = state.folds[col.guid]
+    if kid_narrow and not (state.wlevel and state.wlevel[col.guid]) and fs ~= 'chord' and fs ~= 'pan' then fs = 'mini' end
     -- уровень ширины (7 окт): задан — колонка по нему, свёртка za не действует
     local lvl = (not state.ptmode) and ((state.wlevel and state.wlevel[col.guid]) or state.wzlevel) or nil
     -- 4 ноя: общий уровень (Opt+Cmd+гор. колесо) — потолок, не замена: ужимает только треки шире него; свёрнутые (za)
@@ -8665,7 +8671,7 @@ function D.frame(L, snap, rows, state, info)
     local BTXT = U.readable(G0, U.PANEL, 4.5)
     -- папки: вложенные треки сдвинуты и приглушены, папка помечена «+»
     local indent = (col.depth or 0) * L.cw
-    local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or '- ') or '') .. (col.name ~= '' and col.name or '-')
+    local nm = (col.folder and ((state.fcollapse and state.fcollapse[col.guid]) and '> ' or ((state.fkids and state.fkids[col.guid]) and '= ' or '- ')) or '') .. (col.name ~= '' and col.name or '-')   -- 4 ноя: = дети узкие (zk)
     if c.fn and c.fn > 0 then nm = nm .. ' /' .. c.fn end   -- 1 ноя: свёрнутая папка — сколько треков внутри
     -- имя трека — на всю ширину колонки (кнопки переехали строкой ниже);
     -- на светлой заливке — тёмным (контраст по яркости фона)
