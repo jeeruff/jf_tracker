@@ -9084,12 +9084,39 @@ function D.frame(L, snap, rows, state, info)
           knob(sx, pyy, d2, (lv('panl', col.panL or -1) + 1) / 2, 'panl')
           knob(sx + fx_w - d2, pyy, d2, (lv('panr', col.panR or 1) + 1) / 2, 'panr')
         elseif not bigf and state.panknob ~= false and col.panmode ~= 6 then
-          -- 18 окт: над кнобом пана — слайдер width (правка в режиме без ширины включает stereo pan — edit.track_value)
-          local wv = lv('width', col.width or 1)
-          -- 18 окт: дорожкой без подписи (in_pop = true — не сворачиваться в кнопку w в узкой зоне); значение — в статусе
-          slider(sx, pyy, fx_w, (wv + 1) / 2, true, '', math.floor(wv * 100 + 0.5) .. '', 'width', true, true)
-          local d = math.min(kd, 2 * L.rh - 2)
-          knob(sx + math.floor((fx_w - d) / 2), pyy + L.rh, d, (lv('pan', col.pan or 0) + 1) / 2, 'pan', pan_txt(lv('pan', col.pan or 0)))
+          -- 4 ноя: один кноб pan / width (вместо слайдера width над кнобом): диск — пан (точка), кольцо вокруг —
+          -- ширина дугой от pan − width до pan + width (куда раскинуты L и R; отрицательная — красным).
+          -- Тянуть диск — пан, кольцо — ширина; занимает те же 3 строки, фейдер на месте
+          local pv, wv = lv('pan', col.pan or 0), lv('width', col.width or 1)
+          local d = math.max(8, math.min(fx_w, 3 * L.rh - 2))
+          local kx, ky = sx + math.floor((fx_w - d) / 2), pyy
+          local r = math.floor((d - 1) / 2)
+          local cx, cy = kx + r, ky + r
+          local rt = math.max(2, math.floor(r / 4))
+          local ri = r - rt - 2
+          local kdark = U.mix(U.BG, { 0, 0, 0 }, 0.55)
+          local ddx, ddy = mx - cx, my - cy
+          local dist = math.sqrt(ddx * ddx + ddy * ddy)
+          local zone = dist <= r + 1 and (dist <= ri + 1 and 'pan' or 'width') or nil
+          local ks = info.kslider
+          local kon = ks and ks.col and ks.col.guid == col.guid and (ks.what == 'pan' or ks.what == 'width')
+          local function ang(p) return math.max(-1, math.min(1, p)) * 0.75 * math.pi end   -- -135° … +135°, 0 — верх
+          set(kdark); gfx.circle(cx, cy, r, 1, 1)
+          set(zone == 'width' and U.AMBER or U.LINE); gfx.circle(cx, cy, r, 0, 1)
+          local a1, a2 = ang(pv - math.abs(wv)), ang(pv + math.abs(wv))
+          if a2 - a1 < 0.08 then a1, a2 = ang(pv) - 0.04, ang(pv) + 0.04 end
+          set(wv < 0 and U.RED or (zone == 'width' and U.AMBER or U.CYAN))
+          for k = 1, rt do gfx.arc(cx, cy, r - k, a1, a2, 1) end
+          set(U.mix(kdark, U.BG, 0.5)); gfx.circle(cx, cy, ri, 1, 1)
+          set((zone == 'pan' or kon) and U.AMBER or U.LINE); gfx.circle(cx, cy, ri, 0, 1)
+          local pr = math.max(1, math.floor(ri / 5))
+          local rr = ri - pr - 2
+          local ap = ang(pv)
+          set(U.readable((zone == 'pan' or kon) and U.AMBER or U.TEXT, kdark, 7))
+          gfx.circle(cx + math.floor(math.sin(ap) * rr + 0.5), cy - math.floor(math.cos(ap) * rr + 0.5), pr, 1, 0)
+          if zone then hover.trs = { col = col, what = zone, knob = true, sv = zone == 'pan' and (pv + 1) / 2 or (wv + 1) / 2 } end
+          if D.csel_on(col.guid, 'pan') or D.csel_on(col.guid, 'width') then csel_frame(kx - 1, ky - 1, 2 * r + 3, 2 * r + 3) end
+          hint('trs', kx, ky, 2 * r + 1, 2 * r + 1, { col = col, what = zone or 'pan' })
         elseif col.panmode == 5 then
           slider(sx, pyy, fx_w, (lv('pan', col.pan or 0) + 1) / 2, true, 'p', pan_txt(lv('pan', col.pan or 0)), 'pan', nil, true)
           slider(sx, pyy + L.rh, fx_w, (lv('width', col.width or 1) + 1) / 2, true, 'w', math.floor(lv('width', col.width or 1) * 100 + 0.5) .. '', 'width', nil, true)
