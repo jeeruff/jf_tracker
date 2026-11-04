@@ -32256,6 +32256,7 @@ ctx.cm_help = function()
 end
 ctx.cm_help()
 draw.cm_draw = function(...) return ctx.cm_draw(...) end
+draw.envc = function(h, n) return model.item_env_curve(h, n) end   -- 4 ноя: огибающие пана / громкости ноты для волны
 ctx.cm_wk = function()   -- Ctrl+W c: список custom-модулей (буква — имя)
   local items = {}
   for _, pp in ipairs(draw.panes.PANELS) do if pp.custom then items[#items + 1] = { pp.key, pp.label } end end

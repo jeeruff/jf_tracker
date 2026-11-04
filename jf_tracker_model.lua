@@ -3076,6 +3076,42 @@ function M.file_peaks(path, npix, a, b, spec)
   end
   return M.peaks(e, npix)
 end
+-- 4 ноя: огибающие пана и громкости ноты-айтема (take + трек) по n точкам вдоль айтема → { pan = {}, vol = {}, haspan, hasvol } или nil.
+-- Пан огибающей трека хранится с обратным знаком (L100 = +1), огибающая пана take — смещение к пану take (тот же знак, что у трека);
+-- громкость — через ScaleFromEnvelopeMode. Кеш на айтем и n, пересчёт при правке проекта
+local envc, envc_sc = {}, -1
+function M.item_env_curve(head, n)
+  local it, tk = head and head.item, head and head.take
+  if not (it and tk and R.ValidatePtr(tk, 'MediaItem_Take*')) then return nil end
+  local sc = R.GetProjectStateChangeCount(0)
+  if sc ~= envc_sc then envc, envc_sc = {}, sc end
+  local key = tostring(it) .. '|' .. n
+  local c = envc[key]
+  if c ~= nil then return c or nil end
+  local tr = R.GetMediaItem_Track(it)
+  local function live(e) return (e and R.CountEnvelopePoints(e) > 0) and e or nil end
+  local tp, tv = live(R.GetTakeEnvelopeByName(tk, 'Pan')), live(R.GetTakeEnvelopeByName(tk, 'Volume'))
+  local rp, rv = live(R.GetTrackEnvelopeByName(tr, 'Pan')), live(R.GetTrackEnvelopeByName(tr, 'Volume'))
+  if not (tp or tv or rp or rv) then envc[key] = false; return nil end
+  local pos, len = R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local base = R.GetMediaItemTakeInfo_Value(tk, 'D_PAN')
+  local function ev(e, t) local _, x = R.Envelope_Evaluate(e, t, 0, 0); return x or 0 end
+  local function amp(e, t) return R.ScaleFromEnvelopeMode(R.GetEnvelopeScalingMode(e), ev(e, t)) end
+  local v = { pan = {}, vol = {}, n = n, haspan = (tp or rp) ~= nil, hasvol = (tv or rv) ~= nil }
+  for i = 1, n do
+    local t = (i - 0.5) / n * len
+    local p = base
+    if tp then p = p - ev(tp, t) end
+    if rp then p = p - ev(rp, pos + t) end
+    v.pan[i] = math.max(-1, math.min(1, p))
+    local a = 1
+    if tv then a = a * amp(tv, t) end
+    if rv then a = a * amp(rv, pos + t) end
+    v.vol[i] = math.max(0, math.min(2, a))
+  end
+  envc[key] = v
+  return v
+end
 -- длина файла из того же кеша (после file_peaks), секунды; nil — не знаем
 function M.file_len(path) local e = file_src[path]; return e and e.len or nil end
 

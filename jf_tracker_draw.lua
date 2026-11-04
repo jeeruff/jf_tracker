@@ -2284,6 +2284,7 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   end
   if not pk or pk.n == 0 then return end
   local scale = pk.n / total
+  local ec = D.envc and D.envc(head, math.min(total, 512))   -- 4 ноя: громкость огибающей — ширина волны; пан — янтарная линия в колонке волны
   -- 31 окт: slixer thru — после конца своего среза нота играет дальше: хвост волны тусклее
   local tailq = head.tail_f and math.floor(head.tail_f * total + 0.5) or nil
   local tailc = tailq and U.mix(base_col, U.BG, 0.6) or nil
@@ -2301,10 +2302,17 @@ local function draw_wave(L, head, i, x, y, muted, inv)
       local c = spec_colour(pk.spec[idx]); set(muted and U.mix(c, U.BG, 0.5) or c)
     end
     if tailq and not (column and mode == 'spec') then set(q >= tailq and tailc or base_col) end
+    local ek = ec and math.min(ec.n, math.floor(q / total * ec.n) + 1)
+    if ek and ec.hasvol then local g = math.min(1.5, ec.vol[ek] ^ 0.6); mx, mn = mx * g, mn * g end
     do
       local xa, xb = cx + mn * hw, cx + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
+    end
+    if ek and ec.haspan and column and not inv then
+      local px = x0w + math.floor((ec.pan[ek] + 1) / 2 * (L.w_wave - 1) + 0.5)
+      set(U.AMBER); gfx.rect(px, y + py, 1, 1, 1)
+      set((column and mode == 'spec' and pk.spec) and spec_colour(pk.spec[idx]) or base_col)
     end
     end
   end
@@ -2652,7 +2660,7 @@ end
 D.PV = dofile((debug.getinfo(1, 'S').source:match('^@(.*/)') or './') .. 'jf_tracker_panview.lua')
 D.PANN = 17
 -- волна айтема в ячейке позиции: время вниз (строка row от начала айтема), амплитуда — вширь клетки; true — нарисовал
-function D.pan_wave(L, h, row, gx, y, cw, oncur)
+function D.pan_wave(L, h, row, gx, y, cw, oncur, x0, n)
   local total = math.max(1, math.floor((h.rows_f or h.rows or 1) * L.rh + 0.5))
   local off = math.floor((h.start_f or 0) * L.rh + 0.5)
   local pk = get_peaks(h, math.min(total, 8192), true)   -- 3 ноя: спектральные пики (тот же кеш, цвет — частота)
@@ -2660,6 +2668,7 @@ function D.pan_wave(L, h, row, gx, y, cw, oncur)
   local i = row - (h.row0 or row)
   local cx, hw = gx + cw / 2, cw * 1.5   -- три клетки вокруг позиции: видно, что это волна
   local scale = pk.n / total
+  local ec = D.envc and D.envc(h, math.min(total, 512))   -- 4 ноя: огибающие пана / громкости — змейка по стереополю, ширина по громкости
   local mute = oncur or h.muted
   set(oncur and U.BG or (h.muted and U.mix(U.GREY, U.BG, 0.5) or U.mix(U.TEXT, U.BG, 0.3)))
   for py = 0, L.rh - 1 do
@@ -2670,7 +2679,13 @@ function D.pan_wave(L, h, row, gx, y, cw, oncur)
       local mx, mn = math.min(1, pk.max[idx] or 0), math.max(-1, pk.min[idx] or 0)
       mx = mx > 0 and mx ^ 0.6 or -((-mx) ^ 0.6); mn = mn > 0 and mn ^ 0.6 or -((-mn) ^ 0.6)   -- тихое не ниткой (как колонка волны)
       if pk.spec and not mute then set(spec_colour(pk.spec[idx])) end
-      local xa, xb = cx + mn * hw, cx + mx * hw
+      local c0 = cx
+      if ec then
+        local k = math.min(ec.n, math.floor(q / total * ec.n) + 1)
+        if ec.haspan and x0 then c0 = x0 + ((ec.pan[k] + 1) / 2 * (n - 1)) * cw + cw / 2 end
+        if ec.hasvol then local g = math.min(1.5, ec.vol[k] ^ 0.6); mx, mn = mx * g, mn * g end
+      end
+      local xa, xb = c0 + mn * hw, c0 + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
     end
@@ -2693,7 +2708,7 @@ function D.draw_pan_cell(L, col, row, x, y, ty, inv, w)
     local gx = x0 + (it.pos - 1) * cw
     if it.pos == cur then set(D.inv_bg or U.TEXT); gfx.rect(gx, y, cw, L.rh, 1); colr = U.BG end
     -- 3 ноя: аудио — узкая волна айтема в своей позиции по всем его строкам (серая); голова — буква поверх
-    local wv = h.kind == 'audio' and get_peaks and D.pan_wave(L, h, row, gx, y, cw, it.pos == cur)
+    local wv = h.kind == 'audio' and get_peaks and D.pan_wave(L, h, row, gx, y, cw, it.pos == cur, x0, n)
     if it.cont then
       if not wv then text(gx, ty, '|', it.pos == cur and U.BG or U.mix(colr, U.BG, 0.45)) end
     else   -- 3 ноя: голова — C-4 по центру позиции (сжатое поле — буква), под ней фон / курсор
