@@ -387,6 +387,7 @@ local state = {
   -- плавающее окошко заметок (4 окт): x y w h или nil — левая колонка
   notes_win = (function() local a, b, c, d = reaper.GetExtState(EXT, 'noteswin'):match('^(%-?%d+) (%-?%d+) (%d+) (%d+)$'); return a and { tonumber(a), tonumber(b), tonumber(c), tonumber(d) } or nil end)(),   -- масштаб текста заметок (4 окт), 0 — как везде
   mixroute = flag('mixroute', true),
+  mixrouter = flag('mixrouter', false) or nil,   -- 4 ноя: роутер микшера (кнопка router)
   jumps = flag('jumps', false),
   rowjumps = flag('rowjumps', false),
   ggrel = flag('ggrel', false),   -- 20 окт: gg / G в виде pattern — начало / конец паттерна
@@ -710,7 +711,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -2313,9 +2314,9 @@ ctx = {
       state.mixroute = state.mixroute == false; relayout()
       vim.msg = 'mixer sends strip: ' .. (state.mixroute and 'on (hidden while no track has a send)' or 'off'); return
     end
-    if what == 'router' then   -- 4 ноя: кнопка router — схема маршрутизации всех треков (как routing у мастера; zR — роутер эффектов трека)
-      state.routeview = not state.routeview or nil
-      vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'; return
+    if what == 'router' then   -- 4 ноя: кнопка router — роутер микшера: верхняя половина — устройства каналов и провода, снизу фейдеры
+      state.mixrouter = not state.mixrouter or nil; relayout()
+      vim.msg = state.mixrouter and 'mixer router: the devices of every channel on top, wires - where it goes (send, folder, out); faders below' or 'mixer router: off'; return
     end
     if what == 'declip' then   -- 4 ноя: кнопка declip микшера — вкл / выкл (секунды — опция declip)
       local v = tonumber(state.declip) or 10
@@ -24634,7 +24635,7 @@ local function frame()
       ctx.PERF.reset = ctx.PERF.reset or function() for k in pairs(draw.prof) do draw.prof[k] = nil end; draw.prof_ord = 0 end
       ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit)
     end,
-    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, declip_on = (tonumber(state.declip) or 10) > 0, mixroute_on = state.mixroute ~= false, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
+    pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, declip_on = (tonumber(state.declip) or 10) > 0, mixroute_on = state.mixroute ~= false, mixrouter = state.mixrouter, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
     cur_region = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
@@ -26038,7 +26039,7 @@ local function frame()
   elseif hover.sample and SL.zone_hot then state.status = SL.zone_hot == 'move' and 'slice zone - drag the strip to move the whole slice (same length; all notes of this slice instrument)'
       or ('slice %s - drag the triangle: offset and length of this slice instrument (all its notes)'):format(SL.zone_hot == 'a' and 'start' or 'end')
   elseif hover.mixsnap and hover.mixsnap.what == 'sends' then state.status = 'sends: the strip of sends over the mixer (each send by name, wires to where it goes) - click: on / off'
-  elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the routing of all tracks - sends, receives, outputs (Esc back); the fx router of one track is zR'
+  elseif hover.mixsnap and hover.mixsnap.what == 'router' then state.status = 'router: the mixer split in half - the devices of every channel and wires where the sound goes (sends, folders, outs), small faders below; click: on / off'
   elseif hover.mixsnap and hover.mixsnap.what == 'declip' then state.status = ('declip %s: peaks and clips of every track reset by themselves %d s after the last new peak - click: on / off (the seconds - options, declip)'):format((tonumber(state.declip) or 10) > 0 and 'on' or 'off', state.declip_last or (tonumber(state.declip) or 10) > 0 and (tonumber(state.declip) or 10) or 10)
   elseif hover.mixsnap and hover.mixsnap.what == 'xyc' then state.status = 'XY corner: click - recall (empty - menu), Shift+click - save the mix now, right click - a snapshot from the list or clear'
   elseif hover.mixsnap and hover.mixsnap.what == 'xypad' then state.status = 'mixer XY: drag the puck - morph the mix between the corners: what the snapshot filter takes (volume, pan, mute, solo, sends, fx) - one undo'

@@ -730,6 +730,7 @@ function D.layout(snap, state, nregions)
   L.mix_rows = L.mixer and math.max(6, tonumber(state.mix_rows) or 16) or 0
   -- 9 окт: схема маршрутизации — полосой в верху нижнего микшера (опция mixroute)
   L.route_h = (L.mix_bottom and state.mixroute ~= false) and (D.rt_need or (3 * ms('W') + 16)) or 0
+  if L.mix_bottom and state.mixrouter then L.route_h = math.floor(L.mix_rows * L.rh / 2) end   -- 4 ноя: роутер микшера — верхняя половина
   L.mix_h = L.mix_bottom and (L.mix_rows * L.rh + 4 + L.route_h) or 0
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   -- 11 окт: +1 строка уголка — кнопка markers под регионом; кнопки лейнов
@@ -875,6 +876,7 @@ function D.layout(snap, state, nregions)
     L.mix_pane = mxr or nil
     if mxr then
       L.route_h = math.min(L.route_h, math.max(0, mxr.h - 6 * L.rh))
+      if state.mixrouter then L.route_h = math.floor((mxr.h - 4) / 2) end   -- 4 ноя: роутер микшера — половина панели, фейдеры — нижняя
       L.mix_y, L.mix_h = mxr.y, mxr.h
       L.mix_rows = math.max(4, math.floor((mxr.h - 4 - L.route_h) / L.rh))
       L.route_y = L.mix_y
@@ -2044,8 +2046,105 @@ end
 -- 11 окт: шаблоны треков — «< имя >» в шапке DSP; D.PR.cur — текущий (стрелки, выпадашка)
 D.PR = { cur = 1 }
 
+-- 4 ноя: роутер микшера (кнопка router): верхняя половина микшера — у каждого канала стопка его устройств (эффекты по
+-- порядку цепи, выключенный — тускло; щелчок / двойной — как эффект в шапке), под стопками — провода: посыл (голубой,
+-- заглушён — серый, цвет получателя), выход в папку (тусклый), аппаратный выход (янтарь, подпись out N/N). Провод идёт
+-- вниз из стопки, по своей дорожке к получателю и вверх в его стопку (засечка). Снизу — маленькие фейдеры (нижняя половина)
+function D.mix_router(L, info, hover, x0, x1, y0, h)
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  set(U.PANEL); gfx.rect(x0, y0, x1 - x0, h, 1)
+  set(D.SEP); gfx.rect(x0, y0, x1 - x0, D.SEPW, 1)
+  local cols = {}
+  local xof = {}
+  for _, c in ipairs(L.cols or {}) do
+    local col = c.col
+    if col and col.track and not c.master and c.x and c.x + c.w > x0 and c.x < x1 and reaper.ValidatePtr(col.track, 'MediaTrack*') then
+      cols[#cols + 1] = c; xof[col.track] = c
+    end
+  end
+  -- провода: сначала собрать — сколько дорожек нужно
+  local wires = {}
+  for _, c in ipairs(cols) do
+    for _, e in ipairs(routing_of(c.col.track)) do
+      if not e.recv then
+        local dst = e.dest and xof[e.dest]
+        if e.main then
+          local par = reaper.GetParentTrack(c.col.track)
+          dst = par and xof[par] or nil
+          if dst then wires[#wires + 1] = { src = c, dst = dst, kind = 'folder', e = e } end
+        elseif e.hw then wires[#wires + 1] = { src = c, kind = 'hw', e = e }
+        elseif dst then wires[#wires + 1] = { src = c, dst = dst, kind = 'send', e = e } end
+      end
+    end
+  end
+  local lane = 3
+  local nl = 0
+  for _, w in ipairs(wires) do if w.dst then nl = nl + 1 end end
+  local whh = math.min(math.floor(h * 0.45), 6 + math.min(nl, 12) * lane + L.rh)   -- зона проводов (и подписи out)
+  local sy0, sy1 = y0 + 3, y0 + h - whh                                              -- зона стопок
+  local rowh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 3)
+  local bot = {}                                                                     -- низ стопки канала
+  for _, c in ipairs(cols) do
+    local col = c.col
+    set(U.LINE); gfx.rect(c.x, y0, 1, h, 1)
+    local bx, bw = c.x + 2, c.w - 4
+    local yy = sy0
+    local nfx = #(col.fx or {})
+    local cap = math.max(0, math.floor((sy1 - sy0 - 2) / rowh))
+    for k = 1, math.min(nfx, cap) do
+      local f = col.fx[k]
+      local more = k == cap and nfx > cap
+      local nm = more and ('+' .. (nfx - cap + 1)) or (f.name or ''):gsub('^%w+i?:%s*', ''):gsub('%s*%b()%s*$', '')
+      while nm ~= '' and D.small_measure(nm) > bw - 3 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
+      local hot = mx >= bx and mx < bx + bw and my >= yy and my < yy + rowh - 1
+      local off = f.enabled == false
+      set(hot and D.CURROW or U.mix(U.PANEL, U.BG, 0.5)); gfx.rect(bx, yy, bw, rowh - 1, 1)
+      set(hot and U.AMBER or (off and U.DIM or U.mix(U.CYAN, U.PANEL, 0.4))); gfx.rect(bx, yy, bw, rowh - 1, 0)
+      D.small_text(bx + 2, yy + 1, nm, hot and U.AMBER or (off and U.DIM or U.TEXT))
+      if hot and not more then hover.hdrfx = { col = col, k = k, it = { name = f.name, off = off, k = k, i = f.i } } end
+      -- провод цепи между устройствами — сверху вниз
+      yy = yy + rowh
+      if k < math.min(nfx, cap) then set(U.mix(U.CYAN, U.PANEL, 0.5)); gfx.rect(c.x + math.floor(c.w / 2), yy - 1, 1, 1, 1) end
+    end
+    if nfx == 0 then set(U.mix(U.LINE, U.PANEL, 0.5)); gfx.rect(c.x + math.floor(c.w / 2), sy0, 1, rowh, 1); yy = sy0 + rowh end
+    bot[c] = yy
+  end
+  -- провода
+  local wy0 = sy1 + 2
+  local whot
+  local li = 0
+  for k, w in ipairs(wires) do
+    if w.dst then
+      li = li + 1
+      w.y = wy0 + 2 + ((li - 1) % 12) * lane
+      w.x, w.tx = w.src.x + math.floor(w.src.w / 2) - 1 + (k % 3), w.dst.x + math.floor(w.dst.w / 2) + 1
+      local near = (my >= w.y - 1 and my <= w.y + 1 and mx >= math.min(w.x, w.tx) - 1 and mx <= math.max(w.x, w.tx) + 1)
+      if near then whot = k end
+    end
+  end
+  for k, w in ipairs(wires) do
+    local c = w.src
+    if w.dst then
+      local hot = k == whot
+      if hot then set(U.AMBER) elseif w.e.mute then set(U.GREY) elseif w.kind == 'folder' then set(U.mix(U.TEXT, U.PANEL, 0.6))
+      elseif w.e.rgb then rawset_col(w.e.rgb) else set(U.CYAN) end
+      gfx.rect(w.x, bot[c], 1, w.y - bot[c] + 1, 1)                                 -- вниз из стопки
+      gfx.rect(math.min(w.x, w.tx), w.y, math.abs(w.tx - w.x) + 1, 1, 1)            -- к получателю
+      gfx.rect(w.tx, bot[w.dst], 1, w.y - bot[w.dst] + 1, 1)                         -- вверх в его стопку
+      gfx.rect(w.tx - 1, bot[w.dst], 3, 1, 1)                                        -- засечка входа
+      if hot then hover.btn = { col = c.col, what = 'route', send = w.e } end
+    elseif w.kind == 'hw' then
+      local lb = w.e.name
+      local tw = D.small_measure(lb)
+      if tw <= c.w - 2 then D.small_text(c.x + math.floor((c.w - tw) / 2), y0 + h - rowh, lb, w.e.mute and U.GREY or U.AMBER) end
+    end
+  end
+  if whot then local w = wires[whot]; hover.mixrt = w end
+  set(D.SEP); gfx.rect(x0, y0 + h - 1, x1 - x0, 1, 1)
+end
 function D.route_strip(L, info, hover, x0, x1)
   local y0, h = L.route_y, L.route_h
+  if info.mixrouter and y0 and h > 0 then return D.mix_router(L, info, hover, x0, x1, y0, h) end
   if not y0 or h <= 0 then
     -- 4 ноя: посылов не было — полоса спрятана (rt_need = 0); раз в полсекунды проверить, не появились ли
     if D.rt_need == 0 and reaper.time_precise() - (D.rt_scan_t or 0) > 0.5 then
@@ -6033,7 +6132,7 @@ function D.draw_mixsnaps(L, info, hover)
     for _, b in ipairs(B) do
       local bw = ms(b[1]) + 2 * L.pad
       if bx + bw > x + w and bx > x then bx = x; yy = yy + rh end
-      bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on), false, { what = b[2] }) + 2
+      bx = bx + btn(bx, yy, b[1], (b[2] == 'declip' and info.declip_on) or (b[2] == 'sends' and info.mixroute_on) or (b[2] == 'router' and info.mixrouter), false, { what = b[2] }) + 2
     end
     yy = yy + rh
   end
@@ -7222,7 +7321,7 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local bh = L and (L.rh - 2) or 0
   -- 4 ноя: эффекты — сверху полосы, над кнобом (там место), хоть по строчке на эффект (мелким шрифтом, имя без типа и производителя), пока фейдеру
   -- остаётся 3 строки над M S R; выключенный — тускло; щелчок — как по эффекту в шапке трека (hover.hdrfx)
-  if L and not col.master and col.fx and #col.fx > 0 then
+  if L and not col.master and col.fx and #col.fx > 0 and not info.mixrouter then   -- роутер микшера — эффекты там
     local rowh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2)
     local room = (y1 - y0) - (w | 1) - 2 - 3 * (bh + 2) - 3 * L.rh - 2   -- кноб, M S R и 3 строки фейдера остаются
     local fit = math.max(0, math.floor(room / rowh))
@@ -7241,7 +7340,7 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
     if nfx < #col.fx and nfx > 0 then D.small_text(x + w - D.small_measure('+') - 1, y0 + (nfx - 1) * rowh, '+', U.GREY) end
   end
   -- 4 ноя: место под эффекты — одно на все узкие полосы (по самой загруженной): кнобы и фейдеры на одной линии
-  if L and not col.master then
+  if L and not col.master and not info.mixrouter then
     local res = math.min(D.mini_fxn or 0, math.max(0, math.floor(((y1 - y0) - (w | 1) - 2 - 3 * (bh + 2) - 3 * L.rh - 2) / math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2))))
     if res > 0 then y0 = y0 + res * math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 2) + 2 end
   end
