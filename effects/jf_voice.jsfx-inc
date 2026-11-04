@@ -1,0 +1,258 @@
+// jf_voice.jsfx-inc — ОБЩИЙ ДВИЖОК ГОЛОСОВ экосистемы jf.
+//
+// Извлечён из jf_slixer.jsfx 13 сен ДОСЛОВНО: слайсер обязан звучать байт в
+// байт, поэтому код перенесён как есть, вместе с комментариями. Дальше на нём
+// живут и слайсер, и splr (семплер на восемь срезов).
+//
+// ЧТО ДАЁТ: запуск и снятие голоса, границы среза и четыре режима чтения
+// (вперёд / реверс / петля / пинг-понг), интерполяция, чок-группы, моно и
+// поли, легато с глайдом, гранулярный стретч по афтертачу, паника.
+//
+// ЧЕГО НЕ ЗНАЕТ: как звук попал в буфер, как он нарезан, какие эффекты стоят
+// в цепи и что нарисовано в окне. Это дело вызывающего.
+//
+// ── КОНТРАКТ ──────────────────────────────────────────────────────────────
+// Вызывающий ОБЯЗАН объявить ДО import:
+//
+//   ПАМЯТЬ СРЕЗОВ (слово на срез, шаг 64):
+//     OF_START OF_END OF_PITCH OF_GAIN OF_PAN OF_MODE OF_MUTE OF_CHOKE
+//     OF_CLASS OF_MOUT OF_MNUM OF_MCHAN OF_MBUS
+//     SLB0 — АДРЕС таблицы срезов (переменная, не функция: import в JSFX
+//            допустим только в заголовке файла, поэтому движок не может
+//            звать функции, объявленные ниже него)
+//     cd_buf — адрес аудиобуфера текущей деки, ставится каждый блок
+//
+//   ГОЛОСА: V0 VF NVOICE TLVOICE, поля f* (см. ниже), FXST AW_VW
+//   ДЕКИ:   dk_frames dk_srate dk_nsl dk_sel, cd_buf cd_frames
+//   ПАРАМЕТРЫ: monomode legato glide_ms interp gatemode playthru sloop
+//              velfix velval keysmode basenote_a ped_thru
+//   ФУНКЦИИ: map_note slice_note calc_ends msel_only qpush
+//   ПРОЧЕЕ: OVR OVRN (перф-эффекты), at0 kstr_on kstr_note kstr_ratio
+//
+// Имена сохранены как в слайсере намеренно: переименование означало бы правку
+// пяти тысяч строк вызывающего и риск разойтись по звуку.
+
+// СЕКЦИЯ ОБЯЗАТЕЛЬНА. Файл, импортируемый из заголовка, должен содержать
+// @init или другую секцию: голый список функций REAPER отвергает словами
+// «has no @init or other code». Так же устроены jf_fx_airwindows.jsfx-inc
+// и jf_fx_matrix.jsfx-inc.
+@init
+
+function wrap_pos(v fidx mode) local(p st en ns sb) (
+  p = v[fidx]; st = v[fSTART]; en = v[fEND];
+  mode == 2 ? (
+    p >= en ? p = st + (en - st > 1 ? p - en : 0);
+  ) : mode == 4 ? (
+    // реверс-луп (LOOP при режиме среза rev): дошли до начала — снова с конца
+    p <= st ? p = max(st, en - 1 - (en - st > 1 ? st - p : 0));
+  ) : mode == 3 ? (
+    p >= en ? ( v[fDIR] = -1; p = max(st, 2*en - p - 1); );
+    p <= st ? ( v[fDIR] = 1; p = min(en, 2*st - p); );
+  ) : mode == 1 ? (
+    p <= st ? (
+      // ГЕЙТ ОСТАНАВЛИВАЕТ PLAYTHRU (16 сен). playthru перебрасывает голос на
+      // соседний срез и так до конца сэмпла — при включённом гейте это и
+      // выглядело как «отпускаю клавишу, а сэмпл играет до конца». Пока нота
+      // ЗАЖАТА (fST < 3), переход работает как раньше; отпустил — голос
+      // доигрывает свой срез и гаснет.
+      (playthru || ped_thru) && v[fS] > 0 && !(gatemode && v[fST] >= 3) ? (
+        sb = SLB0;
+        ns = v[fS] - 1;
+        v[fS] = ns; v[fSTART] = sb[OF_START+ns]; v[fEND] = sb[OF_END+ns];
+      ) : v[fST] = 3;
+    );
+  ) : (
+    p >= en ? (
+      (playthru || ped_thru) && v[fS] < dk_nsl[0]-1 && !(gatemode && v[fST] >= 3) ? (
+        sb = SLB0;
+        ns = v[fS] + 1;
+        v[fS] = ns; v[fSTART] = sb[OF_START+ns]; v[fEND] = sb[OF_END+ns];
+      ) : v[fST] = 3;
+    );
+  );
+  v[fidx] = p;
+);
+
+
+
+// audio-thread read; cd_buf / cd_frames must be set for the deck first
+function readsmp(pos ch) local(i f a b c d c1 c2 c3) (
+  pos < 1 ? pos = 1;
+  pos > cd_frames-3 ? pos = cd_frames-3;
+  interp < 0.5 ? (
+    cd_buf[floor(pos+0.5)*2+ch];
+  ) : interp < 1.5 ? (
+    i = floor(pos); f = pos - i;
+    a = cd_buf[i*2+ch];
+    a + (cd_buf[i*2+2+ch] - a) * f;
+  ) : (
+    i = floor(pos); f = pos - i;
+    a = cd_buf[(i-1)*2+ch]; b = cd_buf[i*2+ch];
+    c = cd_buf[(i+1)*2+ch]; d = cd_buf[(i+2)*2+ch];
+    c1 = 0.5*(c-a);
+    c2 = a - 2.5*b + 2*c - 0.5*d;
+    c3 = 0.5*(d-a) + 1.5*(b-c);
+    ((c3*f + c2)*f + c1)*f + b;
+  );
+);
+
+
+
+function trigger_slice(d s vel note ofs) local(sb vb vi v cg tr vol pl pr leg was best bi stp vq) (
+  // VEL: ПОЛНОЕ ИГНОРИРОВАНИЕ ДИНАМИКИ (решение пользователя 13 сен).
+  // Подменяем скорость ОДИН раз, на входе: дальше и громкость, и стретч
+  // чёрных клавиш, и удержание слотов считаются как обычно — иначе пришлось
+  // бы помнить про velfix в пяти местах.
+  velfix ? vel = velval;
+  sb = SLB0; vb = V0;
+  s >= 0 && s < dk_nsl[d] && dk_frames[d] > 0 && sb[OF_START+s] < sb[OF_END+s] && sb[OF_MUTE+s] < 0.5 ? (
+    cg = sb[OF_CHOKE+s];
+    cg ? (
+      vi = 0;
+      while (vi < NVOICE) (
+        v = vb + vi*VF;
+        v[fA] && sb[OF_CHOKE+v[fS]] == cg ? v[fST] = 3;
+        vi += 1;
+      );
+    );
+    monomode ? (
+      vi = 0;
+    ) : (
+      // TLVOICE is skipped: it belongs to the timeline player, not to notes
+      bi = -1; best = 2; vi = 0;
+      while (vi < TLVOICE) (
+        v = vb + vi*VF;
+        v[fA] == 0 ? ( bi = vi; vi = TLVOICE; )
+        : ( v[fENV] <= best ? ( best = v[fENV]; bi = vi; ); vi += 1; );
+      );
+      vi = bi;
+    );
+    v = vb + vi*VF;
+    // новый срез на этом голосе: состояние эффектов слотов — с чистого листа
+    memset(FXST + vi*AW_VW, 0, AW_VW);
+    // NOTE-OFF В ОЧЕРЕДЬ НАПРЯМУЮ, без функции вызывающего: import в JSFX
+    // допустим только в заголовке файла, поэтому движок не имеет права
+    // звать функции, объявленные ПОСЛЕ него. Формат очереди — часть
+    // контракта: тройки (нота+1, канал, шина) в qoff, до QOFFMAX штук.
+    v[fA] && v[fONOTE] ? (
+      vq = 0;
+      while (vq < QOFFMAX && qoff[vq*3] > 0) ( vq += 1; );
+      vq < QOFFMAX ? (
+        qoff[vq*3] = v[fONOTE]; qoff[vq*3+1] = v[fOCH]; qoff[vq*3+2] = v[fOBUS];
+      );
+    );
+    was = v[fA] && v[fST] != 3;
+    leg = monomode && legato && was;
+    tr = pow(2, sb[OF_PITCH+s]/12) * (dk_srate[d] > 0 ? dk_srate[d]/srate : 1);
+    v[fTR] = tr;
+    rnd_p != 0 ? v[fTR] = v[fTR] * pow(2, rnd_p/12);
+    v[fRATE] = (monomode && glide_ms > 0 && was) ? v[fRATE] : tr;
+    v[fS] = s; v[fEND] = sb[OF_END+s]; v[fSTART] = sb[OF_START+s];
+    // РЕВЕРС УДАРА. trig_rev ставит вызывающий ПЕРЕД trigger_slice: так
+    // чёрная клавиша играет срез задом наперёд, не трогая его настройку.
+    // Подмена OF_MODE не годилась: @sample читает режим заново каждый
+    // сэмпл, и к первому же он оказывался восстановлен.
+    v[fREV] = trig_rev;
+    v[fDIR] = (sb[OF_MODE+s] == 1 || trig_rev) ? -1 : 1;
+    stp = (sb[OF_MODE+s] == 1 || trig_rev) ? sb[OF_END+s] - 2 : sb[OF_START+s];
+    trig_rev = 0;          // одноразовый: следующий удар прямой, если не велено
+    v[fPOS] = stp; v[fVT] = stp;
+    v[fPA] = stp; v[fPB] = stp;
+    v[fPHA] = 0; v[fPHB] = 0.5;
+    leg ? 0 : (
+      v[fENV] = v[fA] ? v[fENV] : 0;
+      v[fST] = 1;
+    );
+    // ── МИКРОФЛУКТУАЦИИ: лекарство от «пулемётного эффекта» ─────────────
+    // Повторы среза звучат машиной, потому что каждый удар математически
+    // идентичен. Живой барабанщик не попадает дважды одинаково. Одна ручка
+    // (OF_RND) двигает три величины, каждую в СВОЕЙ мере — они по-разному
+    // слышны, и равные доли дали бы кашу:
+    //   громкость ±3 дБ   — слышно сразу, но не ломает баланс
+    //   высота    ±15 центов — «не в ноту» начинается примерно с 20
+    //   старт     ±2 мс   — сдвиг атаки, а не заметное опоздание
+    // Три НЕЗАВИСИМЫХ случайных числа, а не одно: связанные отклонения
+    // слышатся как качание целиком, а нужна именно неровность.
+    rnd_d = sb[OF_RND+s];
+    rnd_p = 0; rnd_a = 1; rnd_k = 1;
+    rnd_d > 0.001 ? (
+      // ПИТЧ — основная ось (уточнение пользователя): микросдвиг высоты на
+      // каждый удар. ±15 центов на полной ручке: «не в ноту» слышится
+      // примерно с двадцати, поэтому предел ниже порога фальши.
+      rnd_p = (rand(1)*2 - 1) * rnd_d * 0.15;
+      // АТАКА И СПАД — «буквально почти незаметно»: множители в пределах
+      // ±8 %, то есть удар чуть мягче или чуть резче. Слышится как разная
+      // сила нажатия, а не как другая настройка.
+      rnd_a = 1 + (rand(1)*2 - 1) * rnd_d * 0.08;
+      rnd_k = 1 + (rand(1)*2 - 1) * rnd_d * 0.08;
+    );
+    // множители огибающей держим в голосе: @sample берёт их каждый отсчёт
+    v[fRNA] = rnd_a; v[fRNK] = rnd_k;
+    vol = pow(10, sb[OF_GAIN+s]/20) * (vel/127);
+    pl = min(1, 1 - sb[OF_PAN+s]); pr = min(1, 1 + sb[OF_PAN+s]);
+    v[fGL] = vol*pl; v[fGR] = vol*pr;
+    // старт сдвигаем в пределах среза: за его границы выходить нельзя,
+    // иначе зазвучит соседний материал
+
+    // fEPH — фаза ADSR. Обнуляем здесь, вместе с остальным состоянием
+    // голоса: новая нота обязана начинать с атаки, иначе унаследует фазу
+    // предыдущей и вступит с середины спада.
+    v[fEPH] = 0;
+    v[fBCC] = 0; v[fBHL] = 0; v[fBHR] = 0; v[fPH1] = 0; v[fCEN] = 0;
+    v[fSATL] = 0; v[fSATR] = 0; v[fDNC] = 0; v[fDNL] = 0; v[fDNR] = 0;
+    v[fPH2] = 0; v[fPH3] = 0; v[fSTP] = 0; v[fSTC] = 0; v[fGLC] = 0; v[fGLP] = 0;
+    // biquad + follower state must not leak from the voice's previous slice
+    memset(v + fBPL, 0, 10);
+    v[fGRAN] = -1;  // re-resolve playback path on first sample
+    v[fMRND] = rand(1);   // this hit's random, for the random modulation shape
+    v[fNOTE] = note; v[fVEL] = vel; v[fPAT] = 0;
+    // канал-ИСТОЧНИК: MPE-приборы шлют давление и бенд на канал пальца,
+    // и адресовать их надо именно этой ноте. Вызывающий кладёт номер в
+    // src_chan перед handle_on; кто про MPE не знает, оставит 0.
+    v[fSCH] = src_chan;
+    v[fA] = 1;
+    sb[OF_MOUT+s] == 1 ? (
+      midi_bus = sb[OF_MBUS+s];
+      midisend(ofs, $x90 | sb[OF_MCHAN+s], sb[OF_MNUM+s], vel);
+      v[fONOTE] = sb[OF_MNUM+s]+1; v[fOCH] = sb[OF_MCHAN+s]; v[fOBUS] = sb[OF_MBUS+s];
+    ) : sb[OF_MOUT+s] == 2 ? (
+      midi_bus = sb[OF_MBUS+s];
+      midisend(ofs, $xB0 | sb[OF_MCHAN+s], sb[OF_MNUM+s], vel);
+      v[fONOTE] = 0;
+    ) : v[fONOTE] = 0;
+  );
+);
+function release_note(note) local(vi v sbd md) (
+  sbd = SLB0;
+  vi = 0;
+  while (vi < NVOICE) (
+    v = V0 + vi*VF;
+    v[fA] && v[fNOTE] == note ? (
+      md = sbd[OF_MODE + v[fS]];
+      // loop/pingpong always gate on note-off; others follow global TRIG
+      // sloop СЮДА НЕ ВХОДИТ (13 сен). Он зацикливает чтение, а не делает
+      // ноту гейтовой: с ним короткий удар обрывался на отпускании даже в
+      // режиме fwd — «нажимаю коротко, а сэмпл не играет насквозь».
+      // Зацикленный срез гаснет по своему режиму (loop/PP гейтуются ниже)
+      // либо по глобальному TRIG.
+      (gatemode || md == 2 || md == 3) ? v[fST] = 3;
+    );
+    vi += 1;
+  );
+);
+
+
+
+function kill_all() local(vi v) (
+  vi = 0;
+  while (vi < NVOICE) (
+    v = V0 + vi*VF;
+    v[fA] ? v[fST] = 3;
+    vi += 1;
+  );
+  // panic must also drop held performance fx, otherwise they survive it
+  memset(OVR, 0, 32);
+  memset(OVRN, 0, 32);
+  at0 = 0; kstr_on = 0; kstr_note = 0; kstr_ratio = 1;
+);
+

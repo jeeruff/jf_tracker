@@ -1,9 +1,19 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.9.1'
-V.DATE = '2026-11-02'
+V.VERSION = '0.9.2'
+V.DATE = '2026-11-04'
 V.CHANGES = {
+  { v = '0.9.2', d = '2026-11-04', items = {
+    'fix: 0.9.1 crashed on start (jf_tracker.lua:618) - thanks for the report',
+    'pan view (zvp, zvP - every track): the track as a stereo field of 5..65 positions, notes at their pan, audio as a narrow spectral wave; h l, 20h = L20, H L move the note, w b dw x; typing goes beside (on a note - replaces it)',
+    'freesound.org pane (Ctrl+W c f, :freesound): search, listen with a wave, authors as folders, marks, sort, pages; files and CREDITS.txt per author',
+    'custom modules: your own panes from Data/jf_tracker_modules (API.md, section 4)',
+    'browser: a small wave at every row, the view menu (peaks / rectified / spectral, normalize), the path line clickable with f labels, the wheel only scrolls',
+    'tour: starts in a new empty tab with an 8-bit amen in the lib, panes and tracks step, hints where the keys go',
+    'f labels: bars only, the focused module first, then the previous one; :screensets; Cmd+V into the command line and searches',
+    'fonts without the Nerd icons: the download is 3.5 MB instead of 14',
+  } },
   { v = '0.9.1', d = '2026-11-02', items = {
     'microtones as MPE: a microtonal note gets its own MIDI channel 2-16 and a pitch bend (range 48), Surge XT MPE switched on by itself, old MTS sysex migrated; the note column widens only on lanes that use microtones',
     'note ends: === (end of note, the sound releases), OFF (free OFF), ^^^ (cut: CC120 for MIDI, no fade for audio) - glyphs are options (=== --- OFF |_| |); a sounding note drawn as a | | tube; OFF on audio ends the item with a release fade',

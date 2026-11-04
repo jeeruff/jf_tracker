@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 NAME = 'jf_tracker'
 RAW = 'https://github.com/jeeruff/jf_tracker-release/raw'
+BASE = None   # 4 ноя: --gate — ссылки через гейт jeeruff.com/jf_tracker/r/<ключ>/ (воркер подставит {{BASE}})
 # not shipped: development files
 SKIP = re.compile(r'^(tests/|tools/|\.gitignore$|index\.xml$|CHECK\.md$|PAKETTI\.md$|DEVELOPMENT\.md$|AGENTS\.md$|ARCHITECTURE\.md$|PLAN_[A-Z]+\.md$|help/[^/]*private_tmp[^/]*$|jf_tracker_pm\.lua$|jf_tracker_orca\.lua$|daemon_tracker\.lua$)')  # 28 окт: планы, заметки агентов, карта архитектуры — только dev  # pm-карточки и демон jf_grid — только dev
 
@@ -77,7 +78,7 @@ def add_version(pkg, ver, tag, files, main=None, log=''):
         attrs = {'file': f.split('/')[-1] if f.startswith('effects/') else f}
         if f == main:
             attrs['main'] = 'main'
-        ET.SubElement(v, 'source', attrs).text = '%s/%s/%s' % (RAW, tag, f)
+        ET.SubElement(v, 'source', attrs).text = '%s/%s/%s' % (BASE or RAW, tag, f)
 
 
 def build(index_path):
@@ -114,6 +115,13 @@ def main():
         out, tag, ns, ne = build(p)
         p.write_text(out)
         print('index.xml: %s, %d scripts, %d effects' % (tag, ns, ne))
+    elif a[:1] == ['--gate'] and len(a) == 2:   # 4 ноя: index.xml платного канала (в dev-репо, файлы из тегов через гейт)
+        global BASE
+        BASE = '{{BASE}}/v'
+        p = Path(a[1]) / 'index.xml'
+        out, tag, ns, ne = build(p)
+        p.write_text(out)
+        print('gate index.xml: %s, %d scripts, %d effects' % (tag, ns, ne))
     elif a[:1] == ['--check']:
         print(build(None)[0])
     else:
