@@ -38041,6 +38041,7 @@ ctx.mx_menu = function(pick)
   for _, it in ipairs(items) do if it.label:find('^codes') then cv[#cv + 1] = it elseif it.label:find('^patternize') then pz[#pz + 1] = it end end
   local top = {
     { key = 'l', label = 'slot …', sub = function() return { title = 'matrix: slot', items = {
+      K('a', 'append: new slot after + its name', 'a'), K('c', 'change: the pattern of the slot (list)', 'c'),
       K('o', 'new slot after', 'o'), K('O', 'new slot before', 'O'), K('+', 'new region at the end', '+'),
       F('j', 'duplicate the slot below, muted tracks empty (Ctrl+Down)', function() ctx.slot_new('clone_nomute', false) end),
       F('k', 'duplicate the slot above, muted tracks empty (Ctrl+Up)', function() ctx.slot_new('clone_nomute', true) end),

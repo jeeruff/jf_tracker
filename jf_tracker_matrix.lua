@@ -1168,6 +1168,10 @@ function MX.key(c, regions, snap)
   elseif ch == 't' then if ctx.mx_trim then ctx.mx_trim() end
   elseif ch == '+' then ctx.mx_add(nil, nil, count)
   elseif ch == 'o' then ctx.slot_new('empty', false)
+  -- 4 ноя: как в Vim — a (append): новый слот после и сразу его имя (n — в следующем кадре, когда слот уже в списке);
+  -- c (change): заменить паттерн слота — список паттернов (как Enter на номере)
+  elseif ch == 'a' then ctx.slot_new('empty', false); ctx.keyq = ctx.keyq or {}; ctx.keyq[#ctx.keyq + 1] = ('n'):byte()
+  elseif ch == 'c' then if ctx.slot_pat_prompt then ctx.slot_pat_prompt() end
   elseif ch == 'O' then ctx.slot_new('empty', true)
   elseif ch == 'p' then ctx.slot_new('put', false)
   elseif ch == 'P' then ctx.slot_new('pooled')   -- 4 ноя: P — pooled (связанный повтор: MIDI pooled, айтемы в группе; было A / c); вставить до — меню slot
