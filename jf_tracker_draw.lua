@@ -10098,9 +10098,6 @@ function D.frame(L, snap, rows, state, info)
         -- 31 окт: подпись fast+ (было fold — путалось со сворачиванием треков za / zM)
         local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)   -- 2 ноя: снова fold (просьба)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
-        -- 4 ноя: view — меню вида (линейки, трекер, экран) для мыши, между autoarm и fold
-        local vlb = 'view'
-        if xf + ms(vlb) + 4 <= bx + bw - (fl and (ms(fl) + 6) or 0) then small(xf + 2, ay, vlb, 'viewmenu', false, 'viewbtn') end
       else
         local xa = D.cn_r1x
         if xa + ms('arm') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'arm', all and 'off' or 'on', all, 'mautoarm'); D.cn_r1x = xa + ms('arm') + 4 end
@@ -10155,11 +10152,18 @@ function D.frame(L, snap, rows, state, info)
         local xw = bx + btn(bx, yr, azl, 'viewbtn', 'autozoom', state.autozoom) + 2   -- 31 окт: W H — справа от autozoom
         if xw + ms('WH') + 6 <= bx + bw - ms('mark') - 2 then xw = xw + btn(xw, yr, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yr, 'H', 'viewbtn', 'fith') end
         btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
+        if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — меню вида
       else
         local xw = bx + btn(bx, yz, (ms('autozoom') + ms('WH') + 8 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
         if xw + ms('WH') + 6 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yz, 'H', 'viewbtn', 'fith') end   -- 31 окт: W H — справа от autozoom
-        if yz + L.rh <= y4 - L.rh then btn(bx, yz + L.rh, (ms('markers') + 2 <= bw) and 'markers' or 'mark', 'viewbtn', 'markers')
-        else btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers') end   -- 31 окт: короче — zoom / mark (не az mk)
+        if yz + L.rh <= y4 - L.rh then
+          local mkl = (ms('markers') + ms('view') + 6 <= bw) and 'markers' or 'mark'
+          local xm = bx + btn(bx, yz + L.rh, mkl, 'viewbtn', 'markers') + 2
+          if xm + ms('view') + 2 <= bx + bw then btn(bx + bw - ms('view') - 2, yz + L.rh, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — справа от markers
+        else
+          btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers')
+          if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yz, 'view', 'viewbtn', 'viewmenu') end
+        end   -- 31 окт: короче — zoom / mark (не az mk)
       end
     else
       -- 20 окт: низкая шапка — az mk в конце ряда 1 (за param), x2 /2 остаются на своём месте у длины
@@ -10168,7 +10172,9 @@ function D.frame(L, snap, rows, state, info)
       if xr + ms('mark') + 2 <= bx + bw then
         local mw = ms('mark') + 2
         btn(bx + bw - mw, yr, 'mark', 'viewbtn', 'markers')
-        if xr + ms('zoom') + 2 <= bx + bw - mw - 2 then btn(bx + bw - mw - 2 - (ms('zoom') + 2), yr, 'zoom', 'viewbtn', 'autozoom', state.autozoom) end
+        local zx = bx + bw - mw - 2 - (ms('zoom') + 2)
+        if xr + ms('zoom') + 2 <= bx + bw - mw - 2 then btn(zx, yr, 'zoom', 'viewbtn', 'autozoom', state.autozoom) end
+        if xr + ms('view') + 2 <= zx - 2 then btn(zx - ms('view') - 4, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view
       end
     end
     D.rglen_at = nil
