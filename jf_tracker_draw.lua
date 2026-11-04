@@ -459,15 +459,15 @@ function D.layout(snap, state, nregions)
   L.w_slc = ms('S00')
   L.x_slc = false
   L.x_vol = L.x_inst + L.w_inst + L.pad
-  -- порядок: волна | нота | инстр. | vol | fx1..n | delay (просьба 1 окт)
+  -- порядок: волна | нота | инстр. | vol | delay | fx1..n (4 ноя; было — delay последним, 1 окт)
   -- 14 окт: колонка пана (опция pan column) — сразу за громкостью, hex 00..FF, 80 — центр
   L.w_pan = ms('00')
   L.x_pan = state.pancol and (L.x_vol + L.w_vol + L.pad) or false
+  -- 4 ноя: delay — сразу за vol (pan), ближе к ноте; колонки эффектов — после (было: fx1..n, потом delay)
   L.x_fx = {}
-  local x = L.x_pan and (L.x_pan + L.w_pan + L.pad) or (L.x_vol + L.w_vol + L.pad)
+  L.x_del = L.x_pan and (L.x_pan + L.w_pan + L.pad) or (L.x_vol + L.w_vol + L.pad)
+  local x = L.x_del + L.w_del + L.pad
   for k = 1, L.nfx do L.x_fx[k] = x; x = x + L.w_fx + L.pad end
-  L.x_del = x
-  x = L.x_del + L.w_del + L.pad
   -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
   -- 27 окт: вместо колонки +N справа — знак «+» перед нотой (как папка в lf); место только у лейнов со сложенным (L.foldG)
   L.fold_on = state.foldfast and true or false; L.x_fold = nil; L.w_fold = ms('+')
@@ -597,8 +597,9 @@ function D.layout(snap, state, nregions)
   for k = 0, L.MAXFX do
     local t = { nfx = k, x_fx = {}, nfields = 3 + k }
     local xx = L.x_vol + L.w_vol + L.pad
+    t.x_del = xx; xx = xx + L.w_del + L.pad   -- 4 ноя: delay за vol, эффекты после
     for i = 1, k do t.x_fx[i] = xx; xx = xx + L.w_fx + L.pad end
-    t.x_del = xx; fold_tail(t, xx + L.w_del + L.pad)
+    fold_tail(t, xx)
     L.GL[3 + k] = setmetatable(t, { __index = L })
   end
   -- 11 окт: wave only — аудио-подколонка полосой волны; ширина по зуму трека (кэш по ширине)
@@ -5642,7 +5643,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
     if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, D.sig_stack and (ly + L.rh) or (ly + 2 * L.rh + 2 - (L.tp_cut or 0))) end   -- 4 ноя: стопкой — metro, ниже swing
-    if c.tpfull and D.swing_line then local sw0 = group_w(D.sig_line) + 3 * L.pad; draw_group(D.swing_line, bx0 + sw0, bigw - sw0, ly + 2 * L.rh + 2) end   -- 15 окт: swing — в строку с метрономом
   end
   -- порядок блоков
   local by_id = {}
@@ -5688,9 +5688,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   else D.sig_line = nil end
   -- 15 окт: full — rate под кнопками, swing под метрономом (одной строкой: подпись и слайдер)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
-  D.swing_line = nil   -- 25 окт: swing теперь в строке метронома (sig_line)
   -- 15 окт: swing — в строку с метрономом, только если влезает в ширину BPM; иначе — у правого края, как раньше
-  if D.swing_line and group_w(D.sig_line) + 3 * L.pad + group_w(D.swing_line) > bigw then D.swing_line = nil end
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
   local bigblk = big and { w = bigw2, draw = draw_big } or nil
   if big and not D.sig_stack then order[#order + 1] = bigblk elseif not big then addg('play') end   -- 4 ноя: стопкой — у правого края (под мастером)
@@ -5698,7 +5696,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
   if not (c.tpfull and c.tptext) then addg('punch') end   -- 9 окт: LPB — в блоке step (15 окт: full — под rec)
   -- 9 окт: swing со слайдером — у самого правого края (тоглы follow / lock … — в главном модуле)
-  local last = (by_id.swing and not D.swing_line and not D.sig_stack and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
+  local last = (by_id.swing and not D.sig_stack and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   if D.sig_stack and bigblk then last = bigblk end
   local right = x + w - L.pad
   local limit = right - (last and (last.w + sep) or 0)
@@ -8941,7 +8939,7 @@ function D.frame(L, snap, rows, state, info)
         -- одной ширины фейдер и кноб одинаковые (полосы отступа больше нет)
         local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + D.FADER_W(L))   -- 9 окт: 3 знака (метки -12 / -48), было 5 — на x2 слишком широко
         -- 4 ноя: шире — от ноты до конца колонки delay трека (читабельнее кнопки, фейдер и метр); место есть
-        do local wd = math.min((L.x_del or 0) + (L.w_del or 0) - L.pad, 2 * fx_w); if wd > fx_w then fx_w = math.min(lw1 - 2 * L.pad, wd) end end   -- не шире двух прежних (широкий трек давал коробку на всю полосу)
+        do local wd = (L.x_del or 0) + (L.w_del or 0) - L.pad; if wd > fx_w then fx_w = math.min(lw1 - 2 * L.pad, wd) end end   -- 4 ноя: ширина — до конца delay (он теперь сразу за vol)
         -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
         -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
         -- с кнобом — посередине своей части. Нет подходящей линии — как было

@@ -51,8 +51,8 @@ local function fields_of(G)
   if not G.notes_only then
     t[#t + 1] = { 'vol', G.x_vol, G.w_vol }
     if not G.narrow then
+      t[#t + 1] = { 'del', G.x_del, G.w_del }   -- 4 ноя: delay за vol, эффекты после
       for k = 1, G.nfx or 0 do if G.x_fx and G.x_fx[k] then t[#t + 1] = { 'fx' .. k, G.x_fx[k], G.w_fx or G.w_vol } end end
-      t[#t + 1] = { 'del', G.x_del, G.w_del }
     end
   end
   return t

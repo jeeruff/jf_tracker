@@ -1367,7 +1367,7 @@ ctx = {
     state.folds[col.guid] = nil
     relayout()
     local NAMES = { 'note only', 'note + vol', 'note + vol + delay' }
-    vim.msg = ('%s: %s  (Ctrl+Opt+= / - one field; Opt+Shift+L / H - the whole width)'):format(col.name ~= '' and col.name or 'track',
+    vim.msg = ('%s: %s  (Ctrl+Opt+= / - effect columns; Opt+Shift+L / H - the whole width)'):format(col.name ~= '' and col.name or 'track',
       NAMES[n] or ('vol + delay + %d command column(s)'):format(n - 3))
   end,
   fx_cols_step = function(col, d)

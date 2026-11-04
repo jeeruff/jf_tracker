@@ -74,7 +74,6 @@ function B.pv_save()
   local v = B.pv
   if R.SetExtState then R.SetExtState('jf_tracker', 'pvview', ('many=%s;style=%s;norm=%s;colw=%d'):format(v.many and '1' or '0', v.style, v.norm and '1' or '0', v.colw), true) end
 end
-B.pvmany = B.pv.many
 B.pvitem = R.GetExtState and R.GetExtState('jf_tracker', 'pvitem') == '1'   -- 2 ноя: прослушанное — во вкладку item (по умолчанию нет: казалось, что сэмпл уже взят)
 B.hidden = R.GetExtState and R.GetExtState('jf_tracker', 'brhid') == '1' or false
 -- 11 окт: scroll (по умолчанию вкл) — колесо листает список, курсор стоит (двигают щелчок, j k, f)
@@ -2268,8 +2267,7 @@ function B.draw(U, L, x, y, w, h)
   end
   -- 27 окт: колонки как в lf — широкий браузер (развёрнут) в files без поиска: родитель | папка | превью
   -- 1 ноя: опция browser split — то же, без колонки родителя: список папки | превью того, что под курсором (как lf)
-  B.pvmany = B.pv.many
-  local many = B.pvmany and (B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj') and w >= L.cw * 30
+  local many = B.pv.many and (B.mode == 'files' or B.mode == 'recent' or B.mode == 'db' or B.mode == 'proj') and w >= L.cw * 30
   local many_x, many_w
   if many then many_w = math.floor(w * (B.pv.colw or 42) / 100); many_x = x + w - many_w; w = w - many_w - 2 end   -- 3 ноя: колонка маленьких волн справа
   local two = not many and B.split and B.mode == 'files' and B.filter == '' and not B.filtering and w >= L.cw * 40 and w < L.cw * 90
