@@ -2314,10 +2314,7 @@ ctx = {
       state.mixroute = state.mixroute == false; relayout()
       vim.msg = 'mixer sends strip: ' .. (state.mixroute and 'on (hidden while no track has a send)' or 'off'); return
     end
-    if what == 'router' then   -- 4 ноя: кнопка router — роутер микшера: верхняя половина — устройства каналов и провода, снизу фейдеры
-      state.mixrouter = not state.mixrouter or nil; relayout()
-      vim.msg = state.mixrouter and 'mixer router: the devices of every channel on top, wires - where it goes (send, folder, out); faders below' or 'mixer router: off'; return
-    end
+    if what == 'router' then ctx.mixrouter_toggle(); return end   -- 4 ноя: кнопка router — роутер микшера
     if what == 'declip' then   -- 4 ноя: кнопка declip микшера — вкл / выкл (секунды — опция declip)
       local v = tonumber(state.declip) or 10
       if v > 0 then state.declip_last = v; state.declip = 0 else state.declip = state.declip_last or 10 end
@@ -19237,7 +19234,7 @@ local function hint_go(t)
   elseif t.kind == 'mmfx' then ctx.mfx_open()   -- 1 ноя: прыжок f на MFX
   elseif t.kind == 'minfo' then ctx.master_menu()
   elseif t.kind == 'btn' and d.what == 'route' then ctx.route_menu(d.col)
-  elseif t.kind == 'btn' and d.what == 'routeview' then state.routeview = not state.routeview or nil
+  elseif t.kind == 'btn' and d.what == 'routeview' then ctx.mixrouter_toggle()   -- 4 ноя: роутер — в микшере
   elseif t.kind == 'btn' then
     local tr, what = d.col.track, d.what
     edit.run('track ' .. what, function()
@@ -22683,6 +22680,15 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 4 ноя: роутер микшера — верхняя половина микшера: устройства каналов и кабели; и кнопка routing мастера (схема поверх
+-- трекера больше не открывается — роутер часть микшера). Микшер скрыт — показать
+ctx.mixrouter_toggle = function()
+  state.mixrouter = not state.mixrouter or nil
+  if state.mixrouter and not state.mixer then state.mixer = true end
+  state.routeview = nil
+  relayout()
+  vim.msg = state.mixrouter and 'mixer router: the devices of every channel on top, cables in the colour of the track - where the sound goes (send, folder, out); faders below' or 'mixer router: off'
+end
 ctx.declip_tick = function()
   local dc = tonumber(state.declip) or 10
   local now = reaper.time_precise()
@@ -28665,8 +28671,7 @@ local function frame()
       if tr then MMX.PP.cycle_mode(tr, gfx.mouse_cap & 8 == 8 and -1 or 1) end
       click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'routeview' then
-      state.routeview = not state.routeview or nil
-      vim.msg = state.routeview and 'routing: all tracks (click a track - its routing, Esc - back)' or 'routing: back'
+      ctx.mixrouter_toggle()   -- 4 ноя: роутер — часть микшера (была схема поверх трекера)
       click = { t = now2, zone = 'btn' }
     elseif hover.btn and hover.btn.what == 'route' and hover.btn.send and gfx.mouse_cap & 16 == 16 then
       -- 16 окт: Option+клик по маршруту на микшере (подпись или провод) — удалить его

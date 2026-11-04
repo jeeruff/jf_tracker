@@ -2077,7 +2077,17 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
       end
     end
   end
-  local lane = 3
+  -- 4 ноя (2): шапка — имя трека и полоска его цвета над стопкой
+  local hdr = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 4)
+  for _, c in ipairs(cols) do
+    local col = c.col
+    if col.rgb then set(col.rgb); gfx.rect(c.x + 1, y0 + 1, c.w - 1, 2, 1) end
+    local nm = (col.folder and '- ' or '') .. (col.name ~= '' and col.name or '-')
+    while nm ~= '' and D.small_measure(nm) > c.w - 3 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
+    D.small_text(c.x + 2, y0 + 3, nm, U.TEXT)
+  end
+  y0, h = y0 + hdr + 2, h - hdr - 2
+  local lane = 4
   local nl = 0
   for _, w in ipairs(wires) do if w.dst then nl = nl + 1 end end
   local whh = math.min(math.floor(h * 0.45), 6 + math.min(nl, 12) * lane + L.rh)   -- зона проводов (и подписи out)
@@ -2118,7 +2128,7 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
       li = li + 1
       w.y = wy0 + 2 + ((li - 1) % 12) * lane
       w.x, w.tx = w.src.x + math.floor(w.src.w / 2) - 1 + (k % 3), w.dst.x + math.floor(w.dst.w / 2) + 1
-      local near = (my >= w.y - 1 and my <= w.y + 1 and mx >= math.min(w.x, w.tx) - 1 and mx <= math.max(w.x, w.tx) + 1)
+      local near = (my >= w.y - 1 and my <= w.y + 2 and mx >= math.min(w.x, w.tx) - 1 and mx <= math.max(w.x, w.tx) + 2)
       if near then whot = k end
     end
   end
@@ -2126,12 +2136,15 @@ function D.mix_router(L, info, hover, x0, x1, y0, h)
     local c = w.src
     if w.dst then
       local hot = k == whot
-      if hot then set(U.AMBER) elseif w.e.mute then set(U.GREY) elseif w.kind == 'folder' then set(U.mix(U.TEXT, U.PANEL, 0.6))
-      elseif w.e.rgb then rawset_col(w.e.rgb) else set(U.CYAN) end
-      gfx.rect(w.x, bot[c], 1, w.y - bot[c] + 1, 1)                                 -- вниз из стопки
-      gfx.rect(math.min(w.x, w.tx), w.y, math.abs(w.tx - w.x) + 1, 1, 1)            -- к получателю
-      gfx.rect(w.tx, bot[w.dst], 1, w.y - bot[w.dst] + 1, 1)                         -- вверх в его стопку
-      gfx.rect(w.tx - 1, bot[w.dst], 3, 1, 1)                                        -- засечка входа
+      -- 4 ноя (2): кабель толщиной 2 px цветом трека-источника (цветной код); в папку — тусклее, заглушён — тёмный
+      local cc = c.col.rgb or U.CYAN
+      if w.kind == 'folder' then cc = U.mix(cc, U.PANEL, 0.55) end
+      if w.e.mute then cc = U.mix(cc, U.PANEL, 0.75) end
+      set(hot and U.AMBER or cc)
+      gfx.rect(w.x, bot[c], 2, w.y - bot[c] + 2, 1)                                 -- вниз из стопки
+      gfx.rect(math.min(w.x, w.tx), w.y, math.abs(w.tx - w.x) + 2, 2, 1)            -- к получателю
+      gfx.rect(w.tx, bot[w.dst], 2, w.y - bot[w.dst] + 2, 1)                         -- вверх в его стопку
+      gfx.rect(w.tx - 2, bot[w.dst], 6, 2, 1)                                        -- засечка входа
       if hot then hover.btn = { col = c.col, what = 'route', send = w.e } end
     elseif w.kind == 'hw' then
       local lb = w.e.name
@@ -7319,6 +7332,15 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local ks = info.kslider
   local kd = w | 1
   local bh = L and (L.rh - 2) or 0
+  -- 4 ноя (2): имя трека над эффектами (в роутере оно в его шапке) — мелко, с полоской цвета трека
+  if L and L.mix_bottom and not col.master and not info.mixrouter then
+    local nh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 4)
+    if col.rgb then set(col.rgb); gfx.rect(x, y0, w, 2, 1) end
+    local nm = (col.folder and '- ' or '') .. (col.name ~= '' and col.name or '-')
+    while nm ~= '' and D.small_measure(nm) > w - 1 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
+    D.small_text(x + 1, y0 + 2, nm, U.TEXT)
+    y0 = y0 + nh
+  end
   -- 4 ноя: эффекты — сверху полосы, над кнобом (там место), хоть по строчке на эффект (мелким шрифтом, имя без типа и производителя), пока фейдеру
   -- остаётся 3 строки над M S R; выключенный — тускло; щелчок — как по эффекту в шапке трека (hover.hdrfx)
   if L and not col.master and col.fx and #col.fx > 0 and not info.mixrouter then   -- роутер микшера — эффекты там
