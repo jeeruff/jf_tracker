@@ -3652,6 +3652,8 @@ function D.snap_pad(L, sinfo, col, x, w, yy, room, mx, my, hover, hint)
       text(px0 + math.floor((side - ms('corners: save')) / 2), py0 + math.floor(side / 2) - L.rh, 'corners: save', U.DIM)
     end
     if onpad and not oncorner then hover.snappad = { col = col, x0 = px0, y0 = py0, side = side } end
+    -- 4 ноя: CONTROL (Ctrl+Opt) — и этот пэд: обе оси сразу морфят снимки (как XY модуля DSP)
+    if D.slr and n >= 2 and col and col.track then D.slr[#D.slr + 1] = { g = 'snappad:' .. tostring(col.guid), snapxy = col, xy = true, name = 'XY presets', x = px0, y = py0, w = side, h = side } end
 end
 -- 28 окт: мини-роутер — схема цепочки маленькими прямоугольниками: последовательно — вправо (черта между),
 -- параллельно предыдущему — столбиком под ним; модули контейнера — с [ перед первым и ] после последнего; не

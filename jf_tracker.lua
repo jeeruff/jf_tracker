@@ -26562,6 +26562,7 @@ local function frame()
       local function ok(t) return t.track and reaper.ValidatePtr(t.track, t.kind == 'fx' and model.is_take(t.track) and 'MediaItem_Take*' or 'MediaTrack*') end
       ctx.cm_io = {
         get = function(t)
+          if t.kind == 'snap' then return t.axis == 'x' and (t.st.e.x or 0.5) or (1 - (t.st.e.y or 0.5)) end   -- 4 ноя: y пэда сверху вниз, CONTROL — вверх больше
           if not ok(t) then return nil end
           if t.kind == 'fx' then return model.fxapi(t.track).GetParamNormalized(t.track, t.fx, t.p) end
           local v = reaper.GetMediaTrackInfo_Value(t.track, TRS_KEY[t.what] or 'D_VOL')
@@ -26569,6 +26570,14 @@ local function frame()
           return v
         end,
         set = function(t, v)
+          if t.kind == 'snap' then
+            local st = t.st
+            if t.axis == 'x' then st.e.x = v else st.e.y = 1 - v end
+            local e = st.e
+            local have = { e.snaps[1] ~= nil, e.snaps[2] ~= nil, e.snaps[3] ~= nil, e.snaps[4] ~= nil }
+            ctx.snap_apply(t.track, ctx.SN.blend(e.snaps, ctx.SN.weights(e.x or 0.5, e.y or 0.5, have), st.keys), st.fxmap, st.last)
+            return
+          end
           if t.kind == 'fx' then model.fxapi(t.track).SetParamNormalized(t.track, t.fx, t.p, v); return end
           if t.what == 'vol' then v = v <= -60 and 0 or 10 ^ (v / 20) end
           edit.track_value(t.track, TRS_KEY[t.what] or 'D_VOL', v)
@@ -26582,6 +26591,7 @@ local function frame()
           end
         end,
         show = function(t)
+          if t.kind == 'snap' then return ('%s %.2f'):format(t.name, ctx.cm_io.get(t)) end
           if not ok(t) then return '' end
           if t.kind == 'fx' then local _, s2 = model.fxapi(t.track).GetFormattedParamValue(t.track, t.fx, t.p, ''); return (t.name or 'param') .. ' ' .. (s2 or '') end
           local v = ctx.cm_io.get(t)
@@ -26728,6 +26738,19 @@ local function frame()
       local function tcol(r) return r.dsp and dcol or r.col end
       local function tgts(r)
         local c = tcol(r)
+        if r.snapxy then   -- 4 ноя: пэд снимков — X и Y морфа (цели kind = 'snap', одна общая запись e)
+          local sc = r.snapxy
+          if not (sc.track and reaper.ValidatePtr(sc.track, 'MediaTrack*')) then return {} end
+          SG.snapt = SG.snapt or {}
+          local st = SG.snapt[sc.guid]
+          if not st then
+            local e = ctx.snaps_of(sc)
+            st = { e = e, keys = ctx.SN.diff_keys(e.snaps), fxmap = ctx.snap_fxmap(sc.track, sc), last = {} }
+            SG.snapt[sc.guid] = st
+          end
+          return { { kind = 'snap', axis = 'x', st = st, col = sc, track = sc.track, name = 'XY presets X' },
+                   { kind = 'snap', axis = 'y', st = st, col = sc, track = sc.track, name = 'XY presets Y' } }
+        end
         if not (c and c.track) then return {} end
         if r.xy then return { { kind = 'fx', tid = c.guid, track = c.track, fx = r.xy[1], p = r.xy[2], name = r.name .. ' X' },
                               { kind = 'fx', tid = c.guid, track = c.track, fx = r.xy[3], p = r.xy[4], name = r.name .. ' Y' } } end
@@ -26801,14 +26824,28 @@ local function frame()
         OZ.ms = function(t) return OZ.z == 2 and draw.big_measure(t, 2) or U.measure(t) end
         OZ.tx = function(x, y, t, col) if OZ.z == 2 then draw.big_text(x, y, t, col, 2) else U.text(x, y, t, col) end end
         OZ.fit = function(t, w) if OZ.z == 1 then return ctx.fit(t, w) end; t = t or ''; while t ~= '' and OZ.ms(t) > w do t = t:sub(1, -2) end; return t end
+        -- 4 ноя: всплывашка — в пропорциях тачпада MacBook (ширина : высота = 1.6), один размер и место на весь жест:
+        -- от группы не зависит (узкий микшер — она прыгала и меняла размер при каждом выборе)
+        if not SG.pop then
+          local TPA = 1.6
+          local ph = math.floor(math.max(6 * L.rh, math.min(gfx.h * 0.4, gfx.w * 0.5 / TPA)))
+          local pw = math.min(gfx.w, math.floor(ph * TPA))
+          local foot = 2 * OZ.rh + 2
+          local px = math.max(0, math.min(gfx.w - pw, math.floor(SG.px0 - pw / 2)))
+          local py = SG.py0 - ph - foot - 2 * L.rh
+          if py < 0 then py = SG.py0 + 2 * L.rh end
+          SG.pop = { x = px, y = math.max(0, math.min(gfx.h - ph - foot, py)), w = pw, h = ph }
+        end
         if SG.ori == 'xy' then
-          local sd = math.min(math.floor(gfx.h / 3), L.cw * 24 * OZ.z)
-          local qx, qy = gfx.w - sd - 4, 4
+          local P = SG.pop
+          local qx, qy = P.x, P.y
           local fx_, fy_ = ts[1] and frac(ts[1]) or 0.5, ts[2] and frac(ts[2]) or 0.5
           if state.ctlmap ~= false then
-            U.set(U.BG, 0.9); gfx.rect(qx, qy, sd, sd, 1); U.set(U.AMBER); gfx.rect(qx, qy, sd, sd, 0)
-            gfx.circle(qx + math.floor(fx_ * (sd - 1)), qy + math.floor((1 - fy_) * (sd - 1)), 4 * OZ.z, 1, 1)
-            OZ.tx(qx + L.pad, qy + 2, OZ.fit(cur.name or '', sd - 2 * L.pad), U.AMBER)
+            U.set(U.BG, 0.9); gfx.rect(qx, qy, P.w, P.h, 1); U.set(U.AMBER); gfx.rect(qx, qy, P.w, P.h, 0)
+            U.set(U.LINE); gfx.rect(qx + P.w // 2, qy + 1, 1, P.h - 2, 1); gfx.rect(qx + 1, qy + P.h // 2, P.w - 2, 1, 1)
+            U.set(U.AMBER); gfx.circle(qx + math.floor(fx_ * (P.w - 1)), qy + math.floor((1 - fy_) * (P.h - 1)), 4 * OZ.z, 1, 1)
+            OZ.tx(qx + L.pad, qy + 2, OZ.fit(cur.name or '', P.w - 2 * L.pad), U.AMBER)
+            OZ.tx(qx + L.pad, qy + P.h - OZ.rh - 2, OZ.fit(('X %d  Y %d'):format(math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5)), P.w - 2 * L.pad), U.GREY)
           end
           state.status = ('-- CONTROL XY --  %s  X %d  Y %d   (move: both; let Ctrl+Opt go - done)'):format(cur.name or '', math.floor(fx_ * 127 + 0.5), math.floor(fy_ * 127 + 0.5))
         else
@@ -26827,21 +26864,10 @@ local function frame()
           local NRH = L.rh * NZ
           local BH = math.max(4, math.floor(L.rh * 0.6))
           local ROWH = NRH + BH + 6
-          local mapw, maph
-          if vert then
-            mapw = math.min(gfx.w, math.max(x1 - x0 + 6, n * nms('mmmm')))
-            maph = math.min(math.floor(gfx.h / 2.5), 8 * OZ.rh)
-          else
-            local lw = nms('mmmmmmmmmm')
-            for _, r in ipairs(SG.list) do lw = math.max(lw, nms(lab(r))) end
-            mapw = math.min(gfx.w, math.max(x1 - x0 + 6, lw + nms('-00.0 dB') + 3 * L.pad))   -- строгая ширина: имена, не значения
-            maph = n * ROWH
-          end
+          -- 4 ноя: размер и место — SG.pop (пропорции тачпада), шапка хозяина — внутри
           local hdr = (own and not vert) and (OZ.rh + 4) or 0
-          local foot = 2 * OZ.rh + 2
-          local mx0 = math.max(0, math.min(gfx.w - mapw, x0 - 3))
-          local my0 = vert and (y0 - maph - foot - 4) or (y0 - 2 - hdr)
-          my0 = math.max(0, math.min(gfx.h - maph - hdr - foot, my0))
+          local mapw, maph = SG.pop.w, SG.pop.h - hdr
+          local mx0, my0 = SG.pop.x, SG.pop.y
           U.set(U.BG, 0.94); gfx.rect(mx0, my0, mapw, maph + hdr, 1)
           U.set(U.AMBER); gfx.rect(mx0, my0, mapw, maph + hdr, 0)
           if hdr > 0 then
