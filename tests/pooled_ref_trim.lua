@@ -1,4 +1,4 @@
--- прежний A.trim (до 2 окт) — эталон для tests/test_alias.lua
+-- прежний A.trim (до 2 окт) — эталон для tests/test_pooled.lua
 local R = reaper
 local EPS = 1e-6
 local function tracks()

@@ -11,7 +11,7 @@ if R.CountTracks(0) == 1 then local _, n = R.GetTrackName(R.GetTrack(0, 0)); if 
 
 local M = dofile(DIR .. '/jf_tracker_model.lua')
 local E = dofile(DIR .. '/jf_tracker_edit.lua')
-local A = dofile(DIR .. '/jf_tracker_alias.lua')
+local A = dofile(DIR .. '/jf_tracker_pooled.lua')
 E.init(M); A.init(M, E)
 E.pat_item = function() return true end
 

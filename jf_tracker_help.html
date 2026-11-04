@@ -366,11 +366,11 @@ such as <code>:interp vol</code> (a ramp), <code>:arp up 2</code>, <code>:scramb
 <tr><td><b>project</b></td><td>the song: patterns in a row from <code>=START</code> to <code>=END</code>, the library after <code>=END</code></td></tr>
 </table>
 <p class="drop">The song is a list of patterns. A pattern is a REAPER region; regions with the same name are copies of one pattern
-(aliases), and an edit in one copy goes into all of them (<code>autosync</code>). Each slot row shows the name, the time
+(pooled), and an edit in one copy goes into all of them (<code>autosync</code>). Each slot row shows the name, the time
 signature and the length; a click on them edits. Cells are pattern × track.</p>
 <p>Pattern codes, as Elektron banks: a name that starts with a letter and a number (<code>A1</code>, <code>D12 verse</code>)
 is a code, shown in the number box. The letter is a family of variants: a new pattern takes the next free letter
-(<code>C1</code>), a clone the next number of its letter (<code>A1</code> → <code>A3</code>), an alias the same code. A length
+(<code>C1</code>), a clone the next number of its letter (<code>A1</code> → <code>A3</code>), a pooled repeat the same code. A length
 typed on a free bar makes a pattern there. A region without a code over other regions is a <b>section</b>
 (<code>verse</code> over A1 A2): not a slot, its name stands in the ruler and a strip marks its slots; its edges follow its
 first and last pattern after every edit. Old names keep working as patterns. Codes are two characters by default
@@ -681,7 +681,7 @@ snapshot in between.</p>
   <g class="node"><rect x="580" y="120" width="200" height="60" rx="6"/><text x="680" y="145" text-anchor="middle">screen</text><text class="small" x="680" y="164" text-anchor="middle">you</text></g>
   <g class="node"><rect x="580" y="240" width="200" height="60" rx="6"/><text x="680" y="265" text-anchor="middle">vim</text><text class="small" x="680" y="284" text-anchor="middle">modes, motions, : commands</text></g>
   <g class="node core"><rect x="310" y="240" width="200" height="60" rx="6"/><text x="410" y="265" text-anchor="middle">edit</text><text class="small" x="410" y="284" text-anchor="middle">the only writer, undo blocks</text></g>
-  <g class="node"><rect x="40" y="240" width="200" height="60" rx="6"/><text x="140" y="265" text-anchor="middle">matrix · alias · slicer</text><text class="small" x="140" y="284" text-anchor="middle">patterns, copies, slices</text></g>
+  <g class="node"><rect x="40" y="240" width="200" height="60" rx="6"/><text x="140" y="265" text-anchor="middle">matrix · pooled · slicer</text><text class="small" x="140" y="284" text-anchor="middle">patterns, copies, slices</text></g>
   <path d="M300,46 C200,46 140,70 140,116" marker-end="url(#ar)"/><text class="lbl" x="170" y="80">read on change</text>
   <path d="M240,150 L306,150" marker-end="url(#ar)"/>
   <path d="M510,150 L576,150" marker-end="url(#ar)"/>
@@ -694,7 +694,7 @@ snapshot in between.</p>
 columns, sounds, regions and envelopes. <b>draw</b> paints it and reports what is under the mouse. <b>vim</b> turns keys
 into motions and edits; every edit goes through <b>edit</b>, inside one undo block, and after it the copies of a pattern are
 synced. The files: <code>jf_tracker.lua</code> (window and wiring), <code>_model</code>, <code>_draw</code>, <code>_vim</code>,
-<code>_edit</code>, <code>_matrix</code>, <code>_alias</code>, <code>_slicer</code>, <code>_browser</code>, <code>_preview</code>,
+<code>_edit</code>, <code>_matrix</code>, <code>_pooled</code>, <code>_slicer</code>, <code>_browser</code>, <code>_preview</code>,
 <code>_dspmods</code> (the DSP pictures).</p>
 
 <footer>

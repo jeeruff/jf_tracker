@@ -5,7 +5,7 @@
 -- Новый модуль без группы попадает в «прочее» — допиши его в GROUP ниже.
 
 local GROUP = {
-  { 'ядро: данные и правка', { 'jf_tracker', 'model', 'edit', 'alias', 'arr', 'cmds', 'chord', 'import' } },
+  { 'ядро: данные и правка', { 'jf_tracker', 'model', 'edit', 'pooled', 'arr', 'cmds', 'chord', 'import' } },
   { 'клавиши и команды', { 'vim', 'keys', 'whichkey', 'keyhelp', 'hints', 'instkeys', 'dspkeys', 'ctrlmouse', 'names' } },
   { 'окно: раскладка и рисование', { 'draw', 'panes', 'ui', 'themes', 'smart', 'ask', 'png', 'logo' } },
   { 'панели и вкладки', { 'matrix', 'session', 'browser', 'fxbrowser', 'sampleprops', 'slicer', 'preview', 'params', 'modmatrix', 'fxclass',

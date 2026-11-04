@@ -10,8 +10,8 @@ for i = 0, R.CountTracks(0) - 1 do local _, n = R.GetTrackName(R.GetTrack(0, i))
 if (pname and pname ~= '') or not (table.concat(names, ','):find('A drums', 1, true) and table.concat(names, ','):find('B lanes', 1, true) and table.concat(names, ','):find('M synth', 1, true)) then log('REFUSED'); done(); return end
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
-local alias = dofile(DIR .. '/jf_tracker_alias.lua')
-edit.init(model); alias.init(model, edit)
+local pooled = dofile(DIR .. '/jf_tracker_pooled.lua')
+edit.init(model); pooled.init(model, edit)
 local ok, err = pcall(function()
   local regions = model.regions(4)
   local list, by = model.patterns(regions)
@@ -26,7 +26,7 @@ local ok, err = pcall(function()
   local target = by['B']
   local len0 = slot.rgnend - slot.pos
   local n_before = R.CountMediaItems(0)
-  local ok2 = alias.set_slot(regions, slot, target)
+  local ok2 = pooled.set_slot(regions, slot, target)
   model.invalidate()
   regions = model.regions(4)
   local lib_n = 0

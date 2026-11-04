@@ -7,7 +7,7 @@
 --
 -- Модули: model (единственный читатель reaper.*), draw (gfx), vim (режимы и
 -- команды), edit (писатель), matrix (паттерны, живая очередь регионов),
--- alias (одноимённые регионы), preview (CF_Preview / транспорт), browser
+-- pooled (одноимённые регионы), preview (CF_Preview / транспорт), browser
 -- (сайдбар файлов), keys (пианино, раскладка, коды; файл пользователя).
 -- Палитра — jf_looper_ui.lua. Справка — F1 (jf_tracker_help.html).
 --
@@ -79,7 +79,7 @@ local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель св
 draw.sprops_rows = #SPROP.ROWS                         -- 9 окт, панели: лист с item не ниже, чем нужно всем параметрам
 local MX = dofile(DIR .. '/jf_tracker_matrix.lua')
 local PV = dofile(DIR .. '/jf_tracker_preview.lua')
-local alias = dofile(DIR .. '/jf_tracker_alias.lua')
+local pooled = dofile(DIR .. '/jf_tracker_pooled.lua')   -- 4 ноя: было jf_tracker_alias.lua — слоты, регионы, pooled-повторы
 local B = dofile(DIR .. '/jf_tracker_browser.lua')
 B.SM = dofile(DIR .. '/jf_tracker_smap.lua')   -- 27 окт: карта сэмплов папки (граф, как в Obsidian)
 B.SM.MASS = reaper.GetExtState('jf_tracker', 'mapmass') ~= '0'; B.SM.NAMES = reaper.GetExtState('jf_tracker', 'mapnames') ~= '0'   -- 31 окт: точки по размеру файла (по умолчанию)
@@ -1032,7 +1032,7 @@ ctx = {
   -- =START..=END); all — все треки, иначе трек курсора. Один undo
   repeat_pattern = function(all)
     local rc = vim.cur.row
-    local rg = alias.region_at(regions, edit.row_time(rc, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(rc, state.lpb, 0))
     local r0, r1
     if rg then r0, r1 = rg.r0, rg.r1
     else
@@ -1418,7 +1418,7 @@ ctx = {
   end,
   -- запись (этап 8): punch по региону курсора, режимы записи, lanes трека
   punch = function()
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local t0, t1
     if rg then t0, t1 = rg.pos, rg.rgnend else
       local r0, r1 = model.bar_of_row(vim.cur.row, state.lpb)
@@ -3245,7 +3245,7 @@ ctx = {
   slice1_on = function() return state.slice1 or keys.frow() end,   -- 16 окт: frow — клавиша 1 = слайс 1 всегда, весь сэмпл — `
   slice_base = function() return (model.SLICE_BASE or model.BASE_NOTE or 60) + 1 - ((state.slice1 or keys.frow()) and 1 or 0) end,   -- 15 окт: slice1 — q = слайс 1   -- нота слайса 1; C-4 = весь сэмпл (5 окт)     -- кнопка scramble вкладки item (4 окт)
   region_rows = function(row)   -- 2 ноя: row — паттерн другой строки (gp на начале — предыдущий)
-    local rg = alias.region_at(regions, edit.row_time(row or vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(row or vim.cur.row, state.lpb, 0))
     if not rg then return nil end
     return math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6) - 1, rg
   end,
@@ -3253,7 +3253,7 @@ ctx = {
     local f = L.flat[vim.cur.fi]
     if not (f and f.col) then return false end
     local tr = f.col.track
-    local rg = (not all) and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
+    local rg = (not all) and pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
     local t0 = rg and rg.pos or (model.marker_pos(model.START_MARKER) or 0)
     local t1 = rg and rg.rgnend or model.marker_pos(model.END_MARKER) or math.huge
     local n = 0
@@ -3286,7 +3286,7 @@ ctx = {
     if all then for _, c in ipairs(snap.cols) do if c.track and not c.master then trs[#trs + 1] = c.track end end else trs[1] = f.col.track end
     local t0 = model.marker_pos(model.START_MARKER) or 0
     local t1 = model.marker_pos(model.END_MARKER) or math.huge
-    local rg = (all and what == 'e') and alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
+    local rg = (all and what == 'e') and pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)) or nil
     if rg then t0, t1 = rg.pos, rg.rgnend end
     local ra, rb = edit.row_time(vim.cur.row, state.lpb, 0), edit.row_time(vim.cur.row + 1, state.lpb, 0)
     local n, label = 0, nil
@@ -3355,7 +3355,7 @@ ctx = {
   end,
   -- 17 окт: dR — регион курсора на всех треках: всё, что в нём начинается (Shift = все треки, как dr для трека)
   clear_region_all = function()
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'dR: the cursor is not in a pattern'; return false end
     local n = 0
     edit.run('clear the region on all tracks', function()
@@ -3944,7 +3944,7 @@ ctx = {
     end
     local t0, t1 = 0, math.max(1, reaper.GetProjectLength(0))
     if state.view_reg then
-      local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+      local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
       if rg then t0, t1 = rg.pos, rg.rgnend end
     end
     local head = ('%s   %s %.1f-%.1f s   (proj | region switch in the corner)'):format(tgt.label or 'envelope', state.view_reg and 'region' or 'project', t0, t1)
@@ -4038,7 +4038,7 @@ ctx = {
   lfo_span = function()
     local t0, t1 = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
     if t1 > t0 + 1e-6 then return t0, t1, 'time selection' end
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if rg then return rg.pos, rg.rgnend, 'region ' .. (rg.name ~= '' and rg.name or rg.idx) end
     local t = edit.row_time(vim.cur.row, state.lpb, 0)
     local qn = reaper.TimeMap2_timeToQN(0, t)
@@ -4235,7 +4235,7 @@ ctx = {
       local f0, f1, r0, r1 = vim.visual_range(); heads = vim.heads_in(f0, f1, r0, r1)
     else
       local t = edit.row_time(vim.cur.row, state.lpb, 0)
-      local rg = alias.region_at(regions, t)
+      local rg = pooled.region_at(regions, t)
       local r0, r1 = 0, (snap.last_row or 0) + 1
       if rg then r0, r1 = rg.r0, math.max(rg.r0, rg.r1 - 1) end   -- heads_in включительно, r1 региона — нет
       local f = L.flat[vim.cur.fi]
@@ -4313,7 +4313,7 @@ ctx = {
     local f = L.flat[fi]; if not f or not f.col then return end
     local t0 = edit.row_time(row, state.lpb, 0)
     local t1 = edit.row_time(row + math.max(1, n or 1), state.lpb, 0)
-    local rg = alias.region_at(regions, t0)
+    local rg = pooled.region_at(regions, t0)
     local limit = rg and rg.rgnend or reaper.GetProjectLength(0) + 60
     -- 19 окт: опция BS mode: pattern (по умолчанию, как Renoise) — в регионе, клип до конца паттерна держит длину;
     -- track — по всей дорожке до =LIB (клипы следующих регионов подтягиваются)
@@ -4340,18 +4340,18 @@ ctx = {
     if #seq == 0 then return end
     local r0, r1, c0, c1 = MX.block()
     if what == 'copy' then
-      state.mx_clip = alias.cells_copy(seq, snap, r0, r1, c0, c1)
+      state.mx_clip = pooled.cells_copy(seq, snap, r0, r1, c0, c1)
       state.mx_reg = { kind = 'cells' }
       vim.msg = ('matrix: copied %dx%d block'):format(r1 - r0 + 1, c1 - c0 + 1)
     elseif what == 'cut' then
-      state.mx_clip = alias.cells_copy(seq, snap, r0, r1, c0, c1)
+      state.mx_clip = pooled.cells_copy(seq, snap, r0, r1, c0, c1)
       state.mx_reg = { kind = 'cells' }
       local n
-      edit.run('matrix cut', function() n = alias.cells_delete(seq, snap, r0, r1, c0, c1) end)
+      edit.run('matrix cut', function() n = pooled.cells_delete(seq, snap, r0, r1, c0, c1) end)
       vim.msg = ('matrix: cut %d item(s)'):format(n or 0)
     elseif what == 'mute' then
       local f
-      edit.run('matrix mute block', function() f = alias.cells_mute(seq, snap, r0, r1, c0, c1) end)
+      edit.run('matrix mute block', function() f = pooled.cells_mute(seq, snap, r0, r1, c0, c1) end)
       vim.msg = f == nil and 'matrix: block is empty' or ('matrix: block ' .. (f and 'muted' or 'unmuted'))
     elseif what == 'paste' then
       if not state.mx_clip then vim.msg = 'matrix: clipboard empty (Ctrl+C)'; return end
@@ -4368,7 +4368,7 @@ ctx = {
             local pos = t_next or rg.pos
             local len = (clip.lens and clip.lens[dr]) or (rg.rgnend - rg.pos)
             local src = clip.names and clip.names[dr]
-            local nm = (src and src ~= '') and alias.free_name(real, src) or model.SEC.next_family(real)
+            local nm = (src and src ~= '') and pooled.free_name(real, src) or model.SEC.next_family(real)
             reaper.AddProjectMarker2(0, true, pos, pos + len, nm, -1, 0)
             real[#real + 1] = { name = nm, pos = pos, rgnend = pos + len }
             tgt[dr] = { pos = pos, rgnend = pos + len, name = nm }
@@ -4376,7 +4376,7 @@ ctx = {
           else tgt[dr] = rg; t_next = nil end
         end
         local view = setmetatable({}, { __index = function(_, i) local d = i - MX.cur.ri + 1; if d >= 1 and d <= clip.nr then return tgt[d] end; return seq[i] end })
-        n = alias.cells_paste(view, snap, MX.cur.ri, math.max(1, MX.cur.ci), clip)
+        n = pooled.cells_paste(view, snap, MX.cur.ri, math.max(1, MX.cur.ci), clip)
       end)
       vim.msg = ('matrix: pasted %d item(s)%s'):format(n or 0, made > 0 and (' - %d new pattern(s)'):format(made) or '')
     end
@@ -4388,14 +4388,14 @@ ctx = {
     local c = ctx.trim_c
     local now = reaper.time_precise()
     if c and (c.snap == snap or now - c.t < 0.5) then return c.n end
-    local n = (#seq > 0) and alias.trim(ctx.real_seq(), nil, true) or 0
+    local n = (#seq > 0) and pooled.trim(ctx.real_seq(), nil, true) or 0
     ctx.trim_c = { snap = snap, t = now, n = n }
     return n
   end,
   mx_trim = function()
     if #seq == 0 then vim.msg = 'no regions'; return end
     local n = 0
-    edit.run('matrix trim', function() n = alias.trim(ctx.real_seq()) end)
+    edit.run('matrix trim', function() n = pooled.trim(ctx.real_seq()) end)
     ctx.trim_c = nil
     vim.msg = ('trim: %d item edge(s) cut to region bounds'):format(n)
   end,
@@ -5230,9 +5230,9 @@ ctx = {
           -- раньше повтор вставлялся ПЕРЕД тактом и всё сдвигалось, а ноты такта оставались рядом
           if math.abs((p.src.rgnend - p.src.pos) - (slot.rgnend - slot.pos)) < 1e-3 then ctx.bar_link(slot, p.src); return end
           local n
-          ctx.slot_op('matrix put ' .. p.name, function() n = alias.put_pooled(p.src, slot.pos) end)
+          ctx.slot_op('matrix put ' .. p.name, function() n = pooled.put_pooled(p.src, slot.pos) end)
           vim.msg = ('free bar %d: %s - %d item(s), linked (U - make unique)'):format(MX.cur.ri, p.name, n or 0)
-        elseif alias.set_slot(regions, slot, p) then
+        elseif pooled.set_slot(regions, slot, p) then
           vim.msg = ('slot %d → %02d %s'):format(MX.cur.ri, p.num, p.name)
         end
         model.invalidate(); regions = model.regions(state.lpb)
@@ -5247,7 +5247,7 @@ ctx = {
     local p
     for _, q in ipairs(list) do if q.num == n then p = q end end
     if not p then vim.msg = ('no pattern %02d (there are %d)'):format(n, #list); return end
-    if alias.set_slot(regions, slot, p) then
+    if pooled.set_slot(regions, slot, p) then
       vim.msg = ('slot %d → %02d %s'):format(MX.cur.ri, p.num, p.name)
       model.invalidate(); regions = model.regions(state.lpb)
     end
@@ -5265,12 +5265,12 @@ ctx = {
     if not (p and p.src) then vim.msg = ('no pattern %02d'):format(n); return end
     local empty = true
     for ti = 0, reaper.CountTracks(0) - 1 do
-      if #alias.items_over(reaper.GetTrack(0, ti), slot.pos, slot.rgnend) > 0 then empty = false; break end
+      if #pooled.items_over(reaper.GetTrack(0, ti), slot.pos, slot.rgnend) > 0 then empty = false; break end
     end
     local len = p.src.rgnend - p.src.pos
     ctx.slot_op('matrix ' .. p.name .. ' into a free bar', function()
-      alias.put_pooled(p.src, slot.pos)
-      if empty then alias.delete_slot({ gap = true, pos = slot.pos + len, rgnend = slot.rgnend + len }) end
+      pooled.put_pooled(p.src, slot.pos)
+      if empty then pooled.delete_slot({ gap = true, pos = slot.pos + len, rgnend = slot.rgnend + len }) end
     end)
     vim.msg = ('bar %d → %02d %s%s'):format(MX.cur.ri, p.num, p.name, empty and '' or ' (the bar had items - it stays after)')
   end,
@@ -5284,7 +5284,7 @@ ctx = {
     local k = 1
     for i, p in ipairs(list) do if p.name == slot.name then k = i end end
     local p = list[((k - 1 + dir) % #list) + 1]
-    if alias.set_slot(regions, slot, p) then
+    if pooled.set_slot(regions, slot, p) then
       vim.msg = ('slot %d → %02d %s (%d/%d)'):format(ri, p.num, p.name, p.num, #list)
       model.invalidate()
       regions = model.regions(state.lpb)        -- следующий щелчок — по свежим регионам
@@ -5391,7 +5391,7 @@ ctx = {
     local old = which == 'end' and model.marker_pos(model.END_MARKER)
     local lib_moved = 0
     edit.run(name .. ' marker', function()
-      if old and t > old + 1e-6 then lib_moved = alias.shift_lib(old, t - old, { [name] = true }) end
+      if old and t > old + 1e-6 then lib_moved = pooled.shift_lib(old, t - old, { [name] = true }) end
       local _, nmk, nrg = reaper.CountProjectMarkers(0)
       for i = 0, nmk + nrg - 1 do
         local _, isr, _, _, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
@@ -9263,7 +9263,7 @@ ctx = {
     for sri, s in ipairs(seq) do
       if not s.gap and not seen[s.name] then
         seen[s.name] = true
-        if #alias.items_over(col.track, s.pos, s.rgnend) > 0 then
+        if #pooled.items_over(col.track, s.pos, s.rgnend) > 0 then
           local num = nums[s.name] or 0
           local it = { label = ('%02d %s'):format(num, s.name), t = ('%02d'):format(num), v = sri, tip = ('%s on %s: %d steps'):format(s.name, col.name, math.floor(s.r1 - s.r0 + 0.5)) }
           -- 18 окт: превью — что этот паттерн играет на треке (волна / ноты)
@@ -9290,8 +9290,8 @@ ctx = {
         if it.v == 0 then ctx.mx_block('cut'); return end
         local n = 0
         edit.run('matrix: cell from ' .. seq[it.v].name, function()
-          local clip = alias.cells_copy(seq, snap, it.v, it.v, ci, ci, true)
-          n = alias.cells_paste(seq, snap, ri, ci, clip, true)
+          local clip = pooled.cells_copy(seq, snap, it.v, it.v, ci, ci, true)
+          n = pooled.cells_paste(seq, snap, ri, ci, clip, true)
         end)
         ctx.mx_refresh()
         vim.msg = ('%s slot %d: the cell of %s (pooled, %d item(s))'):format(col.name, ri, items[1] and it.label or '', n)
@@ -9301,7 +9301,7 @@ ctx = {
   -- MIDI — ноты схемой (высота — по диапазону нот), прочее — блок. Считается один раз (при открытии)
   mx_cell_parts = function(tr, t0, t1)
     local parts, span = {}, math.max(1e-6, t1 - t0)
-    for _, it in ipairs(alias.items_over(tr, t0, t1)) do
+    for _, it in ipairs(pooled.items_over(tr, t0, t1)) do
       local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
       local fin = pos + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
       local a, b = math.max(t0, pos), math.min(t1, fin)
@@ -9709,7 +9709,7 @@ ctx = {
       local rs = {}
       for i, r in ipairs(list) do rs[i] = r end
       for k = 1, count do
-        local t0, t1 = alias.add_region(rs, names[k], bars or 1)
+        local t0, t1 = pooled.add_region(rs, names[k], bars or 1)
         rs[#rs + 1] = { pos = t0, rgnend = t1, name = names[k] }
       end
     end)
@@ -9771,7 +9771,7 @@ ctx = {
     return out
   end,
   slot_yank = function(ri)
-    local sl = alias.slot_snapshot(seq, snap, ri or MX.cur.ri)
+    local sl = pooled.slot_snapshot(seq, snap, ri or MX.cur.ri)
     if not sl then vim.msg = 'no slot'; return end
     state.mx_reg = { kind = 'slot', sl = sl }
     vim.msg = ('yank slot %s: %d item(s), %d steps - p / P puts it'):format(sl.gap and 'bar' or (sl.name ~= '' and sl.name or '#'), sl.nitems, math.floor((seq[ri or MX.cur.ri].r1 - seq[ri or MX.cur.ri].r0) + 0.5))
@@ -9783,36 +9783,36 @@ ctx = {
     local rg = seq[ri]
     if not rg then return end
     local sl
-    -- как в Renoise (3 окт): alias — связанный повтор (то же имя, пул MIDI и
-    -- группа items с оригиналом; p слота, чей паттерн ещё есть, — тоже alias);
+    -- pooled — связанный повтор (то же имя, пул MIDI и группа items с оригиналом; p слота, чей паттерн
+    -- ещё есть, — тоже pooled);
     -- clone (dup) — независимая копия с новым именем
     if kind == 'dup' then kind = 'clone' end
-    local alias_src
-    if kind == 'pooled' and not rg.gap then alias_src = rg end   -- 4 ноя: pooled (было 'alias')
+    local pooled_src
+    if kind == 'pooled' and not rg.gap then pooled_src = rg end
     if kind == 'put' then
       local reg = state.mx_reg
       if not reg then vim.msg = 'matrix register empty (yy / dd / Ctrl+C)'; return end
       if reg.kind == 'cells' then ctx.mx_block('paste'); return end
       sl = reg.sl
       if sl and sl.name and sl.name ~= '' then
-        for _, r in ipairs(seq) do if not r.gap and r.name == sl.name then alias_src = r; break end end
+        for _, r in ipairs(seq) do if not r.gap and r.name == sl.name then pooled_src = r; break end end
       end
     end
-    if alias_src then
+    if pooled_src then
       local t = before and rg.pos or rg.rgnend
       local n = 0
-      ctx.slot_op('matrix repeat ' .. alias_src.name, function() n = alias.put_pooled(alias_src, t) end)
+      ctx.slot_op('matrix repeat ' .. pooled_src.name, function() n = pooled.put_pooled(pooled_src, t) end)
       MX.goto_cell(seq, snap, before and ri or ri + 1, MX.cur.ci)
-      vim.msg = ('pooled "%s": %d item(s), linked - MIDI pooled, items grouped (yp: a free copy, U: unpool)'):format(alias_src.name, n)
+      vim.msg = ('pooled "%s": %d item(s), linked - MIDI pooled, items grouped (yp: a free copy, U: unpool)'):format(pooled_src.name, n)
       return
     end
     -- 9 окт (Paketti): clone без заглушённых — копия, где у muted-треков пусто
     local nomute = kind == 'clone_nomute'
     if nomute then kind = 'clone' end
     if kind == 'clone' then
-      sl = alias.slot_snapshot(seq, snap, ri)
+      sl = pooled.slot_snapshot(seq, snap, ri)
       if not sl then return end
-      sl.name = alias.free_name(regions, sl.name)
+      sl.name = pooled.free_name(regions, sl.name)
       if nomute and sl.clip and sl.clip.cells[1] then
         for k in pairs(sl.clip.cells[1]) do
           local c2 = snap.cols[k]
@@ -9829,7 +9829,7 @@ ctx = {
     local t = before and rg.pos or rg.rgnend
     local n = 0
     ctx.slot_op(({ empty = 'matrix new slot', put = 'matrix put slot', clone = 'matrix clone slot' })[kind],
-      function() n = alias.put_slot(snap, t, sl) end)
+      function() n = pooled.put_slot(snap, t, sl) end)
     local target = before and ri or ri + 1
     MX.goto_cell(seq, snap, target, MX.cur.ci)
     if kind == 'empty' then
@@ -9843,20 +9843,20 @@ ctx = {
     local rg = seq[ri or MX.cur.ri]
     if not rg or rg.gap then vim.msg = 'make unique: no pattern here'; return end
     local name, n
-    ctx.slot_op('matrix make unique', function() name, n = alias.make_unique(regions, rg) end)
+    ctx.slot_op('matrix make unique', function() name, n = pooled.make_unique(regions, rg) end)
     vim.msg = ('make unique: "%s" is now "%s" - %d item(s) unlinked'):format(rg.name, name, n)
   end,
   slot_delete = function(n)
     local rg = seq[MX.cur.ri]
     if not rg then return end
-    local sl = alias.slot_snapshot(seq, snap, MX.cur.ri)
+    local sl = pooled.slot_snapshot(seq, snap, MX.cur.ri)
     state.mx_reg = { kind = 'slot', sl = sl }
     -- 10 окт: Ndd — N слотов одним undo; с конца, чтобы сдвиг времени не трогал ещё не удалённые
     n = math.max(1, math.min(n or 1, #seq - MX.cur.ri + 1))
     local list = {}
     for i = MX.cur.ri, MX.cur.ri + n - 1 do list[#list + 1] = seq[i] end
     ctx.slot_op(n > 1 and ('matrix delete %d slots'):format(n) or 'matrix delete slot', function()
-      for i = #list, 1, -1 do alias.delete_slot(list[i]) end
+      for i = #list, 1, -1 do pooled.delete_slot(list[i]) end
     end)
     if n > 1 then
       if MX.cur.ri > #seq then MX.cur.ri = math.max(1, #seq) end
@@ -10504,7 +10504,7 @@ ctx = {
   sig_prompt = function(rg)
     local t = rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0)
     local n, d = ctx.sig_at(t)
-    local here = rg or alias.region_at(regions, t)
+    local here = rg or pooled.region_at(regions, t)
     local x, y, above = gfx.mouse_x, gfx.mouse_y + 4, false
     if rg and MX.row_y and MX.row_y[MX.cur.ri] then x, y = 2, MX.row_y[MX.cur.ri] + L.rh
     elseif not rg and draw.strip_cell and draw.strip_cell.sig then x, y, above = draw.strip_cell.sig[1], draw.strip_cell.sig[2], true end
@@ -10529,7 +10529,7 @@ ctx = {
     local rg
     if state.sig_rg then for _, r in ipairs(regions) do if r.idx == state.sig_rg then rg = r end end end
     state.sig_rg = nil
-    rg = rg or alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    rg = rg or pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local multi = state.sig_rgs
     state.sig_rgs = nil
     local function go(sc)
@@ -10603,15 +10603,15 @@ ctx = {
           local tb = reaper.TimeMap2_QNToTime(0, qb)
           local dt = reaper.TimeMap2_QNToTime(0, qb + g) - tb
           ctx.shift_tempo_markers(tb, dt)
-          alias.shift_markers(tb, dt)
+          pooled.shift_markers(tb, dt)
           edit.time_insert(tracks, tb, dt, math.huge)
           if mode == 'last' then
             local ts = reaper.TimeMap2_QNToTime(0, qb - math.min(g, oldbar))
-            for _, tr in ipairs(tracks) do alias.copy_span(tr, { pos = ts, rgnend = tb }, { pos = tb, rgnend = tb + dt }, nil, false) end
+            for _, tr in ipairs(tracks) do pooled.copy_span(tr, { pos = ts, rgnend = tb }, { pos = tb, rgnend = tb + dt }, nil, false) end
           end
           t1 = t1 + dt; nb = nb + 1
         end
-        if sc == 'here' then alias.set_end(rg, t1) end
+        if sc == 'here' then pooled.set_end(rg, t1) end
       end
       if sc == 'all' then
         for i = 0, reaper.CountTempoTimeSigMarkers(0) - 1 do
@@ -10644,7 +10644,7 @@ ctx = {
     if text == '' then
       -- 19 окт: пустое имя + Enter — имя удалено (код паттерна, если есть, остаётся — его ставит выпадашка)
       if rg.gap then vim.msg = 'name: empty'; return end
-      ctx.slot_op('name removed', function() alias.rename(rg, '') end)
+      ctx.slot_op('name removed', function() pooled.rename(rg, '') end)
       model.invalidate(); regions = model.regions(state.lpb)
       vim.msg = 'name removed'
       return
@@ -10656,7 +10656,7 @@ ctx = {
       if not ctx.mx_name_forced then for _, r2 in ipairs(seq) do if not r2.gap and r2.name == text then src = r2; break end end end
       ctx.mx_name_forced = nil
       if src then
-        local var = model.SEC.next_variant(regions, text) or alias.free_name(regions, text)
+        local var = model.SEC.next_variant(regions, text) or pooled.free_name(regions, text)
         local bar = rg
         OPT.ask.open(('"%s" is already a pattern'):format(text), 'this bar has its own notes - what should it be?', {
           { key = 'n', label = ('keep these notes as a new pattern %s'):format(var), fn = function()
@@ -10675,8 +10675,8 @@ ctx = {
     for _, r2 in ipairs(seq) do if r2 ~= rg and not r2.gap and r2.name == text then taken = true end end
     local nu = 0
     edit.run('rename region', function()
-      alias.rename(rg, text)
-      if not taken and text ~= rg.name then nu = alias.unlink_items(rg, text) end
+      pooled.rename(rg, text)
+      if not taken and text ~= rg.name then nu = pooled.unlink_items(rg, text) end
     end)
     ctx.mx_refresh(); model.invalidate()
     vim.msg = 'region: ' .. text .. (nu > 0 and (' - its own pattern now (%d item(s) unlinked from the repeats)'):format(nu) or '')
@@ -10706,7 +10706,7 @@ ctx = {
     end
     ctx.set_region_len(rg, end_of(rg))
   end,
-  -- общая смена длины региона: маркеры — alias.shift_markers, items и
+  -- общая смена длины региона: маркеры — pooled.shift_markers, items и
   -- огибающие — E.time_insert/time_delete (разрез на границе, без лимита)
   set_region_len = function(rg, t1)
     local dt = t1 - rg.rgnend
@@ -10719,8 +10719,8 @@ ctx = {
     local hook = edit.after
     edit.after = nil
     edit.run('region length', function()
-      alias.shift_markers(rg.rgnend, dt)
-      if not rg.gap then alias.set_end(rg, t1) end
+      pooled.shift_markers(rg.rgnend, dt)
+      if not rg.gap then pooled.set_end(rg, t1) end
       if dt > 0 then edit.time_insert(tracks, rg.rgnend, dt, math.huge)
       else edit.time_delete(tracks, t1, rg.rgnend, math.huge) end
       -- 12 окт: длина свободного такта создаёт паттерн (следующая буква с 1): у такта появляется код
@@ -10754,7 +10754,7 @@ ctx = {
   end,
   -- 15 окт: beatsync = длина паттерна (регион курсора) × f
   bsync_pattern = function(e, f)
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'beatsync to pattern: the cursor is not inside a pattern (region)'; return end
     local beats = (rg.r1 - rg.r0) / (state.lpb or 4) * f
     if beats <= 0 then return end
@@ -11604,7 +11604,7 @@ ctx = {
   end,
   pm_cards = function() return state.pmgrid and state.pm_ok or false end,
   -- ── session (6 окт): клипы как в Ableton — модуль SS, REAPER здесь ──────
-  alias = alias,
+  pooled = pooled,
   -- DSP big (7 окт): цепочка FX на всё окно (MX.DB); панель DSP держится
   -- открытой, пока вид открыт (фокус dsp), на выходе — как было
   dsp_big = function()
@@ -11926,7 +11926,7 @@ ctx = {
         for r, c in pairs(sub) do if type(c) == 'table' and c.kind == 'midi' and c.row0 == r then rows[r] = true end end
       end
     end
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local r0 = rg and model.row_of_time(rg.pos, state.lpb) or -1e9
     local r1 = rg and model.row_of_time(rg.rgnend or rg.pos, state.lpb) or 1e9
     local list = {}
@@ -13207,7 +13207,7 @@ ctx = {
     for _, e in ipairs(col.pool or {}) do used[e.name] = true end
     for k, sn in ipairs(reg) do
       local nm = sn.name
-      if used[nm] then nm = alias.free_name(col.pool or {}, nm); while used[nm] do nm = alias.free_name({ { name = nm } }, nm) end end
+      if used[nm] then nm = pooled.free_name(col.pool or {}, nm); while used[nm] do nm = pooled.free_name({ { name = nm } }, nm) end end
       used[nm] = true
       names[k] = nm
     end
@@ -13682,7 +13682,7 @@ ctx = {
       edit.set_fx(heads, state.lpb, 'SL', 0); vim.msg = 'loop off'; return
     end
     if what == 'region' then
-      local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+      local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
       local h = heads[1]
       if not rg then vim.msg = 'cursor is not inside a region'; return end
       if not h or not h.item then vim.msg = 'no event under cursor'; return end
@@ -13698,7 +13698,7 @@ ctx = {
     local groups, order = {}, {}
     for _, h in ipairs(heads) do
       if h.item then
-        local rg = alias.region_at(regions, reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION'))
+        local rg = pooled.region_at(regions, reaper.GetMediaItemInfo_Value(h.item, 'D_POSITION'))
         if rg then
           if not groups[rg] then groups[rg] = {}; order[#order + 1] = rg end
           table.insert(groups[rg], h)
@@ -13838,7 +13838,7 @@ ctx = {
     ctx.set_region_len(rg, t1)
   end,
   garden_mute = function(ri, ci)
-    edit.run('garden mute', function() alias.cells_mute(seq, snap, ri, ri, ci, ci) end)
+    edit.run('garden mute', function() pooled.cells_mute(seq, snap, ri, ri, ci, ci) end)
     vim.msg = 'garden: mute toggled'
   end,
   garden_cmd = function(arg)
@@ -13905,7 +13905,7 @@ ctx = {
   end,
   -- «< N >» над номерами строк: длина региона курсора ±d шагов
   region_len_step = function(d)
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'cursor is not inside a region'; return end
     local steps = math.floor((rg.r1 - rg.r0) + 0.5) + d
     if steps < 1 then vim.msg = 'min 1 step'; return end
@@ -13914,7 +13914,7 @@ ctx = {
   -- 11 окт: клик по числу «< N >» — выпадашка длин: такты и доли размера
   -- в начале региона, вдвое / вполовину от текущей; текущая — (on)
   region_len_menu = function()
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'cursor is not inside a region'; return end
     local cur = math.floor((rg.r1 - rg.r0) + 0.5)
     local _, qms, qme = reaper.TimeMap_QNToMeasures(0, (rg.qn0 or 0) + 1e-6)
@@ -13941,7 +13941,7 @@ ctx = {
   -- кнопки под именем региона (2 окт): /2 x2 — длина вдвое (ripple, как :len),
   -- dup — копия региона справа как новый паттерн (как D в матрице)
   region_btn = function(what)
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then vim.msg = 'cursor is not inside a region'; return end
     if what == 'pooled' or what == 'clone' or what == 'unique' then
       for i, r in ipairs(seq) do
@@ -15414,17 +15414,17 @@ ctx = {
     end
   end,
   sync_here = function()
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     if not rg then return 0 end
     local n = 0
-    edit.run('sync ' .. rg.name, function() n = alias.sync(regions, rg) end)
+    edit.run('sync ' .. rg.name, function() n = pooled.sync(regions, rg) end)
     return n
   end,
-  alias_yank = function(rg) state.yanked_region = rg; vim.msg = 'yank pattern ' .. rg.name end,
-  alias_paste = function()
+  pat_yank = function(rg) state.yanked_region = rg; vim.msg = 'yank pattern ' .. rg.name end,
+  pat_paste = function()
     local rg = state.yanked_region
     if not rg then vim.msg = 'no pattern yanked'; return end
-    local t0 = alias.append(regions, rg)
+    local t0 = pooled.append(regions, rg)
     if t0 then vim.msg = ('pattern %s → %.2fs'):format(rg.name, t0) end
   end,
   -- hydra (which-key) по лидеру \: те же действия, что в контекстном меню
@@ -15439,7 +15439,7 @@ ctx = {
     local col = cur_col()
     local f = L.flat[vim.cur.fi]
     local hover = { fi = vim.cur.fi, cell = f and f.sub and f.sub[vim.cur.row], col = col }
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
     local items = {
       { key = ',', label = 'REAPER preferences', fn = function() reaper.Main_OnCommand(40016, 0) end },   -- 9 окт: \ , — как Cmd+, в macOS
       { key = 'e', label = 'event / selection', sub = function() return group('event', event_actions(hover)) end },
@@ -15689,7 +15689,7 @@ ctx.sections = function() return regions.sections or {} end
 -- 12 окт: play трекера (пробел, кнопки) при lock стартует со строки курсора трекера
 -- 20 окт: Space играет с курсора трекера всегда (с выключенным lock стартовал с edit-курсора REAPER — «курсор на 1.1, играет 2.4»)
 edit.start_at = function() if vim and vim.cur and state.focus ~= 'matrix' then return edit.row_time(vim.cur.row, state.lpb, 0) end end
-alias.init(model, edit)
+pooled.init(model, edit)
 CM.init(model)
 edit.cmds = CM
 -- 19 окт: диапазон pitch bend трека для команд 0U / 0D: у кита drumrs5k — Pitchbend range первого пэда, у jf_slixer — его, иначе ±2
@@ -15806,17 +15806,17 @@ edit.after = function(desc)
   local hard = state.hardedges == true
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
-  if desc == 'add region' then if hard then model.invalidate(); alias.trim(model.regions(state.lpb), edit.changed_items()) end; return end
+  if desc == 'add region' then if hard then model.invalidate(); pooled.trim(model.regions(state.lpb), edit.changed_items()) end; return end
   if desc:match('^sync') or desc:match('^pattern copy') or desc:match('^matrix') or desc:match('^depot') then return end
   -- 1 ноя: строки по всей дорожке (BS mode track: Backspace / Insert) — паттерны сдвинуты намеренно: синк связанных
   -- копий затирал сдвинутое копией паттерна курсора (ноты следующего паттерна пропадали), жёсткие границы резали клипы
   if ctx.bs_wide and (desc:match('^delete time') or desc:match('^insert time')) then return end   -- 2 ноя: и вид project / section
   if state.autosync then
-    local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
-    if rg then alias.sync(regions, rg) end
+    local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+    if rg then pooled.sync(regions, rg) end
   end
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
-  if hard then alias.trim(regions, edit.changed_items()) end
+  if hard then pooled.trim(regions, edit.changed_items()) end
 end
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
@@ -19398,12 +19398,12 @@ function region_actions(rg)
     { 'mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
     { 'next pattern', key = '>', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, 1) end end end },
     { 'previous pattern', key = '<', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_cycle(i, -1) end end end },
-    { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.alias_yank(rg) end },
+    { 'yank pattern (y)', key = 'y', g = 'pattern', fn = function() ctx.pat_yank(rg) end },
     { 'pooled: linked repeat (P in the matrix)', key = 'a', g = 'pattern', fn = function() ctx.region_btn('pooled') end },
     { 'copy: free duplicate (yp)', key = 'c', g = 'pattern', fn = function() ctx.region_btn('clone') end },
     { 'unique: unlink repeat (U)', key = 'u', g = 'pattern', fn = function() for i, r in ipairs(seq) do if r.idx == rg.idx then ctx.slot_unique(i) end end end },
-    { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.alias_paste() end },
-    { 'resync copies: this pattern to its repeats', key = 'r', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() alias.sync(regions, rg) end) end },   -- 21 окт: r (s — секции)
+    { 'paste copy at end (p)', key = 'p', g = 'pattern', fn = function() ctx.pat_paste() end },
+    { 'resync copies: this pattern to its repeats', key = 'r', g = 'pattern', fn = function() edit.run('sync ' .. rg.name, function() pooled.sync(regions, rg) end) end },   -- 21 окт: r (s — секции)
     -- 4 ноя: одно правило на меню: n — имя, d — удалить, s — разрезать, o — новое, < > — соседний
     -- 27 окт: команды панели patterns — для паттернов выделенных слотов (блок), иначе этого
     { 'glue: the selected slots in a row - one pattern', key = 'g', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_glue() end },
@@ -19524,7 +19524,7 @@ function view_actions()
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },
     { 'Loop region under cursor', key = 'l', fn = function()
-        local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+        local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
         if rg then reaper.GetSet_LoopTimeRange(true, true, rg.pos, rg.rgnend, false); reaper.GetSetRepeat(1) end
       end },
     { (state.envs and '!' or '') .. 'Envelopes (:env)', key = 'e', fn = function() state.envs = not state.envs end },
@@ -22629,7 +22629,7 @@ function retro_loop(bars)
   retro.sel.a = retro.sel.b - dur / c.len
   -- куда: следующая граница такта; длина — до конца региона, иначе 4 повтора
   local pos = reaper.TimeMap2_QNToTime(0, qme)
-  local rg = alias.region_at(regions, now)
+  local rg = pooled.region_at(regions, now)
   local total = (rg and rg.rgnend > pos + dur * 0.5) and (rg.rgnend - pos) or (dur * 4)
   retro_put('cursor', true, pos, total)
   vim.msg = ('retro loop: last %d bar%s of %s -> loop from %.2fs, %.2fs long'):format(bars, bars == 1 and '' or 's', c.col.name, pos, total)
@@ -23064,7 +23064,7 @@ local function publish_matrix(playpos)
   if #seq == 0 then if mx_last ~= '' then reaper.SetExtState(EXT, 'mx', '', false); mx_last = '' end return end
   local grid = MX.grid(snap, seq)
   local play_ri, queue_ri = 0, 0
-  if playpos then local rg = alias.region_at(seq, playpos); if rg then for i, r in ipairs(seq) do if r == rg then play_ri = i end end end end
+  if playpos then local rg = pooled.region_at(seq, playpos); if rg then for i, r in ipairs(seq) do if r == rg then play_ri = i end end end end
   if MX.queued then for i, r in ipairs(seq) do if r.idx == MX.queued.idx then queue_ri = i end end end
   local cells = {}
   for ri = 1, #seq do
@@ -23357,7 +23357,7 @@ local function process_orca(playpos)
   if row == orca_row_done then return end
   orca_row_done = row
   local rs = ctx.real_seq()
-  local rg = alias.region_at(rs, playpos)
+  local rg = pooled.region_at(rs, playpos)
   local t_row = edit.row_time(row, state.lpb, 0)
   local rowlen = edit.row_time(row + 1, state.lpb, 0) - t_row
   local rkey = rg and (rg.idx .. ':' .. rg.pos) or 'free'
@@ -23383,7 +23383,7 @@ local function process_orca(playpos)
         local ii = ORCA.b36(a[2]) or 0
         local inst = (col.pool or {})[ii == 0 and vim.inst or ii]
         local target = row + 1
-        local trg = alias.region_at(rs, edit.row_time(target, state.lpb, 0))
+        local trg = pooled.region_at(rs, edit.row_time(target, state.lpb, 0))
         local opts = { track = col.track, lane_idx = col.fixed and col.lanes[1] and col.lanes[1].idx or nil, lpb = state.lpb,
                        row = target, tag = trg and trg.idx or 'free', span = trg and { trg.pos, trg.rgnend } or nil }
         local v = ORCA.b36(o.op == ':' and a[5] or a[4]) or 0
@@ -23502,7 +23502,7 @@ ctx.mx_loop_tick = function(pp)
   if not (MX.loopset and next(MX.loopset)) then MX.loop_cur = nil; return end
   local sl = MX.loop_slots(seq)
   if #sl < 2 then return end
-  local cur = alias.region_at(regions, pp)
+  local cur = pooled.region_at(regions, pp)
   local k
   for i, r in ipairs(sl) do if cur and math.abs(r.pos - cur.pos) < 1e-6 then k = i end end
   local key = k and tostring(sl[k].pos) or 'out'
@@ -23517,7 +23517,7 @@ end
 MX.same_rg = function(a, b) return a and b and a.idx == b.idx and math.abs(a.pos - b.pos) < 1e-6 end
 ctx.mx_enqueue = function(rg)
   MX.queued, MX.queued_native = rg, nil
-  local cur = playing() and alias.region_at(regions, reaper.GetPlayPosition())
+  local cur = playing() and pooled.region_at(regions, reaper.GetPlayPosition())
   if rg and not rg.gap and rg.idx and cur then
     reaper.GoToRegion(0, rg.idx, false); MX.queued_native = true
     MX.queued_rep, MX.queued_pp = MX.same_rg(cur, rg), reaper.GetPlayPosition()   -- тот же, что играет — повтор: снять, когда позиция вернётся назад
@@ -23526,7 +23526,7 @@ end
 -- снять очередь: нативный прыжок не отменить — перенацелить на естественное продолжение (регион встык за играющим)
 ctx.mx_dequeue = function()
   if MX.queued_native and playing() then
-    local cur = alias.region_at(regions, reaper.GetPlayPosition())
+    local cur = pooled.region_at(regions, reaper.GetPlayPosition())
     for _, r in ipairs(cur and regions or {}) do
       if not r.gap and r.idx and math.abs(r.pos - cur.rgnend) < 1e-6 and not r.section then reaper.GoToRegion(0, r.idx, false); break end
     end
@@ -23537,7 +23537,7 @@ end
 local function process_queue(playpos)
   if not MX.queued then return end
   if not playing() then MX.queued, MX.queued_native = nil, nil; return end
-  local cur = alias.region_at(regions, playpos)
+  local cur = pooled.region_at(regions, playpos)
   if MX.queued_native then   -- прыгнет сам REAPER; дошли — очередь снята; страховка — граница прошла на 0.25 с
     local back = playpos < (MX.queued_pp or playpos) - 0.01
     MX.queued_pp = playpos
@@ -23838,7 +23838,7 @@ local function frame()
   end
   local t_2 = reaper.time_precise()
   if playpos then process_queue(playpos); process_jumps(playpos); process_orca(playpos) else jump_row_done = nil; orca_row_done = nil end
-  if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(alias.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
+  if playpos and ctx.PADS and ctx.PADS.rec then ctx.PADS.rec_tick(pooled.region_at(regions, playpos), playpos) end   -- 17 окт: pads rec
   if playpos and ctx.pl_tick then ctx.pl_tick(playpos) end   -- 18 окт: playlist
   if playpos then ctx.mx_loop_tick(playpos) else MX.loop_cur = nil end
   pcall(ctx.master_peek_tick)   -- 20 окт: мастер складывается, когда курсор ушёл
@@ -23880,8 +23880,8 @@ local function frame()
     if k ~= ctx.mx_selk then
       ctx.mx_selk = k
       reaper.PreventUIRefresh(1)
-      if MX.anchor then alias.cells_select(seq, snap, r0, r1, c0, c1) else reaper.SelectAllMediaItems(0, false); reaper.Main_OnCommand(40297, 0) end   -- 40297: снять выделение треков
-      for _, p in pairs(MX.picks) do alias.cells_select(seq, snap, p.ri, p.ri, p.ci, p.ci, true) end
+      if MX.anchor then pooled.cells_select(seq, snap, r0, r1, c0, c1) else reaper.SelectAllMediaItems(0, false); reaper.Main_OnCommand(40297, 0) end   -- 40297: снять выделение треков
+      for _, p in pairs(MX.picks) do pooled.cells_select(seq, snap, p.ri, p.ri, p.ci, p.ci, true) end
       reaper.PreventUIRefresh(-1)
       reaper.UpdateArrange()
       lock_sync.tr = reaper.GetSelectedTrack(0, 0)
@@ -24154,7 +24154,7 @@ local function frame()
     view_clip = { r0, r1 }
   elseif state.view_reg then
     local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
-    local rg = alias.region_at(regions, edit.row_time(ref, state.lpb, 0))
+    local rg = pooled.region_at(regions, edit.row_time(ref, state.lpb, 0))
     if rg then
       -- границы как у region_at (по времени): строка внутри региона не гасится
       local r0, r1 = math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6)
@@ -24438,7 +24438,7 @@ local function frame()
       return { model.row_of_time(a, state.lpb), model.row_of_time(b, state.lpb) }
     end)(),
     cur_region_full = (function()
-      local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+      local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
       if not rg then return nil end
       -- 20 окт: и секция строки курсора — во вертикальной шапке паттерна справа от мастера
       local t, sec = edit.row_time(vim.cur.row, state.lpb, 0), nil
@@ -24594,7 +24594,7 @@ local function frame()
       ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit)
     end,
     pool_ci = (L.flat[vim.cur.fi] or {}).ci, cols = state.ptmode and ctx.visible_cols() or snap.cols, peaks = track_peaks, meter = ctx.track_meter, poolsort = state.poolsort, master_meter_mode = ctx.master_meter_mode, kit_name = cur_col() and edit.lib_preset_name(cur_col().track) or nil,
-    cur_region = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
+    cur_region = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)),
     scope = state.scopes and scope_read or nil,
     spec = state.scopes and spec_read or nil, spec_frame = spec_frame, scopemode = state.scopemode,
     mono = mono_read(),   -- 15 окт: панель grid всегда; чтение шины — раз в 0.25 с
@@ -25172,7 +25172,7 @@ local function frame()
     -- 20 окт: в уголке строки эффектов — номер и имя паттерна курсора (и секция) в его цвете; клик — команды паттерна
     do
       local rgf = (function()
-        local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+        local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
         if not rg then return nil end
         local t, sec = edit.row_time(vim.cur.row, state.lpb, 0), nil
         for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then sec = sc.name; break end end
@@ -25202,7 +25202,7 @@ local function frame()
       -- 31 окт: над именем — длина паттерна < 32 >, над ней x2 /2 dup clr (из шапки сюда, если полоса высокая)
       draw.len_in_fx = rgf and (L.fxrow_h or 0) >= 3 * L.rh or nil
       if draw.len_in_fx then
-        local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+        local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
         local r0, r1 = ctx.region_rows()
         local ly = y0 - L.rh
         local s2 = tostring(r0 and r1 and (r1 - r0 + 1) or 0)
@@ -26125,7 +26125,7 @@ local function frame()
       if ri and (ri - r.last) * r.dir > 0 and r.clip then
         local n = 0
         edit.run(r.linked and 'matrix repeat cell (pooled)' or 'matrix repeat cell (copy)', function()
-          for k = r.last + r.dir, ri, r.dir do if seq[k] then n = n + alias.cells_paste(seq, snap, k, r.ci, r.clip, r.linked) end end
+          for k = r.last + r.dir, ri, r.dir do if seq[k] then n = n + pooled.cells_paste(seq, snap, k, r.ci, r.clip, r.linked) end end
         end)
         r.last = ri; r.n = (r.n or 0) + n; model.invalidate()
         vim.msg = ('cell repeated to slot %d (%s)'):format(ri, r.linked and 'pooled' or 'unique copies')
@@ -27931,12 +27931,12 @@ local function frame()
       -- следующих слотах (вниз / вверх), пока ведёшь; алиасы, с Option — уникальные
       local e = hover.matrix.cellrep
       local linked = gfx.mouse_cap & 16 == 0
-      local probe = alias.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci)
+      local probe = pooled.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci)
       if not (probe.cells[1] and probe.cells[1][1] and #probe.cells[1][1] > 0) then
         vim.msg = 'empty cell - nothing to repeat'                       -- пустая клетка стёрла бы клетки на пути
       else
         local clip = probe
-        if linked then edit.run('matrix repeat cell: link the source', function() clip = alias.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci, true) end) end
+        if linked then edit.run('matrix repeat cell: link the source', function() clip = pooled.cells_copy(seq, snap, e.ri, e.ri, e.ci, e.ci, true) end) end
         ctx.mx_rep = { ri = e.ri, ci = e.ci, last = e.ri, dir = e.edge == 'top' and -1 or 1, linked = linked, clip = clip }
       end
       MX.cur.ri, MX.cur.ci = e.ri, e.ci; ctx.set_focus('matrix')
@@ -32289,7 +32289,7 @@ end
 -- 21 окт: сыгранное длиннее паттерна — меню: дублировать паттерн (хвост — в копию), хвост — в следующий паттерн,
 -- обрезать по концу, сжать (ноты по времени) в этот паттерн
 ctx.retro_overflow = function(it, col, t_row)
-  local rg = alias.region_at(regions, t_row)
+  local rg = pooled.region_at(regions, t_row)
   local tk = it and reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetActiveTake(it)
   if not (rg and tk) then return end
   local last = 0
@@ -32354,13 +32354,13 @@ ctx.retro_overflow = function(it, col, t_row)
           tchunk = ok and edit.strip_guids(c) or nil
           reaper.DeleteTrackMediaItem(reaper.GetMediaItem_Track(tail), tail)
         end
-        local sl = alias.slot_snapshot(seq, snap, ri)
+        local sl = pooled.slot_snapshot(seq, snap, ri)
         if not sl then return end
-        sl.name = alias.free_name(regions, sl.name)
+        sl.name = pooled.free_name(regions, sl.name)
         local hrel = reaper.GetMediaItemInfo_Value(it, 'D_POSITION') - rg.pos   -- сыгранное в копии — только хвост, не повтор головы
         local list = sl.clip and sl.clip.cells[1] and sl.clip.cells[1][ci]
         if list then for j = #list, 1, -1 do if math.abs((list[j].rel or 0) - hrel) < 1e-6 then table.remove(list, j) end end end
-        alias.put_slot(snap, rg.rgnend, sl)
+        pooled.put_slot(snap, rg.rgnend, sl)
         if tchunk then
           local ni = reaper.AddMediaItemToTrack(col.track)
           reaper.SetItemStateChunk(ni, tchunk, false)
@@ -32693,7 +32693,7 @@ ctx.browser_view_menu = function()
 end
 ctx.auto_pattern = function(row)
   local t = edit.row_time(row, state.lpb, 0)
-  if alias.region_at(regions, t) then return false end
+  if pooled.region_at(regions, t) then return false end
   for _, rg in ipairs(seq or {}) do
     if rg.gap and t >= rg.pos - 1e-9 and t < rg.rgnend - 1e-9 then
       local code = model.SEC.next_family(regions)
@@ -32921,7 +32921,7 @@ ctx.tempo_clean = function()
           if math.abs(er - math.floor(er + 0.5)) > 0.02 then
             local slen, isq = reaper.GetMediaSourceLength(reaper.GetMediaItemTake_Source(tk))
             local sq = isq and slen or (reaper.TimeMap2_timeToQN(0, p + slen) - q0)
-            local rg = alias.region_at(regions, p + 1e-6)
+            local rg = pooled.region_at(regions, p + 1e-6)
             local lim = rg and reaper.TimeMap2_timeToQN(0, rg.rgnend) or (q0 + sq)
             local nq = math.min(q0 + sq, lim)
             if nq > q1 + 1e-6 then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', reaper.TimeMap2_QNToTime(0, nq) - p); fixed = fixed + 1 end
@@ -33256,7 +33256,7 @@ ctx.pad_launch = function(off)
     vim.msg = 'pads: ' .. dst.name
   elseif P.mode == 'sudden' then
     local pp = reaper.GetPlayPosition()
-    reaper.SetEditCurPos(P.sudden_pos(alias.region_at(regions, pp), pp, dst), false, true)
+    reaper.SetEditCurPos(P.sudden_pos(pooled.region_at(regions, pp), pp, dst), false, true)
     MX.queued, MX.queued_native = nil, nil
     vim.msg = 'pads: ' .. dst.name .. ' now'
   else
@@ -33277,7 +33277,7 @@ ctx.pads_write = function()
   ctx.slot_op('pads: write the played order', function()
     for _, nm in ipairs(names) do
       local src = by[nm]
-      if src then alias.put_pooled(src, t); t = t + (src.rgnend - src.pos); n = n + 1 end
+      if src then pooled.put_pooled(src, t); t = t + (src.rgnend - src.pos); n = n + 1 end
     end
   end)
   model.invalidate(); regions = model.regions(state.lpb)
@@ -33898,7 +33898,7 @@ MX.spacemode = reaper.GetExtState(EXT, 'mxspace') == 'play' and 'play' or 'cue' 
 -- 20 окт: autozoom (кнопка в уголке над номерами строк) — подбор общей ширины в relayout; выкл — уровень Cmd+колеса
 -- 20 окт: выпадашка команд паттерна строки курсора — от вертикальной шапки справа от мастера
 ctx.rg_head_menu = function()
-  local rg = alias.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+  local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
   if not rg then vim.msg = 'no pattern on this row'; return end
   local items = {}
   for _, a in ipairs(region_actions(rg)) do if a.key then items[#items + 1] = { key = a.key, label = (a[1]:gsub('^!', '')), fn = a.fn } end end
@@ -34329,23 +34329,23 @@ ctx.bar_here = function(t, how)   -- 1 ноя: t, how — точка снару�
 end
 ctx.pat_edge_here = function(which)
   local t, how = ctx.edge_point()
-  local rg = alias.region_at(regions, t - 1e-6) or alias.region_at(regions, t)
+  local rg = pooled.region_at(regions, t - 1e-6) or pooled.region_at(regions, t)
   if not rg then vim.msg = 'no pattern here'; return end
   local q0, q1 = reaper.TimeMap2_timeToQN(0, rg.pos), reaper.TimeMap2_timeToQN(0, rg.rgnend)
   if which == 'end' then
     -- конец паттерна курсора (курсор у начала следующего — конец предыдущего)
     if math.abs(t - rg.pos) < math.abs(t - rg.rgnend) then
-      local prv = alias.region_at(regions, rg.pos - 1e-3)
+      local prv = pooled.region_at(regions, rg.pos - 1e-3)
       if prv then rg = prv; q0, q1 = reaper.TimeMap2_timeToQN(0, prv.pos), reaper.TimeMap2_timeToQN(0, prv.rgnend) end
     end
     ctx.tempo_fit(q1, t, q0, ('%s ends here (%s)'):format(rg.name or 'pattern', how))
   else
     -- начало: ближайшее начало паттерна (этого или следующего); опора — начало предыдущего
-    local nx = alias.region_at(regions, rg.rgnend + 1e-3)
+    local nx = pooled.region_at(regions, rg.rgnend + 1e-3)
     local tgt = rg
     if nx and math.abs(t - rg.rgnend) < math.abs(t - rg.pos) then tgt = nx end
     local qs = reaper.TimeMap2_timeToQN(0, tgt.pos)
-    local prv = alias.region_at(regions, tgt.pos - 1e-3)
+    local prv = pooled.region_at(regions, tgt.pos - 1e-3)
     ctx.tempo_fit(qs, t, prv and reaper.TimeMap2_timeToQN(0, prv.pos) or nil, ('%s starts here (%s)'):format(tgt.name or 'pattern', how))
   end
 end
@@ -34774,7 +34774,7 @@ end
 -- 1 ноя: Ctrl+Shift+Opt+J / K — длина паттерна курсора ± d строк (всё после сдвигается, как :len)
 ctx.pat_len_step = function(d)
   local t = edit.row_time(vim.cur.row, state.lpb, 0)
-  local rg = alias.region_at(regions, t)
+  local rg = pooled.region_at(regions, t)
   if not rg then vim.msg = 'no pattern here'; return end
   local q0 = reaper.TimeMap2_timeToQN(0, rg.pos)
   local rows = math.floor((reaper.TimeMap2_timeToQN(0, rg.rgnend) - q0) * state.lpb + 0.5)
@@ -35420,13 +35420,13 @@ ctx.pl_write = function(at, sec, steps0)
     for _, st in ipairs(steps) do
       local rg = st.rg
       local full = rg.rgnend - rg.pos
-      alias.put_pooled(rg, t)
+      pooled.put_pooled(rg, t)
       local nt = t + full
       if not ctx.PL.whole(st) then
         local a = (st.from > 0 and edit.row_time(rg.r0 + st.from, state.lpb, 0) or rg.pos) - rg.pos
         local b = ((st.from + st.len < st.rows) and edit.row_time(rg.r0 + st.from + st.len, state.lpb, 0) or rg.rgnend) - rg.pos
-        if b < full - 1e-6 then edit.time_delete(trs, t + b, t + full, math.huge); alias.shift_markers(t + full, -(full - b)) end
-        if a > 1e-6 then edit.time_delete(trs, t, t + a, math.huge); alias.shift_markers(t + a, -a) end
+        if b < full - 1e-6 then edit.time_delete(trs, t + b, t + full, math.huge); pooled.shift_markers(t + full, -(full - b)) end
+        if a > 1e-6 then edit.time_delete(trs, t, t + a, math.huge); pooled.shift_markers(t + a, -a) end
         nt = t + (b - a)
         local i = 0
         while true do   -- регион копии: новый конец и своё имя (иначе синхронизация связанных вернула бы ему полную длину)
@@ -35434,9 +35434,9 @@ ctx.pl_write = function(at, sec, steps0)
           if not ret or ret == 0 then break end
           if isr and math.abs(p - t) < 1e-6 and nm == rg.name then
             local cp = { idx = idx, pos = t, rgnend = t + full, name = nm }
-            alias.set_end(cp, nt); cp.rgnend = nt
+            pooled.set_end(cp, nt); cp.rgnend = nt
             model.invalidate(); regions = model.regions(state.lpb)
-            alias.make_unique(regions, cp)
+            pooled.make_unique(regions, cp)
             break
           end
           i = i + 1
@@ -36711,7 +36711,7 @@ ctx.pat_remove = function()   -- из песни: все места выбран
   for _, p in ipairs(sel) do for _, rg in ipairs(seq) do if not rg.gap and rg.name == p.name then occ[#occ + 1] = rg end end end
   if #occ == 0 then vim.msg = 'remove: not in the song'; return end
   table.sort(occ, function(a, b) return a.pos > b.pos end)
-  ctx.slot_op('remove patterns from the song', function() for _, rg in ipairs(occ) do alias.delete_slot(rg) end end)
+  ctx.slot_op('remove patterns from the song', function() for _, rg in ipairs(occ) do pooled.delete_slot(rg) end end)
   MX.pl_multi = {}
   ctx.mx_refresh()
   vim.msg = ('removed %d place(s) from the song - the time closed (u - undo)'):format(#occ)
@@ -37106,7 +37106,7 @@ ctx.bar_link = function(bar, src)
     model.invalidate(); regions = model.regions(state.lpb)
     local s2
     for _, r3 in ipairs(regions) do if r3.idx == src.idx then s2 = r3 end end
-    alias.sync(regions, s2 or src)
+    pooled.sync(regions, s2 or src)
   end)
   vim.msg = ('this bar is now %s (linked, the content of %s; U - make unique)'):format(src.name, src.name)
 end
@@ -37131,7 +37131,7 @@ ctx.section_rows = function(row)
   end
 end
 ctx.pattern_end_row = function(row)
-  local rg = alias.region_at(regions, edit.row_time(row, state.lpb, 0))
+  local rg = pooled.region_at(regions, edit.row_time(row, state.lpb, 0))
   return rg and math.ceil(rg.r1 - 1e-6) or nil
 end
 -- 18 окт: пэд drumrs5k: mute — выкл / вкл (bypass), solo — включён только он (повтор — все включены). Один undo
@@ -37649,24 +37649,24 @@ ctx.sec_free_name = function(name)
   while used[nm] do nm = base .. ' ' .. k; k = k + 1 end
   return nm
 end
--- вставить паттерны секции в t: alias — связанные повторы, иначе свободные копии (новые имена); → конец вставки
+-- вставить паттерны секции в t: pooled — связанные повторы, иначе свободные копии (новые имена); → конец вставки
 ctx.sec_insert = function(sc, t, linked)
   -- 21 окт: каждая вставка раздвигает время; исходник правее точки вставки уезжает на её длину — источник
   -- следующего паттерна берётся со сдвигом (было: по старым позициям — копировалось не то, рядом мусор).
   -- Снимки (copy) — все заранее, до первой вставки
   local pats = ctx.sec_pats(sc)
   local snaps = {}
-  if not linked then for k, e in ipairs(pats) do snaps[k] = alias.slot_snapshot(seq, snap, e.ri) end end
+  if not linked then for k, e in ipairs(pats) do snaps[k] = pooled.slot_snapshot(seq, snap, e.ri) end end
   local t1, shift = t, 0
   for k, e in ipairs(pats) do
     local len = e.rg.rgnend - e.rg.pos
     if linked then
       local src = e.rg
       if shift > 0 then src = setmetatable({ pos = e.rg.pos + shift, rgnend = e.rg.rgnend + shift }, { __index = e.rg }) end
-      alias.put_pooled(src, t1)
+      pooled.put_pooled(src, t1)
     else
       local sl = snaps[k]
-      if sl then sl.name = alias.free_name(regions, sl.name); alias.put_slot(snap, t1, sl) end
+      if sl then sl.name = pooled.free_name(regions, sl.name); pooled.put_slot(snap, t1, sl) end
     end
     if e.rg.pos + shift >= t1 - 1e-6 then shift = shift + len end   -- исходник был правее вставки — уехал
     t1 = t1 + len
@@ -37709,7 +37709,7 @@ ctx.sec_move = function(sc, ri, how)
   if how == 'move' and t >= sc.pos - 1e-6 and t <= sc.rgnend + 1e-6 then vim.msg = 'section: already here'; return end
   if how == 'move' then
     local ok
-    ctx.slot_op('section move ' .. (sc.name or ''), function() ok = alias.move_span(sc.pos, sc.rgnend, t) end)
+    ctx.slot_op('section move ' .. (sc.name or ''), function() ok = pooled.move_span(sc.pos, sc.rgnend, t) end)
     ctx.mx_refresh()
     vim.msg = ok and ('section %s moved before slot %d (u - undo)'):format(sc.name or '', ri) or 'section: nothing moved'
   else
@@ -37787,7 +37787,7 @@ ctx.sec_cmd = function(arg)
   if w == 'launch' then ctx.sec_launch(sc) elseif w == 'show' then ctx.sec_show(sc) elseif w == 'repeat' then ctx.sec_repeat(sc, true) elseif w == 'copy' then ctx.sec_repeat(sc, false)
   elseif w == 'loop' then ctx.mx_loop_span(sc.pos, sc.rgnend)
   elseif w == 'name' then ctx.sec_rename(sc) elseif w == 'del' then ctx.sec_remove(sc) elseif w == 'delall' then ctx.sec_remove_all(sc)   -- 21 окт: из подменю s
-  elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif (w == 'pooledto' or w == 'aliasto') and n then ctx.sec_move(sc, n, 'pooled')
+  elseif w == 'move' and n then ctx.sec_move(sc, n, 'move') elseif w == 'copyto' and n then ctx.sec_move(sc, n, 'copy') elseif w == 'pooledto' and n then ctx.sec_move(sc, n, 'pooled')
   else ctx.sec_menu(sc) end
 end
 -- 18 окт: запуск секции: играет — первый её слот в очередь матрицы (прыжок на границе играющего паттерна), луп — на секцию;
@@ -37836,7 +37836,7 @@ ctx.sec_remove_all = function(sc)
       if isrgn and pos >= p0 - 1e-6 and rend <= p1 + 1e-6 and name ~= model.SESSION_REGION then reaper.DeleteProjectMarkerByIndex(0, i)
       else i = i + 1 end
     end
-    alias.delete_slot({ pos = p0, rgnend = p1, gap = true })
+    pooled.delete_slot({ pos = p0, rgnend = p1, gap = true })
   end)
   ctx.mx_refresh()
   MX.cur.sec = nil
@@ -37968,7 +37968,7 @@ ctx.unstack = function()
     for k = #stack, 1, -1 do
       local st = stack[k]
       reaper.DeleteProjectMarker(0, st.dup.idx, true)
-      alias.put_pooled(st.src, st.src.rgnend)
+      pooled.put_pooled(st.src, st.src.rgnend)
       n = n + 1
     end
   end)

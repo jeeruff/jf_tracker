@@ -58,7 +58,7 @@ reaper = setmetatable({
   end,
 }, { __index = function() return function() end end })
 
-local A = dofile(DIR .. '/jf_tracker_alias.lua')
+local A = dofile(DIR .. '/jf_tracker_pooled.lua')
 A.init({ is_lib_name = function(nm) return nm == 'LIB' end, DEPOT = 'LIB' }, {})
 local function mark(name) for _, m in ipairs(P.marks) do if m.name == name then return m end end end
 

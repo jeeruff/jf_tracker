@@ -10,7 +10,7 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('A drums', 1, tr
   local ok, err = pcall(function()
     local model = dofile(DIR .. '/jf_tracker_model.lua')
     local edit = dofile(DIR .. '/jf_tracker_edit.lua'); edit.init(model)
-    local alias = dofile(DIR .. '/jf_tracker_alias.lua'); alias.init(model, edit)
+    local pooled = dofile(DIR .. '/jf_tracker_pooled.lua'); pooled.init(model, edit)
     local lpb = 16
     local tr = R.GetTrack(0, 0)
     local inst = R.GetTrackMediaItem(tr, 0)
@@ -46,7 +46,7 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('A drums', 1, tr
     local t1 = R.GetMediaItemInfo_Value(it, 'D_POSITION') + 10 * row_sec
     local hook = edit.after; edit.after = nil
     edit.run('region length', function()
-      alias.shift_markers(rg.rgnend, t1 - old_end); alias.set_end(rg, t1)
+      pooled.shift_markers(rg.rgnend, t1 - old_end); pooled.set_end(rg, t1)
       edit.time_delete({ tr }, t1, old_end, math.huge)
     end)
     edit.after = hook
@@ -57,7 +57,7 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('A drums', 1, tr
     for i = 0, R.CountTracks(0) - 1 do local t = R.GetTrack(0, i); for k = 0, R.CountTrackMediaItems(t) - 1 do local x = R.GetTrackMediaItem(t, k); local tk = R.GetActiveTake(x); if tk and R.TakeIsMIDI(tk) then mtr = { t, x } end end end
     if mtr then
       local mit = mtr[2]; local mpos = R.GetMediaItemInfo_Value(mit, 'D_POSITION')
-      local rgm = alias.region_at(model.regions(lpb), mpos)
+      local rgm = pooled.region_at(model.regions(lpb), mpos)
       if rgm then
         edit.loop_items({ mit }, lpb, rgm.rgnend, 8)
         local ml, isqn = R.GetMediaSourceLength(R.GetMediaItemTake_Source(R.GetActiveTake(mit)))

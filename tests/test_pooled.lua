@@ -1,6 +1,6 @@
--- test_alias.lua — жёсткие границы и автосинк паттернов на стабе REAPER:
--- lua tests/test_alias.lua. Новая реализация (2 окт, лайв) сверяется со
--- старой (tests/alias_ref_trim.lua — прежний A.trim) на тех же данных.
+-- test_pooled.lua — жёсткие границы и автосинк паттернов на стабе REAPER:
+-- lua tests/test_pooled.lua. Новая реализация (2 окт, лайв) сверяется со
+-- старой (tests/pooled_ref_trim.lua — прежний A.trim) на тех же данных.
 package.path = './?.lua;' .. package.path
 local n, bad = 0, 0
 local function eq(name, got, want)
@@ -69,7 +69,7 @@ reaper = {
   end,
   GetSetMediaItemInfo_String = function() return true, '' end,
 }
-local A = dofile('jf_tracker_alias.lua')
+local A = dofile('jf_tracker_pooled.lua')
 A.init({ DEPOT = '<depot>' }, {})
 
 local function dump()
@@ -95,7 +95,7 @@ local nt = A.trim(regs)
 eq('trim result', dump(), '1+2:x 3+1:x 9+3:x 10+2:x 12+3:x 12+4:x | 2+1:x 16+2:x 21+9:x')
 eq('trim count', nt, 4)
 -- старая реализация на тех же данных — тот же результат
-local ok_ref, REF = pcall(dofile, 'tests/alias_ref_trim.lua')
+local ok_ref, REF = pcall(dofile, 'tests/pooled_ref_trim.lua')
 if ok_ref then
   reset(spec)
   REF(regs)
@@ -126,7 +126,7 @@ A.reset_groups()
 A.sync(regs, regs[1])
 local src, cp
 for _, it in ipairs(P.tracks[1].items) do if it.pos < 4 then src = it elseif it.pos >= 12 and it.pos < 16 then cp = it end end
-eq('alias copy exists', cp ~= nil, true)
+eq('pooled copy exists', cp ~= nil, true)
 eq('src got a pool', src.pool ~= nil, true)
 eq('copy shares the pool', cp and cp.pool, src.pool)
 eq('src grouped', (src.gid or 0) > 0, true)

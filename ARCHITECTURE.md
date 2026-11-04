@@ -104,51 +104,51 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 32882 | трекерный вид таймлайна REAPER с Vim-редактированием. |
-| `jf_tracker_model.lua` | 2911 | снимок проекта REAPER в трекерных строках. |
-| `jf_tracker_edit.lua` | 6096 | ВСЕ записи трекера в проект REAPER. |
-| `jf_tracker_alias.lua` | 754 | алиасы паттернов (этап 6). |
+| `jf_tracker.lua` | 38134 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker_model.lua` | 3121 | снимок проекта REAPER в трекерных строках. |
+| `jf_tracker_edit.lua` | 6545 | ВСЕ записи трекера в проект REAPER. |
+| `jf_tracker_pooled.lua` | 766 | слоты и регионы матрицы, pooled-повторы паттернов (было jf_tracker_alias.lua, этап 6). |
 | `jf_tracker_arr.lua` | 101 | аранжировки (9 окт): фиксированные лейны трека — его версии, аранжировка — именованный набор играющих лейнов всех треков (C_LANEPLAYS). |
-| `jf_tracker_cmds.lua` | 461 | команды-огибающие и генераторы (этап 7). |
+| `jf_tracker_cmds.lua` | 730 | команды-огибающие и генераторы (этап 7). |
 | `jf_tracker_chord.lua` | 202 | аккорды (8 окт): анализатор и гармонайзер. |
 | `jf_tracker_import.lua` | 184 | импорт нарезанных инструментов (2 окт). |
 | **клавиши и команды** | | |
-| `jf_tracker_vim.lua` | 4497 | Vim-слой трекера: режимы, движения, операторы. |
+| `jf_tracker_vim.lua` | 5064 | Vim-слой трекера: режимы, движения, операторы. |
 | `jf_tracker_keys.lua` | 130 | раскладка клавиш трекера. |
-| `jf_tracker_whichkey.lua` | 89 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
-| `jf_tracker_keyhelp.lua` | 1355 | контекстная справка по клавишам (2 окт). |
-| `jf_tracker_hints.lua` | 161 | Vim-подсказки (как Vimium / easymotion / warpd). |
+| `jf_tracker_whichkey.lua` | 91 | подсказка второй клавиши (7 окт, как which-key в Emacs / Neovim): нажат префикс (d, z, g …) — главный модуль вместо быстрых опций показывает, что м… |
+| `jf_tracker_keyhelp.lua` | 1513 | контекстная справка по клавишам (2 окт). |
+| `jf_tracker_hints.lua` | 175 | Vim-подсказки (как Vimium / easymotion / warpd). |
 | `jf_tracker_instkeys.lua` | 186 | клавиши модуля инструментов в духе Vim (2 окт). |
-| `jf_tracker_dspkeys.lua` | 234 | клавиши DSP-панели в духе Vim (2 окт). |
+| `jf_tracker_dspkeys.lua` | 244 | клавиши DSP-панели в духе Vim (2 окт). |
 | `jf_tracker_ctrlmouse.lua` | 169 | мышь с Ctrl (8 окт): универсальная ручка. |
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
-| `jf_tracker_draw.lua` | 12631 | отрисовка снимка трекера в gfx. |
-| `jf_tracker_panes.lua` | 977 | раскладка окна как в tmux / zellij (9 окт). |
-| `jf_tracker_ui.lua` | 257 | нативная графика REAPER (gfx), минимализм. |
+| `jf_tracker_draw.lua` | 14384 | отрисовка снимка трекера в gfx. |
+| `jf_tracker_panes.lua` | 997 | раскладка окна как в tmux / zellij (9 окт). |
+| `jf_tracker_ui.lua` | 253 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 121 | темы трекера (3 окт). |
-| `jf_tracker_smart.lua` | 339 | смарт-панель (9 окт, как Smart Select в PlayerPro / Paketti): у ячейки курсора всплывает сетка значений того поля, где стоит курсор — ноты (октавы … |
+| `jf_tracker_smart.lua` | 353 | смарт-панель (9 окт, как Smart Select в PlayerPro / Paketti): у ячейки курсора всплывает сетка значений того поля, где стоит курсор — ноты (октавы … |
 | `jf_tracker_ask.lua` | 60 | маленький вопрос посреди окна (3 окт). |
 | `jf_tracker_png.lua` | 78 | PNG без внешних программ (8 окт, снимки measure). |
 | `jf_tracker_logo.lua` | 517 | логотип JFTRACKER для about (главный модуль, 3 окт). |
 | **панели и вкладки** | | |
-| `jf_tracker_matrix.lua` | 1311 | матрица паттернов (этап 3). |
-| `jf_tracker_browser.lua` | 2298 | сайдбар-браузер (справа от трекера). |
-| `jf_tracker_fxbrowser.lua` | 491 | браузер эффектов слева от DSP-панели (2 окт). |
+| `jf_tracker_matrix.lua` | 1335 | матрица паттернов (этап 3). |
+| `jf_tracker_browser.lua` | 2498 | сайдбар-браузер (справа от трекера). |
+| `jf_tracker_fxbrowser.lua` | 542 | браузер эффектов слева от DSP-панели (2 окт). |
 | `jf_tracker_sampleprops.lua` | 499 | панель свойств сэмпла справа от волны (вкладка Sample, 2 окт; как свойства сэмпла в Renoise, но всё нативное: item и take REAPER). |
-| `jf_tracker_slicer.lua` | 1890 | виртуальная нарезка сэмпла (инструмента пула). |
-| `jf_tracker_preview.lua` | 420 | предпрослушивание вставляемого события. |
-| `jf_tracker_params.lua` | 369 | панель «params» во вкладке modulation (3 окт). |
+| `jf_tracker_slicer.lua` | 1976 | виртуальная нарезка сэмпла (инструмента пула). |
+| `jf_tracker_preview.lua` | 413 | предпрослушивание вставляемого события. |
+| `jf_tracker_params.lua` | 383 | панель «params» во вкладке modulation (3 окт). |
 | `jf_tracker_modmatrix.lua` | 258 | модуляционная матрица: нативная модуляция параметров FX REAPER (Parameter Modulation) в виде простой таблицы. |
-| `jf_tracker_fxclass.lua` | 205 | классификатор параметров FX и автомодуль (3 окт). |
-| `jf_tracker_dspmods.lua` | 465 | реестр модулей DSP-панели. |
+| `jf_tracker_fxclass.lua` | 213 | классификатор параметров FX и автомодуль (3 окт). |
+| `jf_tracker_dspmods.lua` | 488 | реестр модулей DSP-панели. |
 | `jf_tracker_dspbig.lua` | 602 | DSP big (7 окт): цепочка FX трека / take на всё окно, роутинг видно. |
-| `jf_tracker_aiedit.lua` | 564 | редактор точек automation item (5 окт). |
-| `jf_tracker_lfogen.lua` | 411 | генератор кривых в точки огибающей (2 окт). |
-| `jf_tracker_sgram.lua` | 167 | спектрограмма (5 окт): время × частота тепловой картой. |
+| `jf_tracker_aiedit.lua` | 581 | редактор точек automation item (5 окт). |
+| `jf_tracker_lfogen.lua` | 428 | генератор кривых в точки огибающей (2 окт). |
+| `jf_tracker_sgram.lua` | 169 | спектрограмма (5 окт): время × частота тепловой картой. |
 | `jf_tracker_macros.lua` | 343 | вкладка macros (9 окт): макросы трекера в одном месте. |
 | `jf_tracker_macro.lua` | 122 | макро-вид трекера (3 окт, :macro): вид «с высоты». |
-| `jf_tracker_midimap.lua` | 287 | MIDI learn для слайсера (вкладка midi, 2 окт). |
+| `jf_tracker_midimap.lua` | 288 | MIDI learn для слайсера (вкладка midi, 2 окт). |
 | `jf_tracker_harm.lua` | 450 | вкладка harmonizer (8 окт), рядом с midi. |
 | `jf_tracker_video.lua` | 149 | вкладка video (9 окт). |
 | `jf_tracker_visor.lua` | 1209 | панель visor: шейдеры ReaVisor прямо из трекера (10 окт). |
@@ -159,26 +159,27 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_perf.lua` | 165 | производительность REAPER в духе htop (6 окт). |
 | `jf_tracker_audio.lua` | 98 | аудиоустройство REAPER из трекера (10 окт): вкладка audio в options и zB (размер буфера). |
 | **опции, справка, служебное** | | |
-| `jf_tracker_options.lua` | 941 | окно Options: все переключатели и числа трекера в одном всплывающем списке (кнопка «options» в контроле, :options, \o). |
+| `jf_tracker_options.lua` | 1036 | окно Options: все переключатели и числа трекера в одном всплывающем списке (кнопка «options» в контроле, :options, \o). |
 | `jf_tracker_screensets.lua` | 45 | формат файла скринсетов (4 окт): строка на набор, «имя&lt;TAB>ключ=тип:значение;…», тип b (0/1) / n (число) / s (строка, ; → %3B). |
 | `jf_tracker_doc.lua` | 247 | справка F1 прямо в трекере (6 окт). |
-| `jf_tracker_tour.lua` | 120 | интерактивный тур (4 окт): ячейка tutorial главного модуля. |
-| `jf_tracker_version.lua` | 983 | версия и список изменений (Options → about). |
+| `jf_tracker_tour.lua` | 218 | интерактивный тур (4 окт): ячейка tutorial главного модуля. |
+| `jf_tracker_version.lua` | 1013 | версия и список изменений (Options → about). |
 | **прочее** | | |
 | `jf_tracker_actions.lua` | 102 | панель actions (16 окт): список действий REAPER шире родного окна Actions. |
 | `jf_tracker_aim.lua` | 68 | математика прицела (12 окт): где в файле звучит нота на строке курсора, где это в секундах показанного инструмента e, где резать в проекте; привязк… |
 | `jf_tracker_arc.lua` | 75 | monome arc в трекере (15 окт): 4 кольца = 4 параметра эффекта. |
-| `jf_tracker_autocanvas.lua` | 358 | холст автоматизации (15 окт): страница curve вкладки automation. |
+| `jf_tracker_autocanvas.lua` | 825 | холст автоматизации (15 окт): страница curve вкладки automation. |
 | `jf_tracker_console.lua` | 228 | консоль: живой язык паттернов (Strudel) в трекере (28 окт; тест tests/test_console.lua). |
 | `jf_tracker_curves.lua` | 95 | кривые для выделения на колонке огибающей (24 окт): reform для автоматизации. |
 | `jf_tracker_drumrack.lua` | 148 | drumrs5k (16 окт): контейнер RS5K видом драм-рэка. |
 | `jf_tracker_dsprack.lua` | 101 | геометрия цепочки DSP без reaper / gfx (28 окт; тест tests/test_dsprack.lua). |
+| `jf_tracker_freesound.lua` | 213 | поиск звуков на freesound.org (API v2) для вкладки fs браузера. |
 | `jf_tracker_fxdump.lua` | 54 | снимок параметров плагина (PLAN_DSP этап 0, 22 окт): образцы для парсера. |
 | `jf_tracker_fxfloat.lua` | 47 | опция «no auto FX windows» (24 окт): окна, которые REAPER открывает сам («Auto-float newly created FX windows») при добавлении эффекта — из трекера… |
-| `jf_tracker_fxparse.lua` | 194 | парсер параметров плагина по тексту значения (PLAN_DSP этапы 1–2, 22 окт). |
-| `jf_tracker_fxpresets.lua` | 79 | поиск по пресетам плагинов (28 окт; тест tests/test_presets_index.lua). |
+| `jf_tracker_fxparse.lua` | 195 | парсер параметров плагина по тексту значения (PLAN_DSP этапы 1–2, 22 окт). |
+| `jf_tracker_fxpresets.lua` | 82 | поиск по пресетам плагинов (28 окт; тест tests/test_presets_index.lua). |
 | `jf_tracker_humanizer.lua` | 215 | панель humanizer (19 окт): тонкая настройка «человечности». |
-| `jf_tracker_keyrep.lua` | 73 | свой автоповтор зажатой клавиши (27 окт; вынесен для тестов tests/test_keyrep.lua). |
+| `jf_tracker_keyrep.lua` | 75 | свой автоповтор зажатой клавиши (27 окт; вынесен для тестов tests/test_keyrep.lua). |
 | `jf_tracker_layers.lua` | 91 | слоёный инструмент (14 окт): несколько items звучат одной нотой. |
 | `jf_tracker_llm.lua` | 157 | мост к языковой модели / MCP (10 окт). |
 | `jf_tracker_mem.lua` | 121 | :mem (21 окт): кто держит память Lua. |
@@ -187,22 +188,26 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_notemod.lua` | 279 | модуляция, которую запускает нота (12 окт, этап 1). |
 | `jf_tracker_numkeys.lua` | 60 | 21 окт: число перед клавишей в панелях reform / humanizer / bouncer (как в DSP): N h / l — шаг ×N, N j / k — на N строк, N Enter — значение строки … |
 | `jf_tracker_padseq.lua` | 54 | pads (17 окт, MPC style): паттерны песни на нотных клавишах, игра паттернами вживую. |
+| `jf_tracker_panview.lua` | 73 | вид пана трека (zvp): трек — поле из N позиций (нечётное, середина — центр), время сверху вниз. |
+| `jf_tracker_phrase.lua` | 195 | фразы (30 окт, PLAN_PHRASES.md): кусок паттерна на многих треках → одна нота. |
+| `jf_tracker_phrasepane.lua` | 119 | панель phrases (31 окт): список фраз проекта (регионы ph:NAME в библиотеке). |
 | `jf_tracker_pins.lua` | 56 | матрица пинов эффекта (24 окт): как Pin Connector REAPER, в стиле трекера. |
 | `jf_tracker_playlist.lua` | 142 | playlist матрицы (18 окт): порядок паттернов текстом, как region playlist. |
 | `jf_tracker_premod.lua` | 85 | premod (22 окт): кривая автоматизации ДО ноты. |
 | `jf_tracker_presets.lua` | 94 | пресеты инструментов на шаблонах треков REAPER (16 окт). |
+| `jf_tracker_ptfx.lua` | 82 | команды ProTracker в PT-mode (1 ноя). |
 | `jf_tracker_reform.lua` | 198 | reform (19 окт): живая переделка выделенных нот. |
 | `jf_tracker_renderer.lua` | 212 | панель renderer (20 окт, gB): баунс нот в аудио и инструмент DSP → сэмплер. |
-| `jf_tracker_sections.lua` | 138 | коды паттернов и секции (12 окт). |
+| `jf_tracker_sections.lua` | 166 | коды паттернов и секции (12 окт). |
 | `jf_tracker_sigpick.lua` | 161 | выпадашка размера такта (18 окт): вместо строки :sig N/D here. |
-| `jf_tracker_slxpanel.lua` | 334 | пульт jf_slixer в DSP трекера, 1 в 1 с окном плагина (25 окт). |
-| `jf_tracker_smap.lua` | 1412 | карта сэмплов папки, как граф Obsidian (27 окт 2026). |
-| `jf_tracker_snaps.lua` | 81 | 22 окт: быстрые пресеты трека в DSP: 4 снапшота всех параметров FX трека в углах XY-пэда (1 — левый верх, 2 — правый верх, 3 — левый низ, 4 — правы… |
+| `jf_tracker_slxpanel.lua` | 395 | пульт jf_slixer в DSP трекера, 1 в 1 с окном плагина (25 окт). |
+| `jf_tracker_smap.lua` | 1503 | карта сэмплов папки, как граф Obsidian (27 окт 2026). |
+| `jf_tracker_snaps.lua` | 134 | 22 окт: быстрые пресеты трека в DSP: 4 снапшота всех параметров FX трека в углах XY-пэда (1 — левый верх, 2 — правый верх, 3 — левый низ, 4 — правы… |
 | `jf_tracker_surge.lua` | 169 | патчи Surge XT из трекера (16 окт). |
-| `jf_tracker_themetab.lua` | 304 | вкладка theme окна Options (10 окт): темы и шрифты с примерами. |
-| `jf_tracker_theory.lua` | 434 | 21 окт: теория для harmonizer (чистый Lua, тест tests/test_theory.lua). |
-| `jf_tracker_tracks.lua` | 199 | дерево треков для модуля tracks (13 окт, как файловый менеджер lf). |
-| `jf_tracker_undosnap.lua` | 96 | снимок состояния проекта для ветвей дерева undo (15 окт). |
+| `jf_tracker_themetab.lua` | 342 | вкладка theme окна Options (10 окт): темы и шрифты с примерами. |
+| `jf_tracker_theory.lua` | 428 | 21 окт: теория для harmonizer (чистый Lua, тест tests/test_theory.lua). |
+| `jf_tracker_tracks.lua` | 198 | дерево треков для модуля tracks (13 окт, как файловый менеджер lf). |
+| `jf_tracker_undosnap.lua` | 98 | снимок состояния проекта для ветвей дерева undo (15 окт). |
 | `jf_tracker_undotree.lua` | 331 | дерево undo (15 окт), как undotree в Vim. |
 | `jf_tracker_utf8.lua` | 18 | набор текста не только латиницей (20 окт): кириллица и любой Юникод в полях ввода. |
 | `jf_tracker_xform.lua` | 156 | модификаторы (15 окт): трансформации времени и громкости блока событий. |
@@ -222,8 +227,10 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 |---|---|---|---|---|
 | `tracker` | tracker | `t` |  | всегда |
 | `patterns` | patterns | `T` | left | всегда |
+| `arranger` | region playlist | `C` | left | всегда |
 | `matrix` | matrix | `m` | left | всегда |
 | `browser` | browser | `b` | right | всегда |
+| `keys` | keys | `K` | right | всегда |
 | `map` | map | `w` | right | всегда |
 | `inst` | lib | `l` | right | всегда |
 | `ctrl` | main | `n` | top | всегда |
@@ -238,11 +245,13 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `actions` | actions | `A` | right | всегда |
 | `reform` | reform | `R` | right | всегда |
 | `humanizer` | humanizer | `H` | right | всегда |
+| `phrases` | phrases | `F` | right | всегда |
+| `lfogen` | lfogen | `G` | right | всегда |
 | `renderer` | bouncer | `B` | right | всегда |
 | `help` | help | `?` | right | всегда |
 | `notes` | notes | `o` | bottom | всегда |
 | `fxb` | fx | `f` | right | всегда |
-| `pm` | pm | `p` | right | всегда |
+| `pm` | pm | `p` | right | dev |
 | `dsp` | dsp | `d` | bottom | всегда |
 | `retro` | rec | `r` | top, вкладка сверху | всегда |
 | `sample` | item | `i` | top, вкладка сверху | всегда |
@@ -255,9 +264,10 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `master` | master | `S` | top, вкладка сверху | всегда |
 | `video` | video | `v` | top, вкладка сверху | всегда |
 | `visor` | visor | `V` | top, вкладка сверху | всегда |
-| `grid` | grid | `g` | top, вкладка сверху | всегда |
+| `grid` | grid | `g` | top, вкладка сверху | dev |
 | `hints` | hints | `I` | top | всегда |
 | `manual` | manual | `Z` | right | всегда |
+| `options` | options | `,` | bottom | всегда |
 | `console` | console | `E` | bottom | всегда |
 | `garden` | orca | `O` | top, вкладка сверху | dev |
 
@@ -268,22 +278,24 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `'` | ' - harpoon (pinned places) | `a` `1..9` `'` `b` `d` |
 | `@` | @ - play a macro | `a..z` `@` `Opt+Shift+2` |
 | `T` | Opt+T - take (the note under the cursor) | `f` `o` |
-| `browser_z` | z - browser view | `i` `o` `z` `m` |
+| `browser_z` | z - browser view | `i` `o` `z` `_` `m` `M` |
 | `c` | c - change | `c` |
-| `d` | d - delete | `d` `c` `C` `W` `p` `P` `t` `r` `R` `T` `a` |
+| `curve_z` | z - view of the curve canvas | `g` `h` `p` `0` `, .` |
+| `d` | d - delete | `d` `D` `l` `w` ``` `W` `i` `c` `C` `p` `P` `S` `Space` `t` `r` `R` `T` `a` |
 | `da` | da - delete all (the track, in the song) | `e` `l` `j` `k` `h` `E` `L` `J K H` |
 | `dsp_a` | a - add / automate | `f` `F` `a` `p` `i` `d` `m` |
 | `dsp_c` | c - rack / container | `c` `u` `n` `v` `b` `f` `=` `/` `s` |
 | `dsp_d` | d - delete | `d` `m` `a` |
 | `dsp_y` | y - copy | `y` |
-| `dsp_z` | z - view / router / pages | `z` `e` `Tab` `w` `X` `r` `R` `l` `f` `F` `p` `P` `m` |
+| `dsp_z` | z - view / router / pages | `z` `e` `E` `Tab` `w` `x` `X` `r` `R` `l` `f` `F` `p` `P` `_` `m` `M` |
 | `dsp_zs` | cs - pad size | `s` `m` `l` |
-| `g` | g - go | `g` `12 Enter` `w` `p` `P` `s` `S` `m` `t` `T` `i` `r` |
+| `g` | g - go | `g` `12 Enter` `w` `p` `P` `n` `N` `s` `S` `m` `q` `Q` `t` `T` `i` `r` |
 | `item_z` | z - view of the item | `z` `w` `x` |
-| `pane` | PANE (Ctrl+W) - Esc out | `h j k l` `H J K L` `w W  1..9` `g + key` `s v + key` `T + key` `B` `X + key  x` `+ -  < >` `=` `z` `c` `Space` `u` |
+| `pane` | PANE (Ctrl+W) - Esc out | `h j k l` `H J K L` `w W  1..9` `g + key` `s v + key` `T + key` `B` `X + key  x` `+ -  < >` `=` `z` `q` `c + key` `Space` `u` |
 | `q` | q - record a macro | `a..z` |
 | `r` | r - replace | `key` |
-| `t` | t - track | `t` `d` `x` `p` `s` `r` `n` `c` `y` `a` `m` `u` `A` `i` `I` `l` `w` `f` `R` `T` `F` `j k` |
+| `t` | t - track | `g` `}` `+ -` `t` `d` `x` `p` `s` `r` `n` `c` `y` `a` `m` `u` `h` `H` `U` `A` `i` `I` `l` `w` `f` `R` `T` `F` `j k` |
 | `y` | y - copy | `y` `c` |
-| `z` | z - view | `z` `Z` `1` `w` `t` `b` `a` `c` `o` `e` `C` `f` `M` `m` `> <` `. ,` `x` `X` `u` `p` `s` `r` `R` |
+| `z` | z - view | `z` `Z` `1` `v` `W` `w` `h` `l` `t` `T` `b` `a` `A` `c` `o` `e` `C` `!` `f` `F` `_` `m` `M` `> <` `. ,` `x` `X` `u` `p` `s` `r` `R` |
+| `zv` | zv - view | `p` `P` `w` |
 <!-- keys:end -->

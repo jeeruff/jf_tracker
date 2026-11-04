@@ -372,7 +372,7 @@ KH.PAGES = {
     { k = 'a', m = 'append: new slot + name', g = 'slot', d = 'as in Vim: a new slot after the cursor and its name at once (o - without the name)' },
     { k = 'c', m = 'change: pattern of the slot', g = 'slot', d = 'as in Vim: change the pattern of the slot - the list of patterns (= Enter on the number)' },
     { k = 'p', m = 'put after', g = 'slot', d = 'put the register after (cells: paste at cursor); before - the menu slot > b' },
-    { k = 'P', m = 'pooled: linked repeat', g = 'slot', d = 'pooled (was alias): the slot repeated linked - same pattern, MIDI pooled and items grouped, edits in one change all (button als; also p of a yanked slot whose pattern still exists)' },
+    { k = 'P', m = 'pooled: linked repeat', g = 'slot', d = 'pooled: the slot repeated linked - same pattern, MIDI pooled and items grouped, edits in one change all (button als; also p of a yanked slot whose pattern still exists)' },
     { k = 'U', m = 'unpool: unlink repeat', g = 'slot', d = 'unpool: unlink the repeat under the cursor - new name, own MIDI pool, no group' },
     { k = 'x', m = 'cut cell', g = 'block', d = 'cut cell (or block) to clipboard' },
     { k = 'n', m = 'rename region', g = 'slot', d = 'rename region' },

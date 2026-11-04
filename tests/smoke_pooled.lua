@@ -1,4 +1,4 @@
--- smoke_alias.lua — алиасы живьём в песочнице: повтор региона A в конец,
+-- smoke_pooled.lua — алиасы живьём в песочнице: повтор региона A в конец,
 -- правка в A → синхронизация в копию. Результат → ExtState jf_tracker/smoke.
 local R = reaper
 local DIR = debug.getinfo(1, 'S').source:sub(2):match('(.*)/tests/')
@@ -13,8 +13,8 @@ if (pname and pname ~= '') or not (table.concat(names, ','):find('A drums', 1, t
 end
 local model = dofile(DIR .. '/jf_tracker_model.lua')
 local edit = dofile(DIR .. '/jf_tracker_edit.lua')
-local alias = dofile(DIR .. '/jf_tracker_alias.lua')
-edit.init(model); alias.init(model, edit)
+local pooled = dofile(DIR .. '/jf_tracker_pooled.lua')
+edit.init(model); pooled.init(model, edit)
 local ok, err = pcall(function()
   local regions = model.regions(4)
   local A
@@ -32,7 +32,7 @@ local ok, err = pcall(function()
     return n
   end
   local nA = count_in(A)
-  local t0 = alias.append(regions, A)
+  local t0 = pooled.append(regions, A)
   model.invalidate()
   regions = model.regions(4)
   local A2
@@ -46,7 +46,7 @@ local ok, err = pcall(function()
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
     if pos >= A.pos - 1e-6 and pos < A.rgnend - 1e-6 then victim = it; break end
   end
-  edit.after = function() alias.sync(regions, A) end
+  edit.after = function() pooled.sync(regions, A) end
   if victim then edit.delete({ { kind = 'audio', item = victim } }, 4) end
   edit.after = nil
   model.invalidate()

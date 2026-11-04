@@ -43,7 +43,7 @@
 | `jf_tracker_vim.lua` | режимы, движения, операторы, регистры, макросы; reaper.* не трогает |
 | `jf_tracker_edit.lua` | ВСЕ записи в проект: delete / mute / transpose / split / note-off / yank-paste / insert / mute_span |
 | `jf_tracker_matrix.lua` | матрица паттернов: регионы × треки, фокус по Tab, mute ячейки, y/p паттерна |
-| `jf_tracker_alias.lua` | алиасы: синхронизация одноимённых регионов, повтор паттерна |
+| `jf_tracker_pooled.lua` | алиасы: синхронизация одноимённых регионов, повтор паттерна |
 | `jf_tracker_aim.lua` | прицел: место файла на строке курсора, точка реза, привязки (тест test_aim, живой smoke_aim) |
 | `jf_tracker_sustain.lua` | луп удержания: поиск точек (спектр полос + корреляция шва + ноль), хвост ноты (plan), метка P_EXT:jf_loop; хвосты — edit.sus_sync в edit.run; тест test_sustain, живой smoke_sustain |
 | `jf_tracker_sections.lua` | коды паттернов (A1, буква — семейство) и секции (регион без кода поверх паттернов, края за ними в edit.run); тест test_sections, живой smoke_sections |
@@ -239,7 +239,7 @@ QWERTY, таблица `keys.layout` в `jf_tracker_keys.lua`, `keys.translate`)
 на команде — буква + две; `r` — то же без шага вниз; Backspace сбрасывает поле.
 `:pitchmode shift|resample` — режим питча трека (ExtState по GUID трека).
 **Алиасы (этап 6)**: регионы с одним именем — один паттерн; после каждой
-правки регион под курсором переписывает одноимённые (`jf_tracker_alias.lua`,
+правки регион под курсором переписывает одноимённые (`jf_tracker_pooled.lua`,
 хук `edit.after` в том же undo-блоке; `:autosync`, `:sync`). В матрице `y`/`p` —
 запомнить регион / его повтор в конце проекта.
 **Колонки команд** (показ, этап 5): `9xx` offset, `8xx` pan, `Ixx`/`Oxx` fades

@@ -12,7 +12,7 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('A drums', 1, tr
   local ok, err = pcall(function()
     local model = dofile(DIR .. '/jf_tracker_model.lua')
     local edit = dofile(DIR .. '/jf_tracker_edit.lua'); edit.init(model)
-    local alias = dofile(DIR .. '/jf_tracker_alias.lua'); alias.init(model, edit)
+    local pooled = dofile(DIR .. '/jf_tracker_pooled.lua'); pooled.init(model, edit)
     local lpb = 16
     local function seq() model.invalidate(); local rg = model.regions(lpb); local o = {}; for _, r in ipairs(rg) do if not r.lib then o[#o + 1] = r end end; o.lib_pos = rg.lib_pos; return o end
     local function dump(s) local t = {}; for _, r in ipairs(s) do t[#t + 1] = ('%s[%.3f-%.3f]'):format(r.name, r.pos, r.rgnend) end; return table.concat(t, ' ') end
@@ -22,19 +22,19 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('A drums', 1, tr
     local s0 = seq(); local i0 = nitems(); local st0 = model.marker_pos(model.START_MARKER)
     log('before: ' .. dump(s0) .. (' items %d start %s'):format(i0, tostring(st0)))
     -- D: дубль первого слота после него, новое имя
-    local sl = alias.slot_snapshot(s0, snap, 1)
-    sl.name = alias.free_name(s0, sl.name)
+    local sl = pooled.slot_snapshot(s0, snap, 1)
+    sl.name = pooled.free_name(s0, sl.name)
     local len = sl.len
-    edit.run('dup', function() alias.put_slot(snap, s0[1].rgnend, sl) end)
+    edit.run('dup', function() pooled.put_slot(snap, s0[1].rgnend, sl) end)
     local s1 = seq()
     log(('dup: count %d→%d, name %s, items +%d (snapshot %d), next slot moved %+.3f (want %+.3f)'):format(#s0, #s1, s1[2] and s1[2].name or '?',
       nitems() - i0, sl.nitems, s0[2] and (s1[3].pos - s0[2].pos) or 0, len))
     -- P перед первым: =START остаётся на месте
-    edit.run('put before', function() alias.put_slot(snap, s1[1].pos, alias.slot_snapshot(s1, snap, 1)) end)
+    edit.run('put before', function() pooled.put_slot(snap, s1[1].pos, pooled.slot_snapshot(s1, snap, 1)) end)
     local s2 = seq()
     log(('put before first: count %d, start %s → %s'):format(#s2, tostring(st0), tostring(model.marker_pos(model.START_MARKER))))
     -- dd: удалить вставленный перед первым
-    edit.run('delete', function() alias.delete_slot(s2[1]) end)
+    edit.run('delete', function() pooled.delete_slot(s2[1]) end)
     local s3 = seq()
     log(('delete: count %d (want %d), first pos %.3f (want %.3f)'):format(#s3, #s1, s3[1].pos, s1[1].pos))
     for _ = 1, 3 do edit.undo() end

@@ -10,7 +10,7 @@ if (pname and pname ~= '') or not table.concat(names, ','):find('M synth', 1, tr
   local ok, err = pcall(function()
     local model = dofile(DIR .. '/jf_tracker_model.lua')
     local edit = dofile(DIR .. '/jf_tracker_edit.lua'); edit.init(model)
-    local A = dofile(DIR .. '/jf_tracker_alias.lua'); A.init(model, edit)
+    local A = dofile(DIR .. '/jf_tracker_pooled.lua'); A.init(model, edit)
     local snap = model.build(4)
     local seq = {}; for _, r in ipairs(model.regions(4)) do if not r.lib then seq[#seq + 1] = r end end
     local ci, ri
