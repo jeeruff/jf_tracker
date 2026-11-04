@@ -2046,7 +2046,19 @@ D.PR = { cur = 1 }
 
 function D.route_strip(L, info, hover, x0, x1)
   local y0, h = L.route_y, L.route_h
-  if not y0 or h <= 0 then return end
+  if not y0 or h <= 0 then
+    -- 4 ноя: посылов не было — полоса спрятана (rt_need = 0); раз в полсекунды проверить, не появились ли
+    if D.rt_need == 0 and reaper.time_precise() - (D.rt_scan_t or 0) > 0.5 then
+      D.rt_scan_t = reaper.time_precise()
+      for _, c in ipairs(L.cols or {}) do
+        local tr = c.col and c.col.track
+        if tr and not c.master and reaper.ValidatePtr(tr, 'MediaTrack*') then
+          for _, e in ipairs(routing_of(tr)) do if not e.recv and not e.main then D.rt_need = nil; return end end
+        end
+      end
+    end
+    return
+  end
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(x0, y0, x1 - x0, h, 1)
   set(D.SEP); gfx.rect(x0, y0, x1 - x0, D.SEPW, 1)
@@ -2077,7 +2089,7 @@ function D.route_strip(L, info, hover, x0, x1)
         if e.dest and xof[e.dest] then wires[#wires + 1] = { x = lx + math.floor(lw / 2), tx = xof[e.dest], rgb = e.rgb, mute = e.mute, col = col, e = e } end
         hint('btn', lx, y0 + 2, lw, h - 3, { col = col, what = 'route' })
       end
-      if #outs == 0 then text(c.x + L.pad, y0 + 3, '-', U.DIM) end
+      -- 4 ноя: без посылов — пусто (был прочерк)
     end
   end
   -- провода: вниз из дорожки, по горизонтали к колонке получателя, стрелка вниз
@@ -2099,7 +2111,7 @@ function D.route_strip(L, info, hover, x0, x1)
     gfx.rect(w.tx, y, 1, y0 + h - 1 - y, 1)
     gfx.rect(w.tx - 1, y0 + h - 3, 3, 1, 1)
   end
-  D.rt_need = need == 0 and (L.rh + 4) or (math.max(3, math.min(10, need)) * cw1 + wires_h + 6)   -- нет выходов — одна строка
+  D.rt_need = need == 0 and 0 or (math.max(3, math.min(10, need)) * cw1 + wires_h + 6)   -- 4 ноя: посылов нет ни у кого — полосы нет (было: строка прочерков)
 end
 
 D.PANE_KEYS = { { 'Cmd+hjkl', 'panel' }, { 'Cmd+Shift+hjkl', 'move' }, { 'Ctrl+W', 'panes' }, { 'F2', 'tracker' }, { '?', 'help' } }
@@ -9849,7 +9861,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
   end
-  if L.mix_bottom and (L.route_h or 0) > 0 then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
+  if L.mix_bottom and ((L.route_h or 0) > 0 or D.rt_need == 0) then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
   -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),
   -- источники (R зелёный), сам трек (белый), трек под строкой — янтарь, 2 px
   local rhl = info.route_hl and info.route_hl()
