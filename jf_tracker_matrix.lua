@@ -548,7 +548,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if MX.fold then nw = 0 end                         -- свёрнута: без имени и длины
     local hot_name = nw > 0 and hover.ri == ri and mx >= nx and mx < nx + nw
     if nw > 0 then
-    local rgn = rg.gap and (orphan and 'unnamed - n' or '') or   -- 4 ноя: свободный такт — пустая строка, как в трекере (было «bar») (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))   -- с кодом — остаток имени
+    -- 4 ноя: свободный такт — пустая строка, как в трекере (было «bar»); с кодом — остаток имени
+    local rgn = rg.gap and (orphan and 'unnamed - n' or '') or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (orphan and U.AMBER or (rg.gap and U.DIM or lc)))
     -- 17 окт: pads вкл — клавиша паттерна справа у имени (запись — красным)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
