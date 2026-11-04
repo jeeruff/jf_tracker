@@ -828,15 +828,16 @@ function O.draw(L, W, H)
       else O.msb_drag = nil end
     end
     O.msb_hot = gfx.mouse_x >= bx + bw - 12 and gfx.mouse_x < bx + bw and gfx.mouse_y >= ty and gfx.mouse_y < ty + th
-    U.set(U.LINE); gfx.rect(bx + bw - 6, ty, 3, th, 1)
-    U.set((O.msb_hot or O.msb_drag) and U.TEXT or U.AMBER); gfx.rect(bx + bw - 9, ky, 7, kh, 1)
+    local sw = O.SBW or 3   -- 4 ноя: толщина — опция scrollbar width, как у всех полос
+    U.set(U.LINE); gfx.rect(bx + bw - 3 - sw, ty, sw, th, 1)
+    U.set((O.msb_hot or O.msb_drag) and U.TEXT or U.AMBER); gfx.rect(bx + bw - 3 - sw, ky, sw, kh, 1)
   end
   if masonry then O.scroll = 0 end
   -- полоса прокрутки списка (5 окт): хоткеев сотни
   O.sb_hot = nil
   local sbw = 0
   if #O.items > cap and not masonry then
-    sbw = 7
+    sbw = O.SBW or 3
     local sx, sy, sh = bx + bw - sbw - 2, by + rh + 4, nvis * rh
     local th = math.max(8, math.floor(sh * cap / #O.items))
     local maxs = math.max(1, #O.items - cap)
