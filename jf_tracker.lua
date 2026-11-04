@@ -19547,7 +19547,6 @@ function view_actions()
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
     { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
-    { 'Manual (the whole help, a pane)', key = '?', fn = function() ctx.help_big() end },   -- 28 окт: \\ ? — справка, \\ h — hints
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
     { 'Console: Strudel patterns into the tracker (:console)', key = 'E', fn = function() ctx.console_open() end },
@@ -19642,9 +19641,7 @@ local function context_menu(hover, anchor)
     if k then G.used[k] = true; G[#G + 1] = { key = k, label = label, fn = fn, hk = (hk ~= k) and hk or nil } end   -- 21 окт: хоткей — колонкой
   end
   local function pick_key(want, label)
-    -- 4 ноя: ? держится в запасе от авто-букв, но пункт, который просит ? сам (manual), его получает (был a)
-    local k = want and (not used[want] or (want == '?' and used['?'] == true and not used['?taken'])) and want or nil
-    if k == '?' then used['?taken'] = true end
+    local k = want and not used[want] and want or nil
     if not k then for ch in label:lower():gmatch('%a') do if not used[ch] then k = ch; break end end end
     if not k then for ch in ('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):gmatch('.') do if not used[ch] then k = ch; break end end end
     if k then used[k] = true end
