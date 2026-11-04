@@ -3833,6 +3833,19 @@ ctx = {
   end,
   -- ── панель params (3 окт, jf_tracker_params.lua) ──
   edit_run = function(name, fn) edit.run(name, fn); model.invalidate() end,
+  -- 4 ноя: take ноты под курсором трекера на этом треке (голова или её продолжение) — для take / Volume … в params
+  cur_take = function(tr)
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    if not (f and f.col and f.col.track == tr) then return nil end
+    local subs = f.sub and { f.sub } or {}
+    if f.folded then for _, ln in ipairs(f.col.lanes or {}) do for _, sb in ipairs(ln.subs or {}) do subs[#subs + 1] = sb end end end   -- свёрнутый / вид пана — все подколонки
+    for _, sub in ipairs(subs) do
+      local c = sub[vim.cur.row]
+      local h = c and ((c.kind == 'audio' or c.kind == 'midi') and c or (c.kind == 'cont' and c.of))
+      if h and h.take then return h.take end
+    end
+    return nil
+  end,
   msg = function(s) vim.msg = s end,
   fx_addresses = function(tr) return model.fx_addresses(tr) end,
   open_picker = function(title, items, fn) vim.open_picker(title, items, fn) end,

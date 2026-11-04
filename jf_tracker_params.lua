@@ -33,6 +33,8 @@ local TRACK_ENVS = {
   { 'Volume (Pre-FX)', 'pre-fx volume' }, { 'Pan (Pre-FX)', 'pre-fx pan' }, { 'Width (Pre-FX)', 'pre-fx width' },
   { 'Trim Volume', 'trim' }, { 'Mute', 'mute' },
 }
+-- 4 ноя: огибающие take ноты под курсором трекера (имя для GetTakeEnvelopeByName, действие-переключатель)
+local TAKE_ENVS = { { 'Volume', 40693 }, { 'Pan', 40694 }, { 'Mute', 40695 }, { 'Pitch', 41612 } }
 local env_cmds   -- слова → id действия (скан один раз)
 local function env_cmd(words)
   if not env_cmds then
@@ -68,12 +70,16 @@ end
 
 function PP.build(tr, fx_addresses)
   local fxa = fx_addresses(tr)
-  local s = signature(tr, fxa)
+  local take = ctx.cur_take and ctx.cur_take(tr)
+  local s = signature(tr, fxa) .. '|' .. tostring(take)
   if s == sig then return PP.all end
   sig = s
   local rows = {}
   for _, te in ipairs(TRACK_ENVS) do
     rows[#rows + 1] = { kind = 'track', label = 'track / ' .. te[1], env_name = te[1], words = te[2] }
+  end
+  if take then   -- 4 ноя: take ноты под курсором — её громкость, пан, mute, высота (огибающие take)
+    for _, te in ipairs(TAKE_ENVS) do rows[#rows + 1] = { kind = 'take', take = take, label = 'take / ' .. te[1], env_name = te[1], cmd = te[2] } end
   end
   for _, fa in ipairs(fxa) do
     local _, fn = R.TrackFX_GetFXName(tr, fa.fx, '')
@@ -97,6 +103,7 @@ end
 -- огибающая строки (create — создать)
 function PP.env_of(tr, r, create)
   if r.kind == 'fx' then return R.GetFXEnvelope(tr, r.fx, r.param, create or false) end
+  if r.kind == 'take' then return R.ValidatePtr(r.take, 'MediaItem_Take*') and R.GetTakeEnvelopeByName(r.take, r.env_name) or nil end
   return R.GetTrackEnvelopeByName(tr, r.env_name)
 end
 
@@ -166,6 +173,13 @@ function PP.toggle_env(tr, r)
       set_flag(env, 'VISIBLE', not flag(env, 'VISIBLE'))
     elseif r.kind == 'fx' then
       R.GetFXEnvelope(tr, r.fx, r.param, true)
+    elseif r.kind == 'take' then   -- выделить только айтем этой ноты, переключить огибающую take, выделение назад
+      if not R.ValidatePtr(r.take, 'MediaItem_Take*') then return end
+      local it, sel = R.GetMediaItemTake_Item(r.take), {}
+      for i = 0, R.CountSelectedMediaItems(0) - 1 do sel[#sel + 1] = R.GetSelectedMediaItem(0, i) end
+      R.SelectAllMediaItems(0, false); R.SetMediaItemSelected(it, true)
+      R.Main_OnCommand(r.cmd, 0)
+      R.SelectAllMediaItems(0, false); for _, o in ipairs(sel) do if R.ValidatePtr(o, 'MediaItem*') then R.SetMediaItemSelected(o, true) end end
     else
       local id = env_cmd(r.words)
       if not id then return end
@@ -198,7 +212,7 @@ function PP.activate(tr, r, key)
   elseif key == 'act' then PP.toggle_flag(tr, r, 'ACTIVE')
   elseif key == 'arm' then PP.toggle_flag(tr, r, 'ARM')
   elseif key == 'mod' then
-    if r.kind ~= 'fx' then ctx.msg('track envelopes have no native modulation - pick an FX parameter'); return end
+    if r.kind ~= 'fx' then ctx.msg((r.kind == 'take' and 'take' or 'track') .. ' envelopes have no native modulation - pick an FX parameter'); return end
     if r.mod then ctx.mod_goto(r) else ctx.mod_add(r); PP.dirty = true end
   elseif key == 'val' and r.kind == 'fx' then ctx.mod_window(r) end
 end
