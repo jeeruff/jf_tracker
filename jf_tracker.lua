@@ -345,7 +345,7 @@ local state = {
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
   pann = tonumber(reaper.GetExtState('jf_tracker', 'pann')) or 17,
   tpkeys = flag('tpkeys', false),
-  fadercap = (function() local v = reaper.GetExtState(EXT, 'fadercap'); return (v == '==' or v == '[-]' or v == 'apart') and v or 'line' end)(),   -- 4 ноя   -- 4 ноя: клавиатура и в полосе транспорта (справа от слова режима), даже при панели keys   -- 3 ноя: делений вида пана (zvp), нечётное; Shift+Opt+H / L
+  fadercap = (function() local v = reaper.GetExtState(EXT, 'fadercap'); return (v == '==' or v == '[-]' or v == 'line') and v or 'apart' end)(),   -- 4 ноя: по умолчанию apart — метр отдельно от фейдера   -- 4 ноя: клавиатура и в полосе транспорта (справа от слова режима), даже при панели keys   -- 3 ноя: делений вида пана (zvp), нечётное; Shift+Opt+H / L
   fxbenter = flag('fxbenter', false),   -- 2 ноя: браузер эффектов — папка открывается по Enter (иначе как lf: сразу справа)
   namedrag = flag('namedrag', false),
   typedtag = flag('typedtag', true),
@@ -13405,7 +13405,7 @@ ctx = {
       { key = 'dimfocus', label = 'dim unfocused', kind = 'num', min = 0, max = 60, step = 2, fmt = '%d %%', desc = 'how much darker the modules without the keyboard focus are (0 = off; digits type the value)', get = function() return state.dimfocus or 0 end, set = function(v) state.dimfocus = v end },   -- 15 окт: слайдер
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
       flag('fxbenter', 'fx browser: Enter opens a folder', 'off (default) - as in lf: moving over a folder on the left shows its plugins on the right at once; on - the list changes only on Enter'),
-      { key = 'fadercap', label = 'fader style', kind = 'cycle', values = { 'line', '==', '[-]', 'apart' }, desc = 'the mixer fader cap: a line across the meter, two lines ==, a bracket cap [-], or apart - the meter on its own and the fader in its own slot beside it (for purists)', get = function() return state.fadercap or 'line' end, set = function(v) state.fadercap = v; reaper.SetExtState(EXT, 'fadercap', v, true) end },
+      { key = 'fadercap', label = 'fader style', kind = 'cycle', values = { 'line', '==', '[-]', 'apart' }, desc = 'the mixer fader cap: a line across the meter, two lines ==, a bracket cap [-], or apart - the meter on its own and the fader in its own slot beside it (for purists)', get = function() return state.fadercap or 'apart' end, set = function(v) state.fadercap = v; reaper.SetExtState(EXT, 'fadercap', v, true) end },
       flag('tpkeys', 'keys in transport', 'the keyboard (oct, keys, vel) also in the transport strip, right of the mode word - even with the keys pane open'),
       flag('pancol', 'pan column', 'a pan field after the volume of every audio note (00 left .. 80 centre .. FF right; empty - centre); 0Pxx is then not shown'),
       { key = 'textonly', label = 'text only', kind = 'toggle', desc = 'cells show only the text: no wave behind the notes, no item fill, no item frame', get = function() return state.textonly end, set = function(v) state.textonly = v; if v then state.waveonly = false end end },

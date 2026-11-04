@@ -8940,6 +8940,8 @@ function D.frame(L, snap, rows, state, info)
         -- 9 окт: отступ вложенности (дети папки) фейдер не сужает — у каналов
         -- одной ширины фейдер и кноб одинаковые (полосы отступа больше нет)
         local fx_w = math.min(lw1 - 2 * L.pad, (bigf and lblw0 or 0) + D.FADER_W(L))   -- 9 окт: 3 знака (метки -12 / -48), было 5 — на x2 слишком широко
+        -- 4 ноя: шире — от ноты до конца колонки delay трека (читабельнее кнопки, фейдер и метр); место есть
+        do local wd = (L.x_del or 0) + (L.w_del or 0) - L.pad; if wd > fx_w then fx_w = math.min(lw1 - 2 * L.pad, wd) end end
         -- 9 окт: линия «фейдер | эффекты» — продолжение вертикали колонки
         -- трекера (граница лейна / подколонки / огибающей), стык встык; фейдер
         -- с кнобом — посередине своей части. Нет подходящей линии — как было
@@ -9085,7 +9087,7 @@ function D.frame(L, snap, rows, state, info)
         hold.clip = hold.max > 0
         local now = reaper.time_precise()
         -- 4 ноя: fader style apart — метр слева, справа своя дорожка фейдера (ручка не ложится на метр)
-        local fcap = D.fadercap or 'line'
+        local fcap = D.fadercap or 'apart'
         local flw = fcap == 'apart' and math.max(5, math.floor(bw0 * 0.3)) or 0
         local mw = math.max(2, math.floor((bw0 - 10 - flw) / 2))
         -- 22 окт: где-то solo — у остальных каналов метр тусклее и маленькая яркая s! (их не слышно)
