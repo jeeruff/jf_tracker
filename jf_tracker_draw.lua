@@ -7354,12 +7354,15 @@ function D.mini_strip(col, x, w, y0, y1, info, hover, mx, my, L)
   local kd = w | 1
   local bh = L and (L.rh - 2) or 0
   -- 4 ноя (2): имя трека над эффектами (в роутере оно в его шапке) — мелко, с полоской цвета трека
+  -- 4 ноя (2): вертикально, шрифтом трекера (масштаб как у всего); высота — по самому длинному имени всех узких
+  -- полос (с прошлого кадра), не больше четверти полосы — кнобы и фейдеры на одной линии
   if L and L.mix_bottom and not col.master and not info.mixrouter then
-    local nh = math.max(6, math.floor((L.th or L.rh) * D.SMALL) + 4)
     if col.rgb then set(col.rgb); gfx.rect(x, y0, w, 2, 1) end
     local nm = (col.folder and '- ' or '') .. (col.name ~= '' and col.name or '-')
-    while nm ~= '' and D.small_measure(nm) > w - 1 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
-    D.small_text(x + 1, y0 + 2, nm, U.TEXT)
+    local cap = math.max(L.rh, math.floor((y1 - y0) / 4))
+    D.mini_nameh_next = math.max(D.mini_nameh_next or 0, math.min(cap, ms(nm) + 6))
+    local nh = math.min(cap, D.mini_nameh or (ms(nm) + 6))
+    if w >= L.th then D.vtext(x + math.floor((w - L.th) / 2), y0 + 3, nh - 4, nm, U.TEXT, U.PANEL, true) end
     y0 = y0 + nh
   end
   -- 4 ноя: эффекты — сверху полосы, над кнобом (там место), хоть по строчке на эффект (мелким шрифтом, имя без типа и производителя), пока фейдеру
@@ -8568,7 +8571,8 @@ function D.frame(L, snap, rows, state, info)
   end
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
-  D.mini_fxn, D.mini_fxn_next = D.mini_fxn_next, nil   -- 4 ноя: узкие полосы — строк эффектов у всех поровну (наибольшее с прошлого кадра)
+  D.mini_fxn, D.mini_fxn_next = D.mini_fxn_next, nil
+  D.mini_nameh, D.mini_nameh_next = D.mini_nameh_next, nil   -- 4 ноя: высота вертикальных имён узких полос — одна на всех   -- 4 ноя: узкие полосы — строк эффектов у всех поровну (наибольшее с прошлого кадра)
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
   D.pmark('draw: top module')
   local W = L.win_w
