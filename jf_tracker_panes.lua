@@ -26,7 +26,7 @@ local PN = {}
 PN.PANELS = {
   { id = 'tracker',    label = 'tracker',    key = 't', hint = 'tracker', fixed = true },
   { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт вечер: снова своя панель — кубики + chain (из матрицы убраны)   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
-  { id = 'arranger',   label = 'arranger',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
+  { id = 'arranger',   label = 'region playlist',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'keys',       label = 'keys',       key = 'K', hint = 'keys',    side = 'right' },   -- 2 ноя: клавиатура (oct / клавиши / vel / ped) — панелью, по умолчанию под браузером
