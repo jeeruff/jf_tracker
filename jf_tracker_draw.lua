@@ -1123,7 +1123,9 @@ function D.layout(snap, state, nregions)
     -- 17 окт: не влез целиком и он не первый видимый — не показывать (и всё после него): к нему ведёт
     -- полоса прокрутки треков; раньше он рисовался обрезанным («drum» у мастера)
     -- 20 окт: влезает хотя бы половина — показать обрезанным (ниже), меньше — спрятать
-    if vis and c.x and c.x + c.w > L.cols_r - 2 and #L.cols > 0 and (L.cols_r - 2 - c.x) < c.w / 2 then
+    -- 4 ноя: прятать, только если от него влезает меньше 4 знаков (было: меньше половины — широкий трек прятался,
+    -- справа оставалось пустое место с виньеткой, хотя туда влезала большая его часть)
+    if vis and c.x and c.x + c.w > L.cols_r - 2 and #L.cols > 0 and (L.cols_r - 2 - c.x) < 4 * L.cw then
       for k = (c.lanes[1] and c.lanes[1].f0 or #L.flat + 1), #L.flat do local f = L.flat[k]; if f.ci == ci then f.x = nil end end
       vis = false; L.hs_cut = true; lx = cx
     end
