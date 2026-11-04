@@ -19265,6 +19265,7 @@ local function hint_go(t)
   elseif t.kind == 'viewbtn' and d == 'mixer' then ctx.toggle_mixer()
   elseif t.kind == 'viewbtn' and d == 'fitw' then ctx.fit_width()
   elseif t.kind == 'viewbtn' and d == 'fith' then ctx.fit_height()
+  elseif t.kind == 'viewbtn' and d == 'viewmenu' then ctx.view_menu()
   elseif t.kind == 'viewbtn' and d == 'foldfast' then ctx.foldfast_toggle()   -- 31 окт: хинт fold переключал вид на project
   elseif t.kind == 'viewbtn' then ctx.view_mode(d == 'reg' and 'pattern' or (d == 'sec' and 'section' or 'project'))
   elseif t.kind == 'lanebtn' then ctx.lane_subs(d.col, d.lane, d.d, d.n)
@@ -22680,6 +22681,47 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 4 ноя: кнопка view в углу трекера — всё про вид мышью: линейки, курсор и строки, что показано; опции те же, что в окне
+-- (переключение — сразу, меню остаётся открытым через повторный показ); all options — окно опций
+ctx.VIEW_GROUPS = {
+  { 'r', 'rulers', { 'ruler', 'unitedruler', 'rowjumps', 'jumps', 'tlruler', 'rowbase', 'mxruler', 'rgnames', 'rgedges', 'rgbar', 'mknames', 'mkedges', 'measure' } },
+  { 't', 'tracker', { 'fixed', 'follow', 'curline', 'bigcur', 'captions', 'envs', 'meters', 'foldfast', 'lanetop', 'offdim', 'itemnames', 'wavebar', 'dotbright', 'tintmute' } },
+  { 's', 'screen', { 'hints', 'bigstatus', 'keycast', 'mixer', 'dsp', 'top', 'side' } },
+}
+ctx.view_menu = function(gi)
+  local by = {}
+  for _, it in ipairs(ctx.option_items()) do if it.key then by[it.key] = it end end
+  local function group(g)
+    local items, n = {}, 0
+    local letters = 'abcdefghijklmnopqrstuvwxyz'
+    for _, k in ipairs(g[3]) do
+      local it = by[k]
+      if it and (it.kind == 'toggle' or it.kind == 'cycle') then
+        n = n + 1
+        local lab, fn
+        if it.kind == 'toggle' then
+          lab = it.label .. ((it.get() and '  (on)') or '')
+          fn = function() it.set(not it.get()); relayout(); vim.msg = it.label .. ': ' .. (it.get() and 'on' or 'off'); ctx.view_menu(g) end
+        else
+          lab = it.label .. ': ' .. tostring(it.get())
+          fn = function()
+            local vs, cur, k2 = it.values or {}, it.get(), 1
+            for i, v in ipairs(vs) do if v == cur then k2 = i end end
+            it.set(vs[k2 % #vs + 1]); relayout(); vim.msg = it.label .. ': ' .. tostring(it.get()); ctx.view_menu(g)
+          end
+        end
+        items[#items + 1] = { key = letters:sub(n, n), label = lab, fn = fn }
+      end
+    end
+    vim.open_hydra({ title = 'view: ' .. g[2] .. ' (click / letter - switch, the menu stays)', items = items })
+  end
+  if type(gi) == 'table' then group(gi); return end
+  local top = {}
+  for _, g in ipairs(ctx.VIEW_GROUPS) do top[#top + 1] = { key = g[1], label = g[2] .. ' …', fn = function() group(g) end } end
+  top[#top + 1] = { key = 'o', label = 'all options …', fn = function() ctx.options() end }
+  vim.open_hydra({ title = 'view - rulers, tracker, screen', items = top })
+  state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+end
 -- 4 ноя: роутер микшера — верхняя половина микшера: устройства каналов и кабели; и кнопка routing мастера (схема поверх
 -- трекера больше не открывается — роутер часть микшера). Микшер скрыт — показать
 ctx.mixrouter_toggle = function()
@@ -25812,6 +25854,7 @@ local function frame()
   elseif hover.viewbtn == 'fitw' then state.status = 'W (zw): all tracks the same width, the widest at which all fit'
   elseif hover.viewbtn == 'fith' then state.status = 'H (zh): the ' .. ctx.view_cur() .. ' fits the screen by height (LPB)'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
+  elseif hover.viewbtn == 'viewmenu' then state.status = 'view: rulers (row numbers, jump ruler, timeline, regions), the tracker (cursor, captions, envelopes, meters), the screen - for the mouse; the same as in options'
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': notes shorter than a row (fast rolls, flams) do not get their own extra column - they show as a + next to the note of their row; off - each gets a column. Not the folding of tracks (za / zM). Click - ' .. (state.foldfast and 'off' or 'on')
   elseif hover.rghead then state.status = 'pattern / section of the cursor row - click: its commands (queue, pooled, clone, /2 x2, length ...; also \\ p)'
   elseif hover.viewbtn == 'rowjumps' then state.status = 'ln - line numbers: how many rows each row is from the cursor (5j, 3k) on / off (option line number)'
@@ -27761,6 +27804,7 @@ local function frame()
     elseif hover.viewbtn == 'mixer' then ctx.toggle_mixer()   -- 31 окт: кнопка mixer в уголке
     elseif hover.viewbtn == 'fitw' then ctx.fit_width()
     elseif hover.viewbtn == 'fith' then ctx.fit_height()
+    elseif hover.viewbtn == 'viewmenu' then ctx.view_menu()   -- 4 ноя: кнопка view — линейки, вид трекера, экран
     elseif hover.viewbtn == 'foldfast' then ctx.foldfast_toggle()      -- 19 окт: fold быстрых нот
     elseif hover.tlist_hdr then ctx.tlist_column(hover.tlist_hdr); click = { t = now2, zone = 'tlist' }   -- 11 окт: tracks — весь столбец
     elseif hover.tlist and hover.tlist.what == 'cell' then

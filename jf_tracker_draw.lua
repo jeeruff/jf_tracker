@@ -10078,6 +10078,9 @@ function D.frame(L, snap, rows, state, info)
         -- 31 окт: подпись fast+ (было fold — путалось со сворачиванием треков za / zM)
         local fl = (xf + ms('fold') + 2 <= bx + bw) and 'fold' or ((xf + ms('fd') + 2 <= bx + bw) and 'fd' or nil)   -- 2 ноя: снова fold (просьба)
         if fl then small(bx + bw - ms(fl) - 2, ay, fl, 'foldfast', state.foldfast, 'viewbtn') end
+        -- 4 ноя: view — меню вида (линейки, трекер, экран) для мыши, между autoarm и fold
+        local vlb = 'view'
+        if xf + ms(vlb) + 4 <= bx + bw - (fl and (ms(fl) + 6) or 0) then small(xf + 2, ay, vlb, 'viewmenu', false, 'viewbtn') end
       else
         local xa = D.cn_r1x
         if xa + ms('arm') + 2 <= bx + bw then small(xa, hy + 1 + L.rh, 'arm', all and 'off' or 'on', all, 'mautoarm'); D.cn_r1x = xa + ms('arm') + 4 end
