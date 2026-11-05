@@ -1102,7 +1102,7 @@ function B.start_find()
 end
 
 -- ── базы Media Explorer ───────────────────────────────────────────────────
-local function res_path() return R.GetResourcePath and R.GetResourcePath() or (os.getenv('HOME') .. '/Library/Application Support/REAPER') end
+local function res_path() return R.GetResourcePath and R.GetResourcePath() or ((os.getenv('HOME') or '') .. '/Library/Application Support/REAPER') end
 
 function B.read_dbs()
   local dbs = {}

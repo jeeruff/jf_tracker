@@ -14048,7 +14048,7 @@ ctx = {
     vim.msg = ('rec arm %s: tracks %s'):format(on == 1 and 'on' or 'off', table.concat(nums, ' '))
   end,
   -- smart input — отдельный скрипт; нет его — кнопки нет (5 окт, релиз)
-  smart_input_path = os.getenv('HOME') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua',
+  smart_input_path = (os.getenv('HOME') or os.getenv('USERPROFILE') or '') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua',   -- 5 ноя: на Windows HOME нет — был nil .. и падение при запуске
   smart_input = function(col)
     col = col or cur_col(); if not col then return end
     reaper.SetOnlyTrackSelected(col.track)
