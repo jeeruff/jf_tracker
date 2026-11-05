@@ -20828,6 +20828,10 @@ function ctx.fxgui_refocus()
   if reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(ctx.hwnd_self) end
 end
 function ctx.fxgui_tick()
+  -- 5 ноя: клавиатура была у трекера (или у его окна плагина) до этого кадра — закрытие окна прошлого канала отдаёт её
+  -- главному окну REAPER (macOS), вернуть; ушёл сам в REAPER / другую программу — не трогать
+  local had_keys = ctx.win_focus or ctx.fxgui_fg_ours()
+  local closed = false
   -- 5 ноя: окно плагина поверх DSP забрало клавиатуру, а мышь не над ним (ручки не крутят) — клавиатура трекеру сразу
   -- (было: «REAPER has the keyboard», клавиши трекера не работали до щелчка в трекер)
   if not ctx.win_focus and next(ctx.fxgui_open or {}) and gfx.mouse_cap & 3 == 0 and ctx.fxgui_fg_ours() then
@@ -20902,10 +20906,11 @@ function ctx.fxgui_tick()
       local fi = (t2 and o.fi and reaper.TrackFX_GetFXGUID(t2, o.fi) == guid) and o.fi or nil   -- и в контейнере (свой индекс)
       if t2 and not fi then for k = 0, reaper.TrackFX_GetCount(t2) - 1 do if reaper.TrackFX_GetFXGUID(t2, k) == guid then fi = k; break end end end
       ctx.fxgui_restore(guid, o.hwnd)
-      if t2 and fi then reaper.TrackFX_Show(t2, fi, 2) end
+      if t2 and fi then reaper.TrackFX_Show(t2, fi, 2); closed = true end
       O[guid] = nil
     end
   end
+  if closed and had_keys then ctx.fxgui_refocus() end
 end
 -- 27 окт: АВТОПОВТОР ЗАЖАТОЙ КЛАВИШИ — свой: пауза state.krdelay мс, потом state.krrate раз в секунду. Системные повторы
 -- той же клавиши, пока она физически держится (JS_VKeys_GetState), гасятся. Только клавиши с понятным кодом (буквы, цифры,
