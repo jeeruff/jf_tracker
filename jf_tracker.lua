@@ -2899,6 +2899,7 @@ ctx = {
     for l in (reaper.GetExtState(EXT, 'fxrecent') or ''):gmatch('[^\n]+') do FB.recent[#FB.recent + 1] = l end
   end,
   fxb_add = function(it, pos)
+    ctx.fx_added_t = reaper.time_precise()   -- 5 ноя: окно, что REAPER откроет сам, закроется — клавиатура вернётся трекеру
     -- 31 окт: отмеченные — все по порядку, одной отменой
     local ml = not it and not pos and FB.marked_list() or {}
     if #ml > 0 and not ctx.fxb_insert and not ctx.fxb_pad then
@@ -26579,7 +26580,12 @@ local function frame()
   if U.click and hover.mfoldauto then state.mfoldauto = not state.mfoldauto; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfoldauto and 'master auto: folded while the cursor is not on it (Opt+W / l from the last track / a click opens it)' or 'master auto off' end
   if U.click and (hover.mfold_meter or hover.mfold_open) then U.click = false; ctx.master_jump() end
   if U.click and (hover.khelp_big or hover.docsec) then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; if hover.docsec and state.focus ~= 'manual' and draw.panes.visible(state.panes, 'manual') then ctx.set_focus('manual') end; U.click = false end   -- справка F1 / панель manual: раздел мышью
-  if state.nofloat and not state.fxopen then pcall(ctx.FF.poll, reaper, reaper.time_precise()) end   -- 24 окт (open after adding — окна нужны)
+  if state.nofloat and not state.fxopen then
+    local c0 = ctx.FF.closed
+    pcall(ctx.FF.poll, reaper, reaper.time_precise())
+    -- 5 ноя: закрытое окно нового эффекта (macOS) отдавало клавиатуру REAPER — эффект добавлен из трекера только что: вернуть
+    if ctx.FF.closed ~= c0 and reaper.time_precise() - (ctx.fx_added_t or 0) < 2 then ctx.fxgui_refocus() end
+  end   -- 24 окт (open after adding — окна нужны)
   pcall(function()   -- 24 окт: история касаний параметров (последний тронутый в REAPER, выбранный в DSP) — для fzf команды ноты
     local okt, tn, fxn, pn = reaper.GetLastTouchedFX()
     local key = okt and (tn .. ':' .. fxn .. ':' .. pn) or nil
