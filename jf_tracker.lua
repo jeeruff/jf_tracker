@@ -14490,14 +14490,14 @@ ctx = {
           while top(list[(i - 2) % n + 1]) == t1 and (i - 2) % n + 1 ~= cur do i = (i - 2) % n + 1 end   -- к её началу
         end
         ctx.surge_load(t.track, f.i, list[i])
-        vim.msg = 'Surge XT: ' .. list[i].label .. '   (Opt+H L - folder, Opt+J K - patch)'
+        vim.msg = 'Surge XT: ' .. list[i].label .. '   (Shift+Opt+H L - folder, Shift+Opt+J K - patch)'
         return
       end
       vim.open_picker('Surge XT patch (' .. #list .. ')', list, function(it) ctx.surge_load(t.track, f.i, it) end)
       state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
       return
     end
-    if what == 'prevdir' or what == 'nextdir' then vim.msg = f.name .. ': REAPER keeps its presets in one list - no folders (Opt+J K - preset)'; return end
+    if what == 'prevdir' or what == 'nextdir' then vim.msg = f.name .. ': REAPER keeps its presets in one list - no folders (Shift+Opt+J K - preset)'; return end
     if what == 'prev' or what == 'next' then
       A.NavigatePresets(t.track, f.i, what == 'next' and 1 or -1)
       local _, nm = A.GetPreset(t.track, f.i, '')
@@ -32097,23 +32097,26 @@ local function frame()
           vim.msg = (p and p.name or '') .. '  (+ - value, j k - next, h l - effects)'
           return
         end
-        -- 26 окт: Opt+J / K — пресет модуля под курсором; 5 ноя: Opt+Shift+J / K — главная папка пресетов (Surge; было
-        -- Opt+H L), Opt+H / L — соседний канал (DSP идёт за треком курсора), Opt+1..0 — инструмент lib, как в трекере
+        -- 5 ноя: Option в DSP — как в трекере: Opt+H / L — соседний канал (DSP идёт за треком курсора), Opt+J / K —
+        -- инструмент lib, Opt+1..0 — инструмент по номеру; пресеты — Shift+Opt: J / K — пресет модуля, H / L — папка
+        -- пресетов (Surge); у slixer папок нет
         do
           local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
           local m5 = ctx.mods()
           if not DK.pending and m5.alt and not m5.ctrl and not m5.cmd then
-            if (cp == 729 or cp == 172) and not m5.shift then ctx.col_step(cp == 172 and 1 or -1); return end
-            local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 10 }
-            if OPTDIG[cp] and ctx.pool_select then ctx.pool_select(OPTDIG[cp]); return end
-            if m5.shift and reaper.JS_VKeys_GetState and f and f.view ~= 'slixer' then
+            if m5.shift and reaper.JS_VKeys_GetState then
               local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
-              local d = (ks and ks:byte(74) ~= 0 and 'nextdir') or (ks and ks:byte(75) ~= 0 and 'prevdir') or nil
-              if d then ctx.dsp_preset(dsp_sel.fx, d); return end
+              local function on(vk) return ks and ks:byte(vk) ~= 0 end
+              local d = (on(74) and 'next') or (on(75) and 'prev') or (on(72) and 'prevdir') or (on(76) and 'nextdir') or nil
+              if d and f and not (f.view == 'slixer' and d:find('dir')) then ctx.dsp_preset(dsp_sel.fx, d); return end
+              if d then return end
+            elseif not m5.shift then
+              if cp == 729 or cp == 172 then ctx.col_step(cp == 172 and 1 or -1); return end
+              if cp == 8710 or cp == 730 then vim.key(cp); return end   -- Opt+J / K — инструмент lib (обработчик трекера)
+              local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 10 }
+              if OPTDIG[cp] and ctx.pool_select then ctx.pool_select(OPTDIG[cp]); return end
             end
           end
-          local OPTP = { [8710] = 'next', [730] = 'prev' }
-          if OPTP[cp] and not DK.pending and f then ctx.dsp_preset(dsp_sel.fx, OPTP[cp]); return end
         end
         if draw.SX.cur and (c == 106 or c == 107 or c == 104 or c == 108 or c == 1685026670 or c == 30064) then draw.SX.cur = nil end   -- 31 окт: клавиши двигают DSP-курсор — курсор пульта снят
         local r = DK.key(c, dsp_sel, #fxs, f and #f.params or 0, ctx.mods())

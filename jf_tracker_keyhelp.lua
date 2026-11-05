@@ -622,9 +622,8 @@ KH.PAGES = {
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
     { k = 'Z', d = 'the menu of the selected module (the same as a right click on it)' },
-    { k = 'Opt+J K', d = 'the preset of the module: next / previous (as < > in its header)' },
-    { k = 'Opt+H L  Opt+1..0', d = 'the previous / next track (the DSP follows it); the instrument 1..10 of the lib - as in the tracker' },
-    { k = 'Opt+Shift+J K', d = 'the main preset folder: next / previous (Surge: Bass, Keys ... - its first patch)' },
+    { k = 'Shift+Opt+J K  H L', d = 'the preset of the module: next / previous (as < > in its header); H L - the main preset folder (Surge: Bass, Keys ...)' },
+    { k = 'Opt+H L  J K  1..0', d = 'as in the tracker: the previous / next track (the DSP follows it), the previous / next lib instrument, the instrument 1..10' },
     { k = 'snapshots', d = 'mixer, empty place on the left, tab snapshots - as the SWS Snapshots window: new (the next free of 12), prev / next (recall), up / down (move the current), sws (its window); the table # / name / date / time - click recalls, Cmd+click saves over, Alt+click deletes, right click - menu (rename); the SWS filter: full track mix / current visibility / custom + pan volume mute fx chain solo sends vis selection, filter on recall, save / recall selected tracks only, prompt for name (low mixer - the filter button)' },
     { k = 'mixer xy', d = 'mixer, tab xy - a quick snapshot pad: 4 corners keep the volume and pan of every track (click an empty corner - save, a filled one - recall, Shift - overwrite), drag the puck - morph between them; one undo per drag' },
     { k = 'mod · auto', d = 'in the track block of DSP: two vertical buttons at its right edge - auto (top) and mod (bottom); either opens the panel (the block doubles in width): automation on top (curves over the song), modulation below (L LFO, A ACS, K link, P premod; LFO drawn as its wave) - click goes to the parameter, right click - its modulation menu; for the parameter selected in DSP - tabs lfo / acs / link / env / premod with editors: on, shape, sync, sliders (base, rate, depth, phase, att, rel, min, max, scale, offs - drag), in 3/4 and side (follows the audio of another track), link source, the envelope curve; env tab - follow: the parameter follows another track (audio) or an envelope via the automation generator' },
@@ -642,7 +641,7 @@ KH.PAGES = {
     { k = 'cb', d = 'DSP: the effect into 3 / 4 / 5 frequency bands (also ÷ in the module header and the module menu: split into bands) - a container ÷N bands of parallel chains low / mid / high, each starts with a native N-Band Splitter passing only its band; the effect goes into low. In DSP: the bands as rows high ... low (click - its fx follow the container as full modules, band > name), crossover under them (one edit sets every band); af / drop - into the selected band' },
     { k = 'drop on a pad', d = 'drag an effect from the fx list onto a drumrs5k pad - it goes into that pad (its own container: sampler, its fx, this one)' },
     { k = 'bands', d = 'router: a REAPER band splitter ... joiner (3 / 4 / 5 band) is drawn as band rows (low < 200 Hz, mid, high) - every effect between them sits in the band of its pins; a on a band - an effect into it (pins set to its channels), zb on an effect - wrap it into 3 / 4 / 5 bands (it stays in low); all native: pins / routing windows show the same' },
-    { k = 'Opt+letter (slixer)', t = {}, d = 'DSP, slixer: the letters on its buttons work with Option - Opt+D detect, Opt+T transient, Opt+C classify, Opt+A auto, Opt+X clear, Opt+Z undo, Opt+E midi, Opt+N names, Opt+S sync, Opt+Q q, Opt+B arp, Opt+U thru, Opt+O out; bare letters stay DSP keys (d - delete ...); Opt+J K - preset' },
+    { k = 'Opt+letter (slixer)', t = {}, d = 'DSP, slixer: the letters on its buttons work with Option - Opt+D detect, Opt+T transient, Opt+C classify, Opt+A auto, Opt+X clear, Opt+Z undo, Opt+E midi, Opt+N names, Opt+S sync, Opt+Q q, Opt+B arp, Opt+U thru, Opt+O out; bare letters stay DSP keys (d - delete ...); Shift+Opt+J K - preset' },
     { k = 'slixer slots', t = {}, d = 'DSP, slixer: the head of the module shows its 8 quick slots (mini wave + name) - click loads that sample; store / clear them in the slixer window (Shift+click / Alt+click a slot). spam (the button on the wave): while you drag a slice edge (also in the sniper zoom) it rolls from the edge, let go - its slice plays' },
     { k = 'ze', d = 'DSP: the window of the track instrument (slixer too), again - close it; e - the window of the module under the cursor' },
     { k = 'zz', d = 'the effects on the whole window with the mixer above them (strips of every track); again - back', t = { 'zz', 'z' } },
@@ -1024,7 +1023,7 @@ do
   end
   KH.PAGES.slixer = { title = 'DSP: slixer (slicer sampler)', e = from_dsp({
     { k = 'slixer', t = {}, d = 'the sampler of the tracker: a sample cut into slices, every slice a note (C-3 up); the module shows the wave with the slices, its buttons on top and the MIDI row below. Notes of the track play the slices; 0Sxx picks a slice, 0Rxy retriggers it' },
-    'Opt+letter (slixer)', 'slixer slots', 'ze', 'Opt+J K',
+    'Opt+letter (slixer)', 'slixer slots', 'ze', 'Shift+Opt+J K  H L',
     { k = 'drag a slice edge', t = {}, d = 'on the wave: move the edge of a slice (spam on - it rolls while you drag, let go - the slice plays); click a slice - select and hear it' },
     'h l', 'w W', 'j k g G', '+ - ^A ^X', 'i', 'Z' }) }
   KH.PAGES.container = { title = 'DSP: container (rack)', e = from_dsp({
@@ -1053,7 +1052,7 @@ KH.PAGES.console = { title = 'console (Strudel patterns)', e = {
 } }
 KH.BARS.console = { { 'Enter', 'line' }, { 'Cmd+Enter', 'all' }, { 'S+Enter', 'new line' }, { 'Up Down', 'history' }, { 'Esc', 'back' } }
 KH.BARS.dsp_slixer = { { 'Opt+D', 'detect' }, { 'Opt+T', 'transient' }, { 'Opt+C', 'classify' }, { 'Opt+X', 'clear' }, { 'Opt+Z', 'undo' },
-  { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
+  { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Shift+Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
 KH.BARS.dsp_container = { { 'h l', 'fx' }, { 'c= c|', 'parallel / serial' }, { 'cc', 'pack' }, { 'cf', 'fold' }, { 'cv', 'grid / list' },
   { 'cb', 'bands' }, { 'zr', 'router' }, { 'P', 'pin ★' }, { 'Z', 'menu' }, { 'dd', 'delete' } }
 KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }

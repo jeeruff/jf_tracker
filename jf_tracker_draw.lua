@@ -13157,7 +13157,7 @@ function D.frame(L, snap, rows, state, info)
           local hy2 = by + bh - (G.nb2 or 0) * L.rh - 2 - L.rh
           local pbot = by + L.rh + 1 + wtop + ((f.rows or 0) + 1) * L.rh
           if hy2 >= pbot then
-            local hint_s = 'Opt+  D detect  T mode  C classify  A auto  X clear  Z undo  E midi  N names  S sync  G gate  R q:trans  Q q  P keys  V vel  B arp  U thru  O out   J K preset   H L track   1..0 lib'
+            local hint_s = 'Opt+  D detect  T mode  C classify  A auto  X clear  Z undo  E midi  N names  S sync  G gate  R q:trans  Q q  P keys  V vel  B arp  U thru  O out   H L track   J K 1..0 instrument   Shift+Opt+J K preset'
             text(x0, hy2, fit(hint_s, w0), U.DIM)
           end
         end
