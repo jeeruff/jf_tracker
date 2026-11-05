@@ -22716,6 +22716,29 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 5 ноя: :debug share — лог отладки, который можно отправить: имена, пути и свободный текст заменены метками
+-- (jf_tracker_dbgshare.lua, белый список слов из самого кода), рядом с логом — jf_tracker_debug_share.txt
+ctx.debug_share = function()
+  local f = io.open(ctx.dlog_path, 'r')
+  local log = f and f:read('a'); if f then f:close() end
+  if not log or log == '' then vim.msg = 'debug share: the log is empty - :debug on, do it again, then :debug share'; return end
+  local DS = dofile(DIR .. '/jf_tracker_dbgshare.lua')
+  local srcs, i = {}, 0
+  while true do
+    local fn = reaper.EnumerateFiles(DIR, i)
+    if not fn then break end
+    if fn:match('^jf_tracker.*%.lua$') then local h = io.open(DIR .. '/' .. fn, 'r'); if h then srcs[#srcs + 1] = h:read('a'); h:close() end end
+    i = i + 1
+  end
+  local V = DS.vocab(srcs)
+  local head = ('jf_tracker %s, REAPER %s, %s'):format(VER and VER.VERSION or '?', reaper.GetAppVersion(), reaper.GetOS())
+  local out, n = DS.share(log, V, head, 3000)
+  local path = reaper.GetResourcePath() .. '/jf_tracker_debug_share.txt'
+  local w = io.open(path, 'w'); if not w then vim.msg = 'debug share: cannot write ' .. path; return end
+  w:write(out); w:close()
+  if reaper.CF_LocateInExplorer then reaper.CF_LocateInExplorer(path) end
+  vim.msg = ('debug share: %d line(s), names / paths / text replaced - send jf_tracker_debug_share.txt (in the REAPER folder)'):format(n)
+end
 -- 4 ноя: прокрутка треков руками (колесо, скроллбар) — курсор левее начала прокрутки переезжает на первый трек справа
 -- от неё; иначе «трек курсора всегда на экране» возвращал прокрутку к нему (широкий трек — дальше не прокрутить)
 ctx.hs_cursor = function()
