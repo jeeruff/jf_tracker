@@ -1,9 +1,17 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.9.3'
-V.DATE = '2026-11-04'
+V.VERSION = '0.9.4'
+V.DATE = '2026-11-05'
 V.CHANGES = {
+  { v = '0.9.4', d = '2026-11-05', items = {
+    'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',
+    ':debug share - a debug log safe to post: names, paths and your own text are replaced',
+    'DSP: Opt+H L - the track, Opt+J K and Opt+1..0 - the instrument, as in the tracker; Shift+Opt+J K - preset, Shift+Opt+H L - preset folder; slixer lists its Option keys',
+    'plugin windows over DSP (gui): only by the gui button; they follow their own track, hide behind options, other tabs and other apps, close with the tracker and give the keyboard back',
+    'mixer: track names vertical in the tracker font, trnames and view buttons; zk - a folder wide with its children narrow',
+    'tracker: the view button next to W H; the track scroll stops at the last track',
+  } },
   { v = '0.9.3', d = '2026-11-04', items = {
     'mixer router (router button): the mixer split in half - every channel with its devices next to the fader and cables in the colour of the track: sends, folders, hardware outs; drag the line to share the height',
     'mixer: armed tracks show a split meter - the input (red) and what goes out, every channel of the track; declip resets peaks and clips by itself; sends / router / declip buttons; one pan / width knob (disc - pan, ring - width)',
