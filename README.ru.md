@@ -83,9 +83,9 @@
 затем *Browse packages → jf_tracker → Install*. Новые версии приходят через
 *Synchronize packages*.
 
-Одна настройка REAPER: выключите *FX: Auto-float new FX windows* (в трекере -
-команда `:autofloat`). Иначе каждый новый эффект открывает своё окно, и оно
-забирает клавиатуру у трекера.
+Трекер при запуске выключает у REAPER *FX: Auto-float new FX windows* (скажет
+об этом один раз): окно нового эффекта забирало бы у него клавиатуру. Вернуть -
+`:autofloat`.
 
 Вручную, без ReaPack:
 

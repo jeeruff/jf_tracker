@@ -326,6 +326,7 @@ local state = {
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
+  noautofloat = flag('noautofloat', true),   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
   dspleft = flag('dspleft', true),
   slicekeys = flag('slicekeys', false),
   fxontop = flag('fxontop', true),   -- 26 окт: окна плагинов, открытые трекером, — поверх (pin)   -- 24 окт: фокус в слайсере — клавиатура (KEYS) сама включается
@@ -715,7 +716,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13444,6 +13445,7 @@ ctx = {
       flag('oneclick', 'one click focus', 'a click on a note / slice shows its sample in the item tab, on an automation item - opens it in the modulation tab'),
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('nofloat', 'no auto FX windows', 'a new effect (added by the tracker or in REAPER, inside containers too) opens no window: the window REAPER floats by itself (its option Auto-float newly created FX windows) closes at once; windows you open yourself (O, double click) stay'),
+      flag('noautofloat', 'no REAPER auto-float', 'REAPER action FX: Auto-float new FX windows is turned off on start: the window of a new effect takes the keyboard from the tracker (told once, the first time); :autofloat turns it back on and this off'),
       flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
@@ -13527,7 +13529,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'noautofloat', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -22757,6 +22759,7 @@ ctx.AUTOFLOAT = 41078
 ctx.autofloat_on = function() return reaper.GetToggleCommandState(ctx.AUTOFLOAT) == 1 end
 ctx.autofloat_cmd = function()
   reaper.Main_OnCommand(ctx.AUTOFLOAT, 0)
+  state.noautofloat = not ctx.autofloat_on()   -- 5 ноя: включил руками — трекер больше не выключает при запуске
   vim.msg = 'REAPER auto-float new FX windows: ' .. (ctx.autofloat_on() and 'on (new effects open their window and take the keyboard)' or 'off - new effects stay in DSP, the keyboard stays with the tracker')
 end
 -- 5 ноя: :debug share — лог отладки, который можно отправить: имена, пути и свободный текст заменены метками
@@ -38385,6 +38388,13 @@ if state.notes_open then pcall(ctx.notes_load) end
   if not reaper.CF_CreatePreview then miss[#miss + 1] = 'SWS (preview)' end
   if not reaper.JS_VKeys_GetState then miss[#miss + 1] = 'js_ReaScriptAPI (held notes, key state)' end
   if #miss > 0 then vim.msg = 'missing: ' .. table.concat(miss, ', ') .. ' - install through ReaPack' end
-  if #miss == 0 and ctx.autofloat_on() then vim.msg = 'tip: REAPER auto-floats new FX windows - they take the keyboard; :autofloat turns it off' end   -- 5 ноя
+  -- 5 ноя: выключить у REAPER автооткрытие окон новых эффектов (они забирают клавиатуру); сказать — только в первый раз
+  if state.noautofloat ~= false and ctx.autofloat_on() then
+    reaper.Main_OnCommand(ctx.AUTOFLOAT, 0)
+    if reaper.GetExtState(EXT, 'autofloat_told') ~= '1' then
+      reaper.SetExtState(EXT, 'autofloat_told', '1', true)
+      vim.msg = 'jf_tracker turned off REAPER FX: Auto-float new FX windows - a new effect window took the keyboard; :autofloat turns it back on'
+    end
+  end
 end)()
 frame()

@@ -84,9 +84,9 @@ Through ReaPack: *Extensions → ReaPack → Import repositories…*, paste
 then *Browse packages → jf_tracker → Install*. New versions come with
 *Synchronize packages*.
 
-One REAPER setting: turn off *FX: Auto-float new FX windows* (type `:autofloat`
-in the tracker). Otherwise every new effect opens its window, and that window
-takes the keyboard away from the tracker.
+The tracker turns off REAPER's *FX: Auto-float new FX windows* on start (it tells
+you once): a new effect window would take the keyboard away from it. `:autofloat`
+turns it back on.
 
 By hand instead of ReaPack:
 
