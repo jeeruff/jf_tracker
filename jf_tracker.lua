@@ -22771,7 +22771,23 @@ ctx.debug_share = function()
 end
 -- 4 ноя: прокрутка треков руками (колесо, скроллбар) — курсор левее начала прокрутки переезжает на первый трек справа
 -- от неё; иначе «трек курсора всегда на экране» возвращал прокрутку к нему (широкий трек — дальше не прокрутить)
+-- 5 ноя: прокрутка вправо — не дальше, чем нужно, чтобы был виден последний трек (без пустоты справа): пока хвост
+-- целиком на экране, начало прокрутки отходит назад (раскладка — на каждый шаг, только при ручной прокрутке)
+ctx.hs_clamp = function()
+  if not (L and L.hs_list and (L.hs_before or 0) > 0) then return end
+  local function tail_ok() return (L.hs_before + (L.hs_full or 0)) >= (L.hs_n or 0) and not L.cols_cut and not L.hs_cut end
+  relayout()
+  if not tail_ok() then return end
+  for _ = 1, 64 do
+    if (L.hs_before or 0) <= 0 then break end
+    local prev = state.hscroll
+    state.hscroll = L.hs_list[L.hs_before] or prev
+    relayout()
+    if not tail_ok() then state.hscroll = prev; relayout(); break end
+  end
+end
 ctx.hs_cursor = function()
+  ctx.hs_clamp()
   local f = L and L.flat and L.flat[vim.cur.fi]
   if not (f and f.ci and state.hscroll and f.ci < state.hscroll) then return end
   for i, g in ipairs(L.flat) do if g.ci and g.ci >= state.hscroll then vim.cur.fi = i; return end end
