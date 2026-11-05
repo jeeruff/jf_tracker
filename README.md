@@ -167,7 +167,8 @@ The DSP module texts use descriptions from Chris Johnson's
 
 All product and company names above are trademarks of their respective owners. They are named
 only to say where an idea came from; jf_tracker is not affiliated with or endorsed by any of them,
-and contains none of their code, graphics or sounds.
+and uses none of their graphics or sounds; the only code taken from others is listed with its
+license in [SOURCES.md](SOURCES.md) (for example the Airwindows ports, MIT).
 
 ## License
 
