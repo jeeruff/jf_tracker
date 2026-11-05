@@ -20865,7 +20865,7 @@ function ctx.fxgui_tick()
           -- 4 ноя: трекер на весь экран (уровень плавающих окон) вставал поверх плагина, как только брал фокус: окно
           -- открывалось на полсекунды и уходило под него (видно в списке окон: jf_tracker выше). TOPMOST — над трекером
           if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd, 'TOPMOST') end
-          o = { hwnd = hwnd }; O[guid] = o
+          o = { hwnd = hwnd, tr = tr, fi = r.fi }; O[guid] = o   -- 5 ноя: трек окна — закрыть на нём, когда DSP ушёл на другой
         end
         if o.key ~= key then
           reaper.JS_Window_SetPosition(hwnd, math.min(sx0, sx1), math.min(sy0, sy1), math.abs(sx1 - sx0), math.abs(sy1 - sy0))
@@ -20873,7 +20873,13 @@ function ctx.fxgui_tick()
         end
       end
     elseif o then
-      if tr and r and reaper.TrackFX_GetFXGUID(tr, r.fi) == guid then ctx.fxgui_restore(guid, o.hwnd); reaper.TrackFX_Show(tr, r.fi, 2) end
+      -- 5 ноя: окно закрывается на СВОЁМ треке (o.tr): DSP перешёл на другой канал — эффект ищется по GUID там, где окно
+      -- открыто (было: только на текущем треке DSP — окна прошлого канала оставались висеть поверх, TOPMOST)
+      local t2 = (o.tr and reaper.ValidatePtr(o.tr, 'MediaTrack*')) and o.tr or tr
+      local fi = (t2 and o.fi and reaper.TrackFX_GetFXGUID(t2, o.fi) == guid) and o.fi or nil   -- и в контейнере (свой индекс)
+      if t2 and not fi then for k = 0, reaper.TrackFX_GetCount(t2) - 1 do if reaper.TrackFX_GetFXGUID(t2, k) == guid then fi = k; break end end end
+      ctx.fxgui_restore(guid, o.hwnd)
+      if t2 and fi then reaper.TrackFX_Show(t2, fi, 2) end
       O[guid] = nil
     end
   end
