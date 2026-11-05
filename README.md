@@ -84,13 +84,13 @@ want); new versions are posted there too.
    *Options → Show REAPER resource path* shows where that is.
 2. Copy every file of `effects/` into REAPER's `Effects` folder. The tracker
    puts them on tracks by itself when a feature needs them:
-   - `jf_rec` — the retro sampler (what you played, caught after the fact);
-   - `jf_tracker_scope` — the oscilloscope / spectrum of the scopes;
-   - `jf_tracker_trig` — a note-on when a sample item starts (note mod);
-   - `jf_tracker_probe` — a level meter between effects (gain staging in the router);
-   - `jf_tracker_zone` — key / velocity / chain zones of a rack, as in Ableton;
-   - `jf_tracker_choke` — pad groups and choke groups of the drum rack;
-   - `jf_tracker_chordfollow` — notes of a track follow the chord lane.
+   - `jf_rec` - the retro sampler (what you played, caught after the fact);
+   - `jf_tracker_scope` - the oscilloscope / spectrum of the scopes;
+   - `jf_tracker_trig` - a note-on when a sample item starts (note mod);
+   - `jf_tracker_probe` - a level meter between effects (gain staging in the router);
+   - `jf_tracker_zone` - key / velocity / chain zones of a rack, as in Ableton;
+   - `jf_tracker_choke` - pad groups and choke groups of the drum rack;
+   - `jf_tracker_chordfollow` - notes of a track follow the chord lane.
 3. Open *Actions → Show action list → New action → Load ReaScript…* and pick
    `jf_tracker.lua`.
 
