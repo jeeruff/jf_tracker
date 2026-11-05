@@ -20836,6 +20836,7 @@ function ctx.fxgui_tick()
     -- (номер перерисовки не меняется, когда DSP не рисуется вовсе — прямоугольник держался, окно висело поверх)
     local dsp_on = not state.router_big and not state.routeview and not state.khelp_big and not state.pm_big
       and not (state.panes_ui and state.panes and draw.panes.visible and not draw.panes.visible(state.panes, 'dsp'))
+      and not (state.panes_ui and L and L.pn and L.pn.by_panel and not L.pn.by_panel.dsp)   -- 5 ноя: DSP в стеке, но вкладка другая (item …) — окна не поверх
     local show = tr and r and r.vis and state.dsp ~= false and dsp_on and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
@@ -20949,7 +20950,7 @@ function ctx.slx_optkeys()
   local prev = ctx.slx_vk or st
   ctx.slx_vk = st
   for vk = 65, 90 do
-    if st:byte(vk) ~= 0 and prev:byte(vk) == 0 and vk ~= 74 and vk ~= 75 then   -- J K — пресет
+    if st:byte(vk) ~= 0 and prev:byte(vk) == 0 and vk ~= 74 and vk ~= 75 and vk ~= 72 and vk ~= 76 then   -- J K — пресет; 5 ноя: H L — канал
       local ch = string.char(vk + 32)
       local v = ctx.slixer_view(t.col.track, f.i)
       local rows, low = draw.SX.items(v, function(name) return (ctx.slx_param(f.i, name)) end)
@@ -32096,11 +32097,22 @@ local function frame()
           vim.msg = (p and p.name or '') .. '  (+ - value, j k - next, h l - effects)'
           return
         end
-        -- 26 окт: Opt+J / K — пресет модуля под курсором, Opt+H / L — главная папка пресетов (Surge)
+        -- 26 окт: Opt+J / K — пресет модуля под курсором; 5 ноя: Opt+Shift+J / K — главная папка пресетов (Surge; было
+        -- Opt+H L), Opt+H / L — соседний канал (DSP идёт за треком курсора), Opt+1..0 — инструмент lib, как в трекере
         do
           local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
-          local OPTP = { [8710] = 'next', [730] = 'prev', [729] = 'prevdir', [172] = 'nextdir' }
-          if OPTP[cp] and not DK.pending and f and f.view == 'slixer' and cp ~= 8710 and cp ~= 730 then return end   -- 27 окт: у slixer Opt+H L — его кнопки (thru …), папок пресетов нет
+          local m5 = ctx.mods()
+          if not DK.pending and m5.alt and not m5.ctrl and not m5.cmd then
+            if (cp == 729 or cp == 172) and not m5.shift then ctx.col_step(cp == 172 and 1 or -1); return end
+            local OPTDIG = { [161] = 1, [8482] = 2, [163] = 3, [162] = 4, [8734] = 5, [167] = 6, [182] = 7, [8226] = 8, [170] = 9, [186] = 10 }
+            if OPTDIG[cp] and ctx.pool_select then ctx.pool_select(OPTDIG[cp]); return end
+            if m5.shift and reaper.JS_VKeys_GetState and f and f.view ~= 'slixer' then
+              local ks = reaper.JS_VKeys_GetState(reaper.time_precise() - 0.5)
+              local d = (ks and ks:byte(74) ~= 0 and 'nextdir') or (ks and ks:byte(75) ~= 0 and 'prevdir') or nil
+              if d then ctx.dsp_preset(dsp_sel.fx, d); return end
+            end
+          end
+          local OPTP = { [8710] = 'next', [730] = 'prev' }
           if OPTP[cp] and not DK.pending and f then ctx.dsp_preset(dsp_sel.fx, OPTP[cp]); return end
         end
         if draw.SX.cur and (c == 106 or c == 107 or c == 104 or c == 108 or c == 1685026670 or c == 30064) then draw.SX.cur = nil end   -- 31 окт: клавиши двигают DSP-курсор — курсор пульта снят

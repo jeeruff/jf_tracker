@@ -13152,6 +13152,15 @@ function D.frame(L, snap, rows, state, info)
         local sy = D.slx_ovy and (D.slx_ovy + ovh + 1) or ((wave_y or (wy + ovh + 1)) + wh + 1)   -- строка статуса сразу под волной (или под обзором)
         -- 26 окт: MIDI · ARP — в самом низу модуля, под группами параметров (как в окне плагина)
         local lay2 = {}
+        -- 5 ноя: над MIDI-строкой — Option-клавиши пульта (буквы кнопок), если там пусто (ниже групп параметров)
+        do
+          local hy2 = by + bh - (G.nb2 or 0) * L.rh - 2 - L.rh
+          local pbot = by + L.rh + 1 + wtop + ((f.rows or 0) + 1) * L.rh
+          if hy2 >= pbot then
+            local hint_s = 'Opt+  D detect  T mode  C classify  A auto  X clear  Z undo  E midi  N names  S sync  G gate  R q:trans  Q q  P keys  V vel  B arp  U thru  O out   J K preset   H L track   1..0 lib'
+            text(x0, hy2, fit(hint_s, w0), U.DIM)
+          end
+        end
         if (G.nb2 or 0) > 0 then
           lay2 = D.SX.layout(G.low, x0, by + bh - G.nb2 * L.rh - 2, w0, L.rh, ms, L.pad)
           local hb2 = D.SX.draw_buttons(U, L, lay2, text, ms, set, mx, my, drag)

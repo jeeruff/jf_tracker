@@ -81,7 +81,8 @@ function SX.items(v, P)
   low[#low + 1] = {
       { kind = 'zone', lab = 'ARP' },
       { kind = 'tog', lab = 'arp', key = 'b', on = (pv('ARP: on') or 0) > 0.5, src = 'p', name = 'ARP: on' },
-      { kind = 'tog', lab = 'thru', key = 'h', on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
+      { kind = 'tog', lab = 'thru', key = 'u',   -- 5 ноя: Opt+H L — канал в DSP
+      on = (pv('Playthrough') or 0) > 0.5, src = 'p', name = 'Playthrough' },
       { kind = 'menu', lab = AR[math.floor(ar + 0.5) + 1] or '1/8', src = 'p', name = 'ARP: rate', items = AR },
       { kind = 'menu', lab = AO[math.floor(ao + 0.5) + 1] or 'up', src = 'p', name = 'ARP: order', items = AO },
       { kind = 'menu', lab = 'ped: ' .. (AP[math.floor(ap + 0.5) + 1] or 'thru'), on = ap > 0.5, src = 'p', name = 'Pedal role', items = AP },
