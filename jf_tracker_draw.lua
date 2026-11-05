@@ -6940,7 +6940,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   end
   if not own_done then add_own() end
   if #inst_rows > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
-  for _, o in ipairs(inst_rows) do rows[#rows + 1] = o end
+  for _, o in ipairs(inst_rows) do
+    rows[#rows + 1] = o
+    -- 5 ноя: выбранный slixer — его срезы папкой (S01 нота длина); щелчок — срез в slixer
+    if not o.col and info.slx_slices and info.inst_fx and info.inst_fx(col) == o.instfx then
+      local sl = info.slx_slices(col, o.instfx)
+      if sl then
+        for _, s2 in ipairs(sl) do rows[#rows + 1] = { slxk = s2.k, slxnote = s2.note, slxsec = s2.sec, slxsel = sl.sel == s2.k, instfx = o.instfx } end
+        if #sl == 0 then rows[#rows + 1] = { slxk = 0, instfx = o.instfx } end
+      end
+    end
+  end
   rows[#rows + 1] = { hdr = 'automation', name = '' }
   rows[#rows + 1] = { auto = true, num = nsamp + gn + 1 }   -- automation как инструмент (5 окт); 21 окт: после всех инструментов проекта
   rows[#rows + 1] = { hdr = 'midi', name = '' }
@@ -7111,6 +7121,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(('%02d    midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
+    elseif row.slxk then
+      -- 5 ноя: срез slixer (ребёнок строки slixer): S01  C-3  0.31s; выбранный в slixer — подсвечен
+      local hot = row.slxk > 0 and mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if row.slxsel then set(U.tint(U.CYAN, 0.18)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      local t = row.slxk > 0 and ('  S%02d  %-4s %5.2fs'):format(row.slxk, row.slxnote or '', row.slxsec or 0) or '  no slices yet - Opt+D in DSP detects'
+      text(ix + 6, y + 1, fit(t, w - 12), row.slxsel and U.CYAN or (row.slxk > 0 and U.TEXT or U.DIM))
+      if hot then hover.pool = { ci = info.pool_ci, slxk = row.slxk, slxnote = row.slxnote } end
     elseif row.instfx then
       local rc = row.col or col
       local sel = info.inst_fx and info.inst_fx(rc) == row.instfx and not row.col

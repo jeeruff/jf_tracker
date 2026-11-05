@@ -22753,6 +22753,23 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 5 ноя: срезы slixer папкой в lib — { { k, note, sec } … } и выбранный (slixer отдаёт вид одному экземпляру: тому,
+-- что выбран; у остальных папки нет)
+ctx.NN12 = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+ctx.slx_slices = function(col, fx)
+  if not (col and col.track and fx) then return nil end
+  local _, nm = reaper.TrackFX_GetFXName(col.track, fx, '')
+  if not (nm or ''):lower():find('slixer', 1, true) then return nil end
+  local v = ctx.slixer_view(col.track, fx)
+  if not (v and v.nsl and v.nsl > 0 and v.starts) then return {} end
+  local out = {}
+  for i = 1, v.nsl do
+    local n = v.notes and v.notes[i]
+    out[i] = { k = i, note = n and (ctx.NN12[n % 12 + 1] .. math.floor(n / 12 - 1)) or '', sec = ((v.ends and v.ends[i] or v.frames or 0) - (v.starts[i] or 0)) / math.max(1, v.sr or 48000) }
+  end
+  out.sel = v.sel and (v.sel + 1) or nil
+  return out
+end
 -- 5 ноя: REAPER «FX: Auto-float new FX windows» (действие 41078) — окно нового эффекта забирает клавиатуру у трекера
 -- (на macOS и при его закрытии). Совет — выключить: при запуске одна строка в статусе, :autofloat — выключить / включить
 ctx.AUTOFLOAT = 41078
@@ -24779,7 +24796,7 @@ local function frame()
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
-    track_insts = ctx.track_insts, inst_fx = ctx.inst_fx,      -- 9 окт: плагины-инструменты в lib
+    track_insts = ctx.track_insts, inst_fx = ctx.inst_fx, slx_slices = ctx.slx_slices,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
     rf_draw = function(Lx, x, y, w, h, foc)   -- 19 окт: без сессии — сколько нот в выделении (возьмётся при первом движении)
       local S = ctx.RFS
@@ -28802,6 +28819,10 @@ local function frame()
       elseif kid.kind == 'y' then ctx.layer_listen(root and root.layers and root.layers[kid.k])
       else ctx.slice_list_do('play') end
       click = { t = now2, zone = 'libsub' }
+    elseif hover.pool and hover.pool.slxk then   -- 5 ноя: срез slixer в папке lib — выбрать его в slixer
+      ctx.slx_cmd(1, hover.pool.slxk - 1)
+      vim.msg = ('slixer: slice %d (%s) - its note plays it'):format(hover.pool.slxk, hover.pool.slxnote or '')
+      click = { t = now2, zone = 'poolslx', row = hover.pool.slxk }
     elseif hover.pool and hover.pool.instfx then
       -- 9 окт: плагин-инструмент: щелчок — выбрать (ноты — MIDI в него) и DSP на нём, двойной — его окно
       local pc = hover.pool.col
