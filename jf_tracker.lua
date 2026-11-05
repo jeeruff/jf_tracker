@@ -20814,6 +20814,28 @@ function ctx.fxgui_auto()
     end
   end
 end
+-- 5 ноя: передний план — окно одного из наших плагинов (крутят его ручки — трекер не в фокусе, окно не убирать)
+function ctx.fxgui_fg_ours()
+  local fg = reaper.JS_Window_GetForeground and reaper.JS_Window_GetForeground()
+  if not fg then return false end
+  for _, o in pairs(ctx.fxgui_open or {}) do
+    local h = fg
+    for _ = 1, 4 do if not h then break end; if h == o.hwnd then return true end; h = reaper.JS_Window_GetParent and reaper.JS_Window_GetParent(h) end
+  end
+  return false
+end
+-- 5 ноя: закрыть все окна плагинов поверх DSP (выход трекера — иначе оставались без рамки и TOPMOST поверх REAPER)
+function ctx.fxgui_close_all()
+  for guid, o in pairs(ctx.fxgui_open or {}) do
+    local t2 = o.tr and reaper.ValidatePtr(o.tr, 'MediaTrack*') and o.tr
+    local fi = (t2 and o.fi and reaper.TrackFX_GetFXGUID(t2, o.fi) == guid) and o.fi or nil
+    if t2 and not fi then for k = 0, reaper.TrackFX_GetCount(t2) - 1 do if reaper.TrackFX_GetFXGUID(t2, k) == guid then fi = k; break end end end
+    pcall(ctx.fxgui_restore, guid, o.hwnd)
+    if o.hwnd and reaper.JS_Window_SetZOrder then pcall(reaper.JS_Window_SetZOrder, o.hwnd, 'NOTOPMOST') end
+    if t2 and fi then reaper.TrackFX_Show(t2, fi, 2) end
+  end
+  ctx.fxgui_open = {}
+end
 function ctx.fxgui_tick()
   ctx.fxgui_auto()
   if not (draw.fxgui and next(draw.fxgui) and reaper.JS_Window_SetPosition) then return end
@@ -20837,6 +20859,7 @@ function ctx.fxgui_tick()
     local dsp_on = not state.router_big and not state.routeview and not state.khelp_big and not state.pm_big
       and not (state.panes_ui and state.panes and draw.panes.visible and not draw.panes.visible(state.panes, 'dsp'))
       and not (state.panes_ui and L and L.pn and L.pn.by_panel and not L.pn.by_panel.dsp)   -- 5 ноя: DSP в стеке, но вкладка другая (item …) — окна не поверх
+      and (ctx.win_focus or ctx.fxgui_fg_ours())   -- 5 ноя: трекер не в фокусе (REAPER, другая программа) — окна убрать; фокус в окне плагина — оставить
     local show = tr and r and r.vis and state.dsp ~= false and dsp_on and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
@@ -38317,7 +38340,7 @@ ctx.mx_more = function()
 end
 -- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
 -- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
-JF_TRACKER_SAVE_WIN = save_win
+JF_TRACKER_SAVE_WIN = function() save_win(); pcall(ctx.fxgui_close_all) end   -- 5 ноя: при выходе — и окна плагинов закрыть
 if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
