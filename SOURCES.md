@@ -11,6 +11,7 @@ Every new borrowing gets a row here (and a line in NOTICE / README Credits).
 | dsp big routing view | ParaNormal FX Router for REAPER, Sexan | - | idea only | own implementation |
 | Orca field | [Orca](https://github.com/hundredrabbits/Orca), Hundred Rabbits | MIT | own implementation | no code copied |
 | DSP module descriptions | Airwindopedia, Chris Johnson | - | read at run time from the user's install | not bundled |
+| Airwindows effects in `effects/jf_fx_airwindows.jsfx-inc` (slixer slots) | [Airwindows](https://github.com/airwindows/airwindows), Chris Johnson | MIT | code ported to EEL2 | license text in `NOTICE` |
 | trackers - rows, hex, the note-vol-fx cell, F1 / F2 octaves, Esc as edit | ProTracker, FastTracker, Impulse Tracker, [Renoise](https://www.renoise.com), [Furnace](https://github.com/tildearrow/furnace), [Dirtywave M8](https://dirtywave.com) | - | idea only | own code |
 | modes, operators and motions | [Vim](https://www.vim.org) (Bram Moolenaar) | - | idea only | own code |
 | a menu of what a prefix key does next | [which-key.nvim](https://github.com/folke/which-key.nvim) (folke) | - | idea only | own code |
