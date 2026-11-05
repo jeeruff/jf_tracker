@@ -76,10 +76,20 @@
 
 ## Установка
 
-Скачайте zip на <https://jeeruff.itch.io/jftracker> (бесплатно или сколько не
-жалко, ноль тоже можно); новые версии появляются там же.
+Через ReaPack: *Extensions → ReaPack → Import repositories…*, вставьте
 
-1. Распакуйте и скопируйте папку `jf_tracker` в папку `Scripts` REAPER.
+    https://jeeruff.com/jf_tracker/r/open/index.xml
+
+затем *Browse packages → jf_tracker → Install*. Новые версии приходят через
+*Synchronize packages*.
+
+Одна настройка REAPER: выключите *FX: Auto-float new FX windows* (в трекере -
+команда `:autofloat`). Иначе каждый новый эффект открывает своё окно, и оно
+забирает клавиатуру у трекера.
+
+Вручную, без ReaPack:
+
+1. Скопируйте папку `jf_tracker` в папку `Scripts` REAPER.
    *Options → Show REAPER resource path* покажет, где она.
 2. Скопируйте все файлы из `effects/` в папку `Effects` REAPER. Трекер сам
    ставит их на треки, когда они нужны (ретро-сэмплер, скопы, триггеры нот,

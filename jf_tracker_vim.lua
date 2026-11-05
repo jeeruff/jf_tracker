@@ -1339,7 +1339,7 @@ V.COMMANDS = {
   { 'browse', 'path', 'browser root' }, { 'freesound', 'words | key <key>', 'search freesound.org in the freesound pane (Ctrl+W c f; <10s >2s - length, cc0 - only CC0); key - your free API key (freesound.org/apiv2/apply); j k listen, Enter - to the lib (:fs)' }, { 'dock', '', 'dock <-> fullscreen (Cmd+F11)' }, { 'preview', '', 'preview on input' },
   { 'pitchmode', 'shift|resample', 'track pitch mode' },
   { 'sync', '', 'sync same-name regions' }, { 'autosync', '', 'sync after edits' },
-  { 'follow', '', 'view follows playhead' }, { 'lock', '', 'tracker cursor = REAPER edit cursor and selected track' }, { 'fixed', '', 'cursor fixed at screen centre (Impulse Tracker)' }, { 'debug', '[share]', 'debug log (jf_tracker_debug.log in the REAPER folder): keys and where they were handled, clicks, actions, errors; fps in the status. share - a copy to send: names, paths and free text replaced (jf_tracker_debug_share.txt)' },
+  { 'follow', '', 'view follows playhead' }, { 'lock', '', 'tracker cursor = REAPER edit cursor and selected track' }, { 'fixed', '', 'cursor fixed at screen centre (Impulse Tracker)' }, { 'autofloat', '', 'REAPER FX: Auto-float new FX windows on / off - off is better with the tracker: a new effect does not open its window and the keyboard stays here' }, { 'debug', '[share]', 'debug log (jf_tracker_debug.log in the REAPER folder): keys and where they were handled, clicks, actions, errors; fps in the status. share - a copy to send: names, paths and free text replaced (jf_tracker_debug_share.txt)' },
   { 'fold', '', 'fold all tracks' }, { 'unfold', '', 'unfold all' },
   { 'trim', '', 'trim items to region bounds (strict patterns)' },
   { 'beatsync', '[beat|bar|N]', 'stretch event end to the nearest beat / bar / N rows (= key, N=)' },
@@ -1433,6 +1433,7 @@ local function run_cmd(line)
   elseif cmd == 'follow' then st.follow = not st.follow
   elseif cmd == 'shotpane' then if ctx.shot_pane then ctx.shot_pane(arg) end   -- 17 окт: снимок панели в help/
   elseif cmd == 'shot' then if ctx.shot_pane then ctx.shot_pane((arg ~= '' and arg or 'window') .. ' ~/Pictures/Screenshots/jftracker ' .. os.date('%Y-%m-%d %H.%M.%S') .. '.png') end   -- 4 ноя: снимок окна (или панели) в Screenshots
+  elseif cmd == 'autofloat' then if ctx.autofloat_cmd then ctx.autofloat_cmd() end   -- 5 ноя
   elseif cmd == 'debug' then if (arg or ''):match('^%s*share') then if ctx.debug_share then ctx.debug_share() end else st.debug = not st.debug end   -- 5 ноя: :debug share
   elseif cmd == 'fold' then ctx.fold_all(true)
   elseif cmd == 'unfold' then ctx.fold_all(false)

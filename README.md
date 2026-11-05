@@ -77,10 +77,20 @@ Both extensions are available through [ReaPack](https://reapack.com/).
 
 ## Install
 
-Download the zip from <https://jeeruff.itch.io/jftracker> (free or pay what you
-want); new versions are posted there too.
+Through ReaPack: *Extensions → ReaPack → Import repositories…*, paste
 
-1. Unzip it and copy the `jf_tracker` folder into REAPER's `Scripts` folder. In REAPER,
+    https://jeeruff.com/jf_tracker/r/open/index.xml
+
+then *Browse packages → jf_tracker → Install*. New versions come with
+*Synchronize packages*.
+
+One REAPER setting: turn off *FX: Auto-float new FX windows* (type `:autofloat`
+in the tracker). Otherwise every new effect opens its window, and that window
+takes the keyboard away from the tracker.
+
+By hand instead of ReaPack:
+
+1. Copy the `jf_tracker` folder into REAPER's `Scripts` folder. In REAPER,
    *Options → Show REAPER resource path* shows where that is.
 2. Copy every file of `effects/` into REAPER's `Effects` folder. The tracker
    puts them on tracks by itself when a feature needs them:

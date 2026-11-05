@@ -22751,6 +22751,14 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 5 ноя: REAPER «FX: Auto-float new FX windows» (действие 41078) — окно нового эффекта забирает клавиатуру у трекера
+-- (на macOS и при его закрытии). Совет — выключить: при запуске одна строка в статусе, :autofloat — выключить / включить
+ctx.AUTOFLOAT = 41078
+ctx.autofloat_on = function() return reaper.GetToggleCommandState(ctx.AUTOFLOAT) == 1 end
+ctx.autofloat_cmd = function()
+  reaper.Main_OnCommand(ctx.AUTOFLOAT, 0)
+  vim.msg = 'REAPER auto-float new FX windows: ' .. (ctx.autofloat_on() and 'on (new effects open their window and take the keyboard)' or 'off - new effects stay in DSP, the keyboard stays with the tracker')
+end
 -- 5 ноя: :debug share — лог отладки, который можно отправить: имена, пути и свободный текст заменены метками
 -- (jf_tracker_dbgshare.lua, белый список слов из самого кода), рядом с логом — jf_tracker_debug_share.txt
 ctx.debug_share = function()
@@ -38377,5 +38385,6 @@ if state.notes_open then pcall(ctx.notes_load) end
   if not reaper.CF_CreatePreview then miss[#miss + 1] = 'SWS (preview)' end
   if not reaper.JS_VKeys_GetState then miss[#miss + 1] = 'js_ReaScriptAPI (held notes, key state)' end
   if #miss > 0 then vim.msg = 'missing: ' .. table.concat(miss, ', ') .. ' - install through ReaPack' end
+  if #miss == 0 and ctx.autofloat_on() then vim.msg = 'tip: REAPER auto-floats new FX windows - they take the keyboard; :autofloat turns it off' end   -- 5 ноя
 end)()
 frame()
