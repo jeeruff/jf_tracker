@@ -20859,6 +20859,7 @@ function ctx.fxgui_tick()
     local dsp_on = not state.router_big and not state.routeview and not state.khelp_big and not state.pm_big
       and not (state.panes_ui and state.panes and draw.panes.visible and not draw.panes.visible(state.panes, 'dsp'))
       and not (state.panes_ui and L and L.pn and L.pn.by_panel and not L.pn.by_panel.dsp)   -- 5 ноя: DSP в стеке, но вкладка другая (item …) — окна не поверх
+      and not OPT.active   -- 5 ноя: опции (окном или панелью на месте DSP) — окна плагинов не поверх них
       and (ctx.win_focus or ctx.fxgui_fg_ours())   -- 5 ноя: трекер не в фокусе (REAPER, другая программа) — окна убрать; фокус в окне плагина — оставить
     local show = tr and r and r.vis and state.dsp ~= false and dsp_on and r.w > 40 and r.h > 40
     local o = O[guid]
