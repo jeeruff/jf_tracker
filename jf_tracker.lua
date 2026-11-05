@@ -20814,6 +20814,12 @@ function ctx.fxgui_auto()
     end
   end
 end
+-- 5 ноя: трекер ушёл совсем: впереди главное окно REAPER или другая программа (окна REAPER впереди нет)
+function ctx.fxgui_fg_away()
+  if not reaper.JS_Window_GetForeground then return false end
+  local fg = reaper.JS_Window_GetForeground()
+  return (not fg) or fg == reaper.GetMainHwnd()
+end
 -- 5 ноя: передний план — окно одного из наших плагинов (крутят его ручки — трекер не в фокусе, окно не убирать)
 function ctx.fxgui_fg_ours()
   local fg = reaper.JS_Window_GetForeground and reaper.JS_Window_GetForeground()
@@ -20836,8 +20842,23 @@ function ctx.fxgui_close_all()
   end
   ctx.fxgui_open = {}
 end
+-- 5 ноя: клавиатура — трекеру: окно на передний план и фокус (на macOS SetFocus без SetForeground оставлял её у плагина)
+function ctx.fxgui_refocus()
+  if ctx.hwnd_self == nil then ctx.hwnd_self = reaper.JS_Window_Find('jf_tracker', true) or false end
+  if not ctx.hwnd_self then return end
+  if reaper.JS_Window_SetForeground then reaper.JS_Window_SetForeground(ctx.hwnd_self) end
+  if reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(ctx.hwnd_self) end
+end
 function ctx.fxgui_tick()
   ctx.fxgui_auto()
+  -- 5 ноя: окно плагина поверх DSP забрало клавиатуру, а мышь не над ним (ручки не крутят) — клавиатура трекеру сразу
+  -- (было: «REAPER has the keyboard», клавиши трекера не работали до щелчка в трекер)
+  if not ctx.win_focus and next(ctx.fxgui_open or {}) and gfx.mouse_cap & 3 == 0 and ctx.fxgui_fg_ours() then
+    local over = false
+    local mx0, my0 = gfx.mouse_x, gfx.mouse_y
+    for _, o in pairs(ctx.fxgui_open) do local q = o.r; if q and mx0 >= q.x and mx0 < q.x + q.w and my0 >= q.y and my0 < q.y + q.h then over = true end end
+    if not over then ctx.fxgui_refocus() end
+  end
   if not (draw.fxgui and next(draw.fxgui) and reaper.JS_Window_SetPosition) then return end
   local t = dsp_target()
   local tr = t and not t.take and t.col and t.col.track
@@ -20860,7 +20881,7 @@ function ctx.fxgui_tick()
       and not (state.panes_ui and state.panes and draw.panes.visible and not draw.panes.visible(state.panes, 'dsp'))
       and not (state.panes_ui and L and L.pn and L.pn.by_panel and not L.pn.by_panel.dsp)   -- 5 ноя: DSP в стеке, но вкладка другая (item …) — окна не поверх
       and not OPT.active   -- 5 ноя: опции (окном или панелью на месте DSP) — окна плагинов не поверх них
-      and (ctx.win_focus or ctx.fxgui_fg_ours())   -- 5 ноя: трекер не в фокусе (REAPER, другая программа) — окна убрать; фокус в окне плагина — оставить
+      and (ctx.win_focus or not ctx.fxgui_fg_away())   -- 5 ноя: впереди главное окно REAPER или другая программа — окна убрать; меню / диалог плагина — оставить
     local show = tr and r and r.vis and state.dsp ~= false and dsp_on and r.w > 40 and r.h > 40
     local o = O[guid]
     if show then
@@ -20870,8 +20891,7 @@ function ctx.fxgui_tick()
       local hwnd = reaper.TrackFX_GetFloatingWindow(tr, r.fi)
       if not hwnd then
         reaper.TrackFX_Show(tr, r.fi, 3); hwnd = reaper.TrackFX_GetFloatingWindow(tr, r.fi)
-        if ctx.hwnd_self == nil then ctx.hwnd_self = reaper.JS_Window_Find('jf_tracker', true) or false end
-        if ctx.hwnd_self and reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(ctx.hwnd_self) end   -- клавиатура — трекеру
+        ctx.fxgui_refocus()   -- клавиатура — трекеру (5 ноя: и SetForeground — на macOS одного SetFocus мало)
         o = nil
       end
       if hwnd then
@@ -20892,6 +20912,7 @@ function ctx.fxgui_tick()
           if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd, 'TOPMOST') end
           o = { hwnd = hwnd, tr = tr, fi = r.fi }; O[guid] = o   -- 5 ноя: трек окна — закрыть на нём, когда DSP ушёл на другой
         end
+        o.r = { x = r.x, y = r.y, w = r.w, h = r.h }   -- 5 ноя: где окно (мышь над ним — фокус не отбирать)
         if o.key ~= key then
           reaper.JS_Window_SetPosition(hwnd, math.min(sx0, sx1), math.min(sy0, sy1), math.abs(sx1 - sx0), math.abs(sy1 - sy0))
           o.key = key
