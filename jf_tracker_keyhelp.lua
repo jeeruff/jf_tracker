@@ -153,7 +153,7 @@ KH.PAGES = {
     { k = 'q @', d = 'record macro (q a .. q) / play: @a register, @1..9 @A..Z saved and built-in (the @ popup lists them, same keys as \\ q), @@ the last, @/ by name (type to filter); Opt+Shift+2 - the big macros panel at the cursor; with the keyboard on Shift+2 is a note - use Opt+Shift+2 or hide the keyboard (m) for @' },
     { k = 'v V', d = 'visual block / visual lines (V is the REAPER time selection too); in VISUAL a - smart select (as Paketti; the cursor stays): first the column over the whole pattern, a wider - the bar on all tracks, half the pattern, the pattern; i narrower - the column in the bar, in the beat; Ctrl+Shift+h j k l - move the selection' },
     { k = 'H J K L', d = 'select: visual block from here, Shift+hjkl extends it (tracks: Option+h l)' },
-    { k = 'zA', d = 'every track: empty columns (delay, commands), extra note subcolumns, envelopes and MIDI lanes with nothing in them - hidden; again - all back' },
+    { k = 'zE', d = 'every track: empty columns (delay, commands), extra note subcolumns, envelopes and MIDI lanes with nothing in them - hidden; again - all back' },
     { k = 'za zF', d = 'fold track: wave + notes, envelopes as a thin line / zF all <-> open all (:fold, :unfold)' },
     { k = 'zf zk', d = 'folder: zf collapse <-> open; zk - the folder wide, its children narrow strips (= before the name; again - back)' },
     { k = 'zr zR', d = 'router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window' },

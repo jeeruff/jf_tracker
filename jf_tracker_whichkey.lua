@@ -26,7 +26,7 @@ local T = {
   z = { title = 'z - view', items = { { 'z', 'zoom the module' }, { 'Z', 'fixed cursor' }, { '1', 'mono: one note lane' }, { 'v', 'view menu' },
         { 'W', 'zoom the item' }, { 'w', 'width: all fit' }, { 'h', 'height: fit' }, { 'l', 'LPB presets' },
         { 't', 'row to the top' }, { 'T', 'zoom the track' }, { 'b', 'row to the bottom' },
-        { 'a', 'fold / open the track' }, { 'A', 'hide empty columns' }, { 'c', 'compact' }, { 'o', 'open' },
+        { 'a', 'fold / open the track' }, { 'E', 'hide empty columns' }, { 'c', 'compact' }, { 'o', 'open' },
         { 'e', 'instrument window' }, { 'C', 'monitor FX' }, { '!', '1-char strip' }, { 'f', 'fold the folder' }, { 'k', 'folder: kids narrow' },
         { 'F', 'fold / open all' }, { '_', 'minimize the pane' }, { 'm', 'mixer' }, { 'M', 'master' },
         { '> <', 'all wider / narrower' }, { '. ,', 'track wider / narrower' }, { 'x', 'crossfade editor' }, { 'X', 'mixer taller' },

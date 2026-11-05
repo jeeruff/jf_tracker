@@ -34221,7 +34221,7 @@ ctx.hide_empty = function()
   if ctx.he_back then
     local b = ctx.he_back; ctx.he_back = nil
     state.wlevel, state.subs_min, state.trackenvs, state.folds = b.wlevel, b.subs_min, b.trackenvs, b.folds
-    relayout(); vim.msg = 'zA: empty columns and lanes back'; return
+    relayout(); vim.msg = 'zE: empty columns and lanes back'; return
   end
   local function cp(t) local o = {}; for k, v in pairs(t or {}) do o[k] = v end; return o end
   ctx.he_back = { wlevel = cp(state.wlevel), subs_min = cp(state.subs_min), trackenvs = cp(state.trackenvs), folds = cp(state.folds) }
@@ -34252,7 +34252,7 @@ ctx.hide_empty = function()
     end
   end
   relayout()
-  vim.msg = ('zA: %d tracks - empty columns and lanes hidden (zA again - back)'):format(n)
+  vim.msg = ('zE: %d tracks - empty columns and lanes hidden (zE again - back)'):format(n)
 end
 ctx.fit_slim = function()
   state.autozoom = nil
