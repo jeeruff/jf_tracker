@@ -14280,6 +14280,15 @@ function D.frame(L, snap, rows, state, info)
     if desc == '' then desc = D.aw_status or '' end
     -- 2 ноя: сообщению — всё, что не занято описанием справа (не меньше трети); пусто справа — вся строка (подсказки z: обрубались)
     local lw = desc == '' and (sw - 2 * L.pad) or math.max(sw / 3, sw - 2 * L.pad - math.min(ms(desc), sw * 2 / 3) - 4 * L.pad)
+    -- 6 ноя: слово режима — и в статусе слева, как -- INSERT -- в Vim (просьба: дублировать), цветом режима
+    local mword = ((info.status_left or ''):match('^([^|]*)|') or ''):gsub('^[%s%-]+', ''):gsub('[%s%-]+$', '')   -- «-- FADE --» уже с чёрточками
+    if mword ~= '' and #mword <= 24 then
+      local mt = '-- ' .. mword .. ' --'
+      local mc = (D.MODE_COL and D.MODE_COL[mword:lower()]) or (mword == 'NORMAL' and U.GREY) or U.AMBER
+      text(sx + L.pad, sy + 2, mt, mc)
+      local mw = ms(mt) + 2 * L.pad
+      sx = sx + mw; sw = sw - mw; lw = lw - mw
+    end
     left = fit((left:gsub('^%s+', '')), lw)
     key_text(sx + L.pad, sy + 2, left, lw, U.AMBER)
     local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
