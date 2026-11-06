@@ -10581,12 +10581,16 @@ function D.frame(L, snap, rows, state, info)
   end
   -- 21 окт: граница паттерна — линия 2 px цвета линий темы (явнее линии такта), граница секции — 2 px её цветом поверх
   local patb, secb = {}, {}
+  D.cur_pat = nil
   do   -- 31 окт: граница паттерна и имена на стыке — всегда (была под опцией rgedges, у пользователя выключена — линий не было)
     for _, rg in ipairs(info.ruler and info.ruler.regions or {}) do
       -- 31 окт: у границы — имена: что кончается (prv) и что начинается (nxt), подписи у линии
       local a0, a1 = math.floor(rg.r0 + 0.5), math.floor(rg.r1 + 0.5)
       patb[a0] = patb[a0] or {}; patb[a0].nxt = rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))
       patb[a1] = patb[a1] or {}; patb[a1].prv = rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))
+      -- 6 ноя: паттерн курсора — в углу над номерами строк (иначе посреди паттерна не видно, в каком ты)
+      local cr = info.vcur and info.vcur.row
+      if cr and cr >= rg.r0 - 1e-6 and cr < rg.r1 - 1e-6 then D.cur_pat = ('%d %s'):format(rg.idx or 0, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))) end
     end
     for _, sc in ipairs(info.sections or {}) do
       local c = U.AMBER   -- 31 окт: секции — всегда жёлтые (не цветом региона, не путаются с паттернами)
@@ -11282,6 +11286,13 @@ function D.frame(L, snap, rows, state, info)
     if mx >= rx0 + L.jl_w and mx < rx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   D.acv_frame(L, info, rows)   -- 2 ноя: рамка видимого на холсте кривых (своя функция: здесь предел локалей)
+  -- 6 ноя: паттерн курсора — в свободном углу строки номеров колонок, над номерами строк (линия прыжков)
+  if D.cur_pat and L.label_w and L.label_w > 2 * L.cw then
+    local cy = L.body_y - L.rh
+    local s2 = fit(D.cur_pat, L.label_w - 2 * L.pad)
+    set(U.PANEL); gfx.rect(tx0 + 1, cy, ms(s2) + 2 * L.pad, L.rh, 1)
+    text(tx0 + 1 + L.pad, cy + 1, s2, U.AMBER)
+  end
   for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
     set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
     text(p[1] + 1, p[4], fit(p[5], p[3] - 1), p[6] and U.AMBER or U.TEXT)

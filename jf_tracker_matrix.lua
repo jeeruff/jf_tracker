@@ -235,6 +235,23 @@ function MX.toggle_zoom()
   if MX.zoom == 'detail' then MX.set_zoom(1, 2) else MX.set_zoom(MX.DETAIL_ROWS, 3) end
 end
 
+-- 6 ноя: свёрнутые колонки слотов (name bpm sig len) — ExtState jf_tracker/mxcfold «name,bpm»
+function MX.cfold_get()
+  if not MX.cfold then
+    MX.cfold = {}
+    for k in (reaper.GetExtState('jf_tracker', 'mxcfold') or ''):gmatch('[^,]+') do MX.cfold[k] = true end
+  end
+  return MX.cfold
+end
+function MX.cfold_toggle(id)
+  local F = MX.cfold_get()
+  F[id] = not F[id] or nil
+  local t = {}
+  for k in pairs(F) do t[#t + 1] = k end
+  table.sort(t)
+  reaper.SetExtState('jf_tracker', 'mxcfold', table.concat(t, ','), true)
+  if ctx and ctx.msg then ctx.msg(('matrix column %s %s (Enter on its header again - back)'):format(id, F[id] and 'folded' or 'open')) end
+end
 function MX.width(L, nregions, ncols)
   -- «< NN >»: стрелки и номер не налезают — ширина из частей с зазорами
   L.mx_arrow_w = U.measure('<')
@@ -255,6 +272,12 @@ function MX.width(L, nregions, ncols)
   -- 9 окт: имя региона — по самому длинному имени (с прошлого кадра), 3..6 знаков
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
   L.mx_bpm_w = (MX.fold or st or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
+  -- 6 ноя: колонки, свёрнутые заголовком (как папки в lf): узкий «+»
+  local F, pw = MX.cfold_get(), U.measure('+') + L.pad
+  if F.name then nmw = pw end
+  if F.bpm and L.mx_bpm_w > 0 then L.mx_bpm_w = pw end
+  if F.sig and L.mx_sig_w > 0 then L.mx_sig_w = pw end
+  if F.len and L.mx_dur_w > 0 then L.mx_dur_w = pw end
   L.mx_label_w = MX.fold and L.mx_idx_w or (L.mx_idx_w + nmw + L.pad + L.mx_bpm_w + L.mx_sig_w + L.mx_dur_w)
   L.mx_cell_w = math.floor(L.cw * MX.hz) + 2 * L.pad
   L.mx_row_h = math.max(L.rh, math.floor(L.rh * MX.vz + 0.5))
@@ -405,6 +428,32 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     local last = 0
     for i, rg in ipairs(regions) do if not rg.gap then last = i end end
     MX.fit_geo = { W = W, H = ybot - top, label_w = L.mx_label_w, pad = L.pad, cw = L.cw, rh = L.rh, ncols = #snap.cols, nrows = last + 2, vis = (MX.vis_w or 0) > 0 and (MX.vis_w + 2) or 0 }
+  end
+  -- 6 ноя: заголовки колонок слотов над строками (name bpm sig len): щелчок / Enter (k с первого слота) — свернуть в «+»
+  MX.hsubs = nil
+  if not MX.fold and not MX.st_on then
+    local hy0 = top - L.rh - 1
+    local F = MX.cfold_get()
+    local dx = L.mx_label_w - L.mx_dur_w
+    local cols = { { 'name', L.mx_idx_w + 2, L.mx_label_w - L.mx_idx_w - L.mx_dur_w - L.mx_sig_w - (L.mx_bpm_w or 0) - 2 - L.pad } }
+    if (L.mx_bpm_w or 0) > 0 then cols[#cols + 1] = { 'bpm', dx - L.mx_sig_w - L.mx_bpm_w, L.mx_bpm_w } end
+    if L.mx_sig_w > 0 then cols[#cols + 1] = { 'sig', dx - L.mx_sig_w, L.mx_sig_w } end
+    if L.mx_dur_w > 0 then cols[#cols + 1] = { 'len', dx, L.mx_dur_w } end
+    MX.hsubs = {}
+    local down = gfx.mouse_cap & 1 == 1
+    for _, c in ipairs(cols) do
+      local id, x0, w0 = c[1], c[2], c[3]
+      MX.hsubs[#MX.hsubs + 1] = id
+      local lab = F[id] and '+' or id
+      if U.measure(lab) > w0 - 2 then lab = F[id] and '+' or id:sub(1, 1) end
+      local hot = mx >= x0 and mx < x0 + w0 and my >= hy0 and my < hy0 + L.rh
+      local cur = MX.cur.hdr == id
+      if cur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x0 - 1, hy0, w0, L.rh, 0) end
+      U.text(id == 'name' and x0 or (x0 + w0 - L.pad - U.measure(lab)), hy0 + 1, lab, (hot or cur) and U.AMBER or U.DIM)
+      if hot and down and not MX.hdr_down then MX.cfold_toggle(id) end
+      if ctx.hint then ctx.hint('mxhdr', x0, hy0, w0, L.rh, id) end
+    end
+    MX.hdr_down = down
   end
   local RW = L.mx_ruler_w or 0
   local marks = info.marks or {}
@@ -570,6 +619,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if nw > 0 then
     -- 4 ноя: свободный такт — пустая строка, как в трекере (было «bar»); с кодом — остаток имени
     local rgn = rg.gap and (orphan and 'unnamed - n' or '') or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))
+    if MX.cfold_get().name and not rg.gap then rgn = '+' end   -- 6 ноя: колонка свёрнута
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (orphan and U.AMBER or (rg.gap and U.DIM or lc)))
     -- 17 окт: pads вкл — клавиша паттерна справа у имени (запись — красным)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
@@ -642,6 +692,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       MX.subs[#MX.subs + 1] = 'len'
       -- 12 окт: длина — ячейка ввода: курсор встаёт (l с имени), цифры — набор шагов
       local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
+      if MX.cfold_get().len then ds = '+' end   -- 6 ноя: свёрнута
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
       if oncur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(dx + 1, y, L.mx_dur_w - 2, L.rh, 0) end
       local hot_dur = hover.ri == ri and mx >= dx and mx < L.mx_label_w
@@ -655,6 +706,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         -- 18 окт: vismetro — у играющего паттерна размер считает доли: 1/4 2/4 3/4 4/4 (доля под плейхедом)
         local beat = MX.vismetro and playing and info.play_row and ctx.state
         if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
+        if MX.cfold_get().sig then ss = '+' end   -- 6 ноя: свёрнута
         local sx = dx - L.mx_sig_w
         if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'sig' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(sx + 1, y, L.mx_sig_w - 2, L.rh, 0) end
         local hot_sig = hover.ri == ri and mx >= sx and mx < dx
@@ -670,7 +722,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         local bx0 = bx1 - L.mx_bpm_w
         if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'bpm' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(bx0 + 1, y, L.mx_bpm_w - 2, L.rh, 0) end
         local hot_bpm = hover.ri == ri and mx >= bx0 and mx < bx1
-        if bs:find('.', 1, true) then MX.bpm_frac = true end   -- 18 окт: дробный темп — колонка шире со следующего кадра
+        if bs:find('.', 1, true) then MX.bpm_frac = true end
+        if MX.cfold_get().bpm then bs = '+' end   -- 6 ноя: свёрнута   -- 18 окт: дробный темп — колонка шире со следующего кадра
         U.text(bx1 - L.pad - U.measure(bs), y + 1, bs, hot_bpm and U.AMBER or (MX.bpm_diff and U.TEXT or U.DIM))
         if hot_bpm then hover.bpm = ri end
         if ctx.hint then ctx.hint('mxbpm', bx0, y, L.mx_bpm_w, L.rh, ri) end
@@ -1038,6 +1091,26 @@ function MX.key(c, regions, snap)
     if ch == 'x' then if sc and ctx.sec_remove then ctx.sec_remove(sc) end; return true end
     if ch == ' ' then if sc and ctx.sec_launch then ctx.sec_launch(sc) end; return true end
     if ch == 'h' or c == 1818584692 then return true end
+  end
+  -- 6 ноя: курсор на заголовках колонок (k с первого слота): h l — по ним, Enter / Space — свернуть / развернуть, j / Esc — назад
+  if MX.cur.hdr and not MX.pending then
+    local hs = MX.hsubs or { 'name' }
+    local i = 1
+    for k, id in ipairs(hs) do if id == MX.cur.hdr then i = k end end
+    if ch == 'h' or c == 1818584692 then MX.cur.hdr = hs[math.max(1, i - 1)]; return true end
+    if ch == 'l' or c == 1919379572 then MX.cur.hdr = hs[math.min(#hs, i + 1)]; return true end
+    if c == 13 or ch == ' ' then MX.cfold_toggle(MX.cur.hdr); return true end
+    if ch == 'j' or c == 1685026670 or c == 27 or ch == 'k' or c == 30064 then
+      local h0 = MX.cur.hdr; MX.cur.hdr = nil
+      if c ~= 27 and ch ~= 'k' and c ~= 30064 then MX.cur.sub = (h0 ~= 'name') and h0 or nil; if MX.cur.sub == 'len' then MX.cur.sub = 'len' end end
+      return true
+    end
+    MX.cur.hdr = nil
+  end
+  if (ch == 'k' or c == 30064) and MX.cur.ri <= 1 and MX.cur.ci == 0 and not MX.fold and not MX.pending and not MX.cur.sec and not mods.ctrl and MX.hsubs then
+    MX.cur.hdr = MX.cur.sub or 'name'
+    ctx.msg('column headers: h l - which, Enter - fold / open (as folders in lf), j - back to the slots')
+    return true
   end
   if (ch == 'h' or c == 1818584692) and MX.cur.ci == 0 and not MX.cur.sub and not MX.pending and not MX.cur.sec and MX.sec_at(regions, MX.cur.ri) then   -- с длины h — сначала на имя
     MX.cur.sec = true

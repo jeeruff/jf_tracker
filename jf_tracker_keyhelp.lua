@@ -347,6 +347,7 @@ KH.PAGES = {
     { k = 'BS', m = 'delete note / row', d = 'INSERT, the note field: on a note - delete the note; on an empty row - delete the row (below moves up; Shift - all tracks)' },
   } },
   matrix = { title = 'matrix of regions (slots)', e = {
+    { k = 'k (first slot)  Enter', d = 'the column headers over the slots (name bpm sig len): k from the first slot goes onto them, h l - which, Enter / Space or a click - fold the column to + and back (as folders in lf), j - back to the slots' },
     { k = 'h j k l', d = 'cell: track left / slot down / slot up / track right' },
     { k = 'gg G', d = 'first slot / last slot' },
     { k = 'chain row', t = {}, d = 'the patterns pane (gt / T): the cubes of every pattern (A1 .. grey - not made yet) and the chain row under them; a click on a cube - hear it, a double click - it joins the chain; h j k l Enter Space n C there' },

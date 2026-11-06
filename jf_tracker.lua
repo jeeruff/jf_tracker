@@ -19386,6 +19386,7 @@ local function hint_go(t)
       if p.kind == 'note' and pd then for _, it in ipairs(ctx.is_heads_items(vim.covering(pd.fi, pd.row))) do items[#items + 1] = it end end
     end
     ctx.is_toggle_items(items); if ctx.IS then ctx.is_msg('labels') end
+  elseif t.kind == 'mxhdr' then ctx.set_focus('matrix'); MX.cfold_toggle(d)   -- 6 ноя: заголовок колонки матрицы — свернуть / развернуть
   elseif t.kind == 'bigfader' then ctx.bf_set(d.x)   -- 6 ноя: метка деления большого фейдера
   elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
