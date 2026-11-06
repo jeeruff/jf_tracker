@@ -142,10 +142,28 @@ function U.dslider(sx, cy, sw, fr, centered, col, hot, rh, lr)
 end
 -- 13 окт: ручка-ромбик (квадрат на угол): заливка цветом, обводка фоном и контуром текста —
 -- видна издалека в любой теме. cx, cy — центр, r — полудиагональ
+U.KNOB_PIX = { '...X...', '..XHX..', '.XHFFX.', 'XHFFFFX', '.XFFFX.', '..XFX..', '...X...' }   -- 6 ноя: X кайма, F заливка, H блик
 function U.diamond(cx, cy, r, col, hot)
   r = r or 5
   -- 6 ноя: опция knob — в пиксельном режиме ромб размывается: bar — чёткая планка, block — квадрат (U.KNOB от main)
   local kn = U.KNOB
+  if kn == 'pixel' then
+    -- пиксель-арт ромб 7×7 клеток (кайма, заливка, блик); клетка растёт с r — крупный шрифт даёт крупный ромб, без мыла
+    local k = math.max(1, math.floor((2 * r + 3) / 7 + 0.5))
+    local x0, y0 = math.floor(cx + 0.5) - 3 * k, math.floor(cy + 0.5) - 3 * k
+    local fill = hot and U.TEXT or col
+    local hl = U.mix(fill, { 1, 1, 1 }, 0.45)
+    for j, row in ipairs(U.KNOB_PIX) do
+      for i = 1, 7 do
+        local ch = row:sub(i, i)
+        if ch ~= '.' then
+          set(ch == 'X' and U.BG or (ch == 'H' and hl or fill))
+          gfx.rect(x0 + (i - 1) * k, y0 + (j - 1) * k, k, k, 1)
+        end
+      end
+    end
+    return
+  end
   if kn == 'bar' or kn == 'block' then
     cx, cy = math.floor(cx + 0.5), math.floor(cy + 0.5)
     local hw = kn == 'bar' and 1 or math.max(2, math.floor(r * 0.7))
