@@ -2648,6 +2648,19 @@ function D.phrase_of(take)
   end
   return v
 end
+-- 6 ноя: айтем — копия фразы (P_EXT:jf_phrc = GUID триггера); кэш по айтему, сброс по счётчику правок
+D.phrc_cache = setmetatable({}, { __mode = 'k' })
+function D.phrc(item)
+  local sc = reaper.GetProjectStateChangeCount(0)
+  if D.phrc_sc ~= sc then D.phrc_sc = sc; D.phrc_cache = setmetatable({}, { __mode = 'k' }) end
+  local v = D.phrc_cache[item]
+  if v == nil then
+    local _, g = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_phrc', '', false)
+    v = (g or '') ~= ''
+    D.phrc_cache[item] = v
+  end
+  return v
+end
 function DCS.inst()
   local L, cell, x, ty = DCS.L, DCS.cell, DCS.x, DCS.ty
   local text, c = DCS.text, DCS.c
@@ -10335,6 +10348,16 @@ function D.frame(L, snap, rows, state, info)
               local fr = state.textonly and 'off' or (state.itemframe or 'item')
               local fx0, fw0 = x0, w0
               if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
+              -- 6 ноя: фраза — триггер (тейк ph:NAME) коробкой во всю длину с именем, ярко; её копии (P_EXT jf_phrc) — призраки:
+              -- после строк поверх ложится полупрозрачный фон (D.ghost_rects), ноты копий видны тусклее (транспоз — их нотами)
+              do
+                local tk = it.midi and reaper.GetActiveTake(it.item)
+                local ph = tk and D.phrase_of(tk)
+                if ph then
+                  set(U.AMBER); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0)
+                  if y0 >= by0 then D.ph_labels = D.ph_labels or {}; D.ph_labels[#D.ph_labels + 1] = { x0 + 2, y0 + 2, w0 - 4, '"' .. ph } end
+                elseif D.phrc(it.item) then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end
+              end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
               if info.items_mode and it.sel then set(U.CYAN); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0) end
               if fr ~= 'off' and not bare then
@@ -10988,6 +11011,14 @@ function D.frame(L, snap, rows, state, info)
   end
   for _, e in ipairs(D.sec_lines or {}) do set(e[4]); gfx.rect(e[1], e[2], e[3], 1, 1) end   -- 1 ноя: 1 px на той же линии — поверх границы паттерна   -- 31 окт: прямо по линии такта (она — верх строки y), не ниже   -- граница секции — её цветом через все треки
   D.sec_lines = nil
+  for _, g in ipairs(D.ghost_rects or {}) do set(U.BG, 0.45); gfx.rect(g[1], g[2], g[3], g[4], 1); gfx.a = 1 end   -- 6 ноя: копии фраз — тусклее
+  D.ghost_rects = nil
+  for _, t in ipairs(D.ph_labels or {}) do   -- 6 ноя: имя фразы в коробке триггера, поверх нот
+    local s2 = fit(t[4], t[3])
+    set(U.AMBER); gfx.rect(t[1], t[2], ms(s2) + 2, L.th or (L.rh - 2), 1)
+    text(t[1] + 1, t[2], s2, U.BG)
+  end
+  D.ph_labels = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
   for _, e in ipairs(D.envcur or {}) do set(e[5]); gfx.rect(e[1], e[2], e[3], e[4], 0); gfx.rect(e[1] + 1, e[2] + 1, e[3] - 2, e[4] - 2, 0) end   -- 31 окт: рамка курсора огибающей — 2 px, поверх линий

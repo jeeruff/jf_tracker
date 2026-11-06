@@ -18074,6 +18074,33 @@ ctx.phr_edit_toggle = function(name)
   relayout()
   vim.msg = ('PHRASE %s: the tracker edits its source - every instance follows; e in the phrases pane (:phedit) - back to the song'):format(r.name)
 end
+-- 6 ноя: \ p — меню фраз в трекере: новая из блока / паттерна, вставить, править, переименовать, удалить, панель.
+-- Фраза для e r x — триггер под курсором, иначе выбор из списка
+ctx.phr_here = function()
+  local f = L.flat[vim.cur.fi]
+  local cell = f and f.sub and f.sub[vim.cur.row]
+  if cell and cell.kind == 'cont' then cell = cell.of end
+  local tk = cell and cell.kind == 'midi' and cell.take
+  return tk and draw.phrase_of(tk) or nil
+end
+ctx.phr_pick = function(title, fn)
+  local items = {}
+  for _, r in ipairs(ctx.phr_list()) do items[#items + 1] = { label = r.name, fn = function() fn(r.name) end } end
+  if #items == 0 then vim.msg = 'no phrases yet - n makes one from the V block or the pattern'; return end
+  vim.open_hydra({ title = title, items = items })
+end
+ctx.phr_menu = function()
+  local here = ctx.phr_here()
+  local function on(op, title) return function() if here then ctx.phr_do({ op = op, name = here }) else ctx.phr_pick(title, function(n) ctx.phr_do({ op = op, name = n }) end) end end end
+  vim.open_hydra({ title = 'phrases' .. (here and (' - "' .. here .. '" under the cursor') or ''), items = {
+    { key = 'e', label = 'edit the phrase in the tracker (its source; every instance follows)', fn = on('edit', 'edit which phrase') },
+    { key = 'i', label = 'insert a phrase at the cursor (a trigger note)', fn = function() ctx.phr_pick('insert which phrase', function(n) ctx.phr_do({ op = 'insert', name = n }) end) end },
+    { key = 'l', label = 'the phrases panel', fn = function() ctx.set_focus('phrases') end },
+    { key = 'n', label = 'new phrase from the V block (else the pattern) of the cursor track', fn = function() ctx.phr_do({ op = 'new' }) end },
+    { key = 'r', label = 'rename (the source and every trigger)', fn = on('rename', 'rename which phrase') },
+    { key = 'x', label = 'delete: the source, its items and every trigger', fn = on('delete', 'delete which phrase') },
+  } })
+end
 ctx.phr_do = function(op)
   local R = reaper
   if op.op == 'new' then ctx.phrase_make(''); ctx.phr_cc = nil; return end
@@ -19603,7 +19630,8 @@ function event_actions(hover)
   add('Paste here (p)', function() edit.paste(vim.regs['"'], lpb, vim.cur.row, function(dfi)
     local f = L.flat[vim.cur.fi + dfi]; if not f then return nil end
     local lane = f.lane or f.col.lanes[1]
-    return { track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil } end) end, 'p')
+    return { track = f.col.track, lane_idx = f.col.fixed and lane.idx or nil } end) end)   -- 6 ноя: без буквы — p в меню у фраз (вставка и так p)
+  add('Phrases ...', function() ctx.phr_menu() end, 'p')   -- 6 ноя: \ p — меню фраз
   add('Insert MIDI item (bar)', function()
     local f = L.flat[vim.cur.fi]
     if f then
