@@ -1160,7 +1160,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local wy, wh = y + (2 + brow) * rh + 2, h - (3 + brow) * rh - 4
   -- 17 окт: полоса-обзор — всегда наверху, на всю ширину, над прицелом и его кнопками; высота — 2 строки (у волны)
   local BH, bar_y, bar_x, bar_w = 2 * rh, nil, x, w   -- 17 окт: 2 строки (3 — много)
-  if wh > BH + 8 * rh then bar_y = wy; wy = wy + BH + 2; wh = wh - BH - 2 end
+  -- 6 ноя: полоса-обзор — в самом низу: сверху вниз от точного к грубому (прицел, волна, вся длина)
+  if wh > BH + 8 * rh then wh = wh - BH - 2; bar_y = wy + wh + 2 end
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
   -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
@@ -1173,9 +1174,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- 12 окт: прицел (зум края) — раньше полосы-обзора: при зуме обзор отнимал высоту, и прицел пропадал
   -- 19 окт: прицел — только когда не дублирует волну: его окно ±zwin не шире трети видимого куска внизу
   local vspan0 = math.max(1e-3, math.min(e.len > 0 and e.len or 1, S.vb or e.len or 1) - math.max(0, S.va or 0))
-  if zt and wh > 9 * rh and 2 * (S.zwin or 0.04) * 3 <= vspan0 then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end   -- волна пополам: сверху целиком, снизу край
+  -- 6 ноя: прицел — всегда, когда есть край (без условия «не дублирует волну»: при зуме колесом он пропадал и
+  -- появлялся, волна прыгала местами с ним)
+  local _ = vspan0
+  if zt and wh > 9 * rh then ZH = math.floor(wh * 0.42); wh = wh - ZH - 2 end
   -- 16 окт: вкладка item внизу экрана (опция zoom on top, по умолчанию вкл) — прицел НАД полной волной
-  local ztop = ZH > 0 and S.zoom_top
+  local ztop = ZH > 0   -- 6 ноя: прицел всегда сверху (выше — точнее)
   local zy_top = ztop and wy or nil
   if ztop then wy = wy + ZH + 2 end
   if SBH > 8 and wh - SBH - 2 < 3 * rh then SBH = 8 end   -- места мало — обзор тонкой полосой, прицел остаётся
