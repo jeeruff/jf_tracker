@@ -425,8 +425,9 @@ KH.PAGES = {
     { k = '< >', d = 'the previous / next arrangement (a named set of the lanes that play)' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
-  keycaster = { title = 'keycaster - the keys you press (Ctrl+W g Y)', e = {
-    { k = 'Ctrl+W g Y', d = 'show the keycaster panel: a QWERTY keyboard, every key you press lights up and fades (modifiers too) - for showing how the tracker is played; needs js_ReaScriptAPI' },
+  keycaster = { title = 'keys - the note keyboard and the keycaster (Ctrl+W g K)', e = {
+    { k = 'notes qwerty', d = 'two views: notes - the keyboard (octave, keys, velocity, pedal; click a key - it plays); qwerty - every key you press lights up and fades (modifiers too), to show how the tracker is played' },
+    { k = 'Options - keys', d = 'transport - the keyboard in the transport bar (this pane hidden); pane - here, not in the transport' },
   } },
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },

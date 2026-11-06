@@ -5914,7 +5914,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 4 ноя: клавиатура — сразу справа от слова режима (как было), опция keys in transport — и при панели keys
   -- 6 ноя: опция keys hide — клавиатура не видна, пока keys mode выключен (полоса свободна)
   local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
-  if D.kbd_w > 0 and not kb_off and (D.tpkeys or not (L.pn and L.pn.by_panel and L.pn.by_panel.keys)) then table.insert(order, 1, { pri = 3, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end
+  if D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster) then table.insert(order, 1, { pri = 3, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end   -- 6 ноя: панелью keys — в транспорте нет
   order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
@@ -7862,9 +7862,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'renderer' and info.rd_draw then hover.rd = info.rd_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'renderer'); if not inside then hover.rd = nil end   -- 20 окт
       elseif id == 'keycaster' and info.kc_draw then
         -- 6 ноя: keycaster — две вкладки: qwerty (нажатые клавиши) и keys (клавиатура нот, бывшая панель keys)
-        local tx, view = ct.x + L.pad, info.kcview or 'qwerty'
+        local tx, view = ct.x + L.pad, info.kcview or 'notes'
         local down = gfx.mouse_cap & 1 == 1
-        for _, v in ipairs({ 'qwerty', 'keys' }) do
+        for _, v in ipairs({ 'notes', 'qwerty' }) do
           local bw = ms(v) + 2 * L.pad
           local on = view == v
           local gx, gy = gfx.mouse_x, gfx.mouse_y   -- панель бывает в буфере со сдвигом мыши
@@ -7878,7 +7878,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         end
         D.kc_down = down
         local y2 = ct.y + L.rh + 4
-        if view == 'keys' then
+        if view == 'notes' then
           local pp = info.piano
           if pp then pp.ins = info.vmode == 'insert' end
           D.piano_strip(L, ct.x, y2, ct.w, ct.y + ct.h - y2, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
@@ -7922,10 +7922,6 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif D.CM and D.CM[id] and D.cm_draw then D.cm_draw(id, L, ct.x, ct.y, ct.w, ct.h, foc == id)   -- 2 ноя: custom-модуль (modules/)
       elseif id == 'console' and info.console_draw then   -- 28 окт: консоль Strudel
         info.console_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'console')
-      elseif id == 'keys' then   -- 2 ноя: клавиатура панелью (та же отрисовка, что в полосе транспорта)
-        local pp = info.piano
-        if pp then pp.ins = info.vmode == 'insert' end
-        D.piano_strip(L, ct.x, ct.y, ct.w, ct.h, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
       elseif id == 'hints' and info.hints_draw then   -- 28 окт: что делает модуль под мышью
         info.hints_draw(L, ct.x + L.pad, ct.y + 2, ct.w - 2 * L.pad, ct.h - 4, foc == 'hints', hover)
       elseif id == 'help' and info.help_draw then   -- 17 окт: справка модуля в фокусе

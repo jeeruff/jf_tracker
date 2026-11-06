@@ -29,7 +29,6 @@ PN.PANELS = {
   { id = 'arranger',   label = 'region playlist',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
-  { id = 'keys',       label = 'keys',       key = 'K', hint = 'keys',    side = 'right', avail = 'merged' },   -- 6 ноя: клавиатура — только в транспорте (просьба); панель выключена   -- 2 ноя: клавиатура (oct / клавиши / vel / ped) — панелью, по умолчанию под браузером
   { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
@@ -44,7 +43,7 @@ PN.PANELS = {
   { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
   { id = 'reform',     label = 'reform',     key = 'R', hint = 'reform', side = 'right' },   -- 19 окт: reform выделенных нот (идея — Reform для Renoise)
   { id = 'humanizer',  label = 'humanizer',  key = 'H', hint = 'humanizer', side = 'right' },
-  { id = 'keycaster',  label = 'keycaster',  key = 'Y', hint = 'keycaster', side = 'right' },   -- 6 ноя: QWERTY, нажатые клавиши горят (показ)
+  { id = 'keycaster',  label = 'keys',       key = 'K', hint = 'keycaster', side = 'right' },   -- 6 ноя: keys — клавиатура нот (notes) и нажатые клавиши (qwerty); панелью или в транспорте (опция keys)
   { id = 'phrases',    label = 'phrases',    key = 'F', hint = 'phrases', side = 'right' },   -- 31 окт: фразы проекта (ph:NAME)
   { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
@@ -633,7 +632,6 @@ local function stack_keep(m, id, into)
   return true
 end
 PN.LATE = {
-  { 'keys', function(m) return PN.visible(m, 'browser') and PN.split(m, 'browser', 'keys', 'd', 0.15) end },   -- 2 ноя
   { 'sprops', function(m) return PN.visible(m, 'sample') and PN.split(m, 'sample', 'sprops', 'r', 0.4) end },
   { 'mixer', function(m) return PN.split(m, 'tracker', 'mixer', 'd', 0.28) end },
   -- 12 окт: note mod — вкладкой в стеке properties (item = волна / свойства / модуляция)
@@ -988,7 +986,7 @@ PN.ABOUT = {
   actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
   reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
   arranger = 'The order of the song in one place: the seq (patterns as text: A1 A1 B1x2 …), a scheme of the whole song, the sections row and the song playlist made of them, the arrangements (named sets of the lanes that play).',
-  keycaster = 'Two views: qwerty - the keys you press light up and fade (modifiers too), to show how the tracker is played; keys - the note keyboard (octave, keys, velocity, pedal).',
+  keycaster = 'Two views: notes - the note keyboard (octave, keys, velocity, pedal); qwerty - the keys you press light up and fade (modifiers too), to show how the tracker is played. Options - keys: in the transport bar or as this pane.',
   phrases = 'The phrases of the project: a piece of a track saved as one note. Enter puts it at the cursor (the note transposes it, velocity scales it), e edits its source - every instance follows.',
   lfogen = 'The curve generator: an LFO, a podkat (a ramp before every note) or an audio follower written into the envelope at the tracker cursor - as points or as an automation item.',
   humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',

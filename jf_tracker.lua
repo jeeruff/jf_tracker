@@ -329,7 +329,7 @@ local state = {
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
   noautofloat = flag('noautofloat', true),
-  kcview = reaper.GetExtState(EXT, 'kcview') ~= '' and reaper.GetExtState(EXT, 'kcview') or 'qwerty',   -- 6 ноя
+  kcview = reaper.GetExtState(EXT, 'kcview') ~= '' and reaper.GetExtState(EXT, 'kcview') or 'notes',   -- 6 ноя
   knob = reaper.GetExtState(EXT, 'knob') ~= '' and reaper.GetExtState(EXT, 'knob') or 'auto',   -- 6 ноя: ползунок слайдеров
   pixel = flag('pixel', true),   -- 6 ноя: пиксельный режим — кадр вполовину, на экран ×2 без сглаживания   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
   dspleft = flag('dspleft', true),
@@ -353,7 +353,7 @@ local state = {
   dotcolor = flag('dotcolor', false),   -- 18 окт: пустые точки — цветом поля
   pancol = flag('pancol', false),   -- 14 окт: колонка пана
   pann = tonumber(reaper.GetExtState('jf_tracker', 'pann')) or 17,
-  tpkeys = flag('tpkeys', false),
+  kbwhere = reaper.GetExtState(EXT, 'kbwhere') == 'pane' and 'pane' or 'transport',   -- 6 ноя: клавиатура — в транспорте или панелью keys
   fadercap = (function() local v = reaper.GetExtState(EXT, 'fadercap'); return (v == '==' or v == '[-]' or v == 'line') and v or 'apart' end)(),   -- 4 ноя: по умолчанию apart — метр отдельно от фейдера   -- 4 ноя: клавиатура и в полосе транспорта (справа от слова режима), даже при панели keys   -- 3 ноя: делений вида пана (zvp), нечётное; Shift+Opt+H / L
   fxbenter = flag('fxbenter', false),   -- 2 ноя: браузер эффектов — папка открывается по Enter (иначе как lf: сразу справа)
   namedrag = flag('namedrag', false),
@@ -488,11 +488,6 @@ state.panes = (function()
   if s ~= '' then
     local m = draw.panes.decode(s)
     if state.autoadd then draw.panes.add_new(m, s) end   -- 13 окт: новые модули — на свои места
-    -- 2 ноя: клавиатура-панель — один раз под браузер и без autoadd
-    if reaper.GetExtState(EXT, 'keyspane') == '' and not draw.panes.visible(m, 'keys') and draw.panes.visible(m, 'browser') then
-      draw.panes.split(m, 'browser', 'keys', 'd', 0.15)
-    end
-    reaper.SetExtState(EXT, 'keyspane', '1', true)
     return m
   end
   return draw.panes.DEFAULT()
@@ -721,7 +716,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13538,7 +13533,7 @@ ctx = {
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
       flag('fxbenter', 'fx browser: Enter opens a folder', 'off (default) - as in lf: moving over a folder on the left shows its plugins on the right at once; on - the list changes only on Enter'),
       { key = 'fadercap', label = 'fader style', kind = 'cycle', values = { 'line', '==', '[-]', 'apart' }, desc = 'the mixer fader cap: a line across the meter, two lines ==, a bracket cap [-], or apart - the meter on its own and the fader in its own slot beside it (for purists)', get = function() return state.fadercap or 'apart' end, set = function(v) state.fadercap = v; reaper.SetExtState(EXT, 'fadercap', v, true) end },
-      flag('tpkeys', 'keys in transport', 'the keyboard (oct, keys, vel) also in the transport strip, right of the mode word - even with the keys pane open'),
+      { key = 'kbwhere', label = 'keys', kind = 'cycle', values = { 'transport', 'pane' }, desc = 'the note keyboard (and the qwerty keycaster): in the transport bar, or as the pane keys (notes / qwerty views)', get = function() return state.kbwhere end, set = function(v) ctx.kbwhere_set(v) end },
       flag('pancol', 'pan column', 'a pan field after the volume of every audio note (00 left .. 80 centre .. FF right; empty - centre); 0Pxx is then not shown'),
       { key = 'textonly', label = 'text only', kind = 'toggle', desc = 'cells show only the text: no wave behind the notes, no item fill, no item frame', get = function() return state.textonly end, set = function(v) state.textonly = v; if v then state.waveonly = false end end },
       -- 11 окт: противоположность text only — аудио-подколонка трека узкой полосой волны (ширина — зум трека колесом)
@@ -13596,7 +13591,7 @@ ctx = {
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'libauto', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'tpkeys', 'fxbenter', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'libauto', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'kbwhere', 'fxbenter', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
       -- 1 ноя: experimental — всё экспериментальное в одном месте (просьба): PT-mode, рамки и визуализаторы, human, скорость фейдеров, карточки pm
@@ -24890,7 +24885,7 @@ local function frame()
       -- в другом модуле — без подсветки нажатий, полоса блёклая; m off
       -- (6 окт) — клавиатура не прячется, тоже блёклая
       -- 24 окт: и в DSP — там цифры при включённой клавиатуре тоже играют ноты (казалось, что она выключена)
-      local kfocus = state.focus == 'tracker' or state.focus == 'dsp' or state.focus == 'keys' or (state.focus == 'top' and state.toptab == 'sample')   -- 2 ноя: и панель keys (щелчок по ней не гасит клавиатуру)
+      local kfocus = state.focus == 'tracker' or state.focus == 'dsp' or state.focus == 'keycaster' or (state.focus == 'top' and state.toptab == 'sample')   -- 2 ноя: и панель keys (щелчок по ней не гасит клавиатуру)
       local active = state.piano_show and kfocus
       local held = {}
       -- 15 окт: клавиши играют ноты (INSERT или слой пианино) — нажатая подсвечивает клавиатуру: краем глаза видно, что идут ноты, не команды
@@ -25094,7 +25089,7 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
-    kcview = state.kcview, kcview_set = function(v) state.kcview = v; reaper.SetExtState(EXT, 'kcview', v, true) end,   -- 6 ноя: вкладка keycaster: qwerty / keys
+    kcview = state.kcview == 'keys' and 'notes' or state.kcview, kcview_set = function(v) state.kcview = v; reaper.SetExtState(EXT, 'kcview', v, true) end,   -- 6 ноя: вкладка keycaster: qwerty / keys
     kc_draw = function(x, y, w, h)   -- 6 ноя: панель keycaster — клавиши, что держатся сейчас (JS_VKeys)
       local now = reaper.time_precise()
       local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
@@ -26139,7 +26134,7 @@ local function frame()
       U.text(lx + L.pad, ly + 1, lab, U.AMBER)
     end
   end
-  draw.tpkeys = state.tpkeys
+  draw.kb_pane = state.kbwhere == 'pane'   -- 6 ноя: клавиатура — панелью keys (в транспорте нет)
   draw.fadercap = state.fadercap   -- 4 ноя: вид ручки фейдера микшера
   do   -- 4 ноя: самая ранняя строка курсора: паттерн или =START до начала проекта — туда можно (строки выше 1.1)
     local t0 = 0
@@ -35939,6 +35934,17 @@ ctx.fill_reaper = function()
   end
   reaper.defer(function() reaper.defer(place) end)
   vim.msg = 'over the REAPER window (Cmd+Opt+F12 again - docked; Cmd+F11 - the whole screen)'
+end
+-- 6 ноя: клавиатура — в транспорте или панелью keys (одна на оба места: панель — виды notes / qwerty)
+ctx.kbwhere_set = function(v)
+  state.kbwhere = v == 'pane' and 'pane' or 'transport'
+  reaper.SetExtState(EXT, 'kbwhere', state.kbwhere, true)
+  local PN, m = draw.panes, state.panes
+  if m and PN then
+    if state.kbwhere == 'pane' and not PN.visible(m, 'keycaster') then ctx.pane_do(function() return PN.show(m, 'keycaster') end, 'keys: a pane')
+    elseif state.kbwhere == 'transport' and PN.visible(m, 'keycaster') then ctx.pane_do(function() return PN.hide(m, 'keycaster') end, 'keys: in the transport') end
+  end
+  relayout()
 end
 ctx.libauto_toggle = function() state.libauto = not state.libauto; vim.msg = 'lib auto select ' .. (state.libauto and 'on - the tracker follows the instrument' or 'off - Enter goes to its track') end
 -- 6 ноя: Enter на инструменте чужого трека (auto select выкл) — туда и выбрать; иначе меню звука

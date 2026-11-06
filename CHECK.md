@@ -2551,3 +2551,4 @@
 - [ ] статус внизу слева: -- NORMAL -- / -- INSERT -- (красным) / -- VISUAL -- цветом режима, дальше сообщение
 - [ ] панели keys больше нет (и в Ctrl+W g); клавиатура — в транспорте (видна в keys mode / INSERT, опция keys hide)
 - [ ] keycaster: вкладки qwerty / keys (щелчок или f); keys — клавиатура нот, как была панель keys
+- [ ] keys = одна панель (Ctrl+W g K): виды notes / qwerty; Options → keys: transport (клавиатура в транспорте, панели нет) / pane (панель, в транспорте нет); старой панели keys и опции keys in transport больше нет
