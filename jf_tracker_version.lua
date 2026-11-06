@@ -984,6 +984,12 @@ V.THANKS = {
   'thanks to my friends and teachers - in particular esa ruoho (lackluster):',
   'parts of jf_tracker are based on his paketti for renoise, used with his permission.',
   'support his work: https://www.patreon.com/esaruoho',
+  '',
+  'beast - my brother, who showed me trackers and the demoscene in the first place.',
+  'huge respect to the demoscene community and pouet: so many people still moving niche tools forward',
+  'and turning the computer world into art.',
+  'great thanks to nicolas betoux of morphcat for the graphics help and the pixel art he makes.',
+  'and thanks to my wife, who has put up with more than 270 hours of me building this tracker so far.',
 }
 -- tutorial (4 окт): первые шаги, ячейка tutorial главного модуля / :tutorial
 V.TUTORIAL = {
