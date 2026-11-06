@@ -111,7 +111,10 @@ function P.draw(U, L, bx, by, bw, bh, hb, fit)
   local kb = collectgarbage('count')
   local lw = U.measure('frame ') + L.pad
   U.text(x, y, 'frame', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, work / frame_ms, ('%.1f / %.0f ms'):format(work, frame_ms)); y = y + L.rh + 2
-  U.text(x, y, 'Lua', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, kb / (64 * 1024), ('%.1f MB'):format(kb / 1024)); y = y + L.rh + 2
+  -- 6 ноя: память Lua — куча скрипта трекера (кэши картинок, снимок проекта, мусор до сборки), не память REAPER.
+  -- Полоса — от пика сессии (была от 64 МБ: всегда полная и красная); красная — только выше 400 МБ
+  P.kb_peak = math.max(P.kb_peak or 0, kb)
+  U.text(x, y, 'Lua', U.CYAN); bar(U, x + lw, y, bw - lw - 2 * L.pad, L.rh, (kb > 400 * 1024) and 1 or kb / math.max(P.kb_peak, 128 * 1024) * 0.7, ('%.1f MB  (peak %.0f)'):format(kb / 1024, P.kb_peak / 1024)); y = y + L.rh + 2
   local a = P.audio or {}
   local nfx, maxpdc = 0, 0
   for _, t in ipairs(P.tracks) do nfx = nfx + t.fx; if t.pdc > maxpdc then maxpdc = t.pdc end end

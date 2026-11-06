@@ -2171,6 +2171,19 @@ function V.key_impl(c)
     -- история (9 окт, как в zsh / atuin): ↑ ↓ Ctrl+P Ctrl+N — по набранному
     -- началу, Ctrl+R — fzf по всей истории (выбранная — в строку)
     V.hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
+    -- 6 ноя: набрано (не листаем историю) — ↑ ↓ по списку совпадений палитры, выбранная — в строку (как Tab);
+    -- пустая строка — ↑ ↓ история; Ctrl+P / N — всегда история
+    if (c == UP or c == DOWN) and not V.hist_pos and ((V.cmd_base or V.cmdline or ''):gsub('^:', '')) ~= '' then
+      V.cmd_base = V.cmd_base or V.cmdline
+      local matches = V.cmd_matches(V.cmd_base)
+      if #matches > 0 then
+        local d = c == UP and -1 or 1
+        V.cmd_cycle = (((V.cmd_cycle or (d > 0 and 0 or 1)) - 1 + d) % #matches) + 1
+        local m = matches[V.cmd_cycle]
+        V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
+      end
+      return
+    end
     if c == UP or c == DOWN or c == 16 or c == 14 then
       local h = V.hist
       if not V.hist_pos then V.hist_pos, V.hist_pre = #h + 1, V.cmdline or '' end
@@ -2191,10 +2204,10 @@ function V.key_impl(c)
       return
     end
     if c ~= UP and c ~= DOWN then V.hist_pos, V.hist_pre = nil, nil end
-    if c == ESC then V.mode = back; V.cmdline = nil; V.cmd_cycle = nil
+    if c == ESC then V.mode = back; V.cmdline = nil; V.cmd_cycle = nil; V.cmd_base = nil
     elseif c == ENTER then
       local line = V.cmdline or ''
-      V.mode = back; V.cmdline = nil; V.cmd_cycle = nil
+      V.mode = back; V.cmdline = nil; V.cmd_cycle = nil; V.cmd_base = nil
       if line:match('%S') then
         for i = #V.hist, 1, -1 do if V.hist[i] == line then table.remove(V.hist, i) end end
         V.hist[#V.hist + 1] = line
@@ -2219,15 +2232,16 @@ function V.key_impl(c)
         if #pc.list > 1 then V.msg = table.concat(pc.list, ' ') end
       end
     elseif c == TAB then
+      V.cmd_base = nil
       local matches, word = V.cmd_matches(V.cmdline)
       if #matches > 0 then
         V.cmd_cycle = ((V.cmd_cycle or 0) % #matches) + 1
         local m = matches[V.cmd_cycle]
         V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
       end
-    elseif c == BS then V.cmdline = TX.bs(V.cmdline); V.cmd_cycle = nil
+    elseif c == BS then V.cmdline = TX.bs(V.cmdline); V.cmd_cycle = nil; V.cmd_base = nil
     elseif c == 47 and ctx.name_suggest and ctx.name_suggest(V.cmdline or '') then V.cmd_cycle = nil   -- «/» в имени — подсказки
-    elseif TX.char(c) then V.cmdline = (V.cmdline or '') .. TX.char(c); V.cmd_cycle = nil end   -- 20 окт: и кириллица
+    elseif TX.char(c) then V.cmdline = (V.cmdline or '') .. TX.char(c); V.cmd_cycle = nil; V.cmd_base = nil end   -- 20 окт: и кириллица
     return
   end
 
@@ -4294,7 +4308,7 @@ function V.popup()
     local b = utf8.offset(t, V.prompt.pos + 1) or (#t + 1)
     return { title = t, before = t:sub(1, b - 1), fresh = V.prompt.fresh, lines = {}, kind = 'prompt' }
   elseif V.mode == 'cmd' then
-    local matches, word = V.cmd_matches(V.cmdline)
+    local matches, word = V.cmd_matches(V.cmd_base or V.cmdline)   -- 6 ноя: ↑ ↓ по списку — список по набранному, не по подставленному
     local lines = {}
     -- 6 ноя: палитра (во всю ширину над строкой): пусто — команды модуля в фокусе (here) и история (recent);
     -- набрано — совпадения и подходящие строки истории
