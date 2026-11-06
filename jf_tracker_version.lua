@@ -989,6 +989,7 @@ V.THANKS = {
   'huge respect to the demoscene community and pouet: so many people still moving niche tools forward',
   'and turning the computer world into art.',
   'great thanks to nicolas betoux of morphcat for the graphics help and the pixel art he makes.',
+  'https://morphcat.de/',
   'and thanks to my wife, who has put up with more than 270 hours of me building this tracker so far.',
 }
 -- tutorial (4 окт): первые шаги, ячейка tutorial главного модуля / :tutorial
