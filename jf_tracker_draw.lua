@@ -6285,8 +6285,15 @@ function D.draw_mixsnaps(L, info, hover)
   row_of({ { 'declip', 'declip' }, { 'sends', 'sends' }, { 'router', 'router' }, { 'trnames', 'trnames' }, { 'view', 'mixview' } })
   set(U.LINE); gfx.rect(x, yy + 1, w, 1, 1)
   yy = yy + 4
-  text(x + 2, yy, fit('snapshots', w - 4), U.GREY); yy = yy + rh   -- 4 ноя: подпись блока снапшотов
-  row_of({ { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' } })
+  -- 6 ноя: кнопки снапшотов не влезают в одну строку — заголовок snapshots сам кнопка с выпадашкой команд
+  local SB = { { 'new', 'new' }, { 'prev', 'prev' }, { 'next', 'next' }, { 'up', 'up' }, { 'down', 'down' }, { 'sws', 'win' }, { 'filter', 'filtermenu' } }
+  local need = 0
+  for _, b in ipairs(SB) do need = need + ms(b[1]) + 2 * L.pad + 2 end
+  if need > w then btn(x, yy, 'snapshots v', false, false, { what = 'snapmenu' }); yy = yy + rh
+  else
+    text(x + 2, yy, fit('snapshots', w - 4), U.GREY); yy = yy + rh   -- 4 ноя: подпись блока снапшотов
+    row_of(SB)
+  end
   yy = yy + 2
   -- таблица
   local nw = ms('12') + L.pad

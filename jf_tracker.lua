@@ -2360,6 +2360,18 @@ ctx = {
       vim.msg = state.declip > 0 and ('declip: peaks and clips reset by themselves %d s after the last new peak (options: declip - the seconds)'):format(state.declip) or 'declip off: peaks hold until a click on the number (Shift+click - all tracks)'
       return
     end
+    if what == 'snapmenu' then   -- 6 ноя: узкий микшер — команды снапшотов выпадашкой
+      vim.open_hydra({ title = 'snapshots', items = {
+        { key = 'n', label = 'new', fn = function() ctx.mixsnap_do('new') end },
+        { key = 'k', label = 'prev', fn = function() ctx.mixsnap_do('prev') end },
+        { key = 'j', label = 'next', fn = function() ctx.mixsnap_do('next') end },
+        { key = 'u', label = 'move up', fn = function() ctx.mixsnap_do('up') end },
+        { key = 'd', label = 'move down', fn = function() ctx.mixsnap_do('down') end },
+        { key = 's', label = 'SWS snapshots window', fn = function() ctx.mixsnap_do('win') end },
+        { key = 'f', label = 'filter ...', fn = function() ctx.mixsnap_do('filtermenu') end },
+      } })
+      return
+    end
     if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then vim.msg = 'snapshots need SWS'; return end
     local rows = ctx.msn_rows()
     local _, cs = reaper.GetProjExtState(0, 'jf_tracker', 'mixsnapcur')
