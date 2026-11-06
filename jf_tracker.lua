@@ -24164,7 +24164,14 @@ local function frame()
     ctx.AIE.drawn = false
   end   -- 2 ноя: «где я» — сверху справки
   -- 27 окт: внешний замер (ExtState jf_dbg/prof = 1, раз в секунду проверка) — сводка jftop в jf_dbg/top, без окна и debug
-  if reaper.time_precise() - (ctx.prof_ext_t or 0) > 1 then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
+  local ext_tick = reaper.time_precise() - (ctx.prof_ext_t or 0) > 1
+  if ext_tick then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
+  -- 6 ноя: диагностика памяти снаружи — jf_dbg mem=1: отчёт :mem в ExtState jf_tracker/mem; jf_dbg gc=inc|gen — режим сборщика
+  if ext_tick then
+    if reaper.GetExtState('jf_dbg', 'mem') == '1' then reaper.SetExtState('jf_dbg', 'mem', '0', false); pcall(ctx.mem) end
+    local g = reaper.GetExtState('jf_dbg', 'gc')
+    if g ~= '' and g ~= ctx.gc_mode_dbg then ctx.gc_mode_dbg = g; ctx.gc_apply(g) end
+  end
   draw.prof_on = state.debug or ctx.prof_ext or (ctx.PERF and ctx.PERF.active and ctx.PERF.jftop and (not state.panes_ui or reaper.time_precise() - (ctx.PERF.seen or 0) < 1)) or false   -- 18 окт: панель perf не видна — без профиля
   draw.prof_mem = ctx.PERF and ctx.PERF.active and ctx.PERF.jftop or false   -- 2 ноя: КБ по участкам — только в окне jftop
   draw.pmark('snapshot + model rebuild')
@@ -32765,6 +32772,14 @@ reaper.DeleteExtState(EXT, 'err', false)
 -- обычно; закрываемся, только если ошибка повторяется ~3 с подряд (цикл)
 -- 21 окт: :mem — кто держит память Lua: полная сборка (до / после — мусор или живое), затем перепись
 -- по корням — upvalues кадра (локальные кэши main), ctx, state; отчёт в статус, debug log и ExtState mem
+-- 6 ноя: сборщик мусора. По умолчанию Lua 5.4 — инкрементальный с паузой 200: новый цикл только когда куча вдвое
+-- больше живых данных — отсюда «пила» 250 → 500 → 250 МБ и пик под 800. Кадр трекера — сотни короткоживущих таблиц и
+-- строк: поколенческий режим (gen) убирает их почти сразу, куча держится у объёма живых данных
+ctx.gc_apply = function(mode)
+  if mode == 'inc' then collectgarbage('incremental', 200, 100) else collectgarbage('generational', 20, 100) end
+  ctx.gc_mode = mode == 'inc' and 'inc' or 'gen'
+end
+ctx.gc_apply(reaper.GetExtState(EXT, 'gcmode') == 'inc' and 'inc' or 'gen')
 ctx.mem = function()
   local before = collectgarbage('count')
   collectgarbage('collect')
