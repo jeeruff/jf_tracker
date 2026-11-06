@@ -17951,6 +17951,22 @@ end
 -- 31 окт: панель phrases — фразы проекта (регионы ph:NAME) с длиной и числом вхождений; кэш по счётчику правок
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
 ctx.KCP = dofile(DIR .. '/jf_tracker_keycaster.lua')   -- 6 ноя: панель keycaster
+-- 6 ноя: палитра команд — команды модуля в фокусе: :слова из его страницы справки (KH), с описанием; → список, имя
+ctx.cmd_here = function()
+  local f = state.focus == 'top' and state.toptab or state.focus
+  local page = KH.PAGES[f] and f or (draw.panes and draw.panes.BY[f] and draw.panes.BY[f].hint)
+  if f == 'tracker' and vim.mode == 'insert' then page = 'insert' end
+  local pg = page and KH.PAGES[page]
+  local out, seen = {}, {}
+  for _, e in ipairs(pg and pg.e or {}) do
+    if type(e) == 'table' and e.k then
+      for tok in tostring(e.k):gmatch('%S+') do
+        if tok:match('^:%a') and not seen[tok] then seen[tok] = true; out[#out + 1] = { tok, e.m or e.d or '' } end
+      end
+    end
+  end
+  return out, (pg and pg.title or f or ''):match('^[^%-]*'):gsub('%s+$', '')
+end
 ctx.phr_list = function()
   local sc = reaper.GetProjectStateChangeCount(0)
   if ctx.phr_cc and ctx.phr_cc.sc == sc then return ctx.phr_cc.list end

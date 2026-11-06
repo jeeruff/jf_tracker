@@ -4296,14 +4296,51 @@ function V.popup()
   elseif V.mode == 'cmd' then
     local matches, word = V.cmd_matches(V.cmdline)
     local lines = {}
+    -- 6 ноя: палитра (во всю ширину над строкой): пусто — команды модуля в фокусе (here) и история (recent);
+    -- набрано — совпадения и подходящие строки истории
+    local typed = (V.cmdline or ''):gsub('^:', '')
+    local AMB, GRY = { 0.95, 0.65, 0.25 }, { 0.6, 0.6, 0.6 }
+    local hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
+    if typed == '' then
+      local here, where = {}, nil
+      if ctx.cmd_here then here, where = ctx.cmd_here() end
+      if #here > 0 then
+        lines[#lines + 1] = { key = 'here', text = (where or '') .. ' - commands of this module', col = AMB }
+        for i, h in ipairs(here) do if i > 10 then break end; lines[#lines + 1] = { key = h[1], text = h[2] } end
+      end
+      local seen, nr = {}, 0
+      for i = #hist, 1, -1 do
+        local l = hist[i]
+        if not seen[l] then
+          seen[l] = true; nr = nr + 1
+          if nr == 1 then lines[#lines + 1] = { key = 'recent', text = 'Up / Down - back through them', col = AMB } end
+          lines[#lines + 1] = { key = ':' .. l, text = '' }
+          if nr >= 8 then break end
+        end
+      end
+      lines[#lines + 1] = { key = 'all', text = 'type to search every command, Tab completes, :! - REAPER actions', col = AMB }
+      return { title = 'commands', lines = lines, kind = 'cmd', full = true }
+    end
     for i, c in ipairs(matches) do
       if i > 14 then break end
       lines[#lines + 1] = { key = c[1] .. (c[2] ~= '' and (' ' .. c[2]) or ''), text = c[3] }
     end
+    do   -- история, что начинается с набранного
+      local seen, nr = {}, 0
+      for i = #hist, 1, -1 do
+        local l = hist[i]
+        if not seen[l] and l:sub(1, #typed) == typed and l ~= typed then
+          seen[l] = true; nr = nr + 1
+          if nr == 1 then lines[#lines + 1] = { key = 'recent', text = '', col = GRY } end
+          lines[#lines + 1] = { key = ':' .. l, text = '', col = GRY }
+          if nr >= 5 then break end
+        end
+      end
+    end
     -- 13 окт: совпадений нет — строкой (иначе окно сжималось до «:i» и казалось, что набор сбросился)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no such command - Backspace, or :! for REAPER actions', col = { 0.6, 0.6, 0.6 } } end
     -- 15 окт: набранное — в поле над списком, не заголовком
-    return { title = 'commands - Tab completes', lines = lines, kind = 'cmd', hl = #matches > 0 and V.cmd_cycle or nil }
+    return { title = 'commands - Tab completes', lines = lines, kind = 'cmd', hl = #matches > 0 and V.cmd_cycle or nil, full = true }
   elseif V.mode == 'search' then
     return { title = '/' .. (V.searchline or ''), lines = { { key = 'Enter', text = 'find next' }, { key = 'n / N', text = 'next / previous' }, { key = '*', text = 'search name under cursor' } }, kind = 'search' }
   end

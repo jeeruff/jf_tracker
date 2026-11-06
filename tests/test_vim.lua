@@ -463,10 +463,10 @@ eq('latin passthrough', keys.translate(104), 104)
 
 -- ── : подсказка и Tab, / поиск, hydra ─────────────────────────────────────
 reset()
-keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo)', #pp.lines, 10)
+keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); local nm = 0; for _, ln in ipairs(pp.lines) do if not ln.col then nm = nm + 1 end end; eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo)', nm, 10); eq('palette full width', pp.full, true)
 V.key(9);      eq('tab completes lpb', V.cmdline, 'lpb ')
 V.key(27)
-keysin(':');   pp = V.popup(); eq('all commands listed (max 14)', #pp.lines, 14)
+keysin(':');   pp = V.popup(); eq('empty palette ends with all', pp.lines[#pp.lines].key, 'all'); eq('empty palette: recent history', (function() for _, ln in ipairs(pp.lines) do if ln.key == 'recent' then return true end end end)(), true)
 V.key(27)
 reset()
 keysin('/sna'); eq('search mode', V.mode, 'search'); pp = V.popup(); eq('search popup', pp and pp.title, '/sna')

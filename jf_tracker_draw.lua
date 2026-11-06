@@ -14571,6 +14571,12 @@ function D.popup(L, p, anchor)
     end
   end
   local w = math.min(W - 2 * L.pad, ncol * colw + L.pad + gw)
+  -- 6 ноя: p.full — палитра команд во всю ширину окна (над строкой ввода), одной колонкой
+  if p.full then
+    ncol, nrow = 1, math.min(n, maxrows)
+    w = W - 2 * L.pad; colw = w
+    tw = math.max(ms('WWWW'), w - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad))
+  end
   local h = (nrow + 1) * L.rh + 2 * L.pad
   -- 27 окт: заголовок влезает целиком (меню не уже своей подписи)
   if p.title and p.title ~= '' and p.kind ~= 'prompt' then w = math.min(W - 2 * L.pad, math.max(w, ms(p.title) + 2 * L.pad + 2)) end
