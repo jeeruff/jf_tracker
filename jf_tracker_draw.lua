@@ -234,7 +234,7 @@ function D.set_font(state)
   if state.pixel ~= false and not D.ttf then D.SPACE = math.max(1, D.SPACE) end   -- 6 ноя: пиксельный режим — буквы не на верхней линии кнопок
   -- 11 окт: мелкий шрифт (метры, подписи колонок) — всегда x1: битмап без масштаба,
   -- TTF — родной кегль; при x1 он равен обычному
-  D.SMALL = D.ttf and math.min(1, D.ttf_px / math.max(1, D.ttf_size)) or 1 / D.SCALE
+  D.SMALL = D.ttf and 1 or 1 / D.SCALE   -- 6 ноя: у TTF мелкий = обычный кегль (родной был слишком мелким)
   tcache, next_img = {}, IMG_FIRST
   if D.reset_vcache then D.reset_vcache() end      -- вертикальные имена — тоже из старого шрифта
   if D.reset_glyph then D.reset_glyph(); D.reset_measure() end
@@ -1314,13 +1314,13 @@ end
 -- 11 окт: мелкий шрифт — подписи колонок, деления dB; всегда x1 (D.SMALL считает set_font)
 D.SMALL = D.SMALL or 1
 function D.small_measure(s)
-  if D.ttf then gfx.setfont(3, D.ttf_face, D.ttf_px); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
+  if D.ttf then gfx.setfont(3, D.ttf_face, D.ttf_size); local w = gfx.measurestr(s); gfx.setfont(D.font_id); return w end
   local s0 = D.SCALE; D.SCALE = 1; local w = ms(s); D.SCALE = s0; return w
 end
 function D.small_text(x, y, s, col)
   if s == nil or s == '' then return end
   if D.ttf then
-    gfx.setfont(3, D.ttf_face, D.ttf_px)
+    gfx.setfont(3, D.ttf_face, D.ttf_size)
     set(col); gfx.x, gfx.y = math.floor(x), math.floor(y + D.SPACE); gfx.drawstr(s)
     gfx.setfont(D.font_id)
     return

@@ -508,8 +508,10 @@ function PN.move(model, id, dir)
   local ax, sg = AX[dir], SG[dir]
   if par.ax == ax and par.kids[ix + sg] then
     par.kids[ix], par.kids[ix + sg] = par.kids[ix + sg], par.kids[ix]
+    par.fr[ix], par.fr[ix + sg] = par.fr[ix + sg], par.fr[ix]   -- 6 ноя: размер едет с панелью (трекер брал долю соседа)
     return bump(model)
   end
+  local f_old = math.max(0.15, math.min(0.6, par.fr[ix] or 0.3))   -- 6 ноя: доля панели — с собой в новое место
   -- вынуть и подняться (detach опустошает лист — вставляется новый); родитель
   -- остался (2+ детей) — подъём с него самого, иначе — с того, кто занял место
   local came = detach(model, id)
@@ -522,8 +524,9 @@ function PN.move(model, id, dir)
       local pos = sg < 0 and i or i + 1
       local n = #p.kids
       table.insert(p.kids, pos, lf)
-      for k = 1, #p.fr do p.fr[k] = p.fr[k] * n / (n + 1) end
-      table.insert(p.fr, pos, 1 / (n + 1))
+      for k = 1, #p.fr do p.fr[k] = p.fr[k] * (1 - f_old) end
+      table.insert(p.fr, pos, f_old)
+      local _ = n
       norm_fr(p)
       return bump(model)
     end
