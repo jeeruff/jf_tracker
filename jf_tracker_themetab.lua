@@ -75,7 +75,7 @@ end
 
 -- превью шрифтов: одна картинка, строка на шрифт
 local function font_img(fonts, pw, ph)
-  local key = pw .. ':' .. ph .. ':' .. #fonts .. ':' .. tostring(U.TEXT[1]) .. tostring(U.TEXT[2])
+  local key = 'v2:' .. pw .. ':' .. ph .. ':' .. #fonts .. ':' .. tostring(U.TEXT[1]) .. tostring(U.TEXT[2])   -- v2: битмап без отсечения
   for _, f in ipairs(fonts) do key = key .. f.key .. tostring(f.face) .. tostring(f.size) end
   if TT.fkey == key then return end
   local d0 = gfx.dest
@@ -91,7 +91,7 @@ local function font_img(fonts, pw, ph)
       gfx.drawstr(f.key .. '  C-4 01 7F')   -- 4 ноя: короче — в плитку влезает без обрезки (было … Abc 0123)
     else
       gfx.setfont(ctx.font_id())
-      ctx.text(4, y + math.floor((ph - ctx.L().rh) / 2), ((f.key == 'off' or f.key == 'bitmap') and 'default bitmap' or f.key) .. '  C-4 01 7F', U.TEXT)   -- 6 ноя: имя битмапа
+      ;(ctx.text_noclip or ctx.text)(4, y + math.floor((ph - ctx.L().rh) / 2), ((f.key == 'off' or f.key == 'bitmap') and 'bitmap default' or f.key) .. '  C-4 01 7F', U.TEXT)   -- 6 ноя: без отсечения — координаты картинки, не экрана   -- 6 ноя: имя битмапа
     end
   end
   gfx.setfont(ctx.font_id()); gfx.dest = d0

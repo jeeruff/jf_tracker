@@ -10250,12 +10250,14 @@ function D.frame(L, snap, rows, state, info)
   do
     local bx, y4 = tx0 + 3, hy + (L.header_rows - 1) * L.rh + 2
     local bw = L.label_w - 4
+    -- 6 ноя: ширина кнопки — одна формула (bw1) и для места, и для рисования; отступ L.pad (пиксельный режим: буквы были на рамке)
+    local function bw1(label) return ms(label) + 2 * L.pad end
     local function btn(x, y, label, kind, what, on)
-      local w1 = ms(label) + 2
+      local w1 = bw1(label)
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.25) or U.BG)); gfx.rect(x, y, w1, L.rh, 1)
       set(hot and U.AMBER or (on and U.CYAN or U.LINE)); gfx.rect(x, y, w1, L.rh, 0)
-      text(x + 1, y, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      text(x + L.pad, y, label, hot and U.AMBER or (on and U.CYAN or U.TEXT))
       if hot then hover[kind] = what end
       hint(kind, x, y, w1, L.rh, what)
       return w1
@@ -10271,33 +10273,33 @@ function D.frame(L, snap, rows, state, info)
         local yr = yz   -- 31 окт: zoom mark — в строке 4, имя паттерна — под ними, над длиной
         local azl = (ms('autozoom') + ms('mark') + ms('WH') + 10 <= bw) and 'autozoom' or 'zoom'
         local xw = bx + btn(bx, yr, azl, 'viewbtn', 'autozoom', state.autozoom) + 2   -- 31 окт: W H — справа от autozoom
-        if xw + ms('WH') + 6 <= bx + bw - ms('mark') - 2 then xw = xw + btn(xw, yr, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yr, 'H', 'viewbtn', 'fith') end
+        if xw + bw1('W') + bw1('H') + 2 <= bx + bw - bw1('mark') then xw = xw + btn(xw, yr, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yr, 'H', 'viewbtn', 'fith') end
         btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
         if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — меню вида
       else
-        local xw = bx + btn(bx, yz, (ms('autozoom') + ms('WH') + 8 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
-        if xw + ms('WH') + 6 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; xw = xw + btn(xw, yz, 'H', 'viewbtn', 'fith') + 2 end   -- 31 окт: W H — справа от autozoom
+        local xw = bx + btn(bx, yz, (bw1('autozoom') + bw1('W') + bw1('H') + 4 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
+        if xw + bw1('W') + bw1('H') + 2 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; xw = xw + btn(xw, yz, 'H', 'viewbtn', 'fith') + 2 end   -- 31 окт: W H — справа от autozoom
         local vdone = false
         local own = yz + L.rh <= y4 - L.rh   -- markers своей строкой (иначе mark справа в этой же)
-        if xw + ms('view') + 2 <= bx + bw - (own and 0 or (ms('mark') + 4)) then btn(xw, yz, 'view', 'viewbtn', 'viewmenu'); vdone = true end   -- 4 ноя: view — сразу за W H
+        if xw + bw1('view') <= bx + bw - (own and 0 or (bw1('mark') + 2)) then btn(xw, yz, 'view', 'viewbtn', 'viewmenu'); vdone = true end   -- 4 ноя: view — сразу за W H
         if yz + L.rh <= y4 - L.rh then
-          local mkl = (ms('markers') + ms('view') + 6 <= bw or vdone) and 'markers' or 'mark'
+          local mkl = (bw1('markers') + bw1('view') + 2 <= bw or vdone) and 'markers' or 'mark'
           local xm = bx + btn(bx, yz + L.rh, mkl, 'viewbtn', 'markers') + 2
-          if not vdone and xm + ms('view') + 2 <= bx + bw then btn(bx + bw - ms('view') - 2, yz + L.rh, 'view', 'viewbtn', 'viewmenu') end   -- запасное место — у markers
+          if not vdone and xm + bw1('view') <= bx + bw then btn(bx + bw - bw1('view'), yz + L.rh, 'view', 'viewbtn', 'viewmenu') end   -- запасное место — у markers
         else
-          btn(bx + bw - ms('mark') - 2, yz, 'mark', 'viewbtn', 'markers')
+          btn(bx + bw - bw1('mark'), yz, 'mark', 'viewbtn', 'markers')
         end   -- 31 окт: короче — zoom / mark (не az mk)
       end
     else
       -- 20 окт: низкая шапка — az mk в конце ряда 1 (за param), x2 /2 остаются на своём месте у длины
       local xr = D.cn_r1x or bx
       local yr = hy + 1 + L.rh
-      if xr + ms('mark') + 2 <= bx + bw then
-        local mw = ms('mark') + 2
+      if xr + bw1('mark') <= bx + bw then
+        local mw = bw1('mark')
         btn(bx + bw - mw, yr, 'mark', 'viewbtn', 'markers')
-        local zx = bx + bw - mw - 2 - (ms('zoom') + 2)
-        if xr + ms('zoom') + 2 <= bx + bw - mw - 2 then btn(zx, yr, 'zoom', 'viewbtn', 'autozoom', state.autozoom) end
-        if xr + ms('view') + 2 <= zx - 2 then btn(zx - ms('view') - 4, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view
+        local zx = bx + bw - mw - 2 - (bw1('zoom'))
+        if xr + bw1('zoom') <= bx + bw - mw - 2 then btn(zx, yr, 'zoom', 'viewbtn', 'autozoom', state.autozoom) end
+        if xr + bw1('view') <= zx - 2 then btn(zx - bw1('view') - 2, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view
       end
     end
     D.rglen_at = nil
@@ -10307,8 +10309,8 @@ function D.frame(L, snap, rows, state, info)
       local rg = info.cur_region
       -- x2 /2 справа от длины — и в низкой шапке (20 окт: markers ушли в ряд 1)
       local rx = bx + bw
-      rx = rx - (ms('/2') + 2); btn(rx, y4, '/2', 'rgbtn', 'half')
-      rx = rx - 4 - (ms('x2') + 2); btn(rx, y4, 'x2', 'rgbtn', 'double')   -- 31 окт: зазор 4 — рамки не слипаются
+      rx = rx - bw1('/2'); btn(rx, y4, '/2', 'rgbtn', 'half')
+      rx = rx - 4 - bw1('x2'); btn(rx, y4, 'x2', 'rgbtn', 'double')   -- 31 окт: зазор 4 — рамки не слипаются
       rx = rx - 2
       local aw = ms('<') + 2
       local s2 = tostring(math.max(0, math.floor((rg.r1 - rg.r0) + 0.5)))

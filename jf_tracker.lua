@@ -16379,6 +16379,7 @@ ctx.modefont_set = function(v) state.modefont = v ~= 'off' and v or nil; draw.mo
 ctx.tt = {}
 ctx.tt_api = {
   L = function() return L end, text = draw.text, measure = draw.measure, fit = draw.fit,
+  text_noclip = function(...) local c = draw.clip; draw.clip = nil; draw.text(...); draw.clip = c end,   -- 6 ноя: текст в свою картинку (образцы шрифтов) — без отсечения по панели
   font_id = function() return draw.font_id or 0 end,
   -- 14 окт: шрифт слова режима — вкладка видит только эту таблицу, не главный ctx (секция была пустой)
   modefonts = function() return ctx.MODEFONTS end,
