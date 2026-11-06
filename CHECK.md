@@ -2534,3 +2534,4 @@
 - [ ] матрица: свёрнутая колонка — узкая, подпись вертикально; одинаковые значения — тусклая точка, отличающиеся — + ярче; имя свёрнуто — пусто
 - [ ] угол трекера: < 128 > x2 /2 и view / mark / zoom / W H — кнопки с отступом, не налезают; fonts: первая плитка «bitmap default  C-4 01 7F»
 - [ ] pixel mode + пиксельный TTF (bigblue, departure, gohu11/14, terminess, proggy, profont, monocraft): size 1 и 2 — родной кегль, 3 — ×2, без мыла
+- [ ] options: вкладки theme (темы + tweak) и fonts (шрифты + слово режима) отдельно; в словах режима нет Andale Mono и Monocraft, есть Marker Felt и Nanum Brush Script

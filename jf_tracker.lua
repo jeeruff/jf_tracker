@@ -13629,14 +13629,14 @@ ctx = {
     -- 10 окт: вкладка theme — темы и шрифты с примерами (jf_tracker_themetab.lua рисует сам)
     -- 14 окт: вкладки theme и audio нет — разделы общего списка options (поиск находит всё)
     items[#items + 1] = { gap = true, sep = true }
-    items[#items + 1] = { sep = true, title = 'theme and fonts', group = 'theme' }   -- 18 окт: снова своя вкладка theme (просьба) — опциям вся ширина
+    items[#items + 1] = { sep = true, title = 'themes', group = 'theme' }   -- 6 ноя: шрифты — своей вкладкой fonts   -- 18 окт: снова своя вкладка theme (просьба) — опциям вся ширина
     ctx.theme_tab.sync()
     items[#items + 1] = { kind = 'block', label = 'themes and fonts',
       height = function() return (ctx.theme_tab.last and ctx.theme_tab.last.total) or 40 * L.rh end,
-      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, OPT.side_ok and 'themes' or 'all') end,   -- 15 окт: без scroll — своя прокрутка (рамка справа в раскладке кирпичами)
-      key = function(c) return ctx.theme_tab.key(c, OPT.side_ok and 'themes' or 'all') end,
-      wheel = function(d) ctx.theme_tab.wheel(d, OPT.side_ok and 'themes' or 'all') end,
-      click = function() return ctx.theme_tab.click(OPT.side_ok and 'themes' or 'all') end }
+      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, 'themes') end,   -- 15 окт: без scroll — своя прокрутка (рамка справа в раскладке кирпичами)
+      key = function(c) return ctx.theme_tab.key(c, 'themes') end,
+      wheel = function(d) ctx.theme_tab.wheel(d, 'themes') end,
+      click = function() return ctx.theme_tab.click('themes') end }
     items[#items + 1] = { gap = true, sep = true }
     -- 27 окт: твик темы (вкладка theme): ползунки поверх любой темы
     items[#items + 1] = { sep = true, title = 'theme tweak', group = 'theme' }
@@ -13652,10 +13652,10 @@ ctx = {
       fn = function() ctx.TW = { hue = 0, sat = 100, bri = 0, con = 100, sha = 0, acc = 100 }; for k, v in pairs(ctx.TW) do reaper.SetExtState(EXT, 'tw_' .. k, tostring(v), true) end; ctx.apply_theme(state.theme); vim.msg = 'theme tweak reset' end }
     -- 31 окт: шрифты — свой блок слева под твиком (там много места), темы справа; места нет — шрифты под темами
     items[#items + 1] = { gap = true, sep = true }
-    items[#items + 1] = { sep = true, title = 'fonts', group = 'theme' }
-    items[#items + 1] = { kind = 'block', label = 'fonts', side = true,
-      height = function() return 8 * L.rh end,
-      draw = function(x, y, w, h, scroll) if not OPT.side_ok then return 0 end; return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, 'fonts') end,
+    items[#items + 1] = { sep = true, title = 'fonts', group = 'fonts' }   -- 6 ноя: своя вкладка (просьба)
+    items[#items + 1] = { kind = 'block', label = 'fonts',
+      height = function() return (ctx.theme_tab.last_f and ctx.theme_tab.last_f.total) or 30 * L.rh end,
+      draw = function(x, y, w, h, scroll) return ctx.theme_tab.draw(x, y, w, h, scroll and { scroll = scroll } or nil, 'fonts') end,
       key = function(c) return ctx.theme_tab.key(c, 'fonts') end,
       wheel = function(d) ctx.theme_tab.wheel(d, 'fonts') end,
       click = function() return ctx.theme_tab.click('fonts') end }
@@ -16369,7 +16369,7 @@ OPT.ask.init(U, ctx)
 -- 10 окт: вкладка theme окна Options — темы карточками, шрифты своим шрифтом
 ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
-ctx.MODEFONTS = { 'off', 'Tengwar Telcontar', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Andale Mono', 'Monocraft Nerd Font',
+ctx.MODEFONTS = { 'off', 'Tengwar Telcontar', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Marker Felt', 'Nanum Brush Script',   -- 6 ноя: Andale Mono и Monocraft убраны (просьба); маркер и кисть — системные
   -- 16 окт: ещё — системные и уже установленные в ~/Library/Fonts (проверено fc-list)
   'Noto Sans Glagolitic', 'Savoye LET',
   'Eau de rose', 'Discognate', 'DemonCubicBlock NKP Shade', 'P0T-NOoDLE', 'mOsOul', 'MicroKnight', 'Topaz a600a1200a400', 'DepartureMono Nerd Font', '3270 Nerd Font' }
