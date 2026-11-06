@@ -36152,7 +36152,9 @@ end
 -- 28 окт: эпоха кэша панелей — растёт при любом вводе / правке / смене снимка, фокуса, раскладки, курсора, инструмента
 ctx.pc_ep, ctx.pc_key = 0, ''
 ctx.pc_epoch_calc = function(sn)
-  draw.pc_on = false   -- 28 окт: кэш панелей выключен — замер без выигрыша, при работе лишние копии через буфер
+  -- 28 окт: кэш панелей выключен — замер без выигрыша; 6 ноя: включается на лету (ExtState jf_dbg pc = 1) — сравнить на живом
+  if reaper.time_precise() - (ctx.pc_flag_t or 0) > 1 then ctx.pc_flag_t = reaper.time_precise(); ctx.pc_flag = reaper.GetExtState('jf_dbg', 'pc') == '1' end
+  draw.pc_on = ctx.pc_flag or false
   local k = table.concat({ tostring(sn), state.focus or '', state.toptab or '', tostring(state.panes and state.panes.v or 0), tostring(state.theme),
     vim.mode or '', tostring(vim.cur.fi), tostring(vim.cur.row), tostring(vim.inst), tostring(reaper.GetProjectStateChangeCount(0)),
     tostring(idle.input_t), tostring(gfx.w), tostring(gfx.h), tostring(vim.msg), tostring(B and B.path) }, '|')
