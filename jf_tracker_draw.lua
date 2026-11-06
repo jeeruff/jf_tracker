@@ -2654,6 +2654,8 @@ function D.phrase_of(take)
 end
 -- 6 ноя: айтем — копия фразы (P_EXT:jf_phrc = GUID триггера); кэш по айтему, сброс по счётчику правок
 D.phrc_cache = setmetatable({}, { __mode = 'k' })
+-- 6 ноя: первое слово имени паттерна — код (A1, B12, #3)?
+function D.code_like(w) return w:match('^%u%d+$') or w:match('^#%d+$') end
 function D.phrc(item)
   local sc = reaper.GetProjectStateChangeCount(0)
   if D.phrc_sc ~= sc then D.phrc_sc = sc; D.phrc_cache = setmetatable({}, { __mode = 'k' }) end
@@ -10785,10 +10787,11 @@ function D.frame(L, snap, rows, state, info)
     end
     -- 1 ноя: имя паттерна у стыка — на последней строке уходящего и на первой строке следующего (в полосе регионов)
     if L.rg_w > 0 and not L.ruler_right and not r.clip then
-      local pn = (patb[r.row] and patb[r.row].nxt) or (patb[r.row + 1] and patb[r.row + 1].prv)
+      local st = patb[r.row] and patb[r.row].nxt
+      local pn = st or (patb[r.row + 1] and patb[r.row + 1].prv)
       if pn then   -- 2 ноя: рисуются после полосы регионов (её подложка их закрашивала) — D.pat_names ниже
         D.pat_names = D.pat_names or {}
-        D.pat_names[#D.pat_names + 1] = { tx0 + L.jl_w + 3, y, L.rg_w - 5, ty, pn, is_cur_row }
+        D.pat_names[#D.pat_names + 1] = { tx0 + L.jl_w + 3, y, L.rg_w - 5, ty, pn, is_cur_row, st and 1 or -1 }   -- 6 ноя: 1 — начало, -1 — конец
       end
     end
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
@@ -11379,9 +11382,25 @@ function D.frame(L, snap, rows, state, info)
     set(U.PANEL); gfx.rect(tx0 + 1, cy, ms(s2) + 2 * L.pad, L.rh, 1)
     text(tx0 + 1 + L.pad, cy + 1, s2, U.AMBER)
   end
-  for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
-    set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
-    text(p[1] + 1, p[4], fit(p[5], p[3] - 1), p[6] and U.AMBER or U.TEXT)
+  -- 6 ноя: на строке стыка — только код (A1); имя — строкой ниже у начинающегося, строкой выше у кончающегося
+  -- (если та строка свободна и в теле трекера)
+  do
+    local taken = {}
+    for _, p in ipairs(D.pat_names or {}) do taken[p[2]] = true end
+    for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
+      local code, rest = p[5]:match('^(%S+)%s+(.+)$')
+      if not (code and D.code_like(code)) then code, rest = p[5], nil end
+      set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
+      text(p[1] + 1, p[4], fit(code, p[3] - 1), p[6] and U.AMBER or U.TEXT)
+      if rest then
+        local ny = p[2] + p[7] * L.rh
+        if not taken[ny] and ny >= L.body_y and ny + L.rh <= L.body_y + L.body_h then
+          taken[ny] = true
+          set(U.BG); gfx.rect(p[1], ny + 1, p[3], L.rh - 2, 1)
+          text(p[1] + 1, p[4] + p[7] * L.rh, fit(rest, p[3] - 1), U.GREY)
+        end
+      end
+    end
   end
   D.pat_names = nil
   -- полоска цвета региона у номеров шагов (2 окт): тот же цвет, что в
