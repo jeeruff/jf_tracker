@@ -11355,7 +11355,8 @@ function D.frame(L, snap, rows, state, info)
         set(c); gfx.rect(laneR, y0, 3, y1 - y0, 1)
         set(bgc); gfx.rect(laneR + 3, y0, L.th + 2, y1 - y0, 1)
         if rg.r0 >= row0 then set(c); gfx.rect(laneR, y0, L.th + 5, 1, 1) end
-        if y1 - y0 > L.th and state.rgnames ~= false and rg.r0 >= row0 then D.vtext(laneR + 4, y0 + 2, y1 - y0 - 4, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
+        if y1 - y0 > L.th + L.rh and state.rgnames ~= false and rg.r0 >= row0 then D.vtext(laneR + 4, y0 + L.rh + 2, y1 - y0 - L.rh - 4,   -- 6 ноя: под кодом на стыке (он закрывал первую букву)
+ rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx)), U.TEXT, bgc, true) end
       end
     end
     local mks = {}
@@ -11392,19 +11393,7 @@ function D.frame(L, snap, rows, state, info)
       if not (code and D.code_like(code)) then code, rest = p[5], nil end
       set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
       text(p[1] + 1, p[4], fit(code, p[3] - 1), p[6] and U.AMBER or U.TEXT)
-      -- 6 ноя (2): имя — вертикально на полосе региона: у начинающегося вниз от кода, у кончающегося — вверх до кода
-      if rest then
-        local b0, b1 = L.body_y, L.body_y + L.body_h
-        if p[7] > 0 then
-          local y0, y1 = p[2] + L.rh, b1
-          for ty2 in pairs(taken) do if ty2 >= y0 and ty2 < y1 then y1 = ty2 end end
-          if y1 - y0 >= ms('ab') then D.vtext(p[1] + 1, y0 + 1, y1 - y0 - 2, rest, U.GREY, U.BG, true) end
-        else
-          local y0, y1 = b0, p[2]
-          for ty2 in pairs(taken) do if ty2 + L.rh <= y1 and ty2 + L.rh > y0 then y0 = ty2 + L.rh end end
-          if y1 - y0 >= ms('ab') then D.vtext(p[1] + 1, y0 + 1, y1 - y0 - 2, rest, U.GREY, U.BG) end
-        end
-      end
+      local _ = rest   -- 6 ноя (3): имя — только на полосе региона (её вертикальная подпись), здесь второго слоя нет
     end
   end
   D.pat_names = nil
