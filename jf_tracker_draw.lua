@@ -5216,15 +5216,16 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   -- к цифре), справа две ровные колонки: LPB / pitch и legato / human (общая ширина колонки — res)
   local stxt = ({ auto = 'a', next = 'n' })[c.step] or tostring(c.step or 0)   -- 15 окт: режимы шага буквой — ширина как у числа
   local stepw = math.max(D.big_measure(stxt, 2), D.big_measure('16', 2)) + L.th + L.pad   -- + вертикальная подпись step (15 окт)
-  local col2, col3 = 'pitch resample', 'legato'   -- 31 окт: human — всегда словом (процент — в статусе), колонка не шире legato
+  -- 6 ноя: тоглы ввода — по 4 знака, таблицей (hold ripp lgto hmnz, высота shft / rsmp): место у LPB; что это — в статусе
+  local col2, col3 = 'LPB 16 T', 'hmnz'
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d%s'):format(c.lpb or 0, ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
-                  { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = 'ripple*' },   -- 28 окт: Opt+`
-                  { 'legato', 'legato', c.legato and U.CYAN or U.GREY, res = col3 } },
-                { { '_', '', w = stepw }, { 'pitch', 'pitch ' .. (c.pitchmode or 'shift'), res = col2 },
-                  { 'ripple', ({ [0] = 'ripple', 'ripple', 'ripple*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = 'ripple*' },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
-                  { 'human', 'human', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
+                  { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = col3 },   -- 28 окт: Opt+`
+                  { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 } },
+                { { '_', '', w = stepw }, { 'pitch', (c.pitchmode == 'resample') and 'rsmp' or 'shft', res = col2 },
+                  { 'ripple', ({ [0] = 'ripp', 'ripp', 'rip*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = col3 },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
+                  { 'human', 'hmnz', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
@@ -5654,13 +5655,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 31 окт (2): тоглы — сразу за x1.00 (rate без своей колонки), прижаты к правому краю кнопок; группа шире, только если не влезли
       need = ms('pun') + ms('pre') + ms('slo*') + ms('qtz') + 8 * L.pad
       local pre = -2
-      for i = 1, (pi or 2) - 1 do pre = pre + TW[i] + 2 end
+      for i = 1, (pi or 2) - 1 do pre = pre + TW[i] + 4 end
       need = math.min(pre + 2, math.floor((TW[1] + ms('mark')) / 2) + 2 * L.pad) + ms('x1.00') + 2 * L.pad + need
     end
     D.tp_play_i = pi
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
-    btot = -2
-    for i = 1, #blist do btot = btot + TW[i] + 2 end
+    btot = -4
+    for i = 1, #blist do btot = btot + TW[i] + 4 end   -- 6 ноя: зазор 4 px, как в нижнем ряду (ряды разъезжались)
     -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
     if need > 0 then btot = math.max(btot, need) end   -- тоглы записи длиннее колонок справа от play — группа шире
   end
@@ -5694,11 +5695,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         gfx.setfont(D.font_id)
       else
       -- 9 окт: символ — на 2 px ниже рамки, слово — на 1 px выше нижней (не заходят на границу)
-      text(bx + math.floor((bw - ms(sym ~= '' and sym or b[2])) / 2), by, sym ~= '' and sym or b[2], tc)   -- 15 окт: слов (rew, play …) нет — при наведении они в статусе
+      text(bx + math.floor((bw - ms(sym ~= '' and sym or b[2])) / 2), by + 1, sym ~= '' and sym or b[2], tc)   -- 6 ноя: на 1 px ниже — не на верхней линии   -- 15 окт: слов (rew, play …) нет — при наведении они в статусе
       end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
-      bx = bx + bw + 2   -- кнопки транспорта — группой (ширина btot — с 2)
+      bx = bx + bw + 4   -- 6 ноя: 4 px, как нижний ряд
     end
     -- 11 окт: full — строка кнопок под транспортом (|<< freeze · slow >>| dub), колонка в колонку
     if c.tpfull then
@@ -5715,7 +5716,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             local on = h[3] ~= nil
             set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(h[3], 0.3) or U.BG)); gfx.rect(hx, sy, w2, L.rh, 1)
             set(hot and U.AMBER or (on and h[3] or U.LINE)); gfx.rect(hx, sy, w2, L.rh, 0)
-            text(hx + math.floor((w2 - ms(h[2])) / 2), sy, fit(h[2], w2 - 2), hot and U.AMBER or (h[3] or U.GREY))
+            text(hx + math.floor((w2 - ms(h[2])) / 2), sy + 1, fit(h[2], w2 - 2), hot and U.AMBER or (h[3] or U.GREY))
             if hot then hover.ctrl = h[1] end
             hint('ctrl', hx, sy, w2, L.rh, h[1])
           end
@@ -5733,8 +5734,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- 16 окт: << / >> — ровно под << / >> верхнего ряда (по центру ячейки), черта | торчит наружу
           if b[1] == 'tp_start' then tx = sx + math.floor((tw - ms('<<')) / 2) - ms('|') elseif b[1] == 'tp_end' then tx = sx + math.floor((tw - ms('>>')) / 2) end
           if b[1] == 'shiftrec' and lab == '^O^' then   -- 15 окт: ^O^ (просьба), O — красное, как у rec
-            text(tx, sy, '^', lc); text(tx + ms('^'), sy, 'O', hot and U.AMBER or D.REC); text(tx + ms('^O'), sy, '^', lc)
-          else text(tx, sy, lab, lc) end
+            text(tx, sy + 1, '^', lc); text(tx + ms('^'), sy + 1, 'O', hot and U.AMBER or D.REC); text(tx + ms('^O'), sy + 1, '^', lc)
+          else text(tx, sy + 1, lab, lc) end
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tw, L.rh, b[1])
         end
@@ -5746,7 +5747,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- под rec и дальше — тоглы записи (punch pre-roll rec>lib slow; не влезли — короче)
     if c.tpfull then
       local ry = ly + 2 * L.rh + 2   -- 15 окт: маркеры / punch — третьей строкой (кнопки в одну строку)
-      local colx = function(i) local x2 = bx0; for k = 1, i - 1 do x2 = x2 + (TW[k] or tbw) + 2 end; return x2 end   -- 19 окт: колонки разной ширины
+      local colx = function(i) local x2 = bx0; for k = 1, i - 1 do x2 = x2 + (TW[k] or tbw) + 4 end; return x2 end   -- 19 окт: колонки разной ширины
       local function cellb(id, lab, x0, w0, on, dimc)
         local hot = cell_hot(x0, ry, w0, L.rh)
         if hot then set(D.CURROW); gfx.rect(x0 - 1, ry, w0 + 2, L.rh, 1); hover.ctrl = id end
