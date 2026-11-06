@@ -5868,7 +5868,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local by_id = {}
   for _, g in ipairs(D.transport_groups(c, L)) do by_id[g[1][1][1]] = g end
   local order = {}
-  local function addg(id) if by_id[id] then order[#order + 1] = { w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
+  -- 6 ноя: pri — что выпадает первым, когда полоса не влезает (меньше — раньше); кнопки транспорта — последними
+  local PRI = { step = 5, listen = 3, play = 7, rate = 2, sig = 2, punch = 1 }
+  local function addg(id) if by_id[id] then order[#order + 1] = { pri = PRI[id] or 2, w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   -- 16 окт: где курсор — у клавиатуры (был модлайн): трек, ниже колонка и строка
   do
     local vc = info.vcur
@@ -5880,7 +5882,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local l2 = ('%04d'):format(math.max(0, vc.row or 0) + (D.ROW_BASE or 1))
       local cl = ms('col') + L.pad          -- пробел в битмапе — нулевой ширины: отступ L.pad
       local lw = math.max(ms(fit(l1, 14 * L.cw)), cl + ms(fname), cl + ms(l2), 10 * L.cw)
-      order[#order + 1] = { w = lw, draw = function(gx)
+      order[#order + 1] = { pri = 4, w = lw, draw = function(gx)
         text(gx, ly, fit(l1, lw), U.TEXT)
         text(gx, ly + L.rh, 'col', U.GREY); text(gx + cl, ly + L.rh, fit(fname, lw - cl), fcol or U.TEXT)   -- 18 окт: цветом колонки
         if h >= 3 * L.rh then text(gx, ly + 2 * L.rh, 'row', U.GREY); text(gx + cl, ly + 2 * L.rh, l2, U.TEXT) end
@@ -5890,8 +5892,10 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   addg('step')
   addg('listen')   -- 12 окт: step / sel / line
   -- 4 ноя: клавиатура — сразу справа от слова режима (как было), опция keys in transport — и при панели keys
-  if D.kbd_w > 0 and (D.tpkeys or not (L.pn and L.pn.by_panel and L.pn.by_panel.keys)) then table.insert(order, 1, { w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end
-  order[#order + 1] = { w = btot, draw = draw_buttons }
+  -- 6 ноя: опция keys hide — клавиатура не видна, пока keys mode выключен (полоса свободна)
+  local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
+  if D.kbd_w > 0 and not kb_off and (D.tpkeys or not (L.pn and L.pn.by_panel and L.pn.by_panel.keys)) then table.insert(order, 1, { pri = 3, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end
+  order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
     local g = by_id.sig
@@ -5910,7 +5914,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   D.rate_line = (c.tpfull and c.tptext and by_id.rate) and true or nil   -- 15 окт: rate — под play (строка под кнопками)
   -- 15 окт: swing — в строку с метрономом, только если влезает в ширину BPM; иначе — у правого края, как раньше
   local bigw2 = D.sig_line and math.max(bigw, group_w(D.sig_line)) or bigw
-  local bigblk = big and { w = bigw2, draw = draw_big } or nil
+  local bigblk = big and { pri = 7, w = bigw2, draw = draw_big } or nil
   if big and not D.sig_stack then order[#order + 1] = bigblk elseif not big then addg('play') end   -- 4 ноя: стопкой — у правого края (под мастером)
   if not D.rate_line then addg('rate') end         -- 11 окт: скорость проекта (15 окт: full — под кнопками)
   if not D.sig_line then addg('sig') end   -- 11 окт: в full он под BPM
@@ -5919,6 +5923,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local last = (by_id.swing and not D.sig_stack and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   if D.sig_stack and bigblk then last = bigblk end
   local right = x + w - L.pad
+  -- 6 ноя: не влезает — выпадает по одному блоку, с наименее важного (правый блок — первым), а не всё правее обрыва:
+  -- play / запись / прыжки (кнопки) остаются до последнего
+  local function need()
+    local s = 0
+    for i, b in ipairs(order) do s = s + b.w + (i > 1 and sep or 0) end
+    return s + (last and (last.w + sep) or 0)
+  end
+  while need() > right - tx and (#order > 0 or last) do
+    local lo, li = math.huge, nil
+    for i, b in ipairs(order) do if (b.pri or 2) <= lo then lo, li = b.pri or 2, i end end
+    if last and (last.pri or 1) <= lo then last = nil   -- правый блок (swing; стопкой — время / BPM) — по своему приоритету
+    elseif li and #order > 1 then table.remove(order, li)
+    else break end
+  end
   local limit = right - (last and (last.w + sep) or 0)
   local cx = tx
   for i, b in ipairs(order) do
@@ -8640,6 +8658,7 @@ function D.frame(L, snap, rows, state, info)
   end
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
+  D.KB_HIDE = state.kbhide ~= false   -- 6 ноя: клавиатура транспорта прячется, пока keys mode выключен
   D.mini_fxn, D.mini_fxn_next = D.mini_fxn_next, nil
   D.mini_nameh, D.mini_nameh_next = D.mini_nameh_next, nil   -- 4 ноя: высота вертикальных имён узких полос — одна на всех   -- 4 ноя: узкие полосы — строк эффектов у всех поровну (наибольшее с прошлого кадра)
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
