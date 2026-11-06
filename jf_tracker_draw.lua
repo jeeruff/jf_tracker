@@ -7459,7 +7459,7 @@ function D.pmark(name)
     p.kb = p.n == 1 and dk or (p.kb * 0.95 + dk * 0.05)
     if dt > p.max then p.max = dt end
   elseif name and D.prof_mem then collectgarbage('stop') end   -- 2 ноя: сборщик стоит только при открытом jftop (с debug кадры дёргались)
-  if not name then collectgarbage('restart') end
+  if not name then collectgarbage('restart'); if D.prof_mem then collectgarbage('step', 1024) end end   -- 6 ноя: стоял весь кадр — догнать (иначе при открытом jftop куча росла до 0.5 ГБ)
   pm_name, pm_t, pm_k = name, t, collectgarbage('count')
 end
 
