@@ -316,7 +316,19 @@ function O.click(mx, my)
     elseif it.kind == 'cycle' and O.hbtn and O.hbtn.i == O.sel then it.set(it.values[O.hbtn.k])
     elseif it.kind == 'cycle' then O.adjust(it, 1)
     elseif it.kind == 'num' and it.min and it.max and r then
-      if mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
+      -- 6 ноя: двойной щелчок по слайдеру — значение по умолчанию (it.def; нет — каким было при первом касании в сессии)
+      local k = it.key or it.label
+      O.orig = O.orig or {}
+      if O.orig[k] == nil and it.get then O.orig[k] = it.get() end
+      local now = reaper.time_precise()
+      local lc = O.lastnum
+      O.lastnum = { k = k, t = now }
+      if lc and lc.k == k and now - lc.t < 0.35 then
+        local d = it.def
+        if d == nil then d = O.orig[k] end
+        if d ~= nil then it.set(d); O.drag = nil; if ctx.msg then ctx.msg((it.label or k) .. ': default') end end
+        O.lastnum = nil
+      elseif mx >= r[1] - 2 and mx < r[1] + r[3] + 2 then O.drag = { i = O.sel }; num_from_x(it, r, mx) end
     else O.adjust(it, 0) end
   end
   if not O.pane and O.box and (mx < O.box[1] or mx > O.box[1] + O.box[3] or my < O.box[2] or my > O.box[2] + O.box[4]) then O.close() end

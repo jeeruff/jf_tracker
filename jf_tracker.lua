@@ -13640,9 +13640,10 @@ ctx = {
     items[#items + 1] = { gap = true, sep = true }
     -- 27 окт: твик темы (вкладка theme): ползунки поверх любой темы
     items[#items + 1] = { sep = true, title = 'theme tweak', group = 'theme' }
+    local TWDEF = { hue = 0, sat = 100, bri = 0, con = 100, sha = 0, acc = 100 }   -- 6 ноя: двойной щелчок — сюда
     for _, d in ipairs({ { 'hue', 'hue', -180, 180, 5, '%+d°' }, { 'sat', 'saturation', 0, 200, 5, '%d %%' }, { 'bri', 'brightness', -50, 50, 2, '%+d' },
                          { 'con', 'contrast', 50, 160, 5, '%d %%' }, { 'sha', 'shadows', -60, 60, 5, '%+d' }, { 'acc', 'accents', 0, 200, 5, '%d %%' } }) do
-      items[#items + 1] = { key = 'tw_' .. d[1], label = d[2], kind = 'num', min = d[3], max = d[4], step = d[5], fmt = d[6],
+      items[#items + 1] = { key = 'tw_' .. d[1], label = d[2], kind = 'num', min = d[3], max = d[4], step = d[5], fmt = d[6], def = TWDEF[d[1]],
         desc = 'theme tweak over any theme: ' .. d[2] .. ' (all of them back - reset tweak)',
         get = function() return ctx.TW[d[1]] end,
         set = function(v) ctx.TW[d[1]] = v; reaper.SetExtState(EXT, 'tw_' .. d[1], tostring(v), true); ctx.apply_theme(state.theme) end }
@@ -29068,10 +29069,15 @@ local function frame()
       -- 20 окт: двойной клик по скорости — x1, слайдер закрыть
       reaper.CSurf_OnPlayRateChange(1); ctx.rate_pop, ctx.ratedrag = nil, nil; vim.msg = 'playrate x1.00'
       click = { t = 0, zone = 'ctrl' }
+    elseif (hover.ctrl == 'swingbar' or hover.ctrl == 'velbar') and dbl and click.zone == hover.ctrl then
+      -- 6 ноя: двойной щелчок по слайдеру — по умолчанию: свинг выкл, velocity 100
+      if hover.ctrl == 'swingbar' then edit.swing_set(false, 0); vim.msg = 'swing off' else vim.vel = 100; vim.msg = 'velocity 100' end
+      ctx.veldrag = nil
+      click = { t = 0, zone = 'ctrl' }
     elseif hover.ctrl then
       if hover.ctrl ~= 'beats' then state.ctrl_sel = hover.ctrl end     -- курсор клавиатуры — на нажатую ячейку
       ctrl_action(hover.ctrl, 0)
-      click = { t = now2, zone = (hover.ctrl == 'ratebar') and 'ratebar' or 'ctrl' }
+      click = { t = now2, zone = (hover.ctrl == 'ratebar' or hover.ctrl == 'swingbar' or hover.ctrl == 'velbar') and hover.ctrl or 'ctrl' }
     elseif hover.scopes_on then
       ctx.toggle_scopes(true); click = { t = now2, zone = 'scopes_on' }
     elseif hover.scope then
