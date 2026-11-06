@@ -32776,7 +32776,7 @@ ctx.gc_apply = function(mode)
   if mode == 'inc' then collectgarbage('incremental', 200, 100) else collectgarbage('generational', 20, 100) end
   ctx.gc_mode = mode == 'inc' and 'inc' or 'gen'
 end
-ctx.gc_apply(reaper.GetExtState(EXT, 'gcmode') == 'inc' and 'inc' or 'gen')
+ctx.gc_apply(reaper.GetExtState(EXT, 'gcmode') == 'gen' and 'gen' or 'inc')   -- 6 ноя замер: gen рос ~2 МБ/с (400 → 466 за 30 с), inc держал ~315
 ctx.mem = function()
   local before = collectgarbage('count')
   collectgarbage('collect')
