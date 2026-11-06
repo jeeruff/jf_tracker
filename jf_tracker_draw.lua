@@ -6023,6 +6023,7 @@ local MW = {
   MAP        = { 'КАРТА',           '地图',       'خريطة',            'pu\'jIn' },
   OPTIONS    = { 'НАСТРОЙКИ',       '选项',       'خيارات',           'DuH' },
   PATTERNS   = { 'УЗОРЫ',           '图案',       'أنماط',            'mIr' },
+  KEYCASTER  = { 'КЛАВИШИ',         '按键',       'مفاتيح',           'leQ' },
   PHRASES    = { 'РѢЧЕНІЯ',         '乐句',       'عبارات',           'mu\'tlhegh' },
   PHRASE     = { 'РѢЧЕНІЕ',         '乐句',       'عبارة',            'mu\'tlhegh' },
   REFORM     = { 'ПЕРЕДѢЛЪ',        '重塑',       'إصلاح',            'choH' },
@@ -7777,6 +7778,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if c.min then   -- 20 окт: свёрнута (zm) — только вкладки, модуль не рисуется
       elseif id == 'reform' and info.rf_draw then hover.rf = info.rf_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'reform'); if not inside then hover.rf = nil end   -- 19 окт
       elseif id == 'renderer' and info.rd_draw then hover.rd = info.rd_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'renderer'); if not inside then hover.rd = nil end   -- 20 окт
+      elseif id == 'keycaster' and info.kc_draw then info.kc_draw(ct.x, ct.y, ct.w, ct.h)   -- 6 ноя
       elseif id == 'phrases' and info.phr_draw then hover.phr = info.phr_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'phrases'); if not inside then hover.phr = nil end   -- 31 окт
       elseif id == 'lfogen' and info.lfogen_draw then hover.lfogen = info.lfogen_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'lfogen'); if not inside then hover.lfogen = nil end   -- 31 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт

@@ -44,6 +44,7 @@ PN.PANELS = {
   { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
   { id = 'reform',     label = 'reform',     key = 'R', hint = 'reform', side = 'right' },   -- 19 окт: reform выделенных нот (идея — Reform для Renoise)
   { id = 'humanizer',  label = 'humanizer',  key = 'H', hint = 'humanizer', side = 'right' },
+  { id = 'keycaster',  label = 'keycaster',  key = 'Y', hint = 'keycaster', side = 'right' },   -- 6 ноя: QWERTY, нажатые клавиши горят (показ)
   { id = 'phrases',    label = 'phrases',    key = 'F', hint = 'phrases', side = 'right' },   -- 31 окт: фразы проекта (ph:NAME)
   { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
@@ -963,6 +964,7 @@ PN.ABOUT = {
   actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
   reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
   arranger = 'The order of the song in one place: the seq (patterns as text: A1 A1 B1x2 …), a scheme of the whole song, the sections row and the song playlist made of them, the arrangements (named sets of the lanes that play).',
+  keycaster = 'A plain QWERTY keyboard: the keys you press light up and fade - to show how the tracker is played (modifiers too).',
   phrases = 'The phrases of the project: a piece of a track saved as one note. Enter puts it at the cursor (the note transposes it, velocity scales it), e edits its source - every instance follows.',
   lfogen = 'The curve generator: an LFO, a podkat (a ramp before every note) or an audio follower written into the envelope at the tracker cursor - as points or as an automation item.',
   humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',

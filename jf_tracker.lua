@@ -17948,6 +17948,7 @@ ctx.phrase_make = function(name, rng)   -- rng (31 окт): { f0, f1, r0, r1 } �
 end
 -- 31 окт: панель phrases — фразы проекта (регионы ph:NAME) с длиной и числом вхождений; кэш по счётчику правок
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
+ctx.KCP = dofile(DIR .. '/jf_tracker_keycaster.lua')   -- 6 ноя: панель keycaster
 ctx.phr_list = function()
   local sc = reaper.GetProjectStateChangeCount(0)
   if ctx.phr_cc and ctx.phr_cc.sc == sc then return ctx.phr_cc.list end
@@ -25065,6 +25066,11 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
+    kc_draw = function(x, y, w, h)   -- 6 ноя: панель keycaster — клавиши, что держатся сейчас (JS_VKeys)
+      local now = reaper.time_precise()
+      local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
+      ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
+    end,
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = (LG.to and LG.to ~= 'here') and ctx.lfo_take_target() or ctx.lfo_here_target() or ctx.lfo_target()

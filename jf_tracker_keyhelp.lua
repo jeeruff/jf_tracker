@@ -423,6 +423,9 @@ KH.PAGES = {
     { k = '< >', d = 'the previous / next arrangement (a named set of the lanes that play)' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
+  keycaster = { title = 'keycaster - the keys you press (Ctrl+W g Y)', e = {
+    { k = 'Ctrl+W g Y', d = 'show the keycaster panel: a QWERTY keyboard, every key you press lights up and fades (modifiers too) - for showing how the tracker is played; needs js_ReaScriptAPI' },
+  } },
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },
     { k = 'Enter', d = 'the phrase at the tracker cursor, on the cursor track: one trigger note C-4 (another note transposes it, velocity scales it, its length cuts it)' },
@@ -966,6 +969,7 @@ KH.PAGES = {
 KH.BARS = {
   -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
   arranger = { { 'j k', 'row' }, { 'h l', 'along' }, { 'Enter', 'do' }, { 'x', 'remove' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
+  keycaster = { { 'Ctrl+W', 'panes' } },
   phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
