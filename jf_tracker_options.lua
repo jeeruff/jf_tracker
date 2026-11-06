@@ -968,7 +968,10 @@ function O.draw(L, W, H)
       local masked = it.masked and it.masked()
       U.text(bx + L.pad, y + 1, ctx.fit(it.label, lw - L.pad), masked and U.DIM or ((i == O.sel or hot) and U.AMBER or U.TEXT))   -- 6 окт: фокус / мышь — имя жёлтым
       -- 6 окт: точка слева от имени — опция есть в быстрых опциях (ПКМ по имени)
-      if it.key and ctx.quick_has and ctx.quick_has(it.key) then U.set(U.LINE); gfx.rect(bx + math.floor(L.pad / 2) - 1, y + math.floor(rh / 2) - 1, 2, 2, 1) end
+      if it.key and ctx.quick_has and ctx.quick_has(it.key) then   -- 6 ноя: в быстрых опциях — маленький плюс (точку было не видно)
+        local cx, cy = bx + math.floor(L.pad / 2), y + math.floor(rh / 2)
+        U.set(U.AMBER); gfx.rect(cx - 2, cy, 5, 1, 1); gfx.rect(cx, cy - 2, 1, 5, 1)
+      end
       local vt = val_text(it)
       local on = it.kind == 'toggle' and it.get()
       local vx = bx + L.pad + lw
