@@ -22820,7 +22820,10 @@ ctx.pix = nil   -- { rw, rh } — настоящий размер окна, по
 ctx.pix_halve = function()
   if not ctx.pix then return end
   local P = ctx.pix
-  if gfx.w ~= P.hw or gfx.h ~= P.hh then P.rw, P.rh = gfx.w, gfx.h; P.hw, P.hh = math.max(1, gfx.w // 2), math.max(1, gfx.h // 2) end
+  -- 6 ноя: ширина и высота — порознь: REAPER обновил одну (после Audio_Init и т. п.) — вторая уже половинная, второй
+  -- раз не делить (статус уезжал в середину окна)
+  if gfx.w ~= P.hw then P.rw = gfx.w; P.hw = math.max(1, gfx.w // 2) end
+  if gfx.h ~= P.hh then P.rh = gfx.h; P.hh = math.max(1, gfx.h // 2) end
   gfx.w, gfx.h = P.hw, P.hh
   fps_buf.rw, fps_buf.rh = P.rw, P.rh   -- настоящий размер окна — для save_win
   -- мышь: REAPER пишет целые; свои — с меткой .25 (не делить второй раз)
@@ -31807,7 +31810,12 @@ local function frame()
   end
   ctx.click_guard = nil                                   -- клавиатура фокус переводит всегда
   -- 12 окт: Opt+A (å) из любого модуля — последний подёрганный параметр в колонку автоматизации
-  if c == 229 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then ctx.auto_touched(); c = 0 end
+  -- 6 ноя: Opt+A — выделить колонку курсора (VISUAL + a: колонка на весь паттерн; ещё a — шире); последний параметр — al
+  if c == 229 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and state.focus == 'tracker' then
+    vim.mode = 'visual'; vim.anchor = { fi = vim.cur.fi, row = vim.cur.row }; vim.vfield, vim.vtrack = nil, nil
+    if vim.smart_expand then vim.smart_expand(1) end
+    c = 0
+  elseif c == 229 and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra then ctx.auto_touched(); c = 0 end   -- вне трекера (automation, DSP …) — как было: последний параметр
   -- 16 окт: ` в NORMAL — весь сэмпл инструмента (прыжок назад убран: гарпун и Ctrl+O); в INSERT ` — note-off
   if c == 96 and not (ctx.mods().ctrl or ctx.mods().cmd) and (vim.mode == 'normal' or state.focus ~= 'tracker') and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.picker and not vim.hydra and not vim.pending then
     vim.play_whole(); c = 0

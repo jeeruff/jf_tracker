@@ -816,9 +816,8 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>env:</kbd> <code>Ctrl+Opt+1..6</code></td><td>segment shape of the point on the row, in any field and mode: 1 lin 2 sqr 3 slo 4 fas 5 fae 6 bez</td></tr>
 <tr><td><kbd>i</kbd></td><td>INSERT: the keyboard writes notes (layout frow / qwerty / renoise - options)</td></tr>
 <tr><td><kbd>I</kbd></td><td>INSERT from the start of the row: the note field of the track (as in Vim)</td></tr>
-<tr><td><kbd>a</kbd></td><td>all automation of the cursor track - envelopes (fx parameters too) and MIDI lanes - shown / hidden, one press toggles; all tracks - the envs button</td></tr>
-<tr><td><kbd>A</kbd></td><td>automate: pick any parameter of the track (fzf) - envelope column, or a take envelope of the note</td></tr>
-<tr><td><kbd>Opt+A</kbd></td><td>the last touched parameter (a knob you just moved, any track) - its envelope column, cursor there</td></tr>
+<tr><td><kbd>aa</kbd> <kbd>ap</kbd> <kbd>al</kbd></td><td>a - the automation menu: aa - all automation of the cursor track (envelopes, fx parameters too, MIDI lanes) shown / hidden; ap - pick any parameter of the track (fzf) - its envelope column, or a take envelope of the note; al - the last touched parameter (a knob you just moved, any track) - its column, the cursor there; all tracks - the envs button</td></tr>
+<tr><td><kbd>Opt+A</kbd></td><td>select the column of the cursor over the pattern (VISUAL; a - wider, i - narrower); in other modules - the last touched parameter as a column</td></tr>
 <tr><td><kbd>ze</kbd></td><td>on a note column: the window of the track instrument (slixer too; again - close it). On an envelope column: the effect and parameter it drives in the title, e - that effect window; its view - c curve, v values (like a command column), s steps (a fader on every row, as a 303 step sequencer: square points, drag across the rows with the mouse in any mode), b values and bars (the number and a line under it, longer - more, as MIDI CC). On a MIDI lane (PAT CC PB AT): b values and bars, s steps, v values, c the curve canvas</td></tr>
 <tr><td><kbd>Enter</kbd> <kbd>(envelope</kbd> <kbd>selection)</kbd></td><td>VISUAL on an envelope column, Enter - curves as cells with a preview (dim - now, bright - after): u ramp up, d down, e exp, g log, s s-curve, w sine, t triangle, a saw, q square, r random (in the range of the values; a flat line - from 0 to it), i invert, x reverse, m more, n less, k j up / down a step, o smooth, p 8 steps, f flat; h - draw by hand (the column as steps, drag with the mouse); u - undo</td></tr>
 <tr><td><kbd>&gt;</kbd> <kbd>&lt;</kbd> <kbd>N&gt;</kbd></td><td>loop: item to region / region to item / N rows</td></tr>
@@ -1455,7 +1454,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 </table>
 <h3 id="keys-automation">automation and modulation: params, curve, mod (LFO / follower / link of REAPER), shape generator, automation items</h3>
 <table>
-<tr><td><kbd>Opt+A</kbd></td><td>from anywhere: the last touched parameter (move a knob in a plugin or in DSP) becomes an envelope column on its track, the cursor goes there - type values in INSERT; a take FX parameter opens its take envelope here</td></tr>
+<tr><td><kbd>Opt+A</kbd></td><td>from any module but the tracker (there - al): the last touched parameter (move a knob in a plugin or in DSP) becomes an envelope column on its track, the cursor goes there - type values in INSERT; a take FX parameter opens its take envelope here</td></tr>
 <tr><td><kbd>L</kbd></td><td>shape: draws a shape (sin tri saw sqr, premod) as envelope points / an automation item - beside the params when wide, a page [shape] when narrow; L again - back</td></tr>
 <tr><td><kbd>M</kbd></td><td>mod: the parameter modulation of the track (REAPER LFO, audio follower, link) - the former modulation tab: a add, x remove, Enter toggle, o w windows</td></tr>
 <tr><td><kbd>C</kbd></td><td>curve: the canvas - the curves of the track drawn from the keyboard (its own key page)</td></tr>

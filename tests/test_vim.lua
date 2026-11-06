@@ -512,12 +512,12 @@ cmd_down = false
 
 -- ── a / A: огибающие и fzf ────────────────────────────────────────────────
 reset()
-keysin('a');  eq('a toggles the automation of the track', last(), 'trackauto'); eq('a not insert', V.mode, 'normal')
-keysin('A');  eq('A opens picker', V.picker and V.picker.title, 'auto'); eq('all items', #V.picker.matches, 3)
+keysin('aa');  eq('aa toggles the automation of the track', last(), 'trackauto'); eq('a not insert', V.mode, 'normal')
+keysin('ap');  eq('ap opens picker', V.picker and V.picker.title, 'auto'); eq('all items', #V.picker.matches, 3)
 keysin('thr'); eq('fuzzy filters', #V.picker.matches, 1); eq('match', V.picker.matches[1].label, 'ReaComp / Threshold')
 local pp2 = V.popup(); eq('picker popup', pp2 and pp2.kind, 'picker')
 V.key(13); eq('enter picks', last(), 'pick:ReaComp / Threshold'); eq('picker closed', V.picker, nil)
-keysin('A'); keysin('ga'); eq('subsequence g..a', #V.picker.matches >= 1, true)
+keysin('ap'); keysin('ga'); eq('subsequence g..a', #V.picker.matches >= 1, true)
 V.key(14); V.key(27); eq('esc closes', V.picker, nil)
 
 -- ── прочее ────────────────────────────────────────────────────────────────

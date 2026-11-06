@@ -3284,6 +3284,14 @@ function V.key_impl(c)
       if keys then V.last_macro = name; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end   -- 15 окт: счётчик — до повторов (2@a было три раза)
       if not keys and c < 256 and ctx.mac_by_key then ctx.mac_by_key(string.char(c)) end   -- 15 окт: 1..9 A..Z — свои / встроенные, / — по имени
       V.count = nil; return
+    elseif p == 'a' then
+      -- 6 ноя: a — меню автоматизации (одна клавиша на одно действие — дорого): aa вся автоматизация трека вкл / выкл,
+      -- ap выбрать параметр (fzf; было A), al последний тронутый параметр (было Opt+A)
+      local ch = string.char(c < 256 and c or 0)
+      if ch == 'a' then if ctx.track_auto_toggle then ctx.track_auto_toggle() end
+      elseif ch == 'p' then ctx.automation_picker()
+      elseif ch == 'l' then if ctx.auto_touched then ctx.auto_touched() end end
+      finish_move(); V.count = nil; return
     elseif p == 'T' then
       -- 11 окт: T f — take FX ноте под курсором (fzf), T o — её цепь в DSP
       local ch = string.char(c < 256 and c or 0)
@@ -3800,7 +3808,7 @@ function V.key_impl(c)
     local f = flat()[V.cur.fi]
     if f and f.col then for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end end
     V.cur.field = 1; clamp_cur(); V.mode = 'insert'; V.count = nil; return
-  elseif ch == 'a' then if ctx.track_auto_toggle then ctx.track_auto_toggle() end; V.count = nil; return   -- 2 ноя: a — вся автоматизация трека курсора (огибающие + MIDI-лейны) вкл / выкл, тогглом
+  elseif ch == 'a' and V.mode == 'normal' then V.pending = 'a'; return   -- 6 ноя: a — меню автоматизации (aa / ap / al)
   elseif ch == 'o' then if ctx.reveal_item then ctx.reveal_item() end; V.count = nil; return
   elseif ch == '=' then
     -- beatsync (= как «выровнять» в Vim): конец события к ближайшей доле; N= — к N строкам
@@ -3813,7 +3821,6 @@ function V.key_impl(c)
   -- лупы в регионе (F1): > item до конца региона (N> — период N шагов), < регион до конца item
   elseif ch == '>' then ctx.loop('item', V.count); V.count = nil; finish_edit(); return
   elseif ch == '<' then ctx.loop('region'); V.count = nil; finish_edit(); return
-  elseif ch == 'A' then ctx.automation_picker(); V.count = nil; return
   elseif ch == 'v' then V.mode = 'visual'; V.anchor = { fi = V.cur.fi, row = V.cur.row }; V.sx, V.vbox = nil, nil
     -- 19 окт: первое v — только поле курсора (vol / delay / команда); на ноте — подколонка, как было
     V.vtrack = nil; V.vfield = ((V.cur.field or 1) >= 2 and not env_of(V.cur.fi)) and V.cur.field or nil
