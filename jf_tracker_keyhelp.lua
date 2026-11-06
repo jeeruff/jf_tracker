@@ -185,6 +185,7 @@ KH.PAGES = {
     { k = ':', d = 'command line (Tab completes)' },
     { k = 'Enter', d = 'the values of the field (notes, instruments, vol, commands; on an envelope / MIDI lane - what to insert); PT-mode on the note field: inserts an empty row as Return in ProTracker (Shift - all channels)' },
     { k = '\\  \\\\', d = '\\ - the menu of what is under the cursor (note, envelope, clip ...); \\\\ - the main menu of everything (v view, P project, o options ...); in a module - its quick menu' },
+    { k = '\\ p', t = {}, d = 'phrases: e edit, i insert at the cursor, l the panel, n new from the V block / pattern, r rename, x delete - the phrase of the trigger under the cursor, else picked from a list. A trigger is a box over its length with the name; the notes it plays are dimmer ghosts (they show the transposition)' },
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },
     { k = 'tg  t}  t+ t-', t = {}, d = 'manual Euclid / polymeter by item geometry: tg glues every item of the cursor track in the pattern into one; t} on a row of it - the loop ends here, the item repeats it to the pattern end (k notes in n rows = Euclid); t+ / t- - the item rate x2 / /2' },
     { k = '\\ q', t = {}, d = 'quit REAPER (as File: Quit - it asks to save a changed project)' },
