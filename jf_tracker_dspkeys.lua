@@ -127,7 +127,7 @@ function DK.key(c, sel, n, np, mods)
   -- вне него цифры и буквы — ноты KEYS (DSP их не перехватывает)
   if DK.ins then
     if c == 27 then DK.ins = nil; ctx.msg('parameter: entry cancelled'); return true end
-    if c == 13 then local buf = DK.ins.buf; DK.ins = nil; if buf ~= '' and ctx.dsp_type_entry then ctx.dsp_type_entry(sel.fx, sel.param, buf) end; return true end
+    if c == 13 then local buf = DK.ins.buf; DK.ins = nil; if buf ~= '' and ctx.dsp_type_entry then ctx.dsp_type_entry(sel.fx, sel.param, buf) elseif buf == '' and ctx.bigfader_open then ctx.bigfader_open(sel.fx, sel.param) end; return true end   -- 6 ноя: Enter на пустом вводе — большой фейдер
     if c == 8 then DK.ins.buf = DK.ins.buf:sub(1, -2); return true end
     if c == UP or c == DOWN then sel.param = math.max(1, math.min(math.max(1, np), sel.param + (c == DOWN and 1 or -1))); DK.ins.buf = ''; return true end
     if c >= 32 and c < 127 then DK.ins.buf = DK.ins.buf .. string.char(c); return true end

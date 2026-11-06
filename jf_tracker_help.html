@@ -145,7 +145,7 @@ dropdown of the field under the cursor: it shows what can be typed there. Type t
 <tr><td><kbd>`</kbd> &nbsp; <kbd>\</kbd></td><td><kbd>`</kbd> is the sustain pedal while you hold it (NORMAL with the keyboard; in INSERT it is the note-off) / <kbd>\</kbd> the menu of what is under the cursor, the same as the right click, <kbd>\</kbd><kbd>\</kbd> the main menu</td></tr>
 <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd> &nbsp; <kbd>Option</kbd>+<kbd>/</kbd> &nbsp; <kbd>Cmd</kbd>+<kbd>/</kbd></td><td>find an effect (all of them) / inside the DSP chain of the track / a file in the browser</td></tr>
 <tr><td><kbd>?</kbd> &nbsp; <kbd>\</kbd> <kbd>?</kbd></td><td>any REAPER action, fuzzy (the <a href="#actions">actions</a> panel shows them all) / the whole help (the menu <kbd>\</kbd>, then <kbd>?</kbd>, or the help button of main; <kbd>\</kbd> <kbd>h</kbd> - the hints pane: what the module under the mouse is and how to use it; holding a modifier half a second shows what it does): <kbd>j</kbd> <kbd>k</kbd> line by line through all sections, <kbd>J</kbd> <kbd>K</kbd> section, <kbd>/</kbd> search, <kbd>o</kbd> the whole help in the browser (with pictures)</td></tr>
-<tr><td><kbd>Ctrl</kbd>+<kbd>Cmd</kbd>+<kbd>F12</kbd></td><td>restart the tracker from its files (after an update); the layout and the options stay</td></tr>
+<tr><td><kbd>Cmd</kbd>+<kbd>F12</kbd></td><td>restart the tracker from its files (after an update); the layout and the options stay</td></tr>
 <tr><td><code>:tutorial</code></td><td>a guided tour, fourteen steps (its chapters are listed in main while it runs)</td></tr>
 </table>
 
@@ -799,7 +799,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>za</kbd> <kbd>zF</kbd></td><td>fold track: wave + notes, envelopes as a thin line / zF all &lt;-&gt; open all (:fold, :unfold)</td></tr>
 <tr><td><kbd>zf</kbd> <kbd>zk</kbd></td><td>folder: zf collapse &lt;-&gt; open; zk - the folder wide, its children narrow strips (= before the name; again - back)</td></tr>
 <tr><td><kbd>zr</kbd> <kbd>zR</kbd></td><td>router: the fx chain of the cursor track with its routing in place of the tracker / big router over the whole window</td></tr>
-<tr><td><kbd>Ctrl+Cmd+F12</kbd></td><td>restart the tracker from its files (as :reload) - after an update, no REAPER restart</td></tr>
+<tr><td><kbd>Cmd+F12</kbd></td><td>restart the tracker from its files (as :reload) - after an update, no REAPER restart</td></tr>
 <tr><td><kbd>zf</kbd> <kbd>zF</kbd></td><td>DSP: fold the module under the cursor into a narrow strip (x B on top, its name vertically; zf again or a click on the name - unfold) / fold all modules (all folded - unfold all)</td></tr>
 <tr><td><kbd>zl</kbd></td><td>DSP: the list of all modules of the chain (type to search), Enter - the cursor on it</td></tr>
 <tr><td><kbd>zp</kbd></td><td>DSP: the preset list of the module under the cursor (also when its &lt; preset &gt; does not fit in the header)</td></tr>
@@ -1243,7 +1243,8 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>^</kbd> <kbd>$</kbd> <kbd>N|</kbd></td><td>the first / last module, module N (3| - the third), as columns in Vim; Cmd+1..0 - a track, as in the tracker</td></tr>
 <tr><td><kbd>dw</kbd> <kbd>db</kbd></td><td>delete modules: d3w - three from the cursor forward, db - the one before, d2b - two before (3dw too)</td></tr>
 <tr><td><kbd>Shift</kbd> <kbd>/</kbd> <kbd>Cmd+click</kbd></td><td>on a module (its name or empty space): Shift - pick from the selected one to it, Cmd - add / remove it (apart is fine); then x delete, b bypass, cc pack (side by side), zf fold, Esc - drop the pick</td></tr>
-<tr><td><kbd>i</kbd></td><td>INSERT the parameter: it and the module frame go red - type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)</td></tr>
+<tr><td><kbd>i</kbd></td><td>INSERT the parameter: it and the module frame go red - type a number (023 = 0.23; a bare number takes the unit shown now: 120 on 71ms = 120 ms) or with a unit (120ms, 1.2s, 2k, -6dB) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)</td></tr>
+<tr><td><kbd>Enter</kbd> <kbd>Enter</kbd></td><td>on a parameter: Enter opens the input, Enter on it empty - the big fader: a wide scale with the values under it; h l 1 %, H L 10 %, j k 0.1 % (a switch / steps - a step), f + 0 ... 9 / m - jump to 0 ... 90 % / max, drag with the mouse, Enter / Esc - close</td></tr>
 <tr><td><kbd>[]</kbd> <kbd>(track</kbd> <kbd>block)</kbd></td><td>contain: every effect of the track into one container (REAPER 7); one container on the track - unpack it; also cc on a range, dc unpacks</td></tr>
 <tr><td><kbd>cb</kbd></td><td>DSP: the effect into 3 / 4 / 5 frequency bands (also ÷ in the module header and the module menu: split into bands) - a container ÷N bands of parallel chains low / mid / high, each starts with a native N-Band Splitter passing only its band; the effect goes into low. In DSP: the bands as rows high ... low (click - its fx follow the container as full modules, band &gt; name), crossover under them (one edit sets every band); af / drop - into the selected band</td></tr>
 <tr><td><kbd>drop</kbd> <kbd>on</kbd> <kbd>a</kbd> <kbd>pad</kbd></td><td>drag an effect from the fx list onto a drumrs5k pad - it goes into that pad (its own container: sampler, its fx, this one)</td></tr>
@@ -1313,7 +1314,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>w</kbd> <kbd>W</kbd></td><td>the next / previous module (around the chain; 3w - three; from a parameter slider too)</td></tr>
 <tr><td><kbd>j</kbd> <kbd>k</kbd> <kbd>g</kbd> <kbd>G</kbd></td><td>parameter down / up / first / last</td></tr>
 <tr><td><kbd>+</kbd> <kbd>-</kbd> <kbd>^A</kbd> <kbd>^X</kbd></td><td>value up / down (Shift: coarse)</td></tr>
-<tr><td><kbd>i</kbd></td><td>INSERT the parameter: it and the module frame go red - type a number (023 = 0.23) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)</td></tr>
+<tr><td><kbd>i</kbd></td><td>INSERT the parameter: it and the module frame go red - type a number (023 = 0.23; a bare number takes the unit shown now: 120 on 71ms = 120 ms) or with a unit (120ms, 1.2s, 2k, -6dB) or the start of a value (hp, saw, off), Enter sets, Esc cancels, BS erases, up / down - another parameter; outside it digits and letters play notes (KEYS)</td></tr>
 <tr><td><kbd>Z</kbd></td><td>the menu of the selected module (the same as a right click on it)</td></tr>
 </table>
 <h3 id="keys-container">DSP: container (rack)</h3>

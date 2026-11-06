@@ -1961,6 +1961,15 @@ ctx = {
   end,
   -- 21 окт: набрать значение параметра числом (в его единицах: 23 → «23» Гц / дБ / % по показу плагина): бисекция по
   -- нормализованному; показ не число — 0..1 как есть, больше — проценты
+  -- 6 ноя: число с единицей → значение в основных единицах (ms → s, kHz → Hz) и множитель единицы
+  unit_num = function(s)
+    s = tostring(s or ''):lower():gsub(',', '.')
+    local num, unit = s:match('([-+]?%d*%.?%d+)%s*([a-z%%]*)')
+    local v = tonumber(num)
+    if not v then return nil end
+    local f = ({ ms = 0.001, us = 0.000001, ['µs'] = 0.000001, khz = 1000, k = 1000 })[unit] or 1
+    return v * f, f, unit ~= ''
+  end,
   dsp_type_value = function(k, pi, v)
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
@@ -1972,7 +1981,7 @@ ctx = {
       A.SetParamNormalized(col.track, id, p.i, x)
       local _, s2 = A.GetFormattedParamValue(col.track, id, p.i, '')
       A.SetParamNormalized(col.track, id, p.i, old)
-      return tonumber((s2 or ''):match('[-+]?%d+%.?%d*')), s2
+      return (ctx.unit_num(s2)), s2   -- 6 ноя: с единицами (999ms → 1.0s — монотонно)
     end
     local old = A.GetParamNormalized(col.track, id, p.i)
     local d0, d1 = disp(0), disp(1)
@@ -2800,7 +2809,21 @@ ctx = {
     local num = buf:match('^%s*([-+]?[%d%.]+)%s*$')
     if num and tonumber(num) then
       local v = (num:match('^0%d') and not num:find('.', 1, true)) and tonumber('0.' .. num:sub(2)) or tonumber(num)
+      -- 6 ноя: голое число — в единицах того, что показано сейчас (71ms: 120 → 120 ms)
+      local c0, f0 = ctx.dsp_fx(k)
+      local p0 = f0 and f0.params[pi]
+      if p0 and c0 then
+        local A0 = model.fxapi(c0.track)
+        local _, cur = A0.GetFormattedParamValue(c0.track, p0.fx or f0.i, p0.i, '')
+        local _, fac = ctx.unit_num(cur)
+        if fac then v = v * fac end
+      end
       return ctx.dsp_type_value(k, pi, v)
+    end
+    -- 6 ноя: число с единицей (120ms, 1.2s, 2k, -6dB)
+    do
+      local v, _, has = ctx.unit_num(buf)
+      if v and has and buf:match('^%s*[-+]?%d*%.?%d+%s*%a+%s*$') then return ctx.dsp_type_value(k, pi, v) end
     end
     local col, f = ctx.dsp_fx(k)
     local p = f and f.params[pi]
@@ -19299,6 +19322,7 @@ local function hint_go(t)
   elseif t.kind == 'patbtn' then ctx.set_focus('patterns'); ctx.pat_btn(d.b)   -- 27 окт: ряд команд patterns
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
+  elseif t.kind == 'bigfader' then ctx.bf_set(d.x)   -- 6 ноя: метка деления большого фейдера
   elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
   elseif t.kind == 'mxctl' then if d == 'open' then state.mx_hidden = false elseif d == 'close' then state.mx_hidden = true end
@@ -22823,6 +22847,99 @@ do   -- обёртки: после опроса окна — снова поло
   gfx.screentoclient = function(x, y) local a, b = s2c0(x, y); if ctx.pix and a then a, b = a / 2, b / 2 end; return a, b end
 end
 ctx.declip = { t = 0, hold = {} }
+-- 6 ноя: БОЛЬШОЙ ФЕЙДЕР параметра DSP (Enter на пустом вводе = Enter Enter): горизонтальная шкала почти во всё окно,
+-- под ней значения в единицах плагина (11 делений, подписи не налезают — лишние пропускаются), метки f на делениях:
+-- 0 … 9 — 0 … 90 %, m — максимум. h l — шаг 1 % (ступенчатый — ступень), H L — 10 %, j k — 0.1 %, мышь — тянуть,
+-- Enter / Esc — закрыть. Пишет как dsp_value — напрямую (без точки отмены на каждый шаг)
+ctx.BF = nil
+ctx.bf_A = function() local B = ctx.BF; return B and model.fxapi(B.track) end
+ctx.bigfader_open = function(k, pi)
+  local col, f = ctx.dsp_fx(k)
+  local p = f and f.params[pi]
+  if not (col and p) then return end
+  local A = model.fxapi(col.track)
+  local id = p.fx or f.i
+  local B = { k = k, pi = pi, track = col.track, f = f, p = p, id = id, ticks = {} }
+  local old = A.GetParamNormalized(col.track, id, p.i)
+  for i = 0, 10 do
+    A.SetParamNormalized(col.track, id, p.i, i / 10)
+    local _, s = A.GetFormattedParamValue(col.track, id, p.i, '')
+    B.ticks[#B.ticks + 1] = { x = i / 10, s = s or '', lab = i < 10 and tostring(i) or 'm' }
+  end
+  A.SetParamNormalized(col.track, id, p.i, old)
+  ctx.BF = B
+  vim.msg = 'big fader: h l 1 %, H L 10 %, j k 0.1 %, f - jump to a mark, Enter / Esc - close'
+end
+ctx.bf_get = function() local B = ctx.BF; return ctx.bf_A().GetParamNormalized(B.track, B.id, B.p.i) end
+ctx.bf_set = function(x)
+  local B = ctx.BF
+  if not B then return end
+  ctx.fx_write(B.track, B.f, B.p, x)
+  model.invalidate()
+end
+ctx.bf_key = function(c)
+  local B = ctx.BF
+  if c == 27 or c == 13 then ctx.BF = nil; vim.msg = ''; return end
+  if c == 102 then   -- f — метки делений
+    if HN.start(function(t) return t.kind == 'bigfader' end) then vim.msg = 'big fader: type the mark (0 … 9, m), Esc' end
+    return
+  end
+  local d = ({ [104] = -0.01, [108] = 0.01, [72] = -0.1, [76] = 0.1, [106] = -0.001, [107] = 0.001 })[c]
+  if not d then return end
+  local p = B.p
+  if p.kind == 'steps' and p.nsteps and math.abs(d) < 0.1 then d = (d > 0 and 1 or -1) / (p.nsteps - 1)
+  elseif p.kind == 'toggle' then d = d > 0 and 1 or -1 end
+  ctx.bf_set(ctx.bf_get() + d)
+end
+ctx.bf_draw = function()
+  local B = ctx.BF
+  if not B then return end
+  if state.focus ~= 'dsp' or not reaper.ValidatePtr(B.track, 'MediaTrack*') then ctx.BF = nil; return end
+  local A = ctx.bf_A()
+  local v = A.GetParamNormalized(B.track, B.id, B.p.i)
+  local _, shown = A.GetFormattedParamValue(B.track, B.id, B.p.i, '')
+  local pad, rh = L.pad, L.rh
+  local w = math.floor(gfx.w * 0.8)
+  local x0 = math.floor((gfx.w - w) / 2)
+  local bh = 2 * rh
+  local h = rh + pad + bh + pad + rh + 2 * pad + rh
+  local y0 = math.floor((gfx.h - h) / 2)
+  U.set(U.BG); gfx.rect(x0, y0, w, h, 1)
+  U.set(U.AMBER); gfx.rect(x0, y0, w, h, 0)
+  local bx, bw = x0 + 2 * pad, w - 4 * pad
+  local ty = y0 + pad
+  local title = (B.p.name or 'param') .. '   '
+  U.text(bx, ty, title, U.TEXT)
+  U.text(bx + U.measure(title), ty, shown or '', U.AMBER)
+  local help = state.hints and 'h l  H L  j k   f jump   Enter close' or ''
+  local hw = U.measure(help)
+  if help ~= '' and bx + U.measure(title .. (shown or '')) + 2 * pad + hw <= bx + bw then U.text(bx + bw - hw, ty, help, U.GREY) end
+  local by = ty + rh + pad
+  U.set(U.PANEL); gfx.rect(bx, by, bw, bh, 1)
+  local fx = math.floor(v * (bw - 1) + 0.5)
+  U.set(U.AMBER, 0.35); gfx.rect(bx, by, fx + 1, bh, 1); gfx.a = 1
+  U.set(U.AMBER); gfx.rect(bx + fx - 1, by, 3, bh, 1)
+  -- деления и подписи: подпись ставится, только если не налезает на прошлую
+  local ly = by + bh + pad
+  local last = -1e9
+  for _, t in ipairs(B.ticks) do
+    local tx = bx + math.floor(t.x * (bw - 1) + 0.5)
+    U.set(U.GREY); gfx.rect(tx, by + bh - pad, 1, pad + 2, 1)
+    local s = t.s
+    local sw = U.measure(s)
+    local sx = math.max(bx, math.min(bx + bw - sw, tx - math.floor(sw / 2)))
+    if sx >= last + 2 * pad then U.text(sx, ly, s, math.abs(t.x - v) < 0.005 and U.AMBER or U.TEXT); last = sx + sw end
+    ctx.hint('bigfader', math.max(bx, math.min(bx + bw - 8, tx - 4)), by, 8, bh, { fixed = t.lab, x = t.x })
+  end
+  -- мышь: тянуть по шкале
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  local inbar = mx >= bx and mx < bx + bw and my >= by and my < by + bh
+  if gfx.mouse_cap & 1 == 1 then
+    if B.drag or (inbar and not B.down) then B.drag = true; ctx.bf_set((mx - bx) / (bw - 1)) end
+    B.down = true
+  else B.drag, B.down = nil, nil end
+  ctx.bf_rect = { x0, y0, w, h }
+end
 -- 6 ноя: o в lib — добавить звук новой строкой (не вместо): файл из браузера, плагин-инструмент на трек, набор lib
 -- 6 ноя: строка подсказок под модулем — действия, не навигация (j k / h l / J K / gg G и стрелки и так понятны)
 ctx.BAR_NAV = { ['j k'] = true, ['h l'] = true, ['J K'] = true, ['H L'] = true, ['gg G'] = true, ['g G'] = true, ['h j k l'] = true, ['hjkl'] = true, ['j k h l'] = true }
@@ -25650,6 +25767,7 @@ local function frame()
   -- (переключение на пустышку 797 — выше, сразу после тела кадра)
   -- 31 окт: рамка INSERT — ещё раз поверх полосы эффектов и оверлеев (иначе верх перекрывался)
   if draw.ins_frame then local fr = draw.ins_frame; U.set(draw.MODE_COL and draw.MODE_COL.insert or U.RED); gfx.rect(fr[1], fr[2], fr[3], fr[4], 0); gfx.rect(fr[1] + 1, fr[2] + 1, fr[3] - 2, fr[4] - 2, 0) end
+  ctx.bf_draw()   -- 6 ноя: большой фейдер — до меток f (метки поверх него)
   draw.pmark('post: hints, ghosts, popups')
   draw.pane_badge_tracker(L, state.pane_mode)
   HN.draw(U, L)
@@ -30840,6 +30958,10 @@ local function frame()
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
+  if ctx.BF and c > 0 then   -- 6 ноя: большой фейдер — клавиатура ему (и меткам f)
+    if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end else ctx.bf_key(c) end
+    c = 0
+  end
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
   if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
@@ -31223,8 +31345,8 @@ local function frame()
     end
   end
   local quit = false
-  -- 16 окт: Ctrl+Cmd+F12 — перезапуск трекера из файлов (как :reload)
-  if c == 6697266 and ctx.mods().ctrl and ctx.mods().cmd then ctx.reloading = true; quit = true; c = 0 end
+  -- 16 окт: перезапуск трекера из файлов (как :reload); 6 ноя: Cmd+F12 (было Ctrl+Cmd+F12)
+  if c == 6697266 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.reloading = true; quit = true; c = 0 end
   if c == 6697264 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.viper_toggle(); c = 0 end   -- 29 окт: Cmd+F10 — viper
   -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
   if c > 0 and ctx.PADS and ctx.PADS.on and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix')
