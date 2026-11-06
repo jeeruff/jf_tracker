@@ -4527,6 +4527,15 @@ local function draw_ctrl(L, info, H, hover)
     end)() },
   }
   local colw = math.floor((L.ctrl_w - 2 * L.pad) / 3)
+  -- 6 ноя: подпись не влезла (крупный шрифт) — короткая форма, потом без гласных, и только потом обрезка (было whichk, autofo)
+  local function short(s, w)
+    if ms(s) <= w then return s end
+    local t = D.SHORT[s]
+    if t and ms(t) <= w then return t end
+    local nv = (t or s):gsub('(%S)([^%s]*)', function(a, b) return a .. b:gsub('[aeiouy]', '') end)
+    if ms(nv) <= w then return nv end
+    return fit(t or nv, w)
+  end
   L.ctrl_area = { 0, 0, L.ctrl_w, H - 2 }                 -- главный модуль: фокус ctrl (3 окт)
   D.ctrl_rect = D.ctrl_rect or {}
   local y = 2
@@ -4546,8 +4555,8 @@ local function draw_ctrl(L, info, H, hover)
       if hot then hover.ctrl = it[1] end
       D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
       -- 11 окт: тёмный текст на жёлтом — с подложкой (при масштабе текст кладётся сложением, чёрный пропадал)
-      if on then text(x + 3, y + 1, fit(it[2], colw - 6), U.BG, U.AMBER)
-      else text(x + 3, y + 1, fit(it[2], colw - 6), (hot or kbd) and U.AMBER or U.GREY) end
+      if on then text(x + 3, y + 1, short(it[2], colw - 6), U.BG, U.AMBER)
+      else text(x + 3, y + 1, short(it[2], colw - 6), (hot or kbd) and U.AMBER or U.GREY) end
       hint('ctrl', x, y, colw, L.rh, it[1])
       return
     end
@@ -4555,7 +4564,7 @@ local function draw_ctrl(L, info, H, hover)
     elseif hot then set(D.CURROW); gfx.rect(x, y, colw - 2, L.rh, 1) end
     if hot then hover.ctrl = it[1] end
     D.ctrl_rect[it[1]] = { x, y, colw, L.rh }
-    text(x + 2, y + 1, fit(it[2], colw - 4), it[3] or U.TEXT)
+    text(x + 2, y + 1, short(it[2], colw - 4 - (it.sizer and ms(' - +') or 0)), it[3] or U.TEXT)
     if it.sizer then
       -- keys - + (4 окт): та же клетка — слово вкл / выкл, - + размер
       local sx = x + 2 + ms(it[2] .. ' ')
@@ -5299,6 +5308,12 @@ function D.kb_pane_kw(L, w, lw, info)
   local cap = math.floor((w - lw - wh0 - 3 * L.pad) / #D.PIANO_WHITE)
   return math.max(4, math.min(cap, (D.PIANO_SMALL or D.PIANO_RENOISE) and (ms('W') + 4) or (2 * ms('W') + 8)))
 end
+-- 6 ноя: короткие формы подписей главного модуля (крупный шрифт, узкая колонка)
+D.SHORT = { whichkey = 'wkey', preview = 'prev', options = 'opts', tutorial = 'tut', screensets = 'sets', ['col names'] = 'cols',
+  autofocus = 'afoc', ['one click'] = '1clk', performance = 'perf', ['follow playhead'] = 'follow', ['lock to REAPER'] = 'lock',
+  ['fixed cursor'] = 'fixcur', ['dB marks'] = 'dB', scopes = 'scope', router = 'route', matrix = 'mtx', listen = 'lstn',
+  debug = 'dbg', input = 'in', names = 'name', notes = 'note', about = 'abt', colours = 'col', browser = 'brws', meters = 'mtrs',
+  ['end stop'] = 'end', ['auto instrument'] = 'ainst', ['rec follows sel'] = 'recf', measure = 'meas', ['title bar'] = 'title' }
 function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local out = { white = 0, black = 0, letters = 0 }
   D.strip_cols = {}
