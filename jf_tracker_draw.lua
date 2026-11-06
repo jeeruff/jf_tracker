@@ -7022,6 +7022,26 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if D.pool_scroll > math.max(0, #rows - nvis) then D.pool_scroll = math.max(0, #rows - nvis) end
   if D.pool_scroll < 0 then D.pool_scroll = 0 end
   local label_w = math.min(L.cw * 18, math.floor(w * 0.55))
+  -- 6 ноя: имя — полностью, если есть место: колонка имени до самого длинного имени (len / pt / bs и место под волну
+  -- остаются); место под «+ 16$» — только если в lib есть нарезанный сэмпл / слои. Кэш на таблицу pool и ширину
+  do
+    local lc = D.lib_lw
+    if not (lc and lc.pool == pool and lc.w == w and lc.cw == L.cw) then
+      local kids, long = false, 0
+      for _, e in ipairs(pool) do
+        if (e.depth or 0) == 0 then
+          if #(e.layers or {}) + #(e.slices or {}) > 0 then kids = true end
+          long = math.max(long, ms((e.kit and '& ' or (e.layers and '¥ ' or '')) .. (e.name or '')))
+        end
+      end
+      lc = { pool = pool, w = w, cw = L.cw, kids = kids, long = long }
+      D.lib_lw = lc
+    end
+    local pre_w = ms('00* ') + (lc.kids and ms('+ 16$') or 0) + 6
+    local cols = ms('88.88s') + ms('-12.5') + ms('16b') + 4 * L.pad + 6 * L.cw   -- len, pt, bs, мини-волна
+    label_w = math.max(label_w, math.min(pre_w + lc.long + L.pad, w - 12 - cols))
+    D.lib_kids = lc.kids
+  end
   -- колонка ~ (9 окт): у item есть точки в огибающих take — щелчок открывает
   -- их во вкладке automation; место — только если такой item есть
   local TILDE = D.ttf and '∿' or '~'
@@ -7234,7 +7254,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 26 окт: число слайсов — сразу после + / - («01+ 16$ amenbro»), не в конце строки
       -- 27 окт: отмечен (m) — «*» между номером и именем, как в lf
       local mk = (D.lib_marks and D.lib_marks[i]) and '*' or ' '
-      local pre = ('%02d%s%s '):format(e.num or i, mk, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or '     ')
+      local pre = ('%02d%s%s '):format(e.num or i, mk, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or (D.lib_kids and '     ' or ''))
       if nkids > 0 and mx >= ix + 6 + ms('00 ') and mx < ix + 6 + ms('00 +') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
       local suf = ''   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
