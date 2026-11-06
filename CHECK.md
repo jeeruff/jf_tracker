@@ -2537,3 +2537,4 @@
 - [ ] options: вкладки theme (темы + tweak) и fonts (шрифты + слово режима) отдельно; в словах режима нет Andale Mono и Monocraft, есть Marker Felt и Nanum Brush Script
 - [ ] тема modus-vivendi: все панели чёрные, как трекер; font size — только 1 2 3 (x1.5 нет и у TTF; сохранённое 1.5 = 2)
 - [ ] options → fonts: кнопка pixel (p) рядом с bold; options → theme: тумблер p pixel в нижнем ряду; p в обеих вкладках
+- [ ] PT-mode (:pt): слева main, паттерны над матрицей; трекер; справа lib, браузер, region playlist; скопы сверху (если уже в PT-mode — :pt дважды)

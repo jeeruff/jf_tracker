@@ -12452,7 +12452,7 @@ ctx = {
     -- 31 окт: панели — только нужные для трека: трекер, матрица, паттерны, main, help, lib, browser, fx, dsp, automation, item
     if state.panes and PN.hide then
       local KEEP = { tracker = true, matrix = true, patterns = true, ctrl = true, help = true, inst = true, browser = true, fxb = true, dsp = true, automation = true, sample = true }
-      if pt then KEEP = { tracker = true, scopes = true, inst = true, browser = true, arranger = true } end   -- 4 ноя: ProTracker — раскладка ctx.PT_PANES (скопы, каналы, сэмплы, браузер, порядок песни)
+      if pt then KEEP = { tracker = true, scopes = true, inst = true, browser = true, arranger = true, ctrl = true, patterns = true, matrix = true } end   -- 4 ноя: ProTracker — раскладка ctx.PT_PANES (скопы, каналы, сэмплы, браузер, порядок песни)
       for _, p in ipairs(PN.PANELS) do if not KEEP[p.id] and PN.visible(state.panes, p.id) then PN.hide(state.panes, p.id) end end
       state.panes.v = (state.panes.v or 1) + 1
     end
@@ -12465,7 +12465,8 @@ ctx = {
   end,
   -- 31 окт: PT-mode = ProTracker, OG-mode слит в него (одна концепция: свобода в ограничениях): 4 канала track1..4
   -- (OG: создаются с инструментами og channel N, видны только они), 31 сэмпл, паттерн 64 строки, шрифт x2, панели — нужные
-  PT_PANES = 'v[0.16:scopes*|0.84:h[0.72:tracker*|0.28:v[0.45:inst*|0.3:browser*|0.25:arranger*]]]',
+  -- 6 ноя: слева main, паттерны над матрицей; в центре трекер; справа lib, браузер, порядок песни; скопы сверху
+  PT_PANES = 'v[0.16:scopes*|0.84:h[0.18:v[0.28:ctrl*|0.22:patterns*|0.5:matrix*]|0.58:tracker*|0.24:v[0.45:inst*|0.3:browser*|0.25:arranger*]]]',
   pt_toggle = function()
     local K = { 'top', 'toptab', 'dsp', 'side', 'mx_hidden', 'fixed', 'meters', 'meterstyle', 'khelp', 'fontscale', 'fxcols', 'wavemode', 'wave', 'envs', 'lpb', 'captions', 'ttf', 'ttfcustom', 'ttfpx' }
     if state.ptmode then
