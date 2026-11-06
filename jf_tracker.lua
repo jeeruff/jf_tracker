@@ -1331,6 +1331,14 @@ ctx = {
     set_lpb(need or LPBS[#LPBS])
     vim.msg = ('unfold: LPB %d -> %d%s (zu again - back)'):format(was, state.lpb, need and '' or ', still folded at the max')
   end,
+  -- 6 ноя: zO — обзор: вертикальная свёртка (строка = такт … 256 тактов), вся песня в экран
+  overview_toggle = function()
+    state.macro = not state.macro
+    if state.macro then
+      draw.macro.scroll = 0
+      vim.msg = 'overview: a row is ' .. draw.macro.bpr .. ' bar(s); - + coarser / finer, 0 - the whole song, j k J K g G move, Enter / Esc - back to the tracker at that bar'
+    else vim.msg = 'overview off' end
+  end,
   zoom_out_toggle = function()
     state.macro = false
     if state.lpb_before_zoom then set_lpb(state.lpb_before_zoom); state.lpb_before_zoom = nil; vim.msg = 'zoom back: LPB ' .. state.lpb
@@ -25850,7 +25858,8 @@ local function frame()
   end
   if state.macro and not big_on and L.body_h > 0 then
     draw.macro.draw(L, snap, L.matrix_w, L.body_y, L.win_w - L.matrix_w, L.body_h, L.label_w, vim.cur.row,
-      beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit)
+      beat_info.rows_bar or (state.lpb * 4), seq, ctx.fit, function(row)   -- 6 ноя: время строки обзора
+        local t = reaper.TimeMap2_QNToTime(0, row / state.lpb); return ('%d:%02d'):format(t // 60, math.floor(t % 60)) end)
     hover.row, hover.fi, hover.cell, hover.itemedge, hover.rownum = nil, nil, nil, nil, nil
   end
   -- метки f и призраки бросков — после всех оверлеев (session, эффекты,
@@ -32141,7 +32150,7 @@ local function frame()
       if vim.hydra or vim.picker then return vim.key(c) end
       if state.macro and state.focus == 'tracker' and vim.mode == 'normal' then
         local mr = draw.macro.key(c, vim.cur.row, beat_info.rows_bar or (state.lpb * 4), snap and snap.last_row)
-        if mr == 'leave' then state.macro = false; vim.msg = 'macro off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end
+        if mr == 'leave' then state.macro = false; vim.msg = 'overview off - bar ' .. (vim.cur.row // math.max(1, beat_info.rows_bar or 16) + 1); return end
         if mr then vim.cur.row = mr; return end
       end
       if state.focus == 'matrix' and ctx.PERF and ctx.PERF.active and not state.panes_ui and ctx.PERF.key(c) then   -- производительность на месте матрицы (6 окт)
@@ -33679,6 +33688,37 @@ draw.wave_pref = function(col)
   end
   if v == 'auto' then return nil end
   return v
+end
+-- 6 ноя: zt — вид трека: P_EXT:jf_tview 'big' / 'spec', нет — обычный (ноты точками)
+ctx.tview_c = {}
+draw.track_view = function(col)
+  local g = col and col.guid
+  if not g then return nil end
+  local v = ctx.tview_c[g]
+  if v == nil then
+    v = ''
+    if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then v = select(2, reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_tview', '', false)) or '' end
+    ctx.tview_c[g] = v
+  end
+  return v ~= '' and v or nil
+end
+ctx.track_view_set = function(col, v)
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end
+  reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_tview', v or '', true)
+  ctx.tview_c[col.guid] = nil
+  model.invalidate(); ctx.relayout()
+  vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zt n - notes)' or (v == 'spec' and 'spectral peaks (zt n - notes)' or 'notes'))
+end
+ctx.track_view_menu = function()
+  local col = cur_col()
+  if not col then vim.msg = 'zt: no track under the cursor'; return end
+  local cur = draw.track_view(col)
+  local function mark(v) return cur == v and '* ' or '  ' end
+  vim.open_hydra({ title = 'zt - view of ' .. (col.name ~= '' and col.name or 'the track'), items = {
+    { key = 'n', label = mark(nil) .. 'notes (normal)', fn = function() ctx.track_view_set(col, nil) end },
+    { key = 's', label = mark('spec') .. 'spectral peaks, wide (stretch markers on it)', fn = function() ctx.track_view_set(col, 'spec') end },
+    { key = 'w', label = mark('big') .. 'big wave instead of the dots (stretch markers on it; . , wider / narrower)', fn = function() ctx.track_view_set(col, 'big') end },
+  } })
 end
 ctx.track_wave = function(col)
   if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return end

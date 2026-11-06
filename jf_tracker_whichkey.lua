@@ -25,7 +25,7 @@ local T = {
   -- 5 ноя: подписи короче (2-4 слова); подробности — keyhelp
   z = { title = 'z - view', items = { { 'z', 'zoom the module' }, { 'Z', 'fixed cursor' }, { '1', 'mono: one note lane' }, { 'v', 'view menu' },
         { 'W', 'zoom the item' }, { 'w', 'width: all fit' }, { 'h', 'height: fit' }, { 'l', 'LPB presets' },
-        { 't', 'row to the top' }, { 'T', 'zoom the track' }, { 'b', 'row to the bottom' },
+        { 't', 'track view: big wave / spectrum / notes' }, { 'O', 'overview: a row = N bars, the whole song' }, { 'T', 'zoom the track' }, { 'b', 'row to the bottom' },
         { 'a', 'fold / open the track' }, { 'E', 'hide empty columns' }, { 'c', 'compact' }, { 'o', 'open' },
         { 'e', 'instrument window' }, { 'C', 'monitor FX' }, { '!', '1-char strip' }, { 'f', 'fold the folder' }, { 'k', 'folder: kids narrow' },
         { 'F', 'fold / open all' }, { '_', 'minimize the pane' }, { 'm', 'mixer' }, { 'M', 'master' },

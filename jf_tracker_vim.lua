@@ -3254,7 +3254,8 @@ function V.key_impl(c)
       elseif c == ('l'):byte() then if ctx.lpb_menu then ctx.lpb_menu() end   -- 1 ноя: zl — пресеты LPB (T триоли, D квинтоли)
       elseif c == ('h'):byte() then if ctx.fit_height then ctx.fit_height() end   -- 31 окт: zh — вид (паттерн / секция / проект) по высоте в экран
       elseif c == ('Z'):byte() then if ctx.fixed_toggle then ctx.fixed_toggle() end   -- 12 окт: zZ — фиксированный курсор (zz — один раз в центр, zZ — всегда)
-      elseif c == ('t'):byte() then st.row0 = math.max(0, V.cur.row)   -- zt — как в Vim: строка курсора наверх
+      elseif c == ('t'):byte() then if ctx.track_view_menu then ctx.track_view_menu() end   -- 6 ноя: zt — вид трека курсора (большая волна / спектр / ноты); прокрутка наверх — zb / zz
+      elseif c == ('O'):byte() then if ctx.overview_toggle then ctx.overview_toggle() end   -- 6 ноя: zO — обзор: строка = N тактов
       elseif c == ('T'):byte() then if ctx.zoom_track then ctx.zoom_track() end   -- 4 ноя: zT — зум трека (все его события, остальные свёрнуты)
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() or c == ('c'):byte() or c == ('o'):byte() then
@@ -4672,7 +4673,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | n N next / prev pattern (same row) | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold | E hide empty (all) | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f k folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | t b top / bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold | E hide empty (all) | c o compact / open | C monitor FX | ! strip | m mixer | M master | _ minimize | f k folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | t track view | O overview | b bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',

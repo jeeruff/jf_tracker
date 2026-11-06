@@ -1063,12 +1063,17 @@ function D.layout(snap, state, nregions)
             if not narrow and (fo or em) then G = L.foldG(G, fo and em) end
             ln.hm = ln.hm or {}; ln.hm[si] = hm
           end
-          if L.waveonly_on and lane.audio_sub and lane.audio_sub[si] then
-            -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24
+          -- 6 ноя: zt — вид трека: big (большая волна, пики) / spec (спектральные пики) вместо точек
+          local tv = D.track_view and D.track_view(col)
+          if (L.waveonly_on or tv) and lane.audio_sub and lane.audio_sub[si] then
+            -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24; вид трека — 40 и шире колесом
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
-            L.GW[ww] = L.GW[ww] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
-              wave = state.wavemode == 'column' and 'spec' or 'peaks', x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
-            G = L.GW[ww]
+            if tv then ww = L.cw * (40 + 8 * math.max(0, (lvl or 1) - 1)) end
+            local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
+            local gk = ww .. wm
+            L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
+              wave = wm, x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
+            G = L.GW[gk]
           end
           parts[si] = { G = G or L, narrow = narrow }
         end
