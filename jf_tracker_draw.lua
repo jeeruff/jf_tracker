@@ -5509,20 +5509,6 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.AMBER, 0.12); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 1); gfx.a = 1
         set(U.AMBER); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 0)
       end
-      -- 6 ноя: в транспорте — вид qwerty (keycaster) поверх клавиш и переключатель qwe / key справа вертикально, мелко
-      if not (info and info.kbd_only) and D.KC_VIEW then
-        local gw = #D.PIANO_WHITE * kw
-        if D.KC_VIEW() == 'qwerty' and D.KC_DRAW then set(U.PANEL); gfx.rect(kx, ky - 1, gw, kh + 2, 1); D.KC_DRAW(kx, ky - 1, gw, kh + 2) end
-        local sx, sw = kx + gw + 2, math.max(L.th, 8) + 2
-        local hot = mx >= sx and mx < sx + sw and my >= ky and my < ky + kh
-        local lab = D.KC_VIEW() == 'qwerty' and 'qwe' or 'key'
-        set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(sx, ky, sw, kh, 1)
-        set(hot and U.AMBER or U.LINE); gfx.rect(sx, ky, sw, kh, 0)
-        D.vtext(sx + 1, ky + 2, kh - 4, lab, hot and U.AMBER or U.GREY, hot and U.tint(U.AMBER, 0.3) or U.PANEL)
-        if hot then hover.ctrl = 'kcview' end
-        hint('ctrl', sx, ky, sw, kh, 'kcview')
-        kx = kx + sw + 2
-      end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
       local nk = D.PIANO_FROW and '1 f1 2' or (D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e')
       local ok2 = (D.PIANO_RENOISE or D.PIANO_FROW) and '[ ]' or 'z x'
@@ -7894,29 +7880,12 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if c.min then   -- 20 окт: свёрнута (zm) — только вкладки, модуль не рисуется
       elseif id == 'reform' and info.rf_draw then hover.rf = info.rf_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'reform'); if not inside then hover.rf = nil end   -- 19 окт
       elseif id == 'renderer' and info.rd_draw then hover.rd = info.rd_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'renderer'); if not inside then hover.rd = nil end   -- 20 окт
-      elseif id == 'keycaster' and info.kc_draw then
-        -- 6 ноя: keycaster — две вкладки: qwerty (нажатые клавиши) и keys (клавиатура нот, бывшая панель keys)
-        local tx, view = ct.x + L.pad, info.kcview or 'notes'
-        local down = gfx.mouse_cap & 1 == 1
-        for _, v in ipairs({ 'notes', 'qwerty' }) do
-          local bw = ms(v) + 2 * L.pad
-          local on = view == v
-          local gx, gy = gfx.mouse_x, gfx.mouse_y   -- панель бывает в буфере со сдвигом мыши
-          local hot = gx >= tx and gx < tx + bw and gy >= ct.y + 1 and gy < ct.y + 1 + L.rh
-          set(on and U.tint(U.AMBER, 0.3) or (hot and D.CURROW or U.PANEL)); gfx.rect(tx, ct.y + 1, bw, L.rh, 1)
-          set(on and U.AMBER or U.LINE); gfx.rect(tx, ct.y + 1, bw, L.rh, 0)
-          text(tx + L.pad, ct.y + 1, v, (on or hot) and U.AMBER or U.GREY)
-          if hot and down and not D.kc_down and info.kcview_set then info.kcview_set(v) end
-          hint('kcview', tx, ct.y + 1, bw, L.rh, v)
-          tx = tx + bw + 2
-        end
-        D.kc_down = down
-        local y2 = ct.y + L.rh + 4
-        if view == 'notes' then
-          local pp = info.piano
-          if pp then pp.ins = info.vmode == 'insert' end
-          D.piano_strip(L, ct.x, y2, ct.w, ct.y + ct.h - y2, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
-        else info.kc_draw(ct.x, y2, ct.w, ct.y + ct.h - y2) end
+      elseif id == 'keycaster' then
+        -- 6 ноя: keys — клавиатура нот; нажатые клавиши — своя панель qwerty
+        local pp = info.piano
+        if pp then pp.ins = info.vmode == 'insert' end
+        D.piano_strip(L, ct.x, ct.y + 2, ct.w, ct.h - 2, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
+      elseif id == 'qwerty' and info.kc_draw then info.kc_draw(ct.x, ct.y, ct.w, ct.h)   -- 6 ноя: keycaster — своя панель
       elseif id == 'phrases' and info.phr_draw then hover.phr = info.phr_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'phrases'); if not inside then hover.phr = nil end   -- 31 окт
       elseif id == 'lfogen' and info.lfogen_draw then hover.lfogen = info.lfogen_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'lfogen'); if not inside then hover.lfogen = nil end   -- 31 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт

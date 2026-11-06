@@ -43,7 +43,8 @@ PN.PANELS = {
   { id = 'actions',    label = 'actions',    key = 'A', hint = 'actions', side = 'right' },
   { id = 'reform',     label = 'reform',     key = 'R', hint = 'reform', side = 'right' },   -- 19 окт: reform выделенных нот (идея — Reform для Renoise)
   { id = 'humanizer',  label = 'humanizer',  key = 'H', hint = 'humanizer', side = 'right' },
-  { id = 'keycaster',  label = 'keys',       key = 'K', hint = 'keycaster', side = 'right' },   -- 6 ноя: keys — клавиатура нот (notes) и нажатые клавиши (qwerty); панелью или в транспорте (опция keys)
+  { id = 'keycaster',  label = 'keys',       key = 'K', hint = 'keycaster', side = 'right' },   -- 6 ноя: keys — клавиатура нот; панелью или в транспорте (опция keys)
+  { id = 'qwerty',     label = 'qwerty',     key = 'Q', hint = 'qwerty',  side = 'right' },   -- 6 ноя: keycaster — нажатые клавиши горят и гаснут
   { id = 'phrases',    label = 'phrases',    key = 'F', hint = 'phrases', side = 'right' },   -- 31 окт: фразы проекта (ph:NAME)
   { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
@@ -986,7 +987,8 @@ PN.ABOUT = {
   actions = 'Every REAPER action, searchable (fuzzy): type, Enter runs it in the main section or the last MIDI editor; recent ones on top.',
   reform = 'Reform the selected notes: shape their timing, velocity and length with curves (stretch, gravity, bounce, tuplets ...) and see the result before applying.',
   arranger = 'The order of the song in one place: the seq (patterns as text: A1 A1 B1x2 …), a scheme of the whole song, the sections row and the song playlist made of them, the arrangements (named sets of the lanes that play).',
-  keycaster = 'Two views: notes - the note keyboard (octave, keys, velocity, pedal); qwerty - the keys you press light up and fade (modifiers too), to show how the tracker is played. Options - keys: in the transport bar or as this pane.',
+  keycaster = 'The note keyboard (octave, keys, velocity, pedal). Options - keys: in the transport bar or as this pane.',
+  qwerty = 'A computer keyboard: the keys you press light up and fade (modifiers too), to show how the tracker is played.',
   phrases = 'The phrases of the project: a piece of a track saved as one note. Enter puts it at the cursor (the note transposes it, velocity scales it), e edits its source - every instance follows.',
   lfogen = 'The curve generator: an LFO, a podkat (a ramp before every note) or an audio follower written into the envelope at the tracker cursor - as points or as an automation item.',
   humanizer = 'Small random timing, velocity, length, pitch and pan for inserted notes (insert on) or the selection; each part with its own range.',

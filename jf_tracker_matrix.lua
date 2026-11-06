@@ -427,7 +427,10 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   end
   if corner then   -- 19 окт: кнопки в углу над слотами
     local need = draw_btns(L.pad, ny, L.mx_label_w - L.pad)
-    MX.corner_need = need + 4
+    -- 6 ноя: свёрнутая колонка слотов — подпись вертикально, выше строки заголовков: угол ниже на её высоту
+    local up = 0
+    if not MX.st_on then for id in pairs(MX.cfold_get()) do up = math.max(up, U.measure(id) + 2 - L.rh + 2) end end
+    MX.corner_need = need + 4 + up
   end
   -- 11 окт: заголовок колонки visor
   if (MX.vis_w or 0) > 0 then

@@ -425,9 +425,12 @@ KH.PAGES = {
     { k = '< >', d = 'the previous / next arrangement (a named set of the lanes that play)' },
     { k = 'Esc', d = 'back to the tracker' },
   } },
-  keycaster = { title = 'keys - the note keyboard and the keycaster (Ctrl+W g K)', e = {
-    { k = 'notes qwerty', d = 'two views: notes - the keyboard (octave, keys, velocity, pedal; click a key - it plays); qwerty - every key you press lights up and fades (modifiers too), to show how the tracker is played' },
+  keycaster = { title = 'keys - the note keyboard (Ctrl+W g K)', e = {
+    { k = 'click', d = 'a key plays; octave, velocity, pedal' },
     { k = 'Options - keys', d = 'transport - the keyboard in the transport bar (this pane hidden); pane - here, not in the transport' },
+  } },
+  qwerty = { title = 'qwerty - the keys you press (Ctrl+W g Q)', e = {
+    { k = 'any key', d = 'lights up and fades (modifiers too), to show how the tracker is played' },
   } },
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },
@@ -973,6 +976,7 @@ KH.BARS = {
   -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
   arranger = { { 'j k', 'row' }, { 'h l', 'along' }, { 'Enter', 'do' }, { 'x', 'remove' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
   keycaster = { { 'Ctrl+W', 'panes' } },
+  qwerty = { { 'Ctrl+W', 'panes' } },
   phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },

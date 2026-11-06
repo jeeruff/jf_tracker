@@ -329,7 +329,6 @@ local state = {
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
   noautofloat = flag('noautofloat', true),
-  kcview = reaper.GetExtState(EXT, 'kcview') ~= '' and reaper.GetExtState(EXT, 'kcview') or 'notes',   -- 6 ноя
   knob = reaper.GetExtState(EXT, 'knob') ~= '' and reaper.GetExtState(EXT, 'knob') or 'auto',   -- 6 ноя: ползунок слайдеров
   pixel = flag('pixel', true),   -- 6 ноя: пиксельный режим — кадр вполовину, на экран ×2 без сглаживания   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
   dspleft = flag('dspleft', true),
@@ -13545,7 +13544,7 @@ ctx = {
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
       flag('fxbenter', 'fx browser: Enter opens a folder', 'off (default) - as in lf: moving over a folder on the left shows its plugins on the right at once; on - the list changes only on Enter'),
       { key = 'fadercap', label = 'fader style', kind = 'cycle', values = { 'line', '==', '[-]', 'apart' }, desc = 'the mixer fader cap: a line across the meter, two lines ==, a bracket cap [-], or apart - the meter on its own and the fader in its own slot beside it (for purists)', get = function() return state.fadercap or 'apart' end, set = function(v) state.fadercap = v; reaper.SetExtState(EXT, 'fadercap', v, true) end },
-      { key = 'kbwhere', label = 'keys', kind = 'cycle', values = { 'transport', 'pane' }, desc = 'the note keyboard (and the qwerty keycaster): in the transport bar, or as the pane keys (notes / qwerty views)', get = function() return state.kbwhere end, set = function(v) ctx.kbwhere_set(v) end },
+      { key = 'kbwhere', label = 'keys', kind = 'cycle', values = { 'transport', 'pane' }, desc = 'the note keyboard: in the transport bar, or as the pane keys (the pressed keys - the pane qwerty)', get = function() return state.kbwhere end, set = function(v) ctx.kbwhere_set(v) end },
       flag('pancol', 'pan column', 'a pan field after the volume of every audio note (00 left .. 80 centre .. FF right; empty - centre); 0Pxx is then not shown'),
       { key = 'textonly', label = 'text only', kind = 'toggle', desc = 'cells show only the text: no wave behind the notes, no item fill, no item frame', get = function() return state.textonly end, set = function(v) state.textonly = v; if v then state.waveonly = false end end },
       -- 11 окт: противоположность text only — аудио-подколонка трека узкой полосой волны (ширина — зум трека колесом)
@@ -19400,7 +19399,6 @@ local function hint_go(t)
       if p.kind == 'note' and pd then for _, it in ipairs(ctx.is_heads_items(vim.covering(pd.fi, pd.row))) do items[#items + 1] = it end end
     end
     ctx.is_toggle_items(items); if ctx.IS then ctx.is_msg('labels') end
-  elseif t.kind == 'kcview' then state.kcview = d; reaper.SetExtState(EXT, 'kcview', d, true)   -- 6 ноя
   elseif t.kind == 'mxhdr' then ctx.set_focus('matrix'); MX.cfold_toggle(d)   -- 6 ноя: заголовок колонки матрицы — свернуть / развернуть
   elseif t.kind == 'bigfader' then ctx.bf_set(d.x)   -- 6 ноя: метка деления большого фейдера
   elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
@@ -23341,7 +23339,6 @@ function ctrl_action(name, delta)
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
   elseif name == 'human' then ctx.human_menu()   -- 31 окт: щелчок — снова меню (вкл / выкл — o в нём, unhuman — u)
-  elseif name == 'kcview' then if delta == 0 then state.kcview = state.kcview == 'qwerty' and 'notes' or 'qwerty'; reaper.SetExtState(EXT, 'kcview', state.kcview, true); vim.msg = 'keys: ' .. (state.kcview == 'qwerty' and 'qwerty - the keys you press' or 'notes - the keyboard') end   -- 6 ноя
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
   elseif name == 'holdroll' then ctx.holdroll_toggle()
@@ -25109,8 +25106,7 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
-    kcview = state.kcview == 'keys' and 'notes' or state.kcview, kcview_set = function(v) state.kcview = v; reaper.SetExtState(EXT, 'kcview', v, true) end,   -- 6 ноя: вкладка keycaster: qwerty / keys
-    kc_draw = function(x, y, w, h)   -- 6 ноя: панель keycaster — клавиши, что держатся сейчас (JS_VKeys)
+    kc_draw = function(x, y, w, h)   -- 6 ноя: панель qwerty — клавиши, что держатся сейчас (JS_VKeys)
       local now = reaper.time_precise()
       local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
       ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
@@ -26154,8 +26150,6 @@ local function frame()
       U.text(lx + L.pad, ly + 1, lab, U.AMBER)
     end
   end
-  draw.KC_VIEW = draw.KC_VIEW or function() return state.kcview == 'qwerty' and 'qwerty' or 'notes' end   -- 6 ноя: вид keys в транспорте
-  draw.KC_DRAW = draw.KC_DRAW or function(x, y, w, h) local now = reaper.time_precise(); local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1); ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac')) end
   draw.kb_pane = state.kbwhere == 'pane'   -- 6 ноя: клавиатура — панелью keys (в транспорте нет)
   draw.fadercap = state.fadercap   -- 4 ноя: вид ручки фейдера микшера
   do   -- 4 ноя: самая ранняя строка курсора: паттерн или =START до начала проекта — туда можно (строки выше 1.1)
@@ -32788,7 +32782,10 @@ ctx.mem = function()
   collectgarbage('collect')
   local after = collectgarbage('count')
   local MEM = dofile(DIR .. '/jf_tracker_mem.lua')
-  local roots = { { 'ctx', ctx }, { 'state', state } }
+  -- 6 ноя: ctx по полям — общий корень ctx в 86 МБ ничего не говорит
+  local roots = { { 'state', state } }
+  for k, v in pairs(ctx) do if type(v) == 'table' or type(v) == 'function' then roots[#roots + 1] = { 'ctx.' .. tostring(k), v } end end
+  roots[#roots + 1] = { 'ctx', ctx }
   local i = 1
   while true do
     local n, v = debug.getupvalue(ctx.frame_inner, i)
@@ -32801,7 +32798,7 @@ ctx.mem = function()
   roots[#roots + 1] = { 'registry', debug.getregistry() }
   local t0 = reaper.time_precise()
   local list, nobj = MEM.census(roots)
-  local rep = ('heap %s -> %s after collect, %d objects (%.0f ms): '):format(MEM.fmt(before * 1024), MEM.fmt(after * 1024), nobj, (reaper.time_precise() - t0) * 1000) .. MEM.report(list, 14)
+  local rep = ('heap %s -> %s after collect, %d objects (%.0f ms): '):format(MEM.fmt(before * 1024), MEM.fmt(after * 1024), nobj, (reaper.time_precise() - t0) * 1000) .. MEM.report(list, 10)
   reaper.SetExtState(EXT, 'mem', rep, false)
   if ctx.dlog then pcall(ctx.dlog, 'mem: ' .. rep) end
   vim.msg = rep
@@ -36000,11 +35997,21 @@ ctx.pane_nudge = function(id, dir)
 end
 ctx.kc_menu = function()
   local function mark(on) return on and '* ' or '  ' end   -- * — что выбрано сейчас
+  local function PN_vis(id) return state.panes and draw.panes and draw.panes.visible(state.panes, id) or false end
   vim.open_hydra({ title = 'keys / keycaster', items = {
     { key = 't', label = mark(state.kbwhere ~= 'pane') .. 'in the transport bar (default)', fn = function() ctx.kbwhere_set('transport') end },
-    { key = 'p', label = mark(state.kbwhere == 'pane') .. 'as a pane (views notes / qwerty)', fn = function() ctx.kbwhere_set('pane') end },
+    { key = 'p', label = mark(state.kbwhere == 'pane') .. 'as the pane keys', fn = function() ctx.kbwhere_set('pane') end },
+    { key = 'q', label = mark(PN_vis('qwerty')) .. 'the pane qwerty: the keys you press light up', fn = function() ctx.pane_toggle_qwerty() end },
     { key = 'f', label = mark(state.keycast) .. 'floating keycast in the tracker (big pressed keys)', fn = function() state.keycast = not state.keycast; ctx.kc = {}; vim.msg = 'keycast ' .. (state.keycast and 'on' or 'off') end },
   } })
+end
+-- 6 ноя: панель qwerty (keycaster) — вкл / выкл
+ctx.pane_toggle_qwerty = function()
+  local PN, m = draw.panes, state.panes
+  if not (PN and m) then return end
+  if PN.visible(m, 'qwerty') then ctx.pane_do(function() return PN.hide(m, 'qwerty') end, 'qwerty: off')
+  else ctx.pane_do(function() return PN.show(m, 'qwerty') end, 'qwerty: the keys you press') end
+  relayout()
 end
 ctx.kbwhere_set = function(v)
   state.kbwhere = v == 'pane' and 'pane' or 'transport'

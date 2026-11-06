@@ -30,7 +30,10 @@ function MEM.census(roots, limit)
             if type(k) == 'table' or type(k) == 'string' or type(k) == 'function' then stack[#stack + 1] = k end
             if type(x) == 'table' or type(x) == 'string' or type(x) == 'function' then stack[#stack + 1] = x end
           end
-          acc.bytes = acc.bytes + 56 + 16 * narr + 32 * math.max(0, nhash - narr)
+          -- хэш-часть в Lua — степень двойки (до 2× от числа пар)
+          local nh, sz = math.max(0, nhash - narr), 0
+          if nh > 0 then sz = 1; while sz < nh do sz = sz * 2 end end
+          acc.bytes = acc.bytes + 56 + 16 * narr + 32 * sz
           local mt = getmetatable(v)
           if type(mt) == 'table' then stack[#stack + 1] = mt end
         end
