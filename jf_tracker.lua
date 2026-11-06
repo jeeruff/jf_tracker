@@ -32224,7 +32224,6 @@ local function frame()
         if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: v - pads / list of a rack or container, b - into bands, z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
-        if ch == 't' and not DK.pending then ctx.dsp_toggle_target(); return end
         if ctx.pinmx and ctx.pins_key(c, ch) then return end   -- 24 окт: матрица пинов открыта — её клавиши
         if ch == 'K' and not DK.pending then ctx.dsp_learn_toggle(); return end   -- 24 окт: K — knobs learn (было E; e — окно)
         if ch == 'I' and not DK.pending and not DK.pads then ctx.pins_open(dsp_sel.fx); return end   -- 24 окт: I — входы / выходы (пины)

@@ -38,7 +38,8 @@ local HINT = {
   d = 'd: d delete fx (v: range) | w delete forward (d3w - three) | b delete the one before | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | u unpack | n empty container | v rack view: pads / list | b into 3 / 4 / 5 bands | f fold the container | = parallel to the previous | | serial | s pad size | Esc',
-  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | f add fx | F take fx on the note | Esc',
+  a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | Esc',
+  t = 't: f add fx (fzf) | F take fx on the note under the cursor | t track fx / take fx | Esc',   -- 6 ноя: как t в трекере
 }
 function DK.pending_hint() return DK.pending and HINT[DK.pending] or nil end
 
@@ -100,8 +101,10 @@ function DK.key(c, sel, n, np, mods)
     elseif op == 'c' and (ch == '=' or ch == '|') then ctx.dsp_par(sel.fx, ch == '=' and 1 or 0)   -- 28 окт: c= параллельно / c| последовательно
     elseif op == 'a' and ch == 'a' then ctx.dsp_automate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'p' then ctx.dsp_pick_param(sel.fx)
-    elseif op == 'a' and ch == 'f' then if not (ctx.pad_fx_add and ctx.pad_fx_add()) then ctx.fx_picker() end   -- 23 окт: на рэке с выбранным пэдом — в пэд
-    elseif op == 'a' and ch == 'F' then ctx.dsp_take_slice()       -- aF (7 окт): take FX на слайс / ноту под курсором трекера
+    -- 6 ноя: эффекты — t (как tf в трекере), a — только автоматизация
+    elseif op == 't' and ch == 'f' then if not (ctx.pad_fx_add and ctx.pad_fx_add()) then ctx.fx_picker() end   -- 23 окт: на рэке с выбранным пэдом — в пэд
+    elseif op == 't' and ch == 'F' then ctx.dsp_take_slice()       -- take FX на слайс / ноту под курсором трекера
+    elseif op == 't' and ch == 't' then ctx.dsp_toggle_target()   -- было t: track fx / take fx
     elseif op == 'a' and ch == 'd' then ctx.dsp_unautomate(sel.fx, sel.param)
     elseif op == 'a' and ch == 'i' then ctx.dsp_autoitem(sel.fx, sel.param)
     elseif op == 'a' and ch == 'm' then ctx.dsp_map_macro(sel.fx, sel.param)
@@ -210,7 +213,7 @@ function DK.key(c, sel, n, np, mods)
     if DK.anchor or DK.marks then DK.clear_pick(); return true end
     return 'leave'
   end
-  if ch == 'd' or ch == 'y' or ch == 'c' or ch == 'a' then
+  if ch == 'd' or ch == 'y' or ch == 'c' or ch == 'a' or ch == 't' then
     DK.pending = ch; DK.dcount = num; ctx.msg((num or '') .. ch .. '...'); return true   -- 22 окт: 3dw — счёт до оператора
   end
   if ch == 'h' or c == LEFT then sel.fx = math.max(1, sel.fx - (cnt or 1)); sel.param = 1
