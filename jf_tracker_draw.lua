@@ -6918,6 +6918,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- 12 окт: insert (играть при вставке) переехал в транспорт — кнопка hear у step / inst / LPB
     -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
+    tbtn('auto', info.libauto, 'libautobtn')   -- 6 ноя: auto select — трекер за инструментом чужого трека
   end
   -- 13 окт: вид tracks во вкладке lib — дерево трек → инструменты → слайсы / automation / MIDI,
   -- неиспользованные — в lib/; кнопки шапки lib (load, пресет, track, sort, bsync, find) остаются

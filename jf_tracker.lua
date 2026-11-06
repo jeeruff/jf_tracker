@@ -191,6 +191,7 @@ local state = {
   toptab = ext('toptab', 'master'),
   top = flag('top', true),                      -- верхняя панель (контрол | метры | инструменты)
   meters = flag('meters', false),               -- большие пик-метры в шапках треков
+  libauto = flag('libauto', false),            -- 6 ноя: lib auto select — шаг на инструмент чужого трека ведёт трекер туда
   poolprev = flag('poolprev', true),            -- прослушивать выбранный слот (кнопка preview)
   -- режим превью инструмента (3 окт): full — до конца item / Esc, hold — пока
   -- держишь кнопку мыши на строке, sec — первая секунда
@@ -717,7 +718,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -891,7 +892,7 @@ function PV.inst_preview(e, track, by_mouse)
   state.prev_hold = (mode == 'hold' and by_mouse) or nil
 end
 local ctx                                        -- 9 окт: раньше pool_select (ему нужны плагины трека)
-local function pool_select(n)
+local function pool_select(n, go)   -- 6 ноя: go — выбрать и чужой инструмент (Enter), когда auto select выкл
   state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
   state.midi_inst = false
   local col = cur_col()
@@ -909,6 +910,12 @@ local function pool_select(n)
     local g = n - nsamp
     local oc, k = ctx.inst_owner(g)
     if oc then
+      -- 6 ноя: auto select выкл (кнопка auto в lib) — lib обычный список: курсор встаёт на чужой инструмент, трекер
+      -- остаётся на своём треке; Enter — перейти на его трек и выбрать
+      if col and oc.guid ~= col.guid and not state.libauto and not go then
+        vim.msg = ('inst %02d: %s on %s - Enter: go to the track and pick it (auto - follow at once)'):format(n, ctx.track_insts(oc)[k].name or '?', oc.name or '?')
+        return
+      end
       if col and oc.guid ~= col.guid then ctx.goto_col(oc) end
       ctx.inst_fx_pick(oc, ctx.track_insts(oc)[k].fx, false, true)
     elseif ctx and ctx.auto_select then ctx.auto_select() end
@@ -13132,7 +13139,7 @@ ctx = {
   end,
   -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
   -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
-  inst_select = function(n) draw.lib_hdr = nil; pool_select(n) end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
+  inst_select = function(n, go) draw.lib_hdr = nil; pool_select(n, go) end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
   lib_nav = function() return draw.lib_nav end,
   lib_hdr = function(name) if name ~= nil then draw.lib_hdr = name or nil end; return draw.lib_hdr end,
   inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
@@ -13544,6 +13551,7 @@ ctx = {
       flag('steplisten', 'step listen', 'transport stopped: moving the cursor plays the row under it (all tracks, with fx)'),
       flag('preview', 'preview on insert', 'audition the note when inserting'),
       flag('poolprev', 'preview on select', 'audition the instrument when selected'),
+      flag('libauto', 'lib auto select', 'a step onto an instrument of another track in the lib moves the tracker to that track at once; off - the lib is a plain list, Enter goes there (the auto button in the lib)'),
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       flag('autosync', 'auto sync pooled', 'edits in a pattern copy to its pooled repeats (same region name)'),
       { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
@@ -13582,7 +13590,7 @@ ctx = {
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
-      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'tpkeys', 'fxbenter', 'endstop', 'recdelprompt' } },
+      { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'libauto', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'tpkeys', 'fxbenter', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
       { 'odd options', { 'namedrag' } },   -- 14 окт: странные, но вдруг кому зайдёт
       -- 1 ноя: experimental — всё экспериментальное в одном месте (просьба): PT-mode, рамки и визуализаторы, human, скорость фейдеров, карточки pm
@@ -19390,6 +19398,7 @@ local function hint_go(t)
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'swapbtn' then ctx.swap_click()
+  elseif t.kind == 'libautobtn' then ctx.libauto_toggle()
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
   elseif t.kind == 'dspbtn' then   -- 11 окт: кнопки шапки эффекта по f — как щелчок
     ctx.set_focus('dsp'); dsp_sel.fx = d.fx
@@ -25098,7 +25107,7 @@ local function frame()
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -26260,6 +26269,7 @@ local function frame()
   elseif hover.mixmode then state.status = 'meter of the master (REAPER VU): RMS / LUFS-M / LUFS-S / peak - click: the list (native, no plugin)'
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
+  elseif hover.libautobtn then state.status = 'auto select: a step onto an instrument of another track moves the tracker there; off - a plain list, Enter goes there (click: on / off)'
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N, right click: menu'
   elseif hover.dbplus or hover.dbpar then state.status = (hover.dbtip or '') .. ' - click: fzf of the effects'
   elseif hover.poolkit then state.status = 'lib preset: the whole lib of the track - click: the presets and save, < > the previous / next one (replaces the lib, Cmd+Z back)'
@@ -27836,6 +27846,9 @@ local function frame()
       ctx.set_focus('inst'); ctx.kit_menu(); click = { t = now2, zone = 'poolkit' }
     elseif hover.poolpprev or hover.poolpnext then
       ctx.set_focus('inst'); ctx.libp_step(hover.poolpnext and 1 or -1); click = { t = now2, zone = 'poolpstep' }
+    elseif hover.libautobtn then
+      ctx.set_focus('inst'); ctx.libauto_toggle()
+      click = { t = now2, zone = 'libautobtn' }
     elseif hover.swapbtn then
       ctx.set_focus('inst'); ctx.swap_click()
       click = { t = now2, zone = 'swapbtn' }
@@ -35716,7 +35729,20 @@ ctx.sound_menu = function(path, o, extra)
   if o.on_enter and vim.hydra then vim.hydra.on_enter = o.on_enter end
 end
 -- lib: Enter — меню сэмпла: Enter Enter — во вкладку item (как было), s b d … — похожие / шаги, выбранный заменяет звук инструмента
+ctx.libauto_toggle = function() state.libauto = not state.libauto; vim.msg = 'lib auto select ' .. (state.libauto and 'on - the tracker follows the instrument' or 'off - Enter goes to its track') end
+-- 6 ноя: Enter на инструменте чужого трека (auto select выкл) — туда и выбрать; иначе меню звука
+ctx.lib_enter_go = function()
+  local col = cur_col()
+  local nsamp = col and (#(col.pool or {}) + draw.empty_slots(#(col.pool or {}))) or 0
+  local n = vim.inst or 0
+  if not col or n <= nsamp then return false end
+  local oc = ctx.inst_owner(n - nsamp)
+  if not oc or oc.guid == col.guid then return false end
+  pool_select(n, true)
+  return true
+end
 ctx.lib_enter_menu = function()
+  if ctx.lib_enter_go() then return end
   local col = cur_col()
   local e = col and col.pool and col.pool[vim.inst]
   local root = e and (e.parent or e)
