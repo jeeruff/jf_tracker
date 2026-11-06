@@ -2536,3 +2536,4 @@
 - [ ] pixel mode + пиксельный TTF (bigblue, departure, gohu11/14, terminess, proggy, profont, monocraft): size 1 и 2 — родной кегль, 3 — ×2, без мыла
 - [ ] options: вкладки theme (темы + tweak) и fonts (шрифты + слово режима) отдельно; в словах режима нет Andale Mono и Monocraft, есть Marker Felt и Nanum Brush Script
 - [ ] тема modus-vivendi: все панели чёрные, как трекер; font size — только 1 2 3 (x1.5 нет и у TTF; сохранённое 1.5 = 2)
+- [ ] options → fonts: кнопка pixel (p) рядом с bold; options → theme: тумблер p pixel в нижнем ряду; p в обеих вкладках

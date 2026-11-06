@@ -208,6 +208,7 @@ function TT.draw(x, y, w, h, emb, part)
       btn('-', false, { 'space', -1 }); lab(tostring(ctx.space())); btn('+', false, { 'space', 1 })
       bx = bx + 3 * pad
       if ctx.bold then btn('bold (b)', ctx.bold(), { 'bold' }) end   -- 31 окт: жирный шрифт
+      if ctx.pixel then btn('pixel (p)', ctx.pixel(), { 'pixel' }) end   -- 6 ноя: пиксельный режим
     end
   end
   local cur_f = ctx.font()
@@ -269,6 +270,20 @@ function TT.draw(x, y, w, h, emb, part)
     text(bx + pad, by, lab, hot and U.AMBER or U.TEXT)
     bx = bx + bw + pad
   end
+  -- 6 ноя: тумблер pixel mode (p) — и во вкладке theme
+  if ctx.pixel then
+    local lab = 'p pixel'
+    local bw = ms(lab) + 2 * pad
+    if bx + bw <= x + w then
+      local on = ctx.pixel()
+      local hot = mx >= bx and mx < bx + bw and my >= by and my < by + rh
+      if hot then TT.btnp[part] = { 'pixel' } end
+      C(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(U.CYAN, 0.3) or U.BG)); gfx.rect(bx, by, bw, rh, 1)
+      C(on and U.CYAN or U.LINE); gfx.rect(bx, by, bw, rh, 0)
+      text(bx + pad, by, lab, hot and U.AMBER or (on and U.CYAN or U.TEXT))
+      bx = bx + bw + pad
+    end
+  end
   -- подсказка выбранного
   local tip
   if TT.sec == 1 and themes[TT.i[1]] then tip = 'theme ' .. themes[TT.i[1]].name
@@ -285,7 +300,7 @@ end
 
 local function act(k)
   if type(k) == 'table' then
-    if k[1] == 'scale' then ctx.set_scale(k[2]) elseif k[1] == 'bold' then ctx.set_bold(not ctx.bold()) else ctx.set_space(ctx.space() + k[2]) end
+    if k[1] == 'scale' then ctx.set_scale(k[2]) elseif k[1] == 'bold' then ctx.set_bold(not ctx.bold()) elseif k[1] == 'pixel' then ctx.set_pixel(not ctx.pixel()) else ctx.set_space(ctx.space() + k[2]) end
     TT.fkey = nil; return
   end
   if k == 'o' then ctx.own_font() elseif k == 'i' then ctx.install_fonts() elseif k == 'd' then ctx.download_fonts()
@@ -321,6 +336,7 @@ function TT.key(c, part)
     act({ 'scale', SC[j] })
   elseif ch == '[' or ch == ']' then act({ 'space', ch == ']' and 1 or -1 })
   elseif ch == 'b' and ctx.bold then act({ 'bold' })   -- 31 окт: жирный шрифт
+  elseif ch == 'p' and ctx.pixel then act({ 'pixel' })   -- 6 ноя: пиксельный режим
   else return false end
   return true
 end

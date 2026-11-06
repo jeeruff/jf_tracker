@@ -16466,6 +16466,8 @@ ctx.tt_api = {
   space = function() return tonumber(state.fontspace) or 2 end,
   set_space = function(n) n = math.max(0, math.min(12, n)); ctx.set_space(n); ctx.relayout(); vim.msg = 'line spacing ' .. n end,
   bold = function() return state.fontbold and true or false end,
+  pixel = function() return state.pixel ~= false end,   -- 6 ноя: тумблер pixel mode во вкладках theme и fonts
+  set_pixel = function(on) state.pixel = on and true or false; draw.set_font(state); ctx.relayout(); vim.msg = 'pixel mode ' .. (on and 'on' or 'off') end,
   set_bold = function(on) state.fontbold = on and true or false; reaper.SetExtState(EXT, 'fontbold', on and '1' or '0', true); draw.set_font(state); ctx.relayout(); vim.msg = 'bold font ' .. (on and 'on' or 'off') end,
   fonts = function()
     local fs = tonumber(state.fontscale) or 2
