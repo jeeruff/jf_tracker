@@ -723,3 +723,9 @@ lvalues1..8, fxchain, fxvalues, mvalues, render) — страница не ме�
 ## План: парсер параметров DSP и их отображение (22 окт)
 
 Отдельным файлом: [PLAN_DSP.md](PLAN_DSP.md) — что есть, что видно на снимках, этапы 0–6 (образцы `:fxdump`, модель параметра, виджеты по типу, раскладка, кураторское против авто, взаимодействие, скорость).
+
+## Keys: one source
+
+Keys live in `jf_tracker_keyhelp.lua` (pages for `?`, bars under the modules). The manual's *All keys*
+section is generated from it: after editing keys run `lua tools/gen_keys.lua`. `tests/test_keys_sync.lua`
+fails when the manual lags behind or a bar names a key keyhelp does not know.

@@ -592,7 +592,7 @@ KH.PAGES = {
     { k = 'p', d = 'auto preview on / off' },
     { k = 'v', d = 'show file in sample tab' },
     { k = 'w q', d = 'panel width / hide' },
-    { k = "'1 '2 '3", t = { "'" }, d = "bookmark: go ('1 ... '0); the digits alone are a count: 10j 5k 3G" },
+    { k = "'1..'0", t = { "'" }, d = "bookmark: go ('1 ... '0); the digits alone are a count: 10j 5k 3G" },
     { k = 'Shift+1..0', d = 'set bookmark 1..10 to this folder', t = { '!', '@', '#', '$', '%', '^', '&', '*', '(', ')' } },
     { k = 'H L', d = 'folder history back / forward (< > buttons)' },
     { k = ':mkdir', t = {}, d = 'new folder here (:mkdir name)' },
@@ -894,6 +894,7 @@ KH.PAGES = {
     { k = 'j k', d = 'channel down / up' },
     { k = 'h l', d = 'move window' },
     { k = '[ ] { }', d = 'start / end edges' },
+    { k = 'bb', t = {}, d = 'the bb button: the capture becomes drum MIDI on a new track (beatbox, = :bb)' },
     { k = 'Esc', d = 'back to tracker' },
   } },
   garden = { title = 'garden (loops in regions)', e = {
@@ -982,7 +983,7 @@ KH.BARS = {
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' } },
-  inst = { { 'o', 'add' }, { 'Enter', 'sound' }, { 's', 'slice' }, { 'L', 'layer' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' },
+  inst = { { 'o', 'add' }, { 's', 'slice' }, { 'L', 'layer' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' },
            { 'Space', 'listen' }, { '/', 'find' }, { 'R', 'ξ random' }, { '[ ]', 'ξ back / fwd' } },
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },
