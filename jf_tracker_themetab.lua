@@ -81,6 +81,8 @@ local function font_img(fonts, pw, ph)
   local d0 = gfx.dest
   gfx.setimgdim(IMG, -1, -1); gfx.setimgdim(IMG, pw, ph * #fonts)
   gfx.dest = IMG
+  -- 6 ноя: картинка — непрозрачным фоном: битмап ложится сложением, на прозрачной картинке строки не было (альфа 0)
+  C(U.BG); gfx.rect(0, 0, pw, ph * #fonts, 1)
   for i, f in ipairs(fonts) do
     local y = (i - 1) * ph
     if f.face then
@@ -89,7 +91,7 @@ local function font_img(fonts, pw, ph)
       gfx.drawstr(f.key .. '  C-4 01 7F')   -- 4 ноя: короче — в плитку влезает без обрезки (было … Abc 0123)
     else
       gfx.setfont(ctx.font_id())
-      ctx.text(4, y + math.floor((ph - ctx.L().rh) / 2), f.key .. '  C-4 01 7F', U.TEXT)
+      ctx.text(4, y + math.floor((ph - ctx.L().rh) / 2), ((f.key == 'off' or f.key == 'bitmap') and 'default bitmap' or f.key) .. '  C-4 01 7F', U.TEXT)   -- 6 ноя: имя битмапа
     end
   end
   gfx.setfont(ctx.font_id()); gfx.dest = d0
@@ -214,8 +216,8 @@ function TT.draw(x, y, w, h, emb, part)
     local cx, cy = x + c * (pw + pad), fy + rh + r * ph
     if vis(cy, ph) then
       local sel = TT.sec == 2 and TT.i[2] == i
-      if sel then C(U.AMBER, 0.30); gfx.rect(cx, cy, pw, ph, 1) end
       gfx.blit(IMG, 1, 0, 0, (i - 1) * ph, math.min(pw, w - (cx - x)), ph, cx, cy, math.min(pw, w - (cx - x)), ph)
+      if sel then C(U.AMBER, 0.30); gfx.rect(cx, cy, pw, ph, 1); gfx.a = 1 end   -- 6 ноя: поверх образца (картинка теперь непрозрачная)
       if f.key == cur_f then C(U.AMBER); gfx.rect(cx, cy, pw, ph, 0) end
       if mx >= cx and mx < cx + pw and my >= cy and my < cy + ph then TT.hotp[part] = { 2, i }; C(U.TEXT); gfx.rect(cx, cy, pw, ph, 0) end
     end
