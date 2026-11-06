@@ -210,7 +210,9 @@ function D.set_font(state)
   if tf then
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
-    if state.pixel ~= false then fs = math.max(0.5, fs / 2) end   -- 6 ноя: пиксельный режим — кадр вполовину, кегль тоже
+    -- 6 ноя: пиксельный режим — кадр вполовину; пиксельный TTF чёткий только в родном кегле (px) и его целых кратных:
+    -- size 1 / 2 — родной, 3 — ×2 (было px·fs/2: 6 или 18 px вместо 12 — каша)
+    if state.pixel ~= false then fs = math.max(1, math.floor(fs / 2 + 0.5)) end
     D.ttf_face, D.ttf_size, D.ttf_px = tf.face, math.floor(tf.px * fs + 0.5), tf.px
     gfx.setfont(1, D.ttf_face, D.ttf_size, D.bold and string.byte('b') or 0)
     D.font_id = 1
