@@ -23341,6 +23341,7 @@ function ctrl_action(name, delta)
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
   elseif name == 'human' then ctx.human_menu()   -- 31 окт: щелчок — снова меню (вкл / выкл — o в нём, unhuman — u)
+  elseif name == 'kcview' then if delta == 0 then state.kcview = state.kcview == 'qwerty' and 'notes' or 'qwerty'; reaper.SetExtState(EXT, 'kcview', state.kcview, true); vim.msg = 'keys: ' .. (state.kcview == 'qwerty' and 'qwerty - the keys you press' or 'notes - the keyboard') end   -- 6 ноя
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
   elseif name == 'holdroll' then ctx.holdroll_toggle()
@@ -26153,6 +26154,8 @@ local function frame()
       U.text(lx + L.pad, ly + 1, lab, U.AMBER)
     end
   end
+  draw.KC_VIEW = draw.KC_VIEW or function() return state.kcview == 'qwerty' and 'qwerty' or 'notes' end   -- 6 ноя: вид keys в транспорте
+  draw.KC_DRAW = draw.KC_DRAW or function(x, y, w, h) local now = reaper.time_precise(); local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1); ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac')) end
   draw.kb_pane = state.kbwhere == 'pane'   -- 6 ноя: клавиатура — панелью keys (в транспорте нет)
   draw.fadercap = state.fadercap   -- 4 ноя: вид ручки фейдера микшера
   do   -- 4 ноя: самая ранняя строка курсора: паттерн или =START до начала проекта — туда можно (строки выше 1.1)

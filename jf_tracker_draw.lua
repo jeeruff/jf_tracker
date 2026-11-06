@@ -5509,6 +5509,20 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.AMBER, 0.12); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 1); gfx.a = 1
         set(U.AMBER); gfx.rect(kx - 2, ky - 2, gw + 3, kh + 4, 0)
       end
+      -- 6 ноя: в транспорте — вид qwerty (keycaster) поверх клавиш и переключатель qwe / key справа вертикально, мелко
+      if not (info and info.kbd_only) and D.KC_VIEW then
+        local gw = #D.PIANO_WHITE * kw
+        if D.KC_VIEW() == 'qwerty' and D.KC_DRAW then set(U.PANEL); gfx.rect(kx, ky - 1, gw, kh + 2, 1); D.KC_DRAW(kx, ky - 1, gw, kh + 2) end
+        local sx, sw = kx + gw + 2, math.max(L.th, 8) + 2
+        local hot = mx >= sx and mx < sx + sw and my >= ky and my < ky + kh
+        local lab = D.KC_VIEW() == 'qwerty' and 'qwe' or 'key'
+        set(hot and U.tint(U.AMBER, 0.3) or U.PANEL); gfx.rect(sx, ky, sw, kh, 1)
+        set(hot and U.AMBER or U.LINE); gfx.rect(sx, ky, sw, kh, 0)
+        D.vtext(sx + 1, ky + 2, kh - 4, lab, hot and U.AMBER or U.GREY, hot and U.tint(U.AMBER, 0.3) or U.PANEL)
+        if hot then hover.ctrl = 'kcview' end
+        hint('ctrl', sx, ky, sw, kh, 'kcview')
+        kx = kx + sw + 2
+      end
       tx = kx + #D.PIANO_WHITE * kw + 2 * L.pad
       local nk = D.PIANO_FROW and '1 f1 2' or (D.PIANO_RENOISE and 'zsx q2w' or 'q2w3e')
       local ok2 = (D.PIANO_RENOISE or D.PIANO_FROW) and '[ ]' or 'z x'
