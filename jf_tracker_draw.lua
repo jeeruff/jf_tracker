@@ -6972,11 +6972,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 11 окт: save — в меню kit (одно место); sort — выпадашка (не перебор по кругу: положений больше двух)
   -- bsync: beatsync выбранного инструмента — длина под N долей темпа в месте
   -- каждой ноты; горит, когда включён
+  -- 6 ноя: bsync и layer — вниз (bsync — под колонкой bs), в шапке find load пресет sort
   local on = cur and cur.bsync
   local blbl = on and ('bsync %d'):format(on) or 'bsync'
-  local bw2 = ms(blbl) + 2 * L.pad
-  local bx2 = fx - bw2 - L.pad
-  hbtn(bx2, bw2, blbl, on and true or false, U.CYAN, 'poolbsync')
+  local bx2 = fx
   local sw2 = ms('sort') + 2 * L.pad
   local sx2 = bx2 - sw2 - L.pad
   if sx2 > ix + L.pad + ms('kit') + 2 * L.pad then hbtn(sx2, sw2, 'sort', false, U.CYAN, 'poolsort'); bx2 = sx2 end
@@ -6988,10 +6987,6 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local lw3 = ms('load') + 2 * L.pad
     local lx3 = ix + L.pad + fw + L.pad   -- 2 ноя: после «/ find»
     hbtn(lx3, lw3, 'load', false, U.CYAN, 'poolload')
-    -- 4 ноя: layer — слой (¥) выбранному инструменту: другой звук lib звучит с ним одной нотой (= L)
-    local lw4 = ms('layer') + 2 * L.pad
-    local lx4 = lx3 + lw3 + L.pad
-    if lx4 + lw4 + L.pad < bx2 then hbtn(lx4, lw4, 'layer', false, U.CYAN, 'poollayer'); lx3, lw3 = lx4, lw4 end
     local room = bx2 - L.pad - (lx3 + lw3 + L.pad)
     local ptw = math.min(ms('< ' .. nm .. ' >') + L.pad, room)
     if ptw > ms('<>') + ms('pre') then
@@ -7024,6 +7019,22 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
     tbtn('auto', info.libauto, 'libautobtn')   -- 6 ноя: auto select — трекер за инструментом чужого трека
+    -- 4 ноя: layer — слой (¥) выбранному инструменту: другой звук lib звучит с ним одной нотой (= L); 6 ноя: внизу
+    tbtn('layer', false, 'poollayer')
+    -- 6 ноя: bsync — под колонкой bs (правый край кнопки — у правого края значений bs), не влезает — следом
+    do
+      local bsr = ix + w - L.pad - 4 - (ms('88.88s') + L.pad)
+      local bw = ms(blbl) + 2 * L.pad
+      local x0 = math.max(bx, bsr - bw + L.pad)
+      if x0 + bw <= ix + w - L.pad then
+        local hot = mx >= x0 and mx < x0 + bw and my >= by and my < by + L.rh
+        set(on and U.tint(U.CYAN, 0.25) or (hot and D.CURROW or U.BG)); gfx.rect(x0, by, bw, L.rh, 1)
+        set(on and U.CYAN or U.LINE); gfx.rect(x0, by, bw, L.rh, 0)
+        text(x0 + L.pad, by, blbl, on and U.CYAN or (hot and U.TEXT or U.GREY))
+        if hot then hover.poolbsync = true end
+        hint('poolbsync', x0, by, bw, L.rh, true)
+      end
+    end
   end
   -- 13 окт: вид tracks во вкладке lib — дерево трек → инструменты → слайсы / automation / MIDI,
   -- неиспользованные — в lib/; кнопки шапки lib (load, пресет, track, sort, bsync, find) остаются
