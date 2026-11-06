@@ -12085,6 +12085,24 @@ ctx = {
       if hot then hover[e.kind] = { col = col, k = e.k, it = e.it, x = x, y = y, w = w2, vert = vert } end   -- 31 окт: место фишки — для броска
       ctx.hint(e.kind, x, y, w2, L.rh, { col = col, k = e.k })
     end
+    -- 6 ноя: узкая колонка (меньше 3 знаков) — имена мелким шрифтом, по строке на эффект (сколько строк есть), а не «+N»
+    if right - cx < L.cw * 3 + 2 * L.pad and #list > 0 and draw.small_text then
+      local sh = math.max(6, math.floor((L.th or L.rh) * (draw.SMALL or 0.5)) + 1)
+      local per = math.max(1, math.floor(L.rh / sh))
+      local cap = math.max(1, (avail or 1) * per)
+      for n = 1, math.min(#list, cap) do
+        local e = list[n]
+        local y = y0 + (n - 1) * sh
+        local nm = (e.it.name or ''):gsub('^%w+i?:%s*', ''):gsub('^>%s*', '>'):gsub('%s*%b()%s*$', '')
+        if n == cap and #list > cap then nm = '+' .. (#list - cap + 1) end
+        while nm ~= '' and draw.small_measure(nm) > right - cx - 1 do nm = nm:sub(1, (utf8.offset(nm, -1) or #nm) - 1) end
+        local hot = mx >= cx and mx < right and my >= y and my < y + sh
+        if hot then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(cx, y, right - cx, sh, 1) end
+        draw.small_text(cx + 1, y, nm, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
+        if hot and e.kind ~= 'hdrparam' then hover[e.kind] = { col = col, k = e.k, it = e.it, x = cx, y = y, w = right - cx } end
+      end
+      return 1
+    end
     if vert then
       -- 30 окт: контейнер — скобка [ слева от своих эффектов (вложенный — на ступень правее), фишки самого
       -- контейнера нет; у эффекта внутри — | (за предыдущим) или =, если по ширине остаётся место под имя
