@@ -31051,7 +31051,7 @@ local function frame()
   end
   if ctx.IS and c > 0 and not HN.active and ctx.is_key(c) then c = 0 end   -- 6 ноя: режим ITEMS
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
-  if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
+  if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and (ctx.mods().cmd or ctx.cmd_letter(c, ctx.mods()))) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус; 6 ноя: и Cmd+Shift+hjkl (Cmd не виден в mouse_cap — по коду 8 10 11 12)
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
     elseif OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c)   -- 1 ноя: z в панели опций — своё z-меню
     else ctx.opt_key(c) end
