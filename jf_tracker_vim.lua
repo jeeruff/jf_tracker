@@ -2115,6 +2115,8 @@ function V.key_impl(c)
       V.cur.row = r; V.msg = ''
       return
     end
+    -- 6 ноя: Opt+Shift+V (◊) — режим ITEMS: выбор айтемов и операции над ними
+    if (cpd == 9674 or (m1.alt and m1.shift and (c == 86 or c == 118))) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.is_mode then ctx.is_mode(); return end
     -- 24 окт: Opt+V (√) в NORMAL / VISUAL — умное выделение: до конца субдоли, доли, такта, паттерна; в INSERT — нота
     if (cpd == 8730 or (m1.alt and not m1.shift and c == 118)) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' and ctx.smart_select then ctx.smart_select(); return end
     if (cpd == 8706 or (m1.alt and (c == 100 or c == 68))) and ctx.slicer_dt and (st.focus == 'sample' or st.focus == 'sprops' or st.focus == 'slices' or (st.focus == 'top' and st.toptab == 'sample')) then ctx.slicer_dt(); return end

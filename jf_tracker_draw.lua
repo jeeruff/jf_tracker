@@ -10335,6 +10335,8 @@ function D.frame(L, snap, rows, state, info)
               local fr = state.textonly and 'off' or (state.itemframe or 'item')
               local fx0, fw0 = x0, w0
               if fr == 'wave' and (G.w_wave or 0) > 0 then fx0, fw0 = x0 + (G.x_wave or L.pad) - 1, G.w_wave + 2 end
+              -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
+              if info.items_mode and it.sel then set(U.CYAN); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0) end
               if fr ~= 'off' and not bare then
                 -- 16 окт: только верх и низ (начало / конец item); боковые кромки рядом с линией между треками
                 -- давали 3-4 линии подряд — между треками одна линия

@@ -19330,6 +19330,13 @@ local function hint_go(t)
   elseif t.kind == 'patbtn' then ctx.set_focus('patterns'); ctx.pat_btn(d.b)   -- 27 окт: ряд команд patterns
   elseif t.kind == 'mxprev' then ctx.slot_cycle(d, -1)
   elseif t.kind == 'mxnext' then ctx.slot_cycle(d, 1)
+  elseif t.kind == 'multi' then   -- 6 ноя: метки f с отметкой нескольких (режим ITEMS): каждая — айтем ноты
+    local items = {}
+    for _, p in ipairs(t.picked or {}) do
+      local pd = p.data
+      if p.kind == 'note' and pd then for _, it in ipairs(ctx.is_heads_items(vim.covering(pd.fi, pd.row))) do items[#items + 1] = it end end
+    end
+    ctx.is_toggle_items(items); if ctx.IS then ctx.is_msg('labels') end
   elseif t.kind == 'bigfader' then ctx.bf_set(d.x)   -- 6 ноя: метка деления большого фейдера
   elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
   elseif t.kind == 'sidectl' then if d == 'open' then state.side = true elseif d == 'close' then ctx.side_hide() end
@@ -24901,7 +24908,7 @@ local function frame()
       for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then sec = sc.name; break end end
       return { name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color), sec = sec }
     end)(),
-    cur_ci = (L.flat[vim.cur.fi] or {}).ci,
+    cur_ci = (L.flat[vim.cur.fi] or {}).ci, items_mode = ctx.IS ~= nil,   -- 6 ноя: режим ITEMS
     vorder = vim.vorder,                            -- 10 окт: линейка прыжков по ячейкам
     seam_guide = seam_drag and seam_drag.active and seam_drag.guide or nil,
     dragging = (B.drag and B.drag.active) or (SL.drag and SL.drag.kind == 'out' and SL.drag.active) or (retro.out and retro.out.active) or nil,
@@ -30978,6 +30985,7 @@ local function frame()
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end else ctx.bf_key(c) end
     c = 0
   end
+  if ctx.IS and c > 0 and not HN.active and ctx.is_key(c) then c = 0 end   -- 6 ноя: режим ITEMS
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
   if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and ctx.mods().cmd) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
@@ -35738,6 +35746,108 @@ ctx.sound_menu = function(path, o, extra)
   if o.on_enter and vim.hydra then vim.hydra.on_enter = o.on_enter end
 end
 -- lib: Enter — меню сэмпла: Enter Enter — во вкладку item (как было), s b d … — похожие / шаги, выбранный заменяет звук инструмента
+-- 6 ноя: РЕЖИМ ITEMS (Opt+Shift+V): выбор айтемов и операции над ними прямо в трекере. Выбор = выделение айтемов
+-- REAPER (видно и в аранже, рамкой — в трекере). hjkl и прочая навигация как обычно; Space — айтем под курсором
+-- вкл / выкл, f — метки на нотах (набор отмечает несколько, Enter — готово), v / V + Enter — все айтемы диапазона.
+-- Операции — одной клавишей: s разрезать по строке курсора, x удалить, g склеить, r reverse, + / - скорость x2 / /2,
+-- n normalize, m mute, o показать в REAPER; Esc — выход (выделение остаётся)
+ctx.IS = nil
+ctx.IS_KEYS = { { 'Space', 'pick / drop the item at the cursor' }, { 'f', 'pick by labels (Enter - done)' }, { 'v V Enter', 'pick a range' },
+  { 's', 'split at the cursor row' }, { 'x', 'delete' }, { 'g', 'glue' }, { 'r', 'reverse' }, { '+ -', 'rate x2 / /2' },
+  { 'n', 'normalize' }, { 'm', 'mute' }, { 'o', 'show in REAPER' }, { 'c', 'clear the pick' }, { 'Esc', 'out' } }
+ctx.is_items = function()
+  local out = {}
+  for i = 0, reaper.CountSelectedMediaItems(0) - 1 do out[#out + 1] = reaper.GetSelectedMediaItem(0, i) end
+  return out
+end
+ctx.is_msg = function(what)
+  vim.msg = ('ITEMS %d picked%s - Space pick, f labels, s split, x del, g glue, r rev, + - rate, n norm, m mute, Esc out'):format(#ctx.is_items(), what and (': ' .. what) or '')
+end
+ctx.is_heads_items = function(heads)
+  local out, seen = {}, {}
+  for _, h in ipairs(heads) do local it = h.item; if it and not seen[it] and reaper.ValidatePtr(it, 'MediaItem*') then seen[it] = true; out[#out + 1] = it end end
+  return out
+end
+ctx.is_cursor_items = function()
+  local hs = vim.covering(vim.cur.fi, vim.cur.row)
+  if #hs == 0 then hs = vim.heads_in(vim.cur.fi, vim.cur.fi, vim.cur.row, vim.cur.row) end
+  return ctx.is_heads_items(hs)
+end
+ctx.is_toggle_items = function(items, on)
+  for _, it in ipairs(items) do
+    local v = on
+    if v == nil then v = not reaper.IsMediaItemSelected(it) end
+    reaper.SetMediaItemSelected(it, v)
+  end
+  reaper.UpdateArrange(); model.invalidate()
+end
+ctx.is_mode = function()
+  if ctx.IS then ctx.IS = nil; vim.msg = 'ITEMS off (the REAPER item selection stays)'; return end
+  ctx.IS = {}
+  reaper.Main_OnCommand(40289, 0)   -- Item: Unselect all items
+  ctx.is_toggle_items(ctx.is_cursor_items(), true)
+  ctx.is_msg()
+end
+ctx.is_op = function(ch)
+  local items = ctx.is_items()
+  if #items == 0 and ch ~= 'o' then ctx.is_msg('nothing picked'); return end
+  local act = ({ g = 40362, r = 41051, n = 40108, m = 40175, x = 40006 })[ch]   -- glue (без time selection), reverse, normalize, mute, remove
+  local name = ({ g = 'glue', r = 'reverse', n = 'normalize', m = 'mute', x = 'delete', s = 'split', ['+'] = 'rate x2', ['-'] = 'rate /2' })[ch]
+  if act then
+    edit.run('items: ' .. name, function() reaper.Main_OnCommand(act, 0) end)
+  elseif ch == 's' then
+    local t = ctx.row_time(vim.cur.row)
+    local n = 0
+    edit.run('items: split', function()
+      for _, it in ipairs(items) do
+        local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+        local p1 = p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+        if t > p0 + 1e-6 and t < p1 - 1e-6 then local r = reaper.SplitMediaItem(it, t); if r then reaper.SetMediaItemSelected(r, true); n = n + 1 end end
+      end
+    end)
+    if n == 0 then ctx.is_msg('the cursor row cuts none of them'); model.invalidate(); return end
+  elseif ch == '+' or ch == '-' then
+    local k = ch == '+' and 2 or 0.5
+    edit.run('items: ' .. name, function()
+      for _, it in ipairs(items) do
+        local tk = reaper.GetActiveTake(it)
+        if tk then
+          reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') * k)
+          reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') / k)
+        end
+      end
+    end)
+  elseif ch == 'o' then reaper.Main_OnCommand(40913, 0)   -- Track: Vertical scroll selected tracks into view
+  end
+  model.invalidate()
+  ctx.is_msg(name)
+end
+-- клавиша в режиме ITEMS: true — съедена; остальное (навигация, v V) — Vim как обычно
+ctx.is_key = function(c)
+  if not ctx.IS or state.focus ~= 'tracker' or vim.picker or vim.hydra or vim.mode == 'cmd' or vim.mode == 'search' or vim.mode == 'insert' then return false end
+  if vim.pending or vim.op then return false end
+  if c == 27 then
+    if vim.mode == 'visual' or vim.mode == 'vline' then return false end
+    ctx.IS = nil; vim.msg = 'ITEMS off (the REAPER item selection stays)'; return true
+  end
+  if c == 13 and (vim.mode == 'visual' or vim.mode == 'vline') then
+    local f0, f1, r0, r1 = vim.visual_range()
+    ctx.is_toggle_items(ctx.is_heads_items(vim.heads_in(f0, f1, r0, r1)), true)
+    vim.mode = 'normal'; ctx.is_msg('range'); return true
+  end
+  if vim.mode ~= 'normal' then return false end
+  local ch = c < 256 and string.char(c) or ''
+  if ch == ' ' then ctx.is_toggle_items(ctx.is_cursor_items()); ctx.is_msg(); return true end
+  if ch == 'f' then
+    HN.multi = true
+    if HN.start(function(t) return t.kind == 'note' end) then vim.msg = 'ITEMS: type labels - each picks / drops its item; Enter - done, Esc - cancel'
+    else HN.multi = false; vim.msg = 'ITEMS: no notes on screen' end
+    return true
+  end
+  if ch == 'c' then reaper.Main_OnCommand(40289, 0); model.invalidate(); ctx.is_msg('cleared'); return true end
+  if ch:match('^[sxgrnmo%+%-]$') then ctx.is_op(ch); return true end
+  return false
+end
 -- 6 ноя: Cmd+Opt+F12 — трекер плавающим окном ровно поверх главного окна REAPER (не весь экран, как Cmd+F11);
 -- ещё раз — обратно в док. Позиция — через кадр: после gfx.dock(0) окно новое
 ctx.fill_reaper = function()
