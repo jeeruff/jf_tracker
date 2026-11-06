@@ -24,7 +24,8 @@ end
 -- bg — окно, panel — панели, text / grey — текст / приглушённый, dim — линии
 -- сетки, line — рамки, amber — акцент и курсор, cyan / green / red — роли
 TH.PAL = {
-  ['modus-vivendi'] = { bg = '#000000', panel = '#1e1e1e', text = '#ffffff', grey = '#989898', dim = '#303030', line = '#646464',
+  ['modus-vivendi'] = { bg = '#000000', panel = '#000000',   -- 6 ноя: панели тоже чёрные, как трекер
+                         text = '#ffffff', grey = '#989898', dim = '#303030', line = '#646464',
     amber = '#fec43f', cyan = '#00d3d0', green = '#44bc44', red = '#ff5f59', hdr = '#303030', hdrsel = '#535353' },
   ['modus-operandi'] = { bg = '#ffffff', panel = '#f2f2f2', text = '#000000', grey = '#595959', dim = '#d0d0d0', line = '#9f9f9f',
     amber = '#884900', cyan = '#005e8b', green = '#006800', red = '#a60000', hdr = '#e0e0e0', hdrsel = '#c4c4c4' },

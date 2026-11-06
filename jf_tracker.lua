@@ -13368,7 +13368,7 @@ ctx = {
       flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
       { key = 'kcfont', label = 'keycast font', kind = 'cycle', dropdown = true, values = (function() local v = { 'bitmap' }; for _, f in ipairs(ctx.MODEFONTS) do if f ~= 'off' then v[#v + 1] = f end end; return v end)(), desc = 'the font of the keycast (kcast): bitmap - the tracker font; any mode font (decorative); click - the list', get = function() return draw.kcfont or 'bitmap' end, set = function(v) ctx.kcfont_set(v) end, pick = function() ctx.kcfont_pick() end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
-      { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the bitmap font (x4 only in PT-mode); x1.5 only for a vector font (Options > theme > fonts)', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
+      { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the font (x4 only in PT-mode); whole steps only - a pixel font is sharp at whole multiples', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
       { key = 'fps', label = 'frame rate', kind = 'cycle', values = { 'max', 30, 25, 24 }, desc = 'redraws per second; max = every REAPER tick (~33, no higher for scripts)', get = function() return state.fps or 'max' end, set = function(v) state.fps = v end },
       flag('insred', 'INSERT cursor red', 'in INSERT the cursor accent (cell, edge, playhead) turns red - the keys write; off - the cursor accent colour as always'),
       { key = 'bsplit', label = 'browser split', kind = 'toggle', desc = 'the browser in two columns when it is 40+ characters wide: the folder left, a preview of what is under the cursor right (a folder - its contents, a file - its wave), as lf; off by default', get = function() return B.split end, set = function(v) B.split = v and true or false; reaper.SetExtState(EXT, 'bsplit', v and '1' or '0', true) end },   -- 1 ноя
@@ -16459,9 +16459,9 @@ ctx.tt_api = {
   theme = function() return state.theme or 'reaper' end,
   apply_theme = function(n) ctx.apply_theme(n); vim.msg = 'theme: ' .. n end,
   -- 11 окт: настройки шрифта под списком шрифтов (были в опциях look)
-  scale = function() local f = tonumber(state.fontscale) or 2; if f == 1.5 then return (state.ttf or 'off') == 'off' and 2 or 1.5 end; return math.floor(f) end,
+  scale = function() local f = tonumber(state.fontscale) or 2; if f == 1.5 then return 2 end; return math.floor(f) end,   -- 6 ноя: без x1.5
   -- 31 окт: шаги размера — у битмапа без 1.5 (неровные штрихи), у векторного шрифта с ним
-  scales = function() return (state.ttf or 'off') == 'off' and { 1, 2, 3 } or { 1, 1.5, 2, 3 } end,
+  scales = function() return { 1, 2, 3 } end,   -- 6 ноя: x1.5 убран и у TTF (дробный — мыло)
   set_scale = function(v) ctx.set_scale(v); vim.msg = 'font size x' .. v end,
   space = function() return tonumber(state.fontspace) or 2 end,
   set_space = function(n) n = math.max(0, math.min(12, n)); ctx.set_space(n); ctx.relayout(); vim.msg = 'line spacing ' .. n end,
@@ -16469,7 +16469,8 @@ ctx.tt_api = {
   set_bold = function(on) state.fontbold = on and true or false; reaper.SetExtState(EXT, 'fontbold', on and '1' or '0', true); draw.set_font(state); ctx.relayout(); vim.msg = 'bold font ' .. (on and 'on' or 'off') end,
   fonts = function()
     local fs = tonumber(state.fontscale) or 2
-    if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
+    if fs == 1.5 then fs = 2 end
+    fs = math.max(1, math.min(3, math.floor(fs)))
     local key = fs .. ':' .. (state.ttfcustom or '') .. ':' .. tostring(state.ttfpx)
     if ctx.tt.fkey ~= key then
       local list = { { key = 'off', tip = 'off - the REAPER bitmap font (font scale x1..x3)' } }

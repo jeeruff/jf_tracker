@@ -209,7 +209,8 @@ function D.set_font(state)
   D.bold = state.fontbold and true or false   -- 31 окт: жирный: у TTF — флаг b, у битмапа — второй проход со сдвигом 1 px
   if tf then
     local fs = tonumber(state.fontscale) or 2
-    if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
+    if fs == 1.5 then fs = 2 end   -- 6 ноя: x1.5 убран и у TTF (сохранённое — как x2)
+    fs = math.max(1, math.min(3, math.floor(fs)))
     -- 6 ноя: пиксельный режим — кадр вполовину; пиксельный TTF чёткий только в родном кегле (px) и его целых кратных:
     -- size 1 / 2 — родной, 3 — ×2 (было px·fs/2: 6 или 18 px вместо 12 — каша)
     if state.pixel ~= false then fs = math.max(1, math.floor(fs / 2 + 0.5)) end
