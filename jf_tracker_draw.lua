@@ -7081,7 +7081,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       D.lib_lw = lc
     end
     local pre_w = ms('00* ') + (lc.kids and ms('+ 16$') or 0) + 6
-    local cols = ms('88.88s') + ms('-12.5') + ms('16b') + 4 * L.pad + 6 * L.cw   -- len, pt, bs, мини-волна
+    local cols = ms('88.88s') + ms('-12.5') + ms('16b') + 5 * L.pad + 8 * L.cw   -- len, pt, bs, мини-волна (не уже 8 знаков)
     label_w = math.max(label_w, math.min(pre_w + lc.long + L.pad, w - 12 - cols))
     D.lib_kids = lc.kids
   end
@@ -7092,6 +7092,19 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if info.pool_tenv then
     for _, e in pairs(pool) do if type(e) == 'table' and info.pool_tenv(e) > 0 then tew = ms(TILDE) + 2 * L.pad; break end end
   end
+  -- 6 ноя: колонки — имя, превью (волна сразу за именем), ~, pt, bs, длина у правого края. Одна геометрия на шапку,
+  -- строки сэмплов и слайсов: C.wx0..C.wx1 — волна, C.pt / C.bs / C.len — правые края значений
+  local C = {}
+  do
+    C.XPW, C.XBW, C.DW = ms('-12.5') + L.pad, ms('16b') + L.pad, ms('88.88s') + L.pad
+    C.len = ix + w - L.pad - 4
+    C.bs = C.len - C.DW
+    C.pt = C.bs - C.XBW
+    C.tx = C.pt - C.XPW - tew + L.pad          -- ~
+    C.wx0 = ix + 6 + label_w + L.pad
+    C.wx1 = C.pt - C.XPW - tew
+    C.on = C.wx1 - C.wx0 >= 0                  -- место под pt / bs / len есть
+  end
   -- заголовки колонок (3 окт): # (порядок: дерево треков / метки), name, len,
   -- preview; клик — сортировка, активная — янтарём
   do
@@ -7100,11 +7113,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local cols_h = { { '#', ix + 6, sort == 'track' or sort == 'mark', sort == 'mark' and '#@' or '#', 'index' },
                      { 'name', ix + 6 + ms('00+ 16$ '), sort == 'name', 'name', 'name' },   -- 26 окт: над именами (после «01+ 16$»)
                      -- 26 окт: len / pt / bs — по правому краю, как их значения (6-е поле — правый край)
-                     { 'len', ix + 6 + label_w + L.pad, sort == 'len', 'len', 'len', ix + 6 + label_w + L.pad + ms('88.88s') },
-                     { 'pt', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad, false, 'pt', nil, ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW - L.pad },
-                     { 'bs', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW, false, 'bs', nil, ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW + XBW - L.pad } }
-    if tew > 0 then cols_h[#cols_h + 1] = { '~', ix + 6 + label_w + L.pad + ms('88.88s') + 2 * L.pad + XPW + XBW, false, TILDE, nil } end
-    cols_h[#cols_h + 1] = { 'preview', ix + 6 + label_w + L.pad + ms('88.88s') + L.pad + XPW + XBW + tew, false, 'preview', nil }
+                     { 'preview', C.wx0, false, 'preview', nil } }
+    local _ = XPW + XBW
+    if C.on then
+      if tew > 0 then cols_h[#cols_h + 1] = { '~', C.tx, false, TILDE, nil } end
+      cols_h[#cols_h + 1] = { 'pt', C.pt - C.XPW + L.pad, false, 'pt', nil, C.pt }
+      cols_h[#cols_h + 1] = { 'bs', C.bs - C.XBW + L.pad, false, 'bs', nil, C.bs }
+      cols_h[#cols_h + 1] = { 'len', C.len - C.DW + L.pad, sort == 'len', 'len', 'len', C.len }
+    end
     -- type (9 окт): у правого края строки заголовков — сортировка по типу
     local tyw = ms('type')
     local tyx = ix + w - L.pad - 4 - tyw
@@ -7237,19 +7253,16 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local nl = info.slice_note and info.slice_note(row.k) or '---'   -- 19 окт: нота слайса вместо клавиши
         lbl = ('%-3s  S%02X'):format(nl or '---', row.k)
         -- 19 окт: длина, pt, bs — в колонках инструмента (под len / pt / bs); pt — свой у ноты-слайса в lib, иначе инструмента
-        local dx = ix + 6 + label_w + L.pad
-        local dw = ms('88.88s') + L.pad
-        if w - (dx - ix) - L.pad > dw + 8 then
+        if C.on then   -- 6 ноя: те же колонки, что у сэмплов (pt bs len у правого края)
           local len = math.max(0, t1 - t0)
           local ds = len < 10 and ('%.2fs'):format(len) or ('%.1fs'):format(len)
-          text(dx + dw - L.pad - ms(ds), y + 1, ds, on and U.AMBER or U.GREY)
-          local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad
+          text(C.len - ms(ds), y + 1, ds, on and U.AMBER or U.GREY)
           local pv = e.pitch or 0
           for _, o in ipairs(pool) do if o.parent == e and o.slice_k == row.k then pv = o.pitch or pv; break end end
           local ps = math.abs(pv) < 0.005 and '0' or ('%+g'):format(math.floor(pv * 10 + 0.5) / 10)
-          text(dx + dw + XPW - L.pad - ms(ps), y + 1, ps, math.abs(pv) >= 0.005 and U.TEXT or U.DIM)
+          text(C.pt - ms(ps), y + 1, ps, math.abs(pv) >= 0.005 and U.TEXT or U.DIM)
           local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
-          text(dx + dw + XPW + XBW - L.pad - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+          text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
         else lbl = lbl .. ('  %.2fs'):format(math.max(0, t1 - t0)) end
       end
       text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, row.sub == 's' and math.min(w - 12 - 4 * L.cw, label_w - 4 * L.cw) or (w - 12 - 4 * L.cw)), on and U.AMBER or U.TEXT)
@@ -7307,31 +7320,26 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, head, lcol)
       if suf ~= '' then text(ix + 6 + ms(head), y + 1, suf, lcol) end
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
-      local dw = ms('88.88s') + L.pad
+      -- 6 ноя: имя → превью → ~ → pt → bs → длина (у правого края); геометрия C — общая с шапкой
       local len = e.len or 0
       local dtxt = len < 10 and ('%.2fs'):format(len) or (len < 100 and ('%.1fs'):format(len) or ('%dm%02d'):format(len // 60, math.floor(len % 60)))
-      local dx = ix + 6 + label_w + L.pad
-      if w - (dx - ix) - L.pad > dw + 8 then
-        text(dx + dw - L.pad - ms(dtxt), y + 1, dtxt, sel and U.AMBER or U.GREY)
-      else dw = 0 end
-      local tx0 = dx + dw
-      -- 19 окт: pt — транспозиция (полутоны take), bs — beatsync в долях («-» — выкл)
-      local XPW, XBW = ms('-12.5') + L.pad, ms('16b') + L.pad
-      if dw > 0 then
-        local ps = math.abs(e.pitch or 0) < 0.005 and '0' or ('%+g'):format(math.floor((e.pitch or 0) * 10 + 0.5) / 10)
-        text(tx0 + XPW - L.pad - ms(ps), y + 1, ps, (math.abs(e.pitch or 0) >= 0.005) and U.TEXT or U.DIM)
-        local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
-        text(tx0 + XPW + XBW - L.pad - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
-        tx0 = tx0 + XPW + XBW
-      else XPW, XBW = 0, 0 end
-      local ntenv = tew > 0 and info.pool_tenv(e) or 0
-      local wx = dx + dw + XPW + XBW + tew
+      local wx, npix = C.wx0, (C.on and C.wx1 or (ix + w - L.pad)) - C.wx0 - L.pad
       local rowhot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if ntenv > 0 then
-        local th = rowhot and mx >= tx0 and mx < wx
-        text(tx0 + L.pad, y + 1, TILDE, th and U.AMBER or U.CYAN)
+      local tenv_hot = nil
+      if C.on then
+        text(C.len - ms(dtxt), y + 1, dtxt, sel and U.AMBER or U.GREY)
+        -- 19 окт: pt — транспозиция (полутоны take), bs — beatsync в долях («-» — выкл)
+        local ps = math.abs(e.pitch or 0) < 0.005 and '0' or ('%+g'):format(math.floor((e.pitch or 0) * 10 + 0.5) / 10)
+        text(C.pt - ms(ps), y + 1, ps, (math.abs(e.pitch or 0) >= 0.005) and U.TEXT or U.DIM)
+        local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
+        text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+        local ntenv = tew > 0 and info.pool_tenv(e) or 0
+        if ntenv > 0 then
+          local th = rowhot and mx >= C.tx and mx < C.tx + tew
+          tenv_hot = th or nil
+          text(C.tx, y + 1, TILDE, th and U.AMBER or U.CYAN)
+        end
       end
-      local npix = w - (wx - ix) - L.pad
       if npix > 8 and e.stype == 'midi' then
         -- MIDI-клип (9 окт): мини-пиано-ролл вместо волны — ноты чёрточками
         local lo, hi = 127, 0
@@ -7388,7 +7396,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         dbg[#dbg + 1] = ('%02d wx%d n%d pk%s wc%.2f,%.2f,%.2f'):format(i, wx, npix, pk and pk.n or '-', wc[1], wc[2], wc[3])
       end
       -- зоны (9 окт): ~ — огибающие take (вкладка automation), волна — вкладка item
-      if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = (ntenv > 0 and mx >= tx0 and mx < wx) or nil, wave = (mx >= wx and npix > 8) or nil } end
+      if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = tenv_hot, wave = (mx >= wx and npix > 8) or nil } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
       if sel and not child then D.lib_xi_btns(L, ix + w - 4, y, mx, my, hover) end   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
       if drag and my >= y and my < y + L.rh then
