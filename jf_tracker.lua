@@ -12100,6 +12100,7 @@ ctx = {
         if hot then U.set(U.tint(U.AMBER, 0.3)); gfx.rect(cx, y, right - cx, sh, 1) end
         draw.small_text(cx + 1, y, nm, hot and U.AMBER or (e.it.off and U.GREY or (e.kind == 'hdrsend' and U.CYAN or U.TEXT)))
         if hot and e.kind ~= 'hdrparam' then hover[e.kind] = { col = col, k = e.k, it = e.it, x = cx, y = y, w = right - cx } end
+        if e.kind ~= 'hdrparam' and not (n == cap and #list > cap) then ctx.hint(e.kind, cx, y, right - cx, sh, { col = col, k = e.k }) end   -- 6 ноя: метки f и у мелких имён
       end
       return 1
     end
