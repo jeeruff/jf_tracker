@@ -90,7 +90,7 @@ KH.PAGES = {
   } },
   tracker = { title = 'tracker NORMAL / VISUAL', e = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
-    { k = 'arrows + mods', d = 'arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl' },
+    { k = 'arrows + mods', d = 'arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - its size, Cmd+Opt - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl' },
     { k = 'Opt+H Opt+L', d = 'previous / next track' },
     { k = 'w b e', d = 'next / previous event of the track (all its columns and envelope points, like words in Vim), end of event; dw yw cw - this column' },
     { k = 'E', d = 'the end of the lowest visible event of the track (the last one that starts on screen); dE - up to there' },
@@ -273,7 +273,7 @@ KH.PAGES = {
     { k = 'Opt+Cmd+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another' },
     { k = 'Cmd+Shift+1..9', d = 'select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)' },
     { k = 'Opt+Shift+V', d = 'ITEMS mode: pick items and work on them right in the tracker (the pick is the REAPER item selection - framed here, seen in the arrange too); hjkl move as usual, Space - pick / drop the item at the cursor, f - labels (each picks / drops, Enter - done), v / V then Enter - every item of the range, c - clear; s split at the cursor row, x delete, g glue, r reverse, + / - rate x2 / /2, n normalize, m mute, o show in REAPER; Esc - out (the selection stays)' },
-    { k = 'Cmd+Opt+hjkl', d = 'size of the pane in focus: its edge moves that way (a neighbour there - the pane grows, none - it shrinks from the other side); Shift - finer. Cmd+hjkl - focus, Cmd+Shift+hjkl - move the pane' },
+    { k = 'Cmd+Shift+hjkl', d = 'size of the pane in focus: its edge moves that way (a neighbour there - the pane grows, none - it shrinks from the other side). Cmd+hjkl - focus, Cmd+Opt+hjkl - move the pane' },
     { k = 'Cmd+F11', d = 'fullscreen <-> docked (quick option title: title bar on / off); F11 alone is a note (frow)' },
     { k = 'Cmd+Opt+F12', d = 'the tracker over the REAPER main window (its size and place, not the whole screen); again - docked' },
     { k = '`', m = 'pedal / note-off', d = 'NORMAL with the keyboard (KEYS): the sustain pedal (CC64) while you hold it; INSERT: note-off (under an ended note - stretches it here); the whole sample: Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice)' },

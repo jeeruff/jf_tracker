@@ -2546,3 +2546,5 @@
 - [ ] Cmd+Opt+hjkl — размер панели в фокусе (край едет в сторону клавиши; Shift — мельче)
 - [ ] fonts → слово режима: Noto Sans Runic (ᛁᚾᛊᛖᚱᛏ), Kefa (ኢንሴርት); i install bundled fonts ставит и руны
 - [ ] Options панелью: Cmd+Shift+j k h l переносят её (в стек снизу и т. д.), а не листают шрифты
+- [ ] Cmd+Shift+hjkl — размер панели в фокусе (mixer, options, любая); Cmd+Opt+hjkl — перенос
+- [ ] Options панелью: Tab — по модулям (как везде), Opt+Tab — вкладки опций

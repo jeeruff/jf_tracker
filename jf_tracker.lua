@@ -31051,7 +31051,7 @@ local function frame()
   end
   if ctx.IS and c > 0 and not HN.active and ctx.is_key(c) then c = 0 end   -- 6 ноя: режим ITEMS
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
-  if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and (ctx.mods().cmd or ctx.cmd_letter(c, ctx.mods()))) then   -- 1 ноя: панелью — Cmd+hjkl уводят фокус; 6 ноя: и Cmd+Shift+hjkl (Cmd не виден в mouse_cap — по коду 8 10 11 12)
+  if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and (ctx.mods().cmd or ctx.cmd_letter(c, ctx.mods()))) and not (OPT.pane and (c == 9 or c == 25) and not ctx.mods().alt and not OPT.typing) then   -- 6 ноя: Tab панелью — по модулям, как везде; вкладки опций — Opt+Tab   -- 1 ноя: панелью — Cmd+hjkl уводят фокус; 6 ноя: и Cmd+Shift+hjkl (Cmd не виден в mouse_cap — по коду 8 10 11 12)
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
     elseif OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c)   -- 1 ноя: z в панели опций — своё z-меню
     else ctx.opt_key(c) end
@@ -31418,10 +31418,9 @@ local function frame()
     if state.pane_mode then ctx.pane_key(c); c = 0
     elseif c == 23 and m.ctrl and not m.cmd then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc'; c = 0
     elseif m.cmd and m.alt and not m.ctrl and ({ [8] = 1, [10] = 1, [11] = 1, [12] = 1, [1818584692] = 1, [1685026670] = 1, [30064] = 1, [1919379572] = 1, [104] = 1, [106] = 1, [107] = 1, [108] = 1, [729] = 1, [8710] = 1, [730] = 1, [172] = 1 })[c] then
-      -- 6 ноя: Cmd+Opt+hjkl — размер панели в фокусе: её край едет в сторону клавиши (˙ ∆ ˚ ¬ — Opt+hjkl на маке)
+      -- 6 ноя: Cmd+Opt+hjkl — перенести панель (˙ ∆ ˚ ¬ — Opt+hjkl на маке); размер — Cmd+Shift+hjkl (просьба)
       local ch = ({ [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l', [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l', [104] = 'h', [106] = 'j', [107] = 'k', [108] = 'l', [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l' })[c]
-      local id = ctx.pane_cur()
-      ctx.pane_do(function() return draw.panes.nudge(state.panes, id, ({ h = 'l', j = 'd', k = 'u', l = 'r' })[ch], m.shift and 0.01 or 0.03) end, 'pane ' .. id .. ' size')
+      ctx.pane_move(ctx.pane_cur(), ({ h = 'l', j = 'd', k = 'u', l = 'r' })[ch])
       c = 0
     elseif (m.cmd or ctx.cmd_letter(c, m)) and not m.ctrl and not m.alt then   -- 1 ноя: в INSERT Cmd не доходит до mouse_cap — по коду / клавише
       local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
@@ -31430,7 +31429,8 @@ local function frame()
       local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
-        if m.shift then ctx.pane_move(id, DIR[ch])
+        if m.shift then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе: её край едет в сторону клавиши (перенос — Cmd+Opt)
+          ctx.pane_do(function() return draw.panes.nudge(state.panes, id, DIR[ch], 0.03) end, 'pane ' .. id .. ' size')
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
@@ -33136,7 +33136,7 @@ ctx.MOD_ARROWS = {
   [16] = { h = 'track', l = 'track', j = 'inst -', k = 'inst +' },                  -- Opt
   [4] = { h = 'pane', l = 'pane', j = 'pane', k = 'pane' },                         -- Cmd
   [8] = { h = 'select', l = 'select', j = 'select', k = 'select' },                 -- Shift
-  [4 | 8] = { h = 'move pane', l = 'move pane', j = 'move pane', k = 'move pane' }, -- Cmd+Shift
+  [4 | 8] = { h = 'pane size', l = 'pane size', j = 'pane size', k = 'pane size' }, -- Cmd+Shift (6 ноя: размер; перенос — Cmd+Opt)
   [16 | 32] = { h = 'rate slower', l = 'rate faster', j = 'repeat down' },          -- Ctrl+Opt
 }
 ctx.MOD_ARROWS_PAN = {   -- в виде пана

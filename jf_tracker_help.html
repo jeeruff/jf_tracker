@@ -732,7 +732,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <h3 id="keys-tracker">tracker NORMAL / VISUAL</h3>
 <table>
 <tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>field left / row down / row up / field right</td></tr>
-<tr><td><kbd>arrows</kbd> <kbd>+</kbd> <kbd>mods</kbd></td><td>arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl</td></tr>
+<tr><td><kbd>arrows</kbd> <kbd>+</kbd> <kbd>mods</kbd></td><td>arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - its size, Cmd+Opt - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl</td></tr>
 <tr><td><kbd>Opt+H</kbd> <kbd>Opt+L</kbd></td><td>previous / next track</td></tr>
 <tr><td><kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd></td><td>next / previous event of the track (all its columns and envelope points, like words in Vim), end of event; dw yw cw - this column</td></tr>
 <tr><td><kbd>E</kbd></td><td>the end of the lowest visible event of the track (the last one that starts on screen); dE - up to there</td></tr>
@@ -915,7 +915,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><code>Opt+Cmd+mouse</code></td><td>tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another</td></tr>
 <tr><td><code>Cmd+Shift+1..9</code></td><td>select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)</td></tr>
 <tr><td><kbd>Opt+Shift+V</kbd></td><td>ITEMS mode: pick items and work on them right in the tracker (the pick is the REAPER item selection - framed here, seen in the arrange too); hjkl move as usual, Space - pick / drop the item at the cursor, f - labels (each picks / drops, Enter - done), v / V then Enter - every item of the range, c - clear; s split at the cursor row, x delete, g glue, r reverse, + / - rate x2 / /2, n normalize, m mute, o show in REAPER; Esc - out (the selection stays)</td></tr>
-<tr><td><kbd>Cmd+Opt+hjkl</kbd></td><td>size of the pane in focus: its edge moves that way (a neighbour there - the pane grows, none - it shrinks from the other side); Shift - finer. Cmd+hjkl - focus, Cmd+Shift+hjkl - move the pane</td></tr>
+<tr><td><code>Cmd+Shift+hjkl</code></td><td>size of the pane in focus: its edge moves that way (a neighbour there - the pane grows, none - it shrinks from the other side). Cmd+hjkl - focus, Cmd+Opt+hjkl - move the pane</td></tr>
 <tr><td><kbd>Cmd+F11</kbd></td><td>fullscreen &lt;-&gt; docked (quick option title: title bar on / off); F11 alone is a note (frow)</td></tr>
 <tr><td><kbd>Cmd+Opt+F12</kbd></td><td>the tracker over the REAPER main window (its size and place, not the whole screen); again - docked</td></tr>
 <tr><td><kbd>`</kbd></td><td>NORMAL with the keyboard (KEYS): the sustain pedal (CC64) while you hold it; INSERT: note-off (under an ended note - stretches it here); the whole sample: Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice)</td></tr>
