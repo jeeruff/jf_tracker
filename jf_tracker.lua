@@ -31362,7 +31362,8 @@ local function frame()
   end
   local quit = false
   -- 16 окт: перезапуск трекера из файлов (как :reload); 6 ноя: Cmd+F12 (было Ctrl+Cmd+F12)
-  if c == 6697266 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.reloading = true; quit = true; c = 0 end
+  if c == 6697266 and ctx.mods().cmd and ctx.mods().alt and not ctx.mods().ctrl then ctx.fill_reaper(); c = 0 end   -- 6 ноя: Cmd+Opt+F12 — на всё окно REAPER
+  if c == 6697266 and ctx.mods().cmd and not ctx.mods().ctrl and not ctx.mods().alt then ctx.reloading = true; quit = true; c = 0 end
   if c == 6697264 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.viper_toggle(); c = 0 end   -- 29 окт: Cmd+F10 — viper
   -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
   if c > 0 and ctx.PADS and ctx.PADS.on and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix')
@@ -35737,6 +35738,25 @@ ctx.sound_menu = function(path, o, extra)
   if o.on_enter and vim.hydra then vim.hydra.on_enter = o.on_enter end
 end
 -- lib: Enter — меню сэмпла: Enter Enter — во вкладку item (как было), s b d … — похожие / шаги, выбранный заменяет звук инструмента
+-- 6 ноя: Cmd+Opt+F12 — трекер плавающим окном ровно поверх главного окна REAPER (не весь экран, как Cmd+F11);
+-- ещё раз — обратно в док. Позиция — через кадр: после gfx.dock(0) окно новое
+ctx.fill_reaper = function()
+  if not (reaper.JS_Window_Find and reaper.JS_Window_SetPosition and reaper.JS_Window_GetClientRect) then vim.msg = 'fill REAPER window: needs js_ReaScriptAPI'; return end
+  local docked = gfx.dock(-1) & 1 == 1
+  if not docked and ctx.filled then ctx.filled = nil; toggle_dock(); return end
+  if docked then reaper.SetExtState(EXT, 'dock_last', tostring(gfx.dock(-1)), true); gfx.dock(0) end
+  ctx.filled = true
+  local function place()
+    local hwnd = reaper.JS_Window_Find('jf_tracker', true)
+    local ok, l, t, r, b = reaper.JS_Window_GetClientRect(reaper.GetMainHwnd())
+    if not (hwnd and ok) then return end
+    if state.notitle and reaper.JS_Window_SetStyle then reaper.JS_Window_SetStyle(hwnd, 'POPUP') end
+    local y0, y1 = math.min(t, b), math.max(t, b)   -- macOS: y снизу (top > bottom)
+    reaper.JS_Window_SetPosition(hwnd, l, y0, r - l, y1 - y0)
+  end
+  reaper.defer(function() reaper.defer(place) end)
+  vim.msg = 'over the REAPER window (Cmd+Opt+F12 again - docked; Cmd+F11 - the whole screen)'
+end
 ctx.libauto_toggle = function() state.libauto = not state.libauto; vim.msg = 'lib auto select ' .. (state.libauto and 'on - the tracker follows the instrument' or 'off - Enter goes to its track') end
 -- 6 ноя: Enter на инструменте чужого трека (auto select выкл) — туда и выбрать; иначе меню звука
 ctx.lib_enter_go = function()

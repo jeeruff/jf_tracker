@@ -272,6 +272,7 @@ KH.PAGES = {
     { k = 'Opt+Cmd+mouse', d = 'tracks gesture: the window width is split into one zone per track - move sideways to pick a track, then up / down moves its fader (Shift fine); clearly sideways again picks another' },
     { k = 'Cmd+Shift+1..9', d = 'select / unselect channel N in REAPER - f on a dB mark moves all selected faders (macOS keeps Cmd+Shift+3 4 5 for screenshots unless you turn those off)' },
     { k = 'Cmd+F11', d = 'fullscreen <-> docked (quick option title: title bar on / off); F11 alone is a note (frow)' },
+    { k = 'Cmd+Opt+F12', d = 'the tracker over the REAPER main window (its size and place, not the whole screen); again - docked' },
     { k = '`', m = 'pedal / note-off', d = 'NORMAL with the keyboard (KEYS): the sustain pedal (CC64) while you hold it; INSERT: note-off (under an ended note - stretches it here); the whole sample: Ctrl+Shift+1 (Ctrl+Shift + a slice key - from that slice)' },
     { k = 'm', d = 'KEYS on / off (the keyboard; the mode word shows KEYS): on - it has priority, 1 f1 2 f2 3 ... play notes (layout qwerty: q 2 w 3 e), [ ] octave (qwerty: z x), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'z_', d = 'minimize the pane in focus to its tab row (any pane but the tracker; in the matrix - z then _; was zm); again, a click on its tab or focusing it - open' },
