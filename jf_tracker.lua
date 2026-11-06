@@ -31979,8 +31979,52 @@ local function frame()
         if ch == 'C' or ch == 'c' or ch == 'i' then ctx.pl_edit(); return end
         if ch == '<' or ch == ',' then ctx.arr('prev'); return end
         if ch == '>' or ch == '.' then ctx.arr('next'); return end
-        MX.spl_focus = true
-        if ctx.spl_kb(c) then return end
+        -- 6 ноя: h j k l внутри панели: j k — строка (seq, секции, плейлист, аранжировка, её кнопки, print jumps),
+        -- h l — по строке, Enter — действие строки, Space — играть
+        local row = MX.arow or 2
+        local down, up = ch == 'j' or c == keys.down, ch == 'k' or c == keys.up
+        local left, right = ch == 'h' or c == keys.left, ch == 'l' or c == keys.right
+        if down or up then
+          local n = 0; for k2 in pairs(MX.arow_y or {}) do if k2 > n then n = k2 end end
+          local nr = row
+          repeat nr = nr + (down and 1 or -1) until nr < 1 or nr > n or (MX.arow_y or {})[nr]
+          if nr >= 1 and nr <= n then MX.arow = nr end
+          vim.msg = ({ 'seq - Enter types the order', 'sections - h l, Enter adds (3 Enter - three times)', 'playlist - h l, Enter plays from it, x removes it', 'arrangement - h l previous / next, Enter - the list', 'h l a button, Enter runs it', 'Enter prints the jumps to the timeline' })[MX.arow] or ''
+          return
+        end
+        if ch == ' ' then ctx.spl_play(); return end
+        if not (left or right or c == 13 or c == 27 or ch == 'x' or ch:match('^%d$')) then return vim.key(c) end   -- остальное (: команды, u …) — как везде
+        if row == 1 then
+          if c == 13 then ctx.pl_edit() elseif left then vim.run_cmd('seq prev') elseif right then vim.run_cmd('seq next') end
+          return
+        elseif row == 2 then
+          MX.spl_focus = true
+          if ctx.spl_kb(c) then MX.spl_focus = true; return end
+          return
+        elseif row == 3 then
+          local words = {}
+          for wd in ctx.spl_text():gmatch('%S+') do words[#words + 1] = wd end
+          MX.spl_w = math.max(1, math.min(#words, MX.spl_w or 1))
+          if left then MX.spl_w = math.max(1, MX.spl_w - 1)
+          elseif right then MX.spl_w = math.min(#words, MX.spl_w + 1)
+          elseif c == 13 and words[MX.spl_w] then
+            local steps, _, errs = ctx.PL.parse(table.concat(words, ' ', MX.spl_w), ctx.spl_find)
+            if #steps > 0 then ctx.pl_play(steps, errs) end
+          elseif ch == 'x' and words[MX.spl_w] then table.remove(words, MX.spl_w); ctx.spl_set(table.concat(words, ' ')); MX.spl_w = math.min(MX.spl_w, math.max(1, #words)) end
+          vim.msg = words[MX.spl_w or 1] and ('playlist: %d / %d %s'):format(MX.spl_w, #words, words[MX.spl_w]) or 'playlist: empty - add sections from the row above'
+          return
+        elseif row == 4 then
+          if left then ctx.arr('prev') elseif right then ctx.arr('next') elseif c == 13 then ctx.mx_btn_do('arrname') end
+          return
+        elseif row == 5 then
+          local nb = #(MX.abtn_x or {})
+          if left then MX.abtn = math.max(1, (MX.abtn or 1) - 1) elseif right then MX.abtn = math.min(math.max(1, nb), (MX.abtn or 1) + 1)
+          elseif c == 13 and MX.abtn_x and MX.abtn_x[MX.abtn or 1] then ctx.mx_btn_do(MX.abtn_x[MX.abtn or 1][3]) end
+          return
+        elseif row == 6 then
+          if c == 13 then ctx.mx_btn_do('printjumps') end
+          return
+        end
         return vim.key(c)
       elseif state.focus == 'phrases' then   -- 31 окт: панель фраз
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end

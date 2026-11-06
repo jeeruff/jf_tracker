@@ -413,6 +413,7 @@ KH.PAGES = {
     { k = 'Esc', d = 'revert - everything as it was' },
   } },
   arranger = { title = 'region playlist - the order of the song (Ctrl+W g C; A in the matrix)', e = {
+    { k = 'j k  h l  Enter', d = 'j k - the row (seq, sections, playlist, arrangement, its buttons, print jumps; amber frame), h l - along it, Enter - its action (type the order / add the section / play from it / the list / run the button)' },
     { k = 'C  i', d = 'seq: type the pattern order right in its row (A1 A1 B1x2 C1:16 D1-8), Tab completes, Enter keeps, Esc - as it was; a click on the seq text - the same' },
     { k = 'h l  Enter', d = 'a section of the sections row; Enter adds it to the song playlist (3 Enter - three times)' },
     { k = 'x', d = 'the last section off the playlist' },
@@ -958,7 +959,7 @@ KH.PAGES = {
 -- строку; полное описание — справка ?. { клавиша, что делает }
 KH.BARS = {
   -- 21 окт: строки клавиш панелей humanizer / reform / bouncer
-  arranger = { { 'C', 'seq' }, { 'h l', 'section' }, { 'Enter', 'add' }, { 'x', 'last off' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
+  arranger = { { 'j k', 'row' }, { 'h l', 'along' }, { 'Enter', 'do' }, { 'x', 'remove' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
   phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },

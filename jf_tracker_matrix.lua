@@ -1263,16 +1263,21 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
   U.set(U.PANEL); gfx.rect(x, y, w, h, 1)
   local function label(t) U.text(x + L.pad, y + 1, ctx.fit(t, w - 2 * L.pad), U.GREY); y = y + L.rh + 1 end
   local function merge(hv) for k, v in pairs(hv or {}) do hover[k] = v end end
+  -- 6 ноя: строки панели для h j k l: 1 seq, 2 секции, 3 плейлист, 4 аранжировка, 5 её кнопки, 6 print jumps
+  MX.arow = MX.arow or 2
+  MX.arow_y = {}
+  local function mark(k, yy) MX.arow_y[k] = yy end
   -- chain
   if ctx.chain_draw and y + L.rh <= ybot then
+    mark(1, y)
     local _, chv = ctx.chain_draw(L, x, y, w - 4)
     merge(chv); y = y + L.rh + 4
   end
   -- секции → плейлист песни
   if ctx.spl_draw and y + 3 * L.rh <= ybot then
     label('song: sections (click - add)' .. (focused and '  h l Enter x Space' or ''))
-    merge(ctx.spl_src_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 2
-    merge(ctx.spl_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 4
+    mark(2, y); merge(ctx.spl_src_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 2
+    mark(3, y); merge(ctx.spl_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 4
   end
   -- аранжировка: заголовок, < имя >, new dup clear del
   if y + 3 * L.rh <= ybot and w >= 8 * L.cw then
@@ -1293,6 +1298,7 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
       if ctx.hint then ctx.hint('mxbtn', bx, by, bw, L.rh, id) end
       return bx + bw + L.pad
     end
+    mark(4, y)
     local bx = btn(x + L.pad, y, '<', 'arrprev')
     local nw = x1 - bx - (U.measure('>') + 3 * L.pad)
     local hot = mx >= bx and mx < bx + nw and my >= y and my < y + L.rh
@@ -1304,15 +1310,19 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
     btn(bx + nw + L.pad, y, '>', 'arrnext')
     y = y + L.rh + 1
     if y + L.rh <= ybot then
-      bx = btn(x + L.pad, y, 'new', 'arrnew')
-      bx = btn(bx, y, 'dup', 'arrdup')
-      bx = btn(bx, y, 'clear', 'arrclear')
-      btn(bx, y, 'del', 'arrdel')
+      mark(5, y)
+      MX.abtn_x = {}
+      local function ab(bx0, lab, id) local nx = btn(bx0, y, lab, id); MX.abtn_x[#MX.abtn_x + 1] = { bx0, nx - bx0 - L.pad, id }; return nx end
+      bx = ab(x + L.pad, 'new', 'arrnew')
+      bx = ab(bx, 'dup', 'arrdup')
+      bx = ab(bx, 'clear', 'arrclear')
+      ab(bx, 'del', 'arrdel')
     end
     y = y + L.rh + 4
   end
   -- 1 ноя: печать прыжков ZB / ZJ — порядок, как его играет трекер, на таймлайн после песни (:pj)
   if y + L.rh <= ybot then
+    mark(6, y)
     local lab = 'print jumps (ZB ZJ -> timeline)'
     local bw = math.min(x1 - x - L.pad, U.measure(lab) + 2 * L.pad)
     local bx = x + L.pad
@@ -1323,6 +1333,15 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
     if hot then hover.btn = 'printjumps' end
     if ctx.hint then ctx.hint('mxbtn', bx, y, bw, L.rh, 'printjumps') end
     y = y + L.rh + 4
+  end
+  -- 6 ноя: курсор строки (h j k l) — янтарная рамка; в строке кнопок — и вокруг выбранной кнопки
+  if focused and MX.arow_y[MX.arow] then
+    local ry = MX.arow_y[MX.arow]
+    U.set(U.AMBER); gfx.rect(x + 1, ry - 1, w - 6, L.rh + 2, 0)
+    if MX.arow == 5 and MX.abtn_x then
+      local b = MX.abtn_x[math.max(1, math.min(#MX.abtn_x, MX.abtn or 1))]
+      if b then gfx.rect(b[1] - 1, ry - 2, b[2] + 2, L.rh + 4, 0) end
+    end
   end
   -- 31 окт: схема всей песни — в остатке панели
   if regions and y + 4 * L.rh <= ybot then
