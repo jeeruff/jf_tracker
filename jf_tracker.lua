@@ -10517,8 +10517,8 @@ ctx = {
     local items = {
       { key = 'i', label = 'detail: events inside the cells' .. on(MX.zoom == 'detail'), fn = function() ctx.mx_zoom() end },
       -- 6 ноя: W H — как в трекере: всё по ширине / по высоте
-      { key = 'W', label = 'width: all tracks fit', fn = function() if MX.fit('w') then relayout(); vim.msg = 'matrix: all tracks fit the width' end end },
-      { key = 'H', label = 'height: all patterns fit', fn = function() if MX.fit('h') then relayout(); vim.msg = 'matrix: all patterns fit the height (rows at least one line)' end end },
+      { key = 'w', label = 'width: all tracks fit', fn = function() if MX.fit('w') then relayout(); vim.msg = 'matrix: all tracks fit the width' end end },
+      { key = 'h', label = 'height: all patterns fit', fn = function() if MX.fit('h') then relayout(); vim.msg = 'matrix: all patterns fit the height (rows at least one line)' end end },
       { key = 'f', label = 'fill: the cells as bars of load' .. on(MX.fill), fn = function() MX.fill = not MX.fill end },
       { key = 'r', label = 'ruler: bar.beat of the slot start' .. on(MX.ruler), fn = function() ctx.mx_ruler_toggle() end },
       { key = 's', label = 's/e: from =START to =END' .. on(state.mxmarks ~= false), fn = function() ctx.mx_btn_do('se') end },
