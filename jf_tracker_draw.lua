@@ -6812,6 +6812,16 @@ end
 -- a = { x, y } — место; → высота поля (всплывашка подсказок — ниже него)
 function D.input_line(L, a, str)
   if not (a and str and str ~= '') then return 0 end
+  -- 6 ноя: a.full — строка ввода внизу окна во всю ширину, поверх статуса (как в Vim / Emacs); курсор — мигающий блок
+  if a.full then
+    local h = L.rh + 4
+    set(U.PANEL); gfx.rect(0, a.y, gfx.w, h, 1)
+    set(U.AMBER); gfx.rect(0, a.y, gfx.w, 1, 1)
+    local s = fit(str, gfx.w - 2 * L.pad - L.cw)
+    text(L.pad, a.y + 2, s, U.TEXT)
+    if math.floor(reaper.time_precise() * 2) % 2 == 0 then set(U.AMBER); gfx.rect(L.pad + ms(s), a.y + 2, math.max(2, L.cw), L.rh, 1) end
+    return h
+  end
   local w = math.min(gfx.w - a.x - L.pad, math.max(ms(str) + 3 * L.pad, L.cw * 40))
   local x = math.max(L.pad, math.min(gfx.w - w - L.pad, a.x))
   local h = L.rh + 4

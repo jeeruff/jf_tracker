@@ -25963,13 +25963,10 @@ local function frame()
   -- 15 окт: ввод (:команда, /поиск, имя) — полем под курсором трекера (не в статусе); подсказки — под полем
   if vim.mode == 'cmd' or vim.mode == 'search' then
     local istr = vim.mode == 'search' and ('/' .. (vim.searchline or '')) or (vim.prompt and (vim.cmdline or '') or (':' .. (vim.cmdline or '')))   -- у промпта префикс уже в строке
-    local ia = anchor
-    if not ia then
-      local r = draw.module_rects and draw.module_rects[state.focus]
-      ia = r and { x = r[1] + 2 * L.pad, y = r[2] + 2 * L.rh } or { x = L.pad, y = L.rh }
-    end
-    local ih = draw.input_line(L, ia, istr)
-    anchor = { x = ia.x, y = ia.y + ih }
+    -- 6 ноя: строка ввода — внизу окна поверх статуса (как в Vim / Emacs), подсказки — над ней (было полем у курсора)
+    local iy = gfx.h - (L.rh + 4)
+    draw.input_line(L, { x = 0, y = iy, full = true }, istr)
+    anchor = { x = L.pad, y = iy, above = true }
   end
   -- 18 окт: попапы не наслаиваются — меню из окна ноты встаёт рядом справа (не влезает — слева), окно ноты под ним
   if ctx.NP then ctx.np_draw() end   -- 13 окт: свойства ноты
