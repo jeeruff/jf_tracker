@@ -14,6 +14,7 @@ Each font keeps its own licence — the texts are in `licenses/`.
 | ProggyCleanNerdFontMono-Regular.ttf | Proggy Clean | Tristan Grimmer (c) 2004-2005, https://github.com/bluescan/proggyfonts | MIT — `licenses/ProggyClean.txt` |
 | ProFontIIxNerdFontMono-Regular.ttf | ProFont IIx | Tobias Jung, Carl Osterwald, Stephen C. Gilardi, Andrew Welch (c) 2014 | MIT — `licenses/ProFont.txt` |
 | 3270NerdFontMono-Regular.ttf | IBM 3270 | Ricardo Banffy and the 3270font authors, https://github.com/rbanffy/3270font | BSD 3-Clause — `licenses/IBM3270.txt` |
+| NotoSansRunic-Regular.ttf | Noto Sans Runic (the mode word in runes) | The Noto Project Authors (c) 2022, https://github.com/notofonts/runic | SIL OFL 1.1 — `licenses/NotoSansRunic-OFL.txt` |
 
 Nerd Fonts patcher and its additions: MIT — `licenses/NerdFonts-MIT.txt`;
 licences of the icon sets merged into every file: `licenses/NerdFonts-icon-licenses.md`.

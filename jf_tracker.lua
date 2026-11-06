@@ -16370,7 +16370,8 @@ OPT.ask.init(U, ctx)
 -- 10 окт: вкладка theme окна Options — темы карточками, шрифты своим шрифтом
 ctx.theme_tab = dofile(DIR .. '/jf_tracker_themetab.lua')
 -- 13 окт: шрифт слова режима — секция вкладки theme
-ctx.MODEFONTS = { 'off', 'Tengwar Telcontar', 'Noto Sans Old Turkic', 'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Marker Felt', 'Nanum Brush Script',   -- 6 ноя: Andale Mono и Monocraft убраны (просьба); маркер и кисть — системные
+ctx.MODEFONTS = { 'off', 'Tengwar Telcontar', 'Noto Sans Old Turkic', 'Noto Sans Runic', 'Kefa',   -- 6 ноя: руны, эфиопское
+  'UnifrakturMaguntia', 'Ponomar', 'Songti SC', 'Diwan Thuluth', 'pIqaD qolqoS', 'Luminari', 'Herculanum', 'Apple Chancery', 'Chalkduster', 'Phosphate', 'Copperplate', 'Silom', 'Krungthep', 'Marker Felt', 'Nanum Brush Script',   -- 6 ноя: Andale Mono и Monocraft убраны (просьба); маркер и кисть — системные
   -- 16 окт: ещё — системные и уже установленные в ~/Library/Fonts (проверено fc-list)
   'Noto Sans Glagolitic', 'Savoye LET',
   'Eau de rose', 'Discognate', 'DemonCubicBlock NKP Shade', 'P0T-NOoDLE', 'mOsOul', 'MicroKnight', 'Topaz a600a1200a400', 'DepartureMono Nerd Font', '3270 Nerd Font' }

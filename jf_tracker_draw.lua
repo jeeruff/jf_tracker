@@ -6108,17 +6108,60 @@ local function tengwar(w)
   end
   return table.concat(out)
 end
-D.MODE_SCRIPT = { ['Tengwar Telcontar'] = {}, ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {}, ['Noto Sans Old Turkic'] = {} }
+-- 6 ноя: руны (старший футарк, Noto Sans Runic, OFL): латиница по звуку, th ng — один знак, ᛫ между словами
+local FUTH = { F = 0x16A0, U = 0x16A2, A = 0x16A8, R = 0x16B1, K = 0x16B2, C = 0x16B2, Q = 0x16B2, G = 0x16B7, W = 0x16B9,
+  V = 0x16B9, H = 0x16BA, N = 0x16BE, I = 0x16C1, J = 0x16C3, Y = 0x16C3, P = 0x16C8, Z = 0x16C9, S = 0x16CA, T = 0x16CF,
+  B = 0x16D2, E = 0x16D6, M = 0x16D7, L = 0x16DA, O = 0x16DF, D = 0x16DE }
+local function runic(w)
+  local out, i, s = {}, 1, w:upper()
+  while i <= #s do
+    local c2, c1 = s:sub(i, i + 1), s:sub(i, i)
+    if c2 == 'TH' then out[#out + 1] = utf8.char(0x16A6); i = i + 2
+    elseif c2 == 'NG' then out[#out + 1] = utf8.char(0x16DC); i = i + 2
+    else
+      if c1 == 'X' then out[#out + 1] = utf8.char(0x16B2, 0x16CA)
+      elseif FUTH[c1] then out[#out + 1] = utf8.char(FUTH[c1])
+      elseif c1 == '-' or c1 == ' ' then out[#out + 1] = utf8.char(0x16EB) end
+      i = i + 1
+    end
+  end
+  return table.concat(out)
+end
+-- 6 ноя: эфиопское письмо (геэз, Kefa в macOS): слоги — согласная + гласная (ряды по 8: ä u i a e ə o),
+-- согласная без гласной — 6-й ряд, гласная без согласной — от አ
+local ETH = { H = 0x1200, L = 0x1208, M = 0x1218, R = 0x1228, S = 0x1230, Q = 0x1240, B = 0x1260, V = 0x1268, T = 0x1270,
+  N = 0x1290, K = 0x12A8, C = 0x12A8, X = 0x12A8, W = 0x12C8, Z = 0x12D8, Y = 0x12E8, D = 0x12F0, J = 0x1300, G = 0x1308,
+  F = 0x1348, P = 0x1350 }
+local ETHV = { A = 3, E = 4, I = 2, O = 6, U = 1 }
+local function ethiopic(w)
+  local out, i, s = {}, 1, w:upper()
+  while i <= #s do
+    local c, n = s:sub(i, i), s:sub(i + 1, i + 1)
+    if s:sub(i, i + 1) == 'SH' then c, i = 'SH', i + 1; n = s:sub(i + 1, i + 1) end
+    if c == 'CH' then c = 'C' end
+    local base = c == 'SH' and 0x1238 or ETH[c]
+    if base then
+      if ETHV[n] then out[#out + 1] = utf8.char(base + ETHV[n]); i = i + 2
+      else out[#out + 1] = utf8.char(base + 5); i = i + 1 end
+    elseif ETHV[c] then out[#out + 1] = utf8.char(0x12A0 + ETHV[c]); i = i + 1
+    elseif c == '-' or c == ' ' then out[#out + 1] = utf8.char(0x1361); i = i + 1
+    else i = i + 1 end
+  end
+  return table.concat(out)
+end
+D.MODE_SCRIPT = { ['Noto Sans Runic'] = {}, ['Kefa'] = {}, ['Tengwar Telcontar'] = {}, ['Ponomar'] = {}, ['Songti SC'] = {}, ['Diwan Thuluth'] = {}, ['pIqaD qolqoS'] = {}, ['Noto Sans Glagolitic'] = {}, ['Noto Sans Old Turkic'] = {} }
 for k, v in pairs(MW) do
   D.MODE_SCRIPT['Ponomar'][k], D.MODE_SCRIPT['Songti SC'][k], D.MODE_SCRIPT['Diwan Thuluth'][k] = v[1], v[2], v[3]
   D.MODE_SCRIPT['pIqaD qolqoS'][k] = klingon(v[4])
   D.MODE_SCRIPT['Noto Sans Glagolitic'][k] = glagolitic(v[1])
   D.MODE_SCRIPT['Noto Sans Old Turkic'][k] = orkhon(k)
   D.MODE_SCRIPT['Tengwar Telcontar'][k] = tengwar(k)
+  D.MODE_SCRIPT['Noto Sans Runic'][k] = runic(k)
+  D.MODE_SCRIPT['Kefa'][k] = ethiopic(k)
 end
 -- 15 окт: таблица вынесена — превью шрифтов во вкладке тем пишет тем же словом
 -- 15 окт: множитель размера — у шрифта мелкое очко при той же высоте строки (арабский был вдвое мельче)
-D.MODE_FONT_SCALE = { ['Tengwar Telcontar'] = 1.4, ['Noto Sans Old Turkic'] = 1.3, ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
+D.MODE_FONT_SCALE = { ['Noto Sans Runic'] = 1.4, ['Kefa'] = 1.3, ['Tengwar Telcontar'] = 1.4, ['Noto Sans Old Turkic'] = 1.3, ['Diwan Thuluth'] = 2.0, ['Ponomar'] = 1.6, ['Songti SC'] = 1.3, ['Noto Sans Glagolitic'] = 1.2, ['Savoye LET'] = 1.6, ['Brush Script MT'] = 1.2, ['SignPainter'] = 1.3 }
 -- 15 окт: слово режима крупно (×2 или декоративным шрифтом mode font): str — «РЕЖИМ | …» (берётся до |),
 -- sx0, sy0 — левый верх, sw — ширина места (слово не шире трети); dry — только измерить; → ширина слова, высота
 -- 22 окт: выпадашка-клавиатура для параметра-ноты DSP (note lo / hi, root): 0..127, текущая — голубым, под мышью —
