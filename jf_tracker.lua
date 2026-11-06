@@ -953,7 +953,7 @@ local function dsp_target()
   -- 31 окт: мышь над нотой со значком fx — DSP пассивно показывает take FX этой ноты (вид не переключается)
   local pk = ctx and ctx.dsp_peek
   if pk and pk.col and reaper.ValidatePtr(pk.tk, 'MediaItem_Take*') then
-    if dspt_cache.snap ~= snap or dspt_cache.take ~= pk.tk then dspt_cache = { snap = snap, take = pk.tk, fx = model.take_fx(pk.tk) } end
+    if dspt_cache.sid ~= snap.sid or dspt_cache.take ~= pk.tk then dspt_cache = { sid = snap.sid, take = pk.tk, fx = model.take_fx(pk.tk) } end
     return { track = pk.tk, fx = dspt_cache.fx, name = 'take fx (hover)', take = true, col = pk.col, peek = true }
   end
   if state.dsp_take then
@@ -972,7 +972,7 @@ local function dsp_target()
       if t2 then tk, e = t2, { name = 'take fx of the note' } end
     end
     if tk and reaper.ValidatePtr(tk, 'MediaItem_Take*') then
-      if dspt_cache.snap ~= snap or dspt_cache.take ~= tk then dspt_cache = { snap = snap, take = tk, fx = model.take_fx(tk) } end
+      if dspt_cache.sid ~= snap.sid or dspt_cache.take ~= tk then dspt_cache = { sid = snap.sid, take = tk, fx = model.take_fx(tk) } end
       return { track = tk, fx = dspt_cache.fx, name = e.name or 'take', take = true, col = col }
     end
   end
@@ -3742,7 +3742,7 @@ ctx = {
     local NM = edit.NM
     local raw = NM.get(e.item)
     local c = ctx.nmod_cache
-    if c and c.snap == snap and c.item == e.item and c.raw == raw then return c.list end
+    if c and c.sid == snap.sid and c.item == e.item and c.raw == raw then return c.list end
     local tr = reaper.GetMediaItem_Track(e.item)
     local pos = reaper.GetMediaItemInfo_Value(e.item, 'D_POSITION')
     local list = { name = e.name, slots = {} }
@@ -3772,7 +3772,7 @@ ctx = {
       list.slots[#list.slots + 1] = sl
       ::next_slot::
     end
-    ctx.nmod_cache = { snap = snap, item = e.item, raw = raw, list = list }
+    ctx.nmod_cache = { sid = snap.sid, item = e.item, raw = raw, list = list }
     return list
   end,
   nmod_add = function()
@@ -4464,9 +4464,9 @@ ctx = {
   trim_need = function()
     local c = ctx.trim_c
     local now = reaper.time_precise()
-    if c and (c.snap == snap or now - c.t < 0.5) then return c.n end
+    if c and (c.sid == snap.sid or now - c.t < 0.5) then return c.n end
     local n = (#seq > 0) and pooled.trim(ctx.real_seq(), nil, true) or 0
-    ctx.trim_c = { snap = snap, t = now, n = n }
+    ctx.trim_c = { sid = snap.sid, t = now, n = n }
     return n
   end,
   mx_trim = function()
@@ -4961,7 +4961,7 @@ ctx = {
   env_point_rows = function(e)
     env_rows_cache = env_rows_cache or {}
     local c = env_rows_cache[e.env]
-    if c and c.snap == snap and c.lpb == state.lpb then return c.rows end
+    if c and c.sid == snap.sid and c.lpb == state.lpb then return c.rows end
     local rows_, seen = {}, {}
     for i = 0, reaper.CountEnvelopePoints(e.env) - 1 do
       local ok, t = reaper.GetEnvelopePoint(e.env, i)
@@ -4982,7 +4982,7 @@ ctx = {
       end
     end
     table.sort(rows_)
-    env_rows_cache[e.env] = { snap = snap, lpb = state.lpb, rows = rows_ }
+    env_rows_cache[e.env] = { sid = snap.sid, lpb = state.lpb, rows = rows_ }
     return rows_
   end,
   env_points = function(e, r0, r1)
@@ -5658,7 +5658,7 @@ ctx = {
     local col = cur_col()
     local scope = ctx.mc_scope
     local c = ctx.mc_cache
-    if c and c.snap == snap and c.scope == scope and (scope == 'project' or c.col == col) then return c.list end
+    if c and c.sid == snap.sid and c.scope == scope and (scope == 'project' or c.col == col) then return c.list end
     local list, tracks = {}, {}
     if scope == 'project' then
       for i = 0, reaper.CountTracks(0) - 1 do tracks[#tracks + 1] = reaper.GetTrack(0, i) end
@@ -5687,7 +5687,7 @@ ctx = {
       end
       ::next_track::
     end
-    ctx.mc_cache = { snap = snap, col = col, scope = scope, list = list }
+    ctx.mc_cache = { sid = snap.sid, col = col, scope = scope, list = list }
     if ctx.mc_sel > #list then ctx.mc_sel = math.max(1, #list) end
     return list
   end,
@@ -6403,7 +6403,7 @@ ctx = {
   end,
   track_insts = function(col)
     if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return {} end
-    ctx.ti_cache = (ctx.ti_cache and ctx.ti_cache.snap == snap) and ctx.ti_cache or { snap = snap }
+    ctx.ti_cache = (ctx.ti_cache and ctx.ti_cache.sid == snap.sid) and ctx.ti_cache or { sid = snap.sid }
     local c = ctx.ti_cache[col.guid]
     if c then return c end
     c = {}
@@ -6487,7 +6487,7 @@ ctx = {
   midi_inst_num = function(item, pitch)
     if not (item and pitch and snap) then return nil end
     local mc = ctx.mi_cache
-    if not mc or mc.snap ~= snap then mc = { snap = snap, cols = {}, n = {} }; ctx.mi_cache = mc
+    if not mc or mc.sid ~= snap.sid then mc = { sid = snap.sid, cols = {}, n = {} }; ctx.mi_cache = mc
       for _, c in ipairs(snap.cols) do if c.track then mc.cols[c.track] = c end end
     end
     local key = tostring(item) .. ':' .. pitch
@@ -6516,7 +6516,7 @@ ctx = {
   midi_kit_slice = function(item, pitch)
     if not (item and pitch and snap) then return nil end
     local mc = ctx.mk_cache
-    if not mc or mc.snap ~= snap then mc = { snap = snap, n = {} }; ctx.mk_cache = mc end
+    if not mc or mc.sid ~= snap.sid then mc = { sid = snap.sid, n = {} }; ctx.mk_cache = mc end
     local key = tostring(item) .. ':' .. pitch
     local v = mc.n[key]
     if v ~= nil then return v or nil end
@@ -6644,7 +6644,7 @@ ctx = {
   -- MIDI-клипы трека для дерева tracks (кэш на снимок)
   tl_midi = function(col)
     local c = ctx.tlm_cache
-    if not (c and c.snap == snap) then c = { snap = snap, t = {} }; ctx.tlm_cache = c end
+    if not (c and c.sid == snap.sid) then c = { sid = snap.sid, t = {} }; ctx.tlm_cache = c end
     if c.t[col] then return c.t[col] end
     local out = {}
     local tr = col.track
@@ -9215,7 +9215,7 @@ ctx = {
   ai_list = function()
     local col = cur_col(); if not col then return {} end
     local c = ctx.ai_cache
-    if c and c.snap == snap and c.col == col then return c.list end
+    if c and c.sid == snap.sid and c.col == col then return c.list end
     local list, seen = {}, {}
     for _, e in ipairs(col.envs or {}) do
       for _, ai in ipairs(e.ais or {}) do
@@ -9239,7 +9239,7 @@ ctx = {
         end
       end
     end
-    ctx.ai_cache = { snap = snap, col = col, list = list }
+    ctx.ai_cache = { sid = snap.sid, col = col, list = list }
     if ctx.ai_sel > #list then ctx.ai_sel = math.max(1, #list) end
     return list
   end,
@@ -9323,8 +9323,8 @@ ctx = {
   esc_vim = function() return state.escmode == 'vim' end,   -- 10 окт: опция Esc mode
   mx_loop_key = function(c) return GD.loop_key(c, snap, seq, MX.cur.ri, math.max(1, MX.cur.ci)) end,
   loop_cells = function()
-    if loop_cache.snap ~= snap or loop_cache.seq ~= seq then
-      loop_cache.snap, loop_cache.seq, loop_cache.grid = snap, seq, GD.cells(snap, seq)
+    if loop_cache.sid ~= snap.sid or loop_cache.seq ~= seq then
+      loop_cache.sid, loop_cache.seq, loop_cache.grid = snap.sid, seq, GD.cells(snap, seq)
     end
     return loop_cache.grid
   end,
@@ -12215,8 +12215,8 @@ ctx = {
   hdr_info = function(col)
     local now = reaper.time_precise()
     local c = ctx.hdr_cache[col.guid]
-    if c and now - c.t < 0.5 and c.snap == snap then return c end
-    c = { t = now, snap = snap, inst = {}, fx = {}, sends = {} }
+    if c and now - c.t < 0.5 and c.sid == snap.sid then return c end
+    c = { t = now, sid = snap.sid, inst = {}, fx = {}, sends = {} }
     for i, e in ipairs(snap and snap.pool or {}) do
       if not e.parent and e.home == col.name then c.inst[#c.inst + 1] = { name = e.name or '?', i = i } end
     end
@@ -32749,6 +32749,7 @@ local function frame()
     if not taken then reaper.DeleteExtState(EXT, 'quit', false); reaper.DeleteExtState(EXT, 'owner', false) end
     if ctx.PM and ctx.PM.flush then pcall(ctx.PM.flush, true) end
     PV.stop(); save_win(); gfx.quit()
+    collectgarbage('restart')   -- 6 ноя: jftop останавливал сборщик на кадр — после выхода / :reload он не должен стоять
     -- 15 окт: :reload — тот же скрипт заново из файлов в следующем тике (новые модули, новое окно)
     if ctx.reloading then
       reaper.defer(function()
@@ -33475,8 +33476,8 @@ end
 ctx.inst_num_c = {}
 function ctx.inst_map()
   local c = ctx.inst_num_c
-  if c.snap == snap then return c end
-  c = { snap = snap, off = {}, list = {} }
+  if c.sid == snap.sid then return c end
+  c = { sid = snap.sid, off = {}, list = {} }
   local n = 0
   for _, col in ipairs(snap and snap.cols or {}) do
     if col.guid then

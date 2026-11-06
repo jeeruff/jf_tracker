@@ -629,6 +629,10 @@ local function place_midi(lane, lpb, it, take, qn0, qn1, midi_cache)
   -- 20 окт: и где тейк на таймлайне (QN двух точек: позиция / offset / rate / темп) — хеш MIDI сдвиг item не меняет:
   -- сдвинутый клип (вставка строки) отдавал ноты со старыми QN, они оказывались до начала item и пропадали
   local key = guid .. '|' .. tostring(hash) .. ('|%.6f|%.6f'):format(R.MIDI_GetProjQNFromPPQPos(take, 0), R.MIDI_GetProjQNFromPPQPos(take, 9600))
+  -- 6 ноя: на тейк — одна запись (ключ старой правки освобождается сразу, не через 4000 записей: сотни МБ нот)
+  local prev = midi_cache['@' .. guid]
+  if prev and prev ~= key then midi_cache[prev] = nil end
+  midi_cache['@' .. guid] = key
   local notes = midi_cache[key]
   if not notes then
     local ok, buf = R.MIDI_GetAllEvts(take, '')
@@ -1148,6 +1152,7 @@ function M.snapshot(lpb)
   if cache.key == key and cache.snap then return cache.snap, false end
   cache.key = key
   cache.snap = M.build(lpb)
+  M.snap_n = (M.snap_n or 0) + 1; cache.snap.sid = M.snap_n   -- 6 ноя: серийный номер — кэши сравнивают его, не держат старый снимок
   return cache.snap, true
 end
 

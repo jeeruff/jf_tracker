@@ -257,10 +257,12 @@ end
 -- 19 окт: снимок — весь проект (chunk каждого трека): в памяти — не больше SNAP_MAX последних (было без предела:
 -- reform откатывал шаг на каждое движение слайдера — 1.4 ГБ); у несохранённого проекта снимки в буфер не идут
 UT.SNAP_MAX = 24
+UT.SNAP_BYTES = 48 * 1024 * 1024   -- 6 ноя: и по байтам — 24 снимка по 4 МБ держали ~100 МБ на проект
 local function snap_keep(S, id)
   S.snap_order = S.snap_order or {}
   S.snap_order[#S.snap_order + 1] = id
-  while #S.snap_order > UT.SNAP_MAX do
+  local function bytes() local b = 0; for _, k in ipairs(S.snap_order) do local x = S.snaps[k]; b = b + (type(x) == 'string' and #x or (type(x) == 'table' and x.data and #x.data) or 0) end; return b end
+  while #S.snap_order > UT.SNAP_MAX or (#S.snap_order > 2 and bytes() > UT.SNAP_BYTES) do
     local old = table.remove(S.snap_order, 1)
     if old ~= id and S.snaps[old] then S.snaps[old] = nil; if S.T.nodes[old] then S.T.nodes[old].snap = nil end end
   end
