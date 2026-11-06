@@ -23240,7 +23240,7 @@ function ctrl_action(name, delta)
   elseif name == 'q_envs' then if delta == 0 then ctx.toggle_envs() end
   elseif name == 'q_scopes' then if delta == 0 then ctx.toggle_scopes() end
   elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
-  elseif name == 'q_keys' then if delta == 0 then state.keycast = not state.keycast; ctx.kc = {} end
+  elseif name == 'q_keys' then if delta == 0 then ctx.kc_menu() end   -- 6 ноя: меню — где keys / keycaster
   elseif name == 'q_listen' then if delta == 0 then state.steplisten = not state.steplisten; vim.msg = 'step listen ' .. (state.steplisten and 'on: moving the cursor plays the row' or 'off') end
   elseif name == 'q_sidel' or name == 'q_sider' then   -- browser < > (7 окт): браузер слева над… под матрицей / справа
     if delta == 0 then
@@ -35936,6 +35936,16 @@ ctx.fill_reaper = function()
   vim.msg = 'over the REAPER window (Cmd+Opt+F12 again - docked; Cmd+F11 - the whole screen)'
 end
 -- 6 ноя: клавиатура — в транспорте или панелью keys (одна на оба места: панель — виды notes / qwerty)
+-- 6 ноя: меню keycaster: клавиатура и нажатые клавиши — в транспорте (по умолчанию) или панелью keys; плавающий
+-- keycast в пустом месте трекера — вкл / выкл
+ctx.kc_menu = function()
+  local function mark(on) return on and '* ' or '  ' end   -- * — что выбрано сейчас
+  vim.open_hydra({ title = 'keys / keycaster', items = {
+    { key = 't', label = mark(state.kbwhere ~= 'pane') .. 'in the transport bar (default)', fn = function() ctx.kbwhere_set('transport') end },
+    { key = 'p', label = mark(state.kbwhere == 'pane') .. 'as a pane (views notes / qwerty)', fn = function() ctx.kbwhere_set('pane') end },
+    { key = 'f', label = mark(state.keycast) .. 'floating keycast in the tracker (big pressed keys)', fn = function() state.keycast = not state.keycast; ctx.kc = {}; vim.msg = 'keycast ' .. (state.keycast and 'on' or 'off') end },
+  } })
+end
 ctx.kbwhere_set = function(v)
   state.kbwhere = v == 'pane' and 'pane' or 'transport'
   reaper.SetExtState(EXT, 'kbwhere', state.kbwhere, true)

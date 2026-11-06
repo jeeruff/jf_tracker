@@ -2553,3 +2553,4 @@
 - [ ] keycaster: вкладки qwerty / keys (щелчок или f); keys — клавиатура нот, как была панель keys
 - [ ] keys = одна панель (Ctrl+W g K): виды notes / qwerty; Options → keys: transport (клавиатура в транспорте, панели нет) / pane (панель, в транспорте нет); старой панели keys и опции keys in transport больше нет
 - [ ] lib: в шапке / find, load, < пресет >, sort; внизу preview swap auto layer, bsync — под колонкой bs (щелчок, колесо, ПКМ как раньше)
+- [ ] main → kcast: меню t в транспорте (по умолчанию) / p панелью / f плавающий keycast; * у выбранного
