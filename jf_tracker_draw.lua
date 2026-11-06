@@ -3278,6 +3278,8 @@ local function pnum(f, vals, label)
 end
 local function lx(fq) return math.log(math.max(20, math.min(20000, fq)) / 20) / math.log(1000) end   -- 20 Гц..20 кГц → 0..1
 function D.fx_view(kind, f, vals, x, y, w, h)
+  -- 6 ноя: кривая компрессора — квадрат: модуль тянется вниз, коробка остаётся квадратной (сверху)
+  if kind == 'comp' and h > w then h = w end
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
   set(U.LINE); gfx.rect(x, y, w, h, 0)
   if w < 20 or h < 12 then return end
@@ -3361,8 +3363,13 @@ function D.fx_view(kind, f, vals, x, y, w, h)
     local function out(i) return i < thr and i or thr + (i - thr) / ratio end
     local function pt(i, o) o = math.max(-60, math.min(0, o)); return ox + (i + 60) / 60 * side, oy + side - (o + 60) / 60 * side end   -- в рамке (порог ниже −60)
     set(U.AMBER)
+    -- 6 ноя: кривая толщиной 3 px (была в 1 — терялась)
     local px0, py0 = pt(-60, out(-60))
-    for k = 1, 30 do local i = -60 + k * 2; local px1, py1 = pt(i, out(i)); gfx.line(px0, py0, px1, py1); px0, py0 = px1, py1 end
+    for k = 1, 30 do
+      local i = -60 + k * 2; local px1, py1 = pt(i, out(i))
+      for d = -1, 1 do gfx.line(px0, py0 + d, px1, py1 + d); gfx.line(px0 + d, py0, px1 + d, py1) end
+      px0, py0 = px1, py1
+    end
     local tx, ty = pt(math.max(-60, math.min(0, thr)), math.max(-60, math.min(0, thr)))
     set(U.CYAN); gfx.rect(math.floor(tx) - 2, math.floor(ty) - 2, 5, 5, 1)
     text(ox + 2, oy + side - VRH - 2, ('%g:1'):format(math.floor(ratio * 10 + 0.5) / 10), U.GREY)
