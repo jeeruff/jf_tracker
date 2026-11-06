@@ -228,6 +228,7 @@ function D.set_font(state)
     D.SCALE = math.max(1, math.min(state.ptmode and 4 or D.SCALE_MAX, fs))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
+  if state.pixel ~= false and not D.ttf then D.SPACE = math.max(1, D.SPACE) end   -- 6 ноя: пиксельный режим — буквы не на верхней линии кнопок
   -- 11 окт: мелкий шрифт (метры, подписи колонок) — всегда x1: битмап без масштаба,
   -- TTF — родной кегль; при x1 он равен обычному
   D.SMALL = D.ttf and math.min(1, D.ttf_px / math.max(1, D.ttf_size)) or 1 / D.SCALE
@@ -434,7 +435,7 @@ function D.layout(snap, state, nregions)
   local L = {}
   L.th = TH()
   L.rh = L.th + 2 + D.SPACE + (D.SCALE % 1 ~= 0 and 1 or 0)   -- x1.5 (5 окт): +1 px снизу текста в кнопках
-  L.pad = ms(' ')
+  L.pad = math.max(ms(' '), 2)   -- 6 ноя: битмап меряет пробел как 0 — в пиксельном режиме текст ложился на рамки кнопок
   if L.pad < 2 then L.pad = math.max(3, math.floor(ms('W') / 2)) end
   L.cw = ms('W')
   L.w_note = ms('C#4')   -- 2 ноя: место под метку микротона (^^) — только у лейна, где микротоны есть (L.microG)

@@ -273,8 +273,8 @@ function MX.width(L, nregions, ncols)
   local nmw = math.max(U.measure('WWW'), math.min(U.measure('WWWWWW'), MX.rgname_px or U.measure('WWWW'))) + 2   -- +2: поле имени уже на 2 px
   L.mx_bpm_w = (MX.fold or st or not MX.bpm) and 0 or (U.measure(MX.bpm_frac and '999.9' or '999') + L.pad)   -- 18 окт: дробный темп — шире
   -- 6 ноя: колонки, свёрнутые заголовком (как папки в lf): узкий «+»
-  local F, pw = MX.cfold_get(), U.measure('+') + L.pad
-  if F.name then nmw = pw end
+  local F, pw = MX.cfold_get(), math.max(U.measure('+'), L.th) + L.pad   -- свёрнутая — шириной в вертикальную подпись
+  if F.name then nmw = pw end   -- имя свёрнуто — только место под вертикальную подпись
   if F.bpm and L.mx_bpm_w > 0 then L.mx_bpm_w = pw end
   if F.sig and L.mx_sig_w > 0 then L.mx_sig_w = pw end
   if F.len and L.mx_dur_w > 0 then L.mx_dur_w = pw end
@@ -331,6 +331,20 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
     end
     MX.rgname_px, MX.sig_same = w, same
+  end
+  -- 6 ноя: свёрнутые колонки — общее (самое частое) значение bpm / размера / длины: совпадает — тусклая точка, нет — «+» ярче
+  do
+    local cnt = { bpm = {}, sig = {}, len = {} }
+    local function add(k, v) if v then cnt[k][v] = (cnt[k][v] or 0) + 1 end end
+    for _, rg in ipairs(regions) do
+      if not rg.gap then
+        if ctx.bpm_at then add('bpm', ('%.1f'):format(ctx.bpm_at(rg.pos))) end
+        if info.sig_at then local n, d = info.sig_at(rg.pos); add('sig', (n or 4) .. '/' .. (d or 4)) end
+        add('len', tostring(math.floor((rg.r1 - rg.r0) + 0.5)))
+      end
+    end
+    MX.common = {}
+    for k, t in pairs(cnt) do local best, bn = nil, 0; for v, n in pairs(t) do if n > bn then best, bn = v, n end end; MX.common[k] = best end
   end
   -- пустой проект (нет регионов) — матрица всё равно видна: кнопки, + (2 окт)
   local grid = MX.grid(snap, regions)
@@ -444,12 +458,22 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     for _, c in ipairs(cols) do
       local id, x0, w0 = c[1], c[2], c[3]
       MX.hsubs[#MX.hsubs + 1] = id
-      local lab = F[id] and '+' or id
-      if U.measure(lab) > w0 - 2 then lab = F[id] and '+' or id:sub(1, 1) end
-      local hot = mx >= x0 and mx < x0 + w0 and my >= hy0 and my < hy0 + L.rh
+      local lab = id
       local cur = MX.cur.hdr == id
-      if cur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x0 - 1, hy0, w0, L.rh, 0) end
-      U.text(id == 'name' and x0 or (x0 + w0 - L.pad - U.measure(lab)), hy0 + 1, lab, (hot or cur) and U.AMBER or U.DIM)
+      local hot
+      if F[id] then
+        -- 6 ноя: свёрнутая — подпись вертикально (3 буквы), снизу к строке заголовков
+        local vh = U.measure(id) + 2
+        local vy = hy0 + L.rh - vh
+        hot = mx >= x0 and mx < x0 + w0 and my >= vy and my < hy0 + L.rh
+        if cur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x0 - 1, vy - 1, w0, vh + 2, 0) end
+        if ctx.vtext then ctx.vtext(x0 + math.floor((w0 - L.th) / 2), vy, vh, id, (hot or cur) and U.AMBER or U.DIM, U.PANEL) end
+      else
+        if U.measure(lab) > w0 - 2 then lab = id:sub(1, 1) end
+        hot = mx >= x0 and mx < x0 + w0 and my >= hy0 and my < hy0 + L.rh
+        if cur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(x0 - 1, hy0, w0, L.rh, 0) end
+        U.text(id == 'name' and x0 or (x0 + w0 - L.pad - U.measure(lab)), hy0 + 1, lab, (hot or cur) and U.AMBER or U.DIM)
+      end
       if hot and down and not MX.hdr_down then MX.cfold_toggle(id) end
       if ctx.hint then ctx.hint('mxhdr', x0, hy0, w0, L.rh, id) end
     end
@@ -619,7 +643,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     if nw > 0 then
     -- 4 ноя: свободный такт — пустая строка, как в трекере (было «bar»); с кодом — остаток имени
     local rgn = rg.gap and (orphan and 'unnamed - n' or '') or (cl and crest or (rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))))
-    if MX.cfold_get().name and not rg.gap then rgn = '+' end   -- 6 ноя: колонка свёрнута
+    if MX.cfold_get().name and not rg.gap then rgn = '' end   -- 6 ноя: колонка свёрнута (имена всегда разные — пусто)
     U.text(nx, y + 1, ctx.fit(rgn, nw), hot_name and U.AMBER or (orphan and U.AMBER or (rg.gap and U.DIM or lc)))
     -- 17 окт: pads вкл — клавиша паттерна справа у имени (запись — красным)
     local pk = ctx.pad_key and not rg.gap and ctx.pad_key(rg.name)
@@ -692,11 +716,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       MX.subs[#MX.subs + 1] = 'len'
       -- 12 окт: длина — ячейка ввода: курсор встаёт (l с имени), цифры — набор шагов
       local oncur = MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'len' and not MX.cur.sec
-      if MX.cfold_get().len then ds = '+' end   -- 6 ноя: свёрнута
+      local dfold = MX.cfold_get().len and (ds == MX.common.len and 'same' or 'diff')   -- 6 ноя: свёрнута
+      if dfold then ds = dfold == 'same' and '.' or '+' end
       if oncur and MX.lenbuf then ds = MX.lenbuf .. '_' end
       if oncur then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(dx + 1, y, L.mx_dur_w - 2, L.rh, 0) end
       local hot_dur = hover.ri == ri and mx >= dx and mx < L.mx_label_w
-      U.text(L.mx_label_w - L.pad - U.measure(ds), y + 1, ds, hot_dur and U.AMBER or U.GREY)
+      U.text(L.mx_label_w - L.pad - U.measure(ds), y + 1, ds, hot_dur and U.AMBER or (dfold == 'same' and U.DIM or (dfold and U.TEXT or U.GREY)))
       if hot_dur then hover.dur = ri end
       if ctx.hint then ctx.hint('mxdur', dx, y, L.mx_dur_w, L.rh, ri) end
       -- размер такта в начале региона (5 окт): клик — :sig для этого паттерна
@@ -706,11 +731,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         -- 18 окт: vismetro — у играющего паттерна размер считает доли: 1/4 2/4 3/4 4/4 (доля под плейхедом)
         local beat = MX.vismetro and playing and info.play_row and ctx.state
         if beat then ss = ('%d/%d'):format(math.floor((info.play_row - rg.r0) / math.max(1, ctx.state.lpb or 4)) % (n or 4) + 1, n or 4) end
-        if MX.cfold_get().sig then ss = '+' end   -- 6 ноя: свёрнута
+        local sfold = MX.cfold_get().sig and (ss == ((n or 4) .. '/' .. (d or 4)) and ((n or 4) .. '/' .. (d or 4)) == MX.common.sig and 'same' or 'diff')   -- 6 ноя: свёрнута
+        if sfold then ss = sfold == 'same' and '.' or '+' end
         local sx = dx - L.mx_sig_w
         if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'sig' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(sx + 1, y, L.mx_sig_w - 2, L.rh, 0) end
         local hot_sig = hover.ri == ri and mx >= sx and mx < dx
-        U.text(dx - L.pad - U.measure(ss), y + 1, ss, (hot_sig or beat) and U.AMBER or U.DIM)
+        U.text(dx - L.pad - U.measure(ss), y + 1, ss, (hot_sig or beat) and U.AMBER or (sfold == 'diff' and U.TEXT or U.DIM))
         if hot_sig then hover.sig = ri end
         if ctx.hint then ctx.hint('mxsig', sx, y, L.mx_sig_w, L.rh, ri) end
       end
@@ -723,7 +749,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         if MX.cur.ri == ri and MX.cur.ci == 0 and MX.cur.sub == 'bpm' and not MX.cur.sec then U.set(MX.focus and U.AMBER or U.LINE); gfx.rect(bx0 + 1, y, L.mx_bpm_w - 2, L.rh, 0) end
         local hot_bpm = hover.ri == ri and mx >= bx0 and mx < bx1
         if bs:find('.', 1, true) then MX.bpm_frac = true end
-        if MX.cfold_get().bpm then bs = '+' end   -- 6 ноя: свёрнута   -- 18 окт: дробный темп — колонка шире со следующего кадра
+        local bfold = MX.cfold_get().bpm and (('%.1f'):format(bpm) == MX.common.bpm and 'same' or 'diff')   -- 6 ноя: свёрнута
+        if bfold then bs = bfold == 'same' and '.' or '+' end   -- 18 окт: дробный темп — колонка шире со следующего кадра
         U.text(bx1 - L.pad - U.measure(bs), y + 1, bs, hot_bpm and U.AMBER or (MX.bpm_diff and U.TEXT or U.DIM))
         if hot_bpm then hover.bpm = ri end
         if ctx.hint then ctx.hint('mxbpm', bx0, y, L.mx_bpm_w, L.rh, ri) end
