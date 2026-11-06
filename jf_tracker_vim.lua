@@ -1361,6 +1361,20 @@ V.COMMANDS = {
   { 'fade', 'in|out [len]', 'fade of audio event over len rows / Nb beats' },
 }
 
+-- 6 ноя: разделы палитры: history (свежие внизу, до 10) и here (команды модуля в фокусе)
+function V.pal_lists()
+  local hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
+  local H, seen = {}, {}
+  for i = #hist, 1, -1 do
+    local l = hist[i]
+    if not seen[l] and l:match('%S') then seen[l] = true; table.insert(H, 1, { cmd = l, run = true }); if #H >= 10 then break end end
+  end
+  local here, where = {}, nil
+  if ctx.cmd_here then here, where = ctx.cmd_here() end
+  local E = {}
+  for i, h in ipairs(here) do if i > 12 then break end; E[#E + 1] = { cmd = (h[1]:gsub('^:', '')) .. ' ', d = h[2] } end
+  return { hist = H, here = E, where = where }
+end
 function V.cmd_matches(line)
   local word = (line or ''):match('^%s*(%S*)') or ''
   local out = {}
@@ -2171,6 +2185,34 @@ function V.key_impl(c)
     -- история (9 окт, как в zsh / atuin): ↑ ↓ Ctrl+P Ctrl+N — по набранному
     -- началу, Ctrl+R — fzf по всей истории (выбранная — в строку)
     V.hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
+    -- 6 ноя: пустая строка — палитра с курсором (как vertico в Doom / q: в Vim): раздел history сверху (свежие внизу,
+    -- ближе к строке), раздел here (команды модуля) ниже; ↑ ↓ — по разделу, Tab — другой раздел, Enter — history
+    -- выполняет строку, here — кладёт команду в строку (дописать аргумент), Esc — снять курсор
+    if ((V.cmdline or ''):gsub('^:', '')) == '' and (c == UP or c == DOWN or c == TAB or ((c == ENTER or c == ESC) and V.pal and V.pal.i)) then
+      local P = V.pal_lists()
+      V.pal = V.pal or { sec = #P.hist > 0 and 'hist' or 'here' }
+      local L = P[V.pal.sec]
+      if c == TAB then
+        V.pal.sec = V.pal.sec == 'hist' and 'here' or 'hist'
+        local L2 = P[V.pal.sec]
+        V.pal.i = #L2 > 0 and (V.pal.sec == 'hist' and #L2 or 1) or nil
+        return
+      end
+      if c == ESC then V.pal.i = nil; return end
+      if c == ENTER then
+        local it = L[V.pal.i]
+        V.pal = nil
+        if not it then return end
+        if it.run then V.cmdline = it.cmd; return V.key(ENTER) end
+        V.cmdline = it.cmd; return
+      end
+      if #L == 0 then return end
+      local d = c == UP and -1 or 1
+      if not V.pal.i then V.pal.i = (V.pal.sec == 'hist') and #L or 1
+      else V.pal.i = math.max(1, math.min(#L, V.pal.i + d)) end
+      return
+    end
+    if V.pal and c ~= UP and c ~= DOWN then V.pal = nil end
     -- 6 ноя: набрано (не листаем историю) — ↑ ↓ по списку совпадений палитры, выбранная — в строку (как Tab);
     -- пустая строка — ↑ ↓ история; Ctrl+P / N — всегда история
     if (c == UP or c == DOWN) and not V.hist_pos and ((V.cmd_base or V.cmdline or ''):gsub('^:', '')) ~= '' then
@@ -2184,10 +2226,10 @@ function V.key_impl(c)
       end
       return
     end
-    if c == UP or c == DOWN or c == 16 or c == 14 then
+    if c == 16 or c == 14 then
       local h = V.hist
       if not V.hist_pos then V.hist_pos, V.hist_pre = #h + 1, V.cmdline or '' end
-      local d = (c == UP or c == 16) and -1 or 1
+      local d = (c == 16) and -1 or 1
       local i = V.hist_pos + d
       while i >= 1 and i <= #h and h[i]:sub(1, #V.hist_pre) ~= V.hist_pre do i = i + d end
       if i < 1 then return end
@@ -4316,24 +4358,16 @@ function V.popup()
     local AMB, GRY = { 0.95, 0.65, 0.25 }, { 0.6, 0.6, 0.6 }
     local hist = V.hist or (ctx.cmd_hist_load and ctx.cmd_hist_load()) or {}
     if typed == '' then
-      local here, where = {}, nil
-      if ctx.cmd_here then here, where = ctx.cmd_here() end
-      if #here > 0 then
-        lines[#lines + 1] = { key = 'here', text = (where or '') .. ' - commands of this module', col = AMB }
-        for i, h in ipairs(here) do if i > 10 then break end; lines[#lines + 1] = { key = h[1], text = h[2] } end
-      end
-      local seen, nr = {}, 0
-      for i = #hist, 1, -1 do
-        local l = hist[i]
-        if not seen[l] then
-          seen[l] = true; nr = nr + 1
-          if nr == 1 then lines[#lines + 1] = { key = 'recent', text = 'Up / Down - back through them', col = AMB } end
-          lines[#lines + 1] = { key = ':' .. l, text = '' }
-          if nr >= 8 then break end
-        end
-      end
-      lines[#lines + 1] = { key = 'all', text = 'type to search every command, Tab completes, :! - REAPER actions', col = AMB }
-      return { title = 'commands', lines = lines, kind = 'cmd', full = true }
+      local P = V.pal_lists()
+      local sec = V.pal and V.pal.sec or (#P.hist > 0 and 'hist' or 'here')
+      local hl
+      local function head(id, t1, t2) lines[#lines + 1] = { key = (sec == id and '> ' or '  ') .. t1, text = t2, col = sec == id and AMB or GRY } end
+      head('hist', 'history', #P.hist > 0 and 'Up / Down - pick, Enter - run it, Tab - the commands below' or 'nothing yet')
+      for i, it in ipairs(P.hist) do lines[#lines + 1] = { key = ':' .. it.cmd, text = '' }; if sec == 'hist' and V.pal and V.pal.i == i then hl = #lines end end
+      head('here', 'here', (P.where or '') .. ' - commands of this module: Enter puts it in the line, Tab - history')
+      for i, it in ipairs(P.here) do lines[#lines + 1] = { key = it.cmd, text = it.d }; if sec == 'here' and V.pal and V.pal.i == i then hl = #lines end end
+      lines[#lines + 1] = { key = '  all', text = 'type to search every command (Up / Down walk the matches), Tab completes, :! - REAPER actions', col = GRY }
+      return { title = 'commands', lines = lines, kind = 'cmd', full = true, hl = hl }
     end
     for i, c in ipairs(matches) do
       if i > 14 then break end
