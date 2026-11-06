@@ -10762,6 +10762,7 @@ function D.frame(L, snap, rows, state, info)
     end
     -- 20 окт: united stepruler — на долях такт.доля (такт ярче), шаги под ней — номером чуть темнее
     local ulab = L.united and (r.beat or r.bar) and not r.clip and info.tl_label and (info.tl_label(r.row))
+    if D.dbg_rows then D.dbg_rows[#D.dbg_rows + 1] = ('%s@%d=%s'):format(tostring(r.row), y, tostring(ulab or r.label)) end   -- 6 ноя: jf_dbg rows=1
     if ulab then text(tx0 + L.rl + L.tl_w + L.pad, ty, ulab, (is_cur_row or r.bar) and U.TEXT or U.mix(U.TEXT, U.GREY, 0.5))
     else
       local nc = is_cur_row and U.TEXT or ((r.acc or 5) <= 2 and D.EMPTY or U.GREY)

@@ -24167,6 +24167,7 @@ local function frame()
   -- 6 ноя: диагностика памяти снаружи — jf_dbg mem=1: отчёт :mem в ExtState jf_tracker/mem; jf_dbg gc=inc|gen — режим сборщика
   if ext_tick then
     if reaper.GetExtState('jf_dbg', 'mem') == '1' then reaper.SetExtState('jf_dbg', 'mem', '0', false); pcall(ctx.mem) end
+    if reaper.GetExtState('jf_dbg', 'rows') == '1' then reaper.SetExtState('jf_dbg', 'rows', '0', false); draw.dbg_rows = {} end   -- 6 ноя: строки кадра (row@y=label) в ExtState jf_tracker/rows
     local g = reaper.GetExtState('jf_dbg', 'gc')
     if g ~= '' and g ~= ctx.gc_mode_dbg then ctx.gc_mode_dbg = g; ctx.gc_apply(g) end
   end
@@ -25644,6 +25645,7 @@ local function frame()
     end or nil,
   })
   ctx.hover_prev = hover   -- 21 окт: для проверок в начале следующего кадра (rate_pop)
+  if draw.dbg_rows then reaper.SetExtState(EXT, 'rows', ('dest %d scale %s pix %s | '):format(gfx.dest, tostring(draw.SCALE), tostring(ctx.pix ~= nil)) .. table.concat(draw.dbg_rows, ' '), false); draw.dbg_rows = nil end
   do   -- 31 окт: нота с take FX под мышью — пассивный показ в DSP (до следующего кадра; ушла мышь — снова трек)
     local hc = hover.cell
     local tk = hc and hc.tfx and (hc.take or (hc.item and reaper.ValidatePtr(hc.item, 'MediaItem*') and reaper.GetActiveTake(hc.item)))
@@ -32782,10 +32784,13 @@ ctx.mem = function()
   collectgarbage('collect')
   local after = collectgarbage('count')
   local MEM = dofile(DIR .. '/jf_tracker_mem.lua')
-  -- 6 ноя: ctx по полям — общий корень ctx в 86 МБ ничего не говорит
+  -- 6 ноя: ctx по полям — общий корень ctx в 86 МБ ничего не говорит. Сначала таблицы (по имени — порядок
+  -- устойчив), функции ctx — в конце: их upvalues достают всё подряд (первая функция забирала 146 МБ)
   local roots = { { 'state', state } }
-  for k, v in pairs(ctx) do if type(v) == 'table' or type(v) == 'function' then roots[#roots + 1] = { 'ctx.' .. tostring(k), v } end end
-  roots[#roots + 1] = { 'ctx', ctx }
+  local keys = {}
+  for k, v in pairs(ctx) do if type(v) == 'table' then keys[#keys + 1] = tostring(k) end end
+  table.sort(keys)
+  for _, k in ipairs(keys) do roots[#roots + 1] = { 'ctx.' .. k, ctx[k] } end
   local i = 1
   while true do
     local n, v = debug.getupvalue(ctx.frame_inner, i)
@@ -32793,6 +32798,7 @@ ctx.mem = function()
     if n ~= 'ctx' and n ~= 'state' then roots[#roots + 1] = { n, v } end
     i = i + 1
   end
+  roots[#roots + 1] = { 'ctx (rest)', ctx }
   -- 28 окт: и глобалы / реестр — 1.2 ГБ живого жило вне ctx
   for k, v in pairs(_G) do if type(v) == 'table' or type(v) == 'function' then roots[#roots + 1] = { '_G.' .. tostring(k), v } end end
   roots[#roots + 1] = { 'registry', debug.getregistry() }
