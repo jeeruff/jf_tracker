@@ -42,8 +42,8 @@ do local tab = 'list'
     ::done::
     eq(found.tab, nil, tab .. ' ' .. hh .. ': no tabs')
     do
-      eq(found.row, true, 'list ' .. hh .. ': a row in hover'); eq(found.new, true, 'list ' .. hh .. ': new button')
-      eq(found.filtermenu, true, hh .. ': filter - a button (30 окт: never inline)'); eq(found.tog, nil, hh .. ': no inline checkboxes')
+      eq(found.row, true, 'list ' .. hh .. ': a row in hover'); eq((found.new or found.snapmenu) and true, true, 'list ' .. hh .. ': new button or the snapshots menu (6 ноя: narrow)')
+      eq((found.filtermenu or found.snapmenu) and true, true, hh .. ': filter - a button or in the menu (30 окт: never inline)'); eq(found.tog, nil, hh .. ': no inline checkboxes')
       if hh > 20 * L.rh then eq(found.xyc, true, hh .. ': XY corners under the list'); eq(found.xypad, true, hh .. ': XY pad under the list')
       else eq(found.xypad, nil, 'low: no room - no XY') end
     end
