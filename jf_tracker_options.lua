@@ -320,7 +320,7 @@ function O.click(mx, my)
       local k = it.key or it.label
       O.orig = O.orig or {}
       if O.orig[k] == nil and it.get then O.orig[k] = it.get() end
-      local now = reaper.time_precise()
+      local now = (ctx.now and ctx.now()) or os.clock()   -- без reaper.* (тесты)
       local lc = O.lastnum
       O.lastnum = { k = k, t = now }
       if lc and lc.k == k and now - lc.t < 0.35 then

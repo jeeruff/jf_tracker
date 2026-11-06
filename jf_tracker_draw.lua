@@ -7741,10 +7741,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local G0 = D.TABGAP or 0
         -- 19 окт: над вкладками — G0 px пустоты (фон окна); вкладка — рамка сверху и с боков, линия панели — под вкладками,
         -- выбранная вкладка открыта вниз (её фон поверх линии) — как настоящая вкладка
-        set(U.BG); gfx.rect(c.x, c.y, c.w, G0, 1)
         local tyt, tth = c.y + G0, th - G0
-        -- 6 ноя: фон за вкладками темнее панели — вкладка отличается от того, что в ней
-        set(U.mix(U.PANEL, { 0, 0, 0 }, 0.35)); gfx.rect(c.x, tyt, c.w, tth - 1, 1)
+        -- 6 ноя: фон за вкладками темнее панели — вкладка отличается от того, что в ней; зазор над ними — тем же цветом
+        set(U.mix(U.PANEL, { 0, 0, 0 }, 0.35)); gfx.rect(c.x, c.y, c.w, G0 + tth - 1, 1)
         local lyl = c.y + th - 1
         local pm = state.panecol ~= 'off' and state.panecol or nil   -- 17 окт: цвета панелей
         local pcol = pm and function(pid) return D.pane_col(pid, pm, state.shadehue) end or nil
