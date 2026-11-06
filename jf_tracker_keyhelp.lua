@@ -497,6 +497,7 @@ KH.PAGES = {
     { k = 'Esc', d = 'back to the tracker' },
   } },
   inst = { title = 'lib', e = {
+    { k = 'o', d = 'add a sound as a new row (not instead): b a file from the browser, i an instrument plugin, l a saved lib set, r record (retro)' },
     { k = 'c', d = 'convert: l slices to the lib, s slice to drumrs5k (a pad per slice), w the whole sample in RS5K, p with a loop, m a list of samples in one RS5K' },
     { k = '!', d = 'Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track); in the lib and the item tab ! slices at transients instead' },
     { k = 'm  Cmd+click', d = 'mark / unmark an instrument (several, not in a row; Shift+click - a range): dd / x cut the marked, yy yanks them, u unmarks' },
@@ -981,7 +982,7 @@ KH.BARS = {
   undotree = { { 'j k', 'node' }, { 'Enter', 'go there' }, { 'zz', 'big + timeline' }, { 'dblclick', 'go' }, { 'u C-r', 'undo / redo' }, { 'Esc', 'tracker' } },
   matrix = { { 'o O', 'new' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'n', 'name' }, { '[ ]', 'bar' },
              { 'C-S-hl', 'pattern' }, { 'M', 'mute' }, { 'Space', 'play' }, { 'R', 'ruler' } },
-  inst = { { 'j k', 'select' }, { 'J K', 'move' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' }, { 'Enter', 'item' }, { 's', 'slice' },
+  inst = { { 'o', 'add' }, { 'Enter', 'sound' }, { 's', 'slice' }, { 'L', 'layer' }, { 'dd', 'cut' }, { 'yy p', 'copy' }, { 'yp', 'dup' }, { 'v', 'range' },
            { 'Space', 'listen' }, { '/', 'find' }, { 'R', 'ξ random' }, { '[ ]', 'ξ back / fwd' } },
   tracks = { { 'h l', 'open / close' }, { 'Enter', 'go / pick' }, { 'Space', 'mark / listen' }, { '+ - c', 'zoom / convert' }, { 'T M S R', 'flags' }, { 'dd yy p P', 'cut copy paste' }, { '>> <<', 'in / out' }, { 'J K', 'move' }, { 'o O F', 'new / folder' }, { 'r', 'rename' }, { '/', 'filter' } },   -- 13 окт: как lf
   pm = { { 'Enter', 'open' }, { 'S+Enter', 'inside' }, { 'Space', 'listen' }, { 'T s p', 'tags status pin' }, { 'a', 'add' }, { 'b', 'big' }, { '/', 'find' } },

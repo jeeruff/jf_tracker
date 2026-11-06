@@ -174,6 +174,7 @@ function IK.key(c, cur, n, nslots, ninst)
   elseif ch == 's' then if ctx.slice_hydra then ctx.slice_hydra() end   -- s — сразу меню нарезки (5 окт)
   elseif ch == ' ' then ctx.inst_listen()
   elseif ch == 'a' then ctx.inst_listen_toggle()
+  elseif ch == 'o' then if ctx.lib_add_menu then ctx.lib_add_menu() end   -- 6 ноя: o — добавить звук в lib (новая строка, как o в Vim)
   elseif ch == '/' then ctx.inst_find()
   elseif (ch == 'h' or c == LEFT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(cur)) then local fo = ctx.lib_folder_cur(); ctx.lib_fold(fo, true); if ctx.lib_hdr then ctx.lib_hdr(fo) end   -- 27 окт: в папке — свернуть, курсор на её имя
   elseif (ch == 'l' or c == RIGHT) and ctx.lib_folder_cur and ctx.lib_folder_cur() and ctx.lib_hidden and ctx.lib_hidden(cur) then ctx.lib_fold(ctx.lib_folder_cur(), false)   -- развернуть

@@ -22775,6 +22775,27 @@ ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
 ctx.declip = { t = 0, hold = {} }
+-- 6 ноя: o в lib — добавить звук новой строкой (не вместо): файл из браузера, плагин-инструмент на трек, набор lib
+-- 6 ноя: строка подсказок под модулем — действия, не навигация (j k / h l / J K / gg G и стрелки и так понятны)
+ctx.BAR_NAV = { ['j k'] = true, ['h l'] = true, ['J K'] = true, ['H L'] = true, ['gg G'] = true, ['g G'] = true, ['h j k l'] = true, ['hjkl'] = true, ['j k h l'] = true }
+ctx.bar_cache = setmetatable({}, { __mode = 'k' })
+ctx.bar_actions = function(b)
+  if not b then return nil end
+  local c = ctx.bar_cache[b]
+  if c then return c end
+  c = {}
+  for _, e in ipairs(b) do if not ctx.BAR_NAV[e[1]] then c[#c + 1] = e end end
+  ctx.bar_cache[b] = c
+  return c
+end
+ctx.lib_add_menu = function()
+  vim.open_hydra({ title = 'lib: add a sound (a new row)', items = {
+    { key = 'b', label = 'a file from the browser - Enter there adds it to the lib', fn = function() ctx.set_focus('browser'); if B.mode ~= 'files' and B.mode ~= 'recent' then B.click('files') end; vim.msg = 'browser: pick a file, Enter - into the lib of the cursor track (Esc - back)' end },
+    { key = 'i', label = 'an instrument plugin (fx list) - it shows under instruments', fn = function() ctx.fx_picker() end },
+    { key = 'l', label = 'a saved lib set (browser tab libs)', fn = function() ctx.set_focus('browser'); B.click('libs'); vim.msg = 'libs: Enter loads a set into the lib' end },
+    { key = 'r', label = 'record: the retro sampler (rec tab)', fn = function() if ctx.top_tab then ctx.top_tab('retro') else vim.run_cmd('retro') end end },
+  } })
+end
 -- 5 ноя: срезы slixer папкой в lib — { { k, note, sec } … } и выбранный (slixer отдаёт вид одному экземпляру: тому,
 -- что выбран; у остальных папки нет)
 ctx.NN12 = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
@@ -24924,7 +24945,12 @@ local function frame()
     end)(),
     trs_live = trs_drag and trs_drag.v and { guid = trs_drag.col.guid, what = trs_drag.what, v = trs_drag.v } or nil,
     khelp = state.khelp,
-    hint_bars = state.hints and function(p) if p == 'dsp' then local k = ctx.dsp_kind(); if k then return KH.BARS['dsp_' .. k] end end; return (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p] end or nil,   -- 14 окт: renoise — свои клавиши
+    hint_bars = state.hints and function(p)
+      local b
+      if p == 'dsp' then local k = ctx.dsp_kind(); if k then b = KH.BARS['dsp_' .. k] end end
+      b = b or (p == 'insert' and keys.layout == 'frow' and KH.BARS.insert_fr) or (p == 'insert' and keys.renoise and KH.BARS.insert_rn) or KH.BARS[p]
+      return ctx.bar_actions(b)
+    end or nil,   -- 14 окт: renoise — свои клавиши
     key_page = function(p) return KH.PAGES[p] end,
     browser_page = (B.mode == 'pm' and B.grid and state.pmgrid and not B.pmproj) and 'pm' or 'browser',   -- полоса подсказок сайдбара (6 окт)
     top_page = (state.toptab == 'garden' and 'orca') or (state.toptab == 'scope' and 'master') or (state.toptab == 'automation' and mod_pane == 'curve' and 'autocanvas') or (state.toptab == 'automation' and mod_pane == 'mod' and 'modulation') or state.toptab,   -- 15 окт: холст — свои подсказки
