@@ -29,7 +29,7 @@ PN.PANELS = {
   { id = 'arranger',   label = 'region playlist',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
-  { id = 'keys',       label = 'keys',       key = 'K', hint = 'keys',    side = 'right' },   -- 2 ноя: клавиатура (oct / клавиши / vel / ped) — панелью, по умолчанию под браузером
+  { id = 'keys',       label = 'keys',       key = 'K', hint = 'keys',    side = 'right', avail = 'merged' },   -- 6 ноя: клавиатура — только в транспорте (просьба); панель выключена   -- 2 ноя: клавиатура (oct / клавиши / vel / ped) — панелью, по умолчанию под браузером
   { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
   { id = 'inst',       label = 'lib',        key = 'l', hint = 'inst',    side = 'right' },
   { id = 'ctrl',       label = 'main',       key = 'n', hint = 'ctrl',    side = 'top' },
@@ -107,7 +107,7 @@ function PN.DEFAULT()
         node('v', { 0.72, 0.28 }, leaf('tracker'), leaf('mixer')),   -- 11 окт: микшер — модуль под трекером
         leaf('dsp')),
       -- 9 окт: browser | pm | fx — один стек справа внизу
-      node('v', { 0.40, 0.20, 0.32, 0.08 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'), leaf('keys'))),
+      node('v', { 0.40, 0.20, 0.40 }, leaf('inst'), leaf('slices'), leaf('browser', 'pm', 'fxb'))),   -- 6 ноя: без keys
     hidden = { notes = true } })
 end
 
