@@ -217,6 +217,20 @@ function MX.set_zoom(vz, hz)
   MX.hz = math.max(1, math.min(16, hz or MX.hz))
   MX.zoom = MX.vz >= 1.75 and 'detail' or 'schematic'
 end
+-- 6 ноя: W — все треки по ширине (ширина клетки), H — все паттерны по высоте (высота строки); по геометрии прошлого кадра
+function MX.fit(dir)
+  local g = MX.fit_geo
+  if not g then return false end
+  if dir == 'w' then
+    local avail = g.W - g.label_w - g.vis - (U.measure('>') + 2 * g.pad + 6) - g.pad
+    local per = avail / math.max(1, g.ncols)
+    MX.set_zoom(nil, (per - 2 * g.pad) / math.max(1, g.cw))
+    MX.hs = 0
+  else
+    MX.set_zoom((g.H - 2) / math.max(1, g.nrows) / math.max(1, g.rh), nil)
+  end
+  return true
+end
 function MX.toggle_zoom()
   if MX.zoom == 'detail' then MX.set_zoom(1, 2) else MX.set_zoom(MX.DETAIL_ROWS, 3) end
 end
@@ -386,6 +400,12 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
   -- 31 окт: аранжировка, плейлист секций и chain — своя панель arranger (MX.arr_draw), из матрицы убраны
   local top = hy + L.mx_head_h
   local rh = L.mx_row_h or L.rh
+  -- 6 ноя: геометрия для W / H меню вида (зум «всё влезает»): ширина, высота под строками, колонки, строки до последнего паттерна
+  do
+    local last = 0
+    for i, rg in ipairs(regions) do if not rg.gap then last = i end end
+    MX.fit_geo = { W = W, H = ybot - top, label_w = L.mx_label_w, pad = L.pad, cw = L.cw, rh = L.rh, ncols = #snap.cols, nrows = last + 2, vis = (MX.vis_w or 0) > 0 and (MX.vis_w + 2) or 0 }
+  end
   local RW = L.mx_ruler_w or 0
   local marks = info.marks or {}
   -- маркер =START строкой до первого слота, =END — после последнего (2 окт);

@@ -2479,6 +2479,7 @@
 - 4 ноя: держишь модификатор в трекере — у курсора метки h l j k (Opt+Shift: narrower <h  l> wider, LPB; Ctrl+Shift: края ноты; Opt; Cmd; Shift; вид пана свои).
 
 ## 4 ноя (вечер)
+- [ ] region playlist: j k — строки (рамка), h l — по строке, Enter — действие; матрица view → W / H — все треки по ширине / все паттерны по высоте
 - [ ] lib: выбран slixer — под ним папка срезов (S01 нота длина), выбранный срез подсвечен; щелчок — срез выбран в slixer; без срезов — подсказка Opt+D
 - [ ] при запуске трекер выключает REAPER «Auto-float new FX windows» (41078), строка в статусе — только в первый раз; :autofloat включает обратно и опция no REAPER auto-float гаснет
 - [ ] :debug on, пара клавиш, :debug share → jf_tracker_debug_share.txt в папке REAPER открывается в Finder; имён треков, путей и текста в кавычках там нет (метки <w> <path> <text>), клавиши и file:line есть
