@@ -31428,7 +31428,7 @@ local function frame()
       if DIR[ch] then
         local id = ctx.pane_cur()
         if m.shift then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе: её край едет в сторону клавиши (перенос — Cmd+Opt)
-          ctx.pane_do(function() return draw.panes.nudge(state.panes, id, DIR[ch], 0.03) end, 'pane ' .. id .. ' size')
+          ctx.pane_nudge(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
         else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
@@ -35938,6 +35938,36 @@ end
 -- 6 ноя: клавиатура — в транспорте или панелью keys (одна на оба места: панель — виды notes / qwerty)
 -- 6 ноя: меню keycaster: клавиатура и нажатые клавиши — в транспорте (по умолчанию) или панелью keys; плавающий
 -- keycast в пустом месте трекера — вкл / выкл
+-- 6 ноя: размер панели с клавиатуры — той же ручкой, что мышью (PN.drag_grip, в пикселях, с минимумами соседей): доля
+-- узла (PN.nudge) упиралась в минимум раскладки — первый шаг, дальше «застывало». Край в сторону dir: есть ручка там —
+-- панель растёт; нет — ручка с другой стороны, панель сжимается
+ctx.pane_nudge = function(id, dir)
+  local PN, m = draw.panes, state.panes
+  local cl = L and L.pn and L.pn.by_panel and L.pn.by_panel[id]
+  if not cl then vim.msg = 'pane ' .. tostring(id) .. ': not on screen'; return end
+  local step = math.max(8, math.floor((dir == 'l' or dir == 'r') and gfx.w * 0.02 or gfx.h * 0.03))
+  local function edge(side)
+    for _, g in ipairs(L.pn.grips or {}) do
+      if side == 'u' or side == 'd' then
+        local y = side == 'u' and cl.y or (cl.y + cl.h)
+        if g.ax == 'v' and math.abs((g.y + g.h / 2) - y) <= 6 and g.x < cl.x + cl.w and g.x + g.w > cl.x then return g end
+      else
+        local x = side == 'l' and cl.x or (cl.x + cl.w)
+        if g.ax == 'h' and math.abs((g.x + g.w / 2) - x) <= 6 and g.y < cl.y + cl.h and g.y + g.h > cl.y then return g end
+      end
+    end
+  end
+  local opp = { l = 'r', r = 'l', u = 'd', d = 'u' }
+  local g, sg = edge(dir), (dir == 'r' or dir == 'd') and 1 or -1
+  if not g then g = edge(opp[dir]) end   -- с той стороны соседа нет — край с другой стороны едет туда же: панель меньше
+  if not g then vim.msg = 'pane ' .. id .. ': no edge to move that way'; return end
+  local before = PN.encode(m)
+  PN.drag_grip(m, L.pn, g, sg * step)
+  if PN.encode(m) ~= before then
+    ctx.pn_undo = ctx.pn_undo or {}; table.insert(ctx.pn_undo, before)
+    relayout(); vim.msg = 'pane ' .. id .. ' size (Cmd+Shift+hjkl)'
+  else vim.msg = 'pane ' .. id .. ': the neighbour is at its minimum' end
+end
 ctx.kc_menu = function()
   local function mark(on) return on and '* ' or '  ' end   -- * — что выбрано сейчас
   vim.open_hydra({ title = 'keys / keycaster', items = {
