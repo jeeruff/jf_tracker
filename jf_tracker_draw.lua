@@ -10591,7 +10591,7 @@ function D.frame(L, snap, rows, state, info)
       patb[a1] = patb[a1] or {}; patb[a1].prv = rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))
       -- 6 ноя: паттерн курсора — в углу над номерами строк (иначе посреди паттерна не видно, в каком ты)
       local cr = info.vcur and info.vcur.row
-      if cr and cr >= rg.r0 - 1e-6 and cr < rg.r1 - 1e-6 then D.cur_pat = ('%d %s'):format(rg.idx or 0, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))) end
+      if cr and cr >= rg.r0 - 1e-6 and cr < rg.r1 - 1e-6 then D.cur_pat = ('%d %s'):format(rg.idx or 0, rg.name ~= '' and rg.name or ('#' .. tostring(rg.idx))); D.cur_pat_r0 = rg.r0 end
     end
     for _, sc in ipairs(info.sections or {}) do
       local c = U.AMBER   -- 31 окт: секции — всегда жёлтые (не цветом региона, не путаются с паттернами)
@@ -11288,7 +11288,8 @@ function D.frame(L, snap, rows, state, info)
   end
   D.acv_frame(L, info, rows)   -- 2 ноя: рамка видимого на холсте кривых (своя функция: здесь предел локалей)
   -- 6 ноя: паттерн курсора — в свободном углу строки номеров колонок, над номерами строк (линия прыжков)
-  if D.cur_pat and L.label_w and L.label_w > 2 * L.cw then
+  -- только когда начало паттерна (его метка у первой строки) выше экрана — иначе имя видно дважды
+  if D.cur_pat and L.label_w and L.label_w > 2 * L.cw and rows[1] and (D.cur_pat_r0 or 0) < rows[1].row - 1e-6 then
     local cy = L.body_y - L.rh
     local s2 = fit(D.cur_pat, L.label_w - 2 * L.pad)
     set(U.PANEL); gfx.rect(tx0 + 1, cy, ms(s2) + 2 * L.pad, L.rh, 1)
