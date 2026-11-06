@@ -144,6 +144,16 @@ end
 -- видна издалека в любой теме. cx, cy — центр, r — полудиагональ
 function U.diamond(cx, cy, r, col, hot)
   r = r or 5
+  -- 6 ноя: опция knob — в пиксельном режиме ромб размывается: bar — чёткая планка, block — квадрат (U.KNOB от main)
+  local kn = U.KNOB
+  if kn == 'bar' or kn == 'block' then
+    cx, cy = math.floor(cx + 0.5), math.floor(cy + 0.5)
+    local hw = kn == 'bar' and 1 or math.max(2, math.floor(r * 0.7))
+    local hh = kn == 'bar' and (r + 1) or hw
+    set(U.BG); gfx.rect(cx - hw - 1, cy - hh - 1, 2 * hw + 3, 2 * hh + 3, 1)
+    set(hot and U.TEXT or col); gfx.rect(cx - hw, cy - hh, 2 * hw + 1, 2 * hh + 1, 1)
+    return
+  end
   set(U.BG); gfx.triangle(cx, cy - r - 2, cx + r + 2, cy, cx, cy + r + 2, cx - r - 2, cy)
   set(hot and U.TEXT or col); gfx.triangle(cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy)
   set(hot and col or U.TEXT, 0.9)
