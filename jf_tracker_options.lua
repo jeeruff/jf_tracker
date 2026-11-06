@@ -493,12 +493,14 @@ local function draw_about(L, W, H)
       local col = s:match('^%d+%.%d') and U.AMBER or (s:match('^jf_tracker') and U.CYAN or U.TEXT)
       local ind = s:match('^(%s*%-?%s*)') or ''
       local cur = ''
+      if s:match('https?://%S+') or s:match('[%w%._%-]+@[%w%-]+%.[%w%.%-]+') then cur = s; goto link end   -- 6 ноя: ссылку не переносить (подпись уезжала от адреса)
       for w in s:gmatch('%S+') do
         local try = cur == '' and (s:match('^%s*') .. w) or (cur .. ' ' .. w)
         if cur ~= '' and U.measure(try) > tw then
           out[#out + 1] = { cur, col }; cur = (' '):rep(#ind) .. w
         else cur = try end
       end
+      ::link::
       out[#out + 1] = { cur, col }
     end
     O.wrapped, O.wrap_w, O.wrap_src = out, tw, O.about
@@ -516,10 +518,13 @@ local function draw_about(L, W, H)
     local url = l[1]:match('(https?://%S+)') or l[1]:match('([%w%._%-]+@[%w%-]+%.[%w%.%-]+)')
     if url then
       local pre = l[1]:sub(1, l[1]:find(url, 1, true) - 1)
-      local ux, uw = bx + L.pad + U.measure(pre), U.measure(url)
+      -- 6 ноя: узко — подпись (itch.io, github …) не рисуется, адрес обрезается по ширине; щелчок — полный адрес
+      if U.measure(pre .. url) > tw then pre = '' end
+      local shown = ctx.fit(url, tw)
+      local ux, uw = bx + L.pad + U.measure(pre), U.measure(shown)
       local hot = gfx.mouse_x >= ux and gfx.mouse_x < ux + uw and gfx.mouse_y >= ly and gfx.mouse_y < ly + rh
       U.text(bx + L.pad, ly, pre, l[2])
-      U.text(ux, ly, url, hot and U.AMBER or U.CYAN)
+      U.text(ux, ly, shown, hot and U.AMBER or U.CYAN)
       U.set(hot and U.AMBER or U.CYAN); gfx.rect(ux, ly + rh - 2, uw, 1, 1)
       if hot then O.link_hot = url:find('://', 1, true) and url or ('mailto:' .. url) end
     else
