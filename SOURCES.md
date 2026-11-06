@@ -22,7 +22,7 @@ Every new borrowing gets a row here (and a line in NOTICE / README Credits).
 | panes, splits and the pane mode | [tmux](https://github.com/tmux/tmux), [zellij](https://zellij.dev) | - | idea only | own code |
 | the pattern grid of codes A1 B2 ... | Polyend Tracker, Elektron sequencers | - | idea only | own code |
 | clips, scenes and launching | Ableton Live (Session View), Bitwig Studio | - | idea only | own code |
-| note keys that play patterns (patternkb), pads | Akai MPC | - | idea only | own code |
+| note keys that play patterns (keyspat), pads | Akai MPC | - | idea only | own code |
 | spam: a moved slice edge rolls | Roland SP-404 | - | idea only | own code |
 | the sniper zoom of a slice edge | Xfer Nerve (Steve Duda) | - | idea only | own code |
 | dense parameter groups of the slixer panel | Madrona Labs Aalto and Kaivo | - | idea only | own code |

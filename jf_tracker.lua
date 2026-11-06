@@ -15578,7 +15578,7 @@ ctx = {
       -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb); 30 окт: clipkb убран
       { key = 'k', label = 'keyboard: notes / patterns', sub = function() return { title = 'keyboard', items = {
           { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
-          { key = 'p', label = 'patternkb - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
+          { key = 'p', label = 'keyspat - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
         } } end },
       { key = 'I', label = 'instrument (pool)', sub = function()
           local it = {}
@@ -26042,7 +26042,7 @@ local function frame()
   elseif hover.matrix and hover.matrix.palbtn then
     state.status = ({
       plist = '+playlist: the pattern of the cursor slot goes to the end of the current playlist',
-      rec = 'rec: record the order of the patterns played (patternkb), again - write it after the song' })[hover.matrix.palbtn] or ''
+      rec = 'rec: record the order of the patterns played (keyspat), again - write it after the song' })[hover.matrix.palbtn] or ''
   elseif hover.matrix and hover.matrix.palname then
     local pn = hover.matrix.palname
     local nt = ctx.pat_note(pn.name)
@@ -33606,7 +33606,7 @@ ctx.pad_launch = function(off)
     vim.msg = 'pads: ' .. dst.name .. ' now'
   else
     ctx.mx_enqueue(dst)
-    vim.msg = 'patternkb: ' .. dst.name .. ' after this one (seamless)'
+    vim.msg = 'keyspat: ' .. dst.name .. ' after this one (seamless)'
   end
 end
 ctx.pads_write = function()
@@ -38407,7 +38407,7 @@ ctx.mx_menu = function(pick)
     { key = 'T', label = 'section from the time selection  (Tr)', fn = keys('Tr') },
     { key = 'A', label = 'region playlist pane  (A)', fn = keys('A') },   -- 4 ноя: песня / seq / плейлист — своя панель, не матрица
     { key = 'k', label = 'keyboard …', sub = function() return { title = 'matrix: keyboard', items = {
-      F('p', 'patternkb: the note keys play the patterns (:patternkb)', function() vim.run_cmd('patternkb') end),
+      F('p', 'keyspat: the note keys play the patterns (:keyspat)', function() vim.run_cmd('keyspat') end),
     } } end },
     { key = 'p', label = 'patternize the empty parts …', sub = function() return { title = 'matrix: patternize', items = pz } end },
     { key = 'o', label = 'pattern codes …', sub = function() return { title = 'matrix: pattern codes', items = cv } end },

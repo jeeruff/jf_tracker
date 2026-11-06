@@ -162,7 +162,7 @@ Ideas only - jf_tracker has its own code for all of them. Respect to their autho
 - panes, splits and the pane mode - [tmux](https://github.com/tmux/tmux), [zellij](https://zellij.dev)
 - the pattern grid of codes A1 B2 ... - Polyend Tracker, Elektron sequencers
 - clips, scenes and launching - Ableton Live (Session View), Bitwig Studio
-- note keys that play patterns (patternkb), pads - Akai MPC
+- note keys that play patterns (keyspat), pads - Akai MPC
 - spam: a moved slice edge rolls - Roland SP-404
 - the sniper zoom of a slice edge - Xfer Nerve (Steve Duda)
 - dense parameter groups of the slixer panel - Madrona Labs Aalto and Kaivo
