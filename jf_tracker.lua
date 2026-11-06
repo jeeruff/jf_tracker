@@ -326,7 +326,8 @@ local state = {
   envpoints = flag('envpoints', true),             -- точки огибающих кружочками (6 окт)            -- MIDI-лейны: CC / PC / артикуляции / SysEx колонками (6 окт)
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
-  noautofloat = flag('noautofloat', true),   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
+  noautofloat = flag('noautofloat', true),
+  pixel = flag('pixel', true),   -- 6 ноя: пиксельный режим — кадр вполовину, на экран ×2 без сглаживания   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
   dspleft = flag('dspleft', true),
   slicekeys = flag('slicekeys', false),
   fxontop = flag('fxontop', true),   -- 26 окт: окна плагинов, открытые трекером, — поверх (pin)   -- 24 окт: фокус в слайсере — клавиатура (KEYS) сама включается
@@ -710,13 +711,13 @@ local function save_win()
   end
   if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
-  S('dock', d); S('x', x); S('y', y); S('w', gfx.w); S('h', gfx.h)
+  S('dock', d); S('x', x); S('y', y); S('w', fps_buf.rw or gfx.w); S('h', fps_buf.rh or gfx.h)   -- 6 ноя: в пиксельном режиме gfx.w — половина
   S('lpb', state.lpb); S('fxcols', state.fxcols); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'tpkeys', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -1030,6 +1031,7 @@ ctx = {
   snap = function() return snap end,
   layout = function() return L end,
   relayout = relayout,
+  draw_set_font = function() draw.set_font(state) end,   -- 6 ноя: :pixel
   bar_of_row = function(row) return model.bar_of_row(row, state.lpb) end,
   row_time = function(row) return edit.row_time(row, state.lpb, 0) end,
   vbar = function(...) return draw.vbar(...) end,
@@ -13468,6 +13470,7 @@ ctx = {
       flag('autofocus', 'autofocus', 'the keyboard cursor on a note / slice / automation item shows its module by itself'),
       flag('nofloat', 'no auto FX windows', 'a new effect (added by the tracker or in REAPER, inside containers too) opens no window: the window REAPER floats by itself (its option Auto-float newly created FX windows) closes at once; windows you open yourself (O, double click) stay'),
       flag('noautofloat', 'no REAPER auto-float', 'REAPER action FX: Auto-float new FX windows is turned off on start: the window of a new effect takes the keyboard from the tracker (told once, the first time); :autofloat turns it back on and this off'),
+      { key = 'pixel', label = 'pixel mode', kind = 'toggle', desc = 'the frame is drawn at half the size and shown x2 without smoothing - four times fewer pixels, much faster on a big screen; the bitmap font looks the same, thin lines get 2 px, small labels can not be smaller than the normal font (:pixel)', get = function() return state.pixel ~= false end, set = function(v) state.pixel = v; draw.set_font(state); relayout() end },
       flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
       flag('tintmute', 'tint channels on solo / mute', 'muted channels are dim; with a solo on, every channel but the soloed ones is dim (as in other trackers)'),
@@ -13551,7 +13554,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'noautofloat', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'noautofloat', 'pixel', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -22774,6 +22777,51 @@ end
 ctx.meter_cache = {}
 -- 4 ноя: declip — удержание пика / клипа трека и мастера само сбрасывается через N с после последнего нового пика
 -- (опция declip, умолчание 10 с; 0 — off). 4 раза в секунду, все треки — не только нарисованные полосы
+-- 6 ноя: ПИКСЕЛЬНЫЙ РЕЖИМ (опция pixel, по умолчанию вкл): весь кадр рисуется в буфер 1018 половинного размера и
+-- выводится на экран ×2 без сглаживания (gfx.mode 4) — пикселей вчетверо меньше (заливки LICE были главной
+-- нагрузкой окна 4K). Коду трекера окно и мышь подаются уже в половинных координатах: gfx.w / gfx.h / mouse_x / y
+-- делятся после каждого gfx.update / getchar (обёртки ниже), clienttoscreen / screentoclient — пересчёт ×2.
+-- Битмап-шрифт x2 и так рисовал точку квадратом 2×2 — вид тот же.
+ctx.PIX_IMG = 1018
+ctx.pix = nil   -- { rw, rh } — настоящий размер окна, пока режим включён
+ctx.pix_halve = function()
+  if not ctx.pix then return end
+  local P = ctx.pix
+  if gfx.w ~= P.hw or gfx.h ~= P.hh then P.rw, P.rh = gfx.w, gfx.h; P.hw, P.hh = math.max(1, gfx.w // 2), math.max(1, gfx.h // 2) end
+  gfx.w, gfx.h = P.hw, P.hh
+  fps_buf.rw, fps_buf.rh = P.rw, P.rh   -- настоящий размер окна — для save_win
+  -- мышь: REAPER пишет целые; свои — с меткой .25 (не делить второй раз)
+  if gfx.mouse_x % 1 == 0 then gfx.mouse_x = gfx.mouse_x // 2 + 0.25 end
+  if gfx.mouse_y % 1 == 0 then gfx.mouse_y = gfx.mouse_y // 2 + 0.25 end
+end
+ctx.pix_begin = function()
+  local want = state.pixel ~= false
+  if want and not ctx.pix then ctx.pix = { hw = -1, hh = -1 } end
+  if not want and ctx.pix then ctx.pix = nil; fps_buf.rw, fps_buf.rh = nil, nil; draw.SCREEN = nil; gfx.dest = -1; return end
+  if not ctx.pix then return end
+  ctx.pix_halve()
+  local P = ctx.pix
+  if P.iw ~= P.hw or P.ih ~= P.hh then gfx.setimgdim(ctx.PIX_IMG, -1, -1); gfx.setimgdim(ctx.PIX_IMG, P.hw, P.hh); P.iw, P.ih = P.hw, P.hh end
+  draw.SCREEN = ctx.PIX_IMG
+  gfx.dest = ctx.PIX_IMG
+end
+ctx.pix_present = function()
+  local P = ctx.pix
+  if not (P and P.iw) then return end
+  if not ctx.frame_skip then
+    gfx.dest = -1; gfx.a = 1; gfx.mode = 6   -- 4 — без сглаживания (точка в квадрат 2×2), 2 — непрозрачно
+    gfx.blit(ctx.PIX_IMG, 1, 0, 0, 0, P.iw, P.ih, 0, 0, P.iw * 2, P.ih * 2)
+    gfx.mode = 0
+  end
+  gfx.dest = ctx.PIX_IMG
+end
+do   -- обёртки: после опроса окна — снова половинные координаты; экранные координаты — ×2
+  local upd0, gch0, c2s0, s2c0 = gfx.update, gfx.getchar, gfx.clienttoscreen, gfx.screentoclient
+  gfx.update = function(...) local r = upd0(...); ctx.pix_halve(); return r end
+  gfx.getchar = function(...) local a, b = gch0(...); ctx.pix_halve(); return a, b end
+  gfx.clienttoscreen = function(x, y) if ctx.pix then x, y = x * 2, y * 2 end; return c2s0(x, y) end
+  gfx.screentoclient = function(x, y) local a, b = s2c0(x, y); if ctx.pix and a then a, b = a / 2, b / 2 end; return a, b end
+end
 ctx.declip = { t = 0, hold = {} }
 -- 6 ноя: o в lib — добавить звук новой строкой (не вместо): файл из браузера, плагин-инструмент на трек, набор lib
 -- 6 ноя: строка подсказок под модулем — действия, не навигация (j k / h l / J K / gg G и стрелки и так понятны)
@@ -23837,6 +23885,7 @@ local function process_queue(playpos)
 end
 
 local function frame()
+  ctx.pix_begin()   -- 6 ноя: пиксельный режим — кадр в половинный буфер
   if ctx.ut_poll then pcall(ctx.ut_poll) end
   -- 16 окт: опция zoom on top — вкладка item ниже трекера: прицел (зум края) над полной волной
   do
@@ -30719,7 +30768,7 @@ local function frame()
     end
     if w > 4 and h > 4 then
       local d0 = gfx.dest
-      gfx.dest = ctx.bigbuf and 1021 or -1
+      gfx.dest = ctx.bigbuf and 1021 or (draw.SCREEN or -1)
       local ok, rgb = pcall(MX.PNG.grab, x, y, w, h)
       gfx.dest = d0
       -- 8 окт: как системный снимок macOS — та же папка (screencapture location
@@ -30752,9 +30801,10 @@ local function frame()
     -- буфер кадров — на экран (каждый тик, даже без перерисовки)
     -- 16 окт: непрозрачно и без сложения — gfx.a / gfx.mode последнего наложения (подсказка, рамка
     -- с alpha) иначе выводили весь кадр полупрозрачно на чёрный экран: окно темнело целиком
-    gfx.dest = -1; gfx.a = 1; gfx.mode = 0
+    gfx.dest = draw.SCREEN or -1; gfx.a = 1; gfx.mode = 0
     gfx.blit(1021, 1, 0, 0, 0, gfx.w, gfx.h, 0, 0, gfx.w, gfx.h)
   end
+  ctx.pix_present()   -- 6 ноя: пиксельный режим — половинный кадр на экран ×2
   U.end_frame()
   -- gfx.update — каждый тик: без него клавиши и мышь приходили только с кадром отрисовки (28 окт: трекер залипал)
   gfx.update()

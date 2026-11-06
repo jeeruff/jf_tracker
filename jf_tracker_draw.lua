@@ -210,6 +210,7 @@ function D.set_font(state)
   if tf then
     local fs = tonumber(state.fontscale) or 2
     if fs ~= 1.5 then fs = math.max(1, math.min(3, math.floor(fs))) end
+    if state.pixel ~= false then fs = math.max(0.5, fs / 2) end   -- 6 ноя: пиксельный режим — кадр вполовину, кегль тоже
     D.ttf_face, D.ttf_size, D.ttf_px = tf.face, math.floor(tf.px * fs + 0.5), tf.px
     gfx.setfont(1, D.ttf_face, D.ttf_size, D.bold and string.byte('b') or 0)
     D.font_id = 1
@@ -221,6 +222,9 @@ function D.set_font(state)
     -- 31 окт: x1.5 у битмапа убран (штрихи 1-2-1-2 px — неровные буквы): сохранённое 1.5 рисуется как x2; у TTF 1.5 есть
     local fs = tonumber(state.fontscale) or 2
     if fs == 1.5 then fs = 2 else fs = math.floor(fs) end
+    -- 6 ноя: пиксельный режим — кадр рисуется вполовину и увеличивается ×2 без сглаживания: шрифт вдвое мельче
+    -- (x2 → x1 — на экране тот же размер), x1 / x3 — ближайший целый
+    if state.pixel ~= false then fs = math.max(1, math.floor(fs / 2 + 0.5)) end
     D.SCALE = math.max(1, math.min(state.ptmode and 4 or D.SCALE_MAX, fs))
   end
   D.SPACE = math.max(0, math.min(12, math.floor(tonumber(state.fontspace) or 2)))
@@ -8357,7 +8361,7 @@ function D.cracks(x, y, w, h, red, ex, style)
   if c.red ~= red then c.red = red; dirty = true end
   if #c.src > 0 and now - c.t > 2 then   -- цвета соседей: пиксель за краем (прошлый кадр); перерисовка — при заметной смене
     c.t = now
-    local od = gfx.dest; gfx.dest = -1
+    local od = gfx.dest; gfx.dest = D.SCREEN or -1   -- 6 ноя: пиксельный режим — «экран» = буфер половинного кадра
     for _, s in ipairs(c.src) do
       gfx.x, gfx.y = s[1], s[2]
       local r, g, b = gfx.getpixel()
