@@ -329,6 +329,7 @@ local state = {
   oneclick = flag('oneclick', true),               -- one click focus: клик по элементу открывает его модуль (6 окт)
   nofloat = flag('nofloat', true),
   noautofloat = flag('noautofloat', true),
+  kcview = reaper.GetExtState(EXT, 'kcview') ~= '' and reaper.GetExtState(EXT, 'kcview') or 'qwerty',   -- 6 ноя
   knob = reaper.GetExtState(EXT, 'knob') ~= '' and reaper.GetExtState(EXT, 'knob') or 'auto',   -- 6 ноя: ползунок слайдеров
   pixel = flag('pixel', true),   -- 6 ноя: пиксельный режим — кадр вполовину, на экран ×2 без сглаживания   -- 5 ноя: REAPER «Auto-float new FX windows» — выключать при запуске
   dspleft = flag('dspleft', true),
@@ -19392,6 +19393,7 @@ local function hint_go(t)
       if p.kind == 'note' and pd then for _, it in ipairs(ctx.is_heads_items(vim.covering(pd.fi, pd.row))) do items[#items + 1] = it end end
     end
     ctx.is_toggle_items(items); if ctx.IS then ctx.is_msg('labels') end
+  elseif t.kind == 'kcview' then state.kcview = d; reaper.SetExtState(EXT, 'kcview', d, true)   -- 6 ноя
   elseif t.kind == 'mxhdr' then ctx.set_focus('matrix'); MX.cfold_toggle(d)   -- 6 ноя: заголовок колонки матрицы — свернуть / развернуть
   elseif t.kind == 'bigfader' then ctx.bf_set(d.x)   -- 6 ноя: метка деления большого фейдера
   elseif t.kind == 'mxbtn' then ctx.set_focus('matrix'); ctx.mx_btn_do(d)   -- 31 окт: как щелчок мышью (свой список терял menu, patternkb, timesel, follow, space …)
@@ -25092,6 +25094,7 @@ local function frame()
     rd_draw = function(Lx, x, y, w, h, foc) return ctx.RD.draw(U, Lx, ctx.rd_load(), ctx.rd_info(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y) end,   -- 20 окт
     -- 31 окт: генератор кривых — своя панель lfogen (была колонкой справа во вкладке automation; щелчок по ней
     -- уводил вкладку на params)
+    kcview = state.kcview, kcview_set = function(v) state.kcview = v; reaper.SetExtState(EXT, 'kcview', v, true) end,   -- 6 ноя: вкладка keycaster: qwerty / keys
     kc_draw = function(x, y, w, h)   -- 6 ноя: панель keycaster — клавиши, что держатся сейчас (JS_VKeys)
       local now = reaper.time_precise()
       local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
