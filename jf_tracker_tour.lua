@@ -40,7 +40,7 @@ T.STEPS = {
     -- 2 ноя: сначала второй трек (с одним Opt+H / L некуда идти); tt ставит курсор на новый — ход считается от него
     ticks = { function(e, b, s) if (e.ntr or 0) >= 2 then s.tk1 = e.tk; return true end end, function(e, b, s) return e.tk ~= s.tk1 end,
       function(e, b, s) s.f0 = s.f0 or e.focus; return e.focus ~= s.f0 end, function(e, b, s) return e.focus == 'tracker' end },
-    text = 'Opt+H / Opt+L go to the previous / next track (channel). Cmd+h j k l move the focus to the pane on the left, below, above, on the right - the framed pane gets the keys.',
+    text = 'Opt+H / Opt+L go to the previous / next track (channel) - in DSP too, and t f adds an effect there as here. Cmd+h j k l move the focus to the pane on the left, below, above, on the right - the framed pane gets the keys.',
     todo = { 'Press t t once more - a second track (skip it if there are two).', 'Press Opt+H or Opt+L - the cursor goes to the other track.', 'Press Cmd+l (or Cmd+j) - the focus goes to another pane.', 'Press Cmd+h (or Cmd+k) to come back to the tracker.' },
     check = function(e, b) return e.tk ~= b.tk end },
   -- 1 ноя: режимы — отдельным шагом, до записи нот

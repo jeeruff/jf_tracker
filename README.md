@@ -98,7 +98,7 @@ By hand instead of ReaPack:
    - `jf_tracker_scope` - the oscilloscope / spectrum of the scopes;
    - `jf_tracker_trig` - a note-on when a sample item starts (note mod);
    - `jf_tracker_probe` - a level meter between effects (gain staging in the router);
-   - `jf_tracker_zone` - key / velocity / chain zones of a rack, as in Ableton;
+   - `jf_tracker_zone` - key / velocity / chain zones of a rack;
    - `jf_tracker_choke` - pad groups and choke groups of the drum rack;
    - `jf_tracker_chordfollow` - notes of a track follow the chord lane.
 3. Open *Actions → Show action list → New action → Load ReaScript…* and pick
@@ -119,7 +119,9 @@ In short:
 | `:` | The command line. Tab completes. |
 | `\` | The leader menu, or the context menu of the focused module. |
 | `Space` | Play / stop. |
-| `?` | The keys of the focused module. |
+| `tt`, `tf` | A new track, add an effect (the same in DSP; `a` there is automation). |
+| `Opt+H` / `Opt+L`, `Opt+J` / `Opt+K` | The previous / next track, the previous / next lib sound - everywhere, DSP too. |
+| `?` | The keys of the focused module. `F1` - the whole manual. |
 
 To drive the tracker from other programs or LLMs, or to write your own DSP
 modules, see [API.md](API.md).
