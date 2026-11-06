@@ -31416,6 +31416,12 @@ local function frame()
     local m = ctx.mods()
     if state.pane_mode then ctx.pane_key(c); c = 0
     elseif c == 23 and m.ctrl and not m.cmd then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc'; c = 0
+    elseif m.cmd and m.alt and not m.ctrl and ({ [8] = 1, [10] = 1, [11] = 1, [12] = 1, [1818584692] = 1, [1685026670] = 1, [30064] = 1, [1919379572] = 1, [104] = 1, [106] = 1, [107] = 1, [108] = 1, [729] = 1, [8710] = 1, [730] = 1, [172] = 1 })[c] then
+      -- 6 ноя: Cmd+Opt+hjkl — размер панели в фокусе: её край едет в сторону клавиши (˙ ∆ ˚ ¬ — Opt+hjkl на маке)
+      local ch = ({ [8] = 'h', [10] = 'j', [11] = 'k', [12] = 'l', [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l', [104] = 'h', [106] = 'j', [107] = 'k', [108] = 'l', [729] = 'h', [8710] = 'j', [730] = 'k', [172] = 'l' })[c]
+      local id = ctx.pane_cur()
+      ctx.pane_do(function() return draw.panes.nudge(state.panes, id, ({ h = 'l', j = 'd', k = 'u', l = 'r' })[ch], m.shift and 0.01 or 0.03) end, 'pane ' .. id .. ' size')
+      c = 0
     elseif (m.cmd or ctx.cmd_letter(c, m)) and not m.ctrl and not m.alt then   -- 1 ноя: в INSERT Cmd не доходит до mouse_cap — по коду / клавише
       local DIR = { h = 'l', j = 'd', k = 'u', l = 'r' }
       -- Cmd+h j k l приходят кодами 8 10 11 12 (как Ctrl+H …), а не буквами (журнал 9 окт)

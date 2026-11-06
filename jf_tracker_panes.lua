@@ -688,6 +688,27 @@ function PN.resize(model, id, ax, delta)
     cur = p
   end
 end
+-- 6 ноя: Cmd+Opt+hjkl — граница панели едет в сторону dir (как resize-pane в tmux): есть сосед там — панель растёт,
+-- нет — сжимается с другой стороны
+function PN.nudge(model, id, dir, step)
+  local ax, sg = AX[dir], SG[dir]
+  local lf = PN.find(model, id)
+  if not (lf and ax) then return false end
+  local cur = lf
+  while true do
+    local p, i = parent_of(model, cur)
+    if not p then return false end
+    if p.ax == ax and #p.kids > 1 then
+      local j, d = i + sg, step or 0.03
+      if not p.kids[j] then j = i - sg; d = -d end      -- соседа в ту сторону нет — край с другой стороны, панель меньше
+      if not p.kids[j] then return false end
+      d = math.max(-(p.fr[i] - 0.05), math.min(p.fr[j] - 0.05, d))
+      p.fr[i], p.fr[j] = p.fr[i] + d, p.fr[j] - d
+      return bump(model)
+    end
+    cur = p
+  end
+end
 -- ручка мышью: граница i узла grip.node сдвигается на dpx (lay — для размера узла)
 function PN.drag_grip(model, lay, grip, dpx)
   local r = lay.nodes[grip.node]
