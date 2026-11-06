@@ -8781,7 +8781,7 @@ function D.frame(L, snap, rows, state, info)
   D.meterstyle = state.meterstyle   -- 20 окт: сложенный мастер рисует метр тем же стилем
   D.PIANO_SMALL = state.pianosmall or false
   U.KNOB = (state.knob == nil or state.knob == 'auto') and (state.pixel ~= false and 'pixel' or 'diamond') or state.knob   -- 6 ноя: ползунок слайдера
-  D.KB_HIDE = state.kbhide ~= false   -- 6 ноя: клавиатура транспорта прячется, пока keys mode выключен
+  D.KB_HIDE = state.kbhide2 == true   -- 6 ноя: клавиатура транспорта прячется, пока keys mode выключен
   D.mini_fxn, D.mini_fxn_next = D.mini_fxn_next, nil
   D.mini_nameh, D.mini_nameh_next = D.mini_nameh_next, nil   -- 4 ноя: высота вертикальных имён узких полос — одна на всех   -- 4 ноя: узкие полосы — строк эффектов у всех поровну (наибольшее с прошлого кадра)
   D.mix_under, D.mix_under_next = D.mix_under_next, nil   -- микшер: был узкий трек → у всех фейдер ниже на 3 строки
