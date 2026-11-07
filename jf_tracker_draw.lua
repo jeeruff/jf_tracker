@@ -321,8 +321,15 @@ local function measure_raw(str)
     mcache[str] = w
     return w
   end
+  -- 7 ноя: и ASCII — из кэша (тот же, что у гибрида; сброс при смене шрифта — D.reset_measure)
+  local w = mcache[str]
+  if w then return w end
   if D.ttf then gfx.setfont(D.font_id) end   -- 4 ноя: TTF — мерить основным шрифтом (не тем, что оставил чужой setfont)
-  return gfx.measurestr(str)
+  w = gfx.measurestr(str)
+  mcount = mcount + 1
+  if mcount > 4000 then mcache, mcount = {}, 0 end
+  mcache[str] = w
+  return w
 end
 D.reset_measure = function() mcache, mcount = {}, 0 end
 ms = function(str) return measure_raw(str) * D.SCALE end
@@ -1241,9 +1248,11 @@ local function text(x, y, s, col, bg)
   -- отрисовка модуля; всё, что правее x1, обрезается (fit), левее x0 — нет
   local cl = D.clip
   if cl then
-    if x >= cl[2] or x + ms(s) <= cl[1] then return end
+    if x >= cl[2] then return end
     if cl[3] and (y < cl[3] - 2 or y >= cl[4]) then return end   -- 9 окт, панели: и по высоте листа
-    if x + ms(s) > cl[2] then s = D.fit(s, cl[2] - x); if s == '' then return end end
+    local sw = ms(s)   -- 7 ноя: ширина — один раз (было до трёх measurestr на вызов)
+    if x + sw <= cl[1] then return end
+    if x + sw > cl[2] then s = D.fit(s, cl[2] - x); if s == '' then return end end
   end
   if bg then col, bg = mono(col), mono(bg) else col = mono_text(col) end   -- с подложкой (курсор) — без порога
   y = y + D.SPACE
@@ -10414,6 +10423,8 @@ function D.frame(L, snap, rows, state, info)
   -- плейхеда ложатся поверх)
   for _, c in ipairs(L.cols) do
     if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
+    -- треки с включённой записью (5 окт): чуть покрасневший фон колонки; 7 ноя — одним прямоугольником, не по строкам
+    if c.x and c.col and c.col.armed then gfx.set(U.RED[1], U.RED[2], U.RED[3], 0.07); gfx.rect(c.x, L.body_y, c.w, L.body_h, 1); gfx.a = 1 end
   end
   -- полосы строки курсора и плейхеда — до рамок items (5 окт): item и
   -- automation item лежат поверх, сверху — только зелёная линия курсора
@@ -10739,10 +10750,6 @@ function D.frame(L, snap, rows, state, info)
     if mkline[r.row] then set(mkline[r.row], 0.75); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.a = 1 end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
-    -- треки с включённой записью (5 окт): чуть покрасневший фон колонки
-    for _, cc in ipairs(L.cols) do
-      if cc.x and cc.col and cc.col.armed then gfx.set(U.RED[1], U.RED[2], U.RED[3], 0.07); gfx.rect(cc.x, y, cc.w, L.rh, 1); gfx.a = 1 end
-    end
     -- до ячеек этой строки: нижний пиксель — уходящему, верхний+1 — следующему
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     -- 31 окт: граница паттерна — явная (Backspace / Insert живут внутри паттерна): 2 px цветом паттерна,

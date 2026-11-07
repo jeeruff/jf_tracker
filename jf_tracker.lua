@@ -24937,7 +24937,7 @@ local function frame()
     airwin_info = ctx.airwin_info,
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
-    smart_ok = reaper.file_exists(ctx.smart_input_path),
+    smart_ok = (function() local now = reaper.time_precise(); if not ctx.smart_ok_t or now - ctx.smart_ok_t > 1 then ctx.smart_ok_t, ctx.smart_ok_v = now, reaper.file_exists(ctx.smart_input_path) end; return ctx.smart_ok_v end)(),   -- 7 ноя: файл — раз в секунду
     dsptrack = state.dsptrack, presets = ctx.presets,
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim, hints = state.hints,   -- 24 окт: описания (гнездо пустого контейнера) — только с хинтами
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
@@ -24974,7 +24974,7 @@ local function frame()
       local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')
       return b, reaper.format_timestr_pos(t, '', 0)
     end or nil,
-    punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+    punch = ctx.punch_on(),
     timesel = (function()
       local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
       if b - a < 1e-6 then return nil end
@@ -25193,7 +25193,7 @@ local function frame()
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
-      punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+      punch = ctx.punch_on(),
       preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       ripple = ctx.ripple_mode(),   -- 16 окт: ripple editing REAPER (0 off, 1 per track, 2 all tracks)
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
@@ -33708,6 +33708,15 @@ ctx.track_view_set = function(col, v)
   ctx.tview_c[col.guid] = nil
   model.invalidate(); ctx.relayout()
   vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zt n - notes)' or (v == 'spec' and 'spectral peaks (zt n - notes)' or 'notes'))
+end
+-- 7 ноя: авто-панч — команда ищется один раз, состояние — раз в 0.25 с (было дважды за кадр, с поиском по списку действий)
+ctx.punch_on = function()
+  local now = reaper.time_precise()
+  local P = ctx.punch_c or {}; ctx.punch_c = P
+  if P.t and now - P.t < 0.25 then return P.v end
+  if P.cmd == nil then P.cmd = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch') or false end
+  P.t, P.v = now, P.cmd and reaper.GetToggleCommandState(P.cmd) == 1 or false
+  return P.v
 end
 ctx.track_view_menu = function()
   local col = cur_col()
