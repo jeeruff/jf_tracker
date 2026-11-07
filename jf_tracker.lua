@@ -15932,6 +15932,7 @@ edit.after = function(desc)
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   if hard then pooled.trim(regions, edit.changed_items()) end
 end
+ctx.edit_after_main = edit.after   -- 7 ноя: хук правок; sig / region length снимают его на время своей правки — ошибка в ней не возвращала (кадр вернёт)
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
 draw.macro = dofile(DIR .. '/jf_tracker_macro.lua')   -- макро-вид (3 окт); полем draw: предел локальных
 draw.key_label = keys.label                              -- подписи клавиш в раскладке (5 окт)
@@ -20962,6 +20963,7 @@ function ctx.fxgui_close_all()
 end
 -- 5 ноя: клавиатура — трекеру: окно на передний план и фокус (на macOS SetFocus без SetForeground оставлял её у плагина)
 function ctx.fxgui_refocus()
+  if not reaper.JS_Window_Find then return end   -- 7 ноя: без js_ReaScriptAPI — молча (было: ошибка кадра)
   if ctx.hwnd_self == nil then ctx.hwnd_self = reaper.JS_Window_Find('jf_tracker', true) or false end
   if not ctx.hwnd_self then return end
   if reaper.JS_Window_SetForeground then reaper.JS_Window_SetForeground(ctx.hwnd_self) end
@@ -24094,6 +24096,7 @@ end
 
 local function frame()
   ctx.pix_begin()   -- 6 ноя: пиксельный режим — кадр в половинный буфер
+  if edit.after == nil and ctx.edit_after_main then edit.after = ctx.edit_after_main end   -- 7 ноя: см. ctx.edit_after_main
   if ctx.ut_poll then pcall(ctx.ut_poll) end
   -- 16 окт: опция zoom on top — вкладка item ниже трекера: прицел (зум края) над полной волной
   do
@@ -33781,6 +33784,7 @@ frame = (function(inner)
     err_streak = err_streak + 1
     local msg = tostring(e)
     if msg ~= err_last then reaper.SetExtState(EXT, 'err', msg, false); err_last = msg; pcall(ctx.dlog, 'ERROR ' .. msg) end
+    pcall(edit.item_drag_end)   -- 7 ноя: упавший кадр посреди протяжки не оставляет блок undo открытым (без протяжки — ничего)
     -- 19 окт: кадр падает каждый раз — недоделанные кэши кадра копятся быстрее сборщика (750 МБ): собрать раз в секунду
     if reaper.time_precise() - (ctx.err_gc or 0) > 1 then ctx.err_gc = reaper.time_precise(); collectgarbage('collect') end
     vim.msg = 'error (tracker keeps running): ' .. (msg:match('^[^\n]*') or msg)
@@ -39039,7 +39043,7 @@ ctx.mx_more = function()
 end
 -- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
 -- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
-JF_TRACKER_SAVE_WIN = function() save_win(); pcall(ctx.fxgui_close_all) end   -- 5 ноя: при выходе — и окна плагинов закрыть
+JF_TRACKER_SAVE_WIN = function() pcall(edit.item_drag_end); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
 if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end

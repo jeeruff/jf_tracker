@@ -142,11 +142,11 @@ function G.wav_reader(path)
     else f:seek('cur', sz + (sz % 2)) end
   end
   if not (data_at and fmt and ch and sr and bits) then f:close(); return nil end
+  local code = (fmt == 3 and bits == 32) and '<f' or (bits == 16 and '<i2' or (bits == 24 and '<i3' or (bits == 32 and '<i4' or nil)))
+  if not code or ch < 1 then f:close(); return nil end   -- 7 ноя: формат — до деления (4-бит ADPCM давал n//0)
   local bps = bits // 8
   local block = bps * ch
   local nframes = data_len // block
-  local code = (fmt == 3 and bits == 32) and '<f' or (bits == 16 and '<i2' or (bits == 24 and '<i3' or (bits == 32 and '<i4' or nil)))
-  if not code then f:close(); return nil end
   local scale = fmt == 3 and 1 or (2 ^ (bits - 1))
   return function(t, n)
     local first = math.floor(t * sr)

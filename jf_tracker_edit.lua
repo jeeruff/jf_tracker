@@ -645,7 +645,8 @@ function E.transpose(heads, lpb, semis, map, label)
         semis = p0 and (map(p0, h) - p0) or 0   -- 26 окт: и сама нота (к аккорду её строки)
       end
       if semis == 0 then goto next_head end
-      local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
+      local slk   -- 7 ноя: `a and f()` отдаёт одно значение — slk всегда был nil, ветка слайса не работала
+      if h.kind == 'audio' then local _r; _r, slk = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false) end
       if h.kind == 'audio' and h.take and tonumber(slk) then
         -- 15 окт: слайс — его высота (как E.set_pitch): D_PITCH от базы инструмента; раньше шло через rate
         -- (resample), а слайс держит свою длину — высота не менялась
@@ -769,7 +770,8 @@ function E.set_pitch(heads, lpb, pitch)
   if #heads == 0 then return end
   run('pitch', function()
     for _, h in ipairs(heads) do
-      local _, slk = h.kind == 'audio' and R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false)
+      local slk   -- 7 ноя: `a and f()` отдаёт одно значение — slk всегда был nil, ветка слайса не работала
+      if h.kind == 'audio' then local _r; _r, slk = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false) end
       if h.kind == 'audio' and h.take and h.mroot then
         -- 27 окт: у сэмпла маркер высоты (:pitch) — звучит набранной нотой: транспоз = нота − определённая
         audio_set_semis(h, pitch - h.mroot)
@@ -5256,10 +5258,12 @@ function E.item_drag_begin(desc)
 end
 function E.item_drag_end()
   if not drag_open then return end
-  R.Undo_EndBlock2(0, 'jf_tracker: ' .. tostring(drag_open), -1)
-  drag_open = false
+  -- 7 ноя: хук (синхронизация связанных паттернов, обрезка) — ВНУТРИ блока жеста: был после EndBlock, Ctrl+Z
+  -- отменял протяжку, а копии в связанных регионах оставались
   if model then model.invalidate() end
   if E.after and not E.in_after then E.in_after = true; pcall(E.after, 'item drag'); E.in_after = false end
+  R.Undo_EndBlock2(0, 'jf_tracker: ' .. tostring(drag_open), -1)
+  drag_open = false
 end
 -- edge: 'end' — конец в t; 'start' — начало в t (offset источника едет
 -- следом, как trim в REAPER); 'move' — сдвиг начала в t с той же длиной
