@@ -4022,7 +4022,7 @@ function V.key_impl(c)
     -- счётчик Esc сначала только сбрасывает (как в Vim)
     -- 10 окт: опция Esc mode = vim — Esc только NORMAL (сбрасывает счётчик и сообщение)
     if V.count then V.count = nil; finish_move() elseif ctx.esc_vim and ctx.esc_vim() then V.msg = ''; finish_move() else V.mode = 'insert'; V.msg = '' end
-  elseif ch == '+' or ch == '=' then ctx.set_lpb(nil, 1)
+  elseif ch == '+' then ctx.set_lpb(nil, 1)   -- 7 ноя: = — beatsync (ветка выше), здесь до него не доходило
   elseif ch == '-' then ctx.set_lpb(nil, -1)
   end
   V.count = nil

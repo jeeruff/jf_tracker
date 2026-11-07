@@ -209,10 +209,10 @@ Options → <code>panes</code> off brings the old fixed layout back.</p>
 <kbd>u</kbd> undo · <kbd>⌘⇧Z</kbd> redo · <kbd>.</kbd> repeat · <kbd>q</kbd> <kbd>@</kbd> macros</div>
 <div><b>view and the rest</b>
 <kbd>f</kbd> jump labels · <kbd>/</kbd> commands at the cursor (fzf) · <kbd>n</kbd> <kbd>N</kbd> <kbd>*</kbd> search<br>
-<kbd>zt</kbd> row to the top · <kbd>zT</kbd> zoom the track (all its events, the others folded) · <kbd>th</kbd> <kbd>tH</kbd> <kbd>tU</kbd> hide the track / show hidden / unhide<br>
+<kbd>zt</kbd> track view: big wave / spectrum / notes · <kbd>zO</kbd> overview (a row = N bars) · <kbd>zT</kbd> zoom the track (all its events, the others folded) · <kbd>th</kbd> <kbd>tH</kbd> <kbd>tU</kbd> hide the track / show hidden / unhide<br>
 <kbd>za</kbd> <kbd>zF</kbd> fold the track / all · <kbd>zE</kbd> hide empty columns · <kbd>zW</kbd> zoom on the item · <kbd>zM</kbd> master · <kbd>zr</kbd> <kbd>zR</kbd> router<br>
 <kbd>+</kbd> <kbd>-</kbd> LPB · <kbd>F</kbd> find a sample for this place · <kbd>m</kbd> keyboard on / off<br>
-<kbd>a</kbd> all automation of the track on / off · <kbd>A</kbd> any parameter (fzf)<br>
+<kbd>aa</kbd> all automation of the track · <kbd>ap</kbd> any parameter (fzf) · <kbd>al</kbd> the last touched<br>
 the <code>view</code> button (top left) — rulers, the tracker, the screen for the mouse · <kbd>`</kbd> pedal · <kbd>\</kbd> menu · <kbd>?</kbd> actions · <kbd>\</kbd> <kbd>?</kbd> help · <kbd>\</kbd> <kbd>h</kbd> hints</div>
 </div>
 <p>With the keyboard on (<kbd>m</kbd>) the digits and the F row play notes, <kbd>[</kbd> <kbd>]</kbd> change the octave; the letters stay Vim (<a href="#keyboard">keyboard</a>). In the master columns <code>cmd</code> and <code>visor</code> <kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd> go from marker to marker, <kbd>dd</kbd> <kbd>yy</kbd> <kbd>p</kbd> cut, copy and put one.
@@ -956,7 +956,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>F4</kbd></td><td>the top pane: its tabs in a circle (in the lib with lib tabs - the lib tabs)</td></tr>
 <tr><td><kbd>F5</kbd> <kbd>F6</kbd></td><td>scopes / master; the same key again - back to the tracker</td></tr>
 <tr><td><kbd>help</kbd></td><td>this panel: the help button of the main module - the whole help</td></tr>
-<tr><td><kbd>Cmd+</kbd> <kbd>Cmd-</kbd></td><td>bitmap scale x1 / x2 / x3; a vector font also has x1.5</td></tr>
+<tr><td><kbd>Cmd+</kbd> <kbd>Cmd-</kbd></td><td>font scale x1 / x2 / x3</td></tr>
 </table>
 <h3 id="keys-insert">tracker INSERT (keyboard)</h3>
 <table>

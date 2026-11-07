@@ -1252,7 +1252,7 @@ ctx = {
     items[#items + 1] = { key = 'p', label = 'pt-mode (ProTracker: 4 channels, 31 samples, 64 rows, x2)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
     if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
-    items[#items + 1] = { key = 'm', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }
+    items[#items + 1] = { key = 'o', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }   -- 7 ноя: m — у pm cards
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
     for i, k in ipairs({ 'z', 'x', 'c' }) do
@@ -19597,7 +19597,7 @@ function region_actions(rg)
     { 'duplicate linked (same patterns)', key = 'l', g = 'section', fn = function() ctx.sec_cmd('repeat') end },
     { 'launch (quantized)', key = 'q', g = 'section', fn = function() ctx.sec_cmd('launch') end },
     { 'show in the tracker', key = 's', g = 'section', fn = function() ctx.sec_cmd('show') end },
-    { 'loop it', key = 'o', g = 'section', fn = function() ctx.sec_cmd('loop') end },
+    { 'loop it', key = 'L', g = 'section', fn = function() ctx.sec_cmd('loop') end },   -- 7 ноя: o — у «new: from selected slots»
     { 'name', key = 'n', g = 'section', fn = function() ctx.sec_cmd('name') end },
     { 'remove the section (patterns stay)', key = 'x', g = 'section', fn = function() ctx.sec_cmd('del') end },
     { 'remove the section and its patterns', key = 'X', g = 'section', fn = function() ctx.sec_cmd('delall') end },
@@ -32544,7 +32544,7 @@ local function frame()
           if f0 then context_menu({ dsp = { fx = dsp_sel.fx, f = f0 } }) else vim.msg = 'Z: no fx here' end
           return
         end
-        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: v - pads / list of a rack or container, b - into bands, z - dsp + mixer on the whole window, Tab - swap them, x - dsp across the width, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets of the module, P - pages: one page + tabs / all sections in one pane, s - pad size (s m l), m - minimize the pane'; return end
+        if ch == 'z' and not DK.pending then state.dsp_z = true; vim.msg = 'z: z - dsp + mixer on the whole window, Tab - swap them, w - dsp across the width, x - taller, r - router in DSP FX, R - big router, l - list of modules, f - fold the module, F - fold / unfold all, p - presets, P - pages, m - mixer, _ - minimize the pane'; return end
         local col = dsp_target(); local fxs = col and col.fx or {}
         local f = fxs[dsp_sel.fx]
         if ctx.pinmx and ctx.pins_key(c, ch) then return end   -- 24 окт: матрица пинов открыта — её клавиши

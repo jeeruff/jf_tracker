@@ -35,7 +35,7 @@ local LEFT, RIGHT, UP, DOWN = 1818584692, 1919379572, 30064, 1685026670
 function DK.init(c) ctx = c end
 
 local HINT = {
-  d = 'd: d delete fx (v: range) | w delete forward (d3w - three) | b delete the one before | m remove modulation of the parameter | a remove its automation | c unpack container | Esc',
+  d = 'd: d delete fx (v: range) | w delete forward (d3w - three) | b delete the one before | m remove modulation of the parameter | a remove its automation | Esc',
   y = 'y: y copy fx, then p after / P before | Esc',
   c = 'c: c pack fx (v: range) into a new container | u unpack | n empty container | v rack view: pads / list | b into 3 / 4 / 5 bands | f fold the container | = parallel to the previous | | serial | s pad size | Esc',
   a = 'a: a automate parameter (envelope) | d delete its automation | i automation item over the item under the cursor | m map to the container (native macro) | p pick parameter | Esc',
