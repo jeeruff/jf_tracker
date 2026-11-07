@@ -22181,6 +22181,11 @@ ctx.unh_snap = function()
         local it = reaper.GetTrackMediaItem(tr, k)
         local tk = reaper.GetActiveTake(it)
         s.items[it] = tk and reaper.TakeIsMIDI(tk) and select(2, reaper.MIDI_GetHash(tk, false, '')) or ''
+        if tk and reaper.TakeIsMIDI(tk) then   -- 7 ноя: ноты до записи (overdub) — их не трогать
+          local old, _, nn = {}, reaper.MIDI_CountEvts(tk)
+          for j = 0, nn - 1 do local _, _, _, a0, _, ch, pi = reaper.MIDI_GetNote(tk, j); old[a0 .. ':' .. ch .. ':' .. pi] = true end
+          s.old = s.old or {}; s.old[it] = old
+        end
       end
     end
   end
@@ -22200,7 +22205,8 @@ ctx.unh_apply = function(s)
             for j = 0, nn - 1 do
               local _, sel, mu, a0, a1, ch, pi, ve = reaper.MIDI_GetNote(tk, j)
               local t = reaper.MIDI_GetProjTimeFromPPQPos(tk, a0)
-              if t >= math.min(s.t0, t1) - 0.05 and t <= math.max(s.t0, t1) + 0.05 then
+              local was = s.old and s.old[it] and s.old[it][a0 .. ':' .. ch .. ':' .. pi]
+              if not was and t >= math.min(s.t0, t1) - 0.05 and t <= math.max(s.t0, t1) + 0.05 then
                 local r = math.floor(model.row_of_time(t, lpb) + 0.5)
                 local b0 = reaper.MIDI_GetPPQPosFromProjTime(tk, edit.row_time(r, lpb, 0))
                 reaper.MIDI_SetNote(tk, j, sel, mu, b0, math.max(b0 + 1, a1 + b0 - a0), ch, pi, vel, true)
@@ -22540,23 +22546,25 @@ local function settle_puts(now)
       end
     end
     if found then
-      reaper.SetMediaItemInfo_Value(found, 'D_POSITION', p.pos)
-      local tk = reaper.GetActiveTake(found)
-      if tk then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', 1) end
-      -- ретро-луп: кусок N тактов повторяется до заданной длины
-      if p.loop then
-        reaper.SetMediaItemInfo_Value(found, 'B_LOOPSRC', 1)
-        reaper.SetMediaItemInfo_Value(found, 'D_LENGTH', p.loop)
-      end
-      -- 8 окт: в библиотеку — jf_rec печатает на свой трек за концом проекта,
-      -- отсюда item переезжает в свой лейн трека LIB (владелец — этот трек)
-      if p.lib then
-        edit.run('retro to lib', function()
+      local function place()   -- 7 ноя: блоком undo (откат убирает и печать); lib — через edit.run, как было
+        reaper.SetMediaItemInfo_Value(found, 'D_POSITION', p.pos)
+        local tk = reaper.GetActiveTake(found)
+        if tk then reaper.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', 0); reaper.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', 1) end
+        -- ретро-луп: кусок N тактов повторяется до заданной длины
+        if p.loop then
+          reaper.SetMediaItemInfo_Value(found, 'B_LOOPSRC', 1)
+          reaper.SetMediaItemInfo_Value(found, 'D_LENGTH', p.loop)
+        end
+        -- 8 окт: в библиотеку — jf_rec печатает на свой трек за концом проекта,
+        -- отсюда item переезжает в свой лейн трека LIB (владелец — этот трек)
+        if p.lib then
           local ltr, lane = edit.lib_slot()
           reaper.MoveMediaItemToTrack(found, ltr)
           edit.lib_mark(found, p.track, lane)
-        end)
+        end
       end
+      if p.lib then edit.run('retro to lib', place)
+      else reaper.Undo_BeginBlock2(0); local okp = pcall(place); reaper.Undo_EndBlock2(0, 'retro put', 4); if not okp then vim.msg = 'retro put failed' end end
       reaper.UpdateArrange(); model.invalidate()
       if p.after then ctx.bb_retry = { it = found, t = now, fn = p.after } end   -- 1 ноя: bb — разбор после печати (пики строятся — повтор)
       table.remove(put_pending, k)
@@ -24514,15 +24522,7 @@ local function frame()
     ctx.note_ons = keep
   end
   if ctx.arm_tmp and reaper.time_precise() > (ctx.arm_tmp.t or 0) then ctx.arm_restore() end
-  if ctx.vkb_iso and reaper.time_precise() > (ctx.vkb_iso.t or 0) then   -- 23 окт: арм соседей — обратно после прослушки
-    for _, e in ipairs(ctx.vkb_iso.list) do
-      if reaper.ValidatePtr(e.tr, 'MediaTrack*') then
-        reaper.SetMediaTrackInfo_Value(e.tr, 'I_RECARM', 1)
-        if e.aa == 1 then reaper.SetMediaTrackInfo_Value(e.tr, 'B_AUTO_RECARM', 1) end
-      end
-    end
-    ctx.vkb_iso = nil
-  end
+  if ctx.vkb_iso and reaper.time_precise() > (ctx.vkb_iso.t or 0) then ctx.vkb_restore() end   -- 23 окт: арм соседей — обратно после прослушки
   if ctx.note_offs and #ctx.note_offs > 0 then
     local now, keep = reaper.time_precise(), {}
     for _, o in ipairs(ctx.note_offs) do
@@ -36155,6 +36155,7 @@ ctx.autoname_tick = function()
     n = (n or ''):gsub('^[%w ]-i?: ', ''):gsub('%s*%b()%s*$', '')
     return n
   end
+  local ren = {}
   for i = 0, reaper.CountTracks(0) - 1 do
     local tr = reaper.GetTrack(0, i)
     local want
@@ -36178,13 +36179,17 @@ ctx.autoname_tick = function()
     if want and want ~= '' then
       local _, cur = reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
       local _, auto = reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_autoname', '', false)
-      if cur ~= want and (cur == '' or cur == auto) then
-        reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', want, true)
-        reaper.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_autoname', want, true)
-        model.invalidate()
-      end
+      if cur ~= want and (cur == '' or cur == auto) then ren[#ren + 1] = { tr, want } end
     end
   end
+  if #ren == 0 then return end
+  reaper.Undo_BeginBlock2(0)   -- 7 ноя: переименования — одной правкой undo
+  for _, r in ipairs(ren) do
+    reaper.GetSetMediaTrackInfo_String(r[1], 'P_NAME', r[2], true)
+    reaper.GetSetMediaTrackInfo_String(r[1], 'P_EXT:jf_autoname', r[2], true)
+  end
+  reaper.Undo_EndBlock2(0, 'track autoname', 1)
+  model.invalidate()
 end
 ctx.autozoom_tick = function()
   if not state.autozoom or not L then return end
@@ -38332,6 +38337,16 @@ ctx.layer_align = function(root, list, lk, save)
   save(('L%d aligned: offset %.2f ms (match %.2f)'):format(lk, l.offs, cval or 0))
 end
 -- 19 окт: пэды с клавиатуры (режим пэдов DSP, jf_tracker_dspkeys.lua): курсор — пэд (draw.kit_sel) или пустая нота (draw.kit_note)
+ctx.vkb_restore = function()
+  local iso = ctx.vkb_iso
+  ctx.vkb_iso = nil
+  for _, e in ipairs(iso and iso.list or {}) do
+    if reaper.ValidatePtr(e.tr, 'MediaTrack*') then
+      reaper.SetMediaTrackInfo_Value(e.tr, 'I_RECARM', 1)
+      if e.aa == 1 then reaper.SetMediaTrackInfo_Value(e.tr, 'B_AUTO_RECARM', 1) end
+    end
+  end
+end
 -- 19 окт: вернуть трек после временного арма прослушки (вход, мониторинг, арм выкл)
 ctx.arm_restore = function()
   local ar = ctx.arm_tmp
@@ -39043,7 +39058,7 @@ ctx.mx_more = function()
 end
 -- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
 -- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
-JF_TRACKER_SAVE_WIN = function() pcall(edit.item_drag_end); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
+JF_TRACKER_SAVE_WIN = function() pcall(edit.item_drag_end); pcall(ctx.arm_restore); pcall(ctx.vkb_restore); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: арм / вход прослушки — вернуть при выходе   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
 if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
