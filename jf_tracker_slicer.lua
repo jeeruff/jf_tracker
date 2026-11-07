@@ -1115,7 +1115,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   local bt_w = 0
   if not e.file and e.item then
     for _, b in ipairs(S.BT) do
-      local kk = S.cross and S.BT_KEYS[b[1]]
+      local kk = S.BT_KEYS[b[1]]   -- 7 ноя: с клавишами всегда (ширина — по самому длинному виду): S.cross здесь ещё прошлого кадра, nbar налезал на clear
       bt_w = bt_w + ((kk and b.act) and (U.measure(kk) + L.pad) or 0) + U.measure(b[2]) + 2 * L.pad + 2
     end
     brow = 1
