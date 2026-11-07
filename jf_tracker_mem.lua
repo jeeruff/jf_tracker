@@ -7,14 +7,18 @@
 local MEM = {}
 
 -- roots — { { name, value } … } → { { name, bytes, tables, strings, big = самая большая строка } … } по убыванию
-function MEM.census(roots, limit)
+-- 7 ноя: r[3] = true — корень только данными (функции не обходить: их upvalues достают чужое); skip — таблицы,
+-- которые не обходить вовсе (ctx: на неё ссылаются модули, его поля — отдельными корнями)
+function MEM.census(roots, limit, skip)
   local seen = {}
+  for _, t in ipairs(skip or {}) do seen[t] = true end
   local out = {}
   limit = limit or 5e7                      -- предохранитель: не больше стольких объектов
   local count = 0
   for _, r in ipairs(roots) do
     local acc = { name = r[1], bytes = 0, tables = 0, strings = 0, big = 0 }
     local stack = { r[2] }
+    local nofn = r[3]
     while #stack > 0 and count < limit do
       local v = table.remove(stack)
       local tv = type(v)
@@ -38,13 +42,14 @@ function MEM.census(roots, limit)
           if type(mt) == 'table' then stack[#stack + 1] = mt end
         end
       elseif tv == 'function' then
-        if not seen[v] then
+        if not seen[v] and not nofn then
           seen[v] = true; count = count + 1
           acc.bytes = acc.bytes + 40
           local i = 1
           while true do
             local n, x = debug.getupvalue(v, i)
             if not n then break end
+            if n == '_ENV' then x = nil end   -- 7 ноя: глобалы — у своих корней _G.*, иначе первая функция модуля забирала весь _G
             if type(x) == 'table' or type(x) == 'string' or type(x) == 'function' then stack[#stack + 1] = x end
             i = i + 1
           end

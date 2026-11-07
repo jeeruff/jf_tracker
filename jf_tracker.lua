@@ -32800,23 +32800,27 @@ ctx.mem = function()
   -- 6 ноя: ctx по полям — общий корень ctx в 86 МБ ничего не говорит. Сначала таблицы (по имени — порядок
   -- устойчив), функции ctx — в конце: их upvalues достают всё подряд (первая функция забирала 146 МБ)
   local roots = { { 'state', state } }
-  local keys = {}
-  for k, v in pairs(ctx) do if type(v) == 'table' then keys[#keys + 1] = tostring(k) end end
-  table.sort(keys)
-  for _, k in ipairs(keys) do roots[#roots + 1] = { 'ctx.' .. k, ctx[k] } end
+  -- 7 ноя: сначала локалы кадра (snap, L, model …) — данными, без функций: иначе первая функция модуля в ctx
+  -- через upvalues забирала их все (ctx.ACV 36 МБ)
   local i = 1
   while true do
     local n, v = debug.getupvalue(ctx.frame_inner, i)
     if not n then break end
-    if n ~= 'ctx' and n ~= 'state' then roots[#roots + 1] = { n, v } end
+    if n ~= 'ctx' and n ~= 'state' and n ~= '_ENV' and type(v) == 'table' then roots[#roots + 1] = { n, v } end
     i = i + 1
   end
-  roots[#roots + 1] = { 'ctx (rest)', ctx }
+  local keys = {}
+  for k, v in pairs(ctx) do if type(v) == 'table' then keys[#keys + 1] = tostring(k) end end
+  table.sort(keys)
+  for _, k in ipairs(keys) do roots[#roots + 1] = { 'ctx.' .. k, ctx[k], true } end
+  local rest = {}
+  for _, v in pairs(ctx) do rest[#rest + 1] = v end
+  roots[#roots + 1] = { 'ctx (rest)', rest }
   -- 28 окт: и глобалы / реестр — 1.2 ГБ живого жило вне ctx
   for k, v in pairs(_G) do if type(v) == 'table' or type(v) == 'function' then roots[#roots + 1] = { '_G.' .. tostring(k), v } end end
   roots[#roots + 1] = { 'registry', debug.getregistry() }
   local t0 = reaper.time_precise()
-  local list, nobj = MEM.census(roots)
+  local list, nobj = MEM.census(roots, nil, { ctx })
   local rep = ('heap %s -> %s after collect, %d objects (%.0f ms): '):format(MEM.fmt(before * 1024), MEM.fmt(after * 1024), nobj, (reaper.time_precise() - t0) * 1000) .. MEM.report(list, 10)
   reaper.SetExtState(EXT, 'mem', rep, false)
   if ctx.dlog then pcall(ctx.dlog, 'mem: ' .. rep) end
