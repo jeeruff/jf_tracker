@@ -430,7 +430,8 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
     -- 6 ноя: свёрнутая колонка слотов — подпись вертикально, выше строки заголовков: угол ниже на её высоту
     local up = 0
     if not MX.st_on then for id in pairs(MX.cfold_get()) do up = math.max(up, U.measure(id) + 2 - L.rh + 2) end end
-    MX.corner_need = need + 4 + up
+    -- 8 ноя: и строка заголовков колонок слотов (name bpm sig len) под кнопками — была на них наложена
+    MX.corner_need = need + 4 + up + ((not MX.fold and not MX.st_on) and (L.rh + 1) or 0)
   end
   -- 11 окт: заголовок колонки visor
   if (MX.vis_w or 0) > 0 then
