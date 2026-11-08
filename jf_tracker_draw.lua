@@ -198,8 +198,8 @@ D.TTF_FACES = {
   proto = { face = '0xProto Nerd Font Mono', px = 14, d = '0xProto' },
   monaspace = { face = 'MonaspiceNe Nerd Font Mono', px = 14, d = 'Monaspace Neon' },
 }
--- 31 окт: убраны из списка inconsolata 3270 commit victor geist ubuntu mononoki hack (записи в TTF_FACES — сохранённый выбор работает)
-D.TTF_LIST = { 'bigblue', 'departure', 'gohu11', 'gohu14', 'terminess', 'proggy', 'profont', 'shure', 'monocraft',
+-- 31 окт: убраны из списка inconsolata 3270 commit victor geist ubuntu mononoki hack (записи в TTF_FACES — сохранённый выбор работает); 8 ноя: и gohu11
+D.TTF_LIST = { 'bigblue', 'departure', 'gohu14', 'terminess', 'proggy', 'profont', 'shure', 'monocraft',
   'iosevka', 'iosevkaslab', 'jetbrains', 'fira', 'plex', 'cascadia', 'space', 'proto', 'monaspace' }
 function D.set_font(state)
   local tf = D.TTF_FACES[state.ttf or 'off']
