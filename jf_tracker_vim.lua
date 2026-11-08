@@ -241,13 +241,14 @@ local function ensure_visible()
   if V.cur.row >= st.row0 + L.nrows then st.row0 = V.cur.row - L.nrows + 1 end
   local f = L.flat[V.cur.fi]
   if f then
-    if f.ci < st.hscroll then st.hscroll = f.ci
-    elseif f.x and f.x + f.w > L.win_w then
+    -- 8 ноя: поле за правым краем треков (под мастером) — x = nil, а не x > края: прокрутка не шла, курсор улетал
+    if f.ci and f.ci < st.hscroll then st.hscroll = f.ci
+    elseif f.ci and ((not f.x) or f.x + f.w > (L.cols_r or L.win_w)) and st.hscroll < f.ci then
       st.hscroll = math.min(f.ci, st.hscroll + 1)
       ctx.relayout()
-      local f2 = ctx.layout().flat[V.cur.fi]
-      while f2 and f2.x and f2.x + f2.w > L.win_w and st.hscroll < f2.ci do
-        st.hscroll = st.hscroll + 1; ctx.relayout(); f2 = ctx.layout().flat[V.cur.fi]
+      local L2 = ctx.layout(); local f2 = L2.flat[V.cur.fi]
+      while f2 and f2.ci and ((not f2.x) or f2.x + f2.w > (L2.cols_r or L2.win_w)) and st.hscroll < f2.ci do
+        st.hscroll = st.hscroll + 1; ctx.relayout(); L2 = ctx.layout(); f2 = L2.flat[V.cur.fi]
       end
     end
   end

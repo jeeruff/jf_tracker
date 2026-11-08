@@ -1167,7 +1167,7 @@ function D.layout(snap, state, nregions)
         end
       end
       for _, ev in ipairs(c.envs) do if ev.x >= lim then ev.x = lim; ev.w = 0 elseif ev.x + ev.w > lim then ev.w = lim - ev.x end end
-      for _, ln in ipairs(c.lanes) do if ln.x and ln.w and ln.x + ln.w > lim then ln.w = math.max(0, lim - ln.x) end end   -- 21 окт: кнопки −+ / a+ шапки — от обрезанной ширины
+      for _, ln in ipairs(c.lanes) do if ln.x and ln.w and ln.x >= lim then ln.x, ln.w = lim, 0 elseif ln.x and ln.w and ln.x + ln.w > lim then ln.w = math.max(0, lim - ln.x) end end   -- 21 окт: кнопки −+ / a+ шапки — от обрезанной ширины; 8 ноя: лейн целиком за краем — к краю (его разделитель рисовался посреди мастера)
       for k = #c.mls, 1, -1 do   -- 21 окт: PB лез на Tempo мастера — за краем лейна нет, у края обрезан
         local ml = c.mls[k]
         if ml.x >= lim - L.pad then table.remove(c.mls, k) elseif ml.x + ml.w > lim then ml.w = lim - ml.x end
