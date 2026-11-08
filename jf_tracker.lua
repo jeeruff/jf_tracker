@@ -8090,6 +8090,34 @@ ctx = {
     vim.msg = ('%s is now in the folder %s'):format(col.name or 'track', pn or '?')
     return true
   end,
+  -- 8 ноя: tF — подменю папки: f в папку трека слева, u распаковать (дети остаются на месте, папки нет)
+  folder_menu = function()
+    vim.open_hydra({ title = 'tF - folder', items = {
+      { key = 'f', label = 'into a folder: the track to the left becomes it', fn = function() ctx.track_into_left() end },
+      { key = 'u', label = 'unpack the folder (the cursor track or its parent): the tracks stay, the folder goes', fn = function() ctx.folder_unpack() end },
+    } })
+  end,
+  folder_unpack = function()
+    local col = cur_col(); if not (col and col.track) then return false end
+    local p = col.track
+    if reaper.GetMediaTrackInfo_Value(p, 'I_FOLDERDEPTH') ~= 1 then p = reaper.GetParentTrack(col.track) end
+    if not p then vim.msg = 'tFu: the track is not a folder and not in one'; return false end
+    local i0 = math.floor(reaper.GetMediaTrackInfo_Value(p, 'IP_TRACKNUMBER'))   -- первый ребёнок (0-based)
+    local lvl, last = 1, nil
+    for i = i0, reaper.CountTracks(0) - 1 do
+      local t = reaper.GetTrack(0, i)
+      lvl = lvl + reaper.GetMediaTrackInfo_Value(t, 'I_FOLDERDEPTH')
+      if lvl <= 0 then last = t; break end
+    end
+    edit.run('unpack folder', function()
+      reaper.SetMediaTrackInfo_Value(p, 'I_FOLDERDEPTH', 0)
+      if last then reaper.SetMediaTrackInfo_Value(last, 'I_FOLDERDEPTH', reaper.GetMediaTrackInfo_Value(last, 'I_FOLDERDEPTH') + 1) end
+    end)
+    model.invalidate()
+    local _, pn = reaper.GetTrackName(p)
+    vim.msg = ('folder %s unpacked'):format(pn or '?')
+    return true
+  end,
   track_move = function(d, n)
     local col = cur_col(); if not (col and col.track) then return false end
     local idx = math.floor(reaper.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')) - 1

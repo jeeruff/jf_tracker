@@ -3398,7 +3398,7 @@ function V.key_impl(c)
         elseif ch == 'f' and ctx.fx_picker then ctx.fx_picker()
         elseif ch == 'R' and ctx.route_menu and col then ctx.route_menu(col)
         elseif ch == 'T' and ctx.template_picker then ctx.template_picker()   -- 11 окт: tT — шаблоны треков (fzf)
-        elseif ch == 'F' and ctx.track_into_left then ctx.track_into_left()   -- 11 окт: tF — в папку трека слева
+        elseif ch == 'F' and ctx.folder_menu then ctx.folder_menu()   -- 8 ноя: tF — подменю папки (f в папку слева, u распаковать); 11 окт: было сразу в папку
         -- 30 окт: tg — склеить трек в паттерне в один айтем; t} — конец лупа на строке курсора; t+ t- — rate ×2 / ÷2
         elseif ch == 'g' and ctx.item_glue then ctx.item_glue(); V.count = nil; finish_edit(); return
         elseif ch == '}' and ctx.item_loop_end then ctx.item_loop_end(); V.count = nil; finish_edit(); return
