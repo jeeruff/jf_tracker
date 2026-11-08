@@ -1642,6 +1642,17 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     gfx.gradrect(px0, y0, ww, h0, c[1], c[2], c[3], al0, 0, 0, 0, (al1 - al0) / ww)
   end
   trail_rect(va, vb, x, w, wy, wh)
+  -- 8 ноя: прицел виден и на целой волне — его окно (±zwin вокруг края) полупрозрачной рамкой, центр — линией
+  if ZH > 0 and zt then
+    local W2 = S.zwin or 0.04
+    local a, b = math.max(va, zt - W2), math.min(vb, zt + W2)
+    if b > va and a < vb then
+      local xa, xb = tx(a), math.max(tx(a) + 1, tx(b))
+      gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.14); gfx.rect(xa, wy, xb - xa, wh, 1)
+      gfx.a = 0.6; gfx.rect(xa, wy, xb - xa, wh, 0); gfx.a = 1
+    end
+    if zt >= va and zt <= vb then U.set(U.AMBER); gfx.rect(tx(zt), wy, 1, wh, 1) end
+  end
   if ZH > 0 then
     local zy = zy_top or (wy + wh + 2)
     local W2 = S.zwin or 0.04

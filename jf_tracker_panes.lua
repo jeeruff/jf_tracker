@@ -1002,7 +1002,7 @@ PN.ABOUT = {
   pm = 'Project cards of jf_pm: your REAPER projects with status, tempo and date; open one or take tracks / regions from it.',
   dsp = 'The FX chain of the cursor track as blocks: meters in / out, gain compensation, delta solo per effect, presets, pictures for the stock plugins. Containers are racks between [ ], parallel branches have a colour line. h l block, j k parameter, + - value, dd delete, cc pack into a container, c= c| parallel / serial, zf fold.',
   retro = 'The retro sampler: what you played recently is kept; take the last seconds as a sample after the fact.',
-  sample = 'The item tab: the wave of the item under the cursor with slices, start / end, zoom and the edge aim; s slices it, the slice keys play.',
+  sample = 'The item tab (slicer): top to bottom - the aim (a close-up of the edge or the wave cursor, its window is the amber frame on the wave), the whole wave with slices and start / end, the strip of the whole sample. s cuts at the aim, the slice keys play them; h j k l work the properties panel on the right (j k row, h l value), the wave by the mouse, Tab / S-Tab and gw.',
   automation = 'Automation of the cursor track over time: envelopes as curves, points and automation items; draw, move and shape them.',
   modulation = 'Modulation of FX parameters: LFOs and links of the cursor track, shown with their curves.',
   midi = 'MIDI of the cursor track: CC, pitch bend and program changes as lanes.',
