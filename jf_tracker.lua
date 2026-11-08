@@ -35352,6 +35352,8 @@ ctx.master_menu = function()
     { key = 'C', label = ('monitor FX (%d) - only to the speakers'):format(nmfx) .. on(41884):gsub('%*', 'bypassed'), fn = function() ctx.mfx_open() end },
     { key = 'b', label = 'monitor FX bypass' .. on(41884), fn = act(41884, 'monitor FX bypass toggled') },
     { key = 'm', label = 'mono (L+R)' .. on(40917), fn = act(40917, 'master mono toggled') },
+    { key = 'p', label = 'pin: the master stays on the right (off - it is the last track)' .. (state.mpin ~= false and '  *' or ''), fn = function()   -- 8 ноя: = кнопка pin
+      state.mpin = state.mpin == false; relayout(); vim.msg = state.mpin and 'master pinned to the right' or 'master: the last track (scroll to the end to see it)' end },
     { key = 'r', label = 'routing and I/O of the master', fn = act(42235, 'master routing') },
     { key = 'u', label = (L and L.mfold) and 'unfold the master column (Opt+Shift+W)' or 'fold the master column into a meter', fn = function()   -- 1 ноя
       if L and L.mfold then state.mfold = false; if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end

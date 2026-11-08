@@ -283,7 +283,7 @@ KH.PAGES = {
     { k = 'm', d = 'KEYS on / off (the keyboard; the mode word shows KEYS): on - it has priority, 1 f1 2 f2 3 ... play notes (layout qwerty: q 2 w 3 e), [ ] octave (qwerty: z x), Esc / Enter - INSERT (writes them); off - plain Vim' },
     { k = 'z_', d = 'minimize the pane in focus to its tab row (any pane but the tracker; in the matrix - z then _; was zm); again, a click on its tab or focusing it - open' },
     { k = 'zm', d = 'the mixer on / off (= F3)' },
-    { k = 'zM', d = 'master properties: fx chain, monitor FX and its bypass, mono, routing, visible in REAPER, tempo envelope, 0 dB (also the i button in the master header)' },
+    { k = 'zM', d = 'master properties: p pin (always right / the last track), fx chain, monitor FX and its bypass, mono, routing, visible in REAPER, tempo envelope, 0 dB (also the i button in the master header)' },
     { k = 'zx', d = 'crossfade editor of REAPER: the note under the cursor and the notes of the track overlapping it' },
     { k = ':pitch', d = 'pitch of the sample under the cursor (audio note on the row, or the lib sample): a take marker per slice - the note (A3, +cents) or, for a chord, its name (Am); again - replaced. No processes (YIN / chroma)' },
     { k = 'zX', d = 'the mixer pane x1.5 taller than the canonical size (the size of the dsp), again - back' },
