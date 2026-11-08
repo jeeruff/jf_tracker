@@ -25800,10 +25800,10 @@ local function frame()
     end
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local MAXL = state.fxparams and 14 or 6
-    -- 8 ноя: не выше панели трекера — телу не меньше 4 строк (14 строк параметров выталкивали строки и транспорт
-    -- на вкладку item ниже)
-    local room = (L.trk_bot or gfx.h) - L.fxrow_y - 2 - (L.jr_h or 0) - (L.low_h or 0) - (L.status_in or 0) - 4 * L.rh
-    MAXL = math.max(1, math.min(MAXL, math.floor(room / L.rh)))
+    -- 8 ноя: не выше панели трекера (14 строк параметров выталкивали строки и транспорт на вкладку item ниже):
+    -- эффектам — не больше половины свободной высоты, телу — не меньше 4 строк; потянул панель — растут и строки
+    local room = (L.trk_bot or gfx.h) - L.fxrow_y - 2 - (L.jr_h or 0) - (L.low_h or 0) - (L.status_in or 0)
+    MAXL = math.max(1, math.min(MAXL, math.floor((room - 4 * L.rh) / L.rh), math.floor(room / 2 / L.rh)))
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
     -- по эффекту на строку (имя по ширине колонки), высота — по самому длинному
@@ -35504,7 +35504,7 @@ end
 -- 1 ноя: Cmd+h j k l в INSERT: клавиатура нот перехватывается, бит Cmd в gfx.mouse_cap не приходит. Коды 10 11 12 без
 -- модификатора не бывают (Enter = 13); 8 — Backspace или Cmd / Ctrl+H: различаем по физически нажатой H (js_ReaScriptAPI)
 ctx.cmd_letter = function(c, m)
-  if m.ctrl or m.alt or m.shift then return false end
+  if m.ctrl or m.alt then return false end   -- 8 ноя: Shift — можно: Cmd+Shift+hjkl (размер панели) в INSERT проваливался
   if c == 10 or c == 11 or c == 12 then return true end
   if c == 8 and reaper.JS_VKeys_GetState then
     local st = reaper.JS_VKeys_GetState(reaper.time_precise() - 1)
