@@ -162,10 +162,11 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
       if hot then hv.toggle = i end
       if RF.hint then RF.hint('rf', sx, yy, bw, rh, { toggle = i }) end
     else
-      local sw = math.max(4 * L.cw, x + w - pad - vw - pad - sx)
+      local sw = x + w - pad - vw - pad - sx   -- 8 ноя: узко — без дорожки (не меньше 4 знаков наезжало на значение); j k / h l и щелчок остаются
       local v = p[r.k] or r.def
       local dim = (r.k == 'lo' or r.k == 'hi' or r.k == 'vcurve') and not p.vals
-      U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), r.min < 0, (hot or cur) and U.AMBER or (dim and U.DIM or U.TEXT), hot, rh)
+      if sw >= 3 * L.cw then U.dslider(sx, yy + math.floor(rh / 2), sw, (v - r.min) / (r.max - r.min), r.min < 0, (hot or cur) and U.AMBER or (dim and U.DIM or U.TEXT), hot, rh) end
+      sw = math.max(sw, L.cw)
       local vs = r.fmt:find('%%d') and r.fmt:format(math.floor(v + 0.5)) or r.fmt:format(v)   -- 21 окт: дробное с %d — не ронять кадр
       local nb = cur and NK.show(RF)
       U.text(x + w - pad - U.measure(nb or vs), yy, nb or vs, nb and U.AMBER or (dim and U.DIM or U.GREY))
@@ -183,6 +184,7 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
     local bx = x + pad
     for _, b in ipairs({ { 'keep (Enter)', 'keep' }, { 'revert (Esc)', 'revert' } }) do
       local bw = U.measure(b[1]) + 2 * pad
+      if bx + bw > x + w then break end   -- 8 ноя: не за край панели
       local bh = mx >= bx and mx < bx + bw and my >= yy + 2 and my < yy + 2 + rh
       U.set(bh and U.tint(U.AMBER, 0.3) or U.BG); gfx.rect(bx, yy + 2, bw, rh - 1, 1)
       U.set(bh and U.AMBER or U.LINE); gfx.rect(bx, yy + 2, bw, rh - 1, 0)

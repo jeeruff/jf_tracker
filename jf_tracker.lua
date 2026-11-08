@@ -24187,6 +24187,12 @@ local function frame()
   if ext_tick then
     if reaper.GetExtState('jf_dbg', 'mem') == '1' then reaper.SetExtState('jf_dbg', 'mem', '0', false); pcall(ctx.mem) end
     if reaper.GetExtState('jf_dbg', 'rows') == '1' then reaper.SetExtState('jf_dbg', 'rows', '0', false); draw.dbg_rows = {} end   -- 6 ноя: строки кадра (row@y=label) в ExtState jf_tracker/rows
+    if reaper.GetExtState('jf_dbg', 'lay') == '1' and draw.pn_lay then   -- 8 ноя: прямоугольники панелей в jf_tracker/lay
+      reaper.SetExtState('jf_dbg', 'lay', '0', false)
+      local o = { ('W %d H %d'):format(gfx.w, gfx.h) }
+      for id, c in pairs(draw.pn_lay.by_panel) do local r = c.content or c; o[#o + 1] = ('%s %s,%s %sx%s'):format(id, tostring(r.x), tostring(r.y), tostring(r.w), tostring(r.h)) end
+      table.sort(o); reaper.SetExtState(EXT, 'lay', table.concat(o, ' | '), false)
+    end
     local g = reaper.GetExtState('jf_dbg', 'gc')
     if g ~= '' and g ~= ctx.gc_mode_dbg then ctx.gc_mode_dbg = g; ctx.gc_apply(g) end
   end
@@ -25794,6 +25800,10 @@ local function frame()
     end
     local mx, my = gfx.mouse_x, gfx.mouse_y
     local MAXL = state.fxparams and 14 or 6
+    -- 8 ноя: не выше панели трекера — телу не меньше 4 строк (14 строк параметров выталкивали строки и транспорт
+    -- на вкладку item ниже)
+    local room = (L.trk_bot or gfx.h) - L.fxrow_y - 2 - (L.jr_h or 0) - (L.low_h or 0) - (L.status_in or 0) - 4 * L.rh
+    MAXL = math.max(1, math.min(MAXL, math.floor(room / L.rh)))
     local need = 1
     -- 8 окт: широкий трек — эффекты в строку; не влезают все — столбиком,
     -- по эффекту на строку (имя по ширине колонки), высота — по самому длинному
