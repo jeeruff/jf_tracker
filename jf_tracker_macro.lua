@@ -46,7 +46,8 @@ end
 -- регион, начинающийся в такте b (имя для левой колонки)
 local function region_at_bar(regions, b, rpb)
   for _, rg in ipairs(regions or {}) do
-    if rg.r0 and rg.r0 >= 0 and rg.r0 // rpb == b then return rg end   -- 6 ноя: начинается в строке (строка = bpr тактов)
+    -- 8 ноя: заглушки «no pattern» (idx < 0) — не регион (были метки -1 на каждой строке)
+    if rg.r0 and rg.r0 >= 0 and rg.r0 // rpb == b and (rg.idx or 0) >= 0 then return rg end   -- 6 ноя: начинается в строке (строка = bpr тактов)
   end
 end
 
@@ -57,6 +58,9 @@ function MC.draw(L, snap, x0, y0, w, h, label_w, cur_row, rpb, regions, fit, tfn
   rpb = bar_rows * MC.bpr
   local c = counts(snap, rpb)
   local rh = L.rh
+  local cap_y = y0                            -- 8 ноя: своя строка описания вида сверху, такты — под ней
+  U.set(U.BG); gfx.rect(x0, y0, w, rh, 1)
+  y0, h = y0 + rh, h - rh
   local nvis = math.max(1, math.floor(h / rh))
   MC.nvis, MC.bar_rows = nvis, bar_rows
   MC.last_bar = (c.last + 1) * MC.bpr
@@ -107,9 +111,17 @@ function MC.draw(L, snap, x0, y0, w, h, label_w, cur_row, rpb, regions, fit, tfn
       end
     end
   end
-  U.set(U.AMBER); gfx.rect(x0, y0, w, 1, 1)
-  local tag = MC.bpr > 1 and ('OVERVIEW %d bars / row  - + 0'):format(MC.bpr) or 'OVERVIEW 1 bar / row  - + 0'
-  U.text(x0 + w - U.measure(tag) - 4, y0 + 1, tag, U.AMBER)
+  U.set(U.AMBER); gfx.rect(x0, y0 - 1, w, 1, 1)
+  -- 8 ноя: что за вид — строкой справа сверху: строка = N тактов, слева такт (и время), в клетке — сколько нот /
+  -- айтемов начинается и первая нота; клавиши. Не влезает — короче
+  local nb2 = MC.bpr > 1 and ('%d bars'):format(MC.bpr) or '1 bar'
+  local tags = {
+    ('OVERVIEW: a row = %s, left - the bar%s, blocks - how many notes / items start there, then the first note;  j k move  - + zoom  0 whole song  Enter back'):format(nb2, MC.bpr > 1 and ' and its time' or ''),
+    ('OVERVIEW: a row = %s, blocks - events in it;  j k  - +  0  Enter'):format(nb2),
+    ('OVERVIEW %s / row  - + 0'):format(nb2) }
+  local tag = tags[#tags]
+  for _, t in ipairs(tags) do if U.measure(t) <= w - 8 then tag = t; break end end
+  U.text(x0 + 4, cap_y + 1, tag, U.AMBER)
 end
 
 -- клавиши; возвращает новую строку курсора, 'leave' или nil (не своя)
