@@ -150,7 +150,13 @@ function U.diamond(cx, cy, r, col, hot)
   if kn == 'pixel' then
     -- пиксель-арт ромб 7×7 клеток (кайма, заливка, блик); клетка растёт с r — крупный шрифт даёт крупный ромб, без мыла
     local k = math.max(1, math.floor((2 * r + 3) / 7 + 0.5))
-    local x0, y0 = math.floor(cx + 0.5) - 3 * k, math.floor(cy + 0.5) - 3 * k
+    -- 8 ноя: чётная клетка — средняя строка / столбец на 1 px толще: центр ромба ровно на линии дорожки (1 px),
+    -- было на полпикселя ниже и правее
+    local e = k % 2 == 0 and 1 or 0
+    local x0 = math.floor(cx + 0.5) - 3 * k - (k + e - 1) // 2
+    local y0 = math.floor(cy + 0.5) - 3 * k - (k + e - 1) // 2
+    local function at(i) return (i - 1) * k + (i > 4 and e or 0) end
+    local function sz(i) return k + (i == 4 and e or 0) end
     local fill = hot and U.TEXT or col
     local hl = U.mix(fill, { 1, 1, 1 }, 0.45)
     for j, row in ipairs(U.KNOB_PIX) do
@@ -158,7 +164,7 @@ function U.diamond(cx, cy, r, col, hot)
         local ch = row:sub(i, i)
         if ch ~= '.' then
           set(ch == 'X' and U.BG or (ch == 'H' and hl or fill))
-          gfx.rect(x0 + (i - 1) * k, y0 + (j - 1) * k, k, k, 1)
+          gfx.rect(x0 + at(i), y0 + at(j), sz(i), sz(j), 1)
         end
       end
     end
