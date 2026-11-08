@@ -32929,13 +32929,14 @@ ctx.opt_pane_draw = function(x, y, w, h, foc)
   end
   OPT.dock = { x = x, y = y, w = w, h = h }
   -- ничего за рамку панели: рисуем в свой буфер во весь кадр и переносим только прямоугольник панели
-  if OPT.buf_w ~= gfx.w or OPT.buf_h ~= gfx.h then gfx.setimgdim(1021, gfx.w, gfx.h); OPT.buf_w, OPT.buf_h = gfx.w, gfx.h end
+  -- 8 ноя: свой буфер 795 — 1021 занят кадром fps-буфера (рисовали в него же и стирали setimgdim: опции пустые)
+  if OPT.buf_w ~= gfx.w or OPT.buf_h ~= gfx.h then gfx.setimgdim(795, gfx.w, gfx.h); OPT.buf_w, OPT.buf_h = gfx.w, gfx.h end
   local d0 = gfx.dest
-  gfx.dest = 1021
+  gfx.dest = 795
   U.set(U.BG); gfx.rect(x, y, w, h, 1)
   OPT.draw(L, gfx.w, gfx.h)
   gfx.dest = d0; gfx.a = 1
-  gfx.blit(1021, 1, 0, x, y, w, h, x, y, w, h)
+  gfx.blit(795, 1, 0, x, y, w, h, x, y, w, h)
 end
 -- 31 окт: Opt+Shift+R — то же, но сыгранное сразу становится новой фразой (pN), на месте — её триггер
 ctx.retro_phrase = function() ctx.retro_insert(true) end
