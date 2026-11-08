@@ -798,7 +798,7 @@ function M.cache_key(lpb, now)
     cache.hashes = midi_hashes()
     cache.hash_t = now
   end
-  return string.format('%s|%d|%d|%s', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), lpb, cache.hashes)   -- 7 ноя: и проект — вкладки с тем же счётчиком
+  return string.format('%s|%d|%s|%s', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), tostring(lpb), cache.hashes)   -- 8 ноя: lpb строкой (дробный — макро)   -- 7 ноя: и проект — вкладки с тем же счётчиком
 end
 
 local pool_by_item = {}        -- item → gkey (все items, не только первый) — номер инструмента в ячейке
@@ -2650,7 +2650,7 @@ end
 -- GetRegionOrMarker, GetSetRegionOrMarkerInfo_String), но сигнатуры новых в
 -- строках бинарника нет — берём старую, она работает. Кеш по ключу снимка.
 function M.regions(lpb)
-  local key = string.format('%s|%d|%d', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), lpb)
+  local key = string.format('%s|%d|%s', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), tostring(lpb))
   if rcache.key == key then return rcache.list end
   local out = {}
   local markers = {}      -- маркеры для линейки трекера (2 окт): имя, строка (дробная), цвет

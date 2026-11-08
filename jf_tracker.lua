@@ -158,7 +158,8 @@ local function flag(k, d)
   return v ~= '0'
 end
 
-local LPBS = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128 }   -- 19 окт: до 128
+-- 8 ноя: и меньше 1 — макро: строка = 2 доли, такт, 2 такта … 16 тактов (10 минут песни — в экран, волна колбасой)
+local LPBS = { 1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128 }   -- 19 окт: до 128
 local state = {
   -- режим разработчика (5 окт): файл .dev рядом со скриптом (в .gitignore) —
   -- Orca и monome; в релизе их нет
@@ -709,7 +710,8 @@ local function save_win()
   if state.pm_big and state.pm_saved then for k, v in pairs(state.pm_saved) do state[k] = v end; state.pm_big = false end   -- pm big тоже (6 окт)
   if state.pm_flush then pcall(state.pm_flush, true) end   -- правки индекса jf_pm — на диск (ctx здесь ещё не виден: поле state)
   S('dock', d); S('x', x); S('y', y); S('w', fps_buf.rw or gfx.w); S('h', fps_buf.rh or gfx.h)   -- 6 ноя: в пиксельном режиме gfx.w — половина
-  S('lpb', state.lpb); S('fxcols', state.fxcols); S('lside_frac', state.lside_frac or '')
+  S('lpb', state.lpb >= 1 and state.lpb or (state.lpb_ov or 4));   -- 8 ноя: макро не запоминается
+  S('fxcols', state.fxcols); S('lside_frac', state.lside_frac or '')
   S('sbw', tostring(state.sbw or 3)); S('phtail', tostring(state.phtail or 0)); S('beacon', state.beacon and '1' or '0'); S('fontscale', state.fontscale); S('fontspace', state.fontspace); S('toptab', state.toptab)
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
@@ -807,7 +809,7 @@ local function set_lpb(n, dir)
     if i < 1 or i > #LPBS then return end
     new = LPBS[i]
   end
-  if new < 1 or new > 128 then return end
+  if new < 1 / 64 - 1e-9 or new > 128 then return end
   local q0, qc = state.row0 / state.lpb, vim.cur.row / state.lpb
   state.lpb = new
   state.row0 = math.floor(q0 * new)
@@ -1328,15 +1330,27 @@ ctx = {
     local was = state.lpb
     state.lpb_before_unfold = was
     set_lpb(need or LPBS[#LPBS])
-    vim.msg = ('unfold: LPB %d -> %d%s (zu again - back)'):format(was, state.lpb, need and '' or ', still folded at the max')
+    vim.msg = ('unfold: LPB %s -> %s%s (zu again - back)'):format(draw.lpb_s(was), draw.lpb_s(state.lpb), need and '' or ', still folded at the max')
   end,
   -- 6 ноя: zO — обзор: вертикальная свёртка (строка = такт … 256 тактов), вся песня в экран
+  -- 8 ноя: обзор — сам трекер издалека: LPB меньше 1 (строка = такт … 16 тактов), вся песня в экран, волна и айтемы
+  -- как обычно; zO ещё раз — прежний LPB у курсора; - + (Opt+Shift+J K) — дальше по тому же ряду LPB
   overview_toggle = function()
-    state.macro = not state.macro
-    if state.macro then
-      draw.macro.scroll = 0
-      vim.msg = 'overview: a row is ' .. draw.macro.bpr .. ' bar(s); - + coarser / finer, 0 - the whole song, j k J K g G move, Enter / Esc - back to the tracker at that bar'
-    else vim.msg = 'overview off' end
+    state.macro = false
+    if state.lpb_ov then
+      local back = state.lpb_ov; state.lpb_ov = nil
+      set_lpb(back); vim.msg = 'overview off - LPB ' .. draw.lpb_s(state.lpb)
+      return
+    end
+    state.lpb_ov = state.lpb
+    local qn = reaper.TimeMap2_timeToQN(0, reaper.GetProjectLength(0))
+    local rows = math.max(8, (L and L.nrows or 40) - 2)
+    local pick = LPBS[1]
+    for _, v in ipairs(LPBS) do if v < 1 and qn * v <= rows then pick = v end end
+    set_lpb(pick)
+    state.row0 = 0
+    vim.msg = ('overview: LPB %s - a row is %s; the whole song on screen; - + zoom, zO back to LPB %s'):format(draw.lpb_s(pick),
+      pick >= 1 / 4 and (pick == 1 / 4 and 'a bar' or 'half a bar') or (math.floor(1 / pick / 4 + 0.5) .. ' bars'), draw.lpb_s(state.lpb_ov))
   end,
   zoom_out_toggle = function()
     state.macro = false
@@ -10750,7 +10764,7 @@ ctx = {
     ctx.set_focus('matrix')
     state.popup_at = { kind = 'mxrow', ri = MX.cur.ri }
     vim.open_prompt('len ', '')
-    vim.msg = ('len: N steps (lpb %d) | Ns seconds | Nb bars; now %d steps = %.3fs'):format(state.lpb, rg.r1 - rg.r0, rg.rgnend - rg.pos)
+    vim.msg = ('len: N steps (lpb %s) | Ns seconds | Nb bars; now %d steps = %.3fs'):format(draw.lpb_s(state.lpb), rg.r1 - rg.r0, rg.rgnend - rg.pos)
   end,
   mx_name = function(text)
     local rg = seq[MX.cur.ri]
@@ -23540,7 +23554,7 @@ local env_cache = {}
 -- пересчитывались все видимые огибающие каждый кадр
 local function env_values(e)
   model.aipoints = state.aipoints ~= false
-  local k = ('%d|%d|%d|%d|%s'):format(reaper.GetProjectStateChangeCount(0), rows[1] and rows[1].row or 0, #rows, state.lpb, tostring(model.aipoints))
+  local k = ('%d|%d|%d|%s|%s'):format(reaper.GetProjectStateChangeCount(0), rows[1] and rows[1].row or 0, #rows, tostring(state.lpb), tostring(model.aipoints))
   if k ~= ctx.env_cache_key then env_cache, ctx.env_cache_key = {}, k end
   local v = env_cache[e]
   if not v then v = model.env_values(e, rows); env_cache[e] = v end
@@ -23652,7 +23666,7 @@ local st_last, cmd_last = '', reaper.GetExtState(EXT, 'cmd')
 local function publish_state(is_playing)
   local col = cur_col()
   local armed = col and col.armed and 1 or 0
-  local str = ('%d,%d,%d,%d,%d,%d,%d,%d,%d'):format(state.lpb, vim.octave, vim.step_auto and 0 or vim.step, vim.inst, col and #(col.pool or {}) or 0,
+  local str = ('%s,%d,%d,%d,%d,%d,%d,%d,%d'):format(state.lpb, vim.octave, vim.step_auto and 0 or vim.step, vim.inst, col and #(col.pool or {}) or 0,
     is_playing and 1 or 0, state.follow and 1 or 0, reaper.GetSetRepeat(-1) == 1 and 1 or 0, armed)
   if str ~= st_last then reaper.SetExtState(EXT, 'st', str, false); st_last = str end
 end
@@ -24374,7 +24388,7 @@ local function frame()
     local b, meas, cml, _, cdenom = reaper.TimeMap2_timeToBeats(0, t)
     beat_info.bar, beat_info.beat = (meas or 0) + 1, b or 0
     beat_info.num, beat_info.den = math.floor((cml or 4) + 0.5), math.floor((cdenom or 4) + 0.5)
-    beat_info.rows_bar = math.floor(beat_info.num * 4 / math.max(1, beat_info.den) * state.lpb + 0.5)
+    beat_info.rows_bar = math.max(1, math.floor(beat_info.num * 4 / math.max(1, beat_info.den) * state.lpb + 0.5))   -- 8 ноя: макро-LPB — не 0
   end
   local changed
   -- 10 окт: выбранный инструмент — по ключу, не по номеру: вставка ноты
@@ -26435,8 +26449,8 @@ local function frame()
   elseif hover.ctrl == 'punch' then state.status = 'auto punch: record only inside the time selection (shown red left of the tracks)'
   elseif hover.ctrl == 'preroll' then state.status = 'pre-roll before recording (REAPER: metronome pre-roll settings)'
   elseif hover.ctrl == 'reclib' then state.status = 'rec -> lib: a take recorded into the tracker also becomes a new instrument in the lib'
-  elseif hover.ctrl == 'sig' then state.status = ('time signature at the cursor %d/%d - %d rows per bar, %d per beat (LPB)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, state.lpb)
-  elseif hover.ctrl == 'beats' then state.status = ('bar %d, beat %d of %d - squares: beats of the bar (amber edge = downbeat), lit = current; %d rows/beat, %d rows/bar'):format(beat_info.bar, math.floor(beat_info.beat) + 1, beat_info.num, state.lpb, beat_info.rows_bar)
+  elseif hover.ctrl == 'sig' then state.status = ('time signature at the cursor %d/%d - %d rows per bar, %s per beat (LPB)'):format(beat_info.num, beat_info.den, beat_info.rows_bar, draw.lpb_s(state.lpb))
+  elseif hover.ctrl == 'beats' then state.status = ('bar %d, beat %d of %d - squares: beats of the bar (amber edge = downbeat), lit = current; %s rows/beat, %d rows/bar'):format(beat_info.bar, math.floor(beat_info.beat) + 1, beat_info.num, draw.lpb_s(state.lpb), beat_info.rows_bar)
   elseif hover.ctrl == 'xfade' then state.status = 'x-fade of inserted notes: click on/off, wheel: length (ms); off = overlaps without crossfade; \\x: menu'
   elseif hover.ctrl == 'fixed' then state.status = 'fixed cursor: the cursor row stays in the middle of the screen, the pattern scrolls under it (Impulse Tracker)'
   elseif hover.ctrl == 'lock' then state.status = 'lock: tracker cursor mirrors REAPER edit cursor and selected track (both ways); follow = view follows playhead'
@@ -34999,7 +35013,7 @@ ctx.qtz_menu = function()
   local items = {
     { key = 'o', label = mark(q.on) .. 'on / off', fn = chg(q.on and 'off' or 'on', function(x) x.on = not x.on end) },
     grid('b', 1, '1/4 (beat)'), grid('e', 0.5, '1/8'), grid('x', 0.25, '1/16'), grid('t', 0.125, '1/32'),
-    grid('3', 1 / 3, '1/8 triplet'), grid('s', step, ('step (1/%d beat, LPB %d)'):format(state.lpb, state.lpb)),
+    grid('3', 1 / 3, '1/8 triplet'), grid('s', step, ('step (1/%s beat, LPB %s)'):format(draw.lpb_s(state.lpb), draw.lpb_s(state.lpb))),
     str('1', 100), str('7', 75), str('5', 50), str('2', 25),
     pos('n', 0, 'nearest step'), pos('<', -1, 'previous step'), pos('>', 1, 'next step'),
     { key = 'f', label = mark(q.offs) .. 'note-offs quantized too', fn = chg('note-offs', function(x) x.offs = not x.offs end) },

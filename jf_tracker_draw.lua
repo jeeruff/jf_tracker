@@ -137,6 +137,8 @@ end
 -- gfx.blit — тот самый PT2-вид), N>0 — TTF моноширинный размера N.
 -- D.SPACE — зазор над буквами в строке (`:space`), входит в высоту строки.
 D.SCALE, D.SPACE = 1, 2
+-- 8 ноя: LPB строкой (дробный — 1/8: строка длиннее доли, макро)
+function D.lpb_s(v) v = v or 4; if v >= 1 then return ('%d'):format(math.floor(v + 0.5)) end; return ('1/%d'):format(math.floor(1 / v + 0.5)) end
 local tcache, next_img = {}, 100
 -- номера картинок gfx — только 0..1023 (1200+ молча не создаются: так 2 окт пропали
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
@@ -4606,7 +4608,7 @@ local function draw_ctrl(L, info, H, hover)
     text(x, y + 1, lbl, U.TEXT)
     x = x + ms(lbl) + L.pad
     local sq_w = num * (bs + 2)
-    local tail = ('%d/beat %d/bar'):format(c.lpb or 4, c.rows_bar or 16)
+    local tail = ('%s/beat %d/bar'):format(D.lpb_s(c.lpb or 4), c.rows_bar or 16)
     local room = L.ctrl_w - L.pad - x
     if sq_w <= room then
       for k = 1, num do
@@ -5246,7 +5248,7 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   local col2, col3 = 'LPB 16 T', 'hmnz'
   -- 16 окт: подпись step — на две строки, как oct (цифра выше)
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
-                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %d%s'):format(c.lpb or 0, ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
+                { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %s%s'):format(D.lpb_s(c.lpb or 4), ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
                   { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = col3 },   -- 28 окт: Opt+`
                   { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 } },
                 { { '_', '', w = stepw }, { 'pitch', (c.pitchmode == 'resample') and 'rsmp' or 'shft', res = col2 },
