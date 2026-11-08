@@ -436,7 +436,22 @@ function D.panes_layout(state, L, nregions, ncols)
   return D.pn_lay
 end
 
+local layout_nomaster = false
 function D.layout(snap, state, nregions)
+  -- 8 ноя: мастер не приколот (pin выкл) — обычный крайний трек: справа ещё есть невлезшие треки — раскладка без него
+  if state.mpin == false and not layout_nomaster and snap and snap.master then
+    local L1 = D.layout_core(snap, state, nregions)
+    if not ((L1.hs_before or 0) + (L1.hs_full or 0) < (L1.hs_n or 0) or L1.cols_cut or L1.hs_cut) then return L1 end
+    layout_nomaster = true
+    local m = snap.master; snap.master = nil
+    local ok, L2 = pcall(D.layout_core, snap, state, nregions)
+    snap.master = m; layout_nomaster = false
+    if not ok then error(L2, 0) end
+    return L2
+  end
+  return D.layout_core(snap, state, nregions)
+end
+function D.layout_core(snap, state, nregions)
   -- модули вплотную (8 окт: опция module gap убрана — она обрезала модули):
   -- между соседями одна линия 1 px; активный — рамка внутри своих границ
   D.SEPW = 1
@@ -8924,8 +8939,19 @@ function D.frame(L, snap, rows, state, info)
       else text(c.x + L.pad, hy - HX + 1 + math.floor(HX / 2), fit('∑ master', c.w - 2 * L.pad), U.AMBER) end   -- 16 окт: шапка мастера подписана; 20 окт: ∑ (Opt+W)
       -- 17 окт: [fold] — сложить мастер в два символа (стерео-метр и подавление)
       if c.mtrack then
+        -- 8 ноя: [pin] — мастер всегда справа (вкл) / обычный крайний трек: виден, когда треки справа кончились (выкл)
+        local pw = ms('pin') + 4
+        local px = c.x + c.w - pw - 2
+        if px > c.x + ms('∑ master') + 2 * L.pad then
+          local phot = mx >= px and mx < px + pw and my >= hy and my < hy + L.rh
+          local pon = state.mpin ~= false
+          set(pon and U.tint(U.CYAN, 0.25) or (phot and D.CURROW or U.PANEL)); gfx.rect(px, hy + 1, pw, L.rh - 2, 1)
+          set(pon and U.CYAN or U.DIM); gfx.rect(px, hy + 1, pw, L.rh - 2, 0)
+          text(px + 2, hy + 1, 'pin', phot and U.AMBER or (pon and U.CYAN or U.GREY))
+          if phot then hover.mpin = true end
+        end
         local fw = ms('fold') + 4
-        local fx = c.x + c.w - fw - 2
+        local fx = px - fw - 2
         if fx > c.x + ((L.hname_k or 1) > 1 and D.big_measure('∑ master', L.hname_k) or ms('∑ master')) + 2 * L.pad then
           local fhot = mx >= fx and mx < fx + fw and my >= hy and my < hy + L.rh
           set(fhot and D.CURROW or U.PANEL); gfx.rect(fx, hy + 1, fw, L.rh - 2, 1)
