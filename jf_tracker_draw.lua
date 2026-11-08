@@ -8848,6 +8848,7 @@ function D.frame(L, snap, rows, state, info)
     hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and L.master_w or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
   for _, c in ipairs(hcols) do
+    D.pmark('hdr: name + bg')
     local col = c.col
     -- фон шапки (3 окт), опция hdrfill: line — полоска цвета под именем,
     -- header — залита строка имени, full — вся шапка (ниже имени тусклее);
@@ -8957,6 +8958,7 @@ function D.frame(L, snap, rows, state, info)
     end
     if not c.master then hint('header', c.x + indent, hy, math.max(L.cw * 3, c.w - indent), L.rh, col) end
     -- строка 2: кнопки в порядке REAPER — R I M S A (A = автоматизация, как trim)
+    D.pmark('hdr: strip (buttons sliders fx)')
     if not c.folded or c.chord or c.pan then   -- 26 окт: и лейн аккордов (у него своя полоса микшера, кнопки)
       local by = hy + L.rh + 1
       local bx = c.x + L.pad + indent
@@ -9899,6 +9901,7 @@ function D.frame(L, snap, rows, state, info)
         end
       end
     end
+    D.pmark('hdr: lanes (+- subcolumns)')
     for li, ln in ipairs(c.lanes) do
       -- −+ подколонок — над нотным полем (3 окт; раньше справа в строке лейна);
       -- справа в строке последнего лейна — −+ колонок эффектов (вместо опции fx)
@@ -9961,6 +9964,7 @@ function D.frame(L, snap, rows, state, info)
       end
       if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1) end
     end
+    D.pmark('hdr: envs + captions')
     for _, m in ipairs(c.mls or {}) do
       text(m.x + L.pad, hy + L.lane_row * L.rh + 2, fit(m.ml.name, m.w - L.pad), U.CYAN)
       set(U.DIM); gfx.rect(m.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
@@ -10068,6 +10072,7 @@ function D.frame(L, snap, rows, state, info)
     -- 9 окт: фон полосы нижнего микшера — тоже «шапка» (щелчок выделяет трек)
     if L.mix_bottom and mx >= c.x and mx < c.x + c.w and my >= L.mix_y and my < L.mix_y + L.mix_h then hover.header_col = col end
   end
+  D.pmark('hdr: after columns')
   -- 1 ноя: правая граница последнего трека — и в шапке (в строках она есть; в шапке была порвана)
   do local lc = L.cols and L.cols[#L.cols]; if lc and lc.x and not lc.master then set(U.LINE); gfx.rect(lc.x + lc.w, hy - HX, 1, L.header_h, 1) end end
   set(D.SEP); gfx.rect(tx0, hy - HX + L.header_h - 2, W - tx0, 1, 1)
@@ -10354,8 +10359,10 @@ function D.frame(L, snap, rows, state, info)
         local azl = (ms('autozoom') + ms('mark') + ms('WH') + 10 <= bw) and 'autozoom' or 'zoom'
         local xw = bx + btn(bx, yr, azl, 'viewbtn', 'autozoom', state.autozoom) + 2   -- 31 окт: W H — справа от autozoom
         if xw + bw1('W') + bw1('H') + 2 <= bx + bw - bw1('mark') then xw = xw + btn(xw, yr, 'W', 'viewbtn', 'fitw') + 2; btn(xw, yr, 'H', 'viewbtn', 'fith') end
-        btn(bx + bw - ms('mark') - 2, yr, 'mark', 'viewbtn', 'markers')
-        if xw + ms('view') + 4 <= bx + bw - ms('mark') - 4 then btn(bx + bw - ms('mark') - ms('view') - 6, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — меню вида
+        -- 8 ноя: место — по ширине кнопки (bw1), не текста: рамка mark заходила на колонку соседнего трека
+        local xmk = bx + bw - bw1('mark')
+        if xmk >= xw then btn(xmk, yr, 'mark', 'viewbtn', 'markers') end
+        if xw + bw1('view') + 2 <= xmk then btn(xmk - bw1('view') - 2, yr, 'view', 'viewbtn', 'viewmenu') end   -- 4 ноя: view — меню вида
       else
         local xw = bx + btn(bx, yz, (bw1('autozoom') + bw1('W') + bw1('H') + 4 <= bw) and 'autozoom' or 'zoom', 'viewbtn', 'autozoom', state.autozoom) + 2
         if xw + bw1('W') + bw1('H') + 2 <= bx + bw then xw = xw + btn(xw, yz, 'W', 'viewbtn', 'fitw') + 2; xw = xw + btn(xw, yz, 'H', 'viewbtn', 'fith') + 2 end   -- 31 окт: W H — справа от autozoom
