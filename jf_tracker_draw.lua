@@ -7690,7 +7690,7 @@ function D.bigcur(b)
   gfx.dest = d
   local below = h - 2 * rh
   if below > 0 then gfx.blit(1019, 1, 0, 0, rh, w, below, b.x0, b.yc + 2 * rh, w, below) end
-  gfx.blit(1019, 1, 0, b.sx - b.x0, 0, b.sw, rh, b.x0, b.yc, b.sw * 2, rh * 2)
+  gfx.blit(1019, 1, 0, 0, 0, w, rh, b.x0, b.yc, w, rh * 2)   -- 8 ноя: только по высоте — колонки на своих местах
   gfx.mode, gfx.a = mode, a
 end
 

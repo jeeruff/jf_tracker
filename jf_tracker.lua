@@ -24911,16 +24911,13 @@ local function frame()
   draw.cur_y = nil
   if bc_yc and bc_yc >= L.body_y and bc_yc + 2 * L.rh <= L.body_y + L.nrows * L.rh then
     local x0, x1 = L.matrix_w, L.win_w
-    local f = L.flat[vim.cur.fi]
-    local cx = f and f.x and (f.x + (f.w or 0) / 2) or (x0 + x1) / 2
-    local sw = math.floor((x1 - x0) / 2)
-    local sx = math.floor(math.max(x0, math.min(x1 - sw, cx - sw / 2)))
+    -- 8 ноя: строка курсора — ×2 только по высоте: колонки, полосы и номера стоят ровно над / под своими
+    -- (×2 по ширине уводил колонки треков от соседних строк)
     local yc, yb = bc_yc, L.body_y + L.nrows * L.rh
-    ctx.bigcur = { x0 = x0, x1 = x1, sx = sx, sw = sw, yc = yc, yb = yb, rh = L.rh }
-    local mx, my = gfx.mouse_x, gfx.mouse_y
-    if mx >= x0 and mx < x1 and my >= yc and my < yb then
-      if my < yc + 2 * L.rh then gfx.mouse_x, gfx.mouse_y = sx + (mx - x0) // 2, yc + (my - yc) // 2
-      else gfx.mouse_y = my - L.rh end
+    ctx.bigcur = { x0 = x0, x1 = x1, yc = yc, yb = yb, rh = L.rh }
+    local my = gfx.mouse_y
+    if gfx.mouse_x >= x0 and gfx.mouse_x < x1 and my >= yc and my < yb then
+      if my < yc + 2 * L.rh then gfx.mouse_y = yc + (my - yc) // 2 else gfx.mouse_y = my - L.rh end
     end
   end
   draw.pc_hits = 0   -- 28 окт: панелей из кэша за кадр (hb)
