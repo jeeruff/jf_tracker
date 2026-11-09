@@ -3695,7 +3695,13 @@ function D.track_block(L, info, col, x, y, w, h, hover, rawc)
       set(hot and U.AMBER or (on and b[3] or (b[4] == 'arm' and rc or U.DIM))); gfx.circle(cx, cy, r, 0, 1)
       if b[4] == 'arm' then
         local aa = col.track and reaper.GetMediaTrackInfo_Value(col.track, 'B_AUTO_RECARM') == 1
-        if aa then text(cx - math.floor(ms('a') / 2) + 1, cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)   -- 27 окт: +1 px — у ширины буквы справа пустой столбец, центр по чернилам
+        if aa and D.ttf then
+          -- 8 ноя: TTF — a своим кеглем по диаметру круга, центр по чернилам строчной (крупный шрифт вылезал из кружка)
+          gfx.setfont(3, D.ttf_face, math.max(6, math.floor(2 * r * 1.25)))
+          local aw, ah = gfx.measurestr('a'), gfx.texth
+          set(on and U.TEXT or rc); gfx.x, gfx.y = cx - math.floor(aw / 2) + 1, cy - math.floor(ah * 0.62); gfx.drawstr('a')
+          gfx.setfont(D.font_id)
+        elseif aa then text(cx - math.floor(ms('a') / 2) + 1, cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), 'a', on and U.TEXT or rc)   -- 27 окт: +1 px — у ширины буквы справа пустой столбец, центр по чернилам
         else set(on and U.TEXT or rc); gfx.circle(cx, cy, math.max(1, math.floor(r / 2)), on and 1 or 0, 1) end
       else text(cx - math.floor(ms(b[1]) / 2), cy - math.floor((L.th or bh) / 2) - (D.SPACE or 0), b[1], on and U.TEXT or rc) end
     else
@@ -10839,6 +10845,12 @@ function D.frame(L, snap, rows, state, info)
     for _, c in ipairs(L.cols) do
       -- 21 окт: трек уходит под мастер — его текст не дальше границы мастера
       local clip_k = D.clip
+      -- 8 ноя: мастер (приколот справа) — непрозрачный фон строки: под ним не просвечивает обрезанный трек
+      if c.master and c.x and c.w then
+        local bg = (vc and vc.row == r.row) and (state.fixed and U.mix(D.CURROW, U.TEXT, 0.12) or D.CURROW) or ((ph and ph == r.row) and D.PLAY or U.BG)
+        set(bg); gfx.rect(c.x, y, c.w + 1, L.rh, 1)
+        if r.bar then set(D.BAR); gfx.rect(c.x, y, c.w + 1, 1, 1) elseif r.beat then set(D.BEAT); gfx.rect(c.x, y, c.w + 1, 1, 1) end
+      end
       if not c.master then   -- пересечение с клипом кадра
         local tc = D.trk_clip or {}; D.trk_clip = tc
         tc[1], tc[2] = clip_k and clip_k[1] or 0, math.min(clip_k and clip_k[2] or 1e9, L.cols_r - 1)
@@ -11463,7 +11475,7 @@ function D.frame(L, snap, rows, state, info)
   end
   -- линии справа от номеров шагов нет (3 окт, просьба): колонки треков начинаются со своей линии
   if tx0 > 0 and not L.pn then set(D.SEP); gfx.rect(tx0 - 2, hy, D.SEPW, L.body_y + L.body_h + L.low_h - hy, 1) end
-  if L.total_w < W then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end
+  if L.total_w < math.min(W, (L.mcol and L.cols_r) or W) then set(U.LINE); gfx.rect(L.total_w, hy, 1, L.body_y + L.body_h - hy, 1) end   -- 8 ноя: не под мастером (конец короткого трека рисовался линией посреди мастера)
 
   -- 31 окт: рамка и визуализаторы — поверх всего модуля трекера (номера строк, линейка, метры)
   do local ins = info.vmode == 'insert'

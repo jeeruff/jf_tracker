@@ -24231,7 +24231,11 @@ local function frame()
       reaper.SetExtState('jf_dbg', 'lay', '0', false)
       local o = { ('W %d H %d'):format(gfx.w, gfx.h) }
       for id, c in pairs(draw.pn_lay.by_panel) do local r = c.content or c; o[#o + 1] = ('%s %s,%s %sx%s'):format(id, tostring(r.x), tostring(r.y), tostring(r.w), tostring(r.h)) end
-      table.sort(o); reaper.SetExtState(EXT, 'lay', table.concat(o, ' | '), false)
+      table.sort(o)
+      local mc = L and L.mcol
+      o[#o + 1] = ('cols_r %s master_w %s mfold %s | mcol %s'):format(tostring(L and L.cols_r), tostring(L and L.master_w), tostring(L and L.mfold), mc and ('x %s w %s envs %s'):format(mc.x, mc.w, table.concat((function() local t = {} for _, e in ipairs(mc.envs) do t[#t + 1] = e.x .. '+' .. e.w end for _, m in ipairs(mc.mls) do t[#t + 1] = 'ml ' .. m.x .. '+' .. m.w end return t end)(), ',')) or 'nil')
+      for _, c in ipairs(L and L.cols or {}) do if c.cut or (c.x and c.x + (c.w or 0) > (L.cols_r or 1e9)) then o[#o + 1] = ('cut %s x %s w %s'):format(c.col and c.col.name or '?', tostring(c.x), tostring(c.w)) end end
+      reaper.SetExtState(EXT, 'lay', table.concat(o, ' | '), false)
     end
     local g = reaper.GetExtState('jf_dbg', 'gc')
     if g ~= '' and g ~= ctx.gc_mode_dbg then ctx.gc_mode_dbg = g; ctx.gc_apply(g) end
