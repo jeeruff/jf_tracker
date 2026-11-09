@@ -385,12 +385,16 @@ do
       local ok = true
       for id, a0 in pairs(e0) do
         local c = l3.by_panel[id]
+        if not c then goto nextid end   -- 9 ноя: сжали до минимума — неважная панель спрятана (PN.PRIO)
+        do
         local a1 = { c.x, c.y, c.x + c.w, c.y + c.h }
         for k = 1, 4 do
           local axk = (k == 2 or k == 4) and 'v' or 'h'
           local at = axk == g0.ax and (math.abs(a0[k] - pos) <= 2 or math.abs(a0[k] - pos - M.sep) <= 2)
           if math.abs(a1[k] - a0[k]) > 1 and not at then ok = false; print(('  far grip %d (%s, %+d): %s edge %d %d -> %d'):format(gi, g0.ax, dir, id, k, a0[k], a1[k])) end
         end
+        end
+        ::nextid::
       end
       eq('grip ' .. gi .. ' far ' .. dir .. ': past the stop only its own edge', ok, true)
     end

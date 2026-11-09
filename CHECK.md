@@ -2598,3 +2598,4 @@
 - 9 ноя: зум наружу (- / zo) не дальше «строка = паттерн курсора»; лидер (Space держать / \) w — режим панелей (= Ctrl+W)
 - 9 ноя: zs — зум выделения (VISUAL / time selection REAPER во весь экран); zS — вид section (было zs); лидер s — screensets (было S)
 - 9 ноя: SPC m — меню того, что под курсором (= \); опции → группа leader key: space leader, space opens (main / here), задержка автопоказа
+- 9 ноя: сжатие панелей — не влезают с минимумом (6 строк / 16 знаков; трекер 10 строк) — менее важные прячутся целиком: tracker > lib > browser > reform > dsp > item > остальные; screensets v — viper, o — обзор (zo)

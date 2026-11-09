@@ -244,6 +244,8 @@ end
 
 -- ── раскладка ─────────────────────────────────────────────────────────────
 -- M = { rh, cw, pad, tab_h, hint_h, sep, grip, tabw(id) → px, avail(id) → bool }
+-- 9 ноя: приоритет при сжатии (меньше — важнее): прячутся сначала самые неважные
+PN.PRIO = { tracker = 1, inst = 2, tracks = 2, browser = 3, reform = 4, dsp = 5, sample = 6, sprops = 7, mixer = 8 }
 local function avail(M, id) return not M.avail or M.avail(id) end
 -- жив ли узел (есть хоть одна доступная панель)
 local function alive(M, n)
@@ -259,13 +261,13 @@ local function min_px(M, ax) return ax == 'v' and M.tab_h or 4 * M.cw end
 local function leaf_min(M, n, ax)
   if n.min then return min_px(M, ax) end
   if ax == 'v' then
-    local m = (n.panes[1] == 'tracker' and 4 or 2) * M.rh
+    local m = (n.panes[1] == 'tracker' and 10 or 6) * M.rh   -- 9 ноя: 6 строк (было 2: панель кашей; меньше — прячется по PN.PRIO)
     -- панель может требовать своё (item: все параметры сэмпла) — по всему стеку,
     -- чтобы высота не прыгала при смене вкладки
     if M.minh then for _, id in ipairs(n.panes) do if avail(M, id) then local v = M.minh(id); if v and v > m then m = v end end end end
     return m + M.tab_h + M.hint_h
   end
-  return 8 * M.cw
+  return 16 * M.cw   -- 9 ноя: 16 знаков (было 8)
 end
 local function node_min(M, n, ax)
   if is_leaf(n) then return leaf_min(M, n, ax) end
@@ -322,6 +324,25 @@ local function place(lay, M, n, x, y, w, h)
     if alive(M, k) then kids[#kids + 1] = k; frs[#frs + 1] = n.fr[i]; fs = fs + n.fr[i]; mins[#mins + 1] = node_min(M, k, n.ax) end
   end
   if #kids == 0 then return end
+  -- 9 ноя: места мало — менее важные листы прячутся целиком (не кашей), место — важным (PN.PRIO)
+  do
+    local avail_px = (n.ax == 'h' and w or h)
+    local function prio(k)
+      if is_leaf(k) then local b = 99; for _, id in ipairs(k.panes) do if avail(M, id) then b = math.min(b, PN.PRIO[id] or 50) end end; return b end
+      local b = 99; for _, c in ipairs(k.kids) do if alive(M, c) then b = math.min(b, prio(c)) end end; return b
+    end
+    while #kids > 1 do
+      local need = M.sep * (#kids - 1)
+      for _, k in ipairs(kids) do need = need + (k.min and min_px(M, n.ax) or node_min(M, k, n.ax)) end
+      if need <= avail_px then break end
+      local worst, wp = nil, -1
+      for i, k in ipairs(kids) do local pr = prio(k); if pr >= wp then worst, wp = i, pr end end
+      lay.squeezed = lay.squeezed or {}
+      lay.squeezed[#lay.squeezed + 1] = kids[worst]
+      table.remove(kids, worst); table.remove(frs, worst); table.remove(mins, worst)
+      fs = 0; for _, v in ipairs(frs) do fs = fs + v end
+    end
+  end
   local total = (n.ax == 'h' and w or h) - M.sep * (#kids - 1)
   local px, used = {}, 0
   -- 20 окт: свёрнутые листы — свой размер, остальным — остаток по долям

@@ -1269,7 +1269,8 @@ ctx = {
     items[#items + 1] = { key = 'p', label = 'pt-mode (ProTracker: 4 channels, 31 samples, 64 rows, x2)', fn = function() ctx.pt_toggle() end }
     items[#items + 1] = { key = 'b', label = 'sample - the big sample editor', fn = function() ctx.sample_big() end }
     if state.pmgrid then items[#items + 1] = { key = 'm', label = 'pm cards - projects over the whole window', fn = function() ctx.pm_big() end } end
-    items[#items + 1] = { key = 'o', label = 'zoom out - a row is a beat (:macro)', fn = function() vim.run_cmd('macro') end }   -- 7 ноя: m — у pm cards
+    items[#items + 1] = { key = 'o', label = 'overview - the whole song (zo)', fn = function() ctx.overview_toggle() end }   -- 9 ноя: = zo (было :macro)
+    items[#items + 1] = { key = 'v', label = 'viper - the tracker as a REAPER panel, Vim keys in REAPER' .. (state.viper and '  *' or ''), fn = function() ctx.viper_toggle() end }   -- 9 ноя
     local have = {}
     for _, name in ipairs(order) do have[name] = true end
     for i, k in ipairs({ 'z', 'x', 'c' }) do
