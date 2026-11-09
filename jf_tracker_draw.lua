@@ -7546,6 +7546,24 @@ D.prof, D.prof_on, D.prof_ord = {}, false, 0
 -- 21 окт: и память — сборщик стоит на время кадра (stop / restart), разница count между метками = КБ,
 -- выделенные участком (куча гуляла 310..540 МБ: ~0.5 МБ мусора за кадр — искать, кто)
 local pm_name, pm_t, pm_k
+-- 9 ноя: имя по ширине: целиком; не влезает — первая буква + согласные (Track 1 → Trck1 → Trk1 → Tr1), номер в конце
+-- остаётся (свой — цифры имени, иначе num — номер трека, если имя не уникально)
+local VOW = { a = 1, e = 1, i = 1, o = 1, u = 1, y = 1, A = 1, E = 1, I = 1, O = 1, U = 1, Y = 1 }
+function D.abbr(name, aw, meas, num)
+  name = name or ''
+  local suf = num and (' ' .. num) or ''
+  if meas(name .. suf) <= aw then return name .. suf end
+  local base, dig = name:match('^(.-)%s*(%d+)$')
+  if not base then base, dig = name, num and tostring(num) or '' end
+  local h, rest = base:sub(1, 1), base:sub(2)
+  local cons = rest:gsub('[%s%p]', ''):gsub('.', function(ch) return VOW[ch] and '' or ch end)
+  local s = h .. cons
+  while #s > 1 and meas(s .. dig) > aw do s = s:sub(1, -2) end
+  if meas(s .. dig) > aw then s = '' end
+  local out = s .. dig
+  while #out > 1 and meas(out) > aw do out = out:sub(1, -2) end
+  return out
+end
 function D.pmark(name)
   if not D.prof_on then if pm_name then collectgarbage('restart') end; pm_name = nil; return end
   local t = reaper.time_precise()
@@ -8858,6 +8876,8 @@ function D.frame(L, snap, rows, state, info)
   if L.mix_pane then set(U.PANEL); gfx.rect(L.mix_pane.x, L.mix_pane.y, L.mix_pane.w, L.mix_pane.h, 1) end
   -- заголовок
   local hy = L.header_y
+  -- 9 ноя: одинаковые имена треков — в сокращённом имени номер трека в конце (иначе не отличить)
+  do local cnt = {}; D.hdr_dups = {}; for _, c in ipairs(L.cols or {}) do local n = c.col and c.col.name or ''; cnt[n] = (cnt[n] or 0) + 1; if cnt[n] > 1 then D.hdr_dups[n] = true end end end
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
   local HX = L.hname_x or 0   -- 20 окт: запас строки имени — всё под именем ниже на HX
   hy = hy + HX
@@ -8925,11 +8945,12 @@ function D.frame(L, snap, rows, state, info)
       local k = L.hname_k or 1
       if k > 1 then
         local s, aw = nm, c.w - 2 * L.pad - indent
-        local bk = nm .. '|' .. aw .. '|' .. k                          -- 20 окт: обрезка по ширине — кэш (не мерить каждый кадр)
+        local dn = D.hdr_dups and D.hdr_dups[nm] and c.ci or nil
+        local bk = nm .. '|' .. aw .. '|' .. k .. '|' .. tostring(dn)  -- 20 окт: обрезка по ширине — кэш (не мерить каждый кадр)
         D.bign = D.bign or {}
         if D.bign[bk] then s = D.bign[bk]
         else
-          while #s > 1 and D.big_measure(s, k) > aw do s = s:sub(1, -2) end
+          s = D.abbr(nm, aw, function(t) return D.big_measure(t, k) end, dn)   -- 9 ноя: по согласным, номер в конце
           D.bign_n = (D.bign_n or 0) + 1; if D.bign_n > 500 then D.bign, D.bign_n = {}, 0 end
           D.bign[bk] = s
         end
@@ -8937,7 +8958,7 @@ function D.frame(L, snap, rows, state, info)
       else
         local amw = 0
         if (not c.folded or c.pan) and c.w - 2 * L.pad - indent > ms('www') + 4 + 3 * L.cw then amw = D.amode_tag(L, c.x + c.w - L.pad, hy - HX + 1 + math.floor(HX / 2), col, hover, mx, my) end   -- 31 окт
-        text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), fit(nm, c.w - 2 * L.pad - indent - (amw > 0 and amw + 2 or 0)), ncol)
+        text(c.x + L.pad + indent, hy - HX + 1 + math.floor(HX / 2), D.abbr(nm, c.w - 2 * L.pad - indent - (amw > 0 and amw + 2 or 0), ms, D.hdr_dups and D.hdr_dups[nm] and c.ci or nil), ncol)   -- 9 ноя: по согласным
       end
     else
       -- 1 ноя: big trackname — и мастер крупно
