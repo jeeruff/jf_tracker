@@ -24864,7 +24864,12 @@ local function frame()
   -- 31 окт: и без lock курсор трекера сдвинулся (транспорт стоит) — edit-курсор REAPER туда же: Space в REAPER играет
   -- с курсора трекера (было: со старого места — «курсор на 0, а играет 1.4»). Только при сдвиге трекера: щелчок в
   -- arrange курсор REAPER ставит сам и не перебивается
-  if not state.lock and not state.viper and ctx.ecur_row ~= vim.cur.row then
+  if ctx.vl_on then   -- 9 ноя: слой viper — курсор трекера ведёт REAPER: трек колонки выделен
+    local f = L and L.flat and L.flat[vim.cur.fi]
+    local tr = f and f.col and f.col.track
+    if tr and tr ~= ctx.vl_track and reaper.ValidatePtr(tr, 'MediaTrack*') then ctx.vl_track = tr; reaper.SetOnlyTrackSelected(tr); reaper.SetMixerScroll(tr) end
+  end
+  if not state.lock and (not state.viper or ctx.vl_on) and ctx.ecur_row ~= vim.cur.row then
     if reaper.GetPlayState() & 1 == 0 then reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false); ctx.ecur_row = vim.cur.row end
   end
   if not ctx.win_focus then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
@@ -31149,6 +31154,7 @@ local function frame()
   if t_4 - t_0 > prof.max then prof.max = t_4 - t_0 end
 
   draw.pmark('keys, commands, polls')
+  pcall(ctx.vlayer_tick)   -- 9 ноя: слой viper — клавиши окна REAPER
   local c = gfx.getchar()
   ctx.frame_t, ctx.frame_t_prev = reaper.time_precise(), ctx.frame_t   -- время кадра: окно отпусканий клавиш (автоповтор)
   ctx.mod_tick(c)
@@ -31174,6 +31180,7 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
+  if c <= 0 and ctx.vlq and #ctx.vlq > 0 then local e = table.remove(ctx.vlq, 1); c = e[1]; inject_cap = e[2] end   -- 9 ноя: клавиши слоя viper из окна REAPER
   c = ctx.space_leader(c, from_q)   -- 9 ноя: зажатый Space — лидер (тап — Play / Stop на отпускание)
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
   if ctx.BF and c > 0 then   -- 6 ноя: большой фейдер — клавиатура ему (и меткам f)
@@ -33250,6 +33257,64 @@ ctx.space_leader = function(c, from_q)
      or ctx.cm_typing() or (OPT and OPT.typing) or (FB and FB.typing) then return c end
   ctx.spc = { t = now }
   return 0
+end
+-- 9 ноя: СЛОЙ VIPER — Vim-клавиши в окне REAPER (замена reaper-keys без keymap): пока viper вкл, на переднем плане
+-- главное окно REAPER, фокус не у трекера и не в поле ввода и не держится Cmd / Ctrl / Opt — клавиши перехвачены
+-- (JS_VKeys_Intercept) и идут в трекер, как будто он в фокусе. Модификатор зажат — перехват снят (Cmd+S и т. п. —
+-- REAPER). При выходе трекера — снимается всегда (JF_TRACKER_SAVE_WIN)
+ctx.VL_OEM = { [186] = { ';', ':' }, [187] = { '=', '+' }, [188] = { ',', '<' }, [189] = { '-', '_' }, [190] = { '.', '>' }, [191] = { '/', '?' },
+  [192] = { '`', '~' }, [219] = { '[', '{' }, [220] = { '\\', '|' }, [221] = { ']', '}' }, [222] = { "'", '"' } }
+ctx.VL_SHDIG = { [48] = ')', [49] = '!', [50] = '@', [51] = '#', [52] = '$', [53] = '%', [54] = '^', [55] = '&', [56] = '*', [57] = '(' }
+ctx.VL_SPEC = { [8] = 8, [9] = 9, [13] = 13, [27] = 27, [32] = 32, [37] = 1818584692, [38] = 30064, [39] = 1919379572, [40] = 1685026670, [46] = 6579564 }
+ctx.vl_vks = function()
+  local t = {}
+  for v = 0x41, 0x5A do t[#t + 1] = v end
+  for v = 0x30, 0x39 do t[#t + 1] = v end
+  for v in pairs(ctx.VL_OEM) do t[#t + 1] = v end
+  for v in pairs(ctx.VL_SPEC) do t[#t + 1] = v end
+  return t
+end
+ctx.vlayer_release = function()
+  if not ctx.vl_on then return end
+  for _, v in ipairs(ctx.vl_vks()) do reaper.JS_VKeys_Intercept(v, -1) end
+  ctx.vl_on = nil
+end
+ctx.vlayer_tick = function()
+  if not (reaper.JS_VKeys_Intercept and reaper.JS_VKeys_GetDown and reaper.JS_Window_GetFocus) then return end
+  local want = false
+  local st = reaper.JS_VKeys_GetState(0)
+  local function dn(v) return st and st:byte(v) ~= 0 end
+  if state.viper then
+    local main = reaper.GetMainHwnd()
+    local fg = reaper.JS_Window_GetForeground()
+    local foc = reaper.JS_Window_GetFocus()
+    ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
+    if fg == main and foc and foc ~= ctx.my_hwnd and not (dn(17) or dn(18) or dn(91) or dn(92)) then
+      local cls = (reaper.JS_Window_GetClassName(foc) or ''):lower()
+      if not (cls:find('edit') or cls:find('combo') or cls:find('text')) then want = true end
+    end
+  end
+  local now = reaper.time_precise()
+  if want and not ctx.vl_on then
+    for _, v in ipairs(ctx.vl_vks()) do reaper.JS_VKeys_Intercept(v, 1) end
+    ctx.vl_on = true; ctx.vl_t = now
+    return
+  elseif not want then ctx.vlayer_release(); return end
+  local d = reaper.JS_VKeys_GetDown(ctx.vl_t or now)
+  ctx.vl_t = now
+  if not d then return end
+  local sh = dn(16)
+  ctx.vlq = ctx.vlq or {}
+  for _, v in ipairs(ctx.vl_vks()) do
+    if d:byte(v) ~= 0 then
+      local c
+      if v >= 0x41 and v <= 0x5A then c = sh and v or (v + 32)
+      elseif v >= 0x30 and v <= 0x39 then c = sh and ctx.VL_SHDIG[v]:byte() or v
+      elseif ctx.VL_OEM[v] then c = ctx.VL_OEM[v][sh and 2 or 1]:byte()
+      else c = ctx.VL_SPEC[v] end
+      if c then ctx.vlq[#ctx.vlq + 1] = { c, sh and 8 or nil } end
+    end
+  end
 end
 ctx.cm_typing = function() local cm = draw.CM[state.focus]; return cm and cm.typing and cm.typing() or false end
 ctx.cm_draw = function(id, Lx, x, y, w, h, foc)
@@ -39202,7 +39267,7 @@ ctx.mx_more = function()
 end
 -- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
 -- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
-JF_TRACKER_SAVE_WIN = function() pcall(edit.item_drag_end); pcall(ctx.arm_restore); pcall(ctx.vkb_restore); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: арм / вход прослушки — вернуть при выходе   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
+JF_TRACKER_SAVE_WIN = function() pcall(ctx.vlayer_release); pcall(edit.item_drag_end); pcall(ctx.arm_restore); pcall(ctx.vkb_restore); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: арм / вход прослушки — вернуть при выходе   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
 if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
