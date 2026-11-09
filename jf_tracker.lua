@@ -19774,6 +19774,12 @@ function view_actions()
   return {
     { (state.meters and '!' or '') .. 'Peak meters over tracks (:meters)', key = 'm', fn = function() state.meters = not state.meters end },
     { 'Options window', key = 'o', fn = function() ctx.options() end },
+    -- 9 ноя: SPC v p / P / 1 2 3 — пиксельный режим, PT-mode, размер шрифта
+    { ((state.pixel ~= false) and '!' or '') .. 'pixel mode', key = 'p', fn = function() ctx.set_pixel(state.pixel == false) end },
+    { (state.ptmode and '!' or '') .. 'PT-mode (ProTracker)', key = 'P', fn = function() ctx.pt_toggle() end },
+    { 'font x1', key = '1', fn = function() ctx.set_scale(1); relayout(); vim.msg = 'font size x1' end },
+    { 'font x2', key = '2', fn = function() ctx.set_scale(2); relayout(); vim.msg = 'font size x2' end },
+    { 'font x3', key = '3', fn = function() ctx.set_scale(3); relayout(); vim.msg = 'font size x3' end },
     { 'Theme and fonts (options tab)', key = 't', fn = function() ctx.options(); OPT.set_tab('theme') end },   -- 10 окт: вместо Font +1 / -1 / bitmap
     { (state.dsp and '!' or '') .. 'DSP panel (:dsp)', key = 'D', fn = ctx.toggle_dsp },
     { 'Matrix zoom: ' .. (MX.zoom == 'detail' and 'schematic' or 'detail') .. ' (:mxzoom)', key = 'z', fn = ctx.mx_zoom },

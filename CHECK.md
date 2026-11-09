@@ -2600,3 +2600,4 @@
 - 9 ноя: SPC m — меню того, что под курсором (= \); опции → группа leader key: space leader, space opens (main / here), задержка автопоказа
 - 9 ноя: сжатие панелей — не влезают с минимумом (6 строк / 16 знаков; трекер 10 строк) — менее важные прячутся целиком: tracker > lib > browser > reform > dsp > item > остальные; screensets v — viper, o — обзор (zo)
 - 9 ноя: складывание панелей — только шрифт x2 / pixel mode (x1 — минимумы прежние); вкладка region playlist → playlist
+- 9 ноя: SPC v p — pixel mode, SPC v P — PT-mode, SPC v 1 2 3 — шрифт x1 x2 x3
