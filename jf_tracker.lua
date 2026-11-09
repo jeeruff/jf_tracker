@@ -289,6 +289,7 @@ local state = {
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
   mpin = flag('mpin', true),
   spcleader = flag('spcleader', true),
+  holdmetro = flag('holdmetro', false),           -- 9 ноя: щелчки метронома, пока держишь ноту в INSERT
   spcmenu = reaper.GetExtState(EXT, 'spcmenu') == 'here' and 'here' or 'main',   -- 9 ноя: Space открывает: главное меню / меню под курсором
   spcdelay = tonumber(reaper.GetExtState(EXT, 'spcdelay')) or 250,           -- 9 ноя: держать Space до автопоказа меню, мс            -- 9 ноя: зажатый Space — лидер (тап — Play / Stop)                     -- 8 ноя: мастер приколот справа (выкл — обычный крайний трек)
   bigcur = flag('bigcur', false),                 -- cursor zoom: строка курсора лупой ×2 (8 окт; 15 окт — и без fixed)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
@@ -720,7 +721,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel', 'mpin', 'spcleader' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel', 'mpin', 'spcleader', 'holdmetro' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -15704,6 +15705,8 @@ ctx = {
           { key = 'p', label = 'punch: time selection = pattern/bar', fn = ctx.punch },
           { key = 'o', label = 'record mode', sub = function() return ctx.hydra_recmode() end },
           { key = 'l', label = 'fixed lanes on/off (:lanes)', fn = ctx.toggle_lanes },
+          { key = 'c', label = 'click while a note is held (INSERT): metronome by the beats' .. (state.holdmetro and '  *' or ''), fn = function()   -- 9 ноя
+              state.holdmetro = not state.holdmetro; vim.msg = 'click while holding a note: ' .. (state.holdmetro and 'on' or 'off') end },
         } } end },
       { key = 'i', label = 'insert: note / slice / whole sample / automation', sub = function() return ctx.insert_hydra() end },
       -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb); 30 окт: clipkb убран
@@ -16021,6 +16024,44 @@ ctx.hold_cap = function(lm, sec)
   local rg = pooled.region_at(regions, lm.t0 + 1e-4)
   if rg and rg.rgnend then return math.min(sec, rg.rgnend - lm.t0) end
   return sec
+end
+-- 9 ноя: щелчки метронома при удержании ноты (опция record → c): транспорт стоит, щелчок — свой короткий звук через
+-- превью SWS на каждой доле, которую «проходит» нота (время удержания от её начала), первая доля такта — выше
+ctx.click_file = function(acc)
+  local dir = reaper.GetResourcePath() .. '/Data/jf_tracker'
+  local path = dir .. (acc and '/click_hi.wav' or '/click_lo.wav')
+  if reaper.file_exists(path) then return path end
+  reaper.RecursiveCreateDirectory(dir, 0)
+  local sr, n, f = 44100, 1600, acc and 1800 or 1200
+  local t = {}
+  for i = 0, n - 1 do
+    local v = math.sin(2 * math.pi * f * i / sr) * math.exp(-i / 220) * 0.8
+    t[#t + 1] = string.pack('<i2', math.floor(v * 32767))
+  end
+  local data = table.concat(t)
+  local fh = io.open(path, 'wb'); if not fh then return nil end
+  fh:write('RIFF', string.pack('<I4', 36 + #data), 'WAVEfmt ', string.pack('<I4I2I2I4I4I2I2', 16, 1, 1, sr, sr * 2, 2, 16), 'data', string.pack('<I4', #data), data)
+  fh:close()
+  return path
+end
+ctx.hold_click = function(lm, now)
+  if not (reaper.CF_CreatePreview and lm.t0) then return end
+  local q0 = reaper.TimeMap2_timeToQN(0, lm.t0)
+  local q1 = reaper.TimeMap2_timeToQN(0, lm.t0 + (now - lm.t_press))
+  local key = tostring(lm.t_press)
+  if ctx.hc_key ~= key then ctx.hc_key, ctx.hc_q = key, math.floor(q0 + 1e-6) end
+  local qn = math.floor(q1 + 1e-6)
+  if qn <= ctx.hc_q then return end
+  ctx.hc_q = qn
+  local _, qms = reaper.TimeMap_QNToMeasures(0, qn)
+  local acc = qms and math.abs(qn - qms) < 1e-6
+  ctx.hc_src = ctx.hc_src or {}
+  local src = ctx.hc_src[acc and 1 or 2] or reaper.PCM_Source_CreateFromFile(ctx.click_file(acc) or '')
+  if not src then return end
+  ctx.hc_src[acc and 1 or 2] = src   -- источник живёт всё время (превью играет из него)
+  local pv = reaper.CF_CreatePreview(src)
+  reaper.CF_Preview_SetValue(pv, 'D_VOLUME', 0.6)
+  reaper.CF_Preview_Play(pv)
 end
 ctx.pat_cut_over = function(items)
   if not items or ctx.view_cur() == 'pattern' or not regions or #regions == 0 then return end   -- 9 ноя: pat — контекст паттерна, не режем; proj / sec — продолжение в следующем
@@ -31966,6 +32007,7 @@ local function frame()
         if rd > 0 and now - rl.t >= rd then rl.t = rl.t + rd; if now - rl.t > rd then rl.t = now end; c = c_held end
       elseif vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(ctx.hold_cap(lm, now - lm.t_press)) then
         ctx.hold_len = lm; reaper.UpdateArrange()
+        if state.holdmetro then pcall(ctx.hold_click, lm, now) end
       end
     else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) }; ctx.roll = nil end
   end
