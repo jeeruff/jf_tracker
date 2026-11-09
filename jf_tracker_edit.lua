@@ -1839,11 +1839,20 @@ local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted, t_row
 end
 -- 21 окт: клавишу ноты держат (автоповтор macOS) — длина последней вставленной ноты = время удержания (sec),
 -- от её начала, не дальше конца item; без undo на каждый шаг (одним — на отпускании, main)
--- 9 ноя: аудио (сэмпл / слайс) — тоже длина удержанием: пока клавиша держится, айтем от начала до сейчас (не длиннее, чем
--- вставлен — дальше чужой звук слайса); отпустил — длина остаётся
+-- 9 ноя: аудио (сэмпл / слайс) — тоже длина удержанием: пока клавиша держится, айтем от начала до сейчас (до конца
+-- сэмпла, за паттерн тоже); отпустил — длина остаётся
 function E.audio_hold(it, t0)
   if not (it and R.ValidatePtr(it, 'MediaItem*')) then return end
-  E.last_midi = { item = it, audio = true, t0 = t0, len0 = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), t_press = R.time_precise() }
+  -- предел — остаток сэмпла от точки старта (не длина вставки: она обрезана паттерном / следующим событием); луп — без предела
+  local tk = R.GetActiveTake(it)
+  local cap = 600
+  if tk and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then
+    local src = R.GetMediaItemTake_Source(tk)
+    local sl = src and select(1, R.GetMediaSourceLength(src)) or 0
+    local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'); if rate <= 0 then rate = 1 end
+    if sl > 0 then cap = math.max(R.GetMediaItemInfo_Value(it, 'D_LENGTH'), (sl - R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) / rate) end
+  end
+  E.last_midi = { item = it, audio = true, t0 = t0, len0 = cap, t_press = R.time_precise() }
 end
 function E.hold_length(sec)
   local lm = E.last_midi
