@@ -1882,7 +1882,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
     U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)
     local pk = wavebar and ctx.peaks and ctx.peaks(e, math.max(16, w))
-    U.set(U.mix(base, U.BG, 0.35))
+    U.set(U.mix(base, U.TEXT, 0.3))   -- 10 ноя: ярче (было в сторону фона — пропадала на тёмном)
     if not wavebar then U.set(U.DIM); gfx.rect(x, sy + math.floor(SBH / 2), w, 1, 1) end   -- обычная полоса: дорожка
     if pk and pk.n > 0 then
       local c2, h2 = sy + SBH / 2, SBH / 2
@@ -1970,6 +1970,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     end
     local troom = math.max(0, (by2 ~= fy and (x + w) or bx) - x - L.pad)
     if bar_y then ovbar(bar_x, bar_y, bar_w, BH) end   -- 17 окт: полоса-обзор — наверху (см. bar_y)
+    if bar_y and fy + rh > bar_y and fy < bar_y + BH then fy = bar_y - rh - 1 end   -- 10 ноя: подсказка — не на полосе-обзоре (наслаивалась)
     if foot ~= S.msg and U.hint_text then U.hint_text(x, fy, foot, troom, U.PANEL)   -- 15 окт: стандарт подсказок
     else U.text(x, fy, ctx.fit(foot, troom), U.GREY) end   -- 10 окт: подсказка — приглушённо
   end
