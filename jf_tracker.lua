@@ -26728,7 +26728,7 @@ local function frame()
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
     local ks = {}; for k in pairs(hover) do ks[#ks + 1] = k end; table.sort(ks)
     if hover.matrix then for k, v in pairs(hover.matrix) do ks[#ks + 1] = 'mx.' .. k .. '=' .. tostring(v) end end
-    reaper.SetExtState(EXT, 'dbg', ('%d,%d %s | %s || pool: %s'):format(gfx.mouse_x, gfx.mouse_y, table.concat(ks, ' '), state.status, (draw.pool_dbg or '') .. ' || ' .. tostring(SL.dbg)), false)
+    reaper.SetExtState(EXT, 'dbg', ('%d,%d %s | %s || pool: %s'):format(math.floor(gfx.mouse_x), math.floor(gfx.mouse_y), table.concat(ks, ' '), state.status, (draw.pool_dbg or '') .. ' || ' .. tostring(SL.dbg)), false)
   end
 
   -- мышь
