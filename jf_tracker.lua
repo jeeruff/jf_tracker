@@ -1587,15 +1587,15 @@ ctx = {
     if on == nil then on = not (state.view_reg and not state.view_secmode) end
     ctx.view_mode(on and 'pattern' or 'project')
   end,
-  -- 26 окт: вид — project (весь трек) / section (секция курсора, zs) / pattern (паттерн курсора, zp); транспозиция
+  -- 26 окт: вид — project (весь трек) / section (секция курсора, zS) / pattern (паттерн курсора, zp); транспозиция
   -- и чистка трека берут то, что видно (WYSIWYG, ctx.view_rows)
   view_mode = function(m)
     state.view_reg = m ~= 'project'
     state.view_secmode = m == 'section' or nil
     state.view_sec = nil; state.view_item = nil
-    vim.msg = ({ project = 'view: the whole project (zs - the section, zp - the pattern)',
-      section = 'view: the section of the cursor (zs again - the whole project, zp - the pattern)',
-      pattern = 'view: the pattern of the cursor only (zp again - the whole project, zs - the section)' })[m]
+    vim.msg = ({ project = 'view: the whole project (zS - the section, zp - the pattern)',
+      section = 'view: the section of the cursor (zS again - the whole project, zp - the pattern)',
+      pattern = 'view: the pattern of the cursor only (zp again - the whole project, zS - the section)' })[m]
   end,
   view_cur = function() return not state.view_reg and 'project' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern') end,
   -- секция курсора: { pos, rgnend, name } или nil
@@ -15745,7 +15745,7 @@ ctx = {
       { key = 'd', label = (((state.panes_ui and L and L.pn) and draw.panes.visible(state.panes, 'dsp')) or (not (state.panes_ui and L and L.pn) and state.dsp)) and 'hide DSP (:dsp)' or 'show DSP (:dsp)', fn = function() ctrl_action('q_dsp', 0) end },   -- панели: лист DSP
       { key = 'o', label = 'options (quick toggles)', sub = function() return ctx.options_hydra() end },
       -- 27 окт: S — скринсеты: загрузить (цифры / буквы), сохранить текущий вид
-      { key = 'S', label = 'screensets …', sub = function()
+      { key = 's', label = 'screensets …', sub = function()   -- 9 ноя: лидер s (было S)
           local sets, order = ctx.ss_read()
           local items = {}
           local keysq = '1234567890abcdefghijklmnopqrtuvwxyz'
@@ -34996,6 +34996,26 @@ ctx.fit_slim = function()
 end
 -- 4 ноя: zT — зум трека: трек курсора во всю ширину со всеми событиями (колонки нот, команды, автоматизация, MIDI-лейны),
 -- остальные — свёрнуты полоской (события видны точками, контекст); ещё раз — как было
+-- 9 ноя: zs — зум выделения: строки VISUAL (без него — time selection REAPER) во весь экран — самый крупный LPB, при
+-- котором влезают, вид — с их начала, колонка первого трека выделения — первой
+ctx.zoom_sel = function(f0, r0, r1)
+  local q0, q1
+  if r0 then q0, q1 = r0 / state.lpb, (r1 + 1) / state.lpb
+  else
+    local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    if b - a > 1e-6 then q0, q1 = reaper.TimeMap2_timeToQN(0, a), reaper.TimeMap2_timeToQN(0, b) end
+  end
+  if not q0 then vim.msg = 'zs: select rows first (v / V) or make a time selection in REAPER'; return end
+  local nrows = math.max(4, (L and L.nrows or 32) - 1)
+  local pick = LPBS[1]
+  for _, v in ipairs(LPBS) do if (q1 - q0) * v <= nrows + 1e-6 then pick = v end end
+  set_lpb(pick)
+  state.row0 = math.floor(q0 * state.lpb + 1e-6)
+  vim.cur.row = state.row0
+  local f = f0 and L and L.flat and L.flat[f0]
+  if f and f.ci then state.hscroll = f.ci; relayout(); for i, g in ipairs(L.flat) do if g.ci == f.ci then vim.cur.fi = i; break end end end
+  vim.msg = ('zs: the selection on the screen - LPB %s (zo - overview, - + zoom)'):format(draw.lpb_s(state.lpb))
+end
 ctx.zoom_track = function()
   local function copy(t) local o = {}; for k, v in pairs(t or {}) do o[k] = v end; return o end
   local zt = ctx.zt_saved

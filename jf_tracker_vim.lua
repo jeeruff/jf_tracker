@@ -3244,7 +3244,11 @@ function V.key_impl(c)
       elseif c == ('X'):byte() then if ctx.dsp_tall then ctx.dsp_tall('mixer') end   -- 26 окт: zX — микшер в 1.5 раза выше, ещё раз — назад
       elseif c == ('1'):byte() then if ctx.mono_lane_cur then ctx.mono_lane_cur() end   -- 24 окт: z1 — трек курсора на одном нотном лейне (моно), ещё раз — свободно
       elseif c == ('p'):byte() then if ctx.view_reg then ctx.view_reg() end   -- 20 окт: zp — вид: паттерн курсора / весь проект
-      elseif c == ('s'):byte() then if ctx.view_mode then ctx.view_mode(ctx.view_cur() == 'section' and 'project' or 'section') end   -- 26 окт: zs — вид: секция курсора / весь проект
+      elseif c == ('S'):byte() then if ctx.view_mode then ctx.view_mode(ctx.view_cur() == 'section' and 'project' or 'section') end   -- 9 ноя: zS — вид: секция курсора / весь проект (было zs)
+      elseif c == ('s'):byte() then   -- 9 ноя: zs — зум выделения: VISUAL (иначе time selection REAPER) во весь экран
+        local f0, r0, r1
+        if V.mode == 'visual' or V.mode == 'vline' then local a, _, b, d = V.visual_range(); f0, r0, r1 = a, b, d; V.mode = 'normal'; V.anchor = nil end
+        if ctx.zoom_sel then ctx.zoom_sel(f0, r0, r1) end
       elseif c == ('u'):byte() then V.unfold_zoom()   -- 20 окт: zu — раскрыть сложенные ноты (LPB до 128), ещё раз — назад
       elseif c == ('r'):byte() then if ctx.dsp_big then ctx.dsp_big() end            -- zr: роутер на месте трекера (7 окт)
       elseif c == ('R'):byte() then if ctx.router_big then ctx.router_big() end      -- zR: большой роутер на всё окно (7 окт)
@@ -4674,7 +4678,7 @@ local PENDING_HINT = {
   c = 'c: c rows (replace) | w event | j k rows | } { bar | Esc',
   g = 'g: g top | 12 Enter row 0012 | p P pattern start / end | n N next / prev pattern (same row) | s S section start / end | w swap | m metronome | q Q quantize / input quantize | t module menu | T project tab | VISUAL: i interpolate, r reform | Esc',
   T = 'T: f add take fx to the note under the cursor | o its take fx chain in DSP | Esc',
-  z = 'z: a fold / open | o overview | E hide empty (all) | C monitor FX | ! strip | m mixer | M master | _ minimize | f k folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | t track view | b bottom',   -- 15 окт: главное; полный список — меню which-key
+  z = 'z: a fold / open | o overview | s zoom selection | S section view | E hide empty (all) | C monitor FX | ! strip | m mixer | M master | _ minimize | f k folder | F all | . , < > width | z zoom | u unfold rows | p pattern / project | t track view | b bottom',   -- 15 окт: главное; полный список — меню which-key
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',

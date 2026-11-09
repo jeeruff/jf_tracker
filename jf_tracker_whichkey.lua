@@ -30,7 +30,7 @@ local T = {
         { 'e', 'instrument window' }, { 'C', 'monitor FX' }, { '!', '1-char strip' }, { 'f', 'fold the folder' }, { 'k', 'folder: kids narrow' },
         { 'F', 'fold / open all' }, { '_', 'minimize the pane' }, { 'm', 'mixer' }, { 'M', 'master' },
         { '> <', 'all wider / narrower' }, { '. ,', 'track wider / narrower' }, { 'x', 'crossfade editor' }, { 'X', 'mixer taller' },
-        { 'u', 'unfold fast notes' }, { 'p', 'pattern / project' }, { 's', 'section / project' }, { 'r', 'router' },
+        { 'u', 'unfold fast notes' }, { 'p', 'pattern / project' }, { 's', 'zoom the selection (VISUAL / time sel.)' }, { 'S', 'section / project' }, { 'r', 'router' },
         { 'R', 'big router' } } },
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },
