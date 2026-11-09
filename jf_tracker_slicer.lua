@@ -1648,10 +1648,14 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local a, b = math.max(va, zt - W2), math.min(vb, zt + W2)
     if b > va and a < vb then
       local xa, xb = tx(a), math.max(tx(a) + 1, tx(b))
-      gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.14); gfx.rect(xa, wy, xb - xa, wh, 1)
-      gfx.a = 0.6; gfx.rect(xa, wy, xb - xa, wh, 0); gfx.a = 1
+      -- 10 ноя: без заливки (волна под ней пропадала) — только края окна, сверху и снизу уголками
+      gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.8)
+      gfx.rect(xa, wy, 1, wh, 1); gfx.rect(xb - 1, wy, 1, wh, 1)
+      local cw = math.min(6, math.floor((xb - xa) / 3))
+      gfx.rect(xa, wy, cw, 1, 1); gfx.rect(xb - cw, wy, cw, 1, 1); gfx.rect(xa, wy + wh - 1, cw, 1, 1); gfx.rect(xb - cw, wy + wh - 1, cw, 1, 1)
+      gfx.a = 1
     end
-    if zt >= va and zt <= vb then U.set(U.AMBER); gfx.rect(tx(zt), wy, 1, wh, 1) end
+    if zt >= va and zt <= vb then gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.45); gfx.rect(tx(zt), wy, 1, wh, 1); gfx.a = 1 end
   end
   if ZH > 0 then
     local zy = zy_top or (wy + wh + 2)
