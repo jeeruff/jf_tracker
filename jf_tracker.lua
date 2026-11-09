@@ -13594,7 +13594,7 @@ ctx = {
       flag('noautofloat', 'no REAPER auto-float', 'REAPER action FX: Auto-float new FX windows is turned off on start: the window of a new effect takes the keyboard from the tracker (told once, the first time); :autofloat turns it back on and this off'),
       { key = 'knob', label = 'slider knob', kind = 'cycle', values = { 'auto', 'pixel', 'bar', 'block', 'diamond' }, desc = 'the handle of the sliders: pixel - a pixel-art diamond (grows with the font), bar - a sharp vertical bar, block - a square, diamond - the old smooth one (blurs in pixel mode); auto - pixel in pixel mode, else diamond', get = function() return state.knob or 'auto' end, set = function(v) state.knob = v end },
       { key = 'spcmenu', label = 'space opens', kind = 'cycle', values = { 'main', 'here' }, desc = 'hold Space: main - the main menu (SPC m - what is under the cursor), here - the menu of what is under the cursor (\\\\ - its main menu item)', get = function() return state.spcmenu or 'main' end, set = function(v) state.spcmenu = v end },
-      { key = 'spcdelay', label = 'space hold before the menu', kind = 'num', min = 100, max = 800, step = 50, fmt = '%d ms', desc = 'how long Space is held before the menu shows by itself (a key pressed sooner goes into it at once)', get = function() return state.spcdelay or 250 end, set = function(v) state.spcdelay = v end },
+      { key = 'spcdelay', label = 'space hold before the menu', kind = 'num', min = 50, max = 800, step = 1, fmt = '%d ms', desc = 'how long Space is held before the menu shows by itself (a key pressed sooner goes into it at once); a tap shorter than this plays / stops. :spctrain - tap Space 8 times as you do for play, it sets this just above your longest tap', get = function() return state.spcdelay or 250 end, set = function(v) state.spcdelay = v end },
       { key = 'spcleader', label = 'space leader', kind = 'toggle', desc = 'hold Space and press a key - the main menu (which-key) with that key; hold longer - the menu opens by itself; a tap of Space plays / stops as before (on release). Needs js_ReaScriptAPI', get = function() return state.spcleader ~= false end, set = function(v) state.spcleader = v end },
       { key = 'pixel', label = 'pixel mode', kind = 'toggle', desc = 'the frame is drawn at half the size and shown x2 without smoothing - four times fewer pixels, much faster on a big screen; the bitmap font looks the same, thin lines get 2 px, small labels can not be smaller than the normal font (:pixel)', get = function() return state.pixel ~= false end, set = function(v) state.pixel = v; draw.set_font(state); relayout() end },
       flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
@@ -33390,6 +33390,18 @@ ctx.space_leader = function(c, from_q)
     if c == 32 then return 0 end                               -- автоповтор Space — проглотить
     if not held then
       ctx.spc = nil
+      if ctx.spc_train then   -- 10 ноя: тренер — тап замерен, не играет
+        local T = ctx.spc_train
+        T[#T + 1] = now - S.t
+        if #T >= 8 then
+          local mx = 0; for _, v in ipairs(T) do mx = math.max(mx, v) end
+          state.spcdelay = math.max(50, math.min(800, math.floor(mx * 1000 * 1.15 + 25)))
+          ctx.spc_train = nil
+          vim.msg = ('space trainer: your longest tap %d ms - the menu now waits %d ms (option space hold before the menu)'):format(math.floor(mx * 1000), state.spcdelay)
+        else vim.msg = ('space trainer: tap %d / 8 - %d ms; tap Space as you do for play'):format(#T, math.floor((now - S.t) * 1000)) end
+        if vim.hydra then vim.key(27) end
+        return c
+      end
       if S.menu then if vim.hydra and not S.used then vim.key(27) end
       elseif not S.used then table.insert(ctx.keyq, 1, 32) end   -- тап — Space как раньше (из очереди мимо лидера)
       return c
