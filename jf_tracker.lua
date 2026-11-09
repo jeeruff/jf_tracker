@@ -13651,7 +13651,7 @@ ctx = {
       { key = 'poolsort', label = 'instrument order', kind = 'cycle', values = { 'track', 'name', 'len', 'mark', 'type' }, desc = 'lib order: by track / name / length / marks / type - audio, video (or click the column heads)', get = function() return state.poolsort or 'track' end, set = function(v) state.poolsort = v end },
       flag('autosync', 'auto sync pooled', 'edits in a pattern copy to its pooled repeats (same region name)'),
       { key = 'patcode', label = 'pattern codes', kind = 'cycle', values = { 'hex', 'dec' }, desc = 'how new pattern codes are made (both kinds are read): hex (default) - two characters, A1 ... A9, AA ... AF (16 on: A16); dec - A1 ... A9, A10, A11. The letter is a family of variants: a new pattern takes the next free letter, a clone the next variant. Matrix menu c / :codes converts the names', get = function() return state.patcode or 'hex' end, set = function(v) state.patcode = v; model.SEC.style = v end },
-      { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on: after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained, pooled repeats copy exactly what is seen; off (default): a note started in a pattern rings on into the next one (as in Renoise), BS / delete keep its real end; the matrix trim button still cuts by hand', get = function() return state.hardedges == true end, set = function(v) state.hardedges = v end },
+      { key = 'hardedges', label = 'hard pattern edges', kind = 'toggle', desc = 'on: in the pattern view (pat) after every edit an item is cut at the end of its pattern (region) - every pattern is self-contained; in proj / sec a note runs on across, pooled repeats copy exactly what is seen; off (default): a note started in a pattern rings on into the next one (as in Renoise), BS / delete keep its real end; the matrix trim button still cuts by hand', get = function() return state.hardedges == true end, set = function(v) state.hardedges = v end },
       flag('keepsamples', 'keep deleted samples', 'deleting the last note of a file keeps the instrument (slices, loop) in the lib'),
       flag('copymedia', 'copy files to project', 'browser files are copied into the project media folder'),
       flag('endstop', 'stop at =END', 'playback started before =END stops there (recording never stops)'),
@@ -16000,8 +16000,8 @@ edit.after = function(desc)
   end
   -- 10 окт: жёсткие границы — своя опция hard pattern edges (по умолчанию вкл,
   -- решение 1 окт), не зависит от auto sync; выкл — нота звучит в следующий паттерн
-  local hard = state.hardedges == true
-  if not hard and not (desc or ''):match('^sync') then pcall(ctx.pat_cut_over, edit.changed_items()) end   -- 9 ноя: вид pattern — режем на начале следующего паттерна
+  local hard = state.hardedges == true and ctx.view_cur() == 'pattern'   -- 10 ноя: жёсткие края — только в виде pat (контекст паттерна); proj / sec — нота идёт насквозь
+  if not hard and ((desc or ''):match('^insert note') or (desc or ''):match('^insert slice')) then pcall(ctx.pat_cut_over, edit.changed_items()) end   -- только вставка (продление Ctrl+Shift+J K — без разреза)   -- 9 ноя: вид pattern — режем на начале следующего паттерна
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
   if desc == 'add region' then if hard then model.invalidate(); pooled.trim(model.regions(state.lpb), edit.changed_items()) end; return end
