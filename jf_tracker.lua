@@ -15998,6 +15998,7 @@ edit.after = function(desc)
   -- 10 окт: жёсткие границы — своя опция hard pattern edges (по умолчанию вкл,
   -- решение 1 окт), не зависит от auto sync; выкл — нота звучит в следующий паттерн
   local hard = state.hardedges == true
+  if not hard and not (desc or ''):match('^sync') then pcall(ctx.pat_cut_over, edit.changed_items()) end   -- 9 ноя: вид pattern — режем на начале следующего паттерна
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
   if desc == 'add region' then if hard then model.invalidate(); pooled.trim(model.regions(state.lpb), edit.changed_items()) end; return end
@@ -16011,6 +16012,28 @@ edit.after = function(desc)
   end
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   if hard then pooled.trim(regions, edit.changed_items()) end
+end
+-- 9 ноя: вид pattern — аудио, зашедшее в следующий паттерн, режется на его начале: продолжение — нота в начале паттерна
+-- с того же места сэмпла (паттерн самодостаточен, как и выглядит); вид project / section — звучит насквозь, как было
+ctx.pat_cut_over = function(items)
+  if not items or ctx.view_cur() ~= 'pattern' or not regions or #regions == 0 then return end
+  local lib = edit.lib_track and edit.lib_track(false)
+  for it in pairs(items) do
+    if reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetMediaItem_Track(it) ~= lib then
+      local tk = reaper.GetActiveTake(it)
+      if tk and not reaper.TakeIsMIDI(tk) then
+        local cur = it
+        for _, rg in ipairs(regions) do
+          local p0 = reaper.GetMediaItemInfo_Value(cur, 'D_POSITION')
+          local p1 = p0 + reaper.GetMediaItemInfo_Value(cur, 'D_LENGTH')
+          if rg.pos and not rg.gap and rg.pos > p0 + 1e-4 and rg.pos < p1 - 1e-4 then
+            local nx = reaper.SplitMediaItem(cur, rg.pos)
+            if nx then cur = nx end
+          end
+        end
+      end
+    end
+  end
 end
 ctx.edit_after_main = edit.after   -- 7 ноя: хук правок; sig / region length снимают его на время своей правки — ошибка в ней не возвращала (кадр вернёт)
 draw.screensets = dofile(DIR .. '/jf_tracker_screensets.lua')   -- формат скринсетов (4 окт)
@@ -31200,6 +31223,7 @@ local function frame()
     if not st or vk == 0 or st:byte(vk) == 0 then
       ctx.hold_len = nil
       edit.last_midi = nil
+      if lm.audio and lm.item then pcall(ctx.pat_cut_over, { [lm.item] = true }) end   -- 9 ноя: вид pattern — за край паттерна продолжением
       reaper.Undo_OnStateChange2(0, 'jf_tracker: note length (held key)')
       model.invalidate()
       vim.msg = ('note length: %.2f s (held)'):format(reaper.time_precise() - lm.t_press)

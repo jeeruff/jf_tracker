@@ -1839,8 +1839,19 @@ local function insert_midi(track, lane_idx, t0, t1, pitch, vel, ch, muted, t_row
 end
 -- 21 окт: клавишу ноты держат (автоповтор macOS) — длина последней вставленной ноты = время удержания (sec),
 -- от её начала, не дальше конца item; без undo на каждый шаг (одним — на отпускании, main)
+-- 9 ноя: аудио (сэмпл / слайс) — тоже длина удержанием: пока клавиша держится, айтем от начала до сейчас (не длиннее, чем
+-- вставлен — дальше чужой звук слайса); отпустил — длина остаётся
+function E.audio_hold(it, t0)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return end
+  E.last_midi = { item = it, audio = true, t0 = t0, len0 = R.GetMediaItemInfo_Value(it, 'D_LENGTH'), t_press = R.time_precise() }
+end
 function E.hold_length(sec)
   local lm = E.last_midi
+  if lm and lm.audio then
+    if not R.ValidatePtr(lm.item, 'MediaItem*') then return false end
+    R.SetMediaItemInfo_Value(lm.item, 'D_LENGTH', math.max(0.02, math.min(lm.len0, sec)))
+    return true
+  end
   if not (lm and lm.take and R.ValidatePtr(lm.take, 'MediaItem_Take*')) then return false end
   local tk = lm.take
   local ip = R.GetMediaItemInfo_Value(lm.item, 'D_POSITION')
@@ -2661,6 +2672,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
     if E.playthru(inst_item) and (E.ghost_q or 0) > 0 then E.warp_slices(lpb, it, slices, base, k) end   -- 15 окт: одна нота, удары — на сетку q (stretch-маркеры)
     made = it
   end)
+  E.audio_hold(made, t0)   -- 9 ноя: удержание клавиши — длина слайса
   return made
 end
 
@@ -2935,6 +2947,7 @@ function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_it
     end
     if E.mono_on(track) then E.mono_cut_at(track, lane_idx, t0) end   -- 24 окт: трек на одном лейне — новая нота обрывает звучащую
   end)
+  if made and R.ValidatePtr(made, 'MediaItem*') and not R.TakeIsMIDI(R.GetActiveTake(made) or made) then E.audio_hold(made, t0) end   -- 9 ноя
   return made
 end
 
