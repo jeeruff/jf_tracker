@@ -24241,6 +24241,19 @@ local function frame()
   if ext_tick then ctx.prof_ext_t = reaper.time_precise(); ctx.prof_ext = reaper.GetExtState('jf_dbg', 'prof') == '1' end
   -- 6 ноя: диагностика памяти снаружи — jf_dbg mem=1: отчёт :mem в ExtState jf_tracker/mem; jf_dbg gc=inc|gen — режим сборщика
   if ext_tick then
+    -- 9 ноя: действие REAPER «viper toggle» (тулбар) — запрос viper_req; пульс hb_t — живой ли трекер; подсветка кнопки
+    reaper.SetExtState(EXT, 'hb_t', ('%.2f'):format(reaper.time_precise()), false)
+    local vr = reaper.GetExtState(EXT, 'viper_req')
+    if vr ~= '' and vr ~= ctx.viper_req_seen then
+      local first = ctx.viper_req_seen == nil and (reaper.time_precise() - (tonumber(vr) or 0)) > 5   -- старый запрос с прошлого запуска — не исполнять
+      ctx.viper_req_seen = vr
+      if not first then ctx.viper_toggle() end
+    end
+    if ctx.viper_led ~= (state.viper and 1 or 0) then
+      ctx.viper_led = state.viper and 1 or 0
+      ctx.viper_cmd = ctx.viper_cmd or reaper.AddRemoveReaScript(true, 0, DIR .. '/jf_tracker_viper_toggle.lua', true)
+      if ctx.viper_cmd and ctx.viper_cmd > 0 then reaper.SetToggleCommandState(0, ctx.viper_cmd, ctx.viper_led); reaper.RefreshToolbar2(0, ctx.viper_cmd) end
+    end
     if reaper.GetExtState('jf_dbg', 'mem') == '1' then reaper.SetExtState('jf_dbg', 'mem', '0', false); pcall(ctx.mem) end
     if reaper.GetExtState('jf_dbg', 'rows') == '1' then reaper.SetExtState('jf_dbg', 'rows', '0', false); draw.dbg_rows = {} end   -- 6 ноя: строки кадра (row@y=label) в ExtState jf_tracker/rows
     if reaper.GetExtState('jf_dbg', 'lay') == '1' and draw.pn_lay then   -- 8 ноя: прямоугольники панелей в jf_tracker/lay
