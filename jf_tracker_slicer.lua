@@ -1684,7 +1684,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     if smp and n then
       local pk = 0.02
       for i = 1, n do local v = math.abs(smp[i] or 0); if v > pk then pk = v end end
-      U.set(sgz and U.TEXT or base)
+      U.set(sgz and U.TEXT or U.mix(base, U.TEXT, 0.45))   -- 10 ноя: ярче (тусклая линия пропадала на тёмном / в красном режиме дисплея)
       local function spcol(tt)
         if spk and spk.spec and spk.n > 0 and ctx.spec_colour then
           local cc = ctx.spec_colour(spk.spec[math.max(1, math.min(spk.n, math.floor(tt / len * spk.n) + 1))])
@@ -1698,7 +1698,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
           local xx = x + (i - 0.5) / n * w
           local yy = zc - (smp[i] or 0) / pk * zh2
           spcol(t0 + (i - 0.5) / n * 2 * W2)
-          if px0 then gfx.line(px0, py0, xx, yy, 1) end
+          if px0 then gfx.line(px0, py0, xx, yy, 1); gfx.line(px0, py0 + 1, xx, yy + 1, 1) end   -- 10 ноя: 2 px толщиной
           px0, py0 = xx, yy
         end
       end
