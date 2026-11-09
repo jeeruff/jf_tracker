@@ -44,11 +44,9 @@ TH.PAL = {
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true },
   -- 24 окт: как mono, только всё одним цветом — красным (ночной режим: глаза не теряют темновую адаптацию) / зелёным
   -- (фосфорный монитор); яркость — по светлоте цвета, оттенок — tint
-  rednight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#b4b4b4', dim = '#4a4a4a', line = '#7c7c7c',   -- 10 ноя: тёмное светлее — в красном волна прицела пропадала
-   
+  rednight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true, tint = { 1.0, 0.16, 0.10 }, cursor = '#ffffff' },
-  greennight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#b4b4b4', dim = '#4a4a4a', line = '#7c7c7c',   -- 10 ноя: тёмное светлее — в красном волна прицела пропадала
-   
+  greennight = { bg = '#000000', panel = '#0c0c0c', text = '#ffffff', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',
     amber = '#e8e8e8', cyan = '#b4b4b4', green = '#c8c8c8', red = '#f4f4f4', hdr = '#262626', hdrsel = '#3a3a3a', mono = true, tint = { 0.30, 1.0, 0.35 }, cursor = '#ffffff' },
   -- ProTracker 2 (4 окт): чёрное поле паттерна, серые панели в духе Amiga,
   -- светло-серый текст, жёлтый акцент (скопы), синий, малиновый курсор PT
