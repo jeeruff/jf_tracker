@@ -25367,7 +25367,7 @@ local function frame()
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
-      bigbpm = state.bigbpm, bigstatus = state.bigstatus,
+      bigbpm = state.bigbpm and not state.viper, bigstatus = state.bigstatus,   -- 9 ноя: viper — время и BPM обычным текстом
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, qtz = ctx.qtz_on(cur_col() and cur_col().track), bpm_edit = state.bpm_edit,
       slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, holdroll = state.holdroll, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
