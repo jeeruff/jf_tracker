@@ -16074,6 +16074,8 @@ ctx.log_add = function(t)
   if L0[#L0] and L0[#L0].t == t then return end
   L0[#L0 + 1] = { at = os.date('%H:%M:%S'), t = t }
   if #L0 > 300 then table.remove(L0, 1) end
+  if state.debug then reaper.SetExtState(EXT, 'log', L0[#L0].at .. ' ' .. t, false) end
+  if ctx.dlog and state.debug then pcall(ctx.dlog, 'log: ' .. t) end
 end
 ctx.log_show = function()
   local items = {}
@@ -31299,6 +31301,18 @@ local function frame()
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
   if c <= 0 and ctx.vlq and #ctx.vlq > 0 then local e = table.remove(ctx.vlq, 1); c = e[1]; inject_cap = e[2] end   -- 9 ноя: клавиши слоя viper из окна REAPER
+  -- 10 ноя: до автоповтора (раньше — после: зажатый Ctrl+Shift+J не повторялся)
+  -- Ctrl+J (9 окт): на macOS код 10 до gfx.getchar не доходит (Ctrl+H K L
+  -- приходят) — физическая J при зажатом Control, только когда окно в фокусе
+  if c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 32 ~= 0 and gfx.mouse_cap & 4 == 0
+     and (gfx.getchar(65536) & 2) ~= 0 then
+    local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
+    if dn and dn:byte(74) ~= 0 then c = 10
+    elseif dn and dn:byte(87) ~= 0 then c = 23   -- Ctrl+W (9 окт, панели): тоже не доходит
+    elseif dn and dn:byte(79) ~= 0 then c = 15   -- Ctrl+O (9 окт, прыжок назад)
+    elseif dn and dn:byte(77) ~= 0 then c = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
+  end
+  ctx.ctrlj_t = reaper.time_precise()
   c = ctx.space_leader(c, from_q)   -- 9 ноя: зажатый Space — лидер (тап — Play / Stop на отпускание)
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
   if ctx.BF and c > 0 then   -- 6 ноя: большой фейдер — клавиатура ему (и меткам f)
@@ -31538,17 +31552,6 @@ local function frame()
     if PN and m and PN.visible(m, 'options') then ctx.pane_do(function() return PN.hide(m, 'options') end, 'options closed'); OPT.active = false end
     c = 0
   end
-  -- Ctrl+J (9 окт): на macOS код 10 до gfx.getchar не доходит (Ctrl+H K L
-  -- приходят) — физическая J при зажатом Control, только когда окно в фокусе
-  if c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 32 ~= 0 and gfx.mouse_cap & 4 == 0
-     and (gfx.getchar(65536) & 2) ~= 0 then
-    local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (reaper.time_precise() - 0.05))
-    if dn and dn:byte(74) ~= 0 then c = 10; c_raw = 10
-    elseif dn and dn:byte(87) ~= 0 then c = 23; c_raw = 23   -- Ctrl+W (9 окт, панели): тоже не доходит
-    elseif dn and dn:byte(79) ~= 0 then c = 15; c_raw = 15   -- Ctrl+O (9 окт, прыжок назад)
-    elseif dn and dn:byte(77) ~= 0 then c = 13; c_raw = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
-  end
-  ctx.ctrlj_t = reaper.time_precise()
   -- 25 окт: ввод темпа и выпадашка BPM — раньше всех: Enter после цифр шёл в трекер (выпадашка нот), темп не ставился
   if state.bpm_edit and c ~= 0 then
     local ch = c < 256 and string.char(c) or ''
