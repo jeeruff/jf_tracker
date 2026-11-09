@@ -26,7 +26,7 @@ local PN = {}
 PN.PANELS = {
   { id = 'tracker',    label = 'tracker',    key = 't', hint = 'tracker', fixed = true },
   { id = 'patterns',   label = 'patterns',   key = 'T', hint = 'matrix',  side = 'left' },   -- 19 окт вечер: снова своя панель — кубики + chain (из матрицы убраны)   -- 19 окт: кубики паттернов — в углу матрицы, своя панель — перебор   -- 19 окт: палитра паттернов матрицы — своя панель (над матрицей)
-  { id = 'arranger',   label = 'region playlist',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
+  { id = 'arranger',   label = 'playlist',   key = 'C', hint = 'arranger', side = 'left' },   -- 31 окт: chain + секции/плейлист песни + аранжировки (были в матрице и patterns)
   { id = 'matrix',     label = 'matrix',     key = 'm', hint = 'matrix',  side = 'left' },
   { id = 'browser',    label = 'browser',    key = 'b', hint = 'browser', side = 'right' },
   { id = 'map',        label = 'map',        key = 'w', hint = 'map',     side = 'right' },   -- 27 окт: карта сэмплов (web): папка / базы / проект / pm, мини-lf
@@ -261,13 +261,13 @@ local function min_px(M, ax) return ax == 'v' and M.tab_h or 4 * M.cw end
 local function leaf_min(M, n, ax)
   if n.min then return min_px(M, ax) end
   if ax == 'v' then
-    local m = (n.panes[1] == 'tracker' and 10 or 6) * M.rh   -- 9 ноя: 6 строк (было 2: панель кашей; меньше — прячется по PN.PRIO)
+    local m = (n.panes[1] == 'tracker' and (M.squeeze and 10 or 4) or (M.squeeze and 6 or 2)) * M.rh   -- 9 ноя: 6 строк (было 2: панель кашей; меньше — прячется по PN.PRIO)
     -- панель может требовать своё (item: все параметры сэмпла) — по всему стеку,
     -- чтобы высота не прыгала при смене вкладки
     if M.minh then for _, id in ipairs(n.panes) do if avail(M, id) then local v = M.minh(id); if v and v > m then m = v end end end end
     return m + M.tab_h + M.hint_h
   end
-  return 16 * M.cw   -- 9 ноя: 16 знаков (было 8)
+  return (M.squeeze and 16 or 8) * M.cw   -- 9 ноя: складывание (шрифт x2 / pixel) — 16 знаков
 end
 local function node_min(M, n, ax)
   if is_leaf(n) then return leaf_min(M, n, ax) end
@@ -331,7 +331,7 @@ local function place(lay, M, n, x, y, w, h)
       if is_leaf(k) then local b = 99; for _, id in ipairs(k.panes) do if avail(M, id) then b = math.min(b, PN.PRIO[id] or 50) end end; return b end
       local b = 99; for _, c in ipairs(k.kids) do if alive(M, c) then b = math.min(b, prio(c)) end end; return b
     end
-    while #kids > 1 do
+    while M.squeeze and #kids > 1 do   -- 9 ноя: только крупный шрифт / пиксельный режим (x1 и так влезает)
       local need = M.sep * (#kids - 1)
       for _, k in ipairs(kids) do need = need + (k.min and min_px(M, n.ax) or node_min(M, k, n.ax)) end
       if need <= avail_px then break end

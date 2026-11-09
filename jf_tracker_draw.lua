@@ -411,6 +411,7 @@ function D.panes_layout(state, L, nregions, ncols)
   s.hi = D.hint_mode(state)
   if state.tababc then D.panes.sort_stacks(m) end
   M.rh, M.cw, M.pad = L.rh, L.cw, L.pad
+  M.squeeze = state.pixel ~= false or (tonumber(state.fontscale) or 2) >= 2   -- 9 ноя: складывание панелей по приоритету
   D.TABGAP = 4                                           -- 19 окт: пустота над вкладками — панели видно отдельно
   M.tab_h = L.rh + 2 + D.TABGAP                         -- подпись листа — вкладкой над рамкой
   M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)

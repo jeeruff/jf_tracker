@@ -358,7 +358,7 @@ KH.PAGES = {
     { k = 'chain row', t = {}, d = 'the patterns pane (gt / T): the cubes of every pattern (A1 .. grey - not made yet) and the chain row under them; a click on a cube - hear it, a double click - it joins the chain; h j k l Enter Space n C there' },
     { k = 'playlist row', t = {}, d = 'over the arrangement: the section names of the song on top, the playlist (song order) under them; a click on a section above - it goes to the end of the playlist; s - keys there: h l pick, Enter adds (3 Enter - three times), x drops the last one, Space plays, Esc back; a click on a playlist word - play from it, > - play all, x - clear' },
     { k = 'f a1', m = 'hints: jump to pattern', d = 'hints: every pattern cube is labelled by its own code - f then a1, bc ... jumps to that pattern in the tracker' },
-    { k = 'A', m = 'region playlist', d = 'the region playlist pane (was arranger): seq - the pattern order as text (C there), the sections row and the song playlist, the arrangements; the matrix itself has no playlist' },
+    { k = 'A', m = 'playlist', d = 'the playlist pane (was arranger): seq - the pattern order as text (C there), the sections row and the song playlist, the arrangements; the matrix itself has no playlist' },
     { k = 'amber corners', t = {}, d = 'a note crosses the pattern edge: bottom right - it runs into the next pattern, top left - it came from the previous one; deleting a pattern trims such audio notes, no tails left' },
     { k = 's', m = 'section menu', d = 'section menu of the cursor slot: new (from selected slots / time selection), duplicate, linked, launch, show, loop, rename, remove' },
     { k = 'buttons', t = {}, d = 'menu view sync trim keyspat timesel follow + live in the empty corner over the slot numbers (follow - the matrix cursor goes with the tracker cursor, on by default) (left of the track names); folded - a row on top' },
@@ -420,7 +420,7 @@ KH.PAGES = {
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },
   } },
-  arranger = { title = 'region playlist - the order of the song (Ctrl+W g C; A in the matrix)', e = {
+  arranger = { title = 'playlist - the order of the song (Ctrl+W g C; A in the matrix)', e = {
     { k = 'j k  h l  Enter', d = 'j k - the row (seq, sections, playlist, arrangement, its buttons, print jumps; amber frame), h l - along it, Enter - its action (type the order / add the section / play from it / the list / run the button)' },
     { k = 'C  i', d = 'seq: type the pattern order right in its row (A1 A1 B1x2 C1:16 D1-8), Tab completes, Enter keeps, Esc - as it was; a click on the seq text - the same' },
     { k = 'h l  Enter', d = 'a section of the sections row; Enter adds it to the song playlist (3 Enter - three times)' },
