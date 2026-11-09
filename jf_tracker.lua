@@ -812,6 +812,18 @@ local function set_lpb(n, dir)
     new = LPBS[i]
   end
   if new < 1 / 64 - 1e-9 or new > 128 then return end
+  -- 9 ноя: самый мелкий зум — строка = паттерн курсора (длиннее строки бессмысленны: 1 деление на паттерн)
+  if new < 1 and regions then
+    local rg = pooled.region_at(regions, reaper.TimeMap2_QNToTime(0, vim.cur.row / state.lpb))
+    local qn = rg and rg.qn1 and rg.qn0 and (rg.qn1 - rg.qn0)
+    if not qn and rg and rg.pos and rg.rgnend then qn = reaper.TimeMap2_timeToQN(0, rg.rgnend) - reaper.TimeMap2_timeToQN(0, rg.pos) end
+    if qn and qn > 0 and new * qn < 1 - 1e-6 then
+      local floor
+      for _, v in ipairs(LPBS) do if v * qn >= 1 - 1e-6 then floor = v; break end end
+      if not floor or floor >= state.lpb then vim.msg = 'zoom: a row is already the whole pattern'; return end
+      new = floor
+    end
+  end
   local q0, qc = state.row0 / state.lpb, vim.cur.row / state.lpb
   state.lpb = new
   state.row0 = math.floor(q0 * new)
@@ -15715,6 +15727,8 @@ ctx = {
           { key = '8', label = 'period 8 rows', fn = function() ctx.loop('item', 8) end },
           { key = 'n', label = 'period N rows … (:loop N)', fn = function() vim.open_prompt('loop ', '') end },
         } } end },
+      { key = 'w', label = 'panes: hjkl focus, HJKL move, size, zoom, hide … (= Ctrl+W)', fn = function()   -- 9 ноя: лидер w — панели
+        if state.panes_ui then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc' end end },
       { key = 'x', label = 'x-fade (' .. (state.xfade and 'on' or 'off') .. ', ' .. state.xfade_ms .. ' ms)', sub = function() return { title = 'x-fade', items = {
           { key = 'x', label = (state.xfade and 'turn OFF' or 'turn ON') .. ' x-fade on insert', fn = ctx.xfade_toggle },
           { key = 'c', label = 'crossfade now (selection / column in region)', fn = ctx.xfade_now },
