@@ -25822,7 +25822,7 @@ local function frame()
     local cap = gfx.mouse_cap
     local was = ctx.dbg_cap or 0
     if (cap & 3) ~= 0 and (was & 3) == 0 then
-      ctx.dlog(('mouse %s %d,%d cap %d focus %s | %s'):format(cap & 2 == 2 and 'R' or 'L', gfx.mouse_x, gfx.mouse_y, cap, state.focus, ctx.hover_dump(hover)))
+      ctx.dlog(('mouse %s %d,%d cap %d focus %s | %s'):format(cap & 2 == 2 and 'R' or 'L', math.floor(gfx.mouse_x), math.floor(gfx.mouse_y), cap, state.focus, ctx.hover_dump(hover)))
     end
     ctx.dbg_cap = cap
   end
