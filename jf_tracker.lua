@@ -19868,6 +19868,7 @@ function view_actions()
     -- 9 ноя: SPC v p / P / 1 2 3 — пиксельный режим, PT-mode, размер шрифта
     { ((state.pixel ~= false) and '!' or '') .. 'pixel mode', key = 'p', fn = function() ctx.set_pixel(state.pixel == false) end },
     { (state.ptmode and '!' or '') .. 'PT-mode (ProTracker)', key = 'P', fn = function() ctx.pt_toggle() end },
+    { 'big … (time / BPM, status, cursor, trackname, fader, sample)', key = 'B', fn = function() ctx.big_menu() end },   -- 10 ноя: SPC v B
     { 'font x1', key = '1', fn = function() ctx.set_scale(1); relayout(); vim.msg = 'font size x1' end },
     { 'font x2', key = '2', fn = function() ctx.set_scale(2); relayout(); vim.msg = 'font size x2' end },
     { 'font x3', key = '3', fn = function() ctx.set_scale(3); relayout(); vim.msg = 'font size x3' end },
@@ -23317,6 +23318,29 @@ ctx.VIEW_GROUPS = {
   { 's', 'screen', { 'hints', 'bigstatus', 'keycast', 'mixer', 'dsp', 'top', 'side' } },
 }
 ctx.VIEW_MIXER = { 'm', 'mixer', { 'mixvnames', 'mixnames', 'mixroute', 'declip', 'clipmark', 'dbmarks', 'meterstyle', 'hdrmeter', 'fadercap', 'bigfader', 'panknob', 'faderfocus', 'masterpos', 'mfoldauto' } }
+-- 10 ноя: SPC v B — всё крупное одним меню (переключение — сразу, меню остаётся)
+ctx.big_menu = function()
+  local by = {}
+  for _, it in ipairs(ctx.option_items()) do if it.key then by[it.key] = it end end
+  local items = {}
+  for _, e in ipairs({ { 't', 'bigbpm' }, { 's', 'bigstatus' }, { 'c', 'bigcur' }, { 'n', 'bigname' }, { 'f', 'bigfader' } }) do
+    local it = by[e[2]]
+    if it then
+      local v = it.get()
+      local lab = it.label .. (it.kind == 'cycle' and (': ' .. tostring(v)) or (v and '  (on)' or ''))
+      items[#items + 1] = { key = e[1], label = lab, fn = function()
+        if it.kind == 'cycle' then
+          local vs, i = it.values, 1
+          for k, x in ipairs(vs) do if x == v then i = k end end
+          it.set(vs[i % #vs + 1])
+        else it.set(not v) end
+        relayout(); ctx.big_menu()
+      end }
+    end
+  end
+  items[#items + 1] = { key = 'b', label = 'the big sample editor', fn = function() ctx.sample_big() end }
+  vim.open_hydra({ title = 'big', items = items })
+end
 ctx.view_menu = function(gi)
   local by = {}
   for _, it in ipairs(ctx.option_items()) do if it.key then by[it.key] = it end end
