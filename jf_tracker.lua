@@ -1333,9 +1333,9 @@ ctx = {
     set_lpb(need or LPBS[#LPBS])
     vim.msg = ('unfold: LPB %s -> %s%s (zu again - back)'):format(draw.lpb_s(was), draw.lpb_s(state.lpb), need and '' or ', still folded at the max')
   end,
-  -- 6 ноя: zO — обзор: вертикальная свёртка (строка = такт … 256 тактов), вся песня в экран
+  -- 6 ноя: zO (9 ноя: zo) — обзор: вертикальная свёртка (строка = такт … 256 тактов), вся песня в экран
   -- 8 ноя: обзор — сам трекер издалека: LPB меньше 1 (строка = такт … 16 тактов), вся песня в экран, волна и айтемы
-  -- как обычно; zO ещё раз — прежний LPB у курсора; - + (Opt+Shift+J K) — дальше по тому же ряду LPB
+  -- как обычно; zo ещё раз — прежний LPB у курсора; - + (Opt+Shift+J K) — дальше по тому же ряду LPB
   overview_toggle = function()
     state.macro = false
     if state.lpb_ov then
@@ -1350,7 +1350,7 @@ ctx = {
     for _, v in ipairs(LPBS) do if v < 1 and qn * v <= rows then pick = v end end
     set_lpb(pick)
     state.row0 = 0
-    vim.msg = ('overview: LPB %s - a row is %s; the whole song on screen; - + zoom, zO back to LPB %s'):format(draw.lpb_s(pick),
+    vim.msg = ('overview: LPB %s - a row is %s; the whole song on screen; - + zoom, zo back to LPB %s'):format(draw.lpb_s(pick),
       pick >= 1 / 4 and (pick == 1 / 4 and 'a bar' or 'half a bar') or (math.floor(1 / pick / 4 + 0.5) .. ' bars'), draw.lpb_s(state.lpb_ov))
   end,
   zoom_out_toggle = function()
@@ -3638,7 +3638,7 @@ ctx = {
   end,
   mods = function()
     local cap = inject_cap or gfx.mouse_cap
-    return { cmd = cap & 4 == 4, ctrl = cap & 32 == 32, alt = cap & 16 == 16, shift = cap & 8 == 8 }
+    return { cmd = cap & 4 == 4, ctrl = cap & 32 == 32, alt = cap & 16 == 16, shift = cap & 8 == 8 and not ctx.esc_noshift }   -- 9 ноя: Esc с тапа Shift — без Shift
   end,
   -- слайсер: оверлей нарезки инструмента (двойной клик по сэмплу / :slice / \is)
   slicer_active = function() return SL.active end,
@@ -8408,13 +8408,19 @@ ctx = {
     for tok in (raw or ''):gmatch('[^|]+') do
       local k, rest = tok:match('^(%a+):(.*)$')
       if not k then k, rest = 'trk', tok end
-      if k == 'trk' then local g, r = rest:match('^([^@]+)@(%d+)$'); if g then list[#list + 1] = { k = 'trk', guid = g, row = tonumber(r) } end
+      if k == 'trk' then   -- 9 ноя: и вид — row~lpb~mode~row0 (LPB, в т. ч. обзор zO, project / section / pattern, прокрутка)
+        local g, r, v = rest:match('^([^@]+)@(%-?%d+)(.*)$')
+        if g then
+          local lp, vm, r0 = (v or ''):match('^~([^~]+)~(%a*)~(%-?%d+)$')
+          list[#list + 1] = { k = 'trk', guid = g, row = tonumber(r), lpb = tonumber(lp), vm = (vm ~= '' and vm or nil), row0 = tonumber(r0) }
+        end
       elseif k == 'mx' then local g, t = rest:match('^([^@]+)@([%d%.%-]+)$'); if g then list[#list + 1] = { k = 'mx', guid = g, pos = tonumber(t) } end
       elseif k == 'dsp' then local g, fg, p = rest:match('^([^@]+)@([^#]+)#(%d+)$'); if g then list[#list + 1] = { k = 'dsp', guid = g, fx = fg, p = tonumber(p) } end end
     end
     local function enc(e)
       if e.k == 'mx' then return ('mx:%s@%.4f'):format(e.guid, e.pos)
       elseif e.k == 'dsp' then return ('dsp:%s@%s#%d'):format(e.guid, e.fx, e.p) end
+      if e.lpb then return ('trk:%s@%d~%s~%s~%d'):format(e.guid, e.row, tostring(e.lpb), e.vm or '', e.row0 or 0) end
       return 'trk:' .. e.guid .. '@' .. e.row
     end
     local function save()
@@ -8443,9 +8449,10 @@ ctx = {
         if f then local _, n = reaper.TrackFX_GetParamName(c.track, kid or f.i, e.p, ''); pn = n end
         return ('dsp  %s · %s · %s'):format(tn, f and f.name or '(gone fx)', pn)
       end
-      return ('trk  %s @ %04d'):format(tn, e.row)
+      local vw = e.lpb and ('  [LPB %s%s]'):format(draw.lpb_s(e.lpb), (e.vm and e.vm ~= 'project') and (' ' .. e.vm) or '') or ''
+      return ('trk  %s @ %04d%s'):format(tn, e.row, vw)
     end
-    local function same(a, b) return a.k == b.k and a.guid == b.guid and a.row == b.row and a.fx == b.fx and a.p == b.p and (a.pos == nil or b.pos == nil or math.abs(a.pos - b.pos) < 1e-3) end
+    local function same(a, b) return a.k == b.k and a.guid == b.guid and a.row == b.row and (a.lpb == nil or b.lpb == nil or a.lpb == b.lpb) and a.fx == b.fx and a.p == b.p and (a.pos == nil or b.pos == nil or math.abs(a.pos - b.pos) < 1e-3) end
     local function to_track(g)                                       -- курсор трекера на трек (DSP идёт за курсором)
       for i, f in ipairs(L.flat) do if f.col and f.col.guid == g and not f.env then vim.cur.fi = i; return true end end
     end
@@ -8483,6 +8490,13 @@ ctx = {
         ctx.set_focus('dsp')
       else
         if not to_track(e.guid) then vim.msg = 'harpoon: the track is not visible (' .. name(e) .. ')'; return end
+        -- 9 ноя: вид места — LPB (обзор zO — с возвратом к прежнему), режим вида, прокрутка
+        if e.lpb and e.lpb ~= state.lpb then
+          if e.lpb < 1 and not state.lpb_ov then state.lpb_ov = state.lpb elseif e.lpb >= 1 then state.lpb_ov = nil end
+          set_lpb(e.lpb)
+        end
+        if e.vm and e.vm ~= ctx.view_cur() and e.vm ~= 'item' then ctx.view_mode(e.vm) end
+        if e.row0 then state.row0 = e.row0 end
         vim.cur.row = e.row; vim.ensure_visible(); ctx.set_focus('tracker')
       end
       vim.msg = 'harpoon: ' .. name(e)
@@ -8499,7 +8513,7 @@ ctx = {
       if p then here = { k = 'dsp', guid = t.col.guid, fx = reaper.TrackFX_GetFXGUID(t.track, p.fx or f.i), p = p.i } end   -- 22 окт: и ребёнок контейнера / пэда
     else
       local f = L.flat[vim.cur.fi]
-      if f and f.col then here = { k = 'trk', guid = f.col.guid, row = vim.cur.row } end
+      if f and f.col then here = { k = 'trk', guid = f.col.guid, row = vim.cur.row, lpb = state.lpb, vm = ctx.view_cur(), row0 = state.row0 } end
     end
     -- 22 окт: 'A — последний тронутый параметр (крутил в окне плагина, в DSP, в шапке) — откуда угодно
     if ch == 'A' then
@@ -31753,7 +31767,14 @@ local function frame()
     ctx.stop_here()
     c = 0
   end
-  if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
+  -- 9 ноя: Esc с тапа правого Shift (Karabiner: right_shift alone = escape) приходит с флагом Shift — это обычный Esc:
+  -- Shift+Esc — только если Shift зажат на самом деле (js; без js — по флагу)
+  ctx.esc_noshift = nil
+  if c == 27 and ctx.mods().shift and reaper.JS_VKeys_GetState and not inject_cap then
+    local st = reaper.JS_VKeys_GetState(0)
+    if st and st:byte(16) == 0 and st:byte(160) == 0 and st:byte(161) == 0 then ctx.esc_noshift = true end
+  end
+  if c == 27 and ctx.mods().shift and not ctx.esc_noshift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
     reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
     vim.msg = 'time selection removed'
     c = 0
@@ -34884,7 +34905,7 @@ ctx.fit_width = function()
   end
   reaper.SetExtState(EXT, 'wzlevel', tostring(state.wzlevel or ''), true)
   -- 1 ноя: и самой узкой ширины мало (50-100 каналов) — все треки свёрнуты в полоску с точками событий: видно всё
-  -- сразу; za / zo на треке — раскрыть его, zw ещё раз — slim
+  -- сразу; za на треке — раскрыть его, zw ещё раз — slim
   if L.cols_cut or L.hs_cut then
     ctx.fold_all(true); relayout()
     if L.cols_cut or L.hs_cut then ctx.fold_all('mini'); relayout() end   -- ещё уже: мини-полоска
