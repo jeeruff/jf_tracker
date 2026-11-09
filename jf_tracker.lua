@@ -24764,7 +24764,21 @@ local function frame()
       view_clip = { r0, r1 }
     end
   end
-  rows = model.rows(state.row0, L.nrows, state.lpb)
+  -- 9 ноя: строки — из кэша model.rows (до 1 с): свой массив, флаги вида сбрасываются каждый кадр, гасящий clip — на
+  -- копии строки. Было: dim оставался от прошлого паттерна, новый загорался через секунду
+  do
+    local src = model.rows(state.row0, L.nrows, state.lpb)
+    ctx.rows_buf = ctx.rows_buf or {}
+    rows = ctx.rows_buf
+    for i = #src + 1, #rows do rows[i] = nil end
+    for i, r in ipairs(src) do
+      r.dim = nil
+      if view_clip and (r.row < view_clip[1] or r.row >= view_clip[2]) and not state.ctxdim then
+        local c = {}; for k, v in pairs(r) do c[k] = v end; r = c
+      end
+      rows[i] = r
+    end
+  end
   if view_clip then
     for _, r in ipairs(rows) do
       -- номер строки настоящий (рамки, линейка, клики считают от него), флаг clip гасит строку
