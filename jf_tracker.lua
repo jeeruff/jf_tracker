@@ -15952,6 +15952,7 @@ edit.pitch_mode = function(head)
   return (g and state.pitchmodes[g]) or 'shift'
 end
 edit.after = function(desc)
+  ctx.log_add('edit: ' .. tostring(desc))   -- 10 ноя: :log
   -- новый паттерн (2 окт): вставка на строку, которую не покрывает ни один
   -- регион (новый проект, свободный такт матрицы) → регион на весь такт этой
   -- строки; имя пустое, как у нового региона REAPER. В том же шаге undo.
@@ -16001,7 +16002,8 @@ edit.after = function(desc)
   -- 10 окт: жёсткие границы — своя опция hard pattern edges (по умолчанию вкл,
   -- решение 1 окт), не зависит от auto sync; выкл — нота звучит в следующий паттерн
   local hard = state.hardedges == true and ctx.view_cur() == 'pattern'   -- 10 ноя: жёсткие края — только в виде pat (контекст паттерна); proj / sec — нота идёт насквозь
-  if not hard and ((desc or ''):match('^insert note') or (desc or ''):match('^insert slice')) then pcall(ctx.pat_cut_over, edit.changed_items()) end   -- только вставка (продление Ctrl+Shift+J K — без разреза)   -- 9 ноя: вид pattern — режем на начале следующего паттерна
+  if not hard and ((desc or ''):match('^insert note') or (desc or ''):match('^insert slice')) then pcall(ctx.pat_cut_over, edit.changed_items()) end
+  if state.hardedges and not hard then ctx.log_add('  hard pattern edges: off in the ' .. ctx.view_cur() .. ' view - nothing cut') end   -- только вставка (продление Ctrl+Shift+J K — без разреза)   -- 9 ноя: вид pattern — режем на начале следующего паттерна
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
   if desc == 'add region' then if hard then model.invalidate(); pooled.trim(model.regions(state.lpb), edit.changed_items()) end; return end
@@ -16011,10 +16013,10 @@ edit.after = function(desc)
   if ctx.bs_wide and (desc:match('^delete time') or desc:match('^insert time')) then return end   -- 2 ноя: и вид project / section
   if state.autosync then
     local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
-    if rg then pooled.sync(regions, rg) end
+    if rg then pooled.sync(regions, rg); ctx.log_add('  auto sync: the linked copies of ' .. tostring(rg.name ~= '' and rg.name or rg.idx) .. ' updated') end
   end
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
-  if hard then pooled.trim(regions, edit.changed_items()) end
+  if hard then pooled.trim(regions, edit.changed_items()); ctx.log_add('  hard pattern edges: items cut at the pattern end (option, pat view)') end
 end
 -- 9 ноя: виды project / section — аудио, зашедшее в следующий паттерн, режется на его начале: продолжение — нота в
 -- начале паттерна с того же места сэмпла; вид pattern — нота не выходит за его конец (удержание — до конца паттерна)
@@ -16063,6 +16065,22 @@ ctx.hold_click = function(lm, now)
   reaper.CF_Preview_SetValue(pv, 'D_VOLUME', 0.6)
   reaper.CF_Preview_Play(pv)
 end
+-- 10 ноя: :log — что происходило, читаемо: правки (их undo-названия), что сработало само после них (синк, края,
+-- разрез), сообщения статуса; 300 строк в памяти, новые сверху
+ctx.LOG = ctx.LOG or {}
+ctx.log_add = function(t)
+  if not t or t == '' then return end
+  local L0 = ctx.LOG
+  if L0[#L0] and L0[#L0].t == t then return end
+  L0[#L0 + 1] = { at = os.date('%H:%M:%S'), t = t }
+  if #L0 > 300 then table.remove(L0, 1) end
+end
+ctx.log_show = function()
+  local items = {}
+  for i = #ctx.LOG, 1, -1 do local e = ctx.LOG[i]; items[#items + 1] = { label = e.at .. '  ' .. e.t } end
+  if #items == 0 then items[1] = { label = 'nothing yet' } end
+  vim.open_picker('log - newest first (/ search, Esc close)', items, function() end)
+end
 ctx.pat_cut_over = function(items)
   if not items or ctx.view_cur() == 'pattern' or not regions or #regions == 0 then return end   -- 9 ноя: pat — контекст паттерна, не режем; proj / sec — продолжение в следующем
   local lib = edit.lib_track and edit.lib_track(false)
@@ -16076,7 +16094,7 @@ ctx.pat_cut_over = function(items)
           local p1 = p0 + reaper.GetMediaItemInfo_Value(cur, 'D_LENGTH')
           if rg.pos and not rg.gap and rg.pos > p0 + 1e-4 and rg.pos < p1 - 1e-4 then
             local nx = reaper.SplitMediaItem(cur, rg.pos)
-            if nx then cur = nx end
+            if nx then cur = nx; ctx.log_add(('  split at the pattern %s: the rest is a note there'):format(tostring(rg.name ~= '' and rg.name or rg.idx))) end
           end
         end
       end
@@ -24973,7 +24991,7 @@ local function frame()
   end
   if not ctx.win_focus and not ctx.vl_on then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
-  if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
+  if vim.msg ~= '' then left = left .. ' | ' .. vim.msg; if vim.msg ~= ctx.log_msg then ctx.log_msg = vim.msg; ctx.log_add(vim.msg) end end   -- 10 ноя: и в :log
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
     left = left .. string.format(' | %.0f fps | key %d @%s | peaks %d', fps.v, state.last_key, ctx.last_trace or '-', model.peaks_cache_size())
   end
