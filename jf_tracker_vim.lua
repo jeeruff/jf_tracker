@@ -1382,6 +1382,14 @@ function V.cmd_matches(line)
   for _, c in ipairs(V.COMMANDS) do
     if word == '' or c[1]:sub(1, #word) == word then out[#out + 1] = c end
   end
+  -- 10 ноя: по имени ничего — по описанию (stret → команды, где есть stretch); первыми — где слово в имени
+  if #out == 0 and #word >= 3 and not (line or ''):match('^%s*%S+%s') then
+    local w = word:lower()
+    for _, c in ipairs(V.COMMANDS) do if c[1]:lower():find(w, 1, true) then out[#out + 1] = c end end
+    for _, c in ipairs(V.COMMANDS) do
+      if not c[1]:lower():find(w, 1, true) and ((c[3] or ''):lower():find(w, 1, true) or (c[2] or ''):lower():find(w, 1, true)) then out[#out + 1] = c end
+    end
+  end
   return out, word
 end
 
