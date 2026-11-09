@@ -9362,7 +9362,7 @@ function D.frame(L, snap, rows, state, info)
       local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
       local db = db_of(vol)
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
-      local py = hy + 3 * L.rh + 1
+      local py = hy + 2 * L.rh + 1   -- 9 ноя: пан — строкой выше громкости (было ниже)
       local px, pw = sx, sw
       local mixin_y                                   -- 9 окт: строка входа в полосе нижнего микшера
       if L.mixer then
@@ -9826,11 +9826,11 @@ function D.frame(L, snap, rows, state, info)
           info.fx_stack(hover, col, ex, ex + ew, ey, math.max(1, math.floor(eh / L.rh)), true)
         end
       else
-      slider(sx, hy + 2 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
+      slider(sx, hy + 3 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
       -- 19 окт: метр трека — тонкая полоса под v (та же шкала -60..+12): пик трека (взведённый аудио — вход);
       -- вход MIDI на трек — жёлтая вспышка, гаснет за 0.3 с
       if not c.master and info.hdrmeter ~= false then
-        local my0 = hy + 3 * L.rh - 1
+        local my0 = hy + 4 * L.rh - 1
         local lw0 = ms('v') + L.pad
         local mx0, mw0 = sx + lw0, math.max(4, sw - lw0)
         local pl, pr = 0, 0
