@@ -33289,7 +33289,15 @@ ctx.vlayer_tick = function()
     local fg = reaper.JS_Window_GetForeground()
     local foc = reaper.JS_Window_GetFocus()
     ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
-    if fg == main and foc and foc ~= ctx.my_hwnd and not (dn(17) or dn(18) or dn(91) or dn(92)) then
+    if reaper.time_precise() - (ctx.vl_dbg_t or 0) > 0.5 then   -- 9 ноя: отладка слоя — ExtState jf_tracker/vl
+      ctx.vl_dbg_t = reaper.time_precise()
+      reaper.SetExtState(EXT, 'vl', ('main %s fg %s foc %s cls %s self %s on %s'):format(tostring(main), tostring(fg), tostring(foc),
+        foc and tostring(reaper.JS_Window_GetClassName(foc)) or '-', tostring(ctx.my_hwnd), tostring(ctx.vl_on)), false)
+    end
+    -- модификаторы — у системы сейчас (JS_Mouse_GetState: 4 Cmd, 16 Opt, 32 Ctrl); VKeys_GetState(0) помнил Cmd,
+    -- отпущенный вне REAPER (снимок экрана), — слой не включался
+    local mods = reaper.JS_Mouse_GetState and reaper.JS_Mouse_GetState(4 | 16 | 32) or 0
+    if fg == main and foc and foc ~= ctx.my_hwnd and mods == 0 then
       local cls = (reaper.JS_Window_GetClassName(foc) or ''):lower()
       if not (cls:find('edit') or cls:find('combo') or cls:find('text')) then want = true end
     end
@@ -33303,7 +33311,7 @@ ctx.vlayer_tick = function()
   local d = reaper.JS_VKeys_GetDown(ctx.vl_t or now)
   ctx.vl_t = now
   if not d then return end
-  local sh = dn(16)
+  local sh = reaper.JS_Mouse_GetState and (reaper.JS_Mouse_GetState(8) & 8) ~= 0 or dn(16)
   ctx.vlq = ctx.vlq or {}
   for _, v in ipairs(ctx.vl_vks()) do
     if d:byte(v) ~= 0 then
