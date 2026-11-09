@@ -24738,6 +24738,12 @@ local function frame()
   -- вид reg (2 окт): только строки региона курсора (при игре с follow — плейхеда),
   -- прокрутка в его пределах, строки вне региона пустые
   local view_clip
+  -- 9 ноя: паттерн / секция влезает в экран целиком (масштаб) — вид не прыгает к его началу: двигается, только
+  -- чтобы он был виден весь; остальные строки — тускло (ctxdim). Не влезает — как было: прокрутка в его пределах
+  ctx.view_row0 = ctx.view_row0 or function(r0, r1)
+    if r1 - r0 <= L.nrows then return math.max(math.min(r0, 0), r1 - L.nrows, math.min(state.row0, r0)) end
+    return math.max(r0, math.min(state.row0, r1 - L.nrows))
+  end
   if not state.view_reg then state.view_sec = nil end
   if state.view_reg and state.view_secmode then   -- 26 окт: вид section — секция под курсором (плейхедом при follow)
     local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
@@ -24746,7 +24752,7 @@ local function frame()
   end
   if state.view_reg and state.view_sec then   -- 18 окт: показ секции целиком (меню секции)
     local r0, r1 = math.floor(model.row_of_time(state.view_sec[1], state.lpb) + 1e-6), math.ceil(model.row_of_time(state.view_sec[2], state.lpb) - 1e-6)
-    if not state.fixed then state.row0 = math.max(r0, math.min(state.row0, math.max(r0, r1 - L.nrows))) end
+    if not state.fixed then state.row0 = ctx.view_row0(r0, r1) end
     view_clip = { r0, r1 }
   elseif state.view_reg then
     local ref = (is_playing and state.follow and ph_row) and math.floor(ph_row) or vim.cur.row
@@ -24754,7 +24760,7 @@ local function frame()
     if rg then
       -- границы как у region_at (по времени): строка внутри региона не гасится
       local r0, r1 = math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6)
-      if not state.fixed then state.row0 = math.max(r0, math.min(state.row0, math.max(r0, r1 - L.nrows))) end
+      if not state.fixed then state.row0 = ctx.view_row0(r0, r1) end
       view_clip = { r0, r1 }
     end
   end
