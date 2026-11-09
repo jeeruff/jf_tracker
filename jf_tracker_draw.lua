@@ -11428,12 +11428,18 @@ function D.frame(L, snap, rows, state, info)
   do
     local taken = {}
     for _, p in ipairs(D.pat_names or {}) do taken[p[2]] = true end
+    local started = {}   -- 9 ноя: конец паттерна — только если его начала на экране не видно
     for _, p in ipairs(D.pat_names or {}) do   -- 2 ноя: имена паттернов на стыке — поверх полосы регионов
+      if p[7] == 1 then started[p[5]] = true end
+      if p[7] == -1 and started[p[5]] then goto skip end
+      do
       local code, rest = p[5]:match('^(%S+)%s+(.+)$')
       if not (code and D.code_like(code)) then code, rest = p[5], nil end
       set(U.BG); gfx.rect(p[1], p[2] + 1, p[3], L.rh - 2, 1)
       text(p[1] + 1, p[4], fit(code, p[3] - 1), p[6] and U.AMBER or U.TEXT)
       local _ = rest   -- 6 ноя (3): имя — только на полосе региона (её вертикальная подпись), здесь второго слоя нет
+      end
+      ::skip::
     end
   end
   D.pat_names = nil
