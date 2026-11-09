@@ -16013,10 +16013,17 @@ edit.after = function(desc)
   -- жёсткие границы: после любой правки items не вылезают из своих регионов
   if hard then pooled.trim(regions, edit.changed_items()) end
 end
--- 9 ноя: вид pattern — аудио, зашедшее в следующий паттерн, режется на его начале: продолжение — нота в начале паттерна
--- с того же места сэмпла (паттерн самодостаточен, как и выглядит); вид project / section — звучит насквозь, как было
+-- 9 ноя: виды project / section — аудио, зашедшее в следующий паттерн, режется на его начале: продолжение — нота в
+-- начале паттерна с того же места сэмпла; вид pattern — нота не выходит за его конец (удержание — до конца паттерна)
+-- 9 ноя: вид pattern — удержание аудио не дальше конца паттерна ноты
+ctx.hold_cap = function(lm, sec)
+  if not (lm.audio and lm.t0 and ctx.view_cur() == 'pattern') then return sec end
+  local rg = pooled.region_at(regions, lm.t0 + 1e-4)
+  if rg and rg.rgnend then return math.min(sec, rg.rgnend - lm.t0) end
+  return sec
+end
 ctx.pat_cut_over = function(items)
-  if not items or ctx.view_cur() ~= 'pattern' or not regions or #regions == 0 then return end
+  if not items or ctx.view_cur() == 'pattern' or not regions or #regions == 0 then return end   -- 9 ноя: pat — контекст паттерна, не режем; proj / sec — продолжение в следующем
   local lib = edit.lib_track and edit.lib_track(false)
   for it in pairs(items) do
     if reaper.ValidatePtr(it, 'MediaItem*') and reaper.GetMediaItem_Track(it) ~= lib then
@@ -31957,7 +31964,7 @@ local function frame()
         if not (rl and rl.c == c_held) then rl = { c = c_held, t = nk.t }; ctx.roll = rl end
         local rd = edit.row_time(vim.cur.row + 1, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)
         if rd > 0 and now - rl.t >= rd then rl.t = rl.t + rd; if now - rl.t > rd then rl.t = now end; c = c_held end
-      elseif vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(now - lm.t_press) then
+      elseif vim.mode == 'insert' and lm and now - lm.t_press < 10 and math.abs(lm.t_press - nk.t) < 0.5 and edit.hold_length(ctx.hold_cap(lm, now - lm.t_press)) then
         ctx.hold_len = lm; reaper.UpdateArrange()
       end
     else ctx.note_key_last = { c = c, t = now, dt = math.min(0.25, now - (ctx.frame_t_prev or now)) }; ctx.roll = nil end
