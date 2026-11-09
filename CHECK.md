@@ -2591,3 +2591,4 @@
 - 9 ноя: Esc с тапа правого Shift (Karabiner) — выходит из INSERT (было: принимался за Shift+Esc, снимал time selection)
 - 9 ноя: harpoon 'a в трекере помнит и вид: LPB (и обзор), pattern / section / project, прокрутку; '1.. — возвращает его
 - 9 ноя: zo — обзор (было zO); za — свернуть / раскрыть трек одной клавишей (zo zc свёртки убраны)
+- 9 ноя: Esc тапом правого Shift — подсказка (' z d …) отменяется, из INSERT выходит; настоящий Shift+Esc (Shift держишь) — снимает time selection

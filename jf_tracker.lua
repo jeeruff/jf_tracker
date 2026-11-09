@@ -31772,8 +31772,12 @@ local function frame()
   ctx.esc_noshift = nil
   if c == 27 and ctx.mods().shift and reaper.JS_VKeys_GetState and not inject_cap then
     local st = reaper.JS_VKeys_GetState(0)
-    if st and st:byte(16) == 0 and st:byte(160) == 0 and st:byte(161) == 0 then ctx.esc_noshift = true end
+    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(reaper.time_precise() - 0.2)   -- Shift отпущен только что — тап
+    local function k(s2, i) return s2 and s2:byte(i) ~= 0 end
+    if (st and not (k(st, 16) or k(st, 160) or k(st, 161))) or k(up, 16) or k(up, 160) or k(up, 161) then ctx.esc_noshift = true end
   end
+  -- 9 ноя: открыта подсказка / набор (' z d …) — Esc сначала отменяет её, даже с Shift
+  if c == 27 and ctx.mods().shift and (vim.pending or vim.op or vim.count or vim.hexbuf) then ctx.esc_noshift = true end
   if c == 27 and ctx.mods().shift and not ctx.esc_noshift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
     reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
     vim.msg = 'time selection removed'
