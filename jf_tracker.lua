@@ -31442,6 +31442,12 @@ local function frame()
       elseif code then c = code; inject_cap = tonumber(cap); ctx.inject_pending = inj end
     end
   end
+  if c == 27 and ctx.opt_esc_t and reaper.time_precise() - ctx.opt_esc_t < 0.6 and state.focus == 'tracker' then   -- 9 ноя: Esc Esc в опциях — выйти и закрыть панель
+    ctx.opt_esc_t = nil
+    local PN, m = draw.panes, state.panes
+    if PN and m and PN.visible(m, 'options') then ctx.pane_do(function() return PN.hide(m, 'options') end, 'options closed'); OPT.active = false end
+    c = 0
+  end
   -- Ctrl+J (9 окт): на macOS код 10 до gfx.getchar не доходит (Ctrl+H K L
   -- приходят) — физическая J при зажатом Control, только когда окно в фокусе
   if c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 32 ~= 0 and gfx.mouse_cap & 4 == 0
@@ -33029,7 +33035,7 @@ ctx.opt_m = function()
   local mx, my = gfx.mouse_x, gfx.mouse_y
   return mx >= b[1] and mx < b[1] + b[3] and my >= b[2] and my < b[2] + b[4]
 end
-ctx.opt_leave = function() ctx.set_focus('tracker') end
+ctx.opt_leave = function() ctx.set_focus('tracker'); ctx.opt_esc_t = reaper.time_precise() end   -- 9 ноя: Esc ещё раз сразу — панель опций закрыть
 ctx.opt_show = function()
   local PN, m = draw.panes, state.panes
   if not PN.visible(m, 'options') then
