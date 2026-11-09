@@ -287,7 +287,8 @@ local state = {
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
   phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
-  mpin = flag('mpin', true),                     -- 8 ноя: мастер приколот справа (выкл — обычный крайний трек)
+  mpin = flag('mpin', true),
+  spcleader = flag('spcleader', true),            -- 9 ноя: зажатый Space — лидер (тап — Play / Stop)                     -- 8 ноя: мастер приколот справа (выкл — обычный крайний трек)
   bigcur = flag('bigcur', false),                 -- cursor zoom: строка курсора лупой ×2 (8 окт; 15 окт — и без fixed)   -- хвост плейхеда, строк (8 окт)   -- толщина скроллбаров, px (8 окт)
   ctlmap = flag('ctlmap', true), ctlx2 = flag('ctlx2', false), patitem = flag('patitem', true),   -- 31 окт: patitem — новый MIDI-айтем на весь паттерн, MIDI без заливки
     -- 27 окт: CONTROL — оверлей (карта трекпада, плашка), шрифт x2
@@ -717,7 +718,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel', 'mpin' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'ggrel', 'mpin', 'spcleader' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -13576,6 +13577,7 @@ ctx = {
       flag('nofloat', 'no auto FX windows', 'a new effect (added by the tracker or in REAPER, inside containers too) opens no window: the window REAPER floats by itself (its option Auto-float newly created FX windows) closes at once; windows you open yourself (O, double click) stay'),
       flag('noautofloat', 'no REAPER auto-float', 'REAPER action FX: Auto-float new FX windows is turned off on start: the window of a new effect takes the keyboard from the tracker (told once, the first time); :autofloat turns it back on and this off'),
       { key = 'knob', label = 'slider knob', kind = 'cycle', values = { 'auto', 'pixel', 'bar', 'block', 'diamond' }, desc = 'the handle of the sliders: pixel - a pixel-art diamond (grows with the font), bar - a sharp vertical bar, block - a square, diamond - the old smooth one (blurs in pixel mode); auto - pixel in pixel mode, else diamond', get = function() return state.knob or 'auto' end, set = function(v) state.knob = v end },
+      { key = 'spcleader', label = 'space leader', kind = 'toggle', desc = 'hold Space and press a key - the main menu (which-key) with that key; hold longer - the menu opens by itself; a tap of Space plays / stops as before (on release). Needs js_ReaScriptAPI', get = function() return state.spcleader ~= false end, set = function(v) state.spcleader = v end },
       { key = 'pixel', label = 'pixel mode', kind = 'toggle', desc = 'the frame is drawn at half the size and shown x2 without smoothing - four times fewer pixels, much faster on a big screen; the bitmap font looks the same, thin lines get 2 px, small labels can not be smaller than the normal font (:pixel)', get = function() return state.pixel ~= false end, set = function(v) state.pixel = v; draw.set_font(state); relayout() end },
       flag('focusback', 'focus back from plugins', 'after you touch a plugin window (VST / CLAP / AU / JS FX window), the mouse back over the tracker gives it the keyboard again; REAPER dialogs and other windows keep theirs'),
       flag('aifill', 'automation item fill', 'a light fill inside automation items in the envelope columns; off - transparent with the frame, as REAPER draws them'),
@@ -13661,7 +13663,7 @@ ctx = {
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
       { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'kbhide2', 'dsp_big', 'measure' } },
-      { 'cursor and editing', { 'noautofloat', 'pixel', 'knob', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
+      { 'cursor and editing', { 'noautofloat', 'spcleader', 'pixel', 'knob', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
       { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
@@ -31159,6 +31161,7 @@ local function frame()
   -- клавиши из контекстной гидры (5 окт): по одной за кадр, как с клавиатуры
   local from_q = false
   if c <= 0 and #ctx.keyq > 0 then c = table.remove(ctx.keyq, 1); from_q = true end
+  c = ctx.space_leader(c, from_q)   -- 9 ноя: зажатый Space — лидер (тап — Play / Stop на отпускание)
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
   if ctx.BF and c > 0 then   -- 6 ноя: большой фейдер — клавиатура ему (и меткам f)
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end else ctx.bf_key(c) end
@@ -33200,6 +33203,40 @@ ctx.cm_wk = function()   -- Ctrl+W c: список custom-модулей (бук
   table.sort(items, function(a, b) return vim.key_rank(a[1]) < vim.key_rank(b[1]) end)
   if #items == 0 then items[1] = { '', 'none - put a module file into Data/jf_tracker_modules' } end
   return { title = 'c - custom modules', items = items }
+end
+-- 9 ноя: ЗАЖАТЫЙ SPACE — ЛИДЕР (опция space leader, по умолчанию вкл; нужен js_ReaScriptAPI). Тап Space (нажал и
+-- отпустил, другого не нажимал) — как раньше (Play / Stop), но на отпускание. Space держится и нажата клавиша — главное
+-- меню (which-key) и эта клавиша в него; держится дольше 0.25 с — меню само. Отпустил с открытым меню без выбора —
+-- меню закрыто. Набор текста (команда, поиск, заметки, поля) и Space с модификаторами — как раньше
+ctx.space_leader = function(c, from_q)
+  local S = ctx.spc
+  if not reaper.JS_VKeys_GetState or state.spcleader == false then ctx.spc = nil; return c end
+  local now = reaper.time_precise()
+  if S then
+    local st = reaper.JS_VKeys_GetState(S.t - 0.5)
+    local held = st and st:byte(0x20) ~= 0
+    if c == 32 then return 0 end                               -- автоповтор Space — проглотить
+    if not held then
+      ctx.spc = nil
+      if S.menu then if vim.hydra and not S.used then vim.key(27) end
+      elseif not S.used then table.insert(ctx.keyq, 1, 32) end   -- тап — Space как раньше (из очереди мимо лидера)
+      return c
+    end
+    if c > 0 and not from_q then
+      S.used = true
+      if not S.menu then S.menu = true; if ctx.main_menu then ctx.main_menu() end end
+      return c                                                -- клавиша — в открытое меню
+    end
+    if not S.menu and now - S.t >= 0.25 then S.menu = true; if ctx.main_menu then ctx.main_menu() end end
+    return c
+  end
+  if c ~= 32 or from_q then return c end
+  local m = ctx.mods()
+  if m.shift or m.ctrl or m.alt or m.cmd or inject_cap then return c end
+  if vim.mode == 'cmd' or vim.mode == 'search' or vim.picker or vim.hydra or state.focus == 'notes' or state.focus == 'console'
+     or ctx.cm_typing() or (OPT and OPT.typing) or (FB and FB.typing) then return c end
+  ctx.spc = { t = now }
+  return 0
 end
 ctx.cm_typing = function() local cm = draw.CM[state.focus]; return cm and cm.typing and cm.typing() or false end
 ctx.cm_draw = function(id, Lx, x, y, w, h, foc)
