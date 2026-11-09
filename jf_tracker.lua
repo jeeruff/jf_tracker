@@ -24880,7 +24880,7 @@ local function frame()
     else left = ((pe and pe.label) or state.focus):upper() end
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свой режим клавиатуры: patternkb (ноты — паттерны) в трекере
-  if state.viper then left = 'VIPER ' .. left end   -- 29 окт
+  if ctx.vl_on then left = 'VIPER ' .. left end   -- 9 ноя: VIPER — только когда слой работает (клавиши из окна REAPER); в трекере — обычный режим
   if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
@@ -24900,7 +24900,7 @@ local function frame()
   if not state.lock and (not state.viper or ctx.vl_on) and ctx.ecur_row ~= vim.cur.row then
     if reaper.GetPlayState() & 1 == 0 then reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false); ctx.ecur_row = vim.cur.row end
   end
-  if not ctx.win_focus then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
+  if not ctx.win_focus and not ctx.vl_on then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg end
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
