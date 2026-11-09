@@ -2597,3 +2597,4 @@
 - 9 ноя: слой viper — viper вкл (кнопка / Cmd+F10), щёлкни в arrange REAPER: hjkl / dd / v / Space … идут в трекер (курсор трекера = edit-курсор REAPER, колонка = выделенный трек); Cmd / Ctrl / Opt + клавиша — REAPER как обычно; щелчок в поле ввода — печатается; viper выкл / трекер закрыт — клавиши REAPER родные
 - 9 ноя: зум наружу (- / zo) не дальше «строка = паттерн курсора»; лидер (Space держать / \) w — режим панелей (= Ctrl+W)
 - 9 ноя: zs — зум выделения (VISUAL / time selection REAPER во весь экран); zS — вид section (было zs); лидер s — screensets (было S)
+- 9 ноя: SPC m — меню того, что под курсором (= \); опции → группа leader key: space leader, space opens (main / here), задержка автопоказа
