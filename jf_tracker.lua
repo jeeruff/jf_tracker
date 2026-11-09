@@ -3638,7 +3638,7 @@ ctx = {
   end,
   mods = function()
     local cap = inject_cap or gfx.mouse_cap
-    return { cmd = cap & 4 == 4, ctrl = cap & 32 == 32, alt = cap & 16 == 16, shift = cap & 8 == 8 and not ctx.esc_noshift }   -- 9 ноя: Esc с тапа Shift — без Shift
+    return { cmd = cap & 4 == 4, ctrl = cap & 32 == 32, alt = cap & 16 == 16, shift = cap & 8 == 8 }
   end,
   -- слайсер: оверлей нарезки инструмента (двойной клик по сэмплу / :slice / \is)
   slicer_active = function() return SL.active end,
@@ -31767,18 +31767,7 @@ local function frame()
     ctx.stop_here()
     c = 0
   end
-  -- 9 ноя: Esc с тапа правого Shift (Karabiner: right_shift alone = escape) приходит с флагом Shift — это обычный Esc:
-  -- Shift+Esc — только если Shift зажат на самом деле (js; без js — по флагу)
-  ctx.esc_noshift = nil
-  if c == 27 and ctx.mods().shift and reaper.JS_VKeys_GetState and not inject_cap then
-    local st = reaper.JS_VKeys_GetState(0)
-    local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp(reaper.time_precise() - 0.2)   -- Shift отпущен только что — тап
-    local function k(s2, i) return s2 and s2:byte(i) ~= 0 end
-    if (st and not (k(st, 16) or k(st, 160) or k(st, 161))) or k(up, 16) or k(up, 160) or k(up, 161) then ctx.esc_noshift = true end
-  end
-  -- 9 ноя: открыта подсказка / набор (' z d …) — Esc сначала отменяет её, даже с Shift
-  if c == 27 and ctx.mods().shift and (vim.pending or vim.op or vim.count or vim.hexbuf) then ctx.esc_noshift = true end
-  if c == 27 and ctx.mods().shift and not ctx.esc_noshift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
+  if c == 27 and ctx.mods().shift and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not ctx.opt_k() then
     reaper.GetSet_LoopTimeRange(true, false, 0, 0, false)
     vim.msg = 'time selection removed'
     c = 0
