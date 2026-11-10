@@ -31774,7 +31774,7 @@ local function frame()
       local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
-        if m.shift then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе: её край едет в сторону клавиши (перенос — Cmd+Opt)
+        if m.shift or (reaper.JS_Mouse_GetState and reaper.JS_Mouse_GetState(8) & 8 ~= 0) then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе (10 ноя: Shift — и у системы: в mouse_cap его часто нет)
           ctx.pane_nudge(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
