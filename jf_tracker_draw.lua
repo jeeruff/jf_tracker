@@ -707,6 +707,7 @@ function D.layout_core(snap, state, nregions)
   -- 20 окт: united stepruler — такт.доля в колонке номеров (beats там не нужен; both → только time)
   L.united = state.unitedruler and true or false
   L.relwave = state.relwave and true or false
+  L.wavefrm = state.wavefrm and true or false
   if L.united and tlr == 'beats' then tlr = 'off' elseif L.united and tlr == 'both' then tlr = 'time' end
   L.tlr = tlr
   L.tl_w = (tlr == 'beats' and ms('999.4') + L.pad) or (tlr == 'time' and ms('0:00.000') + L.pad)
@@ -2498,6 +2499,7 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   -- 10 ноя: волна фоном (тёмная) — контрастная кайма; спектр (вид spec) — цветом каймы
   local back = D.PEAK == D.PEAKB
   local bspec = back and L.base and L.base.wave == 'spec'
+  local frm = column and L.wavefrm and not inv   -- 11 ноя: колонка с каймой — заливка тёмная, край яркий (спектр — цветом края)
   if head.kpk then pk = head.kpk(math.min(total, 8192), (column and mode == 'spec') or bspec)   -- 19 окт: пэд drumrs5k — пики файла пэда
   else pk = get_peaks and get_peaks(head, math.min(total, 8192), (column and mode == 'spec') or bspec) end
   local cx, hw, x0w
@@ -2509,6 +2511,8 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     if v and v < 128 then hw = hw * math.max(0.12, v / 128) end
   end
   local base_col = inv and U.TEXT or (muted and D.PEAKM or D.PEAK)   -- 10 ноя: под подсветкой — яркая (была чёрная)
+  local edge_col = base_col
+  if frm then base_col = U.mix(edge_col, U.BG, 0.72) end
   set(base_col)
   -- непрерывная ось (3 окт): без спектральных пиков волна не рвётся на тишине
   -- и у item без пиков (офлайн) — сплошная линия в границах item, пики поверх
@@ -2533,8 +2537,10 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     if column then   -- 19 окт: тихие госты не ниткой — пики сжаты степенью 0.6 (громкие почти те же)
       mx = mx > 0 and mx ^ 0.6 or -((-mx) ^ 0.6); mn = mn > 0 and mn ^ 0.6 or -((-mn) ^ 0.6)
     end
+    local scol
     if column and mode == 'spec' and pk.spec and not inv then
-      local c = spec_colour(pk.spec[idx]); set(muted and U.mix(c, U.BG, 0.5) or c)
+      scol = spec_colour(pk.spec[idx]); if muted then scol = U.mix(scol, U.BG, 0.5) end
+      set(frm and U.mix(scol, U.BG, 0.72) or scol)
     end
     if tailq and not (column and mode == 'spec') then set(q >= tailq and tailc or base_col) end
     local ek = ec and math.min(ec.n, math.floor(q / total * ec.n) + 1)
@@ -2543,7 +2549,11 @@ local function draw_wave(L, head, i, x, y, muted, inv)
       local xa, xb = cx + mn * hw, cx + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
-      if back and not inv then
+      if frm then
+        set(scol or edge_col)
+        gfx.rect(math.floor(xa), y + py, 1, 1, 1); gfx.rect(math.floor(xb), y + py, 1, 1, 1)
+        set(scol and U.mix(scol, U.BG, 0.72) or base_col)
+      elseif back and not inv then
         local ec2 = (bspec and pk.spec) and spec_colour(pk.spec[idx]) or U.mix(U.TEXT, U.BG, 0.35)
         set(muted and U.mix(ec2, U.BG, 0.5) or ec2)
         gfx.rect(math.floor(xa), y + py, 1, 1, 1); gfx.rect(math.floor(xb), y + py, 1, 1, 1)
