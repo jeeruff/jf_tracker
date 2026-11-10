@@ -28835,8 +28835,11 @@ local function frame()
     elseif hover.matrix and hover.matrix.patrow and gfx.mouse_cap & 8 == 8 then   -- 27 окт: Shift+щелчок — в выбор / из выбора
       ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow; ctx.pat_mark(hover.matrix.patrow)
       click = { t = now2, zone = 'patmark' }
+    elseif hover.matrix and hover.matrix.patempty then   -- 10 ноя: пустой код — щелчок: паттерн с ним на свободном месте
+      ctx.set_focus('patterns'); MX.pl_empty = { code = hover.matrix.patempty }; ctx.pat_create(hover.matrix.patempty)
+      click = { t = now2, zone = 'patempty' }
     elseif hover.matrix and hover.matrix.patrow then   -- 19 окт: список patterns: щелчок — выбор и слушать, двойной — к паттерну
-      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow   -- 27 окт: фокус — панель patterns (её клавиши: J s m v)
+      ctx.set_focus('patterns'); MX.pl_sel = hover.matrix.patrow; MX.pl_empty = nil   -- 27 окт: фокус — панель patterns (её клавиши: J s m v)
       if dbl and click.zone == 'patrow' then local p = (ctx.pat_rows or {})[hover.matrix.patrow]; if p then ctx.chain_add(p.name) end   -- 19 окт: двойной — в цепь
       else ctx.patlist_do('listen') end
       click = { t = now2, zone = 'patrow' }
@@ -32465,7 +32468,7 @@ local function frame()
         if ch == 'l' or c == 1919379572 then ctx.patgrid_move(1, 0); return end
         if ch == 'h' or c == 1818584692 then ctx.patgrid_move(-1, 0); return end
         if ch == ' ' then ctx.patlist_do('listen'); return end
-        if c == 13 then ctx.patlist_do('go'); return end
+        if c == 13 then if MX.pl_empty then ctx.pat_create(MX.pl_empty.code) else ctx.patlist_do('go') end; return end
         if ch == 'n' then ctx.patlist_do('note'); return end
         -- 27 окт: выбор нескольких и команды: Shift+стрелки — расширить, v — отметить, Esc — снять; J glue, s split, r имя, m меню
         if ch == 'v' then ctx.pat_mark(MX.pl_sel); return end
@@ -37045,11 +37048,14 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
     if cy + ch > y + h then break end
     local p = cl.i and list[cl.i]
     if not p then   -- ещё нет: серый кубик с кодом
-      U.set(U.mix(U.LINE, U.PANEL, 0.55)); gfx.rect(cx, cy, cw - 1, ch - 1, 0)
-      U.text(cx + Lx.pad, cy + 1, cl.code or '', U.mix(U.DIM, U.PANEL, 0.4))
+      local eon = MX.pl_empty and MX.pl_empty.code == cl.code   -- 10 ноя: курсор и на пустом коде
+      local ehot = mx >= cx and mx < cx + cw - 1 and my >= cy and my < cy + ch - 1
+      U.set(eon and U.AMBER or (ehot and U.TEXT or U.mix(U.LINE, U.PANEL, 0.55))); gfx.rect(cx, cy, cw - 1, ch - 1, 0)
+      U.text(cx + Lx.pad, cy + 1, cl.code or '', eon and U.AMBER or U.mix(U.DIM, U.PANEL, 0.4))
+      if ehot and cl.code then hv.patempty = cl.code end
       goto pcell_next
     end
-    local on = cl.i == MX.pl_sel
+    local on = cl.i == MX.pl_sel and not MX.pl_empty
     local marked = MX.pl_multi[p.name]   -- 27 окт: в выборе — заливка голубым
     local n = uses[p.name] or 0
     local playing = play_name == p.name
@@ -37096,11 +37102,14 @@ end
 -- курсор сетки: h l — соседняя клетка ряда, j k — ряд (тот же вариант, иначе ближайший)
 ctx.patgrid_move = function(dc, dr)
   local cells, cur = ctx.pat_cells or {}, nil
-  for _, cl in ipairs(cells) do if cl.i == MX.pl_sel then cur = cl end end
-  if not cur then for _, cl in ipairs(cells) do if cl.i then MX.pl_sel = cl.i; return end end; return end
+  -- 10 ноя: и по пустым кодам (серым): курсор там — MX.pl_empty, Enter создаёт паттерн
+  for _, cl in ipairs(cells) do
+    if (MX.pl_empty and cl.code == MX.pl_empty.code and not cl.i) or (not MX.pl_empty and cl.i == MX.pl_sel) then cur = cl end
+  end
+  if not cur then for _, cl in ipairs(cells) do if cl.i then MX.pl_sel = cl.i; MX.pl_empty = nil; return end end; return end
   local best, bd
   for _, cl in ipairs(cells) do
-    if cl.i and cl ~= cur then
+    if (cl.i or cl.code) and cl ~= cur then
       local ok = (dc ~= 0 and cl.r == cur.r and (cl.c - cur.c) * dc > 0) or (dr ~= 0 and (cl.r - cur.r) * dr > 0)
       if ok then
         local d = math.abs(cl.r - cur.r) * 100 + math.abs(cl.c - cur.c)
@@ -37108,7 +37117,7 @@ ctx.patgrid_move = function(dc, dr)
       end
     end
   end
-  if best then MX.pl_sel = best.i; return true end
+  if best then if best.i then MX.pl_sel = best.i; MX.pl_empty = nil else MX.pl_empty = { code = best.code } end; return true end
 end
 -- 19 окт: волна пэда drumrs5k на треке: MIDI-нота кита → пэд по ноте → кусок его сэмпла (пики файла a..b),
 -- длина — секунды куска в строках от строки ноты. col без рэка — nil (быстро: рэк ищется раз на снимок)
@@ -37913,6 +37922,33 @@ ctx.pat_selected = function()
   return out
 end
 ctx.pat_nsel = function() local n = 0; for _ in pairs(MX.pl_multi) do n = n + 1 end; return n end
+-- 10 ноя: паттерн с кодом из панели (пустая клетка): курсор в пустом месте — с его такта, иначе — за последним паттерном;
+-- длина — как у паттерна курсора / последнего (иначе такт), не наезжая на следующий; курсор — туда
+ctx.pat_create = function(code)
+  if not code then return end
+  for _, rg in ipairs(regions or {}) do if not rg.gap and (rg.name:match('^(%S+)') or rg.name) == code then vim.msg = code .. ' exists'; return end end
+  local tcur = edit.row_time(vim.cur.row, state.lpb, 0)
+  local here = pooled.region_at(regions, tcur)
+  local last
+  for _, rg in ipairs(regions or {}) do if not rg.gap and rg.rgnend and (not last or rg.rgnend > last.rgnend) then last = rg end end
+  local ref = (here and not here.gap) and here or last
+  local t0
+  if not here or here.gap then
+    local qn = reaper.TimeMap2_timeToQN(0, tcur)
+    local _, qms = reaper.TimeMap_QNToMeasures(0, qn)
+    t0 = reaper.TimeMap2_QNToTime(0, qms or qn)
+  else t0 = last and last.rgnend or tcur end
+  local q0 = reaper.TimeMap2_timeToQN(0, t0)
+  local len_qn = ref and (reaper.TimeMap2_timeToQN(0, ref.rgnend) - reaper.TimeMap2_timeToQN(0, ref.pos)) or 4
+  local t1 = reaper.TimeMap2_QNToTime(0, q0 + len_qn)
+  for _, rg in ipairs(regions or {}) do if not rg.gap and rg.pos > t0 + 1e-6 and rg.pos < t1 then t1 = rg.pos end end
+  if t1 <= t0 + 1e-4 then vim.msg = code .. ': no room here'; return end
+  edit.run('new pattern ' .. code, function() reaper.AddProjectMarker2(0, true, t0, t1, code, -1, 0) end)
+  model.invalidate(); regions = model.regions(state.lpb)
+  MX.pl_empty = nil
+  vim.cur.row = math.floor(model.row_of_time(t0, state.lpb) + 0.5); vim.ensure_visible()
+  vim.msg = ('pattern %s at %s (Cmd+Z - back)'):format(code, mx_bar_label and mx_bar_label(t0) or ('%.2fs'):format(t0))
+end
 ctx.pat_mark = function(i, on)
   local p = (ctx.pat_rows or {})[i]
   if not p then return end
