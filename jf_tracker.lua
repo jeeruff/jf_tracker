@@ -5647,6 +5647,26 @@ ctx = {
     ctx.peak_move(it, p, to)
     vim.msg = ('peak %.3fs -> row %04d (%+.1f ms)'):format(p, r, (to - p) * 1000)
   end,
+  -- 10 ноя: стретч-маркер на каждом транзиенте айтема — без сдвига (srcpos = pos); дальше двигать удары J K в колонке волны
+  smk_transients = function(it)
+    if not it then local hs = vim.covering and vim.covering(vim.cur.fi, vim.cur.row) or {}; for _, h in ipairs(hs) do if h.kind == 'audio' then it = h.item; break end end end
+    if not (it and reaper.ValidatePtr(it, 'MediaItem*')) then vim.msg = 'smk: an audio note under the cursor'; return end
+    local tk = reaper.GetActiveTake(it)
+    if not tk or reaper.TakeIsMIDI(tk) then vim.msg = 'smk: an audio note under the cursor'; return end
+    local e = { src = reaper.GetMediaItemTake_Source(tk), len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH'),
+                rate = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), offs = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') }
+    local tr = SL.transients_of(e) or {}
+    if #tr == 0 then vim.msg = 'smk: no transients found (the item tab Opt+D tunes the detector)'; return end
+    local n = 0
+    edit.run('stretch markers at transients', function()
+      for _, t in ipairs(tr) do
+        local pos = (type(t) == 'table' and (t.t or t[1]) or t)
+        if pos and pos > 0.005 and pos < e.len - 0.005 then reaper.SetTakeStretchMarker(tk, -1, pos); n = n + 1 end
+      end
+    end)
+    model.invalidate()
+    vim.msg = ('smk: %d stretch marker(s) at the transients - h into the wave, J K moves a hit (u - undo)'):format(n)
+  end,
   peak_pick = function()
     local it, p, pos = ctx.peak_at_cursor(); if not it then return end
     ctx.qmove = { item = it, from = p, pos = pos }
@@ -19833,6 +19853,7 @@ function event_actions(hover)
     if head.kind == 'audio' then
       add('Quantize the nearest peak to the row grid', function() ctx.peak_quantize() end, 'q')
       add('Move the nearest peak to ... (j k a row, Enter)', function() ctx.peak_pick() end, 'Q')
+      add('Stretch markers at all transients (nothing moves; then J K in the wave column) (:smk)', function() ctx.smk_transients(head.item) end, 't')   -- 10 ноя
     end
   end
   local what = sel and 'selection' or 'event'
@@ -23094,8 +23115,21 @@ ctx.pix_halve = function()
   local P = ctx.pix
   -- 6 ноя: ширина и высота — порознь: REAPER обновил одну (после Audio_Init и т. п.) — вторая уже половинная, второй
   -- раз не делить (статус уезжал в середину окна)
-  if gfx.w ~= P.hw then P.rw = gfx.w; P.hw = math.max(1, gfx.w // 2) end
-  if gfx.h ~= P.hh then P.rh = gfx.h; P.hh = math.max(1, gfx.h // 2) end
+  -- 10 ноя: настоящий размер — у системы (окно в пикселях окна: gfx в Retina-координатах — по отношению к прошлому);
+  -- gfx.h, уже поделённый, делился второй раз: статус в середине, внизу — старый кадр
+  local rw, rh = gfx.w, gfx.h
+  if reaper.JS_Window_GetClientSize then
+    ctx.my_hwnd = ctx.my_hwnd or reaper.JS_Window_Find('jf_tracker', true)
+    local ok, cw, ch = false, nil, nil
+    if ctx.my_hwnd then ok, cw, ch = reaper.JS_Window_GetClientSize(ctx.my_hwnd) end
+    if ok and cw and cw > 0 then
+      P.k = P.k or (P.rw and P.rw / cw) or nil
+      if not P.k and gfx.w ~= P.hw then P.k = gfx.w / cw end
+      if P.k and P.k > 0 then rw, rh = math.floor(cw * P.k + 0.5), math.floor(ch * P.k + 0.5) end
+    end
+  end
+  if rw ~= P.rw or P.hw < 0 then P.rw = rw; P.hw = math.max(1, rw // 2) end
+  if rh ~= P.rh or P.hh < 0 then P.rh = rh; P.hh = math.max(1, rh // 2) end
   gfx.w, gfx.h = P.hw, P.hh
   fps_buf.rw, fps_buf.rh = P.rw, P.rh   -- настоящий размер окна — для save_win
   -- мышь: REAPER пишет целые; свои — с меткой .25 (не делить второй раз)
