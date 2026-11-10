@@ -7106,6 +7106,9 @@ ctx = {
     if tgt and tgt.take then vim.msg = 'drumrs5k: a track, not take fx'; return end
     local rack, note0
     for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.kit and f.container then rack = f; break end end
+    if not rack then   -- 10 ноя: пустой «drumrs5k …» (пэды вырезаны) — тоже рэк: файлы в него, не в новый
+      for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.container and (f.name or ''):lower():find('^drumrs5k') then rack = f; break end end
+    end
     if rack then
       note0 = (ctx.slice_base and ctx.slice_base()) or 61
       for _, kid in ipairs(rack.kids or {}) do if kid.note and kid.note >= note0 then note0 = kid.note + 1 end end
@@ -20339,7 +20342,22 @@ function ctx.context_items(hover)
       add('Rename … (:iname)', function() pool_select(i); ctx.rename_inst_prompt() end, 'n')
       add('Copy (yy)', function() ctx.inst_yank(i, i) end, 'y')
       add('Duplicate (yp)', function() ctx.inst_yank(i, i, true); pool_select(i); ctx.inst_put(false) end, 'u')
-      add('Delete (dd) - its notes too', function() ctx.inst_cut(i, i) end, 'd')
+      add('Delete (dd) - its notes too', function() ctx.inst_cut(i, i) end, 'X')
+      -- 10 ноя: d — в drumrs5k: отмеченные (m) или этот, каждый файл — свой пэд в одном рэке трека курсора
+      add('Drumrs5k - a pad per sample (the marked ones, else this one), one rack', function()
+        local list = {}
+        for k in pairs(IK.marks) do list[#list + 1] = k end
+        table.sort(list)
+        if #list == 0 then list[1] = i end
+        local files = {}
+        for _, k in ipairs(list) do
+          local q = col.pool[k]
+          local f = q and q.item and ctx.item_file and ctx.item_file((q.parent or q).item)
+          if f then files[#files + 1] = f end
+        end
+        if #files == 0 then vim.msg = 'drumrs5k: no audio samples'; return end
+        ctx.drum_add_files(files); IK.clear_marks()
+      end, 'd')
     elseif i then
       add('Select empty slot', function() pool_select(i) end, 's')
     end
@@ -38873,7 +38891,7 @@ ctx.drum_audition = function(path)
   local col = dsp_target()
   if not (col and col.track) or col.take then vim.msg = 'drum: the DSP track has no drumrs5k'; return false end
   local k
-  for i, f in ipairs(col.fx or {}) do if f.kit and f.kids and model.DR.is_rack(f.kids) then k = i; break end end
+  for i, f in ipairs(col.fx or {}) do if f.kit and f.kids and model.DR.is_rack(f.kids, f.name) then k = i; break end end
   if not k then vim.msg = 'drum: the DSP track has no drumrs5k'; return false end
   local _, f, _, ki, kid = ctx.pad_cur(k)
   if not (kid and kid.rs5k_i) then vim.msg = 'drum: select a pad (click it or Enter on the rack)'; return false end
@@ -38982,7 +39000,7 @@ ctx.drum_browser_enter = function(files)
 end
 ctx.pad_rack = function(k)
   local col, f = ctx.dsp_fx(k)
-  if col and f and f.kids and model.DR and model.DR.is_rack(f.kids) then return col, f end
+  if col and f and f.kids and model.DR and model.DR.is_rack(f.kids, f.name) then return col, f end
 end
 ctx.pad_cur = function(k)
   local col, f = ctx.pad_rack(k)

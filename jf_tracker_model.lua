@@ -2138,7 +2138,7 @@ function build_one(tr, fx, out)
       if multi then kit = false end
       -- 16 окт: drumrs5k — пэд и подконтейнером [RS5K, эффекты пэда]; у пэда — его RS5K,
       -- файл, кусок a..b (доли файла), нота и категории эффектов (слоты)
-      if not multi and M.DR and M.DR.is_rack(kids) then
+      if not multi and M.DR and M.DR.is_rack(kids, short) then
         kit = true
         local chi = M.choke_fx(A, tr)
         for _, kid in ipairs(kids) do

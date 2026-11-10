@@ -129,8 +129,10 @@ function DR.pad_rs5k(kid, depth)
   return nil
 end
 -- контейнер — драм-рэк: больше одного пэда и все дети — пэды
-function DR.is_rack(kids)
-  if not kids or #kids < 2 then return false end
+-- name (10 ноя): контейнер «drumrs5k …» — рэк и с одним пэдом (иначе каждый файл заводил новый рэк)
+function DR.is_rack(kids, name)
+  local min = (name or ''):lower():find('^drumrs5k') and 1 or 2
+  if not kids or #kids < min then return false end
   for _, kid in ipairs(kids) do if not DR.pad_rs5k(kid) then return false end end
   return true
 end
