@@ -5051,6 +5051,9 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             local function P(t) return R.MIDI_GetPPQPosFromProjTime(tk, t) end
             local p0, p1 = P(t0), P(t1)
             local dp = p1 - p0
+            -- 10 ноя: допуск строки — как у показа (row_of_qn: 1/50 строки); был 1 тик, и нота чуть раньше своей строки
+            -- (округление PPQ) считалась в удаляемой: BS стирал ноту ниже вместо подтягивания
+            local tol = math.max(1, 0.02 * dp / math.max(1, nrows or 1))
             -- 27 окт: keepend — что за концом паттерна (следующий паттерн), на месте; нота, что уходит за конец, держит свой конец
             local plim = (keepend and fin > limit + EPS) and P(limit) or math.huge
             -- 31 окт: ноты за концом клипа (их не видно) — на месте: иначе удаление строки вытаскивало их в клип («из ниоткуда»)
@@ -5059,16 +5062,16 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
             for k = nn - 1, 0, -1 do
               local _, sel, mu, a0, a1, ch, pi, ve = R.MIDI_GetNote(tk, k)
               if a0 >= plim - 1 or a0 >= pvis - 1 or a0 < P(pos) - 1 then   -- в следующем паттерне / вне клипа — на месте
-              elseif a0 >= p0 - 1 and a0 < p1 - 1 then R.MIDI_DeleteNote(tk, k)
+              elseif a0 >= p0 - tol and a0 < p1 - tol then R.MIDI_DeleteNote(tk, k)
               else
                 -- 10 ноя: dp дробный (строка ≠ целое число тиков) — округлять: REAPER отбрасывает дробь, нота уходила на тик
                 -- раньше своей строки, и следующий Backspace удалял её как «в удаляемой строке»
-                local b0 = a0 >= p1 - 1 and math.floor(a0 - dp + 0.5) or a0
+                local b0 = a0 >= p1 - tol and math.floor(a0 - dp + 0.5) or a0
                 local b1 = (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and math.floor(a1 - dp + 0.5) or math.floor(p0 + 0.5)))
                 if b0 ~= a0 or b1 ~= a1 then R.MIDI_SetNote(tk, k, sel, mu, b0, math.max(b0 + 1, b1), ch, pi, ve, true) end
               end
             end
-            rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 and a0 < p1 - 1 then return nil end; return a0 >= p1 - 1 and math.floor(a0 - dp + 0.5) or a0 end,
+            rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - tol and a0 < p1 - tol then return nil end; return a0 >= p1 - tol and math.floor(a0 - dp + 0.5) or a0 end,
               function(a1) return (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and math.floor(a1 - dp + 0.5) or math.floor(p0 + 0.5))) end)
             for k = ncc - 1, 0, -1 do
               local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)

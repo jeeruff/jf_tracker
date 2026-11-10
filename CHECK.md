@@ -2626,3 +2626,4 @@
 - BS on MIDI notes: no drift (ppq rounded) - repeated BS pulls notes up, never eats the next one
 - item-tab aim line in the tracker only on the cursor track
 - lib grp button: folders on/off; on - numbers follow the folders
+- BS on a note-off row: the note below moves up (drifted notes no longer eaten)
