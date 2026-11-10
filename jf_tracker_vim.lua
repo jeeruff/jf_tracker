@@ -1207,6 +1207,30 @@ end
 -- 13 окт: край ноты под курсором на строку (Option+Shift: J / K — конец позже / раньше,
 -- H / L — начало раньше / позже; начало тянет и offset источника, как trim). Без растяжки;
 -- что звучит за концом сэмпла — по лупу инструмента. По сетке строк, один undo
+-- 10 ноя: Ctrl+Opt+Shift+J K на аудио-ноте — растяжение: конец на d строк, звук растягивается (playrate, как Opt+край)
+function V.note_stretch(d)
+  local hs = V.covering(V.cur.fi, V.cur.row)
+  local n, L = 0, lpb()
+  for _, h in ipairs(hs) do
+    local it = h.item
+    if h.kind == 'audio' and it and reaper.ValidatePtr(it, 'MediaItem*') then
+      local tk = reaper.GetActiveTake(it)
+      local pos = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+      local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+      local r = math.floor(ctx.model.row_of_time(pos + len, L) + 0.5) + d
+      local t = ctx.row_time(r)
+      if tk and t > pos + 1e-3 then
+        ctx.edit.item_drag_begin('note stretch')
+        ctx.edit.item_drag_to(it, 'end', t, nil, { len0 = len, rate0 = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE') })
+        n = n + 1
+      end
+    end
+  end
+  if n == 0 then return false end
+  ctx.edit.item_drag_end()
+  V.msg = ('note stretched %+d row(s) (Ctrl+Opt+Shift+J K; Ctrl+Shift+J K - the end without stretch)'):format(d)
+  return true
+end
 function V.note_edge(edge, d)
   local hs = V.covering(V.cur.fi, V.cur.row)
   local fp = flat()[V.cur.fi]
@@ -2392,7 +2416,9 @@ function V.key_impl(c)
   end
   -- 1 ноя: Ctrl+Shift+Opt+J / K — паттерн курсора на строку длиннее / короче (счётчик — N строк); на лейне автоматизации — jog, как было
   if mods.alt and mods.ctrl and mods.shift and not mods.cmd and (hk == 'j' or hk == 'k' or c == DOWN or c == UP) and V.mode ~= 'cmd' and V.mode ~= 'search' and not env_of(V.cur.fi) and ctx.pat_len_step then
-    ctx.pat_len_step(((hk == 'j' or c == DOWN) and 1 or -1) * n)
+    -- 10 ноя: на аудио-ноте — растянуть её (playrate, конец на строку), иначе — длина паттерна
+    local d = ((hk == 'j' or c == DOWN) and 1 or -1) * n
+    if not (V.note_stretch and V.note_stretch(d)) then ctx.pat_len_step(d) end
     V.count = nil; return
   end
   if mods.alt and mods.ctrl and not mods.cmd and (hk == 'j' or c == DOWN) and V.mode ~= 'cmd' and V.mode ~= 'search' then

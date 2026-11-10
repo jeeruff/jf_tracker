@@ -37989,7 +37989,17 @@ ctx.pat_glue = function()
     local sig = {}
     for _, rg in ipairs(run) do sig[#sig + 1] = rg.name:match('^(%S+)') or rg.name end
     run.key = table.concat(sig, '+')
-    if not names[run.key] then names[run.key] = model.SEC.next_family(fake); fake[#fake + 1] = { name = names[run.key] } end
+    -- 10 ноя: склеенный — именем первого (A1 + A2 → A1), если первый нигде больше не играет сам; иначе новый код
+    local first = run[1].name
+    local alone = true
+    for _, rg in ipairs(regions) do
+      if not rg.gap and rg.name == first then
+        local inrun = false
+        for _, r2 in ipairs(runs) do if r2[1] == rg then inrun = true end end
+        if not inrun then alone = false end
+      end
+    end
+    if not names[run.key] then names[run.key] = alone and first or model.SEC.next_family(fake); fake[#fake + 1] = { name = names[run.key] } end
   end
   ctx.slot_op('glue patterns', function()
     for _, run in ipairs(runs) do for _, rg in ipairs(run) do reaper.DeleteProjectMarker(0, rg.idx, true) end end
