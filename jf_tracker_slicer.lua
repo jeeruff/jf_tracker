@@ -1166,8 +1166,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
   local zoomed0 = S.vb ~= nil and (math.min(S.vb, e.len or 1) - (S.va or 0)) < ((e.len or 0) > 0 and e.len or 1) - 1e-6
-  -- 10 ноя: только при зуме — без него полоса повторяла волну под ней
-  if zoomed0 and wh > BH + 8 * rh then bar_y = wy; wy = wy + BH + 2; wh = wh - BH - 2 end
+  -- 10 ноя: только при зуме (без него повторяла волну), в самом низу — под волной, подсказка над ней
+  if zoomed0 and wh > BH + 8 * rh then wh = wh - BH - 2; bar_y = wy + wh + 2 end
   local wavebar = not (ctx.state and ctx.state.wavebar == false)
   local SBH = 0   -- 17 окт: обзор — в нижней строке, под волной места не берёт
   S.cross_update(e)
