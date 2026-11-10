@@ -31336,6 +31336,17 @@ local function frame()
     elseif dn and dn:byte(79) ~= 0 then c = 15   -- Ctrl+O (9 окт, прыжок назад)
     elseif dn and dn:byte(77) ~= 0 then c = 13 end   -- Ctrl+M (13 окт, метроном): если до getchar не дошёл
   end
+  -- 10 ноя: Cmd+H (и Cmd+J K L) — macOS часто не отдаёт getchar (фокус панелей не переходил): физическая буква при
+  -- зажатом Cmd без Ctrl / Opt; пришедший следом системный код той же клавиши (до 0.2 с) — не второй раз
+  do
+    local now = reaper.time_precise()
+    local CM = { [72] = 8, [74] = 10, [75] = 11, [76] = 12 }
+    if c > 0 and ctx.cmdsyn and ctx.cmdsyn.c == c and now - ctx.cmdsyn.t < 0.2 then c = 0; ctx.cmdsyn = nil
+    elseif c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 4 ~= 0 and gfx.mouse_cap & 48 == 0 and (gfx.getchar(65536) & 2) ~= 0 then
+      local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (now - 0.05))
+      for vk, code in pairs(CM) do if dn and dn:byte(vk) ~= 0 then c = code; ctx.cmdsyn = { c = code, t = now }; break end end
+    end
+  end
   ctx.ctrlj_t = reaper.time_precise()
   c = ctx.space_leader(c, from_q)   -- 9 ноя: зажатый Space — лидер (тап — Play / Stop на отпускание)
   c = ctx.key_repeat(c, from_q)   -- 27 окт: свой автоповтор (опции key repeat delay / rate)
