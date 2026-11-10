@@ -837,6 +837,7 @@ function S.dt_adjust(i, d)
   local r = S.DROWS[i]; if not r then return end
   r[4](math.max(r[5], math.min(r[6], r[3]() + d)))
   d_redetect()
+  S.use_transients(); S.msg = ('sliced at %d transients (live)'):format(#S.slices)   -- 10 ноя: сразу apply
 end
 -- клавиши панели (пока открыта); true — съели
 function S.dt_key(c, shift)
@@ -884,7 +885,7 @@ function S.dt_draw(U, L, x, y, w, h)
     local f = math.max(0, math.min(1, (mx - S.dt_drag.bx) / math.max(1, S.dt_drag.bw)))
     local v = r[5] + f * (r[6] - r[5])
     v = math.floor(v / r[8] + 0.5) * r[8]
-    if math.abs(v - r[3]()) > 1e-9 then r[4](v); d_redetect() end
+    if math.abs(v - r[3]()) > 1e-9 then r[4](v); d_redetect(); S.use_transients(); S.msg = ('sliced at %d transients (live)'):format(#S.slices) end   -- 10 ноя: сразу apply
   elseif not down then S.dt_drag = nil end
   local cy = y + (#S.DROWS + 1) * rh + 6
   U.text(x + pad, cy, ctx.fit(('%d transients'):format(#(S.trans or {})), w - 2 * pad), U.CYAN)

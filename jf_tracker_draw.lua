@@ -2505,7 +2505,7 @@ local function draw_wave(L, head, i, x, y, muted, inv)
     local v = tonumber(head.vol, 16)
     if v and v < 128 then hw = hw * math.max(0.12, v / 128) end
   end
-  local base_col = inv and U.BG or (muted and D.PEAKM or D.PEAK)
+  local base_col = inv and U.TEXT or (muted and D.PEAKM or D.PEAK)   -- 10 ноя: под подсветкой — яркая (была чёрная)
   set(base_col)
   -- непрерывная ось (3 окт): без спектральных пиков волна не рвётся на тишине
   -- и у item без пиков (офлайн) — сплошная линия в границах item, пики поверх
@@ -10482,7 +10482,8 @@ function D.frame(L, snap, rows, state, info)
   -- выделенные в REAPER треки: тело колонки чуть светлее (строки курсора и
   -- плейхеда ложатся поверх)
   for _, c in ipairs(L.cols) do
-    if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.09)); gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
+    if (info.trsel or {})[c.col.guid] then set(U.mix(U.BG, U.TEXT, 0.05));   -- 10 ноя: тише (0.09)
+      gfx.rect(c.x + 1, L.body_y, c.w - 1, L.body_h, 1) end
     -- треки с включённой записью (5 окт): чуть покрасневший фон колонки; 7 ноя — одним прямоугольником, не по строкам
     if c.x and c.col and c.col.armed then gfx.set(U.RED[1], U.RED[2], U.RED[3], 0.07); gfx.rect(c.x, L.body_y, c.w, L.body_h, 1); gfx.a = 1 end
   end
@@ -10543,7 +10544,7 @@ function D.frame(L, snap, rows, state, info)
                 if ay > cy0 and ay < cy1 then D.aim_line = { x0, ay, w0 } end
               end
               local fa = state.textonly and 0 or (state.itemalpha or 5) / 100
-              set(rgb); gfx.a = isel and math.min(1, fa * 1.8 + 0.01) or fa       -- полупрозрачно: сетка видна (2 окт)
+              set(rgb); gfx.a = isel and math.min(1, fa * 1.2 + 0.01) or fa   -- 10 ноя: выделенный тише (×1.8)       -- полупрозрачно: сетка видна (2 окт)
               if not bare then gfx.rect(x0, cy0, w0, cy1 - cy0, 1) end
               gfx.a = 1
               -- рамка (опция item frame, 3 окт): item — вокруг всего item, wave —
