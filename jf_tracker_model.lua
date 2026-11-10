@@ -548,6 +548,12 @@ local function place_audio(lane, lpb, it, take, qn0, qn1)
     start_f = d0 / 256,                  -- дробное начало внутри первой строки
   }
   head.fx, head.rowfx = M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
+  -- 11 ноя: нота длиннее сэмпла с loop (legato / длинная нота) — повторы лупа тусклее (draw: tail_f), не похожи на ноты
+  if take and src and R.GetTakeNumStretchMarkers and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') == 1 and R.GetTakeNumStretchMarkers(take) == 0 then
+    local per = M.src_period(src)
+    local play = per > 0 and (per - head.offs) / (rate > 0 and rate or 1) or 0
+    if play > 1e-3 and head.len > play + 1e-3 then head.tail_f = play / head.len end
+  end
   -- 27 окт: у сэмпла есть маркер высоты (:pitch) — нота = как звучит (маркер + транспоз), не транспоз от C-4
   local mroot = take and M.marker_root(take, head.offs, rate > 0 and rate or 1, head.len)
   if mroot then

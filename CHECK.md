@@ -2628,3 +2628,4 @@
 - lib grp button: folders on/off; on - numbers follow the folders
 - BS on a note-off row: the note below moves up (drifted notes no longer eaten)
 - option framed wave (items and waves): wave column dark fill + bright edge
+- a looped note longer than its sample: the loop repeats drawn dim (lgto + loop no longer look like ghost notes)

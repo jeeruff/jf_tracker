@@ -2550,9 +2550,9 @@ local function draw_wave(L, head, i, x, y, muted, inv)
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
       if frm then
-        set(scol or edge_col)
+        set(scol or ((tailq and q >= tailq) and U.mix(edge_col, U.BG, 0.6) or edge_col))
         gfx.rect(math.floor(xa), y + py, 1, 1, 1); gfx.rect(math.floor(xb), y + py, 1, 1, 1)
-        set(scol and U.mix(scol, U.BG, 0.72) or base_col)
+        set(scol and U.mix(scol, U.BG, 0.72) or ((tailq and q >= tailq) and tailc or base_col))
       elseif back and not inv then
         local ec2 = (bspec and pk.spec) and spec_colour(pk.spec[idx]) or U.mix(U.TEXT, U.BG, 0.35)
         set(muted and U.mix(ec2, U.BG, 0.5) or ec2)
