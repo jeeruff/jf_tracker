@@ -19735,8 +19735,15 @@ end
 
 
 function region_actions(rg)
-  if not rg then return {} end
+  -- 10 ноя: курсор вне паттерна — меню не пустое: создать здесь, панель паттернов
+  if not rg then return {
+    { 'new pattern here (this bar)', key = 'o', g = 'pattern', fn = function() ctx.auto_pattern(vim.cur.row); model.invalidate() end },
+    { 'patterns panel menu: glue / split / copy / rename / select …', key = 'm', g = 'pattern', fn = function() ctx.pat_menu() end },
+    { 'split ... (half / 3 / 4 / bars / at the cursor)', key = 's', g = 'pattern', fn = function() ctx.pat_split_menu() end },
+    { 'glue the selected patterns', key = 'g', g = 'pattern', fn = function() ctx.pat_glue() end },
+  } end
   return {
+    { 'patterns panel menu: listen / glue / split / copy / rename / select …', key = 'M', g = 'pattern', fn = function() ctx.pat_menu() end },   -- 10 ноя
     { 'queue after current (Space)', key = 'q', fn = function() ctx.region_space(rg) end },
     { 'jump here now', key = 'j', fn = function() reaper.SetEditCurPos(rg.pos, false, true) end },   -- 10 окт: было «Jump now»
     { 'mute cell (M)', key = 'm', g = 'block', fn = function() MX.toggle_mute(seq, snap) end },
@@ -24407,6 +24414,7 @@ local function frame()
       local mc = L and L.mcol
       o[#o + 1] = ('cols_r %s master_w %s mfold %s | mcol %s'):format(tostring(L and L.cols_r), tostring(L and L.master_w), tostring(L and L.mfold), mc and ('x %s w %s envs %s'):format(mc.x, mc.w, table.concat((function() local t = {} for _, e in ipairs(mc.envs) do t[#t + 1] = e.x .. '+' .. e.w end for _, m in ipairs(mc.mls) do t[#t + 1] = 'ml ' .. m.x .. '+' .. m.w end return t end)(), ',')) or 'nil')
       for _, c in ipairs(L and L.cols or {}) do if c.cut or (c.x and c.x + (c.w or 0) > (L.cols_r or 1e9)) then o[#o + 1] = ('cut %s x %s w %s'):format(c.col and c.col.name or '?', tostring(c.x), tostring(c.w)) end end
+      o[#o + 1] = 'tree ' .. tostring(state.panes and draw.panes.encode(state.panes))
       reaper.SetExtState(EXT, 'lay', table.concat(o, ' | '), false)
     end
     local g = reaper.GetExtState('jf_dbg', 'gc')
