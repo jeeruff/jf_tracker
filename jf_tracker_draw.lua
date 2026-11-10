@@ -2495,8 +2495,11 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   -- инверсия только в режиме note, где волна лежит под подсвеченным полем
   if column then inv = nil end
   local pk
-  if head.kpk then pk = head.kpk(math.min(total, 8192), column and mode == 'spec')   -- 19 окт: пэд drumrs5k — пики файла пэда
-  else pk = get_peaks and get_peaks(head, math.min(total, 8192), column and mode == 'spec') end
+  -- 10 ноя: волна фоном (тёмная) — контрастная кайма; спектр (вид spec) — цветом каймы
+  local back = D.PEAK == D.PEAKB
+  local bspec = back and L.base and L.base.wave == 'spec'
+  if head.kpk then pk = head.kpk(math.min(total, 8192), (column and mode == 'spec') or bspec)   -- 19 окт: пэд drumrs5k — пики файла пэда
+  else pk = get_peaks and get_peaks(head, math.min(total, 8192), (column and mode == 'spec') or bspec) end
   local cx, hw, x0w
   if column then cx = x + L.x_wave + L.w_wave / 2; hw = (L.w_wave / 2) - 1; x0w = x + L.x_wave
   else cx = x + L.x_note + L.w_note / 2; hw = (L.w_note / 2) - 1 end
@@ -2540,6 +2543,12 @@ local function draw_wave(L, head, i, x, y, muted, inv)
       local xa, xb = cx + mn * hw, cx + mx * hw
       if xb - xa < 1 then xa, xb = cx - 0.5, cx + 0.5 end
       gfx.line(xa, y + py, xb, y + py)
+      if back and not inv then
+        local ec2 = (bspec and pk.spec) and spec_colour(pk.spec[idx]) or U.mix(U.TEXT, U.BG, 0.35)
+        set(muted and U.mix(ec2, U.BG, 0.5) or ec2)
+        gfx.rect(math.floor(xa), y + py, 1, 1, 1); gfx.rect(math.floor(xb), y + py, 1, 1, 1)
+        set(base_col)
+      end
     end
     if ek and ec.haspan and column and not inv then
       local px = x0w + math.floor((ec.pan[ek] + 1) / 2 * (L.w_wave - 1) + 0.5)
