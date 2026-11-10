@@ -19889,9 +19889,9 @@ function view_actions()
     { (state.envs and '!' or '') .. 'Envelopes (:env)', key = 'e', fn = function() state.envs = not state.envs end },
     { 'FX columns +1', key = 'x', fn = function() state.fxcols = math.min(4, state.fxcols + 1) end },
     { 'FX columns -1', key = 'X', fn = function() state.fxcols = math.max(0, state.fxcols - 1) end },
-    { 'Wave view ... (zw)', key = 'v', fn = function() ctx.wave_menu() end },   -- 12 окт
+    { 'Wave view ... (zw)', key = 'w', fn = function() ctx.wave_menu() end },   -- 12 окт; 10 ноя: w (было v)
     { (state.fixed and '!' or '') .. 'Fixed cursor: the row stays in the middle (zZ)', key = 'c', fn = function() ctrl_action('fixed', 0) end },
-    { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'w', fn = function() state.follow = not state.follow end },
+    { (state.follow and '!' or '') .. 'Follow playhead (F)', key = 'F', fn = function() state.follow = not state.follow end },
     { 'Dock / fullscreen (Cmd+F11)', key = 'd', fn = toggle_dock },
     { 'Hints: what the module under the mouse does', key = 'h', fn = function() ctx.hints_open() end },
     { 'Help in the browser (html)', key = 'H', fn = open_help },
@@ -32888,7 +32888,7 @@ local function frame()
       elseif state.focus == 'top' and state.top then
         local ch = c < 256 and string.char(c) or ''
         if c == 9 then ctx.toggle_focus()
-        elseif state.toptab == 'sample' and SPROP.key(c, cur_col() and (cur_col().pool or {})[vim.inst]) then
+        elseif state.toptab == 'sample' and not (state.panes_ui and state.panes and draw.panes.visible(state.panes, 'sprops')) and SPROP.key(c, cur_col() and (cur_col().pool or {})[vim.inst]) then   -- 10 ноя: есть панель properties — её клавиши там (h l в item не крутят громкость)
           -- панель свойств: J K строка, H L значение, R сброс
         elseif state.toptab == 'sample' and SL.active then
           vim.key(c)                                   -- 10 окт: через vim — там правило «выбор инструмента мимо слайсера»
