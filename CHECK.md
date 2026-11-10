@@ -2614,3 +2614,4 @@
 - 10 ноя: SPC v B — всё крупное: t time/BPM, s status, c cursor, n trackname (x1.5 / x2), f fader, b big sample editor
 - 10 ноя: опция space hold before the menu — шаг 1 мс (50–800); :spctrain — 8 тапов Space как для Play, порог ставится чуть выше самого длинного
 - 10 ноя: палитра : — по имени нет совпадений → ищет по описаниям (:stret → wave, legato, beatsync …)
+- 10 ноя: item — полоса-обзор наверху над прицелом; мини-волна нормализована и ярче

@@ -1161,7 +1161,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
   -- 17 окт: полоса-обзор — всегда наверху, на всю ширину, над прицелом и его кнопками; высота — 2 строки (у волны)
   local BH, bar_y, bar_x, bar_w = 2 * rh, nil, x, w   -- 17 окт: 2 строки (3 — много)
   -- 6 ноя: полоса-обзор — в самом низу: сверху вниз от точного к грубому (прицел, волна, вся длина)
-  if wh > BH + 8 * rh then wh = wh - BH - 2; bar_y = wy + wh + 2 end
+  -- 10 ноя: полоса-обзор — наверху, над прицелом (внизу её не было видно)
+  if wh > BH + 8 * rh then bar_y = wy; wy = wy + BH + 2; wh = wh - BH - 2 end
   -- 10 окт: под волной — полоска-обзор (весь item мини-волной, рамка — окно зума)
   -- 10 окт: полоска только при зуме; опция wave scrollbar — волной (по умолчанию) или обычной полосой
   if S.zoom_e ~= e.item and S.zoom_e ~= e.path then S.va, S.vb, S.zoom_e = 0, nil, e.item or e.path end
@@ -1882,13 +1883,15 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local inside = mx2 >= x and mx2 < x + w and my2 >= sy and my2 < sy + SBH
     U.set(U.BG); gfx.rect(x, sy, w, SBH, 1)
     local pk = wavebar and ctx.peaks and ctx.peaks(e, math.max(16, w))
-    U.set(U.mix(base, U.TEXT, 0.3))   -- 10 ноя: ярче (было в сторону фона — пропадала на тёмном)
+    U.set(U.mix(base, U.TEXT, 0.6))   -- 10 ноя: ярче (было в сторону фона — пропадала на тёмном)
     if not wavebar then U.set(U.DIM); gfx.rect(x, sy + math.floor(SBH / 2), w, 1, 1) end   -- обычная полоса: дорожка
     if pk and pk.n > 0 then
-      local c2, h2 = sy + SBH / 2, SBH / 2
-      for px = 0, w - 1, 2 do
+      local c2, h2 = sy + SBH / 2, SBH / 2 - 1
+      local nm = 0.02   -- 10 ноя: нормализация — тихий сэмпл не в 1 px
+      for i = 1, pk.n do local v = math.max(math.abs(pk.min[i] or 0), math.abs(pk.max[i] or 0)); if v > nm then nm = v end end
+      for px = 0, w - 1 do
         local idx = math.floor(px / w * pk.n) + 1
-        local a, b = pk.min[idx] or 0, pk.max[idx] or 0
+        local a, b = (pk.min[idx] or 0) / nm, (pk.max[idx] or 0) / nm
         gfx.rect(x + px, math.floor(c2 - b * h2), 1, math.max(1, math.floor((b - a) * h2)), 1)
       end
     end
