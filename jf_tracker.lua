@@ -9633,6 +9633,8 @@ ctx = {
   aim_cut_row = function()
     local c = SL.cross
     if not (c and state.top and state.toptab == 'sample' and reaper.ValidatePtr(c.item, 'MediaItem*')) then return nil end
+    local cc = cur_col()   -- 10 ноя: курсор ушёл с трека этого айтема — полоски нет (висела на файле)
+    if not (cc and cc.track == reaper.GetMediaItem_Track(c.item)) then return nil end
     local t = ctx.AIM.proj_of(c.n, c.e, SL.cut_point(c.t + c.dt))
     if not ctx.AIM.inside(c.n, t) then return nil end
     return { item = c.item, rf = model.row_of_time(t, state.lpb) }
@@ -13477,7 +13479,7 @@ ctx = {
       { label = 'own font', kind = 'action', value = (state.ttfcustom or '') ~= '' and (state.ttfcustom .. ' ' .. (state.ttfpx or 14)) or 'none', desc = 'any installed font by its family name (as in Font Book), optional size in px at the end: Enter opens :font - type e.g. Menlo 13; it becomes "custom" in the font list', fn = function() OPT.close(); vim.cmd_from = vim.mode == 'insert' and 'insert' or 'normal'; vim.mode = 'cmd'; vim.cmdline = 'font ' .. (state.ttfcustom or '') end },
       { label = 'install bundled fonts', kind = 'action', value = 'fonts/', desc = 'copies the pixel fonts that come with the tracker (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270) into your user fonts folder; authors and licences - fonts/README.md. A font not shown yet - restart REAPER', fn = function() vim.msg = ctx.fonts_install() end },
       { label = 'download fonts', kind = 'action', value = 'nerdfonts.com', desc = 'the font list uses Nerd Fonts (terminal monospace): opens their download page in the browser - install the .ttf, reopen the tracker', fn = function() if reaper.CF_ShellExecute then reaper.CF_ShellExecute('https://www.nerdfonts.com/font-downloads') else vim.msg = 'fonts: https://www.nerdfonts.com/font-downloads' end end },
-      flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5 (display only, numbers stay)'),
+      flag('libfolders', 'lib folders', 'lib: samples with a common word (kick, snare, hat, clap, perc, fx ...) or the same name stem - 3 and more - under a folder row /kicks 5, the numbers follow the folders (button grp in the lib)'),
       { key = 'kcfont', label = 'keycast font', kind = 'cycle', dropdown = true, values = (function() local v = { 'bitmap' }; for _, f in ipairs(ctx.MODEFONTS) do if f ~= 'off' then v[#v + 1] = f end end; return v end)(), desc = 'the font of the keycast (kcast): bitmap - the tracker font; any mode font (decorative); click - the list', get = function() return draw.kcfont or 'bitmap' end, set = function(v) ctx.kcfont_set(v) end, pick = function() ctx.kcfont_pick() end },
       { key = 'ttf', label = 'font', kind = 'cycle', values = (function() local v = { 'off' }; for _, k in ipairs(draw.TTF_LIST) do v[#v + 1] = k end; if (state.ttfcustom or '') ~= '' then v[#v + 1] = 'custom' end; return v end)(), desc = 'off - the REAPER bitmap; terminal monospace fonts (Nerd Fonts): pixel ones first (bigblue, bb437, departure, gohu, terminess, proggy, profont, 3270, monocraft), then vector (iosevka, jetbrains, hack, plex ...); font scale = their size. h l - step, the tracker redraws at once', get = function() return state.ttf or 'off' end, set = function(v) state.ttf = v; draw.set_font(state); ctx.relayout() end, pick = function() OPT.set_tab('theme') end },
       { key = 'fontscale', label = 'font scale', kind = 'cycle', values = { 1, 2, 3 }, desc = 'pixel size of the font (x4 only in PT-mode); whole steps only - a pixel font is sharp at whole multiples', get = function() return ctx.tt_api.scale() end, set = function(v) ctx.set_scale(v) end },
@@ -19670,6 +19672,7 @@ local function hint_go(t)
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'swapbtn' then ctx.swap_click()
   elseif t.kind == 'libautobtn' then ctx.libauto_toggle()
+  elseif t.kind == 'libgrpbtn' then ctx.libfolders_toggle()
   elseif t.kind == 'mod' then ctx.set_focus('top'); ctx.mod_toggle(d.col, d.m, d.what)
   elseif t.kind == 'dspbtn' then   -- 11 окт: кнопки шапки эффекта по f — как щелчок
     ctx.set_focus('dsp'); dsp_sel.fx = d.fx
@@ -20375,7 +20378,7 @@ function ctx.context_items(hover)
       add('Folder ' .. lf .. ': load a lib into it …', function() ctx.kit_into_folder(lf) end, 'o')
       add('Folder ' .. lf .. ': to drumrs5k (every sample a pad, the rack of the cursor track)', function() ctx.lib_folder_drum(lf) end, 'D')   -- 1 ноя (d — удалить инструмент)
     end
-    add((state.libfolders and '!' or '') .. 'Folders: kicks, snares, hats … (3+ alike)', function() state.libfolders = not state.libfolders; vim.msg = 'lib folders ' .. (state.libfolders and 'on' or 'off') end, 'f')
+    add((state.libfolders and '!' or '') .. 'Folders: kicks, snares, hats … (3+ alike, button grp)', function() ctx.libfolders_toggle() end, 'f')
     add((state.poolprev and '!' or '') .. 'Preview on select', function() state.poolprev = not state.poolprev end, 'r')
   elseif hover.header_env then
     local e = hover.header_env.e
@@ -25507,9 +25510,9 @@ local function frame()
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
     tabs = ctx.top_tabs(),
-    lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get() end)(),   -- 10 окт: папки / разделители lib
+    lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -26675,6 +26678,7 @@ local function frame()
   elseif hover.mixmode then state.status = 'meter of the master (REAPER VU): RMS / LUFS-M / LUFS-S / peak - click: the list (native, no plugin)'
   elseif hover.mixpk then state.status = 'peak hold of REAPER (as in its mixer; red == - clipped) - click: reset'
   elseif hover.trkio then state.status = ({ sends = 'sends of this track - click: open / close the send panel (+ send by fzf, volume, mute, remove)', input = 'track input - click: list (fzf)', smart = 'smart input: pick the most active input (jf_smart_set_input)', mainsend = 'send to master on / off', routing = 'open the REAPER routing window of this track (sends, receives, hardware outputs)', phase = 'phase invert', fxen = 'track FX on / off (bypass the whole chain)' })[hover.trkio.what] or hover.trkio.what
+  elseif hover.libgrpbtn then state.status = 'grp: samples with alike names (kick, snare ... 3+) go under a folder row, their numbers follow the folders; off - a plain list (click: on / off)'
   elseif hover.libautobtn then state.status = 'auto select: a step onto an instrument of another track moves the tracker there; off - a plain list, Enter goes there (click: on / off)'
   elseif hover.poolbsync then state.status = 'beatsync of the selected item: its length = N beats at the tempo where each note sits (tempo changes followed); click: on / off, wheel: N, right click: menu'
   elseif hover.dbplus or hover.dbpar then state.status = (hover.dbtip or '') .. ' - click: fzf of the effects'
@@ -28256,6 +28260,9 @@ local function frame()
     elseif hover.libautobtn then
       ctx.set_focus('inst'); ctx.libauto_toggle()
       click = { t = now2, zone = 'libautobtn' }
+    elseif hover.libgrpbtn then
+      ctx.set_focus('inst'); ctx.libfolders_toggle()
+      click = { t = now2, zone = 'libgrpbtn' }
     elseif hover.swapbtn then
       ctx.set_focus('inst'); ctx.swap_click()
       click = { t = now2, zone = 'swapbtn' }
@@ -36564,6 +36571,23 @@ ctx.kbwhere_set = function(v)
     elseif state.kbwhere == 'transport' and PN.visible(m, 'keycaster') then ctx.pane_do(function() return PN.hide(m, 'keycaster') end, 'keys: in the transport') end
   end
   relayout()
+end
+-- 10 ноя: grp — папки lib по похожим именам; включено — номера идут за папками (lib_regroup)
+ctx.libfolders_toggle = function() state.libfolders = not state.libfolders; vim.msg = 'lib folders (grp) ' .. (state.libfolders and 'on - numbers follow the folders' or 'off - a plain list') end
+-- порядок исходников на экране (draw.lib_disorder) → номера lib; тот же беспорядок второй раз не трогаем (u отменил — не спорим)
+ctx.lib_regroup = function()
+  local d = draw.lib_disorder; draw.lib_disorder = nil
+  local col = cur_col()
+  if not (d and col and d.col == col) then return end
+  local items, sig = {}, {}
+  for _, i in ipairs(d.order) do local e = col.pool[i]; if e and e.item then items[#items + 1] = e.item; sig[#sig + 1] = tostring(e.item) end end
+  for _, e in ipairs(col.pool) do if not e.parent and e.item then local hit = false; for _, x in ipairs(items) do if x == e.item then hit = true; break end end; if not hit then items[#items + 1] = e.item; sig[#sig + 1] = tostring(e.item) end end end
+  sig = table.concat(sig, ',')
+  if ctx.lib_regroup_sig == sig then return end
+  ctx.lib_regroup_sig = sig
+  edit.lib_order(items)
+  model.invalidate()
+  vim.msg = 'lib: numbers follow the folders (grp off - a plain list)'
 end
 ctx.libauto_toggle = function() state.libauto = not state.libauto; vim.msg = 'lib auto select ' .. (state.libauto and 'on - the tracker follows the instrument' or 'off - Enter goes to its track') end
 -- 6 ноя: Enter на инструменте чужого трека (auto select выкл) — туда и выбрать; иначе меню звука

@@ -5061,24 +5061,26 @@ function E.time_delete(tracks, t0, t1, limit, notes, lpb, nrows, keepend)   -- k
               if a0 >= plim - 1 or a0 >= pvis - 1 or a0 < P(pos) - 1 then   -- в следующем паттерне / вне клипа — на месте
               elseif a0 >= p0 - 1 and a0 < p1 - 1 then R.MIDI_DeleteNote(tk, k)
               else
-                local b0 = a0 >= p1 - 1 and a0 - dp or a0
-                local b1 = (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and a1 - dp or p0))
+                -- 10 ноя: dp дробный (строка ≠ целое число тиков) — округлять: REAPER отбрасывает дробь, нота уходила на тик
+                -- раньше своей строки, и следующий Backspace удалял её как «в удаляемой строке»
+                local b0 = a0 >= p1 - 1 and math.floor(a0 - dp + 0.5) or a0
+                local b1 = (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and math.floor(a1 - dp + 0.5) or math.floor(p0 + 0.5)))
                 if b0 ~= a0 or b1 ~= a1 then R.MIDI_SetNote(tk, k, sel, mu, b0, math.max(b0 + 1, b1), ch, pi, ve, true) end
               end
             end
-            rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 and a0 < p1 - 1 then return nil end; return a0 >= p1 - 1 and a0 - dp or a0 end,
-              function(a1) return (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and a1 - dp or p0)) end)
+            rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 and a0 < p1 - 1 then return nil end; return a0 >= p1 - 1 and math.floor(a0 - dp + 0.5) or a0 end,
+              function(a1) return (a1 <= p0) and a1 or ((a1 > plim) and a1 or ((a1 >= p1) and math.floor(a1 - dp + 0.5) or math.floor(p0 + 0.5))) end)
             for k = ncc - 1, 0, -1 do
               local _, sel, mu, a0, cm, ch, m1, m2 = R.MIDI_GetCC(tk, k)
               if a0 >= plim or a0 >= pvis then   -- следующий паттерн / за клипом
               elseif a0 >= p0 and a0 < p1 then R.MIDI_DeleteCC(tk, k)
-              elseif a0 >= p1 then R.MIDI_SetCC(tk, k, sel, mu, a0 - dp, cm, ch, m1, m2, true) end
+              elseif a0 >= p1 then R.MIDI_SetCC(tk, k, sel, mu, math.floor(a0 - dp + 0.5), cm, ch, m1, m2, true) end
             end
             for k = ntx - 1, 0, -1 do
               local _, sel, mu, a0, ty, msg = R.MIDI_GetTextSysexEvt(tk, k)
               if a0 >= plim then
               elseif a0 >= p0 and a0 < p1 then R.MIDI_DeleteTextSysexEvt(tk, k)
-              elseif a0 >= p1 then R.MIDI_SetTextSysexEvt(tk, k, sel, mu, a0 - dp, ty, msg, true) end
+              elseif a0 >= p1 then R.MIDI_SetTextSysexEvt(tk, k, sel, mu, math.floor(a0 - dp + 0.5), ty, msg, true) end
             end
             R.MIDI_Sort(tk)
             if pos >= t0 - EPS then R.SetMediaItemInfo_Value(it, 'D_POSITION', pos) end
@@ -5165,7 +5167,7 @@ function E.time_insert(tracks, t0, dt, limit, notes, lpb, nrows)
           local nfin = fin > limit + EPS and fin or (nx and fin) or math.min(fin + dt, limit)
           local pfin = P(fin)
           local function spill_t(a) return R.MIDI_GetPPQPosFromProjTime(ntk, R.MIDI_GetProjTimeFromPPQPos(tk, a)) end
-          local p0, dp, plim = P(t0), P(t0 + dt) - P(t0), math.min(P(limit), P(fin) + 1)   -- 31 окт: ноты за концом клипа — не трогать
+          local p0, dp, plim = P(t0), math.floor(P(t0 + dt) - P(t0) + 0.5), math.min(P(limit), P(fin) + 1)   -- 10 ноя: dp целый (дробь REAPER отбрасывал - ноты съезжали на тик); 31 окт: ноты за концом клипа — не трогать
           local mlim = math.min(P(limit), P(nfin) + 1)   -- 31 окт: клип растёт на dt — граница сдвига по НОВОМУ концу (нота у конца клипа пропадала)
           rtg_remap(it, function(a0) if a0 >= plim - 1 then return a0 elseif a0 >= p0 - 1 then return (a0 + dp < mlim - 1) and a0 + dp or nil end; return a0 end,
             function(a1) if a1 <= p0 or a1 >= plim then return a1 end; return math.min(a1 + dp, mlim) end)   -- 28 окт: метки 0R — с нотами

@@ -5157,6 +5157,16 @@ function D.pool_rows(pool, sort, col, cols)
   D.lib_hidden = {}
   D.lib_folder_of = {}
   if D.lib_folders_on then rows = lib_folders(rows, pool) end
+  -- 10 ноя: grp — номера идут за папками: порядок исходников на экране; не по возрастанию — main перенумерует (lib_regroup)
+  D.lib_disorder = nil
+  if D.lib_folders_on then
+    local ord, seen = {}, {}
+    local function put(i) local e = i and pool[i]; if e and not e.parent and e.item and not seen[i] then seen[i] = true; ord[#ord + 1] = i end end
+    for _, r in ipairs(rows) do
+      if r.folder then for _, i in ipairs(r.members or {}) do put(i) end elseif r.i and not r.sub then put(r.i) end
+    end
+    for k = 2, #ord do if ord[k] < ord[k - 1] then D.lib_disorder = { col = col, order = ord }; break end end
+  end
   for _, r in ipairs(rows) do if r.folder then for _, i in ipairs(r.members or {}) do D.lib_folder_of[i] = r.folder end end end
   -- 27 окт: остановки курсора в порядке строк на экране: сэмплы и заголовки папок (j k встают и на имя папки)
   D.lib_nav = {}
@@ -7071,6 +7081,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- 12 окт: insert (играть при вставке) переехал в транспорт — кнопка hear у step / inst / LPB
     -- swap (3 окт): звук инструмента ↔ файл, выбранный в браузере; горит — подменён
     if info.swap_state then tbtn('swap', info.swap_state() == 'on', 'swapbtn') end
+    tbtn('grp', info.libfolders, 'libgrpbtn')   -- 10 ноя: папки по похожим именам (номера идут за ними) / плоский список
     tbtn('auto', info.libauto, 'libautobtn')   -- 6 ноя: auto select — трекер за инструментом чужого трека
     -- 4 ноя: layer — слой (¥) выбранному инструменту: другой звук lib звучит с ним одной нотой (= L); 6 ноя: внизу
     tbtn('layer', false, 'poollayer')

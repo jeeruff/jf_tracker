@@ -2623,3 +2623,6 @@
 - 10 ноя: Ctrl+Opt+Shift+J K на аудио-ноте — растянуть её (playrate) на строку; не на ноте — длина паттерна; glue паттернов — именем первого (если он больше нигде сам не играет)
 - 10 ноя: pixel mode — размер кадра от окна системы (статус уезжал в середину, внизу старый кадр); :smk / SPC e t — стретч-маркеры на все транзиенты аудио-ноты
 - drumrs5k: one rack per track (1-pad / empty rack reused); lib menu d - marked samples to pads
+- BS on MIDI notes: no drift (ppq rounded) - repeated BS pulls notes up, never eats the next one
+- item-tab aim line in the tracker only on the cursor track
+- lib grp button: folders on/off; on - numbers follow the folders
