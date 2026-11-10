@@ -10759,6 +10759,7 @@ function D.frame(L, snap, rows, state, info)
     empty0, under0 = sc(empty0), sc(under0)
   end
   local ACC_F = { [0] = 1, 0.8, 0.5, 0.3, 0.15, 0 }
+  local TEXT90 = U.mix(U.TEXT, U.BG, 0.1)   -- 10 ноя: точки и метки строк — на 10 % тише нот
   -- 19 окт: волна пэда drumrs5k под MIDI-нотой кита: строка → { голова-волна, номер строки в ней }; конец — следующая
   -- нота подколонки (one-shot) или и OFF (obey note-offs); голова выше окна тоже звучит
   local kwmap = nil
@@ -10806,8 +10807,8 @@ function D.frame(L, snap, rows, state, info)
     local ty = y + 1
     local is_cur_row = vc and vc.row == r.row
     local af = ACC_F[r.acc or 5] or 0
-    D.EMPTY = af > 0 and U.mix(empty0, U.TEXT, af) or empty0
-    D.EMPTY_UNDER = af > 0 and U.mix(under0, U.TEXT, af * 0.6) or under0
+    D.EMPTY = af > 0 and U.mix(empty0, TEXT90, af) or empty0
+    D.EMPTY_UNDER = af > 0 and U.mix(under0, TEXT90, af * 0.6) or under0
     if mkline[r.row] then set(mkline[r.row], 0.75); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.a = 1 end
     if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
     elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
@@ -10836,7 +10837,7 @@ function D.frame(L, snap, rows, state, info)
     -- 20 окт: united stepruler — на долях такт.доля (такт ярче), шаги под ней — номером чуть темнее
     local ulab = L.united and (r.beat or r.bar) and not r.clip and info.tl_label and (info.tl_label(r.row))
     if D.dbg_rows then D.dbg_rows[#D.dbg_rows + 1] = ('%s@%d=%s'):format(tostring(r.row), y, tostring(ulab or r.label)) end   -- 6 ноя: jf_dbg rows=1
-    if ulab then text(tx0 + L.rl + L.tl_w + L.pad, ty, ulab, (is_cur_row or r.bar) and U.TEXT or U.mix(U.TEXT, U.GREY, 0.5))
+    if ulab then text(tx0 + L.rl + L.tl_w + L.pad, ty, ulab, is_cur_row and U.TEXT or (r.bar and TEXT90 or U.mix(TEXT90, U.GREY, 0.5)))
     else
       local nc = is_cur_row and U.TEXT or ((r.acc or 5) <= 2 and D.EMPTY or U.GREY)
       if L.united and not is_cur_row then nc = U.mix(nc, U.BG, 0.2) end
