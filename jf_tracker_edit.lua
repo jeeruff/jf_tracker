@@ -431,14 +431,17 @@ function E.item_end(it) return R.GetMediaItemInfo_Value(it, 'D_POSITION') + R.Ge
 
 -- ── поиск MIDI-ноты по голове ─────────────────────────────────────────────
 -- индекс ноты take по (ppq старта ±2, pitch, ch)
-local function note_index(take, ppq, pitch, ch)
+-- tol (11 ноя): допуск в тиках; по умолчанию 2. Голова строки — 1/50 строки, как показ (row_of_qn): нота, съехавшая
+-- на несколько тиков, видна в строке, а удаление / правка её не находили
+local function note_index(take, ppq, pitch, ch, tol)
+  tol = tol or 2
   local _, n = R.MIDI_CountEvts(take)
   local best, bestd
   for i = 0, n - 1 do
     local _, _, _, sppq, _, chan, p = R.MIDI_GetNote(take, i)
     if p == pitch and chan == ch then
       local d = math.abs(sppq - ppq)
-      if d <= 2 and (not bestd or d < bestd) then best, bestd = i, d end
+      if d <= tol and (not bestd or d < bestd) then best, bestd = i, d end
     end
   end
   return best
@@ -450,8 +453,13 @@ local function head_ppq(head, lpb)
   return R.MIDI_GetPPQPosFromProjTime(head.take, t)
 end
 
+local function row_tol(head, lpb)
+  local t0, t1 = row_time(head.row0, lpb, 0), row_time(head.row0 + 1, lpb, 0)
+  local d = R.MIDI_GetPPQPosFromProjTime(head.take, t1) - R.MIDI_GetPPQPosFromProjTime(head.take, t0)
+  return math.max(2, 0.02 * d)
+end
 local function midi_note(head, lpb)
-  local i = note_index(head.take, head_ppq(head, lpb), head.pitch, head.ch)
+  local i = note_index(head.take, head_ppq(head, lpb), head.pitch, head.ch, row_tol(head, lpb))
   if not i then return nil end
   local _, sel, muted, sppq, eppq, ch, pitch, vel = R.MIDI_GetNote(head.take, i)
   return i, { sel = sel, muted = muted, sppq = sppq, eppq = eppq, ch = ch, pitch = pitch, vel = vel }
@@ -511,7 +519,7 @@ function E.dedouble(heads, lpb)
   -- ключи MIDI-голов: только ноты на строках выделения (не весь клип)
   for _, h in ipairs(heads) do
     if h.kind == 'midi' and tseen[h.take] then
-      local i = note_index(h.take, head_ppq(h, lpb), h.pitch, h.ch)
+      local i = note_index(h.take, head_ppq(h, lpb), h.pitch, h.ch, row_tol(h, lpb))
       if i then
         local _, _, _, sppq = R.MIDI_GetNote(h.take, i)
         want[('m%d:%d:%d'):format(h.pitch, h.ch or 0, ms(R.MIDI_GetProjTimeFromPPQPos(h.take, sppq)))] = true
