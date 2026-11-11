@@ -922,7 +922,13 @@ local function pool_select(n, go)   -- 6 ноя: go — выбрать и чуж
   -- 21 окт: плагины-инструменты — сквозная нумерация по трекам проекта (как в REAPER: любой трек — любой инструмент);
   -- номер чужого инструмента — курсор на его трек
   local total = (ctx and ctx.inst_total) and ctx.inst_total() or 0
-  n = math.max(1, math.min(nsamp + total + 1, n))
+  local nph = (ctx and ctx.phr_list) and #ctx.phr_list() or 0   -- 11 ноя: за automation — midi clips и фразы (шаг инструмента не застревал)
+  n = math.max(1, math.min(nsamp + total + 1 + (nph > 0 and (1 + nph) or 0), n))
+  if n > nsamp + total + 1 then
+    local g2 = n - nsamp - total - 1
+    if g2 == 1 then ctx.midi_select() else local r = ctx.phr_list()[g2 - 1]; if r then ctx.phr_select(r.name) end end
+    return
+  end
   if n > nsamp then
     vim.inst = n
     local g = n - nsamp
@@ -7109,7 +7115,8 @@ ctx = {
     if not (col and col.track) or #paths == 0 then vim.msg = 'drumrs5k: no track / no files'; return end
     if tgt and tgt.take then vim.msg = 'drumrs5k: a track, not take fx'; return end
     local rack, note0
-    for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.kit and f.container then rack = f; break end end
+    for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.kit and f.container and #(f.kids or {}) > 0 then rack = f; break end end   -- 11 ноя: с пэдами — первым
+    if not rack then for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.kit and f.container then rack = f; break end end end
     if not rack then   -- 10 ноя: пустой «drumrs5k …» (пэды вырезаны) — тоже рэк: файлы в него, не в новый
       for _, f in ipairs((tgt and tgt.fx) or col.fx or {}) do if f.container and (f.name or ''):lower():find('^drumrs5k') then rack = f; break end end
     end
@@ -7121,7 +7128,21 @@ ctx = {
     for i, pth in ipairs(paths) do cp[i] = edit.media_copy(pth) end
     local c, n = edit.drum_pads(col.track, rack and rack.i, cp, note0, (cp[1]:match('[^/]+$') or 'kit'):gsub('%.%w+$', ''))
     if c and not rack then ctx.ti_cache = nil; pcall(ctx.inst_fx_pick, col, c, false, true) end
-    vim.msg = ('drumrs5k: %d pad(s) %s on %s, from note %d'):format(n, rack and 'added' or 'in a new rack', col.name or 'track', note0)
+    -- 11 ноя: пустые «drumrs5k …» (пэды вырезаны, старые броски) — убрать: рэк на трек один
+    local gone = 0
+    if c then
+      local tr = col.track
+      local keep = reaper.TrackFX_GetFXGUID(tr, c)
+      edit.run('drumrs5k: empty racks removed', function()
+        for i = reaper.TrackFX_GetCount(tr) - 1, 0, -1 do
+          local _, nm = reaper.TrackFX_GetFXName(tr, i)
+          local _, cnt = reaper.TrackFX_GetNamedConfigParm(tr, i, 'container_count')
+          if reaper.TrackFX_GetFXGUID(tr, i) ~= keep and (nm or ''):lower():find('drumrs5k') and tonumber(cnt) == 0 then reaper.TrackFX_Delete(tr, i); gone = gone + 1 end
+        end
+      end)
+      if gone > 0 then model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate() end
+    end
+    vim.msg = ('drumrs5k: %d pad(s) %s on %s, from note %d%s'):format(n, rack and 'added' or 'in a new rack', col.name or 'track', note0, gone > 0 and (', %d empty rack(s) removed'):format(gone) or '')
   end,
   -- бросок файла на пэд — его сэмпл (нота и номер — прежние)
   drum_pad_file = function(kid, path)
@@ -18194,6 +18215,9 @@ ctx.phr_select = function(name)
   state.phr_inst = name; state.auto_inst = false; state.midi_inst = false
   local c = cur_col()
   if c and state.instfx then state.instfx[c.guid] = nil end
+  if c then   -- номер — сквозной, после midi clips (шаг инструмента с него идёт дальше / назад)
+    for k, r in ipairs(ctx.phr_list()) do if r.name == name then vim.inst = #(c.pool or {}) + draw.empty_slots(#(c.pool or {})) + ctx.inst_total() + 2 + k end end
+  end
   local r = ctx.phr_find(name)
   vim.msg = ('phrase %s (%.1f q, %d in the song): a note key puts it at the cursor, C-4 - as written, others transpose; e - edit it'):format(name, r and r.lenq or 0, r and r.n or 0)
 end
@@ -34251,7 +34275,7 @@ ctx.track_view_set = function(col, v)
   reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_tview', v or '', true)
   ctx.tview_c[col.guid] = nil
   model.invalidate(); ctx.relayout()
-  vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zt n - notes)' or (v == 'spec' and 'spectral peaks (zt n - notes)' or 'notes'))
+  vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zT n - notes)' or (v == 'spec' and 'spectral peaks (zT n - notes)' or 'notes'))
 end
 -- 7 ноя: авто-панч — команда ищется один раз, состояние — раз в 0.25 с (было дважды за кадр, с поиском по списку действий)
 ctx.punch_on = function()
@@ -34264,10 +34288,10 @@ ctx.punch_on = function()
 end
 ctx.track_view_menu = function()
   local col = cur_col()
-  if not col then vim.msg = 'zt: no track under the cursor'; return end
+  if not col then vim.msg = 'zT: no track under the cursor'; return end
   local cur = draw.track_view(col)
   local function mark(v) return cur == v and '* ' or '  ' end
-  vim.open_hydra({ title = 'zt - view of ' .. (col.name ~= '' and col.name or 'the track'), items = {
+  vim.open_hydra({ title = 'zT - view of ' .. (col.name ~= '' and col.name or 'the track'), items = {
     { key = 'n', label = mark(nil) .. 'notes (normal)', fn = function() ctx.track_view_set(col, nil) end },
     { key = 's', label = mark('spec') .. 'spectral peaks, wide (stretch markers on it)', fn = function() ctx.track_view_set(col, 'spec') end },
     { key = 'w', label = mark('big') .. 'big wave instead of the dots (stretch markers on it; . , wider / narrower)', fn = function() ctx.track_view_set(col, 'big') end },
@@ -35335,20 +35359,26 @@ ctx.zoom_track = function()
     ctx.zt_saved = nil
     for _, c in ipairs(snap.cols) do ctx.fold(c, zt.folds[c.guid]) end
     state.wlevel, state.trackenvs, state.hscroll = zt.wlevel, zt.trackenvs, zt.hscroll
-    relayout(); vim.msg = 'zT: back'
+    if zt.tv_col then ctx.track_view_set(zt.tv_col, nil) end   -- 11 ноя: большая волна была только на время зума
+    relayout(); vim.msg = 'zt: back'
     return
   end
   local f = L and L.flat and L.flat[vim.cur.fi]
   local cur = f and f.col
-  if not cur then vim.msg = 'zT: no track under the cursor'; return end
+  if not cur then vim.msg = 'zt: no track under the cursor'; return end
   ctx.zt_saved = { folds = copy(state.folds), wlevel = copy(state.wlevel), trackenvs = state.trackenvs and copy(state.trackenvs) or nil, hscroll = state.hscroll }
   for _, c in ipairs(snap.cols) do ctx.fold(c, c.guid ~= cur.guid or nil) end
   state.wlevel = state.wlevel or {}
-  state.wlevel[cur.guid] = L.MAXLVL or 10
+  -- 11 ноя: крупнее то, что есть на треке, а не раскладка на пустые подколонки (MAXLVL добавлял колонки нот):
+  -- все поля своих колонок; аудио — большая волна на время зума
+  state.wlevel[cur.guid] = 3 + (L.MAXFX or 4)
   state.trackenvs = state.trackenvs or {}
   state.trackenvs[cur.guid] = true
+  local has_audio = false
+  for _, ln in ipairs(cur.lanes or {}) do if ln.audio_sub and next(ln.audio_sub) then has_audio = true end end
+  if has_audio and not draw.track_view(cur) then ctx.track_view_set(cur, 'big'); ctx.zt_saved.tv_col = cur end
   relayout()
-  vim.msg = 'zT: ' .. (cur.name or 'track') .. ' - all its events, the others folded (zT again - back)'
+  vim.msg = 'zt: ' .. (cur.name or 'track') .. ' - zoomed, the others folded (zt again - back; zT - its view: big wave / spectrum / notes)'
 end
 ctx.fit_width = function()
   local now = reaper.time_precise()
@@ -35401,7 +35431,7 @@ ctx.fit_width = function()
   end
   local narrowed = 0
   for _ in pairs(state.wlevel or {}) do narrowed = narrowed + 1 end
-  vim.msg = (narrowed > 0 and ('zw: all fit - the widest %d track(s) narrower (a big wave view zt stays as is)'):format(narrowed) or 'zw: all tracks the same width')
+  vim.msg = (narrowed > 0 and ('zw: all fit - the widest %d track(s) narrower (a big wave view zT stays as is)'):format(narrowed) or 'zw: all tracks the same width')
     .. ((L.cols_cut or L.hs_cut) and ' - still not all fit (scroll sideways)' or (narrowed > 0 and '' or ', all fit'))
 end
 -- 31 окт: zh / кнопка H — то, что показывает вид (паттерн / секция / проект), целиком по высоте: самый мелкий LPB,

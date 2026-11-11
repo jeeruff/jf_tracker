@@ -3300,9 +3300,9 @@ function V.key_impl(c)
       elseif c == ('l'):byte() then if ctx.lpb_menu then ctx.lpb_menu() end   -- 1 ноя: zl — пресеты LPB (T триоли, D квинтоли)
       elseif c == ('h'):byte() then if ctx.fit_height then ctx.fit_height() end   -- 31 окт: zh — вид (паттерн / секция / проект) по высоте в экран
       elseif c == ('Z'):byte() then if ctx.fixed_toggle then ctx.fixed_toggle() end   -- 12 окт: zZ — фиксированный курсор (zz — один раз в центр, zZ — всегда)
-      elseif c == ('t'):byte() then if ctx.track_view_menu then ctx.track_view_menu() end   -- 6 ноя: zt — вид трека курсора (большая волна / спектр / ноты); прокрутка наверх — zb / zz
+      elseif c == ('T'):byte() then if ctx.track_view_menu then ctx.track_view_menu() end   -- 11 ноя: zt / zT поменялись (просьба: зум трека — маленькой t)   -- 6 ноя: zt — вид трека курсора (большая волна / спектр / ноты); прокрутка наверх — zb / zz
       elseif c == ('o'):byte() then if ctx.overview_toggle then ctx.overview_toggle() end   -- 9 ноя: zo — обзор (было zO; zo / zc свёртки убраны — za одна)
-      elseif c == ('T'):byte() then if ctx.zoom_track then ctx.zoom_track() end   -- 4 ноя: zT — зум трека (все его события, остальные свёрнуты)
+      elseif c == ('t'):byte() then if ctx.zoom_track then ctx.zoom_track() end   -- 4 ноя: zT — зум трека (все его события, остальные свёрнуты)
       elseif c == ('b'):byte() then st.row0 = math.max(0, V.cur.row - L.nrows + 1)
       elseif c == ('a'):byte() then   -- 9 ноя: свернуть / раскрыть трек — одна клавиша za
         local f = flat()[V.cur.fi]

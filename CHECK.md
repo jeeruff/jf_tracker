@@ -2637,3 +2637,7 @@
 - big-wave track (zt): z, from the first level gives a narrow wave, folds only at 0
 - big-wave track (zt): h l no longer walk ~10 hidden fields behind each wave
 - lib: section " phrases (under midi): pick a phrase, note keys put its trigger (C-4 as written, others transpose); j k / e / dblclick
+- instrument step (from the tracker) goes past automation: midi clips, then the phrases
+- wave: line only at the start (the end line removed)
+- zt = zoom the track (fields + big wave for audio, no empty sub-columns), zT = track view menu
+- drumrs5k: adding files removes empty drumrs5k racks, the rack with pads is used first
