@@ -1096,7 +1096,7 @@ function D.layout_core(snap, state, nregions)
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
             -- 11 ноя: вид трека — шаг колеса мягче: 16 знаков на первом раскрытом уровне, +6 за шаг (было 40 и +8: из
             -- свёрнутого в пол-экрана одним шагом); без уровня — 40, как раньше
-            if tv then ww = L.cw * (lvl and (lvl <= 1 and 10 or (16 + 6 * (lvl - 2))) or 40) end
+            if tv then ww = L.cw * (lvl and (lvl <= 1 and 3 or (lvl == 2 and 10 or (16 + 6 * (lvl - 3)))) or 40) end   -- 11 ноя: 3 знака (как свёрнутая колонка MIDI) — шаг перед полоской
             local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
             local gk = ww .. wm
             L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfields = 1, nfx = 0,   -- 11 ноя: nfields 1 — курсор не ходит по спрятанным за волной полям
