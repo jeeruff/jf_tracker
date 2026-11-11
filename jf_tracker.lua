@@ -390,6 +390,7 @@ local state = {
   cut0x = reaper.GetExtState(EXT, 'cut0x') == '1', cutsnap = reaper.GetExtState(EXT, 'cutsnap') == '1', cutquant = reaper.GetExtState(EXT, 'cutquant') == '1',   -- 12 окт: точка реза s
   trklisten = reaper.GetExtState(EXT, 'trklisten') == '1',   -- 12 окт: listen step (трек курсора)
   fxopen = reaper.GetExtState(EXT, 'fxopen') == '1',
+  fxauto = flag('fxauto', false),   -- 11 ноя: браузер эффектов — после добавления сразу в DSP на этот эффект (кнопка auto open)
   dspmeters = reaper.GetExtState(EXT, 'dspmeters') ~= '0',          -- метры входа / выхода в DSP (5 окт)               -- окно FX после добавления (5 окт)
   slicespos = (reaper.GetExtState(EXT, 'slicespos') == 'split') and 'split' or 'module',   -- модуль слайсов: отдельно / половина lib (4 окт)      -- step listen (4 окт)
   propspos = (reaper.GetExtState(EXT, 'propspos2') == 'left') and 'left' or 'right',   -- перенос влево отменён (4 окт): по умолчанию справа          -- text only (4 окт)
@@ -722,7 +723,7 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'wavefrm', 'ggrel', 'mpin', 'spcleader', 'holdmetro' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'wavefrm', 'fxauto', 'ggrel', 'mpin', 'spcleader', 'holdmetro' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
@@ -3020,6 +3021,7 @@ ctx = {
     local m = state.panes
     if m and draw.panes and not draw.panes.visible(m, 'dsp') then ctx.pane_do(function() return draw.panes.show(m, 'dsp') end, 'dsp shown') end
     model.invalidate()
+    if state.fxauto and ctx.pane_focus then ctx.pane_focus('dsp'); vim.msg = vim.msg .. '  (auto open: DSP)' end   -- 11 ноя: auto open
   end,
   -- dW: удалить весь item под курсором (для MIDI — item целиком, не ноту)
   item_at_cursor = function()
@@ -29050,6 +29052,7 @@ local function frame()
       elseif type(hover.fxb) == 'table' and hover.fxb.folder then
         FB.folder = hover.fxb.folder; FB.cur = 1; FB.scroll = 0; FB.skip_hdr(1)
         vim.msg = 'fx: ' .. FB.folder .. ({ all = ' - every installed fx', fav = ' - favourites (REAPER Favorites + * here)', dev = ' - by developer', type = ' - by type', cat = ' - by category (REAPER fx tags)', rec = ' - recently added' })[FB.folder]
+      elseif type(hover.fxb) == 'table' and hover.fxb.opt then ctx.fxb_opt(hover.fxb.opt)   -- 11 ноя: строка настроек
       elseif type(hover.fxb) == 'table' and hover.fxb.star then
         local it = FB.selected()
         if it then FB.toggle_fav(it); ctx.fxb_save(); vim.msg = (FB.is_fav(it) and '* favourite: ' or 'not a favourite: ') .. FB.short(it.label) end
@@ -36630,6 +36633,17 @@ ctx.lib_regroup = function()
   edit.lib_order(items)
   model.invalidate()
   vim.msg = 'lib: numbers follow the folders (grp off - a plain list)'
+end
+-- 11 ноя: настройки браузера эффектов (строка кнопок внизу списка)
+FB.opt_btns = function()
+  return { { key = 'auto', label = 'auto open', on = state.fxauto },
+           { key = 'win', label = 'window', on = state.fxopen },
+           { key = 'enter', label = 'Enter dir', on = state.fxbenter } }
+end
+ctx.fxb_opt = function(k)
+  if k == 'auto' then state.fxauto = not state.fxauto; vim.msg = 'fx auto open ' .. (state.fxauto and 'on - an added fx opens in DSP' or 'off - the focus stays in the list (add several)')
+  elseif k == 'win' then state.fxopen = not state.fxopen; edit.open_on_add = state.fxopen; vim.msg = 'fx window after adding: ' .. (state.fxopen and 'open' or 'closed')
+  elseif k == 'enter' then state.fxbenter = not state.fxbenter; vim.msg = 'fx browser: ' .. (state.fxbenter and 'Enter opens a folder' or 'a folder opens as the cursor moves (lf)') end
 end
 ctx.libauto_toggle = function() state.libauto = not state.libauto; vim.msg = 'lib auto select ' .. (state.libauto and 'on - the tracker follows the instrument' or 'off - Enter goes to its track') end
 -- 6 ноя: Enter на инструменте чужого трека (auto select выкл) — туда и выбрать; иначе меню звука

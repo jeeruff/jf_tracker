@@ -487,6 +487,23 @@ function FB.draw(U, L, x, y, w, h, focused, fit)
   U.text(x + w - L.pad - cw, sy + 1, cnt, U.GREY)
   if mx >= x and mx < x + w and my >= sy and my < sy + L.rh then hover = 'search' end
   if FB.hint then FB.hint('fxbbtn', x + L.pad, sy, w - 2 * L.pad, L.rh, { search = true }) end
+  -- 11 ноя: строка настроек внизу (FB.opt_btns даёт main: { key, label, on }) — тумблеры словом
+  local obtns = FB.opt_btns and FB.opt_btns() or nil
+  if obtns and #obtns > 0 and h > 6 * L.rh then
+    local oy = y + h - L.rh - 2
+    local ox = x + L.pad
+    for _, b in ipairs(obtns) do
+      local bw = U.measure(b.label) + 2 * L.pad
+      if ox + bw > x + w - L.pad then break end
+      local hot = mx >= ox and mx < ox + bw and my >= oy and my < oy + L.rh
+      U.set(b.on and U.tint(U.CYAN, 0.25) or (hot and U.tint(U.TEXT, 0.08) or U.BG)); gfx.rect(ox, oy, bw, L.rh - 1, 1)
+      U.set(b.on and U.CYAN or U.LINE); gfx.rect(ox, oy, bw, L.rh - 1, 0)
+      U.text(ox + L.pad, oy, b.label, b.on and U.CYAN or (hot and U.TEXT or U.GREY))
+      if hot then hover = { opt = b.key } end
+      ox = ox + bw + 2
+    end
+    h = h - L.rh - 3
+  end
   -- список
   local top = sy + L.rh + 3
   local nvis = math.max(1, math.floor((y + h - top - 2) / L.rh))
