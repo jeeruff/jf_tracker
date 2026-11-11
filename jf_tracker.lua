@@ -18243,6 +18243,37 @@ ctx.phrase_make = function(name, rng)   -- rng (31 окт): { f0, f1, r0, r1 } �
 end
 -- 31 окт: панель phrases — фразы проекта (регионы ph:NAME) с длиной и числом вхождений; кэш по счётчику правок
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
+-- 11 ноя: панель inputs — входы всех треков матрицей (колонки — устройства раз в секунду: подключили / отключили)
+ctx.INP = dofile(DIR .. '/jf_tracker_inputs.lua')
+ctx.in_data = function()
+  local now = reaper.time_precise()
+  if not ctx.in_cols or now - (ctx.in_cols_t or 0) > 1 then ctx.in_cols = ctx.INP.columns(reaper); ctx.in_cols_t = now end
+  local rows = {}
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, i)
+    local _, nm = reaper.GetTrackName(tr)
+    local c = reaper.GetTrackColor(tr)
+    local rgb
+    if c and c ~= 0 then local r, g, b = reaper.ColorFromNative(c); rgb = { r / 255, g / 255, b / 255 } end
+    rows[#rows + 1] = { name = nm, v = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_RECINPUT')), rgb = rgb, tr = tr }
+  end
+  return rows, ctx.in_cols
+end
+ctx.in_apply = function(op)
+  local rows, cols = ctx.in_data()
+  local c = op.c and cols[op.c]
+  if op.op == 'set' and rows[op.r] and c then
+    edit.run('track input', function() reaper.SetMediaTrackInfo_Value(rows[op.r].tr, 'I_RECINPUT', c.v) end)
+    vim.msg = ('%s input: %s'):format(rows[op.r].name, c.label)
+  elseif op.op == 'all' and c then
+    edit.run('input of all tracks', function() for _, r in ipairs(rows) do reaper.SetMediaTrackInfo_Value(r.tr, 'I_RECINPUT', c.v) end end)
+    vim.msg = ('every track input: %s (u undoes)'):format(c.label)
+  elseif op.op == 'solo' and rows[op.r] then
+    edit.run('inputs: only one track', function() for k, r in ipairs(rows) do if k ~= op.r then reaper.SetMediaTrackInfo_Value(r.tr, 'I_RECINPUT', -1) end end end)
+    vim.msg = ('inputs: only %s keeps its input'):format(rows[op.r].name)
+  end
+  model.invalidate()
+end
 ctx.KCP = dofile(DIR .. '/jf_tracker_keycaster.lua')   -- 6 ноя: панель keycaster
 -- 6 ноя: палитра команд — команды модуля в фокусе: :слова из его страницы справки (KH), с описанием; → список, имя
 ctx.cmd_here = function()
@@ -25590,6 +25621,7 @@ local function frame()
       local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
       ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
     end,
+    in_draw = function(Lx, x, y, w, h, foc) local rows, cols = ctx.in_data(); return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 11 ноя: панель inputs
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = (LG.to and LG.to ~= 'here') and ctx.lfo_take_target() or ctx.lfo_here_target() or ctx.lfo_target()
@@ -25672,7 +25704,7 @@ local function frame()
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -26791,6 +26823,7 @@ local function frame()
   elseif hover.viewbtn == 'effects' then state.status = 'effects: one row per track under the headers - its fx (click: DSP, dblclick: window) and sends (> track, click: routing, Option+click: remove); f jumps to any of them'
   elseif hover.viewbtn == 'fitw' then state.status = 'W (zw): all tracks the same width, the widest at which all fit'
   elseif hover.viewbtn == 'fith' then state.status = 'H (zh): the ' .. ctx.view_cur() .. ' fits the screen by height (LPB)'
+  elseif hover.viewbtn == 'inputs' then state.status = 'inputs: a pane with the record input of every track as a grid - one input for all, only one track keeps its input (click: show / hide)'
   elseif hover.viewbtn == 'mixer' then state.status = 'mixer ' .. (state.mixer and 'on' or 'off') .. ': faders, sends and meters of every track (m / F3); click - ' .. (state.mixer and 'off' or 'on')
   elseif hover.viewbtn == 'viewmenu' then state.status = 'view: rulers (row numbers, jump ruler, timeline, regions), the tracker (cursor, captions, envelopes, meters), the screen - for the mouse; the same as in options'
   elseif hover.viewbtn == 'foldfast' then state.status = 'fold ' .. (state.foldfast and 'on' or 'off') .. ': notes shorter than a row (fast rolls, flams) do not get their own extra column - they show as a + next to the note of their row; off - each gets a column. Not the folding of tracks (za / zM). Click - ' .. (state.foldfast and 'off' or 'on')
@@ -28482,6 +28515,11 @@ local function frame()
       ctx.dsp_autoitem(d.k, d.pi)
       ctx.dsp_env_focus = nil
       click = { t = now2, zone = 'acvnew' }
+    elseif hover.inputs then   -- 11 ноя: панель inputs — клетка: вход треку, подпись колонки: всем
+      ctx.set_focus('inputs')
+      if hover.inputs.all then ctx.in_apply({ op = 'all', c = hover.inputs.all })
+      else ctx.INP.r, ctx.INP.c = hover.inputs.r, hover.inputs.c; ctx.in_apply({ op = 'set', r = hover.inputs.r, c = hover.inputs.c }) end
+      click = { t = now2, zone = 'inputs' }
     elseif hover.phr then   -- 31 окт: панель phrases — щелчок строка, двойной — в курсор; new
       ctx.set_focus('phrases')
       if hover.phr.btn == 'new' then ctx.phr_do({ op = 'new' })
@@ -28758,6 +28796,10 @@ local function frame()
     elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'mixer' then ctx.toggle_mixer()   -- 31 окт: кнопка mixer в уголке
+    elseif hover.viewbtn == 'inputs' then   -- 11 ноя: панель inputs — показать (и фокус) / спрятать
+      local m = state.panes
+      if m and draw.panes.visible(m, 'inputs') then ctx.pane_do(function() return draw.panes.hide(m, 'inputs') end, 'inputs hidden')
+      elseif m then ctx.pane_do(function() return draw.panes.show(m, 'inputs') end, 'inputs: the input of every track'); ctx.set_focus('inputs') end
     elseif hover.viewbtn == 'fitw' then ctx.fit_width()
     elseif hover.viewbtn == 'fith' then ctx.fit_height()
     elseif hover.viewbtn == 'viewmenu' then ctx.view_menu()   -- 4 ноя: кнопка view — линейки, вид трекера, экран
@@ -32884,6 +32926,13 @@ local function frame()
           return
         end
         return vim.key(c)
+      elseif state.focus == 'inputs' then   -- 11 ноя: панель входов
+        if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
+        local rows, cols = ctx.in_data()
+        local r = ctx.INP.key(c, #rows, #cols)
+        if r == 'leave' then ctx.set_focus('tracker')
+        elseif type(r) == 'table' then ctx.in_apply(r)
+        elseif not r then return vim.key(c) end
       elseif state.focus == 'phrases' then   -- 31 окт: панель фраз
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local r = ctx.PHP.key(ctx.phr_list(), c)

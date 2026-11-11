@@ -8023,6 +8023,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if pp then pp.ins = info.vmode == 'insert' end
         D.piano_strip(L, ct.x, ct.y + 2, ct.w, ct.h - 2, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
       elseif id == 'qwerty' and info.kc_draw then info.kc_draw(ct.x, ct.y, ct.w, ct.h)   -- 6 ноя: keycaster — своя панель
+      elseif id == 'inputs' and info.in_draw then hover.inputs = info.in_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'inputs'); if not inside then hover.inputs = nil end   -- 11 ноя
       elseif id == 'phrases' and info.phr_draw then hover.phr = info.phr_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'phrases'); if not inside then hover.phr = nil end   -- 31 окт
       elseif id == 'lfogen' and info.lfogen_draw then hover.lfogen = info.lfogen_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'lfogen'); if not inside then hover.lfogen = nil end   -- 31 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт
@@ -10430,7 +10431,12 @@ function D.frame(L, snap, rows, state, info)
         local x3 = small(x2, hy + 1 + L.rh, plb, 'fxparams', info.fxparams, 'viewbtn')
         -- 31 окт: mixer — рядом с param (чтобы найти; F3 / m), не влезает словом — «mix»
         local mlb = (x3 + ms('mixer') + 2 <= bx + bw) and 'mixer' or ((x3 + ms('mix') + 2 <= bx + bw) and 'mix' or nil)
-        if mlb then small(x3, hy + 1 + L.rh, mlb, 'mixer', state.mixer, 'viewbtn') end
+        if mlb then
+          local x4 = small(x3, hy + 1 + L.rh, mlb, 'mixer', state.mixer, 'viewbtn')
+          -- 11 ноя: inputs — панель входов всех треков (за mixer; не влезает словом — «in»)
+          local ilb = (x4 + ms('inputs') + 2 <= bx + bw) and 'inputs' or ((x4 + ms('in') + 2 <= bx + bw) and 'in' or nil)
+          if ilb then small(x4, hy + 1 + L.rh, ilb, 'inputs', info.inputs_on, 'viewbtn') end
+        end
       end
       -- 18 окт: autoarm — под clips (просьба; был в шапке мастера): все треки на автоарм / обратно, горит — у всех
       local all, nt = true, reaper.CountTracks(0)

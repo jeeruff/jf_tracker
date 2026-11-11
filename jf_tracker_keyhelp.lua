@@ -440,6 +440,13 @@ KH.PAGES = {
   qwerty = { title = 'qwerty - the keys you press (Ctrl+W g Q)', e = {
     { k = 'any key', d = 'lights up and fades (modifiers too), to show how the tracker is played' },
   } },
+  inputs = { title = 'inputs - the record input of every track as a grid (Ctrl+W g j)', e = {
+    { k = 'h j k l', d = 'the cell: track (row) / input (column): none, MIDI all, each MIDI device, audio pairs, mono inputs' },
+    { k = 'Enter  click', d = 'this input for this track (a track has one input in REAPER)' },
+    { k = 'a  click on a column name', d = 'this input for every track (u undoes)' },
+    { k = 'x', d = 'only the cursor track keeps its input, the others none' },
+    { k = 'Esc', d = 'back to the tracker' },
+  } },
   phrases = { title = 'phrases - a piece of a track as one note (Ctrl+W g F)', e = {
     { k = 'j k  g G', d = 'the phrase' },
     { k = 'Enter', d = 'the phrase at the tracker cursor, on the cursor track: one trigger note C-4 (another note transposes it, velocity scales it, its length cuts it)' },
@@ -987,6 +994,7 @@ KH.BARS = {
   arranger = { { 'j k', 'row' }, { 'h l', 'along' }, { 'Enter', 'do' }, { 'x', 'remove' }, { 'Space', 'play' }, { '< >', 'arrangement' }, { 'Esc', 'back' } },
   keycaster = { { 'Ctrl+W', 'panes' } },
   qwerty = { { 'Ctrl+W', 'panes' } },
+  inputs = { { 'hjkl', 'cell' }, { 'Enter', 'set' }, { 'a', 'all tracks' }, { 'x', 'only this one' }, { 'Esc', 'back' } },
   phrases = { { 'Enter', 'at cursor' }, { 'e', 'source' }, { 'n', 'new' }, { 'r', 'rename' }, { 'x x', 'delete' }, { 'Esc', 'back' } },
   lfogen = { { 'j k', 'field' }, { 'h l', 'value' }, { 'g', 'auto-item' }, { 'p', 'points' }, { 'Esc', 'back' } },
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
