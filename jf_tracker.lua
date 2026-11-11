@@ -24754,6 +24754,12 @@ local function frame()
   do
     local f = L and L.flat and L.flat[vim.cur.fi]
     if f and f.ci and (state.hscroll or 1) > f.ci then state.hscroll = f.ci; relayout() end
+    -- 11 ноя: треки влезают до мастера (пустота посередине) — прокрутки нет: начало отходит назад, пока хвост виден
+    -- (раньше прокрутка держалась и дёргалась); проверка — только когда сменились ширина / прокрутка / колонки
+    if (state.hscroll or 1) > 1 and L and L.hs_list then
+      local sig = gfx.w .. ':' .. tostring(state.hscroll) .. ':' .. #(L.flat or {}) .. ':' .. tostring(L.hs_n)
+      if ctx.hs_fit_sig ~= sig then ctx.hs_clamp(); ctx.hs_fit_sig = gfx.w .. ':' .. tostring(state.hscroll) .. ':' .. #(L.flat or {}) .. ':' .. tostring(L.hs_n) end
+    end
   end
   -- 11 окт: протяжка слайдера скорости (точки-защёлки 0.25 0.5 0.75 1 1.5 2 — ближе 0.04 — прилипает)
   -- 20 окт: всплывающий слайдер скорости закрывается щелчком мимо него и значения
