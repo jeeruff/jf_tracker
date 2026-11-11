@@ -38579,6 +38579,7 @@ ctx.spl_find = function(ref)
   local pats, secs = ctx.pl_song()
   local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
   local n, lo = tonumber(ref), ref:lower():gsub('_', ' ')
+  if not n then for _, rg in ipairs(pats) do if rg.name:lower() == lo then return { one(rg) } end end end   -- 11 ноя: и паттерн по имени
   for _, s2 in ipairs(secs) do
     if (n and s2.idx == n) or (not n and s2.name:lower() == lo) then
       local o = {}
@@ -38608,7 +38609,10 @@ end
 ctx.all_sections = function() return regions.sections or {} end   -- 31 окт: схема песни (info.regions = seq, без секций)
 ctx.spl_secs = function()
   local o, seen = {}, {}
-  for _, s2 in ipairs(regions.sections or {}) do if not seen[s2.name] then seen[s2.name] = true; o[#o + 1] = s2 end end
+  for _, s2 in ipairs(regions.sections or {}) do if not seen[s2.name] and not s2.name:match('^ph:') then seen[s2.name] = true; o[#o + 1] = s2 end end   -- 11 ноя: источник фразы — не секция
+  -- 11 ноя: за секциями — паттерны песни (плейлист играет и их), по порядку места
+  local pats = ctx.pl_song()
+  for _, p in ipairs(pats or {}) do if not seen[p.name] then seen[p.name] = true; o[#o + 1] = p end end
   return o
 end
 ctx.spl_add = function(name, n)
@@ -38623,7 +38627,7 @@ ctx.spl_src_draw = function(Lx, x, y, w)
   local secs = ctx.spl_secs()
   MX.spl_i = math.max(1, math.min(#secs, MX.spl_i or 1))
   local bx = x
-  if #secs == 0 then U.text(bx, y + 1, ctx.fit('sections: none yet (Tr in the matrix makes one)', w), U.DIM) end
+  if #secs == 0 then U.text(bx, y + 1, ctx.fit('no sections or patterns yet', w), U.DIM) end
   for k, s2 in ipairs(secs) do
     local bw = U.measure(s2.name) + 2 * Lx.pad
     if bx + bw > x + w then break end

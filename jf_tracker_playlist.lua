@@ -30,6 +30,13 @@ end
 -- find(ref) → список паттернов { { rg =, rows = } … } (секция — несколько) или nil
 function PL.parse(text, find)
   local steps, toks, errs = {}, {}, {}
+  -- 11 ноя: коды слитно (a1b1a1b1) — по одному: каждый кусок «буква + цифры», и ни один не x / модификатор
+  text = (text or ''):gsub('[^%s,;|]+', function(tok)
+    local _, npc = tok:gsub('%a%d+', '')
+    if npc < 2 or tok:gsub('%a%d+', '') ~= '' then return nil end
+    for piece in tok:gmatch('%a%d+') do if piece:match('^[xX]%d') then return nil end end
+    return (tok:gsub('(%a%d+)', '%1 '):gsub('%s+$', ''))
+  end)
   for s, tok, e in (text or ''):gmatch('()([^%s,;|]+)()') do
     local t = { s = s, e = e - 1, text = tok }
     toks[#toks + 1] = t

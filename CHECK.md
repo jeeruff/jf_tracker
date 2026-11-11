@@ -2652,3 +2652,4 @@
 - dw / dd on a MIDI note a few ticks off its row deletes it (match tolerance = 1/50 row, as the view)
 - patterns: order button / pattern menu O / :patorder - names by song order A1 B1 C1
 - zf menu: f folder, F fold/open all, p pack into this track, P new folder, u unpack; zF free item positioning
+- playlist: patterns in the source row too (ph: sources gone); seq a1b1a1b1 without spaces works

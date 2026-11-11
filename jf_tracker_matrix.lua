@@ -1399,7 +1399,7 @@ function MX.arr_draw(L, x, y, w, h, focused, snap, regions, ph_row)
   end
   -- секции → плейлист песни
   if ctx.spl_draw and y + 3 * L.rh <= ybot then
-    label('song: sections (click - add)' .. (focused and '  h l Enter x Space' or ''))
+    label('song: sections, patterns (click - add)' .. (focused and '  h l Enter x Space' or ''))
     mark(2, y); merge(ctx.spl_src_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 2
     mark(3, y); merge(ctx.spl_draw(L, x + L.pad, y, x1 - x - L.pad)); y = y + L.rh + 4
   end
