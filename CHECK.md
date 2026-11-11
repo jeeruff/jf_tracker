@@ -2632,3 +2632,4 @@
 - tracks fit before the master: no horizontal scroll (no jitter)
 - framed / back waves: thin line at the wave start and end
 - pane tabs that do not fit: consonant abbreviations (clpbrd), > only when under 2 letters
+- narrow transport: step block and keyboard stay, transport buttons drop first

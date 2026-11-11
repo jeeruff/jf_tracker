@@ -5962,7 +5962,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   for _, g in ipairs(D.transport_groups(c, L)) do by_id[g[1][1][1]] = g end
   local order = {}
   -- 6 ноя: pri — что выпадает первым, когда полоса не влезает (меньше — раньше); кнопки транспорта — последними
-  local PRI = { step = 5, listen = 3, play = 7, rate = 2, sig = 2, punch = 1 }
+  local PRI = { step = 11, listen = 3, play = 7, rate = 2, sig = 2, punch = 1 }   -- 11 ноя: step и клавиатура — до последнего (кнопки транспорта 10 выпадают раньше: Space и так играет)
   local function addg(id) if by_id[id] then order[#order + 1] = { pri = PRI[id] or 2, w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   -- 16 окт: где курсор — у клавиатуры (был модлайн): трек, ниже колонка и строка
   do
@@ -5987,7 +5987,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 4 ноя: клавиатура — сразу справа от слова режима (как было), опция keys in transport — и при панели keys
   -- 6 ноя: опция keys hide — клавиатура не видна, пока keys mode выключен (полоса свободна)
   local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
-  if D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster) then table.insert(order, 1, { pri = 3, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end   -- 6 ноя: панелью keys — в транспорте нет
+  if D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster) then table.insert(order, 1, { pri = 11, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end   -- 6 ноя: панелью keys — в транспорте нет
   order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
