@@ -2316,6 +2316,14 @@ function E.legato(track, lane_idx, t0, t1, off, fill)
         local nl, nr, np = nat_of(e.it, e.tk)
         local nxt
         for j = k + 1, #list do if list[j].pos > e.pos + 1e-4 then nxt = list[j].pos; break end end
+        -- 11 ноя: не дальше конца паттерна (региона) ноты — следующая нота за ним тянула ноту на весь проект
+        if nxt and fill then
+          local _, ri = R.GetLastMarkerAndCurRegion(0, e.pos + 1e-6)
+          if ri and ri >= 0 then
+            local _, isr, _, rend = R.EnumProjectMarkers3(0, ri)
+            if isr and rend and rend > e.pos + 1e-4 and nxt > rend then nxt = rend end
+          end
+        end
         if off or not nxt then
           R.SetMediaItemInfo_Value(e.it, 'D_LENGTH', nl)
           R.SetMediaItemTakeInfo_Value(e.tk, 'D_PLAYRATE', nr)
