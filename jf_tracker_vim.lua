@@ -614,6 +614,11 @@ local function event_end(fi, row)
   return row
 end
 
+-- 11 ноя: подколонка — только волна (вид трека zT): одна остановка курсора — волна (нота под ней не видна)
+local function wave_only(fi)
+  local f = flat()[fi]
+  return f and f.G and f.G.wave_only and true or false
+end
 -- Возвращает цель {fi=, row=, exclusive=, linewise=} или nil.
 local motion
 function motion(c, n, op)
@@ -629,10 +634,16 @@ function motion(c, n, op)
   -- 16 окт: колонка волны (режим column) — подполе слева от ноты: h с ноты — в волну, l — назад на ноту
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and (cur.field or 1) == 1 and not cur.sub and V.wave_field_ok() then
     return { fi = cur.fi, row = cur.row, field = 1, sub = 'wave' }
-  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'wave' then
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'wave' and not wave_only(cur.fi) then
     return { fi = cur.fi, row = cur.row, field = 1 }
+  elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and cur.sub == 'wave' then   -- 11 ноя: колонка — одна волна (вид zT): нота за ней не видна — дальше
+    local fi, fld = step_field(1, 1)
+    if fi ~= cur.fi and (fld or 1) == 1 and wave_only(fi) then return { fi = fi, row = cur.row, field = 1, sub = 'wave' } end
+    return { fi = fi, row = cur.row, field = fld }
   elseif (c == ('h'):byte() or c == LEFT) and n == 1 and cur.sub == 'wave' then
-    local fi, fld = step_field(-1, 1); return { fi = fi, row = cur.row, field = fld }
+    local fi, fld = step_field(-1, 1)
+    if wave_only(fi) then return { fi = fi, row = cur.row, field = 1, sub = 'wave' } end   -- 11 ноя
+    return { fi = fi, row = cur.row, field = fld }
   -- 14 окт: колонка пана — подполе громкости: vol → pan → дальше; h с поля за ним — на пан
   elseif (c == ('l'):byte() or c == RIGHT) and n == 1 and (cur.field or 1) == 2 and cur.sub ~= 'pan' and V.pan_field_ok() then
     return { fi = cur.fi, row = cur.row, field = 2, sub = 'pan' }
@@ -677,6 +688,7 @@ function motion(c, n, op)
   elseif c == ('h'):byte() or c == LEFT then
     local fi, fld = step_field(-1, n)
     local sub = (fld or 1) >= 4 and 'val' or nil
+    if wave_only(fi) then return { fi = fi, row = cur.row, field = 1, sub = 'wave' } end   -- 11 ноя: в колонку-волну — сразу на волну
     if fld == 2 and fi == cur.fi then local sv = V.cur; V.cur = { fi = fi, row = cur.row, field = 2 }; if V.pan_field_ok() then sub = 'pan' end; V.cur = sv end
     return { fi = fi, row = cur.row, field = fld, sub = sub }
   elseif c == ('l'):byte() or c == RIGHT then

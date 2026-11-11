@@ -2641,3 +2641,4 @@
 - wave: line only at the start (the end line removed)
 - zt = zoom the track (fields + big wave for audio, no empty sub-columns), zT = track view menu
 - drumrs5k: adding files removes empty drumrs5k racks, the rack with pads is used first
+- big-wave columns: one cursor stop per wave (h l)
