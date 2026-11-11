@@ -24477,6 +24477,9 @@ local function frame()
         for _, f in ipairs(L.flat or {}) do if f.col == c.col then nf = nf + 1; ws[#ws + 1] = (f.env and 'e' or (f.ml and 'm' or (f.fx and 'x' or 'n'))) .. tostring(f.w) end end
         t[#t + 1] = ('%s x=%s w=%s cut=%s fold=%s lv=%s nf=%d [%s]'):format(c.col and c.col.name or '?', tostring(c.x), tostring(c.w), tostring(c.cut), tostring(state.folds[c.col and c.col.guid or ''] or false), tostring(state.wlevel and c.col and state.wlevel[c.col.guid]), nf, table.concat(ws, ','))
       end
+      local fl = {}
+      for i, f in ipairs(L.flat or {}) do if i > 30 then break end; fl[#fl + 1] = ('%d:%s:%s%s'):format(i, f.col and (f.col.name or '?'):sub(-1) or '-', tostring(f.x and math.floor(f.x) or 'nil'), f.env and 'e' or (f.ml and 'm' or (f.folded and 'f' or ''))) end
+      t[#t + 1] = 'cur=' .. tostring(vim.cur.fi) .. ' flat ' .. table.concat(fl, ' ')
       reaper.SetExtState('jf_tracker', 'cols', table.concat(t, ' | '), false)
     end
     if reaper.GetExtState('jf_dbg', 'lay') == '1' and draw.pn_lay then   -- 8 ноя: прямоугольники панелей в jf_tracker/lay

@@ -1015,7 +1015,9 @@ function D.layout_core(snap, state, nregions)
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать
     if azc then lvl = nil; if fs ~= 'chord' and fs ~= 'pan' then fs = nil end end
-    if lvl and fs ~= 'chord' and fs ~= 'pan' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
+    if lvl and fs ~= 'chord' and fs ~= 'pan' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end
+    -- 11 ноя: трек с видом волны (zt) — уровень 1 не свёртка, а узкая волна: шаг «уже» убавляет волну, полоска — только на 0
+    if lvl == 1 and fs == true and D.track_view and D.track_view(col) then fs = nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
@@ -1094,7 +1096,7 @@ function D.layout_core(snap, state, nregions)
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
             -- 11 ноя: вид трека — шаг колеса мягче: 16 знаков на первом раскрытом уровне, +6 за шаг (было 40 и +8: из
             -- свёрнутого в пол-экрана одним шагом); без уровня — 40, как раньше
-            if tv then ww = L.cw * (lvl and (16 + 6 * math.max(0, lvl - 2)) or 40) end
+            if tv then ww = L.cw * (lvl and (lvl <= 1 and 10 or (16 + 6 * (lvl - 2))) or 40) end
             local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
             local gk = ww .. wm
             L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
