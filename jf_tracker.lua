@@ -20621,6 +20621,7 @@ function ctx.width_step(d, which)
   if #list > 0 then
     state.wlevel = state.wlevel or {}
     for _, c2 in ipairs(list) do
+      if d > 0 and state.folds and state.folds[c2.guid] then ctx.fold(c2, false) end   -- 11 ноя: шире свёрнутого — сперва развернуть
       local cur = state.wlevel[c2.guid] or state.wzlevel or full
       local nl = cur + d
       state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
@@ -35291,6 +35292,7 @@ ctx.fit_width = function()
   state.fold_px = nil
   state.autozoom = nil; reaper.SetExtState(EXT, 'autozoom', '0', true)
   state.wlevel = {}; state.wzlevel = nil; state.hscroll = 0
+  ctx.fold_all(false)   -- 11 ноя: свёрнутые (zF / za) ширину не слушали — zw их разворачивает, свернёт сам, если не влезут
   relayout()
   if L.cols_cut or L.hs_cut then
     local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
