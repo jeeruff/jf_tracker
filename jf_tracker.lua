@@ -24464,6 +24464,16 @@ local function frame()
     end
     if reaper.GetExtState('jf_dbg', 'mem') == '1' then reaper.SetExtState('jf_dbg', 'mem', '0', false); pcall(ctx.mem) end
     if reaper.GetExtState('jf_dbg', 'rows') == '1' then reaper.SetExtState('jf_dbg', 'rows', '0', false); draw.dbg_rows = {} end   -- 6 ноя: строки кадра (row@y=label) в ExtState jf_tracker/rows
+    if reaper.GetExtState('jf_dbg', 'cols') == '1' and L and L.cols then   -- 11 ноя: колонки треков (x w cut), край, уровни ширины → jf_tracker/cols
+      reaper.SetExtState('jf_dbg', 'cols', '0', false)
+      local t = { ('cols_r=%s cols_cut=%s hs_cut=%s wz=%s hscroll=%s'):format(tostring(L.cols_r), tostring(L.cols_cut), tostring(L.hs_cut), tostring(state.wzlevel), tostring(state.hscroll)) }
+      for _, c in ipairs(L.cols) do
+        local nf, ws = 0, {}
+        for _, f in ipairs(L.flat or {}) do if f.col == c.col then nf = nf + 1; ws[#ws + 1] = (f.env and 'e' or (f.ml and 'm' or (f.fx and 'x' or 'n'))) .. tostring(f.w) end end
+        t[#t + 1] = ('%s x=%s w=%s cut=%s fold=%s lv=%s nf=%d [%s]'):format(c.col and c.col.name or '?', tostring(c.x), tostring(c.w), tostring(c.cut), tostring(state.folds[c.col and c.col.guid or ''] or false), tostring(state.wlevel and c.col and state.wlevel[c.col.guid]), nf, table.concat(ws, ','))
+      end
+      reaper.SetExtState('jf_tracker', 'cols', table.concat(t, ' | '), false)
+    end
     if reaper.GetExtState('jf_dbg', 'lay') == '1' and draw.pn_lay then   -- 8 ноя: прямоугольники панелей в jf_tracker/lay
       reaper.SetExtState('jf_dbg', 'lay', '0', false)
       local o = { ('W %d H %d'):format(gfx.w, gfx.h) }
@@ -35295,10 +35305,29 @@ ctx.fit_width = function()
   ctx.fold_all(false)   -- 11 ноя: свёрнутые (zF / za) ширину не слушали — zw их разворачивает, свернёт сам, если не влезут
   relayout()
   if L.cols_cut or L.hs_cut then
+    -- 11 ноя: сужается самый широкий трек, по шагу, пока не влезут все (раньше — общий уровень всем: один трек с
+    -- десятком подколонок сжимал до полоски и остальные); все на нуле и не влезли — как раньше, общий уровень
     local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
-    for lv = full, 0, -1 do
-      state.wzlevel = lv; relayout()
+    state.wlevel = state.wlevel or {}
+    for _ = 1, 200 do
       if not (L.cols_cut or L.hs_cut) then break end
+      local wide, ww
+      for _, c in ipairs(L.cols or {}) do
+        local g = c.col and c.col.guid
+        local lv = g and (state.wlevel[g] or full)
+        if g and not c.master and lv > 1 and (not ww or (c.w or 0) > ww) then wide, ww = c, c.w or 0 end
+      end
+      -- за краем (hs_cut) ширина не посчитана — тогда самый широкий из видимых, иначе — общий уровень ниже
+      if not wide then break end
+      state.wlevel[wide.col.guid] = (state.wlevel[wide.col.guid] or full) - 1
+      relayout()
+    end
+    if L.cols_cut or L.hs_cut then
+      state.wlevel = {}
+      for lv = full, 0, -1 do
+        state.wzlevel = lv; relayout()
+        if not (L.cols_cut or L.hs_cut) then break end
+      end
     end
   end
   reaper.SetExtState(EXT, 'wzlevel', tostring(state.wzlevel or ''), true)
@@ -35315,7 +35344,10 @@ ctx.fit_width = function()
     vim.msg = ('zw: %d tracks folded to fit%s (za on one opens it)'):format(#(snap and snap.cols or {}), (L.cols_cut or L.hs_cut) and ' - still not all (scroll sideways)' or ', all on screen')
     return
   end
-  vim.msg = 'zw: all tracks the same width' .. ((L.cols_cut or L.hs_cut) and ' - still not all fit (scroll sideways)' or ', all fit')
+  local narrowed = 0
+  for _ in pairs(state.wlevel or {}) do narrowed = narrowed + 1 end
+  vim.msg = (narrowed > 0 and ('zw: all fit - the widest %d track(s) narrower (a big wave view zt stays as is)'):format(narrowed) or 'zw: all tracks the same width')
+    .. ((L.cols_cut or L.hs_cut) and ' - still not all fit (scroll sideways)' or (narrowed > 0 and '' or ', all fit'))
 end
 -- 31 окт: zh / кнопка H — то, что показывает вид (паттерн / секция / проект), целиком по высоте: самый мелкий LPB,
 -- при котором влезает; верх вида — на начало

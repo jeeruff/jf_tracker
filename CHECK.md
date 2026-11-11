@@ -2633,3 +2633,4 @@
 - framed / back waves: thin line at the wave start and end
 - pane tabs that do not fit: consonant abbreviations (clpbrd), > only when under 2 letters
 - narrow transport: step block and keyboard stay, transport buttons drop first
+- zw: the widest track narrows first, others keep their width (jf_dbg cols=1 dumps column widths)
