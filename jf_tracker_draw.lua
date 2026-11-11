@@ -7910,6 +7910,31 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local cramped = false
         do local lt = c.tabs[#c.tabs]; cramped = lt ~= nil and lt.x + lt.w > c.x + c.w + 1 end   -- 31 окт (3): > — только когда вкладки (по 3 знака минимум) не влезают в ширину панели; иначе все вкладки
         local tabs = c.tabs
+        -- 11 ноя: не влезают — сперва сокращения по согласным (browser → brwsr, D.abbr): все вкладки видны;
+        -- короткие подписи целиком, остаток ширины — поровну длинным; меньше 2 знаков — тогда «>» со списком
+        if cramped and #c.tabs > 1 then
+          local x0, avail, n = c.tabs[1].x, c.x + c.w - c.tabs[1].x - 1, #c.tabs
+          local full, need = {}, {}
+          for k, t in ipairs(c.tabs) do full[k] = D.ic(t.id, PN.BY[t.id].label); need[k] = ms(full[k]) + 2 * L.pad end
+          local budget, left, rest = {}, avail, n
+          local changed = true
+          while changed do
+            changed = false
+            local share = math.floor(left / math.max(1, rest))
+            for k = 1, n do if not budget[k] and need[k] <= share then budget[k] = need[k]; left = left - need[k]; rest = rest - 1; changed = true end end
+          end
+          local share = math.floor(left / math.max(1, rest))
+          local out, ok, x = {}, true, x0
+          for k, t in ipairs(c.tabs) do
+            local bw = budget[k] or share
+            local lbl = budget[k] and full[k] or D.abbr(full[k], bw - 2 * L.pad, ms)
+            if #lbl < 2 then ok = false; break end
+            bw = math.min(bw, ms(lbl) + 2 * L.pad)   -- впритык: без пустоты за сокращением
+            out[k] = { id = t.id, x = x, y = t.y, w = bw, h = t.h, lbl = lbl }
+            x = x + bw
+          end
+          if ok then tabs = out; cramped = false end
+        end
         if cramped and #c.tabs > 1 then
           local t0 = c.tabs[1]
           for _, t in ipairs(c.tabs) do if t.id == id then t0 = t end end
@@ -7925,7 +7950,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           if mhot then local ids = {}; for _, t in ipairs(c.tabs) do ids[#ids + 1] = t.id end; hover.ptabmore = ids end
         end
         for _, t in ipairs(tabs) do
-          local lbl = fit(D.ic(t.id, PN.BY[t.id].label), t.w - L.pad - 2)
+          local lbl = t.lbl or fit(D.ic(t.id, PN.BY[t.id].label), t.w - L.pad - 2)
           if lbl ~= '' then
             local on = t.id == id
             local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
