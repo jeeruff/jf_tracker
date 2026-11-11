@@ -2559,6 +2559,13 @@ local function draw_wave(L, head, i, x, y, muted, inv)
         gfx.rect(math.floor(xa), y + py, 1, 1, 1); gfx.rect(math.floor(xb), y + py, 1, 1, 1)
         set(base_col)
       end
+      -- 11 ноя: кайма и сверху / снизу — начало и конец волны тонкой линией во всю её ширину (начало сливалось с фоном)
+      if (frm or (back and not inv)) and (q == 0 or q == total - 1) then
+        local ec3 = frm and (scol or edge_col) or ((bspec and pk.spec) and spec_colour(pk.spec[idx]) or U.mix(U.TEXT, U.BG, 0.35))
+        set(muted and U.mix(ec3, U.BG, 0.5) or ec3)
+        gfx.rect(math.floor(cx - hw), y + py, math.max(1, math.floor(2 * hw) + 1), 1, 1)
+        set(scol and frm and U.mix(scol, U.BG, 0.72) or base_col)
+      end
     end
     if ek and ec.haspan and column and not inv then
       local px = x0w + math.floor((ec.pan[ek] + 1) / 2 * (L.w_wave - 1) + 0.5)

@@ -2630,3 +2630,4 @@
 - option framed wave (items and waves): wave column dark fill + bright edge
 - a looped note longer than its sample: the loop repeats drawn dim (lgto + loop no longer look like ghost notes)
 - tracks fit before the master: no horizontal scroll (no jitter)
+- framed / back waves: thin line at the wave start and end
