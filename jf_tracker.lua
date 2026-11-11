@@ -19872,6 +19872,7 @@ function region_actions(rg)
     { 'glue: the selected slots in a row - one pattern', key = 'g', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_glue() end },
     { 'split ... (half / 3 / 4 / bars / at the cursor)', key = 's', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_split_menu() end },
     { 'name (every place)', key = 'n', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_rename() end },
+    { 'order: rename the patterns by song order - A1, B1, C1 ...', key = 'O', g = 'pattern', fn = function() ctx.pat_order() end },   -- 11 ноя
     { 'delete from the song (every place, the time closes)', key = 'd', g = 'pattern', fn = function() ctx.pat_from_matrix(rg); ctx.pat_remove() end },
     -- 20 окт: длина — здесь же (были кнопками /2 x2 в уголке)
     { 'half the length (/2)', key = '/', g = 'length', fn = function() ctx.region_btn('half') end },
@@ -37235,7 +37236,7 @@ ctx.patlist_draw = function(Lx, x, y, w, h)
   -- 27 окт: ряд команд над кубиками: menu glue split copy name, справа — сколько выбрано
   do
     local bx = x
-    for _, b in ipairs({ 'menu', 'glue', 'split', 'copy', 'name', 'patternize' }) do   -- 4 ноя: + patternize
+    for _, b in ipairs({ 'menu', 'glue', 'split', 'copy', 'name', 'order', 'patternize' }) do   -- 4 ноя: + patternize; 11 ноя: + order
       local bw = U.measure(b) + 2 * Lx.pad
       if bx + bw > x + w then break end
       local hot = mx >= bx and mx < bx + bw and my >= y and my < y + Lx.rh
@@ -38333,6 +38334,32 @@ ctx.pat_rename = function()
     vim.msg = ('pattern %s is %s now (%d place(s))'):format(p.name, nm, #occ)
   end)
 end
+-- 11 ноя: порядок имён — по месту в песне: первый паттерн A1, второй B1 … (повтор — то же имя, что и у первого места);
+-- Z1 → дальше A2, B2 … Все места паттерна переименовываются вместе (как n); два прохода — без столкновений имён
+ctx.pat_order = function()
+  local list, i = {}, 0
+  while true do
+    local r, isr, pos, rend, nm, idx, col = reaper.EnumProjectMarkers3(0, i)
+    if not r or r == 0 then break end
+    if isr and not nm:match('^=') and not nm:match('^ph:') and model.SEC.code_of(nm) then list[#list + 1] = { idx = idx, pos = pos, rend = rend, name = nm, color = col } end
+    i = i + 1
+  end
+  table.sort(list, function(a, b) return a.pos < b.pos end)
+  local new, k = {}, 0
+  for _, r in ipairs(list) do
+    if not new[r.name] then local n = k; k = k + 1; new[r.name] = string.char(65 + n % 26) .. (n // 26 + 1) end
+  end
+  local changed = 0
+  for o, n in pairs(new) do if o ~= n then changed = changed + 1 end end
+  if changed == 0 then vim.msg = 'patterns already in song order'; return end
+  edit.run('patterns in song order', function()
+    for _, r in ipairs(list) do reaper.SetProjectMarker3(0, r.idx, true, r.pos, r.rend, '~tmp' .. r.name, r.color or 0) end
+    for _, r in ipairs(list) do reaper.SetProjectMarker3(0, r.idx, true, r.pos, r.rend, new[r.name], r.color or 0) end
+  end)
+  MX.pl_multi = {}
+  ctx.mx_refresh(); model.invalidate()
+  vim.msg = ('patterns in song order: %d renamed (A1, B1 ...; u undoes)'):format(changed)
+end
 ctx.pat_copy = function()   -- свободная копия (как yp в матрице) — за первым местом паттерна в песне
   local p = ctx.pat_selected()[1]
   if not p then return end
@@ -38386,6 +38413,7 @@ end
 ctx.pat_btn = function(b)
   if b == 'menu' then ctx.pat_menu() elseif b == 'glue' then ctx.pat_glue() elseif b == 'split' then ctx.pat_split_menu()
   elseif b == 'copy' then ctx.pat_copy() elseif b == 'name' then ctx.pat_rename()
+  elseif b == 'order' then ctx.pat_order()   -- 11 ноя
   elseif b == 'patternize' then ctx.patternize_ask() end
 end
 -- 19 окт: блок над матрицей: кубики паттернов на всю ширину + строка chain (двойной щелчок по кубику — в цепь,

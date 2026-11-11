@@ -2650,3 +2650,4 @@
 - legato fill stops at the pattern end (a note far later no longer stretched it over the project)
 - lib: < ξ > at the right end of the name, not over the preview
 - dw / dd on a MIDI note a few ticks off its row deletes it (match tolerance = 1/50 row, as the view)
+- patterns: order button / pattern menu O / :patorder - names by song order A1 B1 C1
