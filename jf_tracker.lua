@@ -36979,6 +36979,7 @@ ctx.pl_find = function(ref)
   end
   local n, lo = tonumber(ref), ref:lower()
   for _, rg in ipairs(pats) do if (n and rg.idx == n) or (not n and rg.name:lower() == lo) then return { one(rg) } end end
+  if not n and lo:match('^ph:') then for _, s in ipairs(secs) do if s.name:lower() == lo then return { one(s) } end end end   -- 11 ноя: фраза в seq
   for _, s in ipairs(secs) do if (n and s.idx == n) or (not n and s.name:lower() == lo) then return sec(s) end end
 end
 ctx.pl_words = function()
@@ -38580,6 +38581,7 @@ ctx.spl_find = function(ref)
   local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
   local n, lo = tonumber(ref), ref:lower():gsub('_', ' ')
   if not n then for _, rg in ipairs(pats) do if rg.name:lower() == lo then return { one(rg) } end end end   -- 11 ноя: и паттерн по имени
+  if not n and lo:match('^ph:') then for _, s2 in ipairs(secs) do if s2.name:lower() == lo then return { one(s2) } end end end   -- 11 ноя: фраза — её источник целиком
   for _, s2 in ipairs(secs) do
     if (n and s2.idx == n) or (not n and s2.name:lower() == lo) then
       local o = {}
@@ -38613,6 +38615,8 @@ ctx.spl_secs = function()
   -- 11 ноя: за секциями — паттерны песни (плейлист играет и их), по порядку места
   local pats = ctx.pl_song()
   for _, p in ipairs(pats or {}) do if not seen[p.name] then seen[p.name] = true; o[#o + 1] = p end end
+  -- 11 ноя: и фразы (их источник после =END) — последними
+  for _, s2 in ipairs(regions.sections or {}) do if s2.name:match('^ph:') and not seen[s2.name] then seen[s2.name] = true; o[#o + 1] = s2 end end
   return o
 end
 ctx.spl_add = function(name, n)
