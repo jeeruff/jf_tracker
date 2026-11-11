@@ -3326,9 +3326,7 @@ function V.key_impl(c)
           for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end
           clamp_cur()
         end
-      elseif c == ('f'):byte() then
-        local f = flat()[V.cur.fi]
-        if f and ctx.fold_folder then ctx.fold_folder(f.col); ctx.relayout() end
+      elseif c == ('f'):byte() then if ctx.zfold_menu then ctx.zfold_menu() end   -- 11 ноя: zf — подменю папок (zff папка, zfF все, u p P)
       elseif c == ('k'):byte() then   -- 4 ноя: zk — дети папки узкими полосками, папка широкая
         local f = flat()[V.cur.fi]
         if f and ctx.fold_kids then ctx.fold_kids(f.col); ctx.relayout(); for i, g in ipairs(flat()) do if g.col == f.col then V.cur.fi = i; break end end; clamp_cur() end
@@ -3353,10 +3351,7 @@ function V.key_impl(c)
         V.zrep = true; V.zrep_all = c == ('>'):byte() or c == ('<'):byte()
         if V.zrep_all then V.msg = (V.msg or '') .. '  (> < again - more, without z)' end
       elseif c == ('E'):byte() then if ctx.hide_empty then ctx.hide_empty() end   -- 2 ноя: пустые колонки и лейны всех треков; 5 ноя: zE (empty, было zA)
-      elseif c == ('F'):byte() then   -- 1 ноя: zF (было zM, 7 окт): свернуть все ↔ развернуть все (zR теперь большой роутер; :unfold — тоже)
-        local any = false
-        for _, g in ipairs(flat()) do if g.folded or g.compact then any = true; break end end
-        ctx.fold_all(not any); ctx.relayout(); clamp_cur()
+      elseif c == ('F'):byte() then if ctx.free_items_toggle then ctx.free_items_toggle() end   -- 11 ноя: zF — free item positioning трека (свернуть все — zfF)
       end
       V.count = nil; finish_move(); return
     elseif p == 'r' then

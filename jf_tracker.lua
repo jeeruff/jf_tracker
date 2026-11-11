@@ -8177,6 +8177,56 @@ ctx = {
       { key = 'u', label = 'unpack the folder (the cursor track or its parent): the tracks stay, the folder goes', fn = function() ctx.folder_unpack() end },
     } })
   end,
+  -- 11 ноя: zf — подменю: f папка курсора, F свернуть / развернуть все, u распаковать, p трек — папка выделенных справа,
+  -- P новая папка из выделенных (трек слева от них)
+  zfold_menu = function()
+    vim.open_hydra({ title = 'zf - fold / folders', items = {
+      { key = 'f', label = 'fold the folder', fn = function() local c = cur_col(); if c then ctx.fold_folder(c); ctx.relayout() end end },
+      { key = 'F', label = 'fold / open all', fn = function()
+          local any = false
+          for _, g in ipairs(L.flat or {}) do if g.folded or g.compact then any = true; break end end
+          ctx.fold_all(not any); ctx.relayout() end },
+      { key = 'p', label = 'pack: this track - the folder of the selected tracks', fn = function() ctx.folder_pack(false) end },
+      { key = 'P', label = 'pack into a new folder', fn = function() ctx.folder_pack(true) end },
+      { key = 'u', label = 'unpack', fn = function() ctx.folder_unpack() end },
+    } })
+  end,
+  -- new: новый трек-папка слева от первого выделенного; иначе трек курсора — папка. Выделенных нет — треки справа от курсора
+  folder_pack = function(new)
+    local col = cur_col(); if not (col and col.track) then return false end
+    local R = reaper
+    local sel = {}
+    for i = 0, R.CountSelectedTracks(0) - 1 do local t = R.GetSelectedTrack(0, i); if t ~= col.track then sel[#sel + 1] = t end end
+    if #sel == 0 and not new then
+      for i = math.floor(R.GetMediaTrackInfo_Value(col.track, 'IP_TRACKNUMBER')), R.CountTracks(0) - 1 do sel[#sel + 1] = R.GetTrack(0, i) end
+    end
+    if new and #sel == 0 then sel[1] = col.track end
+    if #sel == 0 then vim.msg = 'pack: no tracks (select tracks, or tracks to the right)'; return false end
+    edit.run(new and 'new folder' or 'pack into folder', function()
+      local parent = col.track
+      if new then
+        local at = math.floor(R.GetMediaTrackInfo_Value(sel[1], 'IP_TRACKNUMBER')) - 1
+        R.InsertTrackAtIndex(at, true)
+        parent = R.GetTrack(0, at)
+        R.GetSetMediaTrackInfo_String(parent, 'P_NAME', 'folder', true)
+      end
+      for i = R.CountTracks(0) - 1, 0, -1 do R.SetTrackSelected(R.GetTrack(0, i), false) end
+      for _, t in ipairs(sel) do R.SetTrackSelected(t, true) end
+      R.ReorderSelectedTracks(math.floor(R.GetMediaTrackInfo_Value(parent, 'IP_TRACKNUMBER')), 1)
+    end)
+    model.invalidate()
+    vim.msg = ('%d track(s) in the folder%s'):format(#sel, new and ' (new)' or (' ' .. (col.name or '')))
+    return true
+  end,
+  -- 11 ноя: zF — free item positioning трека курсора (REAPER: айтемы где угодно по высоте); фиксированные лейны не трогаем
+  free_items_toggle = function()
+    local col = cur_col(); if not (col and col.track) then return end
+    local m = reaper.GetMediaTrackInfo_Value(col.track, 'I_FREEMODE')
+    if m == 2 then vim.msg = 'zF: the track has fixed lanes (tl turns them off first)'; return end
+    edit.run('free item positioning', function() reaper.SetMediaTrackInfo_Value(col.track, 'I_FREEMODE', m == 1 and 0 or 1) end)
+    reaper.UpdateArrange(); model.invalidate()
+    vim.msg = 'free item positioning ' .. (m == 1 and 'off' or 'on') .. ': ' .. (col.name or 'track')
+  end,
   folder_unpack = function()
     local col = cur_col(); if not (col and col.track) then return false end
     local p = col.track

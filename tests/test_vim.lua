@@ -118,6 +118,7 @@ local function reset()
     toggle_lanes = function() calls[#calls + 1] = 'tlanes' end, fx_picker = function() calls[#calls + 1] = 'tfx' end,
     cur_col = function() return { name = 'A', guid = 'g' } end,
     jump_mark = function() calls[#calls + 1] = 'jmark' end,
+    free_items_toggle = function() calls[#calls + 1] = 'freeitems' end,
     width_step = function(d, which) calls[#calls + 1] = 'w:' .. d .. ':' .. (which or 'all') end,
     input_picker = function() calls[#calls + 1] = 'tin' end, smart_input = function() calls[#calls + 1] = 'tsmart' end, route_menu = function() calls[#calls + 1] = 'troute' end,
     piano_on = function() if PIANO_ON ~= nil then return PIANO_ON end return V.piano end,
@@ -446,8 +447,8 @@ keysin('za');  eq('za folds A', folds['A'], true); eq('flat shrinks', #L.flat, 2
 keysin('x');   eq('x in folded → all subs at row', last(), 'delete:kick')
 keysin('2jx'); eq('folded row 2 → ov', last(), 'delete:ov')
 keysin('za');  eq('za unfolds', folds['A'], nil); eq('flat restored', #L.flat, 3)
-keysin('zF');  eq('zF (was zM)', #L.flat, 2)
-keysin('zF');  eq('zF again unfolds all (zR is the big router now)', #L.flat, 3)
+-- 11 ноя: свернуть / развернуть все — zfF (подменю zf, в тесте без hydra); zF — free item positioning трека
+keysin('zF');  eq('zF -> free item positioning', last(), 'freeitems')
 
 -- ── русская раскладка ─────────────────────────────────────────────────────
 reset()
