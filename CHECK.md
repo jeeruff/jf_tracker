@@ -2648,3 +2648,4 @@
 - d. - delete the event here, pull up only the next one (d3. - three), the rest stays
 - lib phrases: x x / dd delete the phrase with its uses
 - legato fill stops at the pattern end (a note far later no longer stretched it over the project)
+- lib: < ξ > at the right end of the name, not over the preview

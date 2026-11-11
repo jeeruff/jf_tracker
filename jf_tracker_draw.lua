@@ -7491,7 +7491,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
       local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
-      local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf)))
+      local xiw = (sel and not child) and (3 * (ms('W') + 7) + 2) or 0   -- 11 ноя: ‹ ξ › — в правой части имени: имя короче на их ширину
+      local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf) - xiw))
       text(ix + 6, y + 1, head, lcol)
       if suf ~= '' then text(ix + 6 + ms(head), y + 1, suf, lcol) end
       -- длительность (3 окт): колонка перед мини-волной, место — у волны
@@ -7573,7 +7574,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- зоны (9 окт): ~ — огибающие take (вкладка automation), волна — вкладка item
       if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = tenv_hot, wave = (mx >= wx and npix > 8) or nil } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
-      if sel and not child then D.lib_xi_btns(L, ix + w - 4, y, mx, my, hover) end   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
+      if sel and not child then D.lib_xi_btns(L, ix + 6 + label_w, y, mx, my, hover) end   -- 11 ноя: у правого края имени (не на превью)   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
       if drag and my >= y and my < y + L.rh then
         if my < y + L.rh / 2 then D.lib_drop, drop_y = { before = i }, y
         else
