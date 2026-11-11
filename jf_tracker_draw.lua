@@ -1092,7 +1092,9 @@ function D.layout_core(snap, state, nregions)
           if (L.waveonly_on or tv) and lane.audio_sub and lane.audio_sub[si] then
             -- зум трека: без него / свёрнут — 3 знака, каждый шаг колеса — +2, до 24; вид трека — 40 и шире колесом
             local ww = math.min(L.cw * 24, L.cw * (3 + 2 * math.max(0, (lvl or 1) - 1)))
-            if tv then ww = L.cw * (40 + 8 * math.max(0, (lvl or 1) - 1)) end
+            -- 11 ноя: вид трека — шаг колеса мягче: 16 знаков на первом раскрытом уровне, +6 за шаг (было 40 и +8: из
+            -- свёрнутого в пол-экрана одним шагом); без уровня — 40, как раньше
+            if tv then ww = L.cw * (lvl and (16 + 6 * math.max(0, lvl - 2)) or 40) end
             local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
             local gk = ww .. wm
             L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
@@ -9909,11 +9911,13 @@ function D.frame(L, snap, rows, state, info)
           info.fx_stack(hover, col, ex, ex + ew, ey, math.max(1, math.floor(eh / L.rh)), true)
         end
       else
-      slider(sx, hy + 3 * L.rh + 1, sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
+      -- 11 ноя: есть строка width — порядок width / pan / vol (width над паном): громкость на свободную строку ниже
+      D.hdr_wfirst = D.hdr_row2_free and D.hdr_row2_free > hy + 2 * L.rh + 1 and col.panmode ~= 6 and not c.master or nil
+      slider(sx, D.hdr_wfirst and D.hdr_row2_free or (hy + 3 * L.rh + 1), sw, (math.max(-60, math.min(12, db)) + 60) / 72, false, 'v', db <= -60 and '-inf' or ('%+.1f'):format(db), 'vol')
       -- 19 окт: метр трека — тонкая полоса под v (та же шкала -60..+12): пик трека (взведённый аудио — вход);
       -- вход MIDI на трек — жёлтая вспышка, гаснет за 0.3 с
       if not c.master and info.hdrmeter ~= false then
-        local my0 = hy + 4 * L.rh - 1
+        local my0 = (D.hdr_wfirst and (D.hdr_row2_free + L.rh) or (hy + 4 * L.rh)) - 1   -- 11 ноя: под v, где бы она ни стояла
         local lw0 = ms('v') + L.pad
         local mx0, mw0 = sx + lw0, math.max(4, sw - lw0)
         local pl, pr = 0, 0
@@ -9933,7 +9937,8 @@ function D.frame(L, snap, rows, state, info)
       end
       -- 16 окт: width — своей строкой под паном: w ----+----, от центра в обе стороны ---===--- (шире —
       -- длиннее, отрицательная — красным); строка — вторая строка кнопок, если она пуста
-      local wrow = D.hdr_row2_free and D.hdr_row2_free > py and col.panmode ~= 6 and not c.master and D.hdr_row2_free or nil
+      local wrow = D.hdr_wfirst and py or nil   -- 11 ноя: width — на строке пана, пан — ниже (на строке громкости)
+      if wrow then py = hy + 3 * L.rh + 1 end
       if wrow then
         local wv = lv('width', col.width or 1)
         local lw = ms('w') + L.pad
@@ -9946,7 +9951,7 @@ function D.frame(L, snap, rows, state, info)
         local mid = wx0 + math.floor(ww / 2)
         set(U.GREY); gfx.rect(mid, cy - 2, 1, 5, 1)
         local hl = math.floor(math.min(1, math.abs(wv)) * ww / 2 + 0.5)
-        set(wv < 0 and U.RED or (hot and U.AMBER or U.TEXT)); gfx.rect(mid - hl, cy - 1, 2 * hl + 1, 3, 1)
+        set(wv < 0 and U.RED or (hot and U.AMBER or U.mix(U.TEXT, U.BG, 0.35))); gfx.rect(mid - hl, cy - 1, 2 * hl + 1, 3, 1)   -- 11 ноя: темнее громкости
         local vt = ('%d'):format(math.floor(wv * 100 + 0.5))
         text(wx0 + ww + L.pad + vres - L.pad - ms(vt), wrow, vt, U.GREY)
         if hot then hover.trs = { col = col, what = 'width', x0 = wx0, w = ww, sv = math.max(0, math.min(1, (mx - wx0) / math.max(1, ww))) } end

@@ -20623,10 +20623,13 @@ function ctx.width_step(d, which)
   if #list > 0 then
     state.wlevel = state.wlevel or {}
     for _, c2 in ipairs(list) do
-      if d > 0 and state.folds and state.folds[c2.guid] then ctx.fold(c2, false) end   -- 11 ноя: шире свёрнутого — сперва развернуть
-      local cur = state.wlevel[c2.guid] or state.wzlevel or full
-      local nl = cur + d
-      state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
+      if d > 0 and state.folds and state.folds[c2.guid] then   -- 11 ноя: шире свёрнутого — развернуть на первый уровень (не сразу во всю ширину)
+        ctx.fold(c2, false); state.wlevel[c2.guid] = 2
+      else
+        local cur = state.wlevel[c2.guid] or state.wzlevel or full
+        local nl = cur + d
+        state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
+      end
     end
     relayout()
     vim.msg = which == 'cur' and ('width of ' .. (list[1].name ~= '' and list[1].name or 'the track') .. ' ' .. (d > 0 and 'wider' or 'narrower'))
