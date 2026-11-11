@@ -770,6 +770,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>dd</kbd> <kbd>dt</kbd></td><td>delete the events of the row - nothing below moves (3dd - three rows; x - one event) / remove the time selection from the project (later items move)</td></tr>
 <tr><td><kbd>dd</kbd> <kbd>dw</kbd> <kbd>dW</kbd> <kbd>di</kbd></td><td>dd - the rows out, everything below moves up (as Vim; 3dd - three rows); dw - clear the row of the track, nothing moves (3dw); dW - clear the row on all tracks; di - the whole item under the cursor</td></tr>
 <tr><td><kbd>dp</kbd> <kbd>dP</kbd></td><td>delete from the pattern start to the cursor / from the cursor to the pattern end (the cursor track)</td></tr>
+<tr><td><kbd>d.</kbd></td><td>delete the event on the cursor row and pull up only the next event to it (d3. - the next three); everything after them stays where it is</td></tr>
 <tr><td><kbd>d</kbd> <kbd>Space</kbd></td><td>delete up to the pause: the run of events of the cursor lane from the cursor down to the first empty row (like d} in Vim); on an empty row - the next run</td></tr>
 <tr><td><kbd>dS</kbd></td><td>delete every item and all automation (envelope points, automation items) of the selected tracks in the whole project (no selection - the cursor track); one undo</td></tr>
 <tr><td><kbd>C-A-j</kbd></td><td>repeat the part of the region above the cursor down to the region end: Ctrl+Opt+J (or Down) - this track; on the first row of a pattern - the previous pattern into this one; :repeat all - all tracks (Paketti)</td></tr>
@@ -900,7 +901,8 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>gt</kbd> <kbd>gT</kbd></td><td>go to a module of the layout (menu by its letter: d dsp, f fx, a automation …) / REAPER project tab; 3gt - the third at once; the next tab of a module - Tab</td></tr>
 <tr><td><kbd>:transpose</kbd></td><td>transpose popup: -24..+24 and where - selection / column / track / pattern (also the right-click menu); :transpose N - the selection by N; :transpose dN - by N degrees of the key</td></tr>
 <tr><td><kbd>td</kbd> <kbd>tx</kbd> <kbd>tp</kbd></td><td>delete (= cut, as d in Vim) / cut N tracks from the cursor track (5td - five), paste them after the cursor track; dd deletes rows (5dd - five)</td></tr>
-<tr><td><kbd>ts</kbd></td><td>new track "send": the selected tracks (or the cursor track) send into it - a bus / fx return</td></tr>
+<tr><td><kbd>ts</kbd></td><td>solo the cursor track (= Shift+S)</td></tr>
+<tr><td><kbd>tS</kbd></td><td>new track "send": the selected tracks (or the cursor track) send into it - a bus / fx return</td></tr>
 <tr><td><kbd>tr</kbd></td><td>new track "source": it sends into the selected tracks (they get a receive)</td></tr>
 <tr><td><kbd>tn</kbd> <kbd>tc</kbd></td><td>track: rename / colour (list: palette, random, default, custom dialog)</td></tr>
 <tr><td><kbd>ty</kbd></td><td>duplicate the cursor track (copy right after it)</td></tr>
@@ -1102,7 +1104,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>~~</kbd></td><td>automation: the last row - automation items of the track as one instrument (j past the last slot); the slices list shows them, a note key / MIDI note inserts the selected one, rate by the key (C-4 = x1, octave up = x2); Opt+Enter on an automation item picks it</td></tr>
 <tr><td><kbd>r</kbd></td><td>slices list: slice mode - by key / random (any slice key inserts a random slice of the sample, never the same twice) / sequence (the next one); also l in the insert menu</td></tr>
 <tr><td><kbd>µ</kbd></td><td>midi clips (µ; in the lib: @ audio, &amp; files kit, N$ sliced, # drumrs5k, ~ automation): the row under automation - MIDI items of the track (a in the slices list: the whole project); j k pick, a note key / MIDI note inserts a copy at the cursor (C-4 = as is, else transposed; the original stays), Enter / double click - go to the clip (Ctrl+O back); a click / j k previews it through its track (no transport), Space stops</td></tr>
-<tr><td><kbd>"</kbd> <kbd>phrases</kbd></td><td>the last section of the lib (under midi): the phrases of the project; pick one (j k / click) - note keys put its trigger at the cursor, C-4 as written, other keys transpose, velocity scales; e / Enter / dblclick - edit it (every use follows)</td></tr>
+<tr><td><kbd>"</kbd> <kbd>phrases</kbd></td><td>the last section of the lib (under midi): the phrases of the project; pick one (j k / click) - note keys put its trigger at the cursor, C-4 as written, other keys transpose, velocity scales; e / Enter / dblclick - edit it (every use follows); x x / dd - delete it with its uses</td></tr>
 <tr><td><kbd>Space</kbd></td><td>preview (how its note sounds: offset, rate, pitch); Esc stops</td></tr>
 <tr><td><kbd>a</kbd></td><td>preview on select on / off (button preview; rclick: full / hold / first second)</td></tr>
 <tr><td><kbd>bsync</kbd></td><td>header button: beatsync - the item lasts N beats at the tempo where each note sits (wheel in the item panel: N)</td></tr>

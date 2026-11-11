@@ -147,6 +147,7 @@ function IK.key(c, cur, n, nslots, ninst)
     if ch == 'k' or c == UP then ctx.phr_step(-1); return true end
     if ch == 'j' or c == DOWN then ctx.phr_step(1); return true end
     if ch == 'e' or c == 13 then ctx.phr_do({ op = 'edit', name = ctx.state_phr() }); return true end
+    if ch == 'x' or ch == 'd' then ctx.phr_del_key(ch); return true end   -- 11 ноя: x x / dd — удалить фразу (источник и все вхождения)
   end
   if ctx.midi_on and ctx.midi_on() then                -- midi — под automation (10 окт)
     if (ch == 'k' or c == UP) and ctx.auto_select then ctx.auto_select(); return true end

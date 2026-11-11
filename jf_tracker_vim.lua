@@ -3433,7 +3433,8 @@ function V.key_impl(c)
       if c == ('t'):byte() and ctx.new_track and ctx.new_track(n) then finish_edit()
       -- 10 окт: td / tx / tp — удалить / вырезать / вставить N треков (5td — пять)
       elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('p'):byte()) and ctx.tracks_op and ctx.tracks_op(c == ('d'):byte() and 'delete' or (c == ('x'):byte() and 'cut' or 'paste'), n) then finish_edit()
-      elseif (c == ('s'):byte() or c == ('r'):byte()) and ctx.bus_track and ctx.bus_track(c == ('s'):byte() and 'send' or 'recv') then finish_edit()   -- ts / tr
+      elseif c == ('s'):byte() and ctx.track_toggle then ctx.track_toggle('solo'); finish_move()   -- 11 ноя: ts — соло трека (шина send — tS)
+      elseif (c == ('S'):byte() or c == ('r'):byte()) and ctx.bus_track and ctx.bus_track(c == ('S'):byte() and 'send' or 'recv') then finish_edit()   -- tS / tr
       -- 9 окт: всё про трек — под t, мнемонично (which-key 't')
       elseif c == ('y'):byte() and ctx.track_dup and ctx.track_dup() then finish_edit()
       elseif (c == ('j'):byte() or c == ('k'):byte()) and ctx.track_move and ctx.track_move(c == ('j'):byte() and 1 or -1, n) then finish_edit()
@@ -3740,6 +3741,34 @@ function V.key_impl(c)
       end
       -- 10 окт: d пробел (было dp до 1 ноя) — до паузы (как d} в Vim: абзац = серия событий лейна без
       -- пустой строки). С курсора вниз; курсор на пустой строке — ближайшая серия
+      -- 11 ноя: d. — убрать событие строки курсора и подтянуть к ней только следующее (d3. — три следующих), остальное
+      -- ниже на месте (dd / BS двигают всё до конца)
+      if p == 'd' and c == ('.'):byte() then
+        local f = flat()[V.cur.fi]
+        if not (f and f.col and f.col.track) or f.env or f.ml then finish_move(); V.count = nil; return end
+        local N = math.max(1, math.floor(V.count or 1))
+        local E, lp, row = ctx.edit, lpb(), V.cur.row
+        local here, rows, seen = {}, {}, {}
+        for _, g in ipairs(flat()) do
+          if g.col == f.col and not g.env and not g.ml then
+            for _, sub in ipairs(subs_of(g)) do
+              for r, cell in pairs(sub) do
+                if type(r) == 'number' and is_head(cell) then
+                  if r == row then here[#here + 1] = cell elseif r > row and not seen[r] then seen[r] = true; rows[#rows + 1] = r end
+                end
+              end
+            end
+          end
+        end
+        table.sort(rows)
+        if #here > 0 then E.delete(here, lp) end
+        if not rows[1] then V.msg = 'd.: nothing below to pull up'; finish_edit(); V.count = nil; return end
+        local gap = rows[1] - row
+        local limit = rows[N + 1] and E.row_time(rows[N + 1], lp, 0) or math.huge
+        E.time_delete({ f.col.track }, E.row_time(row, lp, 0), E.row_time(row + gap, lp, 0), limit, true, lp, gap, true)
+        V.msg = ('d.: %d event(s) up by %d row(s), the rest stays'):format(math.min(N, #rows), gap)
+        finish_edit(); V.count = nil; return
+      end
       if p == 'd' and c == 32 then
         local f = flat()[V.cur.fi]
         if not f or f.env then finish_move(); V.count = nil; return end

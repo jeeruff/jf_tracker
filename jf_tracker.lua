@@ -18222,6 +18222,24 @@ ctx.phr_select = function(name)
   vim.msg = ('phrase %s (%.1f q, %d in the song): a note key puts it at the cursor, C-4 - as written, others transpose; e - edit it'):format(name, r and r.lenq or 0, r and r.n or 0)
 end
 ctx.state_phr = function() return state.phr_inst end
+-- 11 ноя: удаление фразы из lib — вторым нажатием той же клавиши (x x / d d): уходят источник и все вхождения
+ctx.phr_del_key = function(ch)
+  local name = state.phr_inst
+  if not name then return end
+  local now = reaper.time_precise()
+  if ctx.phr_del_arm and ctx.phr_del_arm.name == name and ctx.phr_del_arm.ch == ch and now - ctx.phr_del_arm.t < 2 then
+    ctx.phr_del_arm = nil
+    local list = ctx.phr_list()
+    local at; for i, r in ipairs(list) do if r.name == name then at = i end end
+    ctx.phr_do({ op = 'delete', name = name })
+    local nx = ctx.phr_list()[at] or ctx.phr_list()[(at or 1) - 1]
+    if nx then ctx.phr_select(nx.name) else state.phr_inst = nil; if ctx.midi_select then ctx.midi_select() end end
+    return
+  end
+  local r = ctx.phr_find(name)
+  ctx.phr_del_arm = { name = name, ch = ch, t = now }
+  vim.msg = ('phrase %s: %s again - delete it and its %d use(s) in the song (u undoes)'):format(name, ch == 'd' and 'd' or 'x', r and r.n or 0)
+end
 ctx.phr_on = function() return state.phr_inst and ctx.phr_find(state.phr_inst) and true or false end
 ctx.phr_insert = function(pitch, row)
   local name = state.phr_inst

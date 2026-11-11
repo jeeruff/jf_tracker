@@ -174,13 +174,15 @@ function DK.key(c, sel, n, np, mods)
       if ch == 'x' or c == 8 or c == 6579564 then ctx.pad_cut(sel.fx); return true end
       if ch == 'y' then DK.pending = 'y'; ctx.msg('y: y take the pad, p duplicate it onto the next free note | Esc'); return true end
       if ch == 'p' or ch == 'P' then ctx.pad_paste(sel.fx); return true end
-      if ch == 'M' or ch == 'S' then ctx.pad_ms(sel.fx, ch == 'S'); return true end
+      if ch == 'M' or ch == 'S' then ctx.pad_ms(sel.fx, ch == 'S'); return true end   -- пэды рэка — свои M / S
       if c == 13 then ctx.pad_listen(sel.fx); return true end
       if (ch == '[' or ch == ']') and ctx.pad_cur then local _, f, _, ki = ctx.pad_cur(sel.fx); if ki and ki > 0 then ctx.pad_similar(f, ki, ch == ']' and 1 or -1) else ctx.msg('pads: no pad here') end; return true end   -- 1 ноя: = < > пэда
       if ch == 'r' then ctx.pad_route_cur(sel.fx); return true end
       if ch == 'G' or ch == 'C' then ctx.pad_group_cur(sel.fx, ch == 'C' and 'choke' or 'group'); return true end   -- 19 окт: G — group, C — choke group
     end
   end
+  -- 11 ноя: Shift+S / Shift+M — соло / mute трека DSP, как в трекере (у пэдов рэка — свои, выше)
+  if (ch == 'S' or ch == 'M') and not DK.pending and ctx.track_toggle then ctx.track_toggle(ch == 'M' and 'mute' or 'solo'); return true end
   -- 27 окт: r — заменить выбранный эффект (fzf-список на месте, без перехода в панель fx)
   if ch == 'r' and not DK.pending and ctx.fx_replace then ctx.fx_replace(sel.fx); return true end
   -- 21 окт: счётчик: 20 h / l — шаг ×20, 23 j / k — через 23 параметра, 3w; 22 окт: только когда клавиатура не играет

@@ -2643,3 +2643,7 @@
 - drumrs5k: adding files removes empty drumrs5k racks, the rack with pads is used first
 - big-wave columns: one cursor stop per wave (h l)
 - f jumps: beat lines (1.2 1.3 1.4) get labels too, not only bars
+- DSP: Shift+S / Shift+M - solo / mute of the DSP track (pads keep their own)
+- ts - solo the track, tS - new send bus (was ts)
+- d. - delete the event here, pull up only the next one (d3. - three), the rest stays
+- lib phrases: x x / dd delete the phrase with its uses
