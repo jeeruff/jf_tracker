@@ -912,6 +912,7 @@ local ctx                                        -- 9 окт: раньше pool_
 local function pool_select(n, go)   -- 6 ноя: go — выбрать и чужой инструмент (Enter), когда auto select выкл
   state.auto_inst = false                     -- выбран обычный инструмент — не automation (5 окт)
   state.midi_inst = false
+  state.phr_inst = nil
   local col = cur_col()
   if col and state.instfx then state.instfx[col.guid] = nil end   -- 9 окт: сэмпл вместо плагина-инструмента
   local pool = col and col.pool or {}
@@ -5681,7 +5682,7 @@ ctx = {
   -- скорость — от высоты: C-4 = ×1, октава вверх = ×2
   auto_on = function() return state.auto_inst and true or false end,
   auto_select = function()
-    state.auto_inst = true; state.midi_inst = false
+    state.auto_inst = true; state.midi_inst = false; state.phr_inst = nil
     local c = cur_col()                                 -- 9 окт: номер automation — последний в lib
     if c then
       if state.instfx then state.instfx[c.guid] = nil end
@@ -5701,7 +5702,7 @@ ctx = {
   mc_sel = 1,
   mc_scope = 'track',
   midi_select = function()
-    state.midi_inst = true; state.auto_inst = false
+    state.midi_inst = true; state.auto_inst = false; state.phr_inst = nil
     local c = cur_col()
     if c then
       if state.instfx then state.instfx[c.guid] = nil end
@@ -8207,7 +8208,7 @@ ctx = {
     state.instfx = state.instfx or {}
     state.instfx[col.guid] = fx
     state.auto_inst = false
-    state.midi_inst = false
+    state.midi_inst = false; state.phr_inst = nil   -- 11 ноя: и фраза lib
     -- номер в сквозной нумерации lib (vim.inst) — чтобы , . / Cmd+J K шли дальше от него
     do
       local nsamp = #(col.pool or {}) + draw.empty_slots(#(col.pool or {})) + ctx.inst_off(col)   -- 21 окт: сквозные номера
@@ -18188,6 +18189,35 @@ ctx.cmd_here = function()
   end
   return out, (pg and pg.title or f or ''):match('^[^%-]*'):gsub('%s+$', '')
 end
+-- 11 ноя: фраза — инструментом lib (раздел phrases): выбрана — клавиши нот ставят её триггер на курсор, высота транспонирует
+ctx.phr_select = function(name)
+  state.phr_inst = name; state.auto_inst = false; state.midi_inst = false
+  local c = cur_col()
+  if c and state.instfx then state.instfx[c.guid] = nil end
+  local r = ctx.phr_find(name)
+  vim.msg = ('phrase %s (%.1f q, %d in the song): a note key puts it at the cursor, C-4 - as written, others transpose; e - edit it'):format(name, r and r.lenq or 0, r and r.n or 0)
+end
+ctx.state_phr = function() return state.phr_inst end
+ctx.phr_on = function() return state.phr_inst and ctx.phr_find(state.phr_inst) and true or false end
+ctx.phr_insert = function(pitch, row)
+  local name = state.phr_inst
+  if not (name and ctx.phr_find(name)) then return false end
+  local keep = vim.cur.row
+  vim.cur.row = row
+  ctx.phr_do({ op = 'insert', name = name, pitch = pitch, vel = vim.vel })
+  vim.cur.row = keep
+  return true
+end
+-- j k в lib по разделу фраз: d = ±1; с первой вверх — midi clips
+ctx.phr_step = function(d)
+  local list = ctx.phr_list()
+  local at
+  for i, r in ipairs(list) do if r.name == state.phr_inst then at = i end end
+  if not at then if list[1] and d > 0 then ctx.phr_select(list[1].name) end; return end
+  local nx = at + d
+  if nx < 1 then state.phr_inst = nil; if ctx.midi_select then ctx.midi_select() end
+  elseif list[nx] then ctx.phr_select(list[nx].name) end
+end
 ctx.phr_list = function()
   local sc = reaper.GetProjectStateChangeCount(0)
   if ctx.phr_cc and ctx.phr_cc.sc == sc then return ctx.phr_cc.list end
@@ -18361,7 +18391,15 @@ ctx.phr_do = function(op)
       local tk = R.GetActiveTake(it)
       local nm = tk and select(2, R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)) or ''
       if nm:match('^ph:') and math.abs(R.GetMediaItemInfo_Value(it, 'D_POSITION') - t) < 1e-6 then
-        if nm == 'ph:' .. r.name then vim.msg = ('phrase %s is already at row %d'):format(r.name, vim.cur.row); return end
+        if nm == 'ph:' .. r.name and not op.pitch then vim.msg = ('phrase %s is already at row %d'):format(r.name, vim.cur.row); return end
+        if nm == 'ph:' .. r.name then   -- 11 ноя: та же фраза из lib другой клавишей — сменить высоту триггера
+          edit.run('phrase ' .. r.name .. ' pitch', function()
+            local _, sel, mu, a0, a1, ch, _, ve = R.MIDI_GetNote(tk, 0)
+            if a0 then R.MIDI_SetNote(tk, 0, sel, mu, a0, a1, ch, op.pitch, op.vel or ve, false) end
+          end)
+          ctx.phr_cc = nil; model.invalidate(); vim.msg = ('phrase %s at row %d: %s'):format(r.name, vim.cur.row, model.note_name and model.note_name(op.pitch) or op.pitch)
+          return true
+        end
         edit.run('phrase ' .. r.name .. ' instead of ' .. nm:sub(4), function()
           R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', 'ph:' .. r.name, true)
           R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t)
@@ -18376,7 +18414,7 @@ ctx.phr_do = function(op)
       local tk = it and R.GetActiveTake(it)
       if tk then
         R.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', 'ph:' .. r.name, true)
-        R.MIDI_InsertNote(tk, false, false, 0, R.MIDI_GetPPQPosFromProjTime(tk, t1), 0, 60, 100, false)
+        R.MIDI_InsertNote(tk, false, false, 0, R.MIDI_GetPPQPosFromProjTime(tk, t1), 0, op.pitch or 60, op.vel or 100, false)   -- 11 ноя: из lib — высота клавиши
       end
     end)
     ctx.phr_cc = nil; model.invalidate()
@@ -19666,6 +19704,8 @@ local function hint_go(t)
   elseif t.kind == 'ctrl' and ctx.ctrl_menu and ctx.ctrl_menu(d) then   -- 12 окт: f на ячейке транспорта — её выпадашка (выбор с клавиатуры)
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
+  elseif t.kind == 'pool' and type(d) == 'string' and d:match('^phr:') then ctx.set_focus('inst'); ctx.phr_select(d:sub(5))
+  elseif t.kind == 'pool' and d == 'midi' then ctx.set_focus('inst'); ctx.midi_select()
   elseif t.kind == 'pool' then ctx.set_focus('inst'); pool_select(d)
   elseif t.kind == 'slice' then
     ctx.set_focus('slices')
@@ -25539,7 +25579,7 @@ local function frame()
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
     libtabs = state.libtabs, libtab = state.libtab,
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -26867,6 +26907,8 @@ local function frame()
   elseif hover.btn then state.status = hover.btn.col.name .. ': ' .. hover.btn.what
   elseif hover.pool and hover.pool.instfx then
     state.status = 'instrument plugin: click - note keys write MIDI to it, DSP shows it; dblclick - its window'
+  elseif hover.pool and hover.pool.phr then
+    state.status = 'phrase ' .. hover.pool.phr .. ': click - pick it, then note keys put it at the cursor (C-4 as written, others transpose); dblclick - edit it'
   elseif hover.pool and hover.pool.midi then
     state.status = 'midi clips: MIDI items of the track (or the project - a in the slices list) as one instrument; a note key inserts a copy of the selected one, transposed from C-4'
   elseif hover.pool and hover.pool.auto then
@@ -29473,6 +29515,10 @@ local function frame()
     elseif hover.pool and hover.pool.midi then
       ctx.set_focus('inst'); ctx.midi_select()
       click = { t = now2, zone = 'poolmidi' }
+    elseif hover.pool and hover.pool.phr then   -- 11 ноя: фраза в lib; двойной щелчок — править её
+      ctx.set_focus('inst')
+      if dbl and click.zone == 'poolphr' and state.phr_inst == hover.pool.phr then ctx.phr_do({ op = 'edit', name = hover.pool.phr }) else ctx.phr_select(hover.pool.phr) end
+      click = { t = now2, zone = 'poolphr' }
     elseif hover.libtab then
       state.libtab = hover.libtab; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. ' (F4)'
       click = { t = now2, zone = 'libtab' }

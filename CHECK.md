@@ -2635,3 +2635,5 @@
 - narrow transport: step block and keyboard stay, transport buttons drop first
 - zw: the widest track narrows first, others keep their width (jf_dbg cols=1 dumps column widths)
 - big-wave track (zt): z, from the first level gives a narrow wave, folds only at 0
+- big-wave track (zt): h l no longer walk ~10 hidden fields behind each wave
+- lib: section " phrases (under midi): pick a phrase, note keys put its trigger (C-4 as written, others transpose); j k / e / dblclick

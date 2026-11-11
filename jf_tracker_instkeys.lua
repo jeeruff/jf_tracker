@@ -143,8 +143,14 @@ function IK.key(c, cur, n, nslots, ninst)
     return 'leave'
   end
   -- automation — строка после всех слотов (5 окт): j с последнего слота — туда, k — обратно
+  if ctx.phr_on and ctx.phr_on() then                  -- 11 ноя: фразы — под midi
+    if ch == 'k' or c == UP then ctx.phr_step(-1); return true end
+    if ch == 'j' or c == DOWN then ctx.phr_step(1); return true end
+    if ch == 'e' or c == 13 then ctx.phr_do({ op = 'edit', name = ctx.state_phr() }); return true end
+  end
   if ctx.midi_on and ctx.midi_on() then                -- midi — под automation (10 окт)
     if (ch == 'k' or c == UP) and ctx.auto_select then ctx.auto_select(); return true end
+    if (ch == 'j' or c == DOWN) and ctx.phr_step and #ctx.phr_list() > 0 then ctx.phr_step(1); return true end   -- 11 ноя: дальше — фразы
     if ch == 'j' or c == DOWN or ch == 'G' then return true end
   end
   if ctx.auto_on and ctx.auto_on() then

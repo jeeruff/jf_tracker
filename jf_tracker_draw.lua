@@ -1099,7 +1099,8 @@ function D.layout_core(snap, state, nregions)
             if tv then ww = L.cw * (lvl and (lvl <= 1 and 10 or (16 + 6 * (lvl - 2))) or 40) end
             local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
             local gk = ww .. wm
-            L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfx = 0, x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
+            L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfields = 1, nfx = 0,   -- 11 ноя: nfields 1 — курсор не ходит по спрятанным за волной полям
+              x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
               wave = wm, x_note = L.pad, x_vol = L.pad, x_del = L.pad, sub_w = ww + 2 * L.pad }, { __index = L })
             G = L.GW[gk]
           end
@@ -7168,9 +7169,15 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   rows[#rows + 1] = { auto = true, num = nsamp + gn + 1 }   -- automation как инструмент (5 окт); 21 окт: после всех инструментов проекта
   rows[#rows + 1] = { hdr = 'midi', name = '' }
   rows[#rows + 1] = { midi = true, num = nsamp + gn + 2 }   -- MIDI-клипы трека / проекта (10 окт)
+  -- 11 ноя: фразы — разделом lib (как automation / midi): выбрал — клавиши нот ставят её триггер, высота транспонирует
+  local phl = info.phr_list and info.phr_list() or {}
+  if #phl > 0 then
+    rows[#rows + 1] = { hdr = 'phrases', name = '' }
+    for k, ph in ipairs(phl) do rows[#rows + 1] = { phr = ph.name, num = nsamp + gn + 2 + k, lenq = ph.lenq, uses = ph.n } end
+  end
   -- 10 окт: секции audio / instruments / automation / midi; опция lib tabs — вкладками (F4),
   -- иначе разделителями с пустой строкой перед каждой
-  local SECS = { instruments = true, automation = true, midi = true }
+  local SECS = { instruments = true, automation = true, midi = true, phrases = true }
   do
     local sec, out = 'audio', {}
     for _, row in ipairs(rows) do
@@ -7211,7 +7218,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG - TBH) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
-  for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) then sel_r = r end end
+  for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and not info.phr_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) or (info.phr_inst and row.phr == info.phr_inst) then sel_r = r end end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом можно листать
@@ -7335,7 +7342,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
       -- 26 окт: значок типа — в заголовке раздела, не в каждой строке
-      local glyph = ({ audio = '@ ', instruments = '# ', midi = D.mu() .. ' ', automation = '~ ' })[row.hdr] or ''
+      local glyph = ({ audio = '@ ', instruments = '# ', midi = D.mu() .. ' ', automation = '~ ', phrases = '" ' })[row.hdr] or ''
       local tw = ms(glyph .. row.hdr)
       local hcol = U.TEXT
       if row.folder then   -- 27 окт: заголовок папки lib — щелчок сворачивает / разворачивает; курсор в свёрнутой — подсветка
@@ -7370,6 +7377,16 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       text(ix + 6, y + 1, fit(('%02d    midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
+    elseif row.phr then
+      -- 11 ноя: фраза — номер, имя, длина в четвертях, сколько раз стоит в песне
+      local sel = info.phr_inst == row.phr
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      local tail = ('%.1fq %dx'):format(row.lenq or 0, row.uses or 0)
+      text(ix + 6, y + 1, fit(('%02d    %s'):format(row.num or 0, row.phr), w - 18 - ms(tail)), sel and U.AMBER or U.TEXT)
+      text(ix + w - 6 - ms(tail), y + 1, tail, U.GREY)
+      if hot then hover.pool = { ci = info.pool_ci, phr = row.phr } end
+      hint('pool', ix + 2, y, w - 4, L.rh, 'phr:' .. row.phr)
     elseif row.slxk then
       -- 5 ноя: срез slixer (ребёнок строки slixer): S01  C-3  0.31s; выбранный в slixer — подсвечен
       local hot = row.slxk > 0 and mx >= ix and mx < ix + w and my >= y and my < y + L.rh
