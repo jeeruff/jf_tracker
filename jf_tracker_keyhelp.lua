@@ -650,6 +650,7 @@ KH.PAGES = {
     { k = 'Esc Opt+Tab', d = 'clear search / next tab' },
   } },
   dsp = { title = 'DSP (track fx)', e = {
+    { k = 'T', d = 'pin the DSP to this track (° after the name, the cursor may leave); again - follow the cursor; Ctrl+W D - a second DSP pane pinned here' },
     { k = 'N + -  N j k  N Enter', m = 'numbers on a param', d = 'on a parameter (slider): 20 + / - - step x20 (h l stay for moving between effects), 23 j / k - 23 params down / up, 23 Enter - set it to 23 in its units (Hz, dB, %), 023 Enter - 0.23; Esc - cancel the number. The same on the rows of reform / humanizer / bouncer (a number + Enter sets the row, Enter alone - keep / apply / bounce)' },
     { k = 'h l', d = 'fx left / right' },
     { k = 'w W', d = 'the next / previous module (around the chain; 3w - three; from a parameter slider too)' },
@@ -1015,7 +1016,7 @@ KH.BARS = {
   browser = { { 'Enter', 'open/add' }, { 'a', 'add to' }, { 'h', 'up' }, { 'Space', 'listen' }, { '/', 'find' }, { "'1..'0", 'marks' },
               { 'H L', 'back/fwd' }, { '*', 'mkdir' }, { 'Cmd+Enter', 'replace' } },
   dsp = { { 'h l', 'fx' }, { 'j k', 'param' }, { '+ -', 'value' }, { 'dd', 'delete' }, { 'yy p', 'copy' }, { 'cc', 'container' },
-          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 'tt', 'track/take' }, { '/', 'find' }, { 'tf', 'add' }, { 'zz', 'big' } },
+          { 'aa', 'automate' }, { 'b', 'bypass' }, { 'o', 'window' }, { 'tt', 'track/take' }, { 'T', 'pin' }, { '/', 'find' }, { 'tf', 'add' }, { 'zz', 'big' } },
   -- 9 окт: роутер (zR) и цепочка на всё окно (zz) — подсказки в строке статуса
   router = { { 'h l', 'signal' }, { 'j k', 'row' }, { 'a A', 'add' }, { '|', 'join row' }, { 's', 'solo' }, { '=', 'unity' }, { 'b', 'bypass' },
              { 'd', 'delete' }, { 'o', 'window' }, { 'drag', 'slider' }, { 'dblclick', 'default' }, { 'zR Esc', 'back' } },

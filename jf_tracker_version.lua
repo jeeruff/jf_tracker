@@ -7,6 +7,7 @@ V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
     'phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item',
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
+    'DSP: T pins the panel to its track (° after the name), T again - follow the cursor',
     'panes as buffers: Ctrl+W D duplicates a pane with its own state - inputs, and dsp (the copy is pinned to the cursor track, the first follows the cursor); tracker next',
     'midi tab (own MIDI learn of the slicer) removed: its knobs and buttons are jf_tracker actions now (:learn)',
     'seq: the written song gets a section (the list name by default); :seq write NAME',

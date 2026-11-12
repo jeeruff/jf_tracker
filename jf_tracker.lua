@@ -18417,6 +18417,15 @@ ctx.ain_bind = function(target)
   ctx.ain_kb = ctx.ain_kb or {}
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
+-- 12 ноя: T в DSP — закрепить DSP на треке цели (° у имени; курсор может уйти) / отпустить: dsp_sel.pin (у dsp#2 — свой)
+ctx.dsp_pin_toggle = function()
+  if dsp_sel.pin then dsp_sel.pin = nil; dspt_cache.pin = nil; vim.msg = 'DSP follows the cursor track again (T - pin)'; return end
+  local t = dsp_target()
+  local tr = t and t.col and t.col.track
+  if not (tr and reaper.ValidatePtr(tr, 'MediaTrack*')) then vim.msg = 'T: no track to pin'; return end
+  dsp_sel.pin = reaper.GetTrackGUID(tr); dspt_cache.pin = nil
+  vim.msg = ('DSP pinned to %s ° (T - unpin; Ctrl+W D - a second DSP pinned here)'):format(t.col.name or '')
+end
 -- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);
 -- в фокусе reform / humanizer — подсказка называет экшен строки курсора
 ctx.ain_learn = function()
@@ -26908,7 +26917,7 @@ local function frame()
   elseif hover.dspbtn then state.status = tostring(hover.dspbtn.f and hover.dspbtn.f.name or '') .. ' - ' .. (({ pins = 'inputs / outputs of the plugin (connected / all): click - the pin matrix', open = 'edit: the fx window (e)', bypass = 'bypass on / off (b)', delta = 'delta solo: hear only the difference this fx makes (REAPER :delta)', preset = 'presets: click - the list (fzf), < > - previous / next', pprev = 'previous preset', pnext = 'next preset', del = 'delete this fx (dd, Cmd+Z undo)', chainadd = 'add an fx at the end of the chain (fzf search; af)', cxfade = 'A<>B: crossfade the two chains with one knob - the mix of the first: 100 % only A, 0 % only B (the mix of B follows inverted, a native REAPER link); click again - off', ctab = 'container view: CHAINS (mix, m, s of each chain) / ROUTE (a map of what is inside) / XY (corners = snapshots of every module inside)', mfoldin = 'fold the module into a header: name vertically, x on ∆ e on it (zf; click it - unfold)', mfold = 'folded module: click - unfold (zf)', lastp = 'the last touched parameter of this fx: envelope, LFO / ACS modulation, link (as the Param button in REAPER)',
     ksize = 'pad size: s small (more rows), m medium 4 x 4, l large 4 x 4 - zss zsm zsl',
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks', krprev = 'every pad of the rack - back to its previous sample', krxi = 'every pad of the rack - a random sample like its own (one undo)', krnext = 'every pad of the rack - the next sample like its own' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
-  elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)'
+  elseif hover.dsptarget then state.status = hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)' .. ' - T: pin the DSP to this track (°)'   -- 12 ноя
   elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
   elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
   elseif hover.mpin then state.status = state.mpin ~= false and 'pin: the master stays on the right - click: the master becomes the last track (shown when the tracks to the right are over)' or 'pin off: the master is the last track - click: pin it to the right'
@@ -33246,6 +33255,7 @@ local function frame()
         local f = fxs[dsp_sel.fx]
         if ctx.pinmx and ctx.pins_key(c, ch) then return end   -- 24 окт: матрица пинов открыта — её клавиши
         if ch == 'K' and not DK.pending then ctx.dsp_learn_toggle(); return end   -- 24 окт: K — knobs learn (было E; e — окно)
+        if ch == 'T' and not DK.pending and not DK.pads then ctx.dsp_pin_toggle(); return end   -- 12 ноя: T — закрепить DSP на треке (°) / отпустить
         if ch == 'I' and not DK.pending and not DK.pads then ctx.pins_open(dsp_sel.fx); return end   -- 24 окт: I — входы / выходы (пины)
         if dsp_learn and not DK.pending then
           if c == 27 then ctx.dsp_learn_toggle(); return end

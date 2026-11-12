@@ -2671,3 +2671,4 @@
 - :learn: pattern actions - a knob picks a pattern of the song (plays as keyspat quant / sudden), next / prev buttons; while stopped next starts the first
 - keyspat on: a MIDI Program Change N on the input plays pattern N (SP-404 mode B sends PC)
 - seq: the render button / :seq write NAME put a section over the written patterns (default - the list name); the matrix shows the new slots and the section
+- DSP: T pins the DSP to the target track (° after the name), T again unpins; the title tip says so
