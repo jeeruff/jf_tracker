@@ -6372,6 +6372,16 @@ ctx = {
         return
       end
       if not tgt then vim.msg = 'pane: no panel on ' .. ch; return end
+      -- 12 ноя: s / v / T + буква уже открытой панели, которая умеет второй экземпляр (tracker, dsp, inputs) — новый
+      -- буфер ('tracker#2' и т.п.), как D; трекер не стекается — T на нём = рядом справа
+      if (pend == 's' or pend == 'v' or pend == 'T') and PN.visible(m, tgt) and ctx.BUF.can_multi(tgt) then
+        local nid = ctx.BUF.new(tgt)
+        if nid then
+          ctx.buf_init(nid)
+          if tgt == 'tracker' and pend == 'T' then pend = 'v' end
+          tgt = nid
+        end
+      end
       if pend == 'g' then
         if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
         ctx.pane_focus(tgt)
@@ -6412,13 +6422,7 @@ ctx = {
     elseif ch == 'D' then   -- 12 ноя: D duplicate — ещё один экземпляр панели (буфер, PLAN_BUFFERS): рядом справа, фокус на него
       local nid = ctx.BUF.new(PN.base(id))
       if nid then
-        local col = cur_col()
-        if PN.base(id) == 'dsp' and col and col.track then ctx.BUF.get(nid).st.pin = reaper.GetTrackGUID(col.track) end   -- dsp#2 закреплён на треке курсора
-        if PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — с курсора; фраза выбрана в lib — её режим
-          local st = ctx.BUF.get(nid).st
-          st.cur, st.row0, st.hscroll = vim.cur.row, state.row0 or 0, 0
-          if state.phr_inst then st.mode, st.phr = 'phrase', state.phr_inst end
-        end
+        ctx.buf_init(nid)
         ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
       else vim.msg = ('-- PANE -- D: %s has one instance (so far: tracker, inputs, dsp)'):format(PN.base(id)) end
     elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
@@ -35206,6 +35210,16 @@ ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 -- v1 — смотреть / ходить / слушать, Enter — основной курсор сюда (там и правка; фраза за =END становится видна)
 ctx.T2 = { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 }
 ctx.BUF.register('tracker', ctx.T2, { 'row0', 'cur', 'mode', 'phr', 'rg', 'hscroll' }, { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 })
+-- новый буфер панели — начальное состояние: dsp#2 закреплён на треке курсора; tracker#2 — с курсора, фраза из lib
+ctx.buf_init = function(nid)
+  local b = ctx.BUF.get(nid); if not b then return end
+  local col = cur_col()
+  if b.mod == 'dsp' and col and col.track then b.st.pin = reaper.GetTrackGUID(col.track) end
+  if b.mod == 'tracker' then
+    b.st.cur, b.st.row0, b.st.hscroll = vim.cur.row, state.row0 or 0, 0
+    if state.phr_inst then b.st.mode, b.st.phr = 'phrase', state.phr_inst end
+  end
+end
 ctx.t2_id = function()
   local bp = L and L.pn and L.pn.by_panel
   if not bp then return nil end
