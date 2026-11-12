@@ -6192,7 +6192,7 @@ ctx = {
     for _, t in ipairs(c.tabs or {}) do if t.id == id then mine = true end end
     if whole and mine then return nil end                 -- 16 окт: весь пейн — на себя некуда
     if whole and (h.kind == 'tab' or h.kind == 'tabbar') then
-      if at == 'tracker' then return nil end
+      if draw.panes.base(at) == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz
       return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
     end
     if h.kind == 'tab' or h.kind == 'tabbar' then
@@ -6201,7 +6201,7 @@ ctx = {
         for i, t in ipairs(c.tabs) do if mx < t.x + t.w / 2 then idx = i; break end end
         return { kind = 'order', at = at, index = idx, rect = { c.tab.x, c.tab.y, c.tab.w, c.tab.h } }
       end
-      if at == 'tracker' then return nil end
+      if draw.panes.base(at) == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz
       return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
     end
     local fx, fy = (mx - c.x) / math.max(1, c.w), (my - c.y) / math.max(1, c.h)
@@ -6222,6 +6222,7 @@ ctx = {
   pane_apply = function(m, ids, t)
     local PNm = draw.panes
     local ok
+    if t.kind == 'zoom' then return PNm.zoom(m, ids[1]) end   -- 12 ноя: брошена на трекер — на всё окно (zz)
     if t.kind == 'stack' then ok = PNm.stack(m, ids[1], t.at)
     elseif t.kind == 'split' then ok = PNm.split(m, t.at, ids[1], t.dir, 0.5) end
     if not ok then return false end
@@ -6230,6 +6231,7 @@ ctx = {
   end,
   tab_apply = function(m, id, t)
     local PNm = draw.panes
+    if t.kind == 'zoom' then return PNm.zoom(m, id) end   -- 12 ноя: брошена на трекер — на всё окно (zz)
     if t.kind == 'stack' then return PNm.stack(m, id, t.at)
     elseif t.kind == 'split' then
       if t.at == id then return PNm.unstack(m, id, t.dir) end
@@ -6388,6 +6390,9 @@ ctx = {
         ctx.pane_focus(tgt)
       elseif pend == 's' or pend == 'v' then
         ctx.pane_do(function() return PN.split(m, id, tgt, pend == 's' and 'd' or 'r') end, ('pane %s split %s'):format(tgt, pend == 's' and 'below' or 'right'))
+      elseif pend == 'T' and PN.base(id) == 'tracker' then   -- 12 ноя: в стек трекера — раскрыть на всё окно, как zz (zz — назад)
+        if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
+        ctx.pane_do(function() return PN.zoom(m, tgt) end, ('pane %s over the tracker (zz - back)'):format(tgt)); ctx.pane_focus(tgt)
       elseif pend == 'T' then
         ctx.pane_do(function() return PN.stack(m, tgt, id) end, ('pane %s stacked with %s'):format(tgt, id))
       elseif pend == 'X' then
@@ -27506,7 +27511,7 @@ local function frame()
           local why
           td.target, why = ctx.tab_drop_at(td.id, gfx.mouse_x, gfx.mouse_y, td.whole, td.ids)
           td.msg = (td.whole and ('drag pane ' .. table.concat(td.ids, '|')) or ('drag tab ' .. td.id)) .. ': ' .. (td.target and (td.target.kind == 'split' and ('split ' .. ({ l = 'left of', r = 'right of', u = 'above', d = 'below' })[td.target.dir] .. ' ' .. td.target.at)
-            or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or (why and ('not here - ' .. why)) or 'nowhere - let go to cancel')
+            or td.target.kind == 'zoom' and 'over the tracker, as zz (zz - back)' or td.target.kind == 'stack' and ('into the stack of ' .. td.target.at) or 'reorder in the stack') or (why and ('not here - ' .. why)) or 'nowhere - let go to cancel')
           state.status = td.msg
         end
       else
