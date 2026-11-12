@@ -415,6 +415,7 @@ function D.panes_layout(state, L, nregions, ncols)
   M.squeeze = state.pixel ~= false or (tonumber(state.fontscale) or 2) >= 2   -- 9 ноя: складывание панелей по приоритету
   D.TABGAP = 4                                           -- 19 окт: пустота над вкладками — панели видно отдельно
   M.tab_h = L.rh + 2 + D.TABGAP                         -- подпись листа — вкладкой над рамкой
+  M.tab_trk = L.rh + 1                                  -- 12 ноя: у трекера — без зазора над подписью (кнопки угла выше)
   M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.hint_trk = (state.hints and state.hintpos == 'tabs') and (L.rh + 1) or nil   -- 15 окт: tabs — подсказки в строке вкладок; у трекера вкладок нет — его строка внизу
   M.tabw = function(id) return ms(D.ic(id, D.plabel(id))) end
@@ -7940,7 +7941,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   D.pane_tabs = function(c, id, fon)
       if c.tab then
         local th = c.tab.h
-        local G0 = D.TABGAP or 0
+        local G0 = (th < L.rh + 2 + (D.TABGAP or 0)) and 0 or (D.TABGAP or 0)   -- 12 ноя: низкая строка трекера — без зазора
         -- 19 окт: над вкладками — G0 px пустоты (фон окна); вкладка — рамка сверху и с боков, линия панели — под вкладками,
         -- выбранная вкладка открыта вниз (её фон поверх линии) — как настоящая вкладка
         local tyt, tth = c.y + G0, th - G0

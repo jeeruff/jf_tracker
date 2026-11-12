@@ -6214,6 +6214,7 @@ ctx = {
       elseif dir == 'u' then r[4] = math.floor(c.h / 2) else r[2] = c.y + math.floor(c.h / 2); r[4] = c.h - math.floor(c.h / 2) end
       return { kind = 'split', at = at, dir = dir, rect = r }
     end
+    if draw.panes.base(at) == 'tracker' and not mine then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: в середину трекера — раскрыть, как zz
     if mine or at == 'tracker' then return nil end
     return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
   end,
