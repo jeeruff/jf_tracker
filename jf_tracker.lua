@@ -5153,7 +5153,11 @@ ctx = {
   QUICK_ALIAS = { hints = 'q_hints', steplisten = 'q_listen', scopes = 'q_scopes', hdrin = 'q_input', captions = 'q_captions', itemnames = 'q_names',
     wavemode = 'q_wave', itemcol = 'q_colors', envs = 'q_envs', meters = 'q_meters', dsp = 'q_dsp', side = 'q_side', preview = 'q_preview',
     tlruler = 'q_ruler', keycast = 'q_keys', endstop = 'q_endstop' },
-  quick_str = function() return state.quick or ctx.QUICK_DEFAULT end,
+  quick_str = function()
+    local q = state.quick or ctx.QUICK_DEFAULT
+    if not q:find('q_inputs', 1, true) then q = q:gsub('q_hints', 'q_hints,q_inputs', 1) end   -- 13 ноя: inputs — в быстрых опциях и у своего набора
+    return q
+  end,
   quick_has = function(key)
     local id = ctx.QUICK_ALIAS[key] or key
     for x in ctx.quick_str():gmatch('[^,|]+') do if x == id then return true end end
@@ -5182,7 +5186,7 @@ ctx = {
   end,
   -- клетки быстрых опций, которых нет среди встроенных: подпись и вкл из списка Options
   quick_generic = function()
-    local out, BUILT = {}, { q_mx = 1, q_ruler = 1, q_hints = 1, q_listen = 1, debug = 1, q_scopes = 1, q_input = 1, q_captions = 1, q_names = 1, q_wave = 1,
+    local out, BUILT = {}, { q_inputs = 1, q_mx = 1, q_ruler = 1, q_hints = 1, q_listen = 1, debug = 1, q_scopes = 1, q_input = 1, q_captions = 1, q_names = 1, q_wave = 1,
       q_colors = 1, q_envs = 1, q_meters = 1, q_dsp = 1, q_side = 1, q_preview = 1, q_keys = 1, oneclick = 1, autofocus = 1, perf = 1, follow = 1, lock = 1, fixed = 1, xfade = 1, q_endstop = 1, q_font = 1 }
     local need = {}
     for x in ctx.quick_str():gmatch('[^,|]+') do if not BUILT[x] then need[x] = true end end
@@ -18475,6 +18479,14 @@ ctx.in_data = function()
   end
   return rows, ctx.in_cols
 end
+-- 13 ноя: панель inputs — показать вкладкой у main (ctrl) и фокус / спрятать
+ctx.inputs_toggle = function()
+  local m, PN = state.panes, draw.panes
+  if not m then vim.msg = 'inputs: panes are off (options: panes)'; return end
+  if PN.visible(m, 'inputs') then ctx.pane_do(function() return PN.hide(m, 'inputs') end, 'inputs hidden'); return end
+  ctx.pane_do(function() return PN.show(m, 'inputs') end, 'inputs: the input of every track (a tab beside main)')
+  ctx.pane_focus('inputs')
+end
 ctx.in_apply = function(op)
   local rows, cols = ctx.in_data()
   local c = op.c and cols[op.c]
@@ -23934,6 +23946,7 @@ function ctrl_action(name, delta)
   elseif name == 'q_envs' then if delta == 0 then ctx.toggle_envs() end
   elseif name == 'q_scopes' then if delta == 0 then ctx.toggle_scopes() end
   elseif name == 'q_hints' then if delta == 0 then state.hints = not state.hints end
+  elseif name == 'q_inputs' then if delta == 0 then ctx.inputs_toggle() end   -- 13 ноя: панель inputs — вкладкой у main
   elseif name == 'q_keys' then if delta == 0 then ctx.kc_menu() end   -- 6 ноя: меню — где keys / keycaster
   elseif name == 'q_listen' then if delta == 0 then state.steplisten = not state.steplisten; vim.msg = 'step listen ' .. (state.steplisten and 'on: moving the cursor plays the row' or 'off') end
   elseif name == 'q_sidel' or name == 'q_sider' then   -- browser < > (7 окт): браузер слева над… под матрицей / справа
@@ -24022,7 +24035,13 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
-  elseif name == 'loom' then ctx.loom_cmd(state.loom and 'off' or 'man')   -- 12 ноя: вкл (man) / выкл; Opt+щелчок — auto
+  elseif name == 'loom' then   -- 13 ноя: выпадашка: man / auto / next / off
+    vim.open_hydra({ title = 'loom' .. (state.loom and (' - ' .. state.loom) or ' - off'), items = {
+      { key = 'a', label = 'auto - the pattern loops, edits go straight in' .. (state.loom == 'auto' and '  (on)' or ''), fn = function() ctx.loom_cmd('auto') end },
+      { key = 'm', label = 'man - Opt+Enter / next makes the next turn a new pattern' .. (state.loom == 'man' and '  (on)' or ''), fn = function() ctx.loom_cmd('man') end },
+      { key = 'n', label = 'next turn now (man)', fn = function() if state.loom ~= 'man' then ctx.loom_cmd('man') end; ctx.loom_next() end },
+      { key = 'o', label = 'off', fn = function() ctx.loom_cmd('off') end } } })
+    state.popup_at = { kind = 'ctrlbtn', name = 'loom' }
   elseif name == 'loomnext' then if state.loom == 'man' then ctx.loom_next() elseif state.loom then ctx.loom_cmd('man') else ctx.loom_cmd('auto') end
   elseif name == 'human' then ctx.human_menu()   -- 31 окт: щелчок — снова меню (вкл / выкл — o в нём, unhuman — u)
   elseif name == 'velbar' then
@@ -25923,7 +25942,7 @@ local function frame()
       q_names = state.itemnames, q_colors = state.itemcol, q_input = state.hdrin ~= false, q_preview = state.preview, q_endstop = state.endstop, q_captions = state.captions,
       q_keys = state.keycast, q_listen = state.steplisten,
       q_font_lbl = ('font x%s'):format(tostring(state.fontscale or 2):gsub('%.0$', '')),   -- 1 ноя: font − +
-      q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
+      q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_inputs = state.panes and draw.panes.visible(state.panes, 'inputs') or false, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       ptabs = state.ptabs and ctx.ptabs_info() or nil,   -- 12 ноя: опрос 4 Гц (был перебор проектов каждый кадр)
@@ -27136,7 +27155,7 @@ local function frame()
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
-  elseif hover.ctrl == 'loom' then state.status = 'loom: the cursor pattern loops while you weave it - click: on (man) / off (:loom)'
+  elseif hover.ctrl == 'loom' then state.status = 'loom: the cursor pattern loops while you weave it - click: auto / man / next / off'
   elseif hover.ctrl == 'loomnext' then state.status = state.loom == 'man' and 'loom man: the next turn as a new pattern after this one, the loop moves there (Opt+Enter)' or (state.loom == 'auto' and 'loom auto: just loops - click: man' or 'loom off - click: loom auto (just loops)')
   elseif hover.ctrl == 'human' then state.status = ('human %d%%%s: small random timing, pitch, volume of what you write - click: menu (on / off, amount, u unhuman)'):format(state.human or 0, state.unhuman and ', unhuman' or '')
   elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - its menu: on / off, grid, strength, direction, note-offs'
@@ -27213,6 +27232,7 @@ local function frame()
       q_hints = 'hints: every module shows its main keys in its tab row, the status explains what is under the mouse',
       q_listen = 'listen: moving the cursor plays the row under it (step listen)',
       debug = 'debug: writes keys with their handler, clicks and errors to REAPER/jf_tracker_debug.log, and shows the dev notes tab',
+      q_inputs = 'inputs: the record input of every track as a grid - a tab beside main (Ctrl+W g j)',
       q_scopes = 'scopes: a small oscilloscope in every track header (a bridge plugin on the tracks and the master)',
       q_input = 'input: the input row in the track headers - what the track records from (audio / MIDI)',
       q_captions = 'col names: the name row over the note / vol / fx columns of every track',
@@ -29026,10 +29046,7 @@ local function frame()
     elseif hover.rghead then ctx.rg_head_menu()                         -- 20 окт: шапка паттерна справа от мастера
     elseif hover.viewbtn == 'markers' then ctx.markers_menu()          -- 11 окт: уголок — markers
     elseif hover.viewbtn == 'mixer' then ctx.toggle_mixer()   -- 31 окт: кнопка mixer в уголке
-    elseif hover.viewbtn == 'inputs' then   -- 11 ноя: панель inputs — показать (и фокус) / спрятать
-      local m = state.panes
-      if m and draw.panes.visible(m, 'inputs') then ctx.pane_do(function() return draw.panes.hide(m, 'inputs') end, 'inputs hidden')
-      elseif m then ctx.pane_do(function() return draw.panes.show(m, 'inputs') end, 'inputs: the input of every track'); ctx.set_focus('inputs') end
+    elseif hover.viewbtn == 'inputs' then ctx.inputs_toggle()   -- 11 ноя: панель inputs — показать (и фокус) / спрятать
     elseif hover.viewbtn == 'fitw' then ctx.fit_width()
     elseif hover.viewbtn == 'fith' then ctx.fit_height()
     elseif hover.viewbtn == 'viewmenu' then ctx.view_menu()   -- 4 ноя: кнопка view — линейки, вид трекера, экран

@@ -4588,7 +4588,7 @@ end
 D.CTRL_QL = { q_mx = 'matrix', q_ruler = 'ruler', q_hints = 'hints', q_listen = 'listen', debug = 'debug', q_scopes = 'scopes',
   q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
   q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
-  autofocus = 'autofocus', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
+  autofocus = 'autofocus', q_inputs = 'inputs', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
 D.CTRL_SZ = { q_keys = { sizer = true }, q_font = { sizer = { { '-', 'q_fontm' }, { '+', 'q_fontp' } } },
   q_side = { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } },   -- browser < > (7 окт): слева / справа
   mixer = { sizer = { { '^', 'q_mixup' }, { 'v', 'q_mixdn' } } } }   -- mixer ^ v (8 окт): над / под трекером

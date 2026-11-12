@@ -46,7 +46,7 @@ PN.PANELS = {
   { id = 'keycaster',  label = 'keys',       key = 'K', hint = 'keycaster', side = 'right' },   -- 6 ноя: keys — клавиатура нот; панелью или в транспорте (опция keys)
   { id = 'qwerty',     label = 'qwerty',     key = 'Q', hint = 'qwerty',  side = 'right' },   -- 6 ноя: keycaster — нажатые клавиши горят и гаснут
   { id = 'phrases',    label = 'phrases',    key = 'F', hint = 'phrases', side = 'right' },
-  { id = 'inputs',     label = 'inputs',     key = 'j', hint = 'inputs',  side = 'right' },   -- 11 ноя: входы всех треков матрицей   -- 31 окт: фразы проекта (ph:NAME)
+  { id = 'inputs',     label = 'inputs',     key = 'j', hint = 'inputs',  side = 'right', stack = 'ctrl' },   -- 13 ноя: по умолчанию — вкладкой у main   -- 11 ноя: входы всех треков матрицей   -- 31 окт: фразы проекта (ph:NAME)
   { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
   { id = 'help',       label = 'help',       key = 'I', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
@@ -686,6 +686,7 @@ function PN.show(model, id, at, share)
   if PN.visible(model, id) then return false end   -- 12 ноя: буфер 'dsp#2' в hidden не числится — по дереву
   local p = PN.BY[id]
   if not p then return false end
+  if not at and p.stack and PN.find(model, p.stack) then return PN.stack(model, id, p.stack) end   -- 13 ноя: своё место — вкладкой у соседа
   return PN.split(model, at or 'tracker', id, SIDE_DIR[p.side] or 'd', share or 0.25)
 end
 function PN.toggle(model, id, at, share)

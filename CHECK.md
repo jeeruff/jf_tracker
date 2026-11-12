@@ -2683,3 +2683,5 @@
 - :loom man (default) / auto / off: the cursor pattern loops and plays; man - Opt+Enter copies it after itself as a new pattern and the loop moves there (u undoes); auto - just loops; mode word LOOM MAN / AUTO
 - a pane put onto the tracker (Ctrl+W T + letter on the tracker, or its tab dragged onto the tracker) opens over the whole window as zz; zz brings the layout back
 - corner buttons phr pat sec prj: phr shows the phrase (lib pick / under the cursor / the first) - its source past =END, looped and playing area set; pat / sec / prj leave it; proj is now prj
+- quick option inputs (main, after hints): shows the inputs pane as a tab beside main, focus there; again - hides; Ctrl+W g j / the corner button do the same
+- loom button: a menu - a auto, m man, n next turn, o off
