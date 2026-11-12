@@ -18353,6 +18353,25 @@ ctx.ain_tick = function()
         local M = state.focus == 'reform' and ctx.RF or state.focus == 'humanizer' and ctx.HU or nil
         if M and press then M.sel = math.max(1, math.min(#M.ROWS, M.sel + (e.target == 'next' and 1 or -1))) end
       elseif e.target == 'enter' then if press then ctx.keyq[#ctx.keyq + 1] = 13 end
+      elseif e.target:sub(1, 8) == 'pattern:' then   -- 12 ноя: паттерны песни с контроллера — через pad_launch (keyspat: quant / sudden)
+        local list, what = ctx.pad_list(), e.target:sub(9)
+        local n = #list
+        if n > 0 then
+          local cur   -- играющий паттерн (его место в списке, с нуля); стоим — nil
+          if reaper.GetPlayState() & 1 == 1 then
+            local rg = pooled.region_at(regions, reaper.GetPlayPosition())
+            if rg then for i, r in ipairs(list) do if r.name == rg.name then cur = i - 1; break end end end
+          end
+          local k
+          if what == 'pick' then
+            if e.mode == 0 or e.mode == -1 then k = math.floor(e.val / math.max(1, e.res or 127) * (n - 1) + 0.5)
+            else local d = ctx.AIN.delta(e.mode, e.val); if d ~= 0 then k = (cur or -1) + (d > 0 and 1 or -1) end end
+          elseif press then k = (cur or -1) + (what == 'next' and 1 or -1) end
+          if k then
+            k = (what == 'pick' and (e.mode == 0 or e.mode == -1)) and math.max(0, math.min(n - 1, k)) or (k % n)
+            if k ~= cur then ctx.pad_launch(k) end
+          end
+        else vim.msg = 'controller: no patterns in the song' end
       elseif e.target:sub(1, 7) == 'slicer:' then
         local id = e.target:sub(8)
         local knob = id == 'zone_start' or id == 'zone_end' or id == 'zone_move' or id == 'sens' or id == 'vol' or id == 'inst'

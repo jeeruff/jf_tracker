@@ -47,6 +47,10 @@ AI.ACTIONS = {
   { file = 'slice_depot', target = 'slicer:depot', label = 'slicer: selection to the lib (button)' },
   { file = 'slice_norm', target = 'slicer:norm', label = 'slicer: normalize (button)' },
   { file = 'slicer', target = 'slicer:slicer', label = 'slicer: open on the instrument (button)' },
+  -- паттерны песни (12 ноя): ручка выбирает по списку, кнопки — соседний; играют как keyspat (quant / sudden)
+  { file = 'pat_pick', target = 'pattern:pick', label = 'patterns: pick a pattern of the song by the knob (plays as keyspat: quant / sudden)' },
+  { file = 'pat_next', target = 'pattern:next', label = 'patterns: the next pattern of the song (button)' },
+  { file = 'pat_prev', target = 'pattern:prev', label = 'patterns: the previous pattern of the song (button)' },
   { file = 'play', target = 'slicer:play', label = 'transport: play / stop (button)' },
 }
 

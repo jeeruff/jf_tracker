@@ -2668,3 +2668,4 @@
 - phrase trigger note: inst field = the phrase number from the lib (phrases section), no " and no amber box / name over the item; copies stay as ghosts
 - phrase trigger: a " at the top-left and the bottom-right corner of the item (amber), no box
 - phrase copies: no SL00 (loop off is their norm, as for slices)
+- :learn: pattern actions - a knob picks a pattern of the song (plays as keyspat quant / sudden), next / prev buttons; while stopped next starts the first
