@@ -25480,6 +25480,7 @@ local function frame()
   if ctx.vl_on then left = 'VIPER ' .. left end   -- 9 ноя: VIPER — только когда слой работает (клавиши из окна REAPER); в трекере — обычный режим
   if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
+  if state.loom then left = 'LOOM ' .. state.loom:upper() .. ' ' .. left end   -- 12 ноя
   if state.focus == 'tracker' and state.keyphr and vim.mode == 'normal' then left = 'PHRASEKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end   -- 12 ноя
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
   end
@@ -32207,6 +32208,9 @@ local function frame()
        and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') and not (state.ptmode and (vim.cur.field or 1) == 1) then   -- 1 ноя: PT-mode — Enter на поле ноты вставляет строку (vim); в остальных — как было
       -- 12 ноя: Enter на ноте-триггере фразы — фраза во втором трекере (открыть / переключить), иначе smart
       if not ctx.t2_open_phrase(ctx.phrase_at_cursor()) then vim.smart() end; c = 0
+    elseif c == 13 and m.alt and not (m.ctrl or m.cmd or m.shift) and state.loom == 'man' and state.focus == 'tracker' and not vim.picker and not vim.hydra
+       and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      ctx.loom_next(); c = 0   -- 12 ноя: loom man — следующий виток новым паттерном
     end
   end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
@@ -39932,6 +39936,33 @@ ctx.sec_show = function(sc)
   local r1 = model.row_of_time(sc.rgnend, state.lpb)
   ctx.set_focus('tracker')
   vim.msg = ('section %s in the tracker: %d rows%s (proj in the corner - the whole track)'):format(sc.name or '', math.floor(r1 - r0 + 0.5), (r1 - r0) > (L.nrows or 0) and ' - more than fit, scroll' or '')
+end
+-- 12 ноя: loom (PLAN_LOOM.md) — паттерн курсора крутится по кругу, трек ткётся правками на ходу.
+-- auto — просто крутит (правки сразу в паттерне); man — Opt+Enter: копия паттерна следом (новое имя), луп и курсор — на неё
+ctx.loom_cmd = function(arg)
+  arg = (arg or ''):match('%a+') or ''
+  if arg == 'off' or (arg == '' and state.loom) then
+    state.loom = nil; reaper.GetSetRepeat(0); vim.msg = 'loom off'; return
+  end
+  local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+  if not rg then vim.msg = 'loom: put the cursor in a pattern'; return end
+  state.loom = (arg == 'auto' or arg == 'man') and arg or (state.loom or 'man')
+  ctx.mx_loop_span(rg.pos, rg.rgnend); reaper.GetSetRepeat(1)
+  if reaper.GetPlayState() & 1 == 0 then reaper.SetEditCurPos(rg.pos, false, false); reaper.OnPlayButton() end
+  vim.msg = ('loom %s: %s loops; %s'):format(state.loom, rg.name or '', state.loom == 'man' and 'Opt+Enter - the next turn as a new pattern after it' or 'edits go straight into it')
+end
+ctx.loom_next = function()
+  local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
+  if not rg then vim.msg = 'loom: no pattern at the cursor'; return end
+  local t1
+  ctx.slot_op('loom: next turn of ' .. (rg.name or ''), function() t1 = ctx.sec_insert(rg, rg.rgnend, false) end)
+  ctx.mx_refresh()
+  if not t1 then return end
+  ctx.mx_loop_span(rg.rgnend, t1)
+  vim.cur.row = math.floor(model.row_of_time(rg.rgnend, state.lpb) + 1e-6)
+  state.row0 = math.max(0, vim.cur.row - 2)
+  local nrg = pooled.region_at(regions, rg.rgnend + 1e-4)
+  vim.msg = ('loom: %s -> %s (the loop is on it; u - undo)'):format(rg.name or '', nrg and nrg.name or 'new')
 end
 ctx.sec_repeat = function(sc, linked)
   local nm = ctx.sec_free_name(sc.name)

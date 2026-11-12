@@ -464,7 +464,7 @@ eq('latin passthrough', keys.translate(104), 104)
 
 -- ── : подсказка и Tab, / поиск, hydra ─────────────────────────────────────
 reset()
-keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); local nm = 0; for _, ln in ipairs(pp.lines) do if not ln.col then nm = nm + 1 end end; eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo, log, learn)', nm, 12); eq('palette full width', pp.full, true)
+keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); local nm = 0; for _, ln in ipairs(pp.lines) do if not ln.col then nm = nm + 1 end end; eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo, log, learn, loom)', nm, 13); eq('palette full width', pp.full, true)
 V.key(9);      eq('tab completes lpb', V.cmdline, 'lpb ')
 V.key(27)
 keysin(':');   pp = V.popup(); eq('empty palette ends with all', pp.lines[#pp.lines].key, '  all'); eq('empty palette: history section', (function() for _, ln in ipairs(pp.lines) do if ln.key:match('history$') then return true end end end)(), true)
