@@ -126,7 +126,6 @@ KH.marks_load(reaper.GetExtState('jf_tracker', 'khmarks'))   -- 18 окт: за�
 KH.on_marks = function() reaper.SetExtState('jf_tracker', 'khmarks', KH.marks_str(), true) end
 local IMP = dofile(DIR .. '/jf_tracker_import.lua')
 local NT = dofile(DIR .. '/jf_tracker_notes.lua')        -- заметки проекта / item (2 окт)      -- импорт REX / XRNI (2 окт)
-local MM = dofile(DIR .. '/jf_tracker_midimap.lua')       -- MIDI learn слайсера, вкладка midi (2 окт)
 local LG = dofile(DIR .. '/jf_tracker_lfogen.lua')        -- генератор LFO в точки / automation item (2 окт)
 local LOGO = dofile(DIR .. '/jf_tracker_logo.lua')        -- логотипы about (3 окт)
 math.randomseed(math.floor(os.time() + (reaper.time_precise() % 1) * 1e6))   -- стиль логотипа — новый от запуска к запуску
@@ -5487,7 +5486,7 @@ ctx = {
   top_tabs = function()
     -- rec — снова своя вкладка, первая (3 окт, просьба): кольцо jf_rec трека
     -- 5 окт: grid и orca (только .dev) — в самом конце
-    local t = { 'retro', 'sample', 'automation', 'modulation', 'midi', 'harm', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
+    local t = { 'retro', 'sample', 'automation', 'modulation', 'harm', 'macros', 'scopes', 'master', 'video', 'visor' }   -- 10 окт: visor   -- 10 окт: clips — снова панель   -- 9 окт: macros   -- 9 окт: video — после master   -- 8 окт: harmonizer — рядом с midi   -- 7 окт: вкладки clips нет — сессия в теле трекера (zs)
     t[#t + 1] = 'grid'   -- 15 окт: всегда (была dev-опция gridtab)
     if state.dev then t[#t + 1] = 'garden' end
     return t
@@ -12725,7 +12724,7 @@ ctx = {
   vbar_get = function(key)
     if key == 'palette' then return MX.pal_scroll or 0 end   -- 18 окт
     if key == 'lib' then return draw.pool_scroll elseif key == 'browser' then return B.scroll elseif key == 'matrix' then return MX.scroll or 0 elseif key == 'matrixh' then return MX.hs or 0
-    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0 elseif key == 'midimap' then return MM.scroll or 0
+    elseif key == 'slices' then return SPROP.slice_scroll or 0 elseif key == 'sprops' then return SPROP.scroll or 0
     elseif key == 'undotree' then return (ctx.ut_state().scroll or 0)   -- 15 окт
     elseif key == 'actions' then return ctx.AC.scroll or 0   -- 16 окт
     elseif key == 'fxb' then return FB.scroll or 0 elseif key == 'macros' then return MX.MR.scroll or 0 elseif key == 'notes' then return NT.scroll or 0 elseif key == 'keyhelp' then return KH.scroll or 0 end
@@ -12738,7 +12737,6 @@ ctx = {
     if key == 'palette' then MX.pal_scroll = v end   -- 18 окт
     if key == 'lib' then draw.pool_scroll = v elseif key == 'browser' then B.scroll = v elseif key == 'matrix' then MX.scroll = v elseif key == 'matrixh' then MX.hs = v
     elseif key == 'slices' then SPROP.slice_scroll = v elseif key == 'sprops' then SPROP.scroll = v; SPROP.sel = math.max(SPROP.sel, v + 1)
-    elseif key == 'midimap' then MM.scroll = v; MM.cur = math.max(v + 1, math.min(v + (MM.per or 1), MM.cur))   -- курсор — в видимое, иначе прокрутку вернёт
     elseif key == 'fxb' then FB.scroll = v; FB.cur = math.max(v + 1, math.min(v + (r and r.nvis or 1), FB.cur))
     elseif key == 'keyhelp' then KH.scroll = v
     elseif key == 'kitlist' then draw.kit_lscroll = draw.kit_lscroll or {}; draw.kit_lscroll[draw.kit_lkey or ''] = v   -- 19 окт
@@ -16795,8 +16793,6 @@ vim.init(ctx)
 MX.init(U, ctx)
 DK.init(ctx)
 IK.init(ctx); draw.lib_marks = IK.marks   -- 27 окт: отметки lib (m) — подсветка строк
-MM.hint = function(...) return draw.hint(...) end
-MM.vbar = function(...) return draw.vbar(...) end   -- 8 окт: скроллбар списка привязок
 MX.ruler = state.mxruler
 MX.stack = state.mxstack
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
@@ -18276,6 +18272,15 @@ ctx.ain_tick = function()
         local M = state.focus == 'reform' and ctx.RF or state.focus == 'humanizer' and ctx.HU or nil
         if M and press then M.sel = math.max(1, math.min(#M.ROWS, M.sel + (e.target == 'next' and 1 or -1))) end
       elseif e.target == 'enter' then if press then ctx.keyq[#ctx.keyq + 1] = 13 end
+      elseif e.target:sub(1, 7) == 'slicer:' then
+        local id = e.target:sub(8)
+        local knob = id == 'zone_start' or id == 'zone_end' or id == 'zone_move' or id == 'sens' or id == 'vol' or id == 'inst'
+        local a = { t = id }
+        if knob then
+          if e.mode == 0 or e.mode == -1 then a.v = math.max(0, math.min(1, e.val / math.max(1, e.res or 127))) else a.d = ctx.AIN.delta(e.mode, e.val) end
+        end
+        if knob and a.d == 0 then a = nil end
+        if a and (knob or press) then local ok, err = pcall(ctx.mm_apply, a); if not ok then vim.msg = 'controller: ' .. tostring(err):match('[^\n]*$') end end
       else
         local sl, mod, r = ctx.ain_slider(e.target)
         if sl then
@@ -18296,15 +18301,20 @@ ctx.ain_tick = function()
     end
   end
 end
--- подписи привязок из reaper-kb.ini (перечитывается раз в 3 с, пока панель спрашивает): 'reform:scale' → 'MIDI Chan 1 CC 21'
+-- подписи привязок из reaper-kb.ini (пока панель спрашивает): 'reform:scale' → 'MIDI Chan 1 CC 21'
 ctx.ain_bind = function(target)
   local now = reaper.time_precise()
-  if now - (ctx.ain_kb_t or 0) > 3 then
+  if now - (ctx.ain_kb_t or 0) > 3 then   -- файл ~2 МБ: раз в 3 с только размер, разбор — когда он сменился
     ctx.ain_kb_t = now
-    local f = io.open(RES .. '/reaper-kb.ini', 'r')
-    ctx.ain_kb = f and ctx.AIN.bindings(f:read('a')) or {}
+    local f = io.open(RES .. '/reaper-kb.ini', 'rb')
+    local sz = f and f:seek('end') or -1
+    if sz ~= ctx.ain_kb_sz then
+      ctx.ain_kb_sz = sz
+      if f then f:seek('set', 0); ctx.ain_kb = ctx.AIN.bindings(f:read('a')) else ctx.ain_kb = {} end
+    end
     if f then f:close() end
   end
+  ctx.ain_kb = ctx.ain_kb or {}
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
 ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
@@ -19912,7 +19922,6 @@ local function hint_go(t)
     ctx.set_focus('slices')
     local root = ctx.slice_root()
     if root then ctx.ssel.item = root.item; ctx.ssel.k = 0; ctx.slice_step(d) end
-  elseif t.kind == 'midirow' then state.toptab = 'midi'; ctx.set_focus('top'); MM.cur = d
   elseif t.kind == 'prevbtn' then state.poolprev = not state.poolprev
   elseif t.kind == 'insprevbtn' then state.preview = not state.preview; vim.msg = 'play on insert ' .. (state.preview and 'on' or 'off')
   elseif t.kind == 'swapbtn' then ctx.swap_click()
@@ -22471,22 +22480,11 @@ local function spec_frame(slot) return reaper.gmem_read(slot * 512 + 259) end
 -- удержания от начала строки (кривая внутри длины шага).
 local midiin = { seq = nil, held = {}, nheld = 0, row = nil, t0 = 0, wall0 = 0 }
 
--- ── MIDI learn (2 окт): ручки и пэды контроллера → слайсер ──────────────
--- Привязки — jf_tracker_midimap.lua (глобальный ExtState midimap). Ручка зоны
--- / громкости / чувствительности меняет вид сразу, а правку в проект пишет
--- одну, через полсекунды тишины (иначе каждый тик ручки — шаг undo).
-MM.parse(reaper.GetExtState(EXT, 'midimap'))
-local function mm_save() reaper.SetExtState(EXT, 'midimap', MM.serialize(), true) end
+-- ── контроллер → слайсер (2 окт; 12 ноя — через экшены actions/ и нативный learn REAPER, своя вкладка midi
+-- убрана). a = { t = цель, v = 0..1 (ручка) | d = шаг энкодера | nil (кнопка) }. Ручка зоны / громкости /
+-- чувствительности меняет вид сразу, а правку в проект пишет одну, через полсекунды тишины (иначе каждый тик
+-- ручки — шаг undo).
 local mm_pend = {}            -- отложенные правки: zone = {…}, vol = { item, db }, retrans = true; t — время последнего тика
-local mm_devname = {}
-local function mm_dev(idx)
-  if mm_devname[idx] == nil then
-    local ok, nm = false, nil
-    if reaper.GetMIDIInputName then ok, nm = reaper.GetMIDIInputName(idx & 0xFFFF, '') end
-    mm_devname[idx] = (ok and nm) or (idx == 62 and 'virtual keyboard') or ''
-  end
-  return mm_devname[idx]
-end
 -- выбранный инструмент и (для слайса) его исходник; слайсер открыт на нужном
 local function mm_entry(open)
   local col = cur_col()
@@ -22497,7 +22495,7 @@ local function mm_entry(open)
   if open and not (SL.entry and SL.entry == want) and not (SL.entry and SL.entry.file) then
     SL.open(want, col.track)
     state.top = true
-    if state.toptab ~= 'midi' then state.toptab = 'sample' end
+    state.toptab = 'sample'
   end
   return e, p, col
 end
@@ -22544,13 +22542,6 @@ local function mm_zone(field, a)
 end
 local MM_TRIG = { eq2 = 'eq2', eq4 = 'eq4', eq8 = 'eq8', eq16 = 'eq16', eq32 = 'eq32', trans = 'trans', clear = 'clear', quant = 'quant', snap = 'snap', autotrim = 'autotrim' }
 local function mm_apply(a)
-  if a.learned then
-    mm_save()
-    local t = MM.BY_ID[a.learned]
-    vim.msg = ('learned %s: %s%s'):format(t.label, MM.bind_text(a.bind), (t.kind == 'value' and a.bind.kind == 'cc') and ' - m: abs / rel / rel64 for endless encoders' or '')
-    return
-  end
-  if a.eaten then return end
   local id = a.t
   if id == 'zone_start' or id == 'zone_end' or id == 'zone_move' then mm_zone(id, a)
   elseif id == 'sens' then
@@ -22573,15 +22564,6 @@ local function mm_apply(a)
     local col = cur_col(); local n = #(col and col.pool or {})
     if n == 0 then return end
     if a.v then pool_select(1 + math.floor(a.v * (n - 1) + 0.5)) else pool_select(vim.inst + (a.d > 0 and 1 or -1)) end
-  elseif id == 'patterns' then ctx.pad_launch(a.k - 1)   -- 1 ноя: паттерны с MIDI-пэдов (выученная нота — первый)
-  elseif id == 'pads' then
-    local e, p, col = mm_entry(false)
-    if not e or not col then return end
-    local src = (e.slices and e) or (p and p.slices and p) or nil
-    if src then
-      local k = a.k
-      if src.slices[k] then ctx.preview_slice(col.track, src, src.slices[k], src.slices[k + 1] or src.len); vim.msg = ('pad %d -> slice %d'):format(k, k) end
-    elseif e.item then PV.audio(col.track, e.item, a.k - 1); vim.msg = ('pad %d: %+d st'):format(a.k, a.k - 1) end
   elseif MM_TRIG[id] then
     local e = mm_entry(true)
     if e then SL.button(MM_TRIG[id]); vim.msg = SL.msg ~= '' and SL.msg or id end
@@ -22603,6 +22585,7 @@ local function mm_apply(a)
   elseif id == 'slicer' then state.top = true; state.toptab = 'sample'; mm_entry(true)
   elseif id == 'play' then edit.play_stop() end
 end
+ctx.mm_apply = mm_apply
 -- learn касанием: новое касание параметра этого FX в окне плагина → в модуль
 function learn_poll()
   if not dsp_learn then return end
@@ -22834,20 +22817,8 @@ local function poll_midi_in()
     fresh = rest
     if #fresh == 0 then return end
   end
-  -- MIDI learn: привязанные CC / ноты (и learn) — не дальше (2 окт)
-  do
-    local rest = {}
-    for k = #fresh, 1, -1 do
-      local b = fresh[k].buf
-      local a = MM.feed(b:byte(1), b:byte(2) or 0, b:byte(3) or 0, mm_dev(fresh[k].dev or 0))
-      if a then local ok, err = pcall(mm_apply, a); if not ok then vim.msg = 'midi: ' .. tostring(err):match('[^\n]*$') end
-      else table.insert(rest, 1, fresh[k]) end
-    end
-    fresh = rest
-    if #fresh == 0 then return end
-  end
   -- 1 ноя: patternkb включён — ноты MIDI-входа тоже запускают паттерны: C1 (36, первый пэд у большинства контроллеров)
-  -- — первый паттерн, дальше по полутонам (своя нота — MIDI learn «pattern pads» во вкладке midi)
+  -- — первый паттерн, дальше по полутонам
   if ctx.PADS and ctx.PADS.on then
     local rest = {}
     for _, ev in ipairs(fresh) do
@@ -25895,10 +25866,6 @@ local function frame()
     harm_draw = function(Lx, x, y, w, h)
       return MMX.HM.draw(Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'harm', ctx.harm_info(), ctx.fit, ctx.hint)
     end,
-    midi_draw = function(Lx, x, y, w, h)
-      local hv = MM.draw(U, Lx, x, y, w, h, state.focus == 'top' and state.toptab == 'midi', ctx.fit)
-      return hv
-    end,
     -- вкладка modulate (2 окт): нативная матрица модуляции + генератор кривых
     -- (lfo / premod = Anticipate / follow). Широко — рядом, узко — страницы
     -- [matrix] [curves] (L переключает)
@@ -26881,9 +26848,6 @@ local function frame()
   elseif hover.video then state.status = hover.video.tip or 'video'
   elseif hover.visor then state.status = hover.visor.tip or 'visor'
   elseif hover.harm then state.status = ({ root = 'key: tonic down / up (h l)', mode = 'major / minor (m)', auto = 'guess the key from the notes of the track (a)', lane = 'the track as one chord lane (c, :chord)', tr = 'transposer (T, :tr): semitones, octaves, degrees of the key, to the chord of the row, just intonation; listen - hear the selection moved', deg = 'write this chord at the cursor row (1..7, Shift - seventh)' })[hover.harm.kind] or ''
-  elseif hover.midimap then
-    local t = MM.TARGETS[hover.midimap.row]
-    state.status = t and (t.label .. ': ' .. t.d .. (hover.midimap.btn == 'mode' and ' - click: abs / rel / rel64' or ' - click: select, click again / Enter: learn, d: clear')) or ''
   elseif hover.mm and hover.mm.strip then state.status = ({ shape = 'LFO shape (turns L1 on)', toggle = 'group on / off: L1 = LFO, ENV = audio follower, LNK = link', slider = 'drag: value (one undo on release)' })[hover.mm.strip]
   elseif hover.mm then
     local c = MMX.COLS[hover.mm.col]
@@ -28580,13 +28544,6 @@ local function frame()
     elseif hover.harm then
       ctx.set_focus('top'); ctx.harm_do(MMX.HM.click(hover.harm, ctx.harm_pitches(cur_col())))
       click = { t = now2, zone = 'harm' }
-    elseif hover.midimap then
-      ctx.set_focus('top')
-      local i = hover.midimap.row
-      if hover.midimap.btn == 'mode' then MM.cur = i; if MM.key(('m'):byte()) == 'save' then mm_save() end
-      elseif MM.cur == i then MM.key(13)          -- второй клик по строке — learn
-      else MM.cur = i end
-      click = { t = now2, zone = 'midimap' }
     elseif lfo_hover and lfo_hover.acv_new and state.top and state.toptab == 'automation' then
       -- 24 окт: параметр DSP без огибающей — щелчок по холсту: огибающая + automation item (item под курсором / такт), его редактор
       local d = lfo_hover.acv_new
@@ -31464,9 +31421,6 @@ local function frame()
     ctx.preview_set_vol(10 ^ (math.max(-40, math.min(6, db + (gfx.mouse_wheel > 0 and 1 or -1))) / 20))
     gfx.mouse_wheel = 0
   end
-  if gfx.mouse_wheel ~= 0 and hover.midimap then          -- 8 окт: колесо по списку MIDI learn — прокрутка
-    ctx.vbar_scroll('midimap', (MM.scroll or 0) + (gfx.mouse_wheel > 0 and -1 or 1)); gfx.mouse_wheel = 0
-  end
   if gfx.mouse_wheel ~= 0 and hover.trs then
     ctx.trs_nudge(hover.trs.col, hover.trs.what, gfx.mouse_wheel > 0 and 1 or -1)
     gfx.mouse_wheel = 0
@@ -33290,11 +33244,6 @@ local function frame()
         elseif state.toptab == 'harm' then
           local r = MMX.HM.key(c, ctx.harm_pitches(cur_col()))
           if r then ctx.harm_do(r) else return vim.key(c) end
-        elseif state.toptab == 'midi' then
-          local r = MM.key(c)
-          if r == 'leave' then ctx.set_focus('tracker')
-          elseif r == 'save' then mm_save()
-          elseif not r then return vim.key(c) end
         elseif state.toptab == 'automation' and c == 67 and mod_pane ~= 'curve' then mod_pane = 'curve'; vim.msg = 'curve: the canvas - h l row, j k value, v range, s t q r f n shapes, Tab curve, P params, L curves'   -- 15 окт: C — холст
         elseif state.toptab == 'automation' and c == 77 and mod_pane ~= 'mod' then mod_pane = 'mod'; vim.msg = 'mod: the modulation of the track (LFO / audio follower / link) - a add, x remove, Enter toggle, o w windows; P params, C curve, L shape'   -- 18 окт: M — модуляция
         elseif state.toptab == 'automation' and mod_pane == 'mod' and c ~= 80 and c ~= 76 and c ~= 67 then

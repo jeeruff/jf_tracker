@@ -4884,9 +4884,6 @@ local function draw_topbar(L, info)
   elseif tab == 'harm' then
     -- harmonizer (8 окт, jf_tracker_harm.lua): лад, ступени, аккорды трека
     if info.harm_draw then hover.harm = info.harm_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
-  elseif tab == 'midi' then
-    -- MIDI learn (jf_tracker_midimap.lua): цели слайсера и их CC / ноты
-    if info.midi_draw then hover.midimap = info.midi_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
   elseif tab == 'garden' then
     -- Garden (jf_tracker_garden.lua): лупы регион × трек и поле Orca
     if info.garden_draw then hover.garden = info.garden_draw(L, sx0, cy0, sx1 - sx0, H - cy0 - 2) end
@@ -8950,7 +8947,6 @@ function D.frame(L, snap, rows, state, info)
     hover.poolbsync = th.poolbsync or hover.poolbsync
     hover.scopemode, hover.monobtn, hover.retrobtn, hover.retro = th.scopemode, th.monobtn, th.retrobtn, th.retro
     hover.mm = th.mm
-    hover.midimap = th.midimap
     hover.notes = th.notes or hover.notes
     hover.zone = th.zone or hover.zone
     hover.garden = th.garden

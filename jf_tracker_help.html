@@ -1524,18 +1524,6 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>o</kbd> <kbd>w</kbd></td><td>fx window / native modulation window</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>back to tracker</td></tr>
 </table>
-<h3 id="keys-midi">MIDI learn (slicer from a controller)</h3>
-<table>
-<tr><td><kbd>:learn</kbd></td><td>any controller on the tracker by the native REAPER learn: the jf_tracker actions (slider under the cursor, next / prev, Enter, reform, humanizer) - MIDI CC / OSC / key in the action list, global</td></tr>
-<tr><td><kbd>j</kbd> <kbd>k</kbd> <kbd>g</kbd> <kbd>G</kbd></td><td>target down / up / first / last</td></tr>
-<tr><td><kbd>Enter</kbd> <kbd>l</kbd></td><td>learn: the next CC / note becomes the binding (Esc cancels)</td></tr>
-<tr><td><kbd>d</kbd> <kbd>x</kbd> <kbd>BS</kbd></td><td>clear binding</td></tr>
-<tr><td><kbd>m</kbd></td><td>knob mode: abs 0..127 / rel (1..63 up, 65..127 down) / rel64 (64 +- n)</td></tr>
-<tr><td><kbd>knobs</kbd></td><td>slice start / end / move, sensitivity, volume, instrument - edits land 0.5 s after the knob stops (one undo)</td></tr>
-<tr><td><kbd>pads</kbd></td><td>learned note = the whole sample, next notes = slices 1 2 3 … (preview)</td></tr>
-<tr><td><kbd>buttons</kbd></td><td>equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play</td></tr>
-<tr><td><kbd>Esc</kbd></td><td>back to tracker</td></tr>
-</table>
 <h3 id="keys-grid">monome grid / arc (jf_grid)</h3>
 <table>
 <tr><td><kbd>take</kbd></td><td>give the grid to the tracker module (rows 1-7: slots x tracks, row 8: transport)</td></tr>
@@ -1698,6 +1686,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>row: scale, curve, shift, redistribute, anchor (notes / selection), values on, value from / to, value curve, value mode (remap / even)</td></tr>
 <tr><td><kbd>h</kbd> <kbd>l</kbd></td><td>value (Shift: fine); on a switch row - switch it</td></tr>
 <tr><td><kbd>Space</kbd></td><td>listen: play the selection from its start (again - stop)</td></tr>
+<tr><td><kbd>:learn</kbd></td><td>a knob / button of any controller on the rows by the native REAPER learn (MIDI CC / OSC / key, global): the slider under the cursor, next / prev, Enter, scale / curve / shift; the row tip shows the binding</td></tr>
 <tr><td><kbd>0</kbd></td><td>the row back to its default</td></tr>
 <tr><td><kbd>Enter</kbd></td><td>keep the result (u - undo)</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>revert - everything as it was</td></tr>

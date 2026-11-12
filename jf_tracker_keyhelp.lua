@@ -420,6 +420,7 @@ KH.PAGES = {
     { k = 'j k', d = 'row: scale, curve, shift, redistribute, anchor (notes / selection), values on, value from / to, value curve, value mode (remap / even)' },
     { k = 'h l', d = 'value (Shift: fine); on a switch row - switch it' },
     { k = 'Space', d = 'listen: play the selection from its start (again - stop)' },
+    { k = ':learn', d = 'a knob / button of any controller on the rows by the native REAPER learn (MIDI CC / OSC / key, global): the slider under the cursor, next / prev, Enter, scale / curve / shift; the row tip shows the binding' },
     { k = '0', d = 'the row back to its default' },
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },
@@ -848,17 +849,6 @@ KH.PAGES = {
     { k = 'options', d = 'the tab can be switched off in options (grid tab) if you have no monome' },
     { k = 'Esc', d = 'back to tracker' },
   } },
-  midi = { title = 'MIDI learn (slicer from a controller)', e = {
-    { k = ':learn', d = 'any controller on the tracker by the native REAPER learn: the jf_tracker actions (slider under the cursor, next / prev, Enter, reform, humanizer) - MIDI CC / OSC / key in the action list, global' },
-    { k = 'j k g G', d = 'target down / up / first / last' },
-    { k = 'Enter l', d = 'learn: the next CC / note becomes the binding (Esc cancels)' },
-    { k = 'd x BS', d = 'clear binding' },
-    { k = 'm', d = 'knob mode: abs 0..127 / rel (1..63 up, 65..127 down) / rel64 (64 +- n)' },
-    { k = 'knobs', d = 'slice start / end / move, sensitivity, volume, instrument - edits land 0.5 s after the knob stops (one undo)' },
-    { k = 'pads', d = 'learned note = the whole sample, next notes = slices 1 2 3 … (preview)' },
-    { k = 'buttons', d = 'equal 2..32, transients, detect, clear, snap, quantize, preview, insert, to library, play' },
-    { k = 'Esc', d = 'back to tracker' },
-  } },
   autocanvas = { title = 'curve: the automation canvas - curves of the track over the bar / region / time selection, drawn from the keyboard', e = {
     { k = 'h l  { }', d = 'row (= the tracker cursor) / a grid cell; g G - the edges of the span' },
     { k = 'j k  J K', d = 'the value of the active curve at the row: -/+ 1/16, Shift - 1/128 (a point is written)' },
@@ -1045,7 +1035,6 @@ KH.BARS = {
              { 'p', 'pin' }, { 'x', 'clear' } },
   orca = { { 'arrows', 'move' }, { 'A-Z', 'operator' }, { '!', 'bang' }, { '.', 'erase' }, { 'Space', 'play' }, { 'Esc', 'back' } },
   grid = { { 'take', 'grid to tracker' }, { 'grid', 'back to mixer' }, { 'Esc', 'back' } },
-  midi = { { 'j k', 'target' }, { 'Enter', 'learn' }, { 'd', 'clear' }, { 'm', 'abs/rel' }, { 'Esc', 'back' } },
   master = { { 'm', 'scope mode' }, { 'Esc', 'back' } },
   ctrl = { { 'hjkl', 'cell' }, { '+ -', 'value' }, { 'Enter', 'press' }, { 'F', 'follow' }, { 'Esc', 'back' } },   -- F: тоглы переехали сюда (5 окт)
   help = { { 'type', 'search' }, { 'Left Right', 'page' }, { 'Esc', 'back' } },
@@ -1092,7 +1081,7 @@ KH.BARS.dsp_slixer = { { 'Opt+D', 'detect' }, { 'Opt+T', 'transient' }, { 'Opt+C
   { 'Opt+E', 'midi' }, { 'Opt+N', 'names' }, { 'Opt+B', 'arp' }, { 'Shift+Opt+J K', 'preset' }, { 'ze', 'window' }, { 'h l', 'fx' } }
 KH.BARS.dsp_container = { { 'h l', 'fx' }, { 'c= c|', 'parallel / serial' }, { 'cc', 'pack' }, { 'cf', 'fold' }, { 'cv', 'grid / list' },
   { 'cb', 'bands' }, { 'zr', 'router' }, { 'P', 'pin ★' }, { 'Z', 'menu' }, { 'dd', 'delete' } }
-KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'midi', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
+KH.ORDER = { 'intro', 'pane', 'ctrl', 'tracker', 'insert', 'matrix', 'playlist', 'inst', 'slices', 'tracks', 'clipboard', 'browser', 'map', 'pm', 'dsp', 'slixer', 'container', 'console', 'fxb', 'notes', 'undotree', 'actions', 'sample', 'sprops', 'nmod', 'automation', 'autocanvas', 'modulation', 'grid', 'visor', 'retro', 'garden', 'orca', 'master', 'help' }
 
 -- токены записи (кэш)
 local function toks(e)

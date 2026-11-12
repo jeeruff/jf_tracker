@@ -5,6 +5,7 @@ V.VERSION = '0.9.4'
 V.DATE = '2026-11-05'
 V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
+    'midi tab (own MIDI learn of the slicer) removed: its knobs and buttons are jf_tracker actions now (:learn)',
     ':learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer',
     'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',
     ':debug share - a debug log safe to post: names, paths and your own text are replaced',
