@@ -1,5 +1,8 @@
 # Проверить (dev notes — пополняет Claude)
 
+## 12 ноя — frame cost: info table / ctrl pane
+- jftop: 'pre: info table' and 'pane: ctrl' should drop; project tabs row (ptabs) refreshes at 4 Hz: switch a project tab, dirty `*` after an edit, punch / pre-roll buttons, smart input button (file appears / disappears within 1 s), quick options widths after :font / bold change
+
 ## 30 окт — JOG: столбики в клетках, направление
 - Оверлея нет: новые значения шагов — столбиками янтарём прямо в клетках лейна PB / CC (с числом) или огибающей (столбик и точка); текущий шаг ярче
 - Опция jog direction (control mode): invert (умолчание: палец вверх — дальше) / normal; шаг — полстроки движения (чувствительнее)

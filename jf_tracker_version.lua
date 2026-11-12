@@ -14,6 +14,7 @@ V.CHANGES = {
     'plugin windows over DSP (gui): only by the gui button; they follow their own track, hide behind options, other tabs and other apps, close with the tracker and give the keyboard back',
     'mixer: track names vertical in the tracker font, trnames and view buttons; zk - a folder wide with its children narrow',
     'tracker: the view button next to W H; the track scroll stops at the last track',
+    'performance: per-frame polls cached (project tabs 4 Hz, punch / pre-roll ids, smart input file, SWS check, main module label widths)',
   } },
   { v = '0.9.3', d = '2026-11-04', items = {
     'mixer router (router button): the mixer split in half - every channel with its devices next to the fader and cables in the colour of the track: sends, folders, hardware outs; drag the line to share the height',
