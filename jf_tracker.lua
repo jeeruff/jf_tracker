@@ -34630,7 +34630,7 @@ ctx.mx_btn_do = function(b)
   elseif b == 'plnext' then ctx.pl_cmd('next')
   elseif b == 'plname' then vim.open_prompt('pl name ', (ctx.pl_cur() or {}).name or '')
   elseif b == 'plplay' then if ctx.pl_playing() then ctx.pl_cmd('stop') else ctx.pl_play() end
-  elseif b == 'plwrite' then ctx.pl_write()
+  elseif b == 'plwrite' then ctx.name_pick('region', 'section over the written song (empty - none)', (ctx.pl_cur() or {}).name or '', function(nm) ctx.pl_write(nil, nm) end)   -- 12 ноя: имя секции — списка
   elseif b == 'printjumps' then ctx.print_jumps()   -- 1 ноя: кнопка в arranger
   elseif b == 'plnew' then ctx.pl_cmd('new')
   elseif b == 'pldel' then
@@ -37273,7 +37273,7 @@ ctx.pl_write = function(at, sec, steps0)
   end)
   model.invalidate(); regions = model.regions(state.lpb)
   vim.msg = at and ('seq: %d step(s) rendered into the matrix at the cursor%s (u - undo)'):format(n, (sec and sec ~= '') and (' as section ' .. sec) or '')
-    or ('seq: %d step(s) written after the song (whole ones - linked repeats; u - undo)'):format(n)
+    or ('seq: %d step(s) written after the song%s (whole ones - linked repeats; u - undo)'):format(n, (sec and sec ~= '') and (' as section ' .. sec) or '')
   return t_start, t
 end
 -- 1 ноя: печать прыжков — песня проигрывается «в уме» по ZB / ZJ (как их исполняет трекер при игре), получившийся
@@ -37430,7 +37430,7 @@ ctx.pl_cmd = function(arg)
   if arg == '' then ctx.pl_edit(); return
   elseif arg == 'play' then ctx.pl_play(); return
   elseif arg == 'stop' then ctx.PLY = nil; vim.msg = 'seq: stopped following'; return
-  elseif arg == 'write' then ctx.pl_write(); return
+  elseif w == 'write' then ctx.pl_write(nil, rest ~= '' and rest or nil); return   -- 12 ноя: :seq write NAME — и секция над записанным
   elseif arg == 'next' or arg == 'prev' then
     if #P.lists > 0 then P.cur = (P.cur - 1 + (arg == 'next' and 1 or -1)) % #P.lists + 1; ctx.pl_save() end
   elseif w == 'new' then
@@ -38665,7 +38665,7 @@ end
 ctx.chain_render = function()
   local slot = seq[MX.cur.ri]
   local at = slot and slot.pos
-  ctx.name_pick('region', 'section name for the chain (empty - none)', '', function(nm) ctx.pl_write(at, nm) end)
+  ctx.name_pick('region', 'section name for the chain (empty - none)', (ctx.pl_cur() or {}).name or '', function(nm) ctx.pl_write(at, nm) end)   -- 12 ноя: по умолчанию — имя списка
 end
 ctx.chain_draw = function(Lx, x, y, w)
   local hv = {}
