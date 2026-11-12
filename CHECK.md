@@ -2654,3 +2654,4 @@
 - zf menu: f folder, F fold/open all, p pack into this track, P new folder, u unpack; zF free item positioning
 - playlist: patterns in the source row too (ph: sources gone); seq a1b1a1b1 without spaces works
 - inputs pane (Ctrl+W g j, corner button inputs): grid tracks x inputs; Enter/click set, a all tracks, x only this one
+- :learn - registers actions/jf_tracker_*.lua, opens the action list: bind a CC to 'value of the slider under the cursor', focus reform (gr) - the knob moves the row; next / prev / Enter buttons; reform:scale direct; OSC /action too

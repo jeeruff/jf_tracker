@@ -18245,6 +18245,67 @@ end
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
 -- 11 ноя: панель inputs — входы всех треков матрицей (колонки — устройства раз в секунду: подключили / отключили)
 ctx.INP = dofile(DIR .. '/jf_tracker_inputs.lua')
+-- 12 ноя: вход с контроллера через экшены REAPER (actions/jf_tracker_*.lua, нативный MIDI / OSC learn; :learn
+-- регистрирует их и открывает список экшенов). Скрипты пишут ExtState jf_tracker/in, трекер забирает в кадре.
+ctx.AIN = dofile(DIR .. '/jf_tracker_actin.lua')
+-- цель → слайдер модуля: value — строка курсора модуля в фокусе; mod:key — строка key модуля mod (курсор на неё)
+ctx.ain_slider = function(target)
+  local mod, key = state.focus, nil
+  if target ~= 'value' then mod, key = target:match('^(%w+):(%w+)$') end
+  local M, p
+  if mod == 'reform' then M, p = ctx.RF, ctx.rf_p
+  elseif mod == 'humanizer' then M, p = ctx.HU, ctx.hum_load().v
+  else return nil, mod end
+  local i = M.sel
+  if key then for k, r in ipairs(M.ROWS) do if r.k == key then i = k end end; M.sel = i end
+  local r = M.ROWS[i]; if not r then return nil, mod end
+  return { min = r.min, max = r.max, step = r.step or 1, toggle = r.toggle, get = function() return p[r.k] end,
+    set = function(v)
+      p[r.k] = v
+      if mod == 'reform' and (r.k == 'lo' or r.k == 'hi' or r.k == 'vcurve') then p.vals = true end
+      ctx.ain_dirty = ctx.ain_dirty or {}; ctx.ain_dirty[mod] = true
+    end }, mod, r
+end
+ctx.ain_tick = function()
+  local s = reaper.GetExtState(EXT, 'in')
+  if s ~= '' then
+    reaper.SetExtState(EXT, 'in', '', false)
+    for _, e in ipairs(ctx.AIN.parse(s)) do
+      local press = e.mode == -1 or e.val >= (e.res or 127) / 2   -- кнопка: нажатие (шорткат — всегда), не отпускание
+      if e.target == 'next' or e.target == 'prev' then
+        local M = state.focus == 'reform' and ctx.RF or state.focus == 'humanizer' and ctx.HU or nil
+        if M and press then M.sel = math.max(1, math.min(#M.ROWS, M.sel + (e.target == 'next' and 1 or -1))) end
+      elseif e.target == 'enter' then if press then ctx.keyq[#ctx.keyq + 1] = 13 end
+      else
+        local sl, mod, r = ctx.ain_slider(e.target)
+        if sl then
+          if ctx.AIN.apply(sl, e.mode, e.res, e.val) then
+            local v = sl.get()
+            vim.msg = ('%s: %s %s'):format(mod, r.label, sl.toggle and (v and 'on' or 'off') or (r.fmt and r.fmt:format(v) or tostring(v)))
+          end
+        elseif e.target == 'value' then vim.msg = 'controller: no slider under the cursor (focus reform or humanizer)' end
+      end
+    end
+  end
+  local d = ctx.ain_dirty
+  if d then
+    if d.humanizer then d.humanizer = nil; ctx.hum_save() end
+    if d.reform then   -- применяется не чаще 10 раз в секунду (как слайдер мышью)
+      local now = reaper.time_precise()
+      if now - (ctx.rf_t or 0) > 0.1 then ctx.rf_t = now; d.reform = nil; ctx.rf_apply() end
+    end
+  end
+end
+-- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша)
+ctx.ain_learn = function()
+  local n = 0
+  for i, a in ipairs(ctx.AIN.ACTIONS) do
+    local id = reaper.AddRemoveReaScript(true, 0, DIR .. '/actions/jf_tracker_' .. a.file .. '.lua', i == #ctx.AIN.ACTIONS)
+    if id and id > 0 then n = n + 1 end
+  end
+  reaper.Main_OnCommand(40605, 0)
+  vim.msg = ('learn: %d jf_tracker actions in the action list - search "jf_tracker", pick one, Add... a MIDI CC / OSC / key'):format(n)
+end
 ctx.in_data = function()
   local now = reaper.time_precise()
   if not ctx.in_cols or now - (ctx.in_cols_t or 0) > 1 then ctx.in_cols = ctx.INP.columns(reaper); ctx.in_cols_t = now end
@@ -24871,7 +24932,7 @@ local function frame()
   pcall(ctx.mx_follow_tick)   -- 19 окт: матрица за курсором трекера   -- 18 окт: выборочный луп матрицы
   do   -- 8 окт: опросы с замером — вызов дольше 20 мс пишется в debug log (ищем пики)
     local function T(nm, fn, ...) local t0 = reaper.time_precise(); fn(...); local dt = (reaper.time_precise() - t0) * 1000; if dt > 20 and state.debug then ctx.dlog(('slow %s %.1f ms'):format(nm, dt)) end end
-    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in); T('rec ghost', ctx.recg_tick); T('lib guard', ctx.lib_guard)
+    T('publish_matrix', publish_matrix, playpos); T('publish_state', publish_state, is_playing); T('poll_gridkey', poll_gridkey); T('poll_cmd', poll_cmd); T('poll_midi_in', poll_midi_in); T('ain_tick', ctx.ain_tick); T('rec ghost', ctx.recg_tick); T('lib guard', ctx.lib_guard)
     T('poll_audio_in', poll_audio_in, reaper.time_precise()); T('settle_puts', settle_puts, reaper.time_precise()); T('mm_settle', mm_settle, reaper.time_precise()); T('learn_poll', learn_poll)
   end
 

@@ -5,6 +5,7 @@ V.VERSION = '0.9.4'
 V.DATE = '2026-11-05'
 V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
+    ':learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer',
     'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',
     ':debug share - a debug log safe to post: names, paths and your own text are replaced',
     'DSP: Opt+H L - the track, Opt+J K and Opt+1..0 - the instrument, as in the tracker; Shift+Opt+J K - preset, Shift+Opt+H L - preset folder; slixer lists its Option keys',

@@ -849,6 +849,7 @@ KH.PAGES = {
     { k = 'Esc', d = 'back to tracker' },
   } },
   midi = { title = 'MIDI learn (slicer from a controller)', e = {
+    { k = ':learn', d = 'any controller on the tracker by the native REAPER learn: the jf_tracker actions (slider under the cursor, next / prev, Enter, reform, humanizer) - MIDI CC / OSC / key in the action list, global' },
     { k = 'j k g G', d = 'target down / up / first / last' },
     { k = 'Enter l', d = 'learn: the next CC / note becomes the binding (Esc cancels)' },
     { k = 'd x BS', d = 'clear binding' },
