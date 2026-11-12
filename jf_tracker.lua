@@ -22923,6 +22923,7 @@ local function poll_midi_in()
     for _, ev in ipairs(fresh) do
       local st, nt, vl = ev.buf:byte(1) or 0, ev.buf:byte(2) or 0, ev.buf:byte(3) or 0
       if (st & 0xF0) == 0x90 and vl > 0 and nt >= 36 then ctx.pad_launch(nt - 36)
+      elseif (st & 0xF0) == 0xC0 then ctx.pad_launch(nt)   -- 12 ноя: Program Change N — N-й паттерн (SP-404 / педали)
       elseif not ((st & 0xF0) == 0x80 or (st & 0xF0) == 0x90) then rest[#rest + 1] = ev end
     end
     fresh = rest

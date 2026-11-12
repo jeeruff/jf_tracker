@@ -421,7 +421,7 @@ KH.PAGES = {
     { k = 'j k', d = 'row: scale, curve, shift, redistribute, anchor (notes / selection), values on, value from / to, value curve, value mode (remap / even)' },
     { k = 'h l', d = 'value (Shift: fine); on a switch row - switch it' },
     { k = 'Space', d = 'listen: play the selection from its start (again - stop)' },
-    { k = ':learn', d = 'a knob / button of any controller on the rows by the native REAPER learn (MIDI CC / OSC / key, global): the slider under the cursor, next / prev, Enter, scale / curve / shift; the row tip shows the binding' },
+    { k = ':learn', d = 'a knob / button of any controller on the rows by the native REAPER learn (MIDI CC / OSC / key, global): the slider under the cursor, next / prev, Enter, scale / curve / shift; the row tip shows the binding; OSC: /action/str _RS... and /action/<id>/cc for the value' },
     { k = '0', d = 'the row back to its default' },
     { k = 'Enter', d = 'keep the result (u - undo)' },
     { k = 'Esc', d = 'revert - everything as it was' },

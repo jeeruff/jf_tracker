@@ -9,6 +9,7 @@ V.CHANGES = {
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
     'panes as buffers: Ctrl+W D duplicates a pane with its own state - inputs, and dsp (the copy is pinned to the cursor track, the first follows the cursor); tracker next',
     'midi tab (own MIDI learn of the slicer) removed: its knobs and buttons are jf_tracker actions now (:learn)',
+    'keyspat: MIDI Program Change plays the pattern of that number',
     ':learn: patterns of the song from a controller - a knob picks, buttons next / prev (keyspat quant / sudden)',
     ':learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer',
     'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',
