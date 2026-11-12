@@ -18296,7 +18296,20 @@ ctx.ain_tick = function()
     end
   end
 end
--- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша)
+-- подписи привязок из reaper-kb.ini (перечитывается раз в 3 с, пока панель спрашивает): 'reform:scale' → 'MIDI Chan 1 CC 21'
+ctx.ain_bind = function(target)
+  local now = reaper.time_precise()
+  if now - (ctx.ain_kb_t or 0) > 3 then
+    ctx.ain_kb_t = now
+    local f = io.open(RES .. '/reaper-kb.ini', 'r')
+    ctx.ain_kb = f and ctx.AIN.bindings(f:read('a')) or {}
+    if f then f:close() end
+  end
+  for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
+end
+ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
+-- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);
+-- в фокусе reform / humanizer — подсказка называет экшен строки курсора
 ctx.ain_learn = function()
   local n = 0
   for i, a in ipairs(ctx.AIN.ACTIONS) do
@@ -18304,7 +18317,11 @@ ctx.ain_learn = function()
     if id and id > 0 then n = n + 1 end
   end
   reaper.Main_OnCommand(40605, 0)
-  vim.msg = ('learn: %d jf_tracker actions in the action list - search "jf_tracker", pick one, Add... a MIDI CC / OSC / key'):format(n)
+  local want
+  local M = state.focus == 'reform' and ctx.RF or state.focus == 'humanizer' and ctx.HU or nil
+  local r = M and M.ROWS[M.sel]
+  if r then for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == state.focus .. ':' .. r.k then want = 'jf_tracker_' .. a.file end end end
+  vim.msg = ('learn: %d jf_tracker actions in the action list - search "%s", Add... a MIDI CC / OSC / key (global, all projects)'):format(n, want or 'jf_tracker')
 end
 ctx.in_data = function()
   local now = reaper.time_precise()

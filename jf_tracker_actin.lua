@@ -70,6 +70,26 @@ function AI.apply(sl, mode, res, val)
   sl.set(v); return true
 end
 
+-- reaper-kb.ini → { [file] = 'подпись' }: SCR … RS<id> "…" "…/actions/jf_tracker_<file>.lua" даёт id скрипта,
+-- KEY <mod> <key> _RS<id> 0 # Main : <клавиша / MIDI Chan 1 CC 21 / …> : Script: … — подпись из комментария REAPER
+-- (кодировку MIDI в KEY не разбираем: REAPER сам пишет имя привязки после #)
+function AI.bindings(kb)
+  local id_of, out = {}, {}
+  for line in (kb or ''):gmatch('[^\n]+') do
+    local id, file = line:match('^SCR %d+ %d+ (RS%x+) "[^"]*" "[^"]*jf_tracker_([%w_]+)%.lua"')
+    if id then id_of[id] = file
+    else
+      local id2, rest = line:match('^KEY %d+ %d+ _(RS%x+) %d+%s*#?%s*(.*)$')
+      if id2 and id_of[id2] then
+        local name = rest:match('^[^:]+: ([^:]+) :') or rest:match('^[^:]+: (.-)%s*$') or '?'
+        name = name:gsub('%s+$', '')
+        out[id_of[id2]] = out[id_of[id2]] and (out[id_of[id2]] .. ', ' .. name) or name
+      end
+    end
+  end
+  return out
+end
+
 -- текст экшен-скрипта (actions/jf_tracker_<file>.lua)
 function AI.script(a)
   return ('-- jf_tracker: %s - an action for the native REAPER learn (MIDI CC / OSC / shortcut), 12 ноя.\n' ..

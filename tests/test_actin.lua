@@ -44,5 +44,16 @@ local s = AI.script(AI.ACTIONS[5])
 ok(s:find('get_action_context', 1, true) and s:find("'reform:scale %d %d %s\\n'", 1, true), 'script text')
 ok(#AI.ACTIONS >= 8, 'actions list')
 
+-- reaper-kb.ini → подписи: SCR даёт id, KEY — комментарий REAPER
+local kb = 'SCR 4 0 RSaa11 "Script: jf_tracker_reform_scale.lua" "jf_tracker/actions/jf_tracker_reform_scale.lua"\n' ..
+  'SCR 4 0 RSbb22 "Script: jf_tracker_value.lua" "jf_tracker/actions/jf_tracker_value.lua"\n' ..
+  'KEY 255 149 _RSaa11 0\t\t # Main : MIDI Chan 1 CC 21 : Script: jf_tracker_reform_scale.lua\n' ..
+  'KEY 1 76 _RSbb22 0\t\t # Main : L : Script: jf_tracker_value.lua\n' ..
+  'KEY 255 248 989 0\t\t # Main : Mousewheel : OVERRIDE DEFAULT : View: Scroll vertically\n'
+local b = AI.bindings(kb)
+ok(b.reform_scale == 'MIDI Chan 1 CC 21', 'binding midi ' .. tostring(b.reform_scale))
+ok(b.value == 'L', 'binding key ' .. tostring(b.value))
+ok(b.next == nil and next(AI.bindings('')) == nil, 'no binding')
+
 print(('test_actin: %d checks, %d failed'):format(n, fail))
 os.exit(fail == 0 and 0 or 1)

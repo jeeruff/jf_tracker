@@ -178,7 +178,8 @@ function RF.draw(U, L, p, info, x, y, w, h, focus, mx, my)
   -- 21 окт: подсказка строки под мышью (иначе выбранной) — что она делает
   local tipr = RF.ROWS[hv.row or (focus and RF.sel) or 0]
   if tipr and tipr.tip and yy + 2 * rh + 4 <= y + h then
-    U.text(x + pad, y + h - rh - 2, (RF.fit or function(t) return t end)(tipr.label .. ': ' .. tipr.tip, w - 2 * pad), U.GREY)
+    local b = RF.bind and RF.bind(tipr.k)   -- 12 ноя: привязка контроллера (нативный learn REAPER) — в конце подсказки
+    U.text(x + pad, y + h - rh - 2, (RF.fit or function(t) return t end)(tipr.label .. ': ' .. tipr.tip .. (b and (' · ' .. b) or ''), w - 2 * pad), U.GREY)
   end
   if yy + rh + 2 <= y + h then
     local bx = x + pad
