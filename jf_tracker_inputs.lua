@@ -70,6 +70,7 @@ function IN.draw(U, L, rows, cols, x, y, w, h, focused, mx, my, fit, xs)
     local lhot = mx >= x and mx < x + nw and my >= ry and my < ry + L.rh
     U.text(x + L.pad, ry, fit(c.label, nw - 2 * L.pad), lhot and U.AMBER or (k == IN.c and focused and U.AMBER or kcol))
     if lhot then hv = { all = k } end
+    if IN.hint then IN.hint('in', x + L.pad, ry, nw - 2 * L.pad, L.rh, { c = k }) end   -- 13 ноя: метки f — на вход
     for i, g in pairs(tx) do
       local on = col_of(cols, rows[i].v) == k
       local hot = mx >= g.x and mx < g.x + g.w and my >= ry and my < ry + L.rh
@@ -77,6 +78,7 @@ function IN.draw(U, L, rows, cols, x, y, w, h, focused, mx, my, fit, xs)
       if on then U.set(U.tint(kcol, 0.45)); gfx.rect(g.x + 1, ry + 1, g.w - 2, L.rh - 2, 1) end
       U.set(cur and U.AMBER or (hot and U.TEXT or U.LINE)); gfx.rect(g.x + 1, ry + 1, g.w - 2, L.rh - 2, 0)
       if hot then hv = { r = i, c = k } end
+      if IN.hint then IN.hint('in', g.x + 1, ry, g.w - 2, L.rh, { r = i, c = k }) end   -- 13 ноя: метки f — на клетку
     end
   end
   return hv

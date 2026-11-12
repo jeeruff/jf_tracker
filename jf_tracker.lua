@@ -18362,6 +18362,7 @@ end
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
 -- 11 ноя: панель inputs — входы всех треков матрицей (колонки — устройства раз в секунду: подключили / отключили)
 ctx.INP = dofile(DIR .. '/jf_tracker_inputs.lua')
+ctx.INP.hint = function(...) return ctx.hint(...) end   -- 13 ноя: метки f в панели inputs
 -- 12 ноя: буферы панелей (PLAN_BUFFERS.md, шаг 1): модуль + состояние; буфер 1 = таблица модуля, 'inputs#2' —
 -- второй экземпляр с подменой полей (B.with). Регистрация называет поля состояния; роутер и раскладка — шаг 3.
 ctx.BUF = dofile(DIR .. '/jf_tracker_buffers.lua')
@@ -20173,6 +20174,10 @@ local function hint_go(t)
     if e and e.item and not (SL.active and SL.entry and SL.entry.item == e.item) then SL.open(e, cur_col() and cur_col().track) end
     SL.button(d)
   elseif t.kind == 'rf' then ctx.rf_click(d)
+  elseif t.kind == 'in' then   -- 13 ноя: метка f в inputs — курсор на клетку / вход (Enter — поставить, a — всем)
+    ctx.set_focus(draw.panes.base(state.focus) == 'inputs' and state.focus or 'inputs')
+    if d.r then ctx.INP.r = d.r end; ctx.INP.c = d.c
+    vim.msg = 'inputs: Enter - this input for the track, a - for every track'
   elseif t.kind == 'rd' then ctx.rd_click(d)
   elseif t.kind == 'dspkit' then draw.kit_sel = draw.kit_sel or {}; draw.kit_sel[d.key] = d.ki; ctx.set_focus('dsp')   -- 11 окт: fx routing (колонка кнопок DSP)
   elseif t.kind == 'hdrfx' or t.kind == 'hdrinst' or t.kind == 'hdrsend' then ctx.hdr_pick(t.kind == 'hdrfx' and 'fx' or (t.kind == 'hdrinst' and 'inst' or 'send'), d.col, d.k)

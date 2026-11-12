@@ -2687,3 +2687,4 @@
 - loom button: a menu - a auto, m man, n next turn, o off
 - Ctrl+W a / p / e / f / i - a menu of panes by category (a i = inputs, a d = dsp, p m = matrix, e r = reform, f l = lib, i h = help …); g + letter still opens a pane by its own letter (g a automation, g p pm, g f fx, g i item, g e properties)
 - inputs pane turned: rows = inputs, columns = tracks; j k input, h l track; put it under the tracker (stack with dsp / mixer) - its columns line up with the tracker tracks
+- f jumps reach the inputs pane: a label on every cell and input name; the jump puts the cursor there (Enter sets, a - every track)
