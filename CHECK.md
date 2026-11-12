@@ -2662,3 +2662,4 @@
 - midi tab gone: slicer knobs / buttons are actions (slicer: slice start / end / move, sensitivity, volume, instrument, eq2..32, transients …) via :learn; :tab midi / :midi gone
 - buffers step 1 (no visible change): jf_tracker_buffers.lua, PN.BY['dsp#2'] = dsp; nothing creates a second buffer yet
 - PANE (Ctrl+W) D on inputs: a second inputs pane 'inputs 2' with its own cursor; keys / clicks go to the focused one; q on it drops it; other panes say 'one instance'
+- dsp#2 step 1 (no visible change): dsp selection + DK keys registered as a buffer; dsp_target honours dsp_sel.pin (no UI yet)

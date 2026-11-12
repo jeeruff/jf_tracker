@@ -975,6 +975,16 @@ local function dsp_target()
   -- 8 окт: пока тянут выделение мышью — DSP держит трек начала протяжки
   -- (иначе каждая новая колонка перестраивала панель, 8 fps)
   local col = (sel_drag and sel_drag.active and sel_drag.col) or cur_col()
+  -- 12 ноя: закреплённый трек (dsp_sel.pin — GUID; буфер dsp#2 держит свой): его колонка вместо трека курсора
+  if dsp_sel.pin then
+    local pc = dspt_cache.pin
+    if not (pc and pc.sid == snap.sid and pc.guid == dsp_sel.pin) then
+      pc = { sid = snap.sid, guid = dsp_sel.pin }
+      for _, c in ipairs(snap.cols or {}) do if c.track and reaper.ValidatePtr(c.track, 'MediaTrack*') and reaper.GetTrackGUID(c.track) == dsp_sel.pin then pc.col = c; break end end
+      dspt_cache.pin = pc
+    end
+    if pc.col then col = pc.col else dsp_sel.pin = nil end   -- трека больше нет — открепить
+  end
   if not col then return nil end
   -- 31 окт: мышь над нотой со значком fx — DSP пассивно показывает take FX этой ноты (вид не переключается)
   local pk = ctx and ctx.dsp_peek
@@ -18357,6 +18367,7 @@ ctx.ain_bind = function(target)
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
 ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
+ctx.BUF.register('dsp', dsp_sel, { 'fx', 'param', 'pin' }, { fx = 1, param = 1 }, { { tbl = DK, fields = { 'anchor', 'pending', 'marks' } } })   -- 12 ноя: dsp#2 — шаг 1 (pin — GUID закреплённого трека)
 ctx.BUF.register('reform', ctx.RF, {})      -- значения (rf_p) общие в main — второй буфер пока не нужен
 ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 -- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);

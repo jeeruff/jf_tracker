@@ -39,6 +39,14 @@ local RF = { sel = 4 }
 B.register('reform', RF, { 'sel' })
 ok(B.get(B.new('reform')).st.sel == 4, 'new from current values')
 
+-- несколько таблиц состояния (dsp: выбор + клавиши DK)
+local SEL, DK = { fx = 3, param = 2, pin = nil }, { anchor = 5 }
+B.register('dsp', SEL, { 'fx', 'param', 'pin' }, { fx = 1, param = 1 }, { { tbl = DK, fields = { 'anchor' } } })
+local d2 = B.new('dsp')
+ok(B.get(d2).st.fx == 1 and B.get(d2).st['1:anchor'] == 5, 'extra table state seeded ' .. tostring(B.get(d2).st['1:anchor']))
+B.with(d2, function() DK.anchor = 9; SEL.pin = 'g1' end)
+ok(DK.anchor == 5 and SEL.pin == nil and B.get(d2).st['1:anchor'] == 9 and B.get(d2).st.pin == 'g1', 'extra table swapped and kept')
+
 -- панели: PN.BY знает 'dsp#2' как dsp (реестр не меняется)
 ok(PN.BY['dsp#2'] == PN.BY.dsp and PN.BY['dsp#2'].label == 'dsp', 'PN.BY base-aware')
 ok(PN.BY['nope#2'] == nil and PN.BY.nope == nil, 'PN.BY unknown')
