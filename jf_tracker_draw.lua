@@ -10454,6 +10454,7 @@ function D.frame(L, snap, rows, state, info)
   -- session | router, ряд 2 — номер и имя региона в его цвете, ряд 3 — /2 x2
   -- слева и als cln парой справа, последний — длина «< N >»
   do
+    local hy = hy - math.max(0, (L.hname_x or 0) - 2)   -- 12 ноя: кнопки угла — к заголовку (запас под крупное имя трека им не нужен), снизу место
     local rg = info.cur_region_full
     local bx, bw = tx0 + 3, L.label_w - 4              -- 9 окт: зазор от границы модуля (2 px) — левая рамка кнопок видна
     local function small(x, y, label, what, on, kind, oc)   -- oc — свой цвет включённой (31 окт: proj sec pat)

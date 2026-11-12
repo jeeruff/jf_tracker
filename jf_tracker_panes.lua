@@ -286,7 +286,7 @@ end
 
 local function place_leaf(lay, M, n, x, y, w, h)
   local cell = { node = n, x = x, y = y, w = w, h = h, tabs = {} }
-  local th = (PN.base(n.panes[1]) == 'tracker' and M.tab_trk) or M.tab_h   -- 12 ноя: заголовок листа — и у трекера (tracker / phrase p1 / pattern B1), подсказки в нём, как у всех
+  local th = M.tab_h   -- 12 ноя: заголовок листа — и у трекера (tracker / phrase p1 / pattern B1), подсказки в нём, как у всех
   local hh = (M.hint_h == 0) and 0 or M.hint_h
   -- активная доступная панель: активная, иначе первая доступная
   local act = n.panes[n.active]
