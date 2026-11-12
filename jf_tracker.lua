@@ -6414,8 +6414,13 @@ ctx = {
       if nid then
         local col = cur_col()
         if PN.base(id) == 'dsp' and col and col.track then ctx.BUF.get(nid).st.pin = reaper.GetTrackGUID(col.track) end   -- dsp#2 закреплён на треке курсора
+        if PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — с курсора; фраза выбрана в lib — её режим
+          local st = ctx.BUF.get(nid).st
+          st.cur, st.row0, st.hscroll = vim.cur.row, state.row0 or 0, 0
+          if state.phr_inst then st.mode, st.phr = 'phrase', state.phr_inst end
+        end
         ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
-      else vim.msg = ('-- PANE -- D: %s has one instance (so far: inputs, dsp)'):format(PN.base(id)) end
+      else vim.msg = ('-- PANE -- D: %s has one instance (so far: tracker, inputs, dsp)'):format(PN.base(id)) end
     elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
       if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); if state.dsp_buf == id then dsp_buf_set('dsp') end; ctx.BUF.drop(id) end   -- 12 ноя: буфер #n — выбросить
     elseif ch == ' ' then
@@ -25828,6 +25833,7 @@ local function frame()
       ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
     end,
     buf_with = function(id, fn, ...) return ctx.BUF.with(id, fn, ...) end,   -- 12 ноя: отрисовка буфера #n с его состоянием
+    t2_draw = ctx.t2_draw,   -- 12 ноя: tracker#2
     dsp_buf = state.dsp_buf or 'dsp', dsp_fields = dsp_fields, buf_switch = function(id) ctx.BUF.switch(id); dspt_cache.pin = nil end,   -- 12 ноя: dsp#2 — второй лист DSP
     in_draw = function(Lx, x, y, w, h, foc) local rows, cols = ctx.in_data(); return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 11 ноя: панель inputs
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
@@ -27787,6 +27793,7 @@ local function frame()
     if gfx.mouse_cap & 1 == 1 then local dg = ctx.hum_drag; ctx.HU.set_from_x(ctx.hum_s, dg.i, (gfx.mouse_x - dg.x0) / math.max(1, dg.w)); ctx.hum_dirty = true
     else ctx.hum_drag = nil; if ctx.hum_dirty then ctx.hum_dirty = nil; ctx.hum_save() end end
   end
+  if U.click and ctx.t2_click and ctx.t2_click() then U.click = false end   -- 12 ноя: щелчок в tracker#2
   if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов: щелчок — пэд (семплер справа) и страница с ним; Opt — mute, Shift — solo
     local km = hover.dspkitmap
     local kid = km.f and km.f.kids[km.ki]
@@ -33115,6 +33122,9 @@ local function frame()
           return
         end
         return vim.key(c)
+      elseif draw.panes.base(state.focus) == 'tracker' and state.focus ~= 'tracker' then   -- 12 ноя: tracker#2 — свои клавиши, правка — в основном
+        if vim.mode == 'cmd' or vim.mode == 'search' or c == 58 then return vim.key(c) end
+        if not ctx.t2_key(c) then vim.msg = 'tracker 2: j k J K g G rows, h l tracks, [ ] next, p pattern / phrase, Space listen, Enter edit in the main tracker, Esc back' end
       elseif draw.panes.base(state.focus) == 'inputs' then   -- 11 ноя: панель входов (12 ноя: и буфер inputs#2)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local rows, cols = ctx.in_data()
@@ -35192,6 +35202,134 @@ ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
 ctx.BUF.register('dsp', dsp_sel, { 'fx', 'param', 'pin' }, { fx = 1, param = 1 }, { { tbl = DK, fields = { 'anchor', 'pending', 'marks' } } })   -- 12 ноя: dsp#2 — шаг 1 (pin — GUID закреплённого трека)
 ctx.BUF.register('reform', ctx.RF, {})      -- значения (rf_p) общие в main — второй буфер пока не нужен
 ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
+-- 12 ноя: tracker#2 (PLAN_BUFFERS) — второй вид трекера в своём листе: паттерн или фраза, свой курсор и колонки;
+-- v1 — смотреть / ходить / слушать, Enter — основной курсор сюда (там и правка; фраза за =END становится видна)
+ctx.T2 = { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 }
+ctx.BUF.register('tracker', ctx.T2, { 'row0', 'cur', 'mode', 'phr', 'rg', 'hscroll' }, { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 })
+ctx.t2_id = function()
+  local bp = L and L.pn and L.pn.by_panel
+  if not bp then return nil end
+  for id in pairs(bp) do if id ~= 'tracker' and draw.panes.base(id) == 'tracker' and ctx.BUF.get(id) then return id end end
+end
+-- окно строк вида: [r0, r1) паттерна / фразы; фраза — её источник виден модели (SHOW_EXTRA)
+ctx.t2_span = function(st)
+  local extra
+  local r0, r1
+  if st.mode == 'phrase' then
+    local r = (st.phr and ctx.phr_find(st.phr)) or ctx.phr_list()[1]
+    if r then
+      st.phr = r.name; extra = { r.pos, r.rend }
+      r0 = math.floor(model.row_of_time(r.pos, state.lpb) + 1e-6); r1 = math.ceil(model.row_of_time(r.rend, state.lpb) - 1e-6)
+    end
+  end
+  if not r0 then
+    if st.mode == 'phrase' then st.mode = 'pattern' end   -- фраз нет — паттерн
+    local list, rg = ctx.pl_song(), nil
+    for _, p in ipairs(list) do if p.name == st.rg then rg = p; break end end
+    rg = rg or pooled.region_at(regions, edit.row_time(st.cur, state.lpb, 0)) or list[1]
+    if rg then st.rg = rg.name; r0, r1 = math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6) else r0, r1 = 0, 64 end
+  end
+  local old = model.SHOW_EXTRA
+  if (old and old[1]) ~= (extra and extra[1]) or (old and old[2]) ~= (extra and extra[2]) then model.SHOW_EXTRA = extra; model.invalidate() end
+  return r0, math.max(r0 + 1, r1)
+end
+ctx.t2_draw = function(block, info)
+  local id = ctx.t2_id()
+  if not id then if model.SHOW_EXTRA then model.SHOW_EXTRA = nil; model.invalidate() end; ctx.t2_vis = nil; return end
+  local st = ctx.BUF.get(id).st
+  local r0, r1 = ctx.t2_span(st)
+  st.cur = math.max(r0, math.min(r1 - 1, st.cur or r0))
+  local key = tostring(L) .. '|' .. id .. '|' .. (st.hscroll or 0)
+  if ctx.t2_Lk ~= key then
+    draw.layout_leaf = id
+    local ok, L2 = pcall(draw.layout, snap, setmetatable({ hscroll = st.hscroll or 0 }, { __index = state }), #regions)
+    draw.layout_leaf = nil
+    if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); return end
+    ctx.t2_L, ctx.t2_Lk = L2, key
+  end
+  local L2 = ctx.t2_L
+  local n = math.max(1, L2.nrows or 1)
+  if r1 - r0 <= n then st.row0 = r0
+  elseif st.cur < (st.row0 or r0) then st.row0 = st.cur
+  elseif st.cur > (st.row0 or r0) + n - 2 then st.row0 = st.cur - n + 2 end
+  st.row0 = math.max(r0, math.min(st.row0 or r0, math.max(r0, r1 - n)))
+  local sc = reaper.GetProjectStateChangeCount(0)
+  local rk = ('%d|%d|%d|%d|%d|%d'):format(st.row0, n, state.lpb, sc, r0, r1)
+  if ctx.t2_rk ~= rk then
+    local rows2 = model.rows_build(st.row0, n, state.lpb)
+    for _, r in ipairs(rows2) do if r.row < r0 or r.row >= r1 then r.clip = true; r.label = ''; r.bar = false; r.beat = false end end
+    ctx.t2_rows, ctx.t2_rk = rows2, rk
+  end
+  local foc = state.focus == id
+  local fi2 = 1   -- колонка курсора основного вида — та же колонка трека во втором (его раскладка своя)
+  local f0 = L.flat and L.flat[vim.cur.fi]
+  if f0 and f0.col then for i, f in ipairs(L2.flat or {}) do if f.col and f.col.guid == f0.col.guid then fi2 = i; break end end end
+  local vc = { fi = fi2, row = st.cur, field = 1, sub = vim.cur.sub }
+  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = nil, hexbuf = nil, typed = nil, mixfocus = nil },
+    { __index = info })
+  local hover2 = {}
+  block(L2, ctx.t2_rows, setmetatable({ row0 = st.row0, hscroll = st.hscroll or 0 }, { __index = state }), info2, hover2)
+  ctx.t2_vis = { id = id, hv = hover2, rect = L.pn.by_panel[id], r0 = r0, r1 = r1 }
+end
+-- щелчок в листе tracker#2: фокус на него, курсор — на строку под мышью
+ctx.t2_click = function()
+  local v = ctx.t2_vis
+  local c = v and v.rect
+  if not c then return false end
+  local mx, my = gfx.mouse_x, gfx.mouse_y
+  if not (mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h) then return false end
+  local st = ctx.BUF.get(v.id) and ctx.BUF.get(v.id).st
+  if st and v.hv.row then st.cur = v.hv.row end
+  ctx.set_focus(v.id)
+  vim.msg = 'tracker 2: j k rows, [ ] ' .. ((st and st.mode == 'phrase') and 'phrase' or 'pattern') .. ', p pattern / phrase, Space listen, Enter - the main cursor here, Esc back'
+  return true
+end
+ctx.t2_key = function(c)
+  local id = state.focus
+  local b = ctx.BUF.get(id); if not b then return false end
+  local st = b.st
+  local ch = (c > 0 and c < 256) and string.char(c) or ''
+  local v = ctx.t2_vis
+  local r0, r1 = (v and v.r0) or 0, (v and v.r1) or ((st.cur or 0) + 1)
+  local bar = state.lpb * 4
+  local function step_list(d)
+    if st.mode == 'phrase' then
+      local l = ctx.phr_list(); if #l == 0 then return end
+      local k = 1; for i, r in ipairs(l) do if r.name == st.phr then k = i end end
+      st.phr = l[(k - 1 + d) % #l + 1].name; vim.msg = 'tracker 2: phrase ' .. st.phr
+    else
+      local l = ctx.pl_song(); if #l == 0 then return end
+      local k = 1; for i, r in ipairs(l) do if r.name == st.rg then k = i end end
+      local rg = l[(k - 1 + d) % #l + 1]; st.rg = rg.name; vim.msg = 'tracker 2: ' .. rg.name
+    end
+    st.cur = -1   -- в начало нового окна (t2_draw зажмёт)
+  end
+  if c == 27 then ctx.set_focus('tracker')
+  elseif ch == 'j' or c == 1685026670 then st.cur = math.min(r1 - 1, st.cur + 1)
+  elseif ch == 'k' or c == 30064 then st.cur = math.max(r0, st.cur - 1)
+  elseif ch == 'J' then st.cur = math.min(r1 - 1, st.cur + bar)
+  elseif ch == 'K' then st.cur = math.max(r0, st.cur - bar)
+  elseif ch == 'g' then st.cur = r0
+  elseif ch == 'G' then st.cur = r1 - 1
+  elseif ch == 'h' or c == 1818584692 then st.hscroll = math.max(0, (st.hscroll or 0) - 1)
+  elseif ch == 'l' or c == 1919379572 then st.hscroll = (st.hscroll or 0) + 1
+  elseif ch == '[' then step_list(-1)
+  elseif ch == ']' then step_list(1)
+  elseif ch == 'p' then
+    st.mode = st.mode == 'phrase' and 'pattern' or 'phrase'; st.phr = st.phr or state.phr_inst; st.cur = -1
+    vim.msg = 'tracker 2: ' .. (st.mode == 'phrase' and 'phrases ([ ] - next; Enter - edit it in the main tracker)' or 'patterns')
+  elseif c == 32 then
+    if st.mode == 'phrase' then ctx.phr_preview(st.phr)
+    elseif reaper.GetPlayState() & 1 == 1 then PV.stop()
+    else PV.midi(edit.row_time(st.cur, state.lpb, 0), edit.row_time(r1, state.lpb, 0)); vim.msg = 'tracker 2: playing from the cursor row (Space - stop)' end
+  elseif c == 13 then
+    vim.cur.row = st.cur
+    state.row0 = math.max(0, st.cur - math.floor((L and L.nrows or 20) / 3))
+    ctx.set_focus('tracker')
+    vim.msg = st.mode == 'phrase' and ('phrase ' .. (st.phr or '') .. ': the main cursor is in its source - edit here (copies follow)') or 'the main cursor is here'
+  else return false end
+  return true
+end
 ctx.rf_p = ctx.RF.defaults()
 ctx.rf_open = function(auto)
   -- 19 окт: панель без gr — последнее выделение трекера (запоминается каждый кадр VISUAL)

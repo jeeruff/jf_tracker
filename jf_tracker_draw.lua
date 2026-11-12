@@ -7944,6 +7944,8 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
           info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
       end
+    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.track_block (info.t2_draw); здесь — рамка фокуса
+      rects[id] = { c.x, c.y, c.w, c.h }
     elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
       -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
       local ct = c.content
@@ -11658,7 +11660,7 @@ function D.frame(L, snap, rows, state, info)
   if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
   if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   end
-  if info.t2_draw then info.t2_draw(D.track_block) end   -- 12 ноя: tracker#2
+  if info.t2_draw then info.t2_draw(D.track_block, info) end   -- 12 ноя: tracker#2
   D.track_block(L, rows, state, info, hover)
   D.pmark('draw: matrix / performance')
   -- 21 окт: что видно в трекере (строки тела, треки) — матрица подсвечивает эту зону светло-серым
