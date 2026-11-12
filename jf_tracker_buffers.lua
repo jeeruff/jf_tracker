@@ -71,7 +71,7 @@ end
 -- подменить поля модуля на состояние буфера (буфер 1 — ничего); leave возвращает их и запоминает изменения
 local cur
 function B.enter(id)
-  local b = B.bufs[id]
+  local b = B.bufs[id] or B.ensure(id)   -- раскладка из ExtState / скринсета: буфер создаётся при первом входе
   if not b or b.n == 1 or cur then return false end
   local m = B.mods[b.mod]
   local saved = {}

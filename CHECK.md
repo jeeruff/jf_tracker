@@ -2676,3 +2676,4 @@
 - tracker 2: Ctrl+W D on the tracker - a second tracker beside it (another pattern; a phrase if one is picked in the lib); j k J K g G, h l tracks, [ ] next pattern / phrase, p switch, Space listen, Enter - main cursor there (a phrase source opens for editing), Esc; click in it - focus + row; the main tracker unchanged
 - Ctrl+W v t / s t / T t (tracker already open) - tracker 2 too, like D; same for dsp and inputs
 - Enter on a phrase trigger note: tracker 2 opens (or switches) on that phrase, focus there; while the song plays, thin amber bars in tracker 2 mark where each playing copy is in the phrase
+- tracker 2 after review: layouts with tracker#2 / dsp#2 survive :reload (the # broke the whole layout); fractional LPB no longer crashes it; only one tracker 2 (a second Ctrl+W D focuses it); mouse wheel scrolls it; its own key bar; no VISUAL / hex box / pattern flash leaking from the main view

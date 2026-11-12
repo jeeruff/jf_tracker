@@ -7944,8 +7944,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
           info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
       end
-    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.tracker_body (info.t2_draw); здесь — рамка фокуса
+    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.tracker_body (info.t2_draw); здесь — рамка фокуса и строка клавиш
       rects[id] = { c.x, c.y, c.w, c.h }
+      if c.hint and info.hint_bars then D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w, info.hint_bars('tracker2') or D.PANE_KEYS, foc == id) end
     elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
       -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
       local ct = c.content
@@ -11352,7 +11353,7 @@ function D.frame(L, snap, rows, state, info)
   -- 31 окт: курсор перешёл в другой паттерн — его имя вспыхивает крупно у курсора (как цифра step), цветом паттерна
   do
     local vc = info.vcur
-    if vc and info.ruler and info.ruler.regions then
+    if vc and info.ruler and info.ruler.regions and not info.t2 then   -- 12 ноя: вспышка смены паттерна — только у основного вида
       local cur
       for _, rg in ipairs(info.ruler.regions) do if vc.row >= rg.r0 - 1e-6 and vc.row < rg.r1 - 1e-6 then cur = rg end end
       local key = cur and (cur.idx or cur.name) or false
@@ -14538,6 +14539,7 @@ function D.frame(L, snap, rows, state, info)
   if L.pn and (L.pn_keys or 0) > 0 then
     local f = info.focus
     local page = (state.router_big and 'router') or (state.dsp_big and 'dspbig') or (f == 'tracker' and (info.vmode == 'insert' and 'insert' or 'tracker'))
+      or (f ~= 'tracker' and D.panes.base(f) == 'tracker' and 'tracker2')   -- 12 ноя
       or (f == 'top' and D.panes.BY[info.toptab or ''] and D.panes.BY[info.toptab].hint)
       or (f == 'browser' and (info.browser_page or 'browser')) or (f == 'slices' and 'inst') or f
     set(U.PANEL); gfx.rect(0, sy, gfx.w, L.pn_keys, 1)

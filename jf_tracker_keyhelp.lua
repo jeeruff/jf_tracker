@@ -993,6 +993,7 @@ KH.BARS = {
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
   reform = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { '0', 'reset' }, { 'Space', 'listen' }, { 'Enter', 'keep' }, { 'Esc', 'revert' }, { 'f', 'jump' } },
   renderer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'toggle' }, { '0', 'defaults' }, { 'Enter', 'bounce' }, { 'Esc', 'back' }, { 'f', 'jump' } },
+  tracker2 = { { 'j k', 'rows' }, { 'J K', 'bars' }, { 'h l', 'tracks' }, { '[ ]', 'next' }, { 'p', 'pattern/phrase' }, { 'Space', 'listen' }, { 'Enter', 'edit in main' }, { 'Esc', 'back' } },   -- 12 ноя: tracker 2
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { '.', 'repeat' }, { 'Opt+J K', 'inst' }, { 'a', 'step auto' },

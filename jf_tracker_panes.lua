@@ -286,7 +286,7 @@ end
 
 local function place_leaf(lay, M, n, x, y, w, h)
   local cell = { node = n, x = x, y = y, w = w, h = h, tabs = {} }
-  local tracker = n.panes[1] == 'tracker'
+  local tracker = PN.base(n.panes[1]) == 'tracker'   -- 12 ноя: tracker#2 — как трекер: без вкладок, своя строка клавиш
   local th = tracker and 0 or M.tab_h
   local hh = (tracker and M.hint_trk) or ((M.hint_h == 0) and 0 or M.hint_h)   -- 10 окт: строка клавиш — и у трекера (15 окт: tabs — только у него)
   -- активная доступная панель: активная, иначе первая доступная
@@ -576,7 +576,7 @@ end
 
 -- панель — в стек листа другой панели (zellij stack)
 function PN.stack(model, id, into)
-  if id == 'tracker' or into == 'tracker' or id == into then return false end
+  if PN.base(id) == 'tracker' or PN.base(into) == 'tracker' or id == into then return false end   -- 12 ноя: и tracker#2 не стекается
   local lt = PN.find(model, into)
   if not lt then return false end
   if model.hidden[id] then model.hidden[id] = nil else detach(model, id) end
@@ -915,12 +915,12 @@ local function dec(s, pos)
       if c == '|' then pos = pos + 1 elseif c == ']' then return n, pos + 1 else return nil end
     end
   end
-  local body, p2 = s:match('^([%w_%*,]+~?)()', pos)
+  local body, p2 = s:match('^([%w_%*,#]+~?)()', pos)
   if not body then return nil end
   local lf = { panes = {}, active = 1 }
   if body:sub(-1) == '~' then lf.min = true; body = body:sub(1, -2) end
   for tok in body:gmatch('[^,]+') do
-    local id, star = tok:match('^(%w+)(%*?)$')
+    local id, star = tok:match('^([%w#]+)(%*?)$')
     if not id then return nil end
     lf.panes[#lf.panes + 1] = id
     if star == '*' then lf.active = #lf.panes end
@@ -933,7 +933,7 @@ function PN.decode(s)
   local root = tree and dec(tree, 1)
   if not root then return PN.DEFAULT() end
   local model = { v = 1, root = root, hidden = {} }
-  local z = rest:match('Z:(%w+)')
+  local z = rest:match('Z:([%w#]+)')
   if z and z ~= '' then model.zoom = z end
   local ok, m = pcall(PN.normalize, model)
   if not ok or not m or not PN.find(m, 'tracker') then return PN.DEFAULT() end

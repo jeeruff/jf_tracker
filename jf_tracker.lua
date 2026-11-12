@@ -6375,6 +6375,7 @@ ctx = {
       -- 12 ноя: s / v / T + буква уже открытой панели, которая умеет второй экземпляр (tracker, dsp, inputs) — новый
       -- буфер ('tracker#2' и т.п.), как D; трекер не стекается — T на нём = рядом справа
       if (pend == 's' or pend == 'v' or pend == 'T') and PN.visible(m, tgt) and ctx.BUF.can_multi(tgt) then
+        if tgt == 'tracker' and ctx.t2_id() then ctx.pane_focus(ctx.t2_id()); vim.msg = 'tracker 2 is already open'; return end   -- 12 ноя: второй вид один
         local nid = ctx.BUF.new(tgt)
         if nid then
           ctx.buf_init(nid)
@@ -6420,6 +6421,7 @@ ctx = {
     elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
     elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
     elseif ch == 'D' then   -- 12 ноя: D duplicate — ещё один экземпляр панели (буфер, PLAN_BUFFERS): рядом справа, фокус на него
+      if PN.base(id) == 'tracker' and ctx.t2_id() then ctx.pane_focus(ctx.t2_id()); vim.msg = 'tracker 2 is already open'; return end   -- 12 ноя: второй вид один
       local nid = ctx.BUF.new(PN.base(id))
       if nid then
         ctx.buf_init(nid)
@@ -15685,7 +15687,7 @@ ctx = {
     if f ~= 'fxb' then ctx.fxb_pad = nil end
     if f == 'dsp' then   -- 12 ноя: dsp#2 — активный буфер: лист, заданный pane_focus, иначе лист под мышью (щелчок)
       local want = ctx.dsp_buf_want or draw.dsp_hover_id; ctx.dsp_buf_want = nil
-      if want and want ~= (state.dsp_buf or 'dsp') and (want == 'dsp' or ctx.BUF.get(want)) then dsp_buf_set(want) end
+      if want and want ~= (state.dsp_buf or 'dsp') and (want == 'dsp' or ctx.BUF.ensure(want)) then dsp_buf_set(want) end
     end
     if f ~= state.focus then ctx.focus_prev = state.focus == 'top' and state.toptab or state.focus end   -- 3 ноя: прошлый модуль — вторая очередь меток f
     -- 24 окт: опция slicer keys on — фокус в слайсере (вкладка item / slices): клавиатура (m) сама вкл, ушёл — как была
@@ -31702,6 +31704,10 @@ local function frame()
     elseif type(hover.browser) == 'number' then B.scroll = math.max(0, math.min(math.max(0, #B.entries - 1), B.scroll + (step > 0 and 3 or -3)))   -- 3 ноя: колесо всегда листает, курсор стоит (кнопка scroll убрана)
     elseif ctx.wheel_vbar(step) then   -- 25 окт: список с полосой под мышью (часть разделённого списка — своя полоса)
     elseif wo == 'help' or wo == 'khelp' then KH.scroll = math.max(0, (KH.scroll or 0) + (step > 0 and 3 or -3))   -- 21 окт: панель help — своя прокрутка
+    elseif gfx.mouse_wheel ~= 0 and wo and draw.panes.base(wo) == 'tracker' and wo ~= 'tracker' and ctx.BUF.get(wo) and ctx.t2_vis then   -- 12 ноя: колесо над tracker 2 — его строки
+      local st, v = ctx.BUF.get(wo).st, ctx.t2_vis
+      st.cur = math.max(v.r0, math.min(v.r1 - 1, (st.cur or v.r0) + (gfx.mouse_wheel > 0 and -4 or 4)))
+      gfx.mouse_wheel = 0; gfx.mouse_hwheel = 0
     elseif not w_trk then   -- 21 окт: другой модуль под мышью — трекер не листается
     elseif gfx.mouse_cap & 8 == 8 then
       state.hscroll = math.max(1, math.min(math.max(1, #snap.cols), state.hscroll + (step > 0 and 1 or -1)))
@@ -35224,7 +35230,7 @@ end
 ctx.t2_id = function()
   local bp = L and L.pn and L.pn.by_panel
   if not bp then return nil end
-  for id in pairs(bp) do if id ~= 'tracker' and draw.panes.base(id) == 'tracker' and ctx.BUF.get(id) then return id end end
+  for id, c in pairs(bp) do if id ~= 'tracker' and draw.panes.base(id) == 'tracker' and ctx.BUF.ensure(id) and (c.active_id == nil or c.active_id == id) then return id end end
 end
 -- окно строк вида: [r0, r1) паттерна / фразы; фраза — её источник виден модели (SHOW_EXTRA)
 ctx.t2_span = function(st)
@@ -35299,12 +35305,13 @@ ctx.t2_draw = function(block, info)
   local st = ctx.BUF.get(id).st
   local r0, r1 = ctx.t2_span(st)
   st.cur = math.max(r0, math.min(r1 - 1, st.cur or r0))
-  local key = tostring(L) .. '|' .. id .. '|' .. (st.hscroll or 0)
+  local c0 = L.pn.by_panel[id]
+  local key = table.concat({ id, snap and snap.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
   if ctx.t2_Lk ~= key then
     draw.layout_leaf = id
     local ok, L2 = pcall(draw.layout, snap, setmetatable({ hscroll = st.hscroll or 0 }, { __index = state }), #regions)
     draw.layout_leaf = nil
-    if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); return end
+    if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); ctx.t2_vis = nil; return end
     ctx.t2_L, ctx.t2_Lk = L2, key
   end
   local L2 = ctx.t2_L
@@ -35314,7 +35321,7 @@ ctx.t2_draw = function(block, info)
   elseif st.cur > (st.row0 or r0) + n - 2 then st.row0 = st.cur - n + 2 end
   st.row0 = math.max(r0, math.min(st.row0 or r0, math.max(r0, r1 - n)))
   local sc = reaper.GetProjectStateChangeCount(0)
-  local rk = ('%d|%d|%d|%d|%d|%d'):format(st.row0, n, state.lpb, sc, r0, r1)
+  local rk = table.concat({ st.row0, n, state.lpb, sc, r0, r1, model.ROW_BASE or 1 }, '|')   -- 12 ноя: без %d — LPB бывает дробным
   if ctx.t2_rk ~= rk then
     local rows2 = model.rows_build(st.row0, n, state.lpb)
     for _, r in ipairs(rows2) do if r.row < r0 or r.row >= r1 then r.clip = true; r.label = ''; r.bar = false; r.beat = false end end
@@ -35325,7 +35332,7 @@ ctx.t2_draw = function(block, info)
   local f0 = L.flat and L.flat[vim.cur.fi]
   if f0 and f0.col then for i, f in ipairs(L2.flat or {}) do if f.col and f.col.guid == f0.col.guid then fi2 = i; break end end end
   local vc = { fi = fi2, row = st.cur, field = 1, sub = vim.cur.sub }
-  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = nil, hexbuf = nil, typed = nil, mixfocus = nil },
+  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = false, hexbuf = false, typed = false, mixfocus = false, t2 = true },   -- false: nil не затеняет поля основного info
     { __index = info })
   local hover2 = {}
   block(L2, ctx.t2_rows, setmetatable({ row0 = st.row0, hscroll = st.hscroll or 0 }, { __index = state }), info2, hover2)
@@ -35362,7 +35369,7 @@ ctx.t2_key = function(c)
   local ch = (c > 0 and c < 256) and string.char(c) or ''
   local v = ctx.t2_vis
   local r0, r1 = (v and v.r0) or 0, (v and v.r1) or ((st.cur or 0) + 1)
-  local bar = state.lpb * 4
+  local bar = math.max(1, math.floor(state.lpb * 4 + 0.5))
   local function step_list(d)
     if st.mode == 'phrase' then
       local l = ctx.phr_list(); if #l == 0 then return end
