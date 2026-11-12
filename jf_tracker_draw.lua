@@ -2436,6 +2436,7 @@ local ICON = {
 }
 -- 12 ноя: подпись панели; буфер 'inputs#2' — «inputs 2»
 function D.plabel(id)
+  if D.tracker_label and D.panes.base(id) == 'tracker' then local l = D.tracker_label(id); if l then return l end end   -- 12 ноя: трекер — по функции (tracker / phrase p1 / pattern B1)
   local p = D.panes.BY[id]
   local b, n = tostring(id):match('^(.-)#(%d+)$')
   return (p and p.label or id) .. (n and (' ' .. n) or '')
@@ -7934,33 +7935,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   local foc = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
   local function focused(id) return foc == id or (foc == 'top' and id == info.toptab) end
   local rects = {}
-  for _, c in ipairs(lay.cells) do
-    local id = c.active_id
-    if id then D.PMN[id] = D.PMN[id] or ('pane: ' .. id); D.pmark(D.PMN[id]) end   -- 17 окт: jftop — время каждой панели отдельно
-    if id == 'tracker' then
-      rects.tracker = { c.x, c.y, c.w, c.h }
-      D.pn_tracker_cell = c                        -- 11 окт: его номер в PANE рисуется поверх (D.pane_badge_tracker)
-      if c.hint and info.hint_bars then           -- 10 окт: и у трекера своя строка клавиш (hints where = panes)
-        D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
-          info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
-      end
-    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.tracker_body (info.t2_draw); здесь — рамка фокуса и строка клавиш
-      rects[id] = { c.x, c.y, c.w, c.h }
-      if c.hint and info.hint_bars then D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w, info.hint_bars('tracker2') or D.PANE_KEYS, foc == id) end
-    elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
-      -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
-      local ct = c.content
-      local rk = PN.BY[id].tab and 'top' or id
-      if PN.base(id) == 'dsp' then rk = id == (info.dsp_buf or 'dsp') and 'dsp' or id end   -- 12 ноя: рамка фокуса dsp — у активного буфера
-      if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
-      if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
-    elseif id then
-      local pcb = D.pc_begin(id, c)
-      local ct = c.content
-      -- 11 окт: mixer — полоски уже нарисованы трекером (раньше оболочки): фон только под подписью
-      set(U.PANEL); gfx.rect(c.x, c.y, c.w, id == 'mixer' and math.max(0, ct.y - c.y) or c.h, 1)
-      -- верхняя линия рамки и подписи на ней
-      local fon = focused(id)
+  -- 12 ноя: строка вкладок листа (подписи, фокус, hints where = tabs) — функция: её зовут и обычные панели, и трекер
+  -- (у трекера теперь тоже заголовок: tracker / phrase p1 / pattern B1). Тело не сдвинуто
+  D.pane_tabs = function(c, id, fon)
       if c.tab then
         local th = c.tab.h
         local G0 = D.TABGAP or 0
@@ -8047,7 +8024,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       if c.tab and info.hint_bars and state.hints and state.hintpos == 'tabs' and id ~= 'mixer' then
         local last = c.tabs[#c.tabs]
         local hx = (last and (last.x + math.min(last.w, ms(fit(D.ic(last.id, D.plabel(last.id)), last.w - 2 * L.pad)) + 2 * L.pad)) or c.x) + 3 * L.pad
-        local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
+        local page = (id ~= 'tracker' and PN.base(id) == 'tracker' and 'tracker2') or (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id   -- 12 ноя: tracker 2
         if PN.BY[id].tab and id == info.toptab and info.top_page then page = info.top_page end   -- 15 окт: вкладка — подсказки её страницы (холст automation)
         local bar = info.hint_bars(page) or D.PANE_KEYS
         D.qm_bars = D.qm_bars or setmetatable({}, { __mode = 'k' })
@@ -8056,6 +8033,37 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         local badge = (state.pane_mode and c.num and c.num <= 9) and (3 * L.cw) or 0
         D.hint_pairs(hx, c.y + (D.TABGAP or 0) + 1, c.x + c.w - L.pad - badge, qb, U.PANEL)
       end
+  end
+  for _, c in ipairs(lay.cells) do
+    local id = c.active_id
+    if id then D.PMN[id] = D.PMN[id] or ('pane: ' .. id); D.pmark(D.PMN[id]) end   -- 17 окт: jftop — время каждой панели отдельно
+    if id == 'tracker' then
+      rects.tracker = { c.x, c.y, c.w, c.h }
+      D.pn_tracker_cell = c                        -- 11 окт: его номер в PANE рисуется поверх (D.pane_badge_tracker)
+      D.pane_tabs(c, id, foc == 'tracker')   -- 12 ноя: заголовок листа и у трекера
+      if c.hint and info.hint_bars then           -- 10 окт: и у трекера своя строка клавиш (hints where = panes)
+        D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
+          info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
+      end
+    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.tracker_body (info.t2_draw); здесь — рамка фокуса и строка клавиш
+      rects[id] = { c.x, c.y, c.w, c.h }
+      D.pane_tabs(c, id, foc == id)   -- 12 ноя: заголовок: phrase p1 / pattern B1
+      if c.hint and info.hint_bars then D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w, info.hint_bars('tracker2') or D.PANE_KEYS, foc == id) end
+    elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
+      -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
+      local ct = c.content
+      local rk = PN.BY[id].tab and 'top' or id
+      if PN.base(id) == 'dsp' then rk = id == (info.dsp_buf or 'dsp') and 'dsp' or id end   -- 12 ноя: рамка фокуса dsp — у активного буфера
+      if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
+      if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
+    elseif id then
+      local pcb = D.pc_begin(id, c)
+      local ct = c.content
+      -- 11 окт: mixer — полоски уже нарисованы трекером (раньше оболочки): фон только под подписью
+      set(U.PANEL); gfx.rect(c.x, c.y, c.w, id == 'mixer' and math.max(0, ct.y - c.y) or c.h, 1)
+      -- верхняя линия рамки и подписи на ней
+      local fon = focused(id)
+      D.pane_tabs(c, id, fon)   -- 12 ноя: строка вкладок — функция (и у трекера)
       -- режим PANE: номер листа (1..9 — фокус цифрой) у правого края рамки
       if state.pane_mode and c.num and c.num <= 9 and c.tab then D.pane_badge(L, c, c.tab.h) end
       D.clip = { ct.x, ct.x + ct.w, ct.y, ct.y + ct.h }

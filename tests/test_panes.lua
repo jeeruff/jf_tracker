@@ -32,7 +32,7 @@ local lay = tiling('default 1600x900', m, 1600, 900)
 tiling('default 800x500', m, 800, 500)
 eq('cells', #lay.cells, 9)   -- 6 ноя: keys убран (клавиатура в транспорте); 2 ноя: + keys под браузером; 9 окт: browser | pm | fx — один стек, dsp один; 11 окт: + mixer под трекером
 ok('tracker rect', lay.rects.tracker ~= nil)
-ok('tracker has no tab', lay.by_panel.tracker.tab == nil)
+ok('tracker has a tab too (12 Nov: pane title)', lay.by_panel.tracker.tab ~= nil and lay.by_panel.tracker.tab.h == M.tab_h)
 eq('order starts with tracker', lay.order[1], 'tracker')
 eq('master active', lay.by_panel.master.active_id, 'master')
 eq('notes hidden', m.hidden.notes, true)

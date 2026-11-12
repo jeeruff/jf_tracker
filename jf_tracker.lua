@@ -35309,6 +35309,14 @@ ctx.t2_ruler = function(lpb2)
   ctx.t2_rul = { src = regions, lpb = lpb2, v = v }
   return v
 end
+-- 12 ноя: подпись листа трекера — по тому, что он показывает: tracker / phrase p1 / pattern B1 (D.plabel)
+draw.tracker_label = function(id)
+  if id == 'tracker' then return 'tracker' end
+  local b = ctx.BUF.get(id); local st = b and b.st
+  if not st then return nil end
+  if st.mode == 'phrase' then return 'phrase ' .. (st.phr or '') end
+  return 'pattern ' .. (st.rg or '')
+end
 ctx.t2_draw = function(block, info)
   local id = ctx.t2_id()
   if not id then if model.SHOW_EXTRA then model.SHOW_EXTRA = nil; model.invalidate() end; ctx.t2_vis = nil; return end
