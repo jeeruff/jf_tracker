@@ -230,6 +230,7 @@ function D.set_font(state)
   tcache, next_img = {}, IMG_FIRST
   if D.reset_vcache then D.reset_vcache() end      -- вертикальные имена — тоже из старого шрифта
   if D.reset_glyph then D.reset_glyph(); D.reset_measure() end
+  D.ctrl_mwc = nil   -- 12 ноя: ширины подписей главного модуля — из старого шрифта (жирный / кегль меняются при том же font_id)
   gfx.setfont(D.font_id)
   D.bitmap_th = gfx.texth
 end
@@ -4462,6 +4463,23 @@ end
 
 -- главный модуль (help / options / транспорт) в своих координатах: x от 0,
 -- y от 0, высота H, ширина L.ctrl_w; рисует верхняя панель или отдельно (3 окт)
+-- 12 ноя: постоянные таблицы главного модуля — не собирать каждый кадр (подписи быстрых опций, кнопки - + и помощник q)
+D.CTRL_QL = { q_mx = 'matrix', q_ruler = 'ruler', q_hints = 'hints', q_listen = 'listen', debug = 'debug', q_scopes = 'scopes',
+  q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
+  q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
+  autofocus = 'autofocus', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
+D.CTRL_SZ = { q_keys = { sizer = true }, q_font = { sizer = { { '-', 'q_fontm' }, { '+', 'q_fontp' } } },
+  q_side = { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } },   -- browser < > (7 окт): слева / справа
+  mixer = { sizer = { { '^', 'q_mixup' }, { 'v', 'q_mixdn' } } } }   -- mixer ^ v (8 окт): над / под трекером
+function D.ctrl_q(id, label, on, extra) local t = { id, label, on and U.CYAN or U.GREY }; if extra then for k, v in pairs(extra) do t[k] = v end end; return t end
+-- ширины подписей быстрых опций — кэш по строке (measurestr ~30 раз за кадр); сброс — смена шрифта (set_font) / масштаба
+function D.ctrl_mw(s)
+  local mw = D.ctrl_mwc
+  if not mw or D.ctrl_mws ~= D.SCALE or D.ctrl_mwf ~= D.font_id then mw = {}; D.ctrl_mwc, D.ctrl_mws, D.ctrl_mwf = mw, D.SCALE, D.font_id end
+  local w = mw[s]
+  if not w then w = ms(s); mw[s] = w end
+  return w
+end
 local function draw_ctrl(L, info, H, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local c = info.ctrl or {}
@@ -4483,22 +4501,19 @@ local function draw_ctrl(L, info, H, hover)
     -- быстрые вкл / выкл (5 окт): колонка — где это на экране: слева / в центре
     -- (сверху вниз, как на экране) / справа; пустые клетки — { false }
     { name = 'quick', items = (function()
-      local function q(id, label, on, extra) local t = { id, label, on and U.CYAN or U.GREY }; if extra then for k, v in pairs(extra) do t[k] = v end end; return t end
+      local q, SZ = D.ctrl_q, D.CTRL_SZ   -- 12 ноя: помощник и таблицы кнопок - + — постоянные (D.CTRL_*), не на каждый кадр
       -- 6 окт: набор и порядок — c.quick («id,id|id,…|…», три колонки; правка —
       -- ПКМ по имени опции в окне Options). Встроенные — свои подписи и флаги,
       -- остальные опции — c.qgen[id] = { label, on }
-      local QL = { q_mx = 'matrix', q_ruler = 'ruler', q_hints = 'hints', q_listen = 'listen', debug = 'debug', q_scopes = 'scopes',
-        q_input = 'input', q_captions = 'col names', q_names = 'names', q_wave = 'wave', q_colors = 'colours', q_envs = 'envs',
-        q_meters = 'meters', q_dsp = 'dsp', q_side = 'browser', q_preview = 'preview', q_keys = 'kcast', oneclick = 'one click',
-        autofocus = 'autofocus', perf = 'performance', follow = 'follow playhead', lock = 'lock to REAPER', fixed = 'fixed cursor', q_endstop = 'end stop' }
-      if c.q_font_lbl then QL.q_font = c.q_font_lbl end   -- 1 ноя: font x2 - +
+      local QL = D.CTRL_QL
+      QL.q_font = c.q_font_lbl or nil   -- 1 ноя: font x2 - +
       local cols = {}
       for part in ((c.quick or '') .. '|'):gmatch('([^|]*)|') do
         local col = {}
         for id in part:gmatch('[^,]+') do
           if id == 'xfade' then col[#col + 1] = q('xfade', c.xfade and ('x-fade ' .. (c.xfade_ms or 10)) or 'x-fade', c.xfade)
-          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], (id == 'q_keys' and { sizer = true }) or (id == 'q_font' and { sizer = { { '-', 'q_fontm' }, { '+', 'q_fontp' } } }) or (id == 'q_side' and { sizer = { { '<', 'q_sidel' }, { '>', 'q_sider' } } }) or nil)   -- browser < > (7 окт): слева / справа
-          elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on, id == 'mixer' and { sizer = { { '^', 'q_mixup' }, { 'v', 'q_mixdn' } } } or nil) end   -- mixer ^ v (8 окт): над / под трекером
+          elseif QL[id] then col[#col + 1] = q(id, QL[id], c[id], SZ[id])   -- browser < > (7 окт): слева / справа
+          elseif c.qgen and c.qgen[id] then col[#col + 1] = q(id, c.qgen[id].label, c.qgen[id].on, id == 'mixer' and SZ.mixer or nil) end   -- mixer ^ v (8 окт): над / под трекером
         end
         cols[#cols + 1] = col
         if #cols == 3 then break end
@@ -4626,7 +4641,7 @@ local function draw_ctrl(L, info, H, hover)
       local need = { 0, 0, 0 }
       for i, it in ipairs(g.items) do
         local k = (i - 1) % 3 + 1
-        if it[1] then need[k] = math.max(need[k], ms(it[2] or '') + (it.sizer and ms(' - +') or 0) + 6) end
+        if it[1] then need[k] = math.max(need[k], D.ctrl_mw(it[2] or '') + (it.sizer and D.ctrl_mw(' - +') or 0) + 6) end   -- 12 ноя: ширины из кэша
       end
       local total = L.ctrl_w - 2 * L.pad
       local sum = need[1] + need[2] + need[3]

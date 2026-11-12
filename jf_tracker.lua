@@ -2309,7 +2309,8 @@ ctx = {
     ctx.msn_c = nil
   end,
   mixsnaps_info = function()
-    if reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') == 0 then return nil end
+    if ctx.msn_sws == nil then ctx.msn_sws = reaper.NamedCommandLookup('_SWSSNAPSHOT_GET1') ~= 0 end   -- 12 ноя: SWS есть / нет — один раз (NamedCommandLookup шёл каждый кадр)
+    if not ctx.msn_sws then return nil end
     local now = reaper.time_precise()
     local c = ctx.msn_c
     if c and now - c.t < 0.5 then c.xy = ctx.mixxy_info(); return c end
@@ -3864,6 +3865,17 @@ ctx = {
     end
     cmd_text_cache[pat] = found or false
     return found
+  end,
+  -- 12 ноя: id действий punch / pre-roll — один раз за сессию (было: поиск по имени каждый кадр, punch — дважды: info и ctrl)
+  rec_cmd = function(key)
+    local c = ctx.rec_cmds; if not c then c = {}; ctx.rec_cmds = c end
+    if c[key] == nil then
+      local id
+      if key == 'punch' then id = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch')
+      else id = ctx.cmd_by_text('pre-roll on record') end
+      c[key] = id or false
+    end
+    return c[key] or nil
   end,
   -- ── модуляционная матрица ──
   mod_field = function(r, key, val) local col = cur_col(); if col then edit.mod_field(col.track, r.fx, r.param, key, val) end end,
@@ -7613,6 +7625,21 @@ ctx = {
     end
     ctx.mk_cc, ctx.mk_set = sc, set
     return set
+  end,
+  -- 12 ноя: вкладки проектов главного модуля — опрос 4 Гц (EnumProjects / GetProjectName / IsProjectDirty на каждый
+  -- проект шли каждый кадр); смена активной вкладки — сразу (ключ — её указатель)
+  ptabs_info = function()
+    local cur, now = reaper.EnumProjects(-1), reaper.time_precise()
+    local c = ctx.ptabs_c
+    if c and c.cur == cur and now - c.t < 0.25 then return c.list end
+    local out = {}
+    for i = 0, 63 do
+      local p = reaper.EnumProjects(i); if not p then break end
+      local nm = (reaper.GetProjectName(p) or ''):gsub('%.[Rr][Pp][Pp]$', '')
+      out[#out + 1] = { name = nm ~= '' and nm or 'unsaved', on = p == cur, dirty = reaper.IsProjectDirty(p) ~= 0 }
+    end
+    ctx.ptabs_c = { cur = cur, t = now, list = out }
+    return out
   end,
   human_menu = function()
     -- 19 окт: проценты — amount панели humanizer (диапазоны и точки DSP — там: h)
@@ -14074,6 +14101,12 @@ ctx = {
   end,
   -- smart input — отдельный скрипт; нет его — кнопки нет (5 окт, релиз)
   smart_input_path = (os.getenv('HOME') or os.getenv('USERPROFILE') or '') .. '/code/reascript/jf_smart-input-select/jf_smart_set_input.lua',   -- 5 ноя: на Windows HOME нет — был nil .. и падение при запуске
+  -- 12 ноя: file_exists (stat диска) шёл каждый кадр из info — раз в секунду хватает, скрипт появляется редко
+  smart_ok = function()
+    local now = reaper.time_precise()
+    if ctx.smart_ok_v == nil or now - (ctx.smart_ok_t or 0) > 1 then ctx.smart_ok_t, ctx.smart_ok_v = now, reaper.file_exists(ctx.smart_input_path) end
+    return ctx.smart_ok_v
+  end,
   smart_input = function(col)
     col = col or cur_col(); if not col then return end
     reaper.SetOnlyTrackSelected(col.track)
@@ -24651,7 +24684,7 @@ local function frame()
     airwin_info = ctx.airwin_info,
     fx_ab = ctx.ab_get,
     step_labels = ctx.step_labels,
-    smart_ok = reaper.file_exists(ctx.smart_input_path),
+    smart_ok = ctx.smart_ok(),   -- 12 ноя: раз в секунду, не stat каждый кадр
     dsptrack = state.dsptrack, presets = ctx.presets,
     eqgraph = state.eqgraph, dspleft = state.dspleft, offdim = state.offdim, hints = state.hints,   -- 24 окт: описания (гнездо пустого контейнера) — только с хинтами
     -- шапка трека (7 окт, опция header info): инструменты lib, инсерты, сенды
@@ -24688,7 +24721,7 @@ local function frame()
       local b = reaper.format_timestr_pos(t, '', 2):gsub('%.00$', '')
       return b, reaper.format_timestr_pos(t, '', 0)
     end or nil,
-    punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+    punch = (function() local p = ctx.rec_cmd('punch'); ctx.punch_now = p and reaper.GetToggleCommandState(p) == 1; return ctx.punch_now end)(),   -- 12 ноя: id из кэша, значение кадра — и для ctrl ниже
     timesel = (function()
       local a, b = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
       if b - a < 1e-6 then return nil end
@@ -24890,20 +24923,12 @@ local function frame()
       q_dsp = state.dsp, q_side = state.side, q_mx = not state.mx_hidden, q_envs = state.envs, q_scopes = state.scopes, q_hints = state.hints,
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
-      ptabs = state.ptabs and (function()
-        local out, cur = {}, reaper.EnumProjects(-1)
-        for i = 0, 63 do
-          local p = reaper.EnumProjects(i); if not p then break end
-          local nm = (reaper.GetProjectName(p) or ''):gsub('%.[Rr][Pp][Pp]$', '')
-          out[#out + 1] = { name = nm ~= '' and nm or 'unsaved', on = p == cur, dirty = reaper.IsProjectDirty(p) ~= 0 }
-        end
-        return out
-      end)() or nil,
+      ptabs = state.ptabs and ctx.ptabs_info() or nil,   -- 12 ноя: опрос 4 Гц (был перебор проектов каждый кадр)
       quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
-      punch = (function() local p = ctx.cmd_exact('Record: Set record mode to time selection auto-punch') or ctx.cmd_by_text('record mode: time selection auto punch'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
-      preroll = (function() local p = ctx.cmd_by_text('pre-roll on record'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
+      punch = ctx.punch_now,   -- 12 ноя: посчитано выше в этом же кадре (info.punch)
+      preroll = (function() local p = ctx.rec_cmd('preroll'); return p and reaper.GetToggleCommandState(p) == 1 end)(),
       ripple = ctx.ripple_mode(),   -- 16 окт: ripple editing REAPER (0 off, 1 per track, 2 all tracks)
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
