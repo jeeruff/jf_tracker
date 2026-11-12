@@ -880,7 +880,7 @@ function D.layout_core(snap, state, nregions)
     L.status_h = (L.rh + 4) + L.pn_keys
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
-    local c = lay.by_panel.tracker
+    local c = lay.by_panel[D.layout_leaf or 'tracker']   -- 12 ноя: tracker#2 — раскладка на свой лист
     local tr = c and c.content or { x = 0, y = 0, w = gfx.w, h = gfx.h - L.status_h }
     -- 15 окт: развёрнут другой модуль (zz) — у трекера листа нет: не раскладывать его на всё окно под ним
     -- (шапка «fx Superior», транспорт и модлайн ложились поверх развёрнутого слайсера)
@@ -9004,11 +9004,17 @@ function D.frame(L, snap, rows, state, info)
     hover.garden = th.garden
   end
 
+  -- 12 ноя (tracker#2, PLAN_BUFFERS): тело трекера — шапки треков, строки, курсор — функция вида: параметры
+  -- затеняют кадровые (L, rows, state, info, hover), тело не сдвинуто. Второй вид зовёт её до основного;
+  -- hy / ph / cur / vis читает остаток кадра — последним их пишет основной вид
+  local hy, ph, cur, vis
+  D.track_block = function(L, rows, state, info, hover)
+  local W, tx0 = L.win_w, L.matrix_w
   D.pmark('draw: track headers')
   -- 11 окт: модуль mixer — фон его листа до полосок (оболочка листов рисуется позже и его не трогает)
   if L.mix_pane then set(U.PANEL); gfx.rect(L.mix_pane.x, L.mix_pane.y, L.mix_pane.w, L.mix_pane.h, 1) end
   -- заголовок
-  local hy = L.header_y
+  hy = L.header_y
   -- 9 ноя: одинаковые имена треков — в сокращённом имени номер трека в конце (иначе не отличить)
   do local cnt = {}; D.hdr_dups = {}; for _, c in ipairs(L.cols or {}) do local n = c.col and c.col.name or ''; cnt[n] = (cnt[n] or 0) + 1; if cnt[n] > 1 then D.hdr_dups[n] = true end end end
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
@@ -10613,9 +10619,9 @@ function D.frame(L, snap, rows, state, info)
   end
 
   -- тело
-  local ph = info.ph_row and math.floor(info.ph_row) or nil
-  local cur = info.cur_row and math.floor(info.cur_row) or nil
-  local vc, vis = info.vcur, info.vis
+  ph = info.ph_row and math.floor(info.ph_row) or nil
+  cur = info.cur_row and math.floor(info.cur_row) or nil
+  local vc; vc, vis = info.vcur, info.vis
   local env_vals = {}
   for _, c in ipairs(L.cols) do
     for _, ev in ipairs(c.envs) do env_vals[ev] = info.env_values and info.env_values(ev.e) or {} end
@@ -11651,6 +11657,9 @@ function D.frame(L, snap, rows, state, info)
     if fs then D.cracks(tx0, L.body_y, W - tx0, L.body_h, ins and fs ~= 'blood', ex, fs) end end   -- 31 окт: рамка; INSERT — красная
   if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
   if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
+  end
+  if info.t2_draw then info.t2_draw(D.track_block) end   -- 12 ноя: tracker#2
+  D.track_block(L, rows, state, info, hover)
   D.pmark('draw: matrix / performance')
   -- 21 окт: что видно в трекере (строки тела, треки) — матрица подсвечивает эту зону светло-серым
   do
