@@ -35442,7 +35442,8 @@ ctx.t2_draw = function(block, info)
   local lpb2 = st.lpb or state.lpb   -- 12 ноя: своё LPB вида — только сетка строк, время общее (как плейхед и edit-курсор REAPER)
   local snap2 = (lpb2 == state.lpb) and snap or model.snapshot_at(lpb2)
   local r0, r1 = ctx.t2_span(st, lpb2)
-  st.cur = math.max(r0, math.min(r1 - 1, st.cur or r0))
+  if type(st.cur) ~= 'number' then st.cur = r0 end   -- 13 ноя: страховка (сохранённая раскладка / старый щелчок)
+  st.cur = math.max(r0, math.min(r1 - 1, st.cur))
   local c0 = L.pn.by_panel[id]
   local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
   if ctx.t2_Lk ~= key then
@@ -35499,7 +35500,9 @@ ctx.t2_click = function()
   local mx, my = gfx.mouse_x, gfx.mouse_y
   if not (mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h) then return false end
   local st = ctx.BUF.get(v.id) and ctx.BUF.get(v.id).st
-  if st and v.hv.row then st.cur = v.hv.row end
+  local hr = v.hv.row   -- hover.row тела — таблица строки ({ row = … }), не номер
+  if type(hr) == 'table' then hr = hr.row end
+  if st and type(hr) == 'number' then st.cur = hr end
   ctx.set_focus(v.id)
   vim.msg = 'tracker 2: j k rows, [ ] ' .. ((st and st.mode == 'phrase') and 'phrase' or 'pattern') .. ', p pattern / phrase, Space listen, Enter - the main cursor here, Esc back'
   return true
