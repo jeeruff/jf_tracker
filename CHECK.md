@@ -2667,3 +2667,4 @@
 - playlist seq: a phrase by its bare name (p1) works, the error says phrase too; the seq row has a status tip; Ctrl+W ? = hints pane, Ctrl+W I = help pane (swapped); PANE keys land in the debug log
 - phrase trigger note: inst field = the phrase number from the lib (phrases section), no " and no amber box / name over the item; copies stay as ghosts
 - phrase trigger: a " at the top-left and the bottom-right corner of the item (amber), no box
+- phrase copies: no SL00 (loop off is their norm, as for slices)

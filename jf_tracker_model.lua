@@ -450,7 +450,8 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   local fo = R.GetMediaItemInfo_Value(it, 'D_FADEOUTLEN')
   if fo > 0.02 then fx[#fx + 1] = 'SO' .. M.hex2((qn1 - R.TimeMap2_timeToQN(0, pos + len - fo)) * lpb * 16) end
   -- loop source в REAPER включён по умолчанию — показываем только ВЫКЛЮЧЕННЫЙ
-  if not slk and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 then fx[#fx + 1] = 'SL00' end   -- 13 окт: у слайса луп выкл — норма, не показывать
+  -- 12 ноя: и у куска фразы (копия P_EXT:jf_phrc) луп выкл — норма: без SL00 на каждой копии
+  if not slk and R.GetMediaItemInfo_Value(it, 'B_LOOPSRC') ~= 1 and (select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_phrc', '', false)) or '') == '' then fx[#fx + 1] = 'SL00' end   -- 13 окт: у слайса луп выкл — норма, не показывать
   local cm = R.GetMediaItemTakeInfo_Value(take, 'I_CHANMODE')
   if cm and cm ~= 0 then fx[#fx + 1] = 'SM' .. M.hex2(math.floor(cm)) end
   -- слайс (P_EXT:jf_slice) командой не показывается (2 окт): как в Renoise,
