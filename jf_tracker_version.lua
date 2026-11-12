@@ -5,6 +5,7 @@ V.VERSION = '0.9.4'
 V.DATE = '2026-11-05'
 V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
+    'phrases: listen from a MIDI key or Shift + a note key (the phrase tracks solo); Shift+Space on a trigger plays its transposed copies; MIDI rec writes triggers',
     'phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item',
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
     'DSP: T pins the panel to its track (° after the name), T again - follow the cursor',

@@ -9704,7 +9704,7 @@ ctx = {
     for _, o in ipairs(ctx.mx_solo) do reaper.SetMediaTrackInfo_Value(o[1], 'I_SOLO', only[o[1]] and 2 or 0) end
     -- 18 окт: follow во время прослушки уводил курсор трекера на паттерн — вернуть после
     if not ctx.mx_keep_cur then ctx.mx_keep_cur = { row = vim.cur.row, row0 = state.row0 } end
-    PV.midi(t0, math.min(t1, t0 + 8))
+    PV.midi(t0, math.min(t1, t0 + (owner == 'phrase' and 32 or 8)))   -- 12 ноя: фраза — до 32 с
   end,
   mx_cell_preview_end = function()
     if not ctx.mx_solo then return end
@@ -19610,7 +19610,45 @@ ctx.play_note_item = function(it)
   local len = reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
   local _, l0 = reaper.GetSetMediaItemInfo_String(it, 'P_EXT:jf_len', '', false)
   if tonumber(l0) then len = math.max(len, tonumber(l0)) end
+  -- 12 ноя: триггер фразы — слышно её копии (они на треках фразы, транспонированы как нота): соло и их треков
+  local tk = reaper.GetActiveTake(it)
+  local _, tn = tk and reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)
+  if tk and (tn or ''):match('^ph:') then
+    local only = ctx.phr_tracks(p0, p0 + len, true)
+    only[reaper.GetMediaItem_Track(it)] = true
+    ctx.mx_cell_preview(only, p0, p0 + len, 'phrase')
+    return
+  end
   ctx.mx_cell_preview(reaper.GetMediaItem_Track(it), p0, p0 + len, 'note')
+end
+-- 12 ноя: треки с айтемами в [t0, t1) (copies — только копии фраз, P_EXT:jf_phrc) → { [track] = true }
+ctx.phr_tracks = function(t0, t1, copies)
+  local out = {}
+  for ti = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, ti)
+    for k = 0, reaper.CountTrackMediaItems(tr) - 1 do
+      local it2 = reaper.GetTrackMediaItem(tr, k)
+      local a = reaper.GetMediaItemInfo_Value(it2, 'D_POSITION')
+      if a >= t1 then break end
+      if a + reaper.GetMediaItemInfo_Value(it2, 'D_LENGTH') > t0 + 1e-6
+         and (not copies or (select(2, reaper.GetSetMediaItemInfo_String(it2, 'P_EXT:jf_phrc', '', false)) or '') ~= '') then
+        out[tr] = true; break
+      end
+    end
+  end
+  return out
+end
+-- 12 ноя: прослушать фразу (выбранную в lib или по имени): её источник (регион ph:NAME за =END) транспортом, соло —
+-- треки фразы; звучит через их инструменты и FX, как в песне. Высота — исходная (транспоз слышен на триггере: Shift+Space)
+ctx.phr_preview = function(name)
+  local r = ctx.phr_find(name or state.phr_inst or '')
+  if not r then return false end
+  if reaper.GetPlayState() & 1 == 1 and not ctx.mx_solo then vim.msg = 'phrase: playing - stop first to listen'; return false end
+  local only = ctx.phr_tracks(r.pos, r.rend)
+  if not next(only) then vim.msg = 'phrase ' .. r.name .. ': empty'; return false end
+  ctx.mx_cell_preview(only, r.pos, r.rend, 'phrase')
+  vim.msg = ('phrase %s: listening (%.1f beats)'):format(r.name, r.lenq or 0)
+  return true
 end
 ctx.help_pane_on = function() return L and L.pn and L.pn.by_panel and L.pn.by_panel.help ~= nil end
 -- 28 окт: панель hints — что за модуль под мышью (вне модулей — в фокусе) и как с ним работать (draw.panes.about)
@@ -22972,6 +23010,11 @@ local function poll_midi_in()
   local pinst = col and not state.midi_inst and not state.auto_inst and not (ctx.inst_fx and ctx.inst_fx(col)) and (col.pool or {})[vim.inst] or nil
   if pinst and not (pinst.item and reaper.ValidatePtr(pinst.item, 'MediaItem*')) then pinst = nil end
   local function play_in(e)
+    if ctx.phr_on and ctx.phr_on() then   -- 12 ноя: фраза из lib — MIDI-нота слушает её (источник, исходная высота)
+      local st, d2 = e.buf:byte(1) or 0, e.buf:byte(3) or 0
+      if (st & 0xF0) == 0x90 and d2 > 0 then ctx.phr_preview() end
+      return
+    end
     if not pinst then return end
     local st, d1, d2 = e.buf:byte(1), e.buf:byte(2) or 0, e.buf:byte(3) or 0
     local kind = st and (st & 0xF0)
@@ -23009,6 +23052,8 @@ local function poll_midi_in()
         if ctx.ai_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
       elseif kind == 0x90 and d2 > 0 and state.midi_inst then
         if ctx.mc_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
+      elseif kind == 0x90 and d2 > 0 and ctx.phr_on and ctx.phr_on() then   -- 12 ноя: фраза из lib — запись ставит её триггер (высота = транспоз)
+        if ctx.phr_insert(d1, vim.cur.row) then vim.cur.row = vim.cur.row + math.max(0, vim.step or 1) end
       elseif kind == 0x90 and d2 > 0 then
         if midiin.nheld == 0 then
           -- новый аккорд: строка курсора; без Shift — перезапись того, что там стоит

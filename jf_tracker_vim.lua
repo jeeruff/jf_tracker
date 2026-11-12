@@ -2901,6 +2901,7 @@ function V.key_impl(c)
       if ctx.ai_insert(kp, V.cur.row) then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       return
     end
+    if kp and ctx.phr_on and ctx.phr_on() and how == 'audition' then if ctx.phr_preview then ctx.phr_preview() end; return end   -- 12 ноя: Shift+нота — послушать фразу
     if kp and ctx.phr_on and ctx.phr_on() and how ~= 'audition' then   -- 11 ноя: фраза из lib — её триггер, высота клавиши
       if ctx.phr_insert(kp, V.cur.row) then V.cur.row = V.cur.row + step_rows(); ensure_visible() end
       return
