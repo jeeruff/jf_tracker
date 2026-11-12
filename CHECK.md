@@ -2679,3 +2679,4 @@
 - tracker 2 after review: layouts with tracker#2 / dsp#2 survive :reload (the # broke the whole layout); fractional LPB no longer crashes it; only one tracker 2 (a second Ctrl+W D focuses it); mouse wheel scrolls it; its own key bar; no VISUAL / hex box / pattern flash leaking from the main view
 - tracker 2: + / - set its own LPB (e.g. 16 beside a main at 4): the same notes on a finer grid, bars / patterns / markers / playhead at the same time, Enter and Space by time; a second snapshot is built only while the LPBs differ
 - pane title on the tracker too: 'tracker'; tracker 2 says 'phrase p1' / 'pattern B1'; hints where = tabs go into that strip (the bottom strip of the tracker is gone)
+- :keyphr (\ k f): note keys / MIDI C1.. play phrase 1, 2 … (stopped; phrase tracks solo); mode word PHRASEKB; keyspat turns it off and back

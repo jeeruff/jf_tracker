@@ -15898,6 +15898,7 @@ ctx = {
       -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb); 30 окт: clipkb убран
       { key = 'k', label = 'keyboard: notes / patterns', sub = function() return { title = 'keyboard', items = {
           { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
+          { key = 'f', label = 'keyphr - the note keys play the phrases (1st key - phrase 1)' .. (state.keyphr and '  (on)' or ''), fn = function() ctx.keyphr_cmd() end },
           { key = 'p', label = 'keyspat - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
         } } end },
       { key = 'I', label = 'instrument (pool)', sub = function()
@@ -22976,6 +22977,16 @@ local function poll_midi_in()
   end
   -- 1 ноя: patternkb включён — ноты MIDI-входа тоже запускают паттерны: C1 (36, первый пэд у большинства контроллеров)
   -- — первый паттерн, дальше по полутонам
+  if state.keyphr then   -- 12 ноя: keyphr — MIDI-ноты играют фразы: C1 (36) — фраза 1, дальше по полутонам
+    local rest = {}
+    for _, ev in ipairs(fresh) do
+      local st, nt, vl = ev.buf:byte(1) or 0, ev.buf:byte(2) or 0, ev.buf:byte(3) or 0
+      if (st & 0xF0) == 0x90 and vl > 0 and nt >= 36 then ctx.phr_key(nt - 36)
+      elseif not ((st & 0xF0) == 0x80 or (st & 0xF0) == 0x90) then rest[#rest + 1] = ev end
+    end
+    fresh = rest
+    if #fresh == 0 then return end
+  end
   if ctx.PADS and ctx.PADS.on then
     local rest = {}
     for _, ev in ipairs(fresh) do
@@ -25469,6 +25480,7 @@ local function frame()
   if ctx.vl_on then left = 'VIPER ' .. left end   -- 9 ноя: VIPER — только когда слой работает (клавиши из окна REAPER); в трекере — обычный режим
   if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
+  if state.focus == 'tracker' and state.keyphr and vim.mode == 'normal' then left = 'PHRASEKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end   -- 12 ноя
   if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
   end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
@@ -32230,6 +32242,12 @@ local function frame()
   if c == 6697266 and ctx.mods().cmd and not ctx.mods().ctrl and not ctx.mods().alt then ctx.reloading = true; quit = true; c = 0 end
   if c == 6697264 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.viper_toggle(); c = 0 end   -- 29 окт: Cmd+F10 — viper
   -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
+  -- 12 ноя: keyphr — нотные клавиши играют фразы проекта (1-я клавиша — фраза 1, как keyspat с паттернами)
+  if c > 0 and state.keyphr and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix' or state.focus == 'inst')
+     and vim.mode == 'normal' and not vim.picker and not vim.hydra and not vim.pending and not vim.op then
+    local m = ctx.mods()
+    if not (m.cmd or m.ctrl or m.alt or m.shift) then ctx.phr_key(keys.piano[c]); c = 0 end
+  end
   if c > 0 and ctx.PADS and ctx.PADS.on and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix')
      and vim.mode == 'normal' and not vim.picker and not vim.hydra and not vim.pending and not vim.op then
     local m = ctx.mods()
@@ -34899,9 +34917,25 @@ ctx.pads_write = function()
   model.invalidate(); regions = model.regions(state.lpb)
   vim.msg = ('pads rec: %d pattern(s) written after the song (linked repeats; u - undo)'):format(n)
 end
+-- 12 ноя: keyphr — нотные клавиши / MIDI играют фразы проекта (k-я клавиша — k-я фраза lib); keyspat при этом выкл
+ctx.keyphr_cmd = function(arg)
+  arg = (arg or ''):match('%a+') or ''
+  local on = (arg == 'off' and false) or (arg == 'on' and true) or not state.keyphr
+  state.keyphr = on or nil
+  if on and ctx.PADS then ctx.PADS.on, ctx.PADS.rec = false, false end
+  local n = #ctx.phr_list()
+  vim.msg = on and ('keyphr on: the note keys / MIDI C1.. play the %d phrase(s) (Shift+Space on a trigger - its copies; :keyphr off)'):format(n) or 'keyphr off'
+end
+ctx.phr_key = function(k)
+  local l = ctx.phr_list()
+  local r = l[(k or 0) + 1]
+  if not r then vim.msg = ('keyphr: no phrase on this key (%d phrase(s))'):format(#l); return end
+  ctx.phr_preview(r.name)
+end
 ctx.pads_cmd = function(arg)
   local P = ctx.PADS
   arg = (arg or ''):match('%a+') or ''
+  state.keyphr = nil   -- 12 ноя: keyspat и keyphr — одно из двух
   if arg == 'quant' or arg == 'sudden' then P.mode = arg; P.on = true
   elseif arg == 'rec' then
     if P.rec then P.rec = false; ctx.pads_write(); return end
