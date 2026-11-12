@@ -25904,7 +25904,13 @@ local function frame()
     buf_with = function(id, fn, ...) return ctx.BUF.with(id, fn, ...) end,   -- 12 ноя: отрисовка буфера #n с его состоянием
     t2_draw = ctx.t2_draw,   -- 12 ноя: tracker#2
     dsp_buf = state.dsp_buf or 'dsp', dsp_fields = dsp_fields, buf_switch = function(id) ctx.BUF.switch(id); dspt_cache.pin = nil end,   -- 12 ноя: dsp#2 — второй лист DSP
-    in_draw = function(Lx, x, y, w, h, foc) local rows, cols = ctx.in_data(); return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 11 ноя: панель inputs
+    in_draw = function(Lx, x, y, w, h, foc)
+      local rows, cols = ctx.in_data()
+      local xs, at = {}, {}   -- 13 ноя: колонки треков трекера (панель под / над ним — те же x и ширины)
+      for _, c in ipairs((L and L.cols) or {}) do if c.col and c.col.track and c.x and c.w then at[c.col.track] = { x = c.x, w = c.w } end end
+      for i, r in ipairs(rows) do xs[i] = at[r.tr] end
+      return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit, xs)
+    end,   -- 11 ноя: панель inputs
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = (LG.to and LG.to ~= 'here') and ctx.lfo_take_target() or ctx.lfo_here_target() or ctx.lfo_target()

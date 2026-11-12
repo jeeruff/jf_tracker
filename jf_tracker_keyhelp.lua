@@ -444,7 +444,7 @@ KH.PAGES = {
     { k = 'any key', d = 'lights up and fades (modifiers too), to show how the tracker is played' },
   } },
   inputs = { title = 'inputs - the record input of every track as a grid (Ctrl+W g j)', e = {
-    { k = 'h j k l', d = 'the cell: track (row) / input (column): none, MIDI all, each MIDI device, audio pairs, mono inputs' },
+    { k = 'h j k l', d = 'the cell: j k - input (row: none, MIDI all, each MIDI device, audio pairs, mono), h l - track (column; under / over the tracker the columns line up with its tracks)' },
     { k = 'Enter  click', d = 'this input for this track (a track has one input in REAPER)' },
     { k = 'a  click on a column name', d = 'this input for every track (u undoes)' },
     { k = 'x', d = 'only the cursor track keeps its input, the others none' },
