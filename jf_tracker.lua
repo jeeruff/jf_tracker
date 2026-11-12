@@ -6310,7 +6310,7 @@ ctx = {
   -- Tab стек, + - < > размер, = поровну, z zoom, c скрыть, Space пресет,
   -- u отмена, Esc / Enter / Ctrl+W — выход
   -- 1 ноя: буквы-команды режима PANE (панель с такой буквой — только g + буква)
-  PANE_CMD = { h = 1, j = 1, k = 1, l = 1, H = 1, J = 1, K = 1, L = 1, w = 1, W = 1, g = 1, s = 1, v = 1, T = 1, B = 1, X = 1, x = 1,
+  PANE_CMD = { D = 1, h = 1, j = 1, k = 1, l = 1, H = 1, J = 1, K = 1, L = 1, w = 1, W = 1, g = 1, s = 1, v = 1, T = 1, B = 1, X = 1, x = 1,
     z = 1, c = 1, q = 1, u = 1, ['+'] = 1, ['-'] = 1, ['<'] = 1, ['>'] = 1, ['='] = 1, [' '] = 1 },
   pane_key = function(c)
     local PN, m = draw.panes, state.panes
@@ -6366,8 +6366,12 @@ ctx = {
     elseif ch == '>' or ch == '<' then ctx.pane_do(function() return PN.resize(m, id, 'h', ch == '>' and 0.03 or -0.03) end)
     elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
     elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
+    elseif ch == 'D' then   -- 12 ноя: D duplicate — ещё один экземпляр панели (буфер, PLAN_BUFFERS): рядом справа, фокус на него
+      local nid = ctx.BUF.new(PN.base(id))
+      if nid then ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
+      else vim.msg = ('-- PANE -- D: %s has one instance (so far: inputs)'):format(PN.base(id)) end
     elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
-      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker') end
+      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); ctx.BUF.drop(id) end   -- 12 ноя: буфер #n — выбросить
     elseif ch == ' ' then
       ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
       local nm = PN.preset(ctx.pn_preset, m)
@@ -18244,6 +18248,7 @@ ctx.INP = dofile(DIR .. '/jf_tracker_inputs.lua')
 -- 12 ноя: буферы панелей (PLAN_BUFFERS.md, шаг 1): модуль + состояние; буфер 1 = таблица модуля, 'inputs#2' —
 -- второй экземпляр с подменой полей (B.with). Регистрация называет поля состояния; роутер и раскладка — шаг 3.
 ctx.BUF = dofile(DIR .. '/jf_tracker_buffers.lua')
+draw.panes.on_buffer = function(id) return ctx.BUF.ensure(id) ~= nil end   -- раскладка из скринсета / ExtState: 'inputs#2' оживает
 ctx.BUF.register('inputs', ctx.INP, { 'r', 'c', 'r0', 'c0' }, { r = 1, c = 1, r0 = 1, c0 = 1 })
 -- 12 ноя: вход с контроллера через экшены REAPER (actions/jf_tracker_*.lua, нативный MIDI / OSC learn; :learn
 -- регистрирует их и открывает список экшенов). Скрипты пишут ExtState jf_tracker/in, трекер забирает в кадре.
@@ -18322,8 +18327,8 @@ ctx.ain_bind = function(target)
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
 ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
-ctx.BUF.register('reform', ctx.RF, { 'sel' }, { sel = 1 })
-ctx.BUF.register('humanizer', ctx.HU, { 'sel' }, { sel = 1 })
+ctx.BUF.register('reform', ctx.RF, {})      -- значения (rf_p) общие в main — второй буфер пока не нужен
+ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 -- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);
 -- в фокусе reform / humanizer — подсказка называет экшен строки курсора
 ctx.ain_learn = function()
@@ -25676,6 +25681,7 @@ local function frame()
       local st = reaper.JS_VKeys_GetState and reaper.JS_VKeys_GetState(now - 1)
       ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
     end,
+    buf_with = function(id, fn, ...) return ctx.BUF.with(id, fn, ...) end,   -- 12 ноя: отрисовка буфера #n с его состоянием
     in_draw = function(Lx, x, y, w, h, foc) local rows, cols = ctx.in_data(); return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 11 ноя: панель inputs
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
@@ -28557,9 +28563,10 @@ local function frame()
       ctx.dsp_env_focus = nil
       click = { t = now2, zone = 'acvnew' }
     elseif hover.inputs then   -- 11 ноя: панель inputs — клетка: вход треку, подпись колонки: всем
-      ctx.set_focus('inputs')
-      if hover.inputs.all then ctx.in_apply({ op = 'all', c = hover.inputs.all })
-      else ctx.INP.r, ctx.INP.c = hover.inputs.r, hover.inputs.c; ctx.in_apply({ op = 'set', r = hover.inputs.r, c = hover.inputs.c }) end
+      local hi = hover.inputs
+      ctx.set_focus(hi.id or 'inputs')
+      if hi.all then ctx.in_apply({ op = 'all', c = hi.all })
+      else ctx.BUF.with(hi.id or 'inputs', function() ctx.INP.r, ctx.INP.c = hi.r, hi.c end); ctx.in_apply({ op = 'set', r = hi.r, c = hi.c }) end
       click = { t = now2, zone = 'inputs' }
     elseif hover.phr then   -- 31 окт: панель phrases — щелчок строка, двойной — в курсор; new
       ctx.set_focus('phrases')
@@ -32964,10 +32971,10 @@ local function frame()
           return
         end
         return vim.key(c)
-      elseif state.focus == 'inputs' then   -- 11 ноя: панель входов
+      elseif draw.panes.base(state.focus) == 'inputs' then   -- 11 ноя: панель входов (12 ноя: и буфер inputs#2)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local rows, cols = ctx.in_data()
-        local r = ctx.INP.key(c, #rows, #cols)
+        local r = ctx.BUF.with(state.focus, ctx.INP.key, c, #rows, #cols)
         if r == 'leave' then ctx.set_focus('tracker')
         elseif type(r) == 'table' then ctx.in_apply(r)
         elseif not r then return vim.key(c) end

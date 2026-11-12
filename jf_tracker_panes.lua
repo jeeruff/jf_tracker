@@ -190,7 +190,8 @@ function PN.normalize(model)
       if is_leaf(n) then
         local out = {}
         for _, id in ipairs(n.panes) do
-          if PN.BY[id] and not seen[id] then seen[id] = true; out[#out + 1] = id end
+          -- 12 ноя: 'inputs#2' — буфер: берётся, если хук on_buffer (main → B.ensure) его знает
+          if PN.BY[id] and not seen[id] and (id == PN.base(id) or not PN.on_buffer or PN.on_buffer(id)) then seen[id] = true; out[#out + 1] = id end
         end
         n.panes = out
       end
@@ -1042,7 +1043,7 @@ PN.ABOUT = {
 function PN.about(id, ctx)
   local fn = ctx and ctx.about_fn and ctx.about_fn[id]
   if fn then local ok, t = pcall(fn); if ok and t then return t end end
-  return PN.ABOUT[id]
+  return PN.ABOUT[id] or PN.ABOUT[PN.base(id)]
 end
 
 return PN

@@ -5,6 +5,7 @@ V.VERSION = '0.9.4'
 V.DATE = '2026-11-05'
 V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
+    'panes as buffers (first step): Ctrl+W D duplicates a pane with its own cursor and scroll - inputs for now, dsp and tracker next',
     'midi tab (own MIDI learn of the slicer) removed: its knobs and buttons are jf_tracker actions now (:learn)',
     ':learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer',
     'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',

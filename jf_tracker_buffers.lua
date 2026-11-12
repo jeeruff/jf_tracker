@@ -39,6 +39,16 @@ function B.new(mod)
   return id
 end
 function B.get(id) return B.bufs[id] end
+-- буфер по id из сохранённой раскладки ('inputs#2'): есть — он, модуль умеет — создать с этим номером, иначе nil
+function B.ensure(id)
+  if B.bufs[id] then return B.bufs[id] end
+  local mod, n = B.base(id)
+  if n < 2 or not B.can_multi(mod) then return nil end
+  local m, st = B.mods[mod], {}
+  for _, f in ipairs(m.fields) do st[f] = m.defaults and m.defaults[f]; if st[f] == nil then st[f] = m.tbl[f] end end
+  B.bufs[id] = { id = id, mod = mod, n = n, st = st }
+  return B.bufs[id]
+end
 function B.drop(id) local b = B.bufs[id]; if b and b.n > 1 then B.bufs[id] = nil; return true end; return false end
 function B.list(mod)
   local out = {}

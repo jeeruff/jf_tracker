@@ -416,7 +416,7 @@ function D.panes_layout(state, L, nregions, ncols)
   M.tab_h = L.rh + 2 + D.TABGAP                         -- подпись листа — вкладкой над рамкой
   M.hint_h = (state.hints and state.hintpos == 'panes') and (L.rh + 1) or 0   -- 10 окт: строка клавиш под каждой панелью (hints where)
   M.hint_trk = (state.hints and state.hintpos == 'tabs') and (L.rh + 1) or nil   -- 15 окт: tabs — подсказки в строке вкладок; у трекера вкладок нет — его строка внизу
-  M.tabw = function(id) return ms(D.ic(id, D.panes.BY[id].label)) end
+  M.tabw = function(id) return ms(D.ic(id, D.plabel(id))) end
   -- item: все параметры сэмпла в две колонки + строка заголовка + строки кнопок вкладки
   M.minh = function(id)
     -- 1 ноя: минимум item (все параметры сэмпла) снят — он держал высоту всего нижнего стека (dsp, options …); свойства — своя панель
@@ -2433,6 +2433,12 @@ local ICON = {
   take = 0xF0A6, grid = 0xF00A, dsp = 0xF1DE, files = 0xF07B, autoprev = 0xF04B,
   monitor = 0xF025, monauto = 0xF0E7, proj = 0xF15B,
 }
+-- 12 ноя: подпись панели; буфер 'inputs#2' — «inputs 2»
+function D.plabel(id)
+  local p = D.panes.BY[id]
+  local b, n = tostring(id):match('^(.-)#(%d+)$')
+  return (p and p.label or id) .. (n and (' ' .. n) or '')
+end
 function D.ic(name, text)
   -- иконки только в TTF-режиме; битмап — строго буквы (решение пользователя)
   local cp = D.icons and not D.hybrid and D.font_id ~= 0 and ICON[name]
@@ -7934,7 +7940,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if cramped and #c.tabs > 1 then
           local x0, avail, n = c.tabs[1].x, c.x + c.w - c.tabs[1].x - 1, #c.tabs
           local full, need = {}, {}
-          for k, t in ipairs(c.tabs) do full[k] = D.ic(t.id, PN.BY[t.id].label); need[k] = ms(full[k]) + 2 * L.pad end
+          for k, t in ipairs(c.tabs) do full[k] = D.ic(t.id, D.plabel(t.id)); need[k] = ms(full[k]) + 2 * L.pad end
           local budget, left, rest = {}, avail, n
           local changed = true
           while changed do
@@ -7958,7 +7964,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           local t0 = c.tabs[1]
           for _, t in ipairs(c.tabs) do if t.id == id then t0 = t end end
           local x0 = c.tabs[1].x
-          local lw = math.min(ms(D.ic(t0.id, PN.BY[t0.id].label)) + 2 * L.pad, c.w - ms('>') - 4 * L.pad)
+          local lw = math.min(ms(D.ic(t0.id, D.plabel(t0.id))) + 2 * L.pad, c.w - ms('>') - 4 * L.pad)
           tabs = { { id = t0.id, x = x0, y = t0.y, w = lw, h = t0.h } }
           local mx0 = x0 + lw + L.pad
           local mw = ms('>') + 2 * L.pad
@@ -7969,7 +7975,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
           if mhot then local ids = {}; for _, t in ipairs(c.tabs) do ids[#ids + 1] = t.id end; hover.ptabmore = ids end
         end
         for _, t in ipairs(tabs) do
-          local lbl = t.lbl or fit(D.ic(t.id, PN.BY[t.id].label), t.w - L.pad - 2)
+          local lbl = t.lbl or fit(D.ic(t.id, D.plabel(t.id)), t.w - L.pad - 2)
           if lbl ~= '' then
             local on = t.id == id
             local hot = mx >= t.x and mx < t.x + t.w and my >= t.y and my < t.y + t.h
@@ -7997,7 +8003,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       -- 15 окт: hints where = tabs — клавиши модуля в строке вкладок, справа от подписей (глаз уже здесь)
       if c.tab and info.hint_bars and state.hints and state.hintpos == 'tabs' and id ~= 'mixer' then
         local last = c.tabs[#c.tabs]
-        local hx = (last and (last.x + math.min(last.w, ms(fit(D.ic(last.id, PN.BY[last.id].label), last.w - 2 * L.pad)) + 2 * L.pad)) or c.x) + 3 * L.pad
+        local hx = (last and (last.x + math.min(last.w, ms(fit(D.ic(last.id, D.plabel(last.id)), last.w - 2 * L.pad)) + 2 * L.pad)) or c.x) + 3 * L.pad
         local page = (id == 'browser' and (info.browser_page or 'browser')) or (id == 'pm' and 'pm') or (id == 'garden' and 'orca') or PN.BY[id].hint or id
         if PN.BY[id].tab and id == info.toptab and info.top_page then page = info.top_page end   -- 15 окт: вкладка — подсказки её страницы (холст automation)
         local bar = info.hint_bars(page) or D.PANE_KEYS
@@ -8020,7 +8026,10 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         if pp then pp.ins = info.vmode == 'insert' end
         D.piano_strip(L, ct.x, ct.y + 2, ct.w, ct.h - 2, pp, { ctrl = info.ctrl, kbd_only = true, wheels = info.wheels }, hover)
       elseif id == 'qwerty' and info.kc_draw then info.kc_draw(ct.x, ct.y, ct.w, ct.h)   -- 6 ноя: keycaster — своя панель
-      elseif id == 'inputs' and info.in_draw then hover.inputs = info.in_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'inputs'); if not inside then hover.inputs = nil end   -- 11 ноя
+      elseif PN.base(id) == 'inputs' and info.in_draw then   -- 11 ноя; 12 ноя: и буфер inputs#2 (своё состояние на время отрисовки)
+        hover.inputs = info.buf_with and info.buf_with(id, info.in_draw, L, ct.x, ct.y, ct.w, ct.h, foc == id) or info.in_draw(L, ct.x, ct.y, ct.w, ct.h, foc == id)
+        if hover.inputs then hover.inputs.id = id end
+        if not inside then hover.inputs = nil end
       elseif id == 'phrases' and info.phr_draw then hover.phr = info.phr_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'phrases'); if not inside then hover.phr = nil end   -- 31 окт
       elseif id == 'lfogen' and info.lfogen_draw then hover.lfogen = info.lfogen_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'lfogen'); if not inside then hover.lfogen = nil end   -- 31 окт
       elseif id == 'humanizer' and info.hum_draw then hover.hum = info.hum_draw(L, ct.x, ct.y, ct.w, ct.h, foc == 'humanizer'); if not inside then hover.hum = nil end   -- 19 окт
@@ -8127,7 +8136,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         end
         if inside and type(th) == 'table' then for k, v in pairs(th) do if k ~= 'tab' then hover[k] = v end end end
       elseif id ~= 'mixer' then
-        text(ct.x + L.pad, ct.y + 2, fit(PN.BY[id].label, ct.w - 2 * L.pad), U.GREY)
+        text(ct.x + L.pad, ct.y + 2, fit(D.plabel(id), ct.w - 2 * L.pad), U.GREY)
       end
       D.clip = nil
       -- 11 окт: 'top' — лист АКТИВНОЙ вкладки (стеков вкладок может быть два: clips сверху, visor слева;

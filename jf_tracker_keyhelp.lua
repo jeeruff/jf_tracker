@@ -82,6 +82,7 @@ KH.PAGES = {
     { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
     { k = '+ -  < >  =', d = 'height / width / equal in the parent' },
     { k = 'z', d = 'zoom the pane to the window, again - back (also :big for item)' },
+    { k = 'D', d = 'duplicate: one more instance of the pane beside it, its own cursor and scroll (inputs for now; q closes the extra one)' },
     { k = 'q', d = 'hide the pane (g + key brings it back)' },
     { k = 'c + key', t = {}, d = 'custom modules - files in modules/ and Data/jf_tracker_modules/: c f - freesound' },
     { k = 'Space  u', d = 'next layout (main-left, main-right, wide, stack, tracker) / undo' },

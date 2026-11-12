@@ -2658,3 +2658,4 @@
 - reform row tip ends with ' · MIDI Chan 1 CC 21' once bound (reaper-kb.ini, 3 s); :learn in reform names the row action (jf_tracker_reform_scale)
 - midi tab gone: slicer knobs / buttons are actions (slicer: slice start / end / move, sensitivity, volume, instrument, eq2..32, transients …) via :learn; :tab midi / :midi gone
 - buffers step 1 (no visible change): jf_tracker_buffers.lua, PN.BY['dsp#2'] = dsp; nothing creates a second buffer yet
+- PANE (Ctrl+W) D on inputs: a second inputs pane 'inputs 2' with its own cursor; keys / clicks go to the focused one; q on it drops it; other panes say 'one instance'
