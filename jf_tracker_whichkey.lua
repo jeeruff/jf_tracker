@@ -32,7 +32,7 @@ local T = {
         { '> <', 'all wider / narrower' }, { '. ,', 'track wider / narrower' }, { 'x', 'crossfade editor' }, { 'X', 'mixer taller' },
         { 'u', 'unfold fast notes' }, { 'p', 'pattern / project' }, { 's', 'zoom the selection (VISUAL / time sel.)' }, { 'S', 'section / project' }, { 'r', 'router' },
         { 'R', 'big router' } } },
-  pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
+  pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'a p e f i', 'audio / song / edit / files / info' }, { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },
         { 'w W  1..9', 'next / prev / number' }, { 'g + key', 'go to panel' }, { 's v + key', 'split below / right' },
         { 'T + key', 'stack (tab)' }, { 'B', 'out of the stack' }, { 'X + key  x', 'swap / with last' },
         { '+ -  < >', 'height / width' }, { '=', 'equal' }, { 'z', 'zoom' }, { 'D  v t', 'duplicate / tracker 2' }, { 'q', 'hide' }, { 'c + key', 'custom modules (c f freesound)' }, { 'Space', 'next layout' }, { 'u', 'undo' } },

@@ -82,6 +82,7 @@ KH.PAGES = {
     { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
     { k = '+ -  < >  =', d = 'height / width / equal in the parent' },
     { k = 'z', d = 'zoom the pane to the window, again - back (also :big for item)' },
+    { k = 'a p e f i', d = 'panes by category: a audio (i inputs, d dsp, x mixer, f fx, r rec, c scopes, m master, k keys), p song (m matrix, p patterns, l playlist, f phrases, e console), e edit (a automation, r reform, h humanizer, g lfogen, b bouncer, n note mod, y clipboard, u undo), f files (l lib, b browser, w map, i item, e properties, p pm), i info (h help, ? hints, z manual, a actions, o notes, p performance, , options, q qwerty, n main, k tracks); g + letter - a pane by its own letter' },
     { k = 'D', d = 'duplicate (also s / v / T + the letter of an open tracker, dsp, inputs - e.g. v t): on the tracker - tracker 2 (another pattern or a phrase: j k J K g G rows, h l tracks, [ ] next, p pattern / phrase, + - its own LPB (the time is shared, only the grid differs), Space listen, Enter - the main cursor there to edit, Esc back); on other panes one more instance beside it, its own cursor and scroll (inputs for now; q closes the extra one)' },
     { k = 'q', d = 'hide the pane (g + key brings it back)' },
     { k = 'c + key', t = {}, d = 'custom modules - files in modules/ and Data/jf_tracker_modules/: c f - freesound' },

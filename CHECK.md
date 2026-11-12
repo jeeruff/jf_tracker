@@ -2685,3 +2685,4 @@
 - corner buttons phr pat sec prj: phr shows the phrase (lib pick / under the cursor / the first) - its source past =END, looped and playing area set; pat / sec / prj leave it; proj is now prj
 - quick option inputs (main, after hints): shows the inputs pane as a tab beside main, focus there; again - hides; Ctrl+W g j / the corner button do the same
 - loom button: a menu - a auto, m man, n next turn, o off
+- Ctrl+W a / p / e / f / i - a menu of panes by category (a i = inputs, a d = dsp, p m = matrix, e r = reform, f l = lib, i h = help …); g + letter still opens a pane by its own letter (g a automation, g p pm, g f fx, g i item, g e properties)

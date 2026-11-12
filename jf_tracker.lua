@@ -6363,6 +6363,14 @@ ctx = {
   -- 1 ноя: буквы-команды режима PANE (панель с такой буквой — только g + буква)
   PANE_CMD = { D = 1, h = 1, j = 1, k = 1, l = 1, H = 1, J = 1, K = 1, L = 1, w = 1, W = 1, g = 1, s = 1, v = 1, T = 1, B = 1, X = 1, x = 1,
     z = 1, c = 1, q = 1, u = 1, ['+'] = 1, ['-'] = 1, ['<'] = 1, ['>'] = 1, ['='] = 1, [' '] = 1 },
+  -- 13 ноя: категории панелей (буква категории → буква панели); остальные буквы — панели напрямую, g + буква — всегда панель
+  PANE_CAT = {
+    a = { title = 'audio', items = { { 'i', 'inputs' }, { 'd', 'dsp' }, { 'x', 'mixer' }, { 'f', 'fxb' }, { 'r', 'retro' }, { 'c', 'scopes' }, { 'm', 'master' }, { 'k', 'keycaster' } } },
+    p = { title = 'song', items = { { 'm', 'matrix' }, { 'p', 'patterns' }, { 'l', 'arranger' }, { 'f', 'phrases' }, { 'e', 'console' } } },
+    e = { title = 'edit', items = { { 'a', 'automation' }, { 'r', 'reform' }, { 'h', 'humanizer' }, { 'g', 'lfogen' }, { 'b', 'renderer' }, { 'n', 'nmod' }, { 'y', 'clipboard' }, { 'u', 'undotree' } } },
+    f = { title = 'files / sounds', items = { { 'l', 'inst' }, { 'b', 'browser' }, { 'w', 'map' }, { 'i', 'sample' }, { 'e', 'sprops' }, { 'p', 'pm' } } },
+    i = { title = 'info', items = { { 'h', 'help' }, { '?', 'hints' }, { 'z', 'manual' }, { 'a', 'actions' }, { 'o', 'notes' }, { 'p', 'perf' }, { ',', 'options' }, { 'q', 'qwerty' }, { 'n', 'ctrl' }, { 'k', 'tracks' } } },
+  },
   pane_key = function(c)
     local PN, m = draw.panes, state.panes
     local ch = (c > 0 and c < 256) and string.char(c) or ''
@@ -6420,6 +6428,19 @@ ctx = {
     elseif ch:match('^[1-9]$') then ctx.pane_focus(L.pn.order[tonumber(ch)])
     elseif ch == 'g' or ch == 's' or ch == 'v' or ch == 'T' or ch == 'X' or ch == 'c' then
       ctx.pn_pend = ch; vim.msg = '-- PANE -- ' .. ch .. (ch == 'c' and ' + custom module letter' or ' + panel letter')
+    elseif ctx.PANE_CAT[ch] then   -- 13 ноя: панели по категориям — Ctrl+W a i (audio → inputs); g + буква — сама панель, как было
+      local cat = ctx.PANE_CAT[ch]
+      local items = {}
+      for _, e in ipairs(cat.items) do
+        local pid = e[2]
+        if PN.BY[pid] then
+          items[#items + 1] = { key = e[1], label = PN.BY[pid].label .. (PN.visible(m, pid) and '  (open)' or ''), fn = function()
+            if not PN.visible(m, pid) then ctx.pane_do(function() return PN.show(m, pid) end) end
+            ctx.pane_focus(pid); state.pane_mode = false
+          end }
+        end
+      end
+      vim.open_hydra({ title = 'PANE ' .. ch .. ' - ' .. cat.title, items = items })
     elseif not ctx.PANE_CMD[ch] and PN.BYKEY[ch] then   -- 1 ноя: буква панели — сразу к ней (меню это и обещало), как g + буква
       local tgt = PN.BYKEY[ch]
       if not PN.visible(m, tgt) then ctx.pane_do(function() return PN.show(m, tgt) end) end
