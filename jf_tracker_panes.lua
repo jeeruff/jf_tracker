@@ -73,6 +73,9 @@ PN.PANELS = {
   { id = 'garden',     label = 'orca',       key = 'O', hint = 'orca',    side = 'top', tab = true, avail = 'dev' },
 }
 PN.BY, PN.TABS, PN.BYKEY = {}, {}, {}
+-- 12 ноя: буферы (jf_tracker_buffers.lua): 'dsp#2' — второй экземпляр панели dsp; реестр один, BY['dsp#2'] = BY.dsp
+function PN.base(id) if type(id) == 'string' then local b = id:match('^(.-)#%d+$'); if b then return b end end; return id end
+setmetatable(PN.BY, { __index = function(t, k) local b = PN.base(k); if b ~= k then return rawget(t, b) end end })
 for _, p in ipairs(PN.PANELS) do
   PN.BY[p.id] = p
   PN.BYKEY[p.key] = p.id
@@ -681,7 +684,7 @@ local SIDE_DIR = { left = 'l', right = 'r', top = 'u', bottom = 'd' }
 -- показать: at — панель, рядом с которой (по умолчанию трекер со стороны
 -- PANELS[id].side); share — доля новичка
 function PN.show(model, id, at, share)
-  if not model.hidden[id] then return false end
+  if PN.visible(model, id) then return false end   -- 12 ноя: буфер 'dsp#2' в hidden не числится — по дереву
   local p = PN.BY[id]
   if not p then return false end
   return PN.split(model, at or 'tracker', id, SIDE_DIR[p.side] or 'd', share or 0.25)

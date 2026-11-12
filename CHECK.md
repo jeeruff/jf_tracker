@@ -2657,3 +2657,4 @@
 - :learn - registers actions/jf_tracker_*.lua, opens the action list: bind a CC to 'value of the slider under the cursor', focus reform (gr) - the knob moves the row; next / prev / Enter buttons; reform:scale direct; OSC /action too
 - reform row tip ends with ' · MIDI Chan 1 CC 21' once bound (reaper-kb.ini, 3 s); :learn in reform names the row action (jf_tracker_reform_scale)
 - midi tab gone: slicer knobs / buttons are actions (slicer: slice start / end / move, sensitivity, volume, instrument, eq2..32, transients …) via :learn; :tab midi / :midi gone
+- buffers step 1 (no visible change): jf_tracker_buffers.lua, PN.BY['dsp#2'] = dsp; nothing creates a second buffer yet

@@ -18241,6 +18241,10 @@ end
 ctx.PHP = dofile(DIR .. '/jf_tracker_phrasepane.lua')
 -- 11 ноя: панель inputs — входы всех треков матрицей (колонки — устройства раз в секунду: подключили / отключили)
 ctx.INP = dofile(DIR .. '/jf_tracker_inputs.lua')
+-- 12 ноя: буферы панелей (PLAN_BUFFERS.md, шаг 1): модуль + состояние; буфер 1 = таблица модуля, 'inputs#2' —
+-- второй экземпляр с подменой полей (B.with). Регистрация называет поля состояния; роутер и раскладка — шаг 3.
+ctx.BUF = dofile(DIR .. '/jf_tracker_buffers.lua')
+ctx.BUF.register('inputs', ctx.INP, { 'r', 'c', 'r0', 'c0' }, { r = 1, c = 1, r0 = 1, c0 = 1 })
 -- 12 ноя: вход с контроллера через экшены REAPER (actions/jf_tracker_*.lua, нативный MIDI / OSC learn; :learn
 -- регистрирует их и открывает список экшенов). Скрипты пишут ExtState jf_tracker/in, трекер забирает в кадре.
 ctx.AIN = dofile(DIR .. '/jf_tracker_actin.lua')
@@ -18318,6 +18322,8 @@ ctx.ain_bind = function(target)
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
 ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
+ctx.BUF.register('reform', ctx.RF, { 'sel' }, { sel = 1 })
+ctx.BUF.register('humanizer', ctx.HU, { 'sel' }, { sel = 1 })
 -- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);
 -- в фокусе reform / humanizer — подсказка называет экшен строки курсора
 ctx.ain_learn = function()

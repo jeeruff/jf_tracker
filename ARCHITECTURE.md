@@ -104,7 +104,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | файл | строк | за что отвечает |
 |---|---:|---|
 | **ядро: данные и правка** | | |
-| `jf_tracker.lua` | 39948 | трекерный вид таймлайна REAPER с Vim-редактированием. |
+| `jf_tracker.lua` | 39954 | трекерный вид таймлайна REAPER с Vim-редактированием. |
 | `jf_tracker_model.lua` | 3132 | снимок проекта REAPER в трекерных строках. |
 | `jf_tracker_edit.lua` | 6592 | ВСЕ записи трекера в проект REAPER. |
 | `jf_tracker_pooled.lua` | 766 | слоты и регионы матрицы, pooled-повторы паттернов (было jf_tracker_alias.lua, этап 6). |
@@ -124,7 +124,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_names.lua` | 62 | подсказки имён (5 окт): «/» в поле имени трека, инструмента, item или региона открывает список. |
 | **окно: раскладка и рисование** | | |
 | `jf_tracker_draw.lua` | 15029 | отрисовка снимка трекера в gfx. |
-| `jf_tracker_panes.lua` | 1045 | раскладка окна как в tmux / zellij (9 окт). |
+| `jf_tracker_panes.lua` | 1048 | раскладка окна как в tmux / zellij (9 окт). |
 | `jf_tracker_ui.lua` | 287 | нативная графика REAPER (gfx), минимализм. |
 | `jf_tracker_themes.lua` | 122 | темы трекера (3 окт). |
 | `jf_tracker_smart.lua` | 353 | смарт-панель (9 окт, как Smart Select в PlayerPro / Paketti): у ячейки курсора всплывает сетка значений того поля, где стоит курсор — ноты (октавы … |
@@ -169,6 +169,7 @@ Vim-слой (`jf_tracker_vim.lua`): режимы NORMAL / INSERT / VISUAL, дв
 | `jf_tracker_aim.lua` | 68 | математика прицела (12 окт): где в файле звучит нота на строке курсора, где это в секундах показанного инструмента e, где резать в проекте; привязк… |
 | `jf_tracker_arc.lua` | 75 | monome arc в трекере (15 окт): 4 кольца = 4 параметра эффекта. |
 | `jf_tracker_autocanvas.lua` | 825 | холст автоматизации (15 окт): страница curve вкладки automation. |
+| `jf_tracker_buffers.lua` | 76 | панель показывает буфер: модуль + его состояние (курсор, прокрутка, выбор). |
 | `jf_tracker_console.lua` | 228 | консоль: живой язык паттернов (Strudel) в трекере (28 окт; тест tests/test_console.lua). |
 | `jf_tracker_curves.lua` | 95 | кривые для выделения на колонке огибающей (24 окт): reform для автоматизации. |
 | `jf_tracker_dbgshare.lua` | 80 | :debug share: лог отладки, который можно отправить автору. |
