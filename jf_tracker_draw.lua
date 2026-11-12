@@ -2767,7 +2767,12 @@ function DCS.inst()
   local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
   -- 31 окт: нота-триггер фразы (тейк ph:NAME); 12 ноя: номер фразы из lib, как у любого инструмента (был знак " и буква)
   local ph = cell and cell.kind == 'midi' and cell.take and D.phrase_of(cell.take)
-  if ph then local pn = D.phr_num(cell.item, ph); text(x + L.x_inst, ty, pn and D.DEC2[pn % 100] or ph:sub(1, 2), c('inst', cell.muted and U.GREY or U.TEXT))
+  if ph then   -- 13 ноя: C-4 11" — номер фразы из lib и знак фразы сразу за ним (влезает — до поля громкости; узко — только номер)
+    local pn = D.phr_num(cell.item, ph)
+    local s2 = pn and D.DEC2[pn % 100] or ph:sub(1, 2)
+    text(x + L.x_inst, ty, s2, c('inst', cell.muted and U.GREY or U.TEXT))
+    local qx = x + L.x_inst + ms(s2)
+    if not L.x_vol or qx + ms('"') <= x + L.x_vol + 1 then text(qx, ty, '"', U.AMBER) end
   elseif not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
   if ph then
   elseif n then text(x + L.x_inst, ty, D.DEC2[n % 100], c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
@@ -10720,10 +10725,11 @@ function D.frame(L, snap, rows, state, info)
               do
                 local tk = it.midi and reaper.GetActiveTake(it.item)
                 local ph = tk and D.phrase_of(tk)
-                if ph then   -- 12 ноя: триггер — обычная нота с номером фразы; метка фразы — " слева сверху и справа снизу
-                  local qw = ms('"')
-                  if y0 >= by0 then text(x0 + 1, cy0 - 1, '"', U.AMBER) end
-                  if y1 <= by1 then text(x0 + w0 - qw - 1, cy1 - (L.rh - 1), '"', U.AMBER) end
+                if ph then   -- 13 ноя: триггер — обычная нота; уголки янтарём: слева сверху и справа снизу (кавычки были непонятны)
+                  local k = math.max(3, math.floor(L.rh / 2))
+                  set(U.AMBER)
+                  if y0 >= by0 then gfx.rect(x0, cy0, k, 1, 1); gfx.rect(x0, cy0, 1, k, 1) end
+                  if y1 <= by1 then gfx.rect(x0 + w0 - k, cy1 - 1, k, 1, 1); gfx.rect(x0 + w0 - 1, cy1 - k, 1, k, 1) end
                 elseif D.phrc(it.item) then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end
               end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)

@@ -2688,3 +2688,4 @@
 - Ctrl+W a / p / e / f / i - a menu of panes by category (a i = inputs, a d = dsp, p m = matrix, e r = reform, f l = lib, i h = help …); g + letter still opens a pane by its own letter (g a automation, g p pm, g f fx, g i item, g e properties)
 - inputs pane turned: rows = inputs, columns = tracks; j k input, h l track; put it under the tracker (stack with dsp / mixer) - its columns line up with the tracker tracks
 - f jumps reach the inputs pane: a label on every cell and input name; the jump puts the cursor there (Enter sets, a - every track)
+- phrase trigger: C-4 11" on one line (lib number, amber " right after it; a narrow column - just the number); the item has amber corner lines top-left and bottom-right instead of the quote marks
