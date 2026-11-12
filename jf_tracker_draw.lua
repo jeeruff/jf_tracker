@@ -9006,11 +9006,11 @@ function D.frame(L, snap, rows, state, info)
     hover.garden = th.garden
   end
 
-  -- 12 ноя (tracker#2, PLAN_BUFFERS): тело трекера — шапки треков, строки, курсор — функция вида: параметры
+  -- 12 ноя (tracker#2, PLAN_BUFFERS): тело трекера (D.tracker_body; D.track_block — блок track в DSP) — функция вида: параметры
   -- затеняют кадровые (L, rows, state, info, hover), тело не сдвинуто. Второй вид зовёт её до основного;
   -- hy / ph / cur / vis читает остаток кадра — последним их пишет основной вид
   local hy, ph, cur, vis
-  D.track_block = function(L, rows, state, info, hover)
+  D.tracker_body = function(L, rows, state, info, hover)
   local W, tx0 = L.win_w, L.matrix_w
   D.pmark('draw: track headers')
   -- 11 окт: модуль mixer — фон его листа до полосок (оболочка листов рисуется позже и его не трогает)
@@ -11660,8 +11660,8 @@ function D.frame(L, snap, rows, state, info)
   if state.sand then D.sand(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор sand
   if state.bloodviz then D.blood(L, tx0, L.body_y, W - tx0, L.body_h) end   -- 31 окт: визуализатор blood   -- 31 окт: эксперимент
   end
-  if info.t2_draw then info.t2_draw(D.track_block, info) end   -- 12 ноя: tracker#2
-  D.track_block(L, rows, state, info, hover)
+  if info.t2_draw then info.t2_draw(D.tracker_body, info) end   -- 12 ноя: tracker#2
+  D.tracker_body(L, rows, state, info, hover)
   D.pmark('draw: matrix / performance')
   -- 21 окт: что видно в трекере (строки тела, треки) — матрица подсвечивает эту зону светло-серым
   do

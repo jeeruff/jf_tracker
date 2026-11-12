@@ -57,14 +57,14 @@ lib в две колонки. Одна прокрутка / курсор / фо�
 
 План (тот же приём, что D.dsp_block):
 1. `D.layout(snap, state, n, leaf)` — лист по id (по умолчанию 'tracker'); для #2 — state-копия с его row0 / hscroll.
-2. Тело трекера → `D.track_block = function(L, rows, state, info)` внутри D.frame (параметры затеняют кадровые —
+2. Тело трекера → `D.tracker_body = function(L, rows, state, info)` внутри D.frame (параметры затеняют кадровые —
    тело не правится), вызов для основного как сейчас.
 3. tracker#2: буфер { row0, hscroll, cur = { fi, row }, pin = паттерн / треки }; для его листа — своя L2 (layout на
    лист), свои rows (строки окна), info2 = setmetatable({ vcur = cur2, focus = … }, { __index = info }); hover
    второго вида — свой (не мешать щелчкам основного).
 4. Клавиши #2 (v1): j k / gg G / [ ] паттерн / Space играть / Enter — перенести основной курсор сюда; правка — нет.
 5. PANE D на трекере → tracker#2 (PN: tracker fixed — разрешить 'tracker#n' как не fixed).
-Сделано 12 ноя: шаги 1–5 (D.track_block, layout_leaf, ctx.t2_*: паттерн / фраза через model.SHOW_EXTRA,
+Сделано 12 ноя: шаги 1–5 (D.tracker_body, layout_leaf, ctx.t2_*: паттерн / фраза через model.SHOW_EXTRA,
 клавиши, щелчок, PANE D). Нет: правка прямо во втором виде, свои треки, подсказки строки клавиш листа.
 Риск: 200 локалей main (всё в ctx.* / draw.*), кэши строк в D.* по одному виду — ключевать по id листа; цена кадра ×2
 пока виден второй вид. Оценка: ~250–400 строк, 3–4 шага с тестами.
