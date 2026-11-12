@@ -24022,6 +24022,8 @@ function ctrl_action(name, delta)
       else vim.step_auto = true end
       vim.msg = 'step: ' .. (vim.step_next and 'next - to the next note / item / command / envelope point of the track' or (vim.step_auto and 'auto - to the end of the inserted item / slice' or tostring(vim.step)))
     else vim.step = math.max(0, vim.step + delta); vim.step_auto = false; vim.step_next = false end
+  elseif name == 'loom' then ctx.loom_cmd(state.loom and 'off' or 'man')   -- 12 ноя: вкл (man) / выкл; Opt+щелчок — auto
+  elseif name == 'loomnext' then if state.loom == 'man' then ctx.loom_next() elseif state.loom then ctx.loom_cmd('man') else ctx.loom_cmd('auto') end
   elseif name == 'human' then ctx.human_menu()   -- 31 окт: щелчок — снова меню (вкл / выкл — o в нём, unhuman — u)
   elseif name == 'velbar' then
     if delta == 0 then ctx.veldrag = true else vim.vel = math.max(1, math.min(127, (vim.vel or 100) + delta * 4)); vim.msg = 'velocity ' .. vim.vel end
@@ -25909,7 +25911,7 @@ local function frame()
     ctrl = {
       bigbpm = state.bigbpm and not state.viper, bigstatus = state.bigstatus,   -- 9 ноя: viper — время и BPM обычным текстом
       playing = is_playing, pos = fmt_pos(playpos or curpos), bpm = reaper.Master_GetTempo(), rate = reaper.Master_GetPlayRate(0), rate_pop = ctx.rate_pop, slowrate = state.slowrate, slowrec = ctx.slowrec ~= nil, qtz = ctx.qtz_on(cur_col() and cur_col().track), bpm_edit = state.bpm_edit,
-      slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, holdroll = state.holdroll, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
+      slicepitch = state.slicepitch, insmode = state.insmode, legato = edit.step_legato, loom = state.loom, holdroll = state.holdroll, human = state.human, lpb = state.lpb, oct = vim.octave, vel = vim.vel, step = vim.step_next and 'next' or (vim.step_auto and 'auto' or vim.step), inst = vim.inst,
       follow = state.follow, lock = state.lock, fixed = state.fixed, loop = reaper.GetSetRepeat(-1) == 1,
       pitchmode = (cur_col() and state.pitchmodes[cur_col().guid]) or 'shift',
       font = state.font, scale = state.fontscale, fx = state.fxcols, meters = state.meters, wave = state.wave,
@@ -27134,6 +27136,8 @@ local function frame()
   elseif hover.ctrl == 'tp_play' then state.status = 'play / stop (Space)'
   elseif hover.ctrl == 'tp_pause' then state.status = 'pause'
   elseif hover.ctrl == 'rec' then state.status = 'record into the cursor track from the cursor row (Option+R); while recording - stop and keep (Space)'
+  elseif hover.ctrl == 'loom' then state.status = 'loom: the cursor pattern loops while you weave it - click: on (man) / off (:loom)'
+  elseif hover.ctrl == 'loomnext' then state.status = state.loom == 'man' and 'loom man: the next turn as a new pattern after this one, the loop moves there (Opt+Enter)' or (state.loom == 'auto' and 'loom auto: just loops - click: man' or 'loom off - click: loom auto (just loops)')
   elseif hover.ctrl == 'human' then state.status = ('human %d%%%s: small random timing, pitch, volume of what you write - click: menu (on / off, amount, u unhuman)'):format(state.human or 0, state.unhuman and ', unhuman' or '')
   elseif hover.ctrl == 'qtz' then state.status = 'qtz: input quantize of the cursor track - recorded MIDI lands on the step (1/LPB beat); click - its menu: on / off, grid, strength, direction, note-offs'
   elseif hover.ctrl == 'ripple' then state.status = 'ripple editing (REAPER): off / per track / all tracks - click: the list; on - deleting a note pulls up what is below it'

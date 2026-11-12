@@ -5357,10 +5357,12 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %s%s'):format(D.lpb_s(c.lpb or 4), ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
                   { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = col3 },   -- 28 окт: Opt+`
-                  { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 } },
+                  { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 },
+                  { 'loom', 'loom', c.loom and U.CYAN or U.GREY, res = col3 } },   -- 12 ноя: loom — паттерн по кругу (man / auto)
                 { { '_', '', w = stepw }, { 'pitch', (c.pitchmode == 'resample') and 'rsmp' or 'shft', res = col2 },
                   { 'ripple', ({ [0] = 'ripp', 'ripp', 'rip*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = col3 },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
-                  { 'human', 'hmnz', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 15 окт: human — тайминг, высота, velocity
+                  { 'human', 'hmnz', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 },
+                  { 'loomnext', c.loom == 'auto' and 'auto' or 'next', c.loom and U.TEXT or U.DIM, res = col3 } } }   -- 12 ноя: man — следующий виток (= Opt+Enter); auto — пометка   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
