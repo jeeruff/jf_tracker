@@ -10698,7 +10698,10 @@ function D.frame(L, snap, rows, state, info)
               do
                 local tk = it.midi and reaper.GetActiveTake(it.item)
                 local ph = tk and D.phrase_of(tk)
-                if ph then   -- 12 ноя: триггер — обычная нота с номером фразы, без коробки и имени (экономит колонку)
+                if ph then   -- 12 ноя: триггер — обычная нота с номером фразы; метка фразы — " слева сверху и справа снизу
+                  local qw = ms('"')
+                  if y0 >= by0 then text(x0 + 1, cy0 - 1, '"', U.AMBER) end
+                  if y1 <= by1 then text(x0 + w0 - qw - 1, cy1 - (L.rh - 1), '"', U.AMBER) end
                 elseif D.phrc(it.item) then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end
               end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
