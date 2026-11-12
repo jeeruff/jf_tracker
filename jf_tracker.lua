@@ -1024,7 +1024,7 @@ local function dsp_fields()
     dsp_range = (on and DK.anchor) and { DK.range(dsp_sel) } or nil,
     dsp_marks = on and DK.marks or nil,
     dsp_fxs = t and t.fx or {},
-    dsp_title = t and ((t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' · pinned' or '')) or nil,
+    dsp_title = t and ((t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' °' or '')) or nil,
     dsp_is_take = t and t.take or false,
     dsp_col = t and t.col or nil,
   }
@@ -25796,7 +25796,7 @@ local function frame()
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
     dsp_fxs = (function() local t = dsp_target(); return t and t.fx or {} end)(),
     dsp_title = (function() local t = dsp_target(); if not t then return nil end
-      return (t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' · pinned' or '') end)(),   -- 12 ноя: те же поля — dsp_fields()
+      return (t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' °' or '') end)(),   -- 12 ноя: те же поля — dsp_fields()
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
