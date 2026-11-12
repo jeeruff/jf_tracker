@@ -2664,3 +2664,4 @@
 - PANE (Ctrl+W) D on inputs: a second inputs pane 'inputs 2' with its own cursor; keys / clicks go to the focused one; q on it drops it; other panes say 'one instance'
 - dsp#2 step 1 (no visible change): dsp selection + DK keys registered as a buffer; dsp_target honours dsp_sel.pin (no UI yet)
 - dsp#2: Ctrl+W D on the dsp pane - a second DSP pinned to the cursor track ('name · pinned'); the first keeps following the cursor; click / Cmd+hjkl pick which one gets the keys (focus frame); q on it closes; the layout keeps it (unpinned after a restart)
+- playlist seq: a phrase by its bare name (p1) works, the error says phrase too; the seq row has a status tip; Ctrl+W ? = hints pane, Ctrl+W I = help pane (swapped); PANE keys land in the debug log

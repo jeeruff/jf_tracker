@@ -43,7 +43,7 @@ function PL.parse(text, find)
     local ref, m = PL.word(tok)
     local pats = ref and find(ref)
     if not ref then t.err = m
-    elseif not pats or #pats == 0 then t.err = ('"%s": no such pattern / section / region number'):format(ref)
+    elseif not pats or #pats == 0 then t.err = ('"%s": no such pattern / section / phrase / region number'):format(ref)
     elseif (m.rep or 1) < 1 or (m.div or 1) < 1 or (m.len and m.len < 1) then t.err = ('"%s": zero?'):format(tok) end
     if t.err then errs[#errs + 1] = t.err
     else

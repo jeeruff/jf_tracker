@@ -6358,6 +6358,7 @@ ctx = {
     local PN, m = draw.panes, state.panes
     local ch = (c > 0 and c < 256) and string.char(c) or ''
     local id = ctx.pane_cur()
+    if state.debug and ctx.dlog then ctx.dlog(('pane key %d %q pend %s cur %s focus %s'):format(c, ch, tostring(ctx.pn_pend), tostring(id), tostring(state.focus))) end   -- 12 ноя: PANE в debug-лог
     local pend = ctx.pn_pend
     ctx.pn_pend = nil
     if pend then
@@ -26961,6 +26962,11 @@ local function frame()
   elseif hover.matrix and hover.matrix.dur then state.status = 'region length in steps - click: change (:len N, =); later regions and items ripple'
   elseif hover.matrix and hover.matrix.bpm then state.status = 'tempo at the pattern start - click: type the BPM of this pattern (a tempo marker at its start)'
   elseif hover.matrix and hover.matrix.btn == 'view' then state.status = 'matrix view: detail, fill, ruler, s/e, bpm column (z)'
+  elseif hover.matrix and hover.matrix.chainbtn then   -- 12 ноя: строка seq — что это (было без подсказки)
+    local b = hover.matrix.chainbtn
+    state.status = ({ pltext = 'seq: the song as one line - pattern and phrase names in order (A1 A1 B1x2 C1:16 p1; xN repeat, :N first N rows); click or C - type, Enter - keep, Space - play',
+      plname = 'seq: this list - click: rename (several lists: < > switch, :seq new)', play = 'seq: play the song in this order (Space)', render = 'seq: write the song after the end as one piece (:seq write)',
+      clear = 'seq: clear the line', plprev = 'seq: the previous list', plnext = 'seq: the next list' })[b] or 'seq'
   elseif hover.matrix and hover.matrix.palbtn then
     state.status = ({
       plist = '+playlist: the pattern of the cursor slot goes to the end of the current playlist',
@@ -37137,7 +37143,7 @@ ctx.pl_find = function(ref)
   end
   local n, lo = tonumber(ref), ref:lower()
   for _, rg in ipairs(pats) do if (n and rg.idx == n) or (not n and rg.name:lower() == lo) then return { one(rg) } end end
-  if not n and lo:match('^ph:') then for _, s in ipairs(secs) do if s.name:lower() == lo then return { one(s) } end end end   -- 11 ноя: фраза в seq
+  if not n then for _, s in ipairs(secs) do if s.name:lower() == lo or s.name:lower() == 'ph:' .. lo then return { one(s) } end end end   -- 11 ноя: фраза в seq; 12 ноя: и голым именем (p1)
   for _, s in ipairs(secs) do if (n and s.idx == n) or (not n and s.name:lower() == lo) then return sec(s) end end
 end
 ctx.pl_words = function()
@@ -38695,7 +38701,7 @@ ctx.chain_draw = function(Lx, x, y, w)
     local cx0 = bx + U.measure(pre)
     if math.floor(reaper.time_precise() * 2) % 2 == 0 then U.set(U.AMBER); gfx.rect(cx0, y, 2, Lx.rh - 2, 1) end
   elseif text == '' then
-    U.text(bx, y, ctx.fit(cfoc and 'empty - a on a cube appends, i inserts' or 'a / double click a cube, or C - type it: A1 A1 B1x2 C1:16', tw), cfoc and U.AMBER or U.DIM)
+    U.text(bx, y, ctx.fit(cfoc and 'empty - a on a cube appends, i inserts' or 'the song as text: pattern / phrase names in order (A1 B1x2 p1) - click or C to type', tw), cfoc and U.AMBER or U.DIM)
   else   -- 19 окт: ячейками — курсор (фокус chain), играющая — зелёным
     local cur = ctx.PLY and ctx.PLY.segs[ctx.PLY.i]
     local tx, k = bx, 0
@@ -38739,7 +38745,7 @@ ctx.spl_find = function(ref)
   local function one(rg) return { rg = rg, rows = math.floor(rg.r1 - rg.r0 + 0.5) } end
   local n, lo = tonumber(ref), ref:lower():gsub('_', ' ')
   if not n then for _, rg in ipairs(pats) do if rg.name:lower() == lo then return { one(rg) } end end end   -- 11 ноя: и паттерн по имени
-  if not n and lo:match('^ph:') then for _, s2 in ipairs(secs) do if s2.name:lower() == lo then return { one(s2) } end end end   -- 11 ноя: фраза — её источник целиком
+  if not n then for _, s2 in ipairs(secs) do if s2.name:lower() == 'ph:' .. lo then return { one(s2) } end end end   -- 11 ноя: фраза — её источник целиком; 12 ноя: голым именем (p1)
   for _, s2 in ipairs(secs) do
     if (n and s2.idx == n) or (not n and s2.name:lower() == lo) then
       local o = {}

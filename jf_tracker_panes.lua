@@ -49,7 +49,7 @@ PN.PANELS = {
   { id = 'inputs',     label = 'inputs',     key = 'j', hint = 'inputs',  side = 'right' },   -- 11 ноя: входы всех треков матрицей   -- 31 окт: фразы проекта (ph:NAME)
   { id = 'lfogen',     label = 'lfogen',     key = 'G', hint = 'lfogen',  side = 'right' },   -- 31 окт: генератор кривых (lfo / podkat / follow) — своя панель (был колонкой automation)
   { id = 'renderer',   label = 'bouncer',    key = 'B', hint = 'renderer', side = 'right' },   -- 20 окт: баунс нот, инструмент → сэмплер (gB)   -- 19 окт: тонкий humanizer (help — на ?)
-  { id = 'help',       label = 'help',       key = '?', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
+  { id = 'help',       label = 'help',       key = 'I', hint = 'help',    side = 'right' },        -- 17 окт: коротко о модуле в фокусе и его клавиши     -- 16 окт: действия REAPER — секции, группы, шорткаты, избранное
   { id = 'notes',      label = 'notes',      key = 'o', hint = 'notes',   side = 'bottom' },
   { id = 'fxb',        label = 'fx',         key = 'f', hint = 'fxb',     side = 'right' },
   { id = 'pm',         label = 'pm',         key = 'p', hint = 'pm',      side = 'right', avail = 'dev' },   -- 2 ноя: в релизе нет   -- 9 окт: проекты — своя панель (был режим браузера)
@@ -66,7 +66,7 @@ PN.PANELS = {
   { id = 'video',      label = 'video',      key = 'v', hint = 'video',   side = 'top', tab = true },
   { id = 'visor',      label = 'visor',      key = 'V', hint = 'visor',   side = 'top', tab = true },   -- 10 окт: шейдеры ReaVisor из трекера
   { id = 'grid',       label = 'grid',       key = 'g', hint = 'grid',    side = 'top', tab = true, avail = 'dev' },   -- 2 ноя: в релизе нет (monome)   -- 15 окт: всегда (arc / грид; было за dev-опцией gridtab — в стек вставала невидимой)
-  { id = 'hints',      label = 'hints',      key = 'I', hint = 'hints',   side = 'top' },
+  { id = 'hints',      label = 'hints',      key = '?', hint = 'hints',   side = 'top' },
   { id = 'manual',     label = 'manual',     key = 'Z', hint = 'help',    side = 'right' },
   { id = 'options',    label = 'options',    key = ',', hint = 'options', side = 'bottom' },   -- 1 ноя: окно Options — панелью (в стеке DSP): клавиши только в фокусе   -- 29 окт: вся справка (была на всё окно)
   { id = 'console',    label = 'console',    key = 'E', hint = 'console', side = 'bottom' },   -- 28 окт: Strudel-строки пишут ноты в паттерн (:console, \\ E)   -- 28 окт: что делает модуль под мышью / в фокусе (\\ h)
