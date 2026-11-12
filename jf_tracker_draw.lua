@@ -10733,7 +10733,7 @@ function D.frame(L, snap, rows, state, info)
                 end
                 local cg = (not ph) and D.phrc(it.item)
                 if ph then box(select(2, reaper.GetSetMediaItemInfo_String(it.item, 'GUID', '', false)), x0, cy0, w0, cy1 - cy0)
-                elseif cg then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 }; box(cg, x0, cy0, w0, cy1 - cy0) end
+                elseif cg then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end   -- 13 ноя: коробка — только колонка триггера (копии на других треках её не растягивают)
               end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
               if info.items_mode and it.sel then set(U.CYAN); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0) end
