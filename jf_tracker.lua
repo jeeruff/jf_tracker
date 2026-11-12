@@ -18366,10 +18366,6 @@ ctx.ain_bind = function(target)
   ctx.ain_kb = ctx.ain_kb or {}
   for _, a in ipairs(ctx.AIN.ACTIONS) do if a.target == target then return ctx.ain_kb[a.file] end end
 end
-ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
-ctx.BUF.register('dsp', dsp_sel, { 'fx', 'param', 'pin' }, { fx = 1, param = 1 }, { { tbl = DK, fields = { 'anchor', 'pending', 'marks' } } })   -- 12 ноя: dsp#2 — шаг 1 (pin — GUID закреплённого трека)
-ctx.BUF.register('reform', ctx.RF, {})      -- значения (rf_p) общие в main — второй буфер пока не нужен
-ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 -- :learn — зарегистрировать экшены и открыть список экшенов REAPER (поиск «jf_tracker», Add… — MIDI CC / OSC / клавиша);
 -- в фокусе reform / humanizer — подсказка называет экшен строки курсора
 ctx.ain_learn = function()
@@ -35075,6 +35071,11 @@ ctx.hum_load()   -- диапазоны вставки — сразу (E.HUM)
 ctx.RF = dofile(DIR .. '/jf_tracker_reform.lua')
 ctx.RF.hint = function(...) return ctx.hint(...) end   -- 21 окт: метки f в панели
 ctx.RF.fit = function(t, w) return ctx.fit(t, w) end   -- 21 окт: подсказка строки reform
+-- 12 ноя: подпись привязки контроллера в подсказке строки; буферы — dsp / reform / humanizer (RF и HU есть только здесь)
+ctx.RF.bind = function(k) return ctx.ain_bind('reform:' .. k) end
+ctx.BUF.register('dsp', dsp_sel, { 'fx', 'param', 'pin' }, { fx = 1, param = 1 }, { { tbl = DK, fields = { 'anchor', 'pending', 'marks' } } })   -- 12 ноя: dsp#2 — шаг 1 (pin — GUID закреплённого трека)
+ctx.BUF.register('reform', ctx.RF, {})      -- значения (rf_p) общие в main — второй буфер пока не нужен
+ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 ctx.rf_p = ctx.RF.defaults()
 ctx.rf_open = function(auto)
   -- 19 окт: панель без gr — последнее выделение трекера (запоминается каждый кадр VISUAL)
