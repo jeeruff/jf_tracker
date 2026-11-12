@@ -898,7 +898,7 @@ function M.build(lpb)
           -- зона сессии видна, когда сессия играет (M.SHOW_ZONE, 7 окт): каждый канал — свой клип
           local in_zone = M.SHOW_ZONE and snap.zone and ip >= snap.zone[1] - 1e-6 and ip < snap.zone[2] - 1e-6
           -- 12 ноя: tracker#2 показывает фразу — её источник за =END виден (и правится основным трекером)
-          if M.SHOW_EXTRA and ip >= M.SHOW_EXTRA[1] - 1e-6 and ip < M.SHOW_EXTRA[2] - 1e-6 then in_zone = true end
+          for _, w in ipairs(M.SHOW_EXTRA or {}) do if ip >= w[1] - 1e-6 and ip < w[2] - 1e-6 then in_zone = true end end   -- 12 ноя: окна (фраза основного вида, tracker 2)
           if ip >= snap.end_pos - 1e-6 and not in_zone then lane = nil end
         end
         -- 13 окт: копии ретриггера (0Rxy, P_EXT:jf_gen) — часть своей ноты: своих ячеек и подколонок нет

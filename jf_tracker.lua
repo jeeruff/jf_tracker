@@ -1634,6 +1634,8 @@ ctx = {
   -- 26 окт: вид — project (весь трек) / section (секция курсора, zS) / pattern (паттерн курсора, zp); транспозиция
   -- и чистка трека берут то, что видно (WYSIWYG, ctx.view_rows)
   view_mode = function(m)
+    if m == 'phrase' then return ctx.view_phrase() end   -- 12 ноя: phr — фраза (источник за =END), сразу в лупе
+    if state.view_phr then state.view_phr = nil; ctx.extra_set('main', nil) end
     state.view_reg = m ~= 'project'
     state.view_secmode = m == 'section' or nil
     state.view_sec = nil; state.view_item = nil
@@ -1641,7 +1643,7 @@ ctx = {
       section = 'view: the section of the cursor (zS again - the whole project, zp - the pattern)',
       pattern = 'view: the pattern of the cursor only (zp again - the whole project, zS - the section)' })[m]
   end,
-  view_cur = function() return not state.view_reg and 'project' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern') end,
+  view_cur = function() return not state.view_reg and 'project' or state.view_phr and 'phrase' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern') end,
   -- секция курсора: { pos, rgnend, name } или nil
   section_at = function(t)
     for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then return sc end end
@@ -29053,7 +29055,7 @@ local function frame()
       if state.fxparams and not state.fxrow then state.fxrow = true; reaper.SetExtState(EXT, 'fxrow', '1', true) end
       ctx.hdr_cache = {}; relayout()
     elseif hover.viewbtn == 'effects' then state.fxrow = not state.fxrow; reaper.SetExtState(EXT, 'fxrow', state.fxrow and '1' or '0', true); relayout()
-    elseif hover.viewbtn then ctx.view_mode(hover.viewbtn == 'reg' and 'pattern' or (hover.viewbtn == 'sec' and 'section' or 'project'))
+    elseif hover.viewbtn then ctx.view_mode(hover.viewbtn == 'reg' and 'pattern' or (hover.viewbtn == 'sec' and 'section' or (hover.viewbtn == 'phr' and 'phrase' or 'project')))
     elseif hover.rgbtn then ctx.region_btn(hover.rgbtn)
     elseif hover.rglen then
       if hover.rglen ~= 0 then ctx.region_len_step(hover.rglen) else ctx.region_len_menu() end
@@ -35294,8 +35296,7 @@ ctx.t2_span = function(st, lpb2)
     rg = rg or pooled.region_at(regions, edit.row_time(st.cur, lpb2, 0)) or list[1]
     if rg then st.rg = rg.name; r0, r1 = math.floor(model.row_of_time(rg.pos, lpb2) + 1e-6), math.ceil(model.row_of_time(rg.rgnend, lpb2) - 1e-6) else r0, r1 = 0, 64 end
   end
-  local old = model.SHOW_EXTRA
-  if (old and old[1]) ~= (extra and extra[1]) or (old and old[2]) ~= (extra and extra[2]) then model.SHOW_EXTRA = extra; model.invalidate() end
+  ctx.extra_set('t2', extra)
   return r0, math.max(r0 + 1, r1)
 end
 -- 12 ноя: нота-триггер фразы под курсором основного трекера → имя фразы (или nil)
@@ -35361,9 +35362,29 @@ draw.tracker_label = function(id)
   if st.mode == 'phrase' then return 'phrase ' .. (st.phr or '') end
   return 'pattern ' .. (st.rg or '')
 end
+-- 12 ноя: окна за =END, видимые модели (источники фраз): main — вид phr основного трекера, t2 — второй трекер
+ctx.extra_w = ctx.extra_w or {}
+ctx.extra_set = function(who, w)
+  ctx.extra_w[who] = w
+  local list, key = {}, ''
+  for _, k in ipairs({ 'main', 't2' }) do local v = ctx.extra_w[k]; if v then list[#list + 1] = v; key = key .. v[1] .. ':' .. v[2] .. ';' end end
+  if key ~= (ctx.extra_key or '') then ctx.extra_key = key; model.SHOW_EXTRA = #list > 0 and list or nil; model.invalidate() end
+end
+-- phr: основной трекер показывает фразу (выбранную в lib / под курсором / первую) и крутит её лупом
+ctx.view_phrase = function(name)
+  local r = ctx.phr_find(name or state.phr_inst or ctx.phrase_at_cursor() or '') or ctx.phr_list()[1]
+  if not r then vim.msg = 'phr: no phrases in the project (make one: select notes, then the phrase menu)'; return end
+  state.view_phr = r.name
+  state.view_reg, state.view_secmode, state.view_item = true, nil, nil
+  state.view_sec = { r.pos, r.rend }
+  ctx.extra_set('main', { r.pos, r.rend })
+  vim.cur.row = math.floor(model.row_of_time(r.pos, state.lpb) + 1e-6)
+  ctx.mx_loop_span(r.pos, r.rend); reaper.GetSetRepeat(1)
+  vim.msg = ('view: phrase %s - its source, looped (edit here, copies follow; pat / sec / prj - back)'):format(r.name)
+end
 ctx.t2_draw = function(block, info)
   local id = ctx.t2_id()
-  if not id then if model.SHOW_EXTRA then model.SHOW_EXTRA = nil; model.invalidate() end; ctx.t2_vis = nil; return end
+  if not id then ctx.extra_set('t2', nil); ctx.t2_vis = nil; return end
   local st = ctx.BUF.get(id).st
   local lpb2 = st.lpb or state.lpb   -- 12 ноя: своё LPB вида — только сетка строк, время общее (как плейхед и edit-курсор REAPER)
   local snap2 = (lpb2 == state.lpb) and snap or model.snapshot_at(lpb2)

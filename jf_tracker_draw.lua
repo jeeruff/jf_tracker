@@ -10478,14 +10478,15 @@ function D.frame(L, snap, rows, state, info)
     local vm = info.view_mode or (info.view_reg and 'pattern' or 'project')
     -- 31 окт: порядок pat sec proj (от малого к большому): зелёный, жёлтый (секции везде жёлтые), красный;
     -- выбранная — словом целиком, если влезает (остальные коротко)
-    local long = ({ pattern = 'pattern', section = 'section', project = 'project' })[vm]
+    local long = ({ phrase = 'phrase', pattern = 'pattern', section = 'section', project = 'project' })[vm]
     local function lab(m, short) return (vm == m) and m or short end
     -- 31 окт: место — по настоящим подписям (было с запасом на два «proj» — project не влезал, хотя место было)
-    local full = long and (ms(lab('pattern', 'pat')) + ms(lab('section', 'sec')) + ms(lab('project', 'proj')) + 3 * 2 + 2 * 2 <= bw)
+    local full = long and (ms(lab('phrase', 'phr')) + ms(lab('pattern', 'pat')) + ms(lab('section', 'sec')) + ms(lab('project', 'prj')) + 4 * 2 + 3 * 2 <= bw)
     if not full then lab = function(_, short) return short end end
+    x0 = small(x0, hy + 1, lab('phrase', 'phr'), 'phr', vm == 'phrase', 'viewbtn', U.CYAN)   -- 12 ноя: фраза — источник, сразу в лупе
     x0 = small(x0, hy + 1, lab('pattern', 'pat'), 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
     x0 = small(x0, hy + 1, lab('section', 'sec'), 'sec', vm == 'section', 'viewbtn', U.AMBER)
-    small(x0, hy + 1, lab('project', 'proj'), 'all', vm == 'project', 'viewbtn', U.RED)
+    small(x0, hy + 1, lab('project', 'prj'), 'all', vm == 'project', 'viewbtn', U.RED)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает

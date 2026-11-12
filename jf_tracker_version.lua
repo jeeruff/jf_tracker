@@ -8,6 +8,7 @@ V.CHANGES = {
     'phrases: listen from a MIDI key or Shift + a note key (the phrase tracks solo); Shift+Space on a trigger plays its transposed copies; MIDI rec writes triggers',
     'phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item',
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
+    'view buttons phr pat sec prj: phr - the phrase source in the tracker, looped',
     ':loom man / auto - the pattern loops while you weave it; man: Opt+Enter - the next turn as a new pattern after it',
     ':keyphr - the note keys and MIDI play the phrases',
     'the tracker pane has a title like every pane: tracker; the second one - phrase p1 / pattern B1',
