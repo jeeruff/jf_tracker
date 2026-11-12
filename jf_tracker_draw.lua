@@ -2731,7 +2731,7 @@ function D.phrc(item)
   local v = D.phrc_cache[item]
   if v == nil then
     local _, g = reaper.GetSetMediaItemInfo_String(item, 'P_EXT:jf_phrc', '', false)
-    v = (g or '') ~= ''
+    v = (g or '') ~= '' and g or false   -- 13 ноя: GUID триггера (коробка фразы — триггер + его копии)
     D.phrc_cache[item] = v
   end
   return v
@@ -10725,12 +10725,15 @@ function D.frame(L, snap, rows, state, info)
               do
                 local tk = it.midi and reaper.GetActiveTake(it.item)
                 local ph = tk and D.phrase_of(tk)
-                if ph then   -- 13 ноя: триггер — обычная нота; уголки янтарём: слева сверху и справа снизу (кавычки были непонятны)
-                  local k = math.max(3, math.floor(L.rh / 2))
-                  set(U.AMBER)
-                  if y0 >= by0 then gfx.rect(x0, cy0, k, 1, 1); gfx.rect(x0, cy0, 1, k, 1) end
-                  if y1 <= by1 then gfx.rect(x0 + w0 - k, cy1 - 1, k, 1, 1); gfx.rect(x0 + w0 - 1, cy1 - k, 1, k, 1) end
-                elseif D.phrc(it.item) then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end
+                -- 13 ноя: коробка фразы — триггер и все его копии одним прямоугольником (уголки рисуются после строк)
+                local function box(g, x, y, w, h)
+                  D.ph_box = D.ph_box or {}
+                  local b = D.ph_box[g]
+                  if not b then D.ph_box[g] = { x, y, x + w, y + h } else b[1] = math.min(b[1], x); b[2] = math.min(b[2], y); b[3] = math.max(b[3], x + w); b[4] = math.max(b[4], y + h) end
+                end
+                local cg = (not ph) and D.phrc(it.item)
+                if ph then box(select(2, reaper.GetSetMediaItemInfo_String(it.item, 'GUID', '', false)), x0, cy0, w0, cy1 - cy0)
+                elseif cg then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 }; box(cg, x0, cy0, w0, cy1 - cy0) end
               end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
               if info.items_mode and it.sel then set(U.CYAN); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0) end
@@ -11397,6 +11400,14 @@ function D.frame(L, snap, rows, state, info)
   D.sec_lines = nil
   for _, g in ipairs(D.ghost_rects or {}) do set(U.BG, 0.45); gfx.rect(g[1], g[2], g[3], g[4], 1); gfx.a = 1 end   -- 6 ноя: копии фраз — тусклее
   D.ghost_rects = nil
+  -- 13 ноя: коробка фразы — длинные янтарные уголки: слева сверху и справа снизу вокруг триггера и его копий
+  for _, b in pairs(D.ph_box or {}) do
+    local k = math.max(6, math.min(math.floor((b[3] - b[1]) / 3), 3 * L.rh))
+    set(U.AMBER)
+    gfx.rect(b[1], b[2], k, 1, 1); gfx.rect(b[1], b[2], 1, math.min(k, b[4] - b[2]), 1)
+    gfx.rect(b[3] - k, b[4] - 1, k, 1, 1); gfx.rect(b[3] - 1, b[4] - math.min(k, b[4] - b[2]), 1, math.min(k, b[4] - b[2]), 1)
+  end
+  D.ph_box = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
   for _, e in ipairs(D.envcur or {}) do set(e[5]); gfx.rect(e[1], e[2], e[3], e[4], 0); gfx.rect(e[1] + 1, e[2] + 1, e[3] - 2, e[4] - 2, 0) end   -- 31 окт: рамка курсора огибающей — 2 px, поверх линий
