@@ -7944,7 +7944,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
         D.hint_bar(setmetatable({ hint_h = c.hint.h }, { __index = L }), c.hint.x, c.hint.y, c.hint.w,
           info.hint_bars(info.vmode == 'insert' and 'insert' or 'tracker') or D.PANE_KEYS, foc == 'tracker')
       end
-    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.track_block (info.t2_draw); здесь — рамка фокуса
+    elseif PN.base(id) == 'tracker' then   -- 12 ноя: tracker#2 — тело рисует D.tracker_body (info.t2_draw); здесь — рамка фокуса
       rects[id] = { c.x, c.y, c.w, c.h }
     elseif id and D.pc_hit(id, c, info, mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h, focused(id)) then
       -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
