@@ -11764,8 +11764,10 @@ function D.frame(L, snap, rows, state, info)
   -- режим справки (?): то же место внизу занимает контекстная справка
   D.pmark('draw: dsp, help, keyboard strip')
   -- DSP (9 окт, панели): место — лист dsp (L.pn_dsp), иначе полоса внизу
-  local DX, DY, DH, DR = nil, L.dsp_y, L.dsp_h, L.win_w
-  if L.pn then local r = L.pn_dsp; if r then DX, DY, DH, DR = r.x, r.y, r.h, r.x + r.w else DH = 0 end end
+  -- 12 ноя (буферы, PLAN_BUFFERS): блок DSP — функция на прямоугольник листа, чтобы звать её на каждый лист dsp
+  -- (dsp#2). Замыкание кадра: локали frame (L, info, mx, my, hover …) видны как раньше; тело не сдвинуто, чтобы
+  -- diff и blame остались читаемыми.
+  D.dsp_block = function(DX, DY, DH, DR)
   -- 28 окт: кэш и для DSP (транспорт стоит — метры стоят): прямоугольник листа
   D.dpc = D.dpc or {}   -- поле D: в draw.frame предел 200 локальных
   D.dpc.c = (DH > 0) and { x = DX or (L.browser_left and L.matrix_w or 0), y = DY, h = DH } or nil
@@ -14416,6 +14418,12 @@ function D.frame(L, snap, rows, state, info)
     D.clip = nil
     if info.pinmx and info.PINS then D.pins_draw(L, info, fbw, dy, DR - fbw, DH, mx, my, hover) end   -- 24 окт: матрица пинов поверх DSP
     D.pc_end(D.dpc.b, info, D.dpc.inside)
+  end
+  end
+  do
+    local DX, DY, DH, DR = nil, L.dsp_y, L.dsp_h, L.win_w
+    if L.pn then local r = L.pn_dsp; if r then DX, DY, DH, DR = r.x, r.y, r.h, r.x + r.w else DH = 0 end end
+    D.dsp_block(DX, DY, DH, DR)
   end
 
   -- 11 окт: кнопка «<» и протяжка у линии трекер | браузер убраны — размеры и показ панелей у дерева (ручки, Ctrl+W)
