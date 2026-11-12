@@ -2734,14 +2734,38 @@ function D.phrc(item)
   end
   return v
 end
+-- 12 ноя: номер фразы у ноты-триггера — тот же, что у неё в lib (сэмплы + пустые слоты + инструменты проекта +
+-- automation + midi + её место в списке фраз); было: знак " и буква. Кэш по счётчику правок и треку
+function D.phr_num(item, name)
+  local info, snap = D.finfo, D.fsnap
+  if not (info and info.phr_list and info.track_insts and snap and item) then return nil end
+  local sc = reaper.GetProjectStateChangeCount(0)
+  if not D.phn or D.phn.sc ~= sc or D.phn.sid ~= snap.sid then D.phn = { sc = sc, sid = snap.sid } end
+  local tr = reaper.GetMediaItem_Track(item)
+  local k = D.phn[tr]
+  if not k then
+    local col, gn, seen = nil, 0, {}
+    for _, c in ipairs(snap.cols or {}) do
+      if c.track == tr then col = col or c end
+      if c.track and not seen[c.track] then seen[c.track] = true; gn = gn + #info.track_insts(c) end
+    end
+    local pool = col and col.pool or {}
+    local nr = 0; for _, e in ipairs(pool) do if not e.parent then nr = nr + 1 end end
+    k = { base = nr + D.empty_slots(#pool) + gn + 2, by = {} }
+    for i, ph in ipairs(info.phr_list()) do k.by[ph.name] = i end
+    D.phn[tr] = k
+  end
+  local i = k.by[name]
+  return i and (k.base + i) or nil
+end
 function DCS.inst()
   local L, cell, x, ty = DCS.L, DCS.cell, DCS.x, DCS.ty
   local text, c = DCS.text, DCS.c
   if not (L.x_inst and not DCS.name_row) then return end
   local n = cell and (cell.kind == 'audio') and ((D.inst_num and D.inst_num[cell.item]) or (D.inst_of and D.inst_of[cell.item]))   -- номер исходника (3 окт)
-  -- 31 окт: нота-триггер фразы (тейк ph:NAME) — вместо инструмента знак фразы " и первая буква её имени
+  -- 31 окт: нота-триггер фразы (тейк ph:NAME); 12 ноя: номер фразы из lib, как у любого инструмента (был знак " и буква)
   local ph = cell and cell.kind == 'midi' and cell.take and D.phrase_of(cell.take)
-  if ph then text(x + L.x_inst, ty, '"' .. ph:sub(1, 1), c('inst', cell.muted and U.AMBER or U.AMBER))
+  if ph then local pn = D.phr_num(cell.item, ph); text(x + L.x_inst, ty, pn and D.DEC2[pn % 100] or ph:sub(1, 2), c('inst', cell.muted and U.GREY or U.TEXT))
   elseif not n and cell and cell.kind == 'midi' and D.midi_inst then n = D.midi_inst(cell.item, cell.pitch) end   -- 11 окт: MIDI — плагин, что играет ноту (RS5K по диапазону)
   if ph then
   elseif n then text(x + L.x_inst, ty, D.DEC2[n % 100], c('inst', cell.muted and U.GREY or U.TEXT))   -- Renoise: инструмент цветом ноты
@@ -8909,6 +8933,7 @@ function D.blood(L, x0, y0, w, h)
   gfx.a = 1
 end
 function D.frame(L, snap, rows, state, info)
+  D.fsnap, D.finfo = snap, info   -- 12 ноя: снимок и info кадра — для помощников вне frame (D.phr_num)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
   D.PHTAIL = math.max(0, math.min(32, tonumber(state.phtail) or 0))
@@ -10673,9 +10698,7 @@ function D.frame(L, snap, rows, state, info)
               do
                 local tk = it.midi and reaper.GetActiveTake(it.item)
                 local ph = tk and D.phrase_of(tk)
-                if ph then
-                  set(U.AMBER); gfx.rect(x0, cy0, w0, cy1 - cy0, 0); gfx.rect(x0 + 1, cy0 + 1, w0 - 2, cy1 - cy0 - 2, 0)
-                  if y0 >= by0 then D.ph_labels = D.ph_labels or {}; D.ph_labels[#D.ph_labels + 1] = { x0 + 2, y0 + 2, w0 - 4, '"' .. ph } end
+                if ph then   -- 12 ноя: триггер — обычная нота с номером фразы, без коробки и имени (экономит колонку)
                 elseif D.phrc(it.item) then D.ghost_rects = D.ghost_rects or {}; D.ghost_rects[#D.ghost_rects + 1] = { x0, cy0, w0, cy1 - cy0 } end
               end
               -- 6 ноя: режим ITEMS — выбранный айтем рамкой со всех сторон (и у MIDI паттерна без рамки)
@@ -11343,12 +11366,6 @@ function D.frame(L, snap, rows, state, info)
   D.sec_lines = nil
   for _, g in ipairs(D.ghost_rects or {}) do set(U.BG, 0.45); gfx.rect(g[1], g[2], g[3], g[4], 1); gfx.a = 1 end   -- 6 ноя: копии фраз — тусклее
   D.ghost_rects = nil
-  for _, t in ipairs(D.ph_labels or {}) do   -- 6 ноя: имя фразы в коробке триггера, поверх нот
-    local s2 = fit(t[4], t[3])
-    set(U.AMBER); gfx.rect(t[1], t[2], ms(s2) + 2, L.th or (L.rh - 2), 1)
-    text(t[1] + 1, t[2], s2, U.BG)
-  end
-  D.ph_labels = nil
   for _, e in ipairs(D.edge_lines or {}) do set(e[4] and D.EDITTOP or D.CURTOP); gfx.rect(e[1], e[2], e[3], 1, 1) end
   D.edge_lines = nil
   for _, e in ipairs(D.envcur or {}) do set(e[5]); gfx.rect(e[1], e[2], e[3], e[4], 0); gfx.rect(e[1] + 1, e[2] + 1, e[3] - 2, e[4] - 2, 0) end   -- 31 окт: рамка курсора огибающей — 2 px, поверх линий

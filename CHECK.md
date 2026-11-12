@@ -2665,3 +2665,4 @@
 - dsp#2 step 1 (no visible change): dsp selection + DK keys registered as a buffer; dsp_target honours dsp_sel.pin (no UI yet)
 - dsp#2: Ctrl+W D on the dsp pane - a second DSP pinned to the cursor track ('name °'); the first keeps following the cursor; click / Cmd+hjkl pick which one gets the keys (focus frame); q on it closes; the layout keeps it (unpinned after a restart)
 - playlist seq: a phrase by its bare name (p1) works, the error says phrase too; the seq row has a status tip; Ctrl+W ? = hints pane, Ctrl+W I = help pane (swapped); PANE keys land in the debug log
+- phrase trigger note: inst field = the phrase number from the lib (phrases section), no " and no amber box / name over the item; copies stay as ghosts
