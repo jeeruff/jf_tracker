@@ -36,7 +36,7 @@ ok('tracker has no tab', lay.by_panel.tracker.tab == nil)
 eq('order starts with tracker', lay.order[1], 'tracker')
 eq('master active', lay.by_panel.master.active_id, 'master')
 eq('notes hidden', m.hidden.notes, true)
-ok('tabs in one cell', lay.by_panel.sample == lay.by_panel.midi)
+ok('tabs in one cell', lay.by_panel.sample == lay.by_panel.harm)
 -- недоступная панель: slices нет → лист схлопнут
 local M2 = setmetatable({ avail = function(id) return id ~= 'slices' end }, { __index = M })
 local lay2 = tiling('no slices', m, 1600, 900, M2)
@@ -97,10 +97,10 @@ eq('inst on top band', lay.by_panel.inst.y, 0)
 ok('inst full width', lay.by_panel.inst.w == 1600)
 -- move из стека: break-out
 m = PN.DEFAULT()
-ok('move midi down', PN.move(m, 'midi', 'd'))
+ok('move harm down', PN.move(m, 'harm', 'd'))
 lay = PN.layout(m, 1600, 900, M)
-ok('midi own cell', lay.by_panel.midi ~= lay.by_panel.sample)
-ok('midi below tabs', lay.by_panel.midi.y > lay.by_panel.sample.y)
+ok('harm own cell', lay.by_panel.harm ~= lay.by_panel.sample)
+ok('harm below tabs', lay.by_panel.harm.y > lay.by_panel.sample.y)
 eq('tabs cell active still master', lay.by_panel.sample.active_id, 'master')
 
 -- swap / stack / unstack / split
@@ -167,7 +167,7 @@ ok('grip moved +0.1', math.abs(gr.node.fr[gr.i] - f1 - 0.1) < 1e-6)
 m = PN.DEFAULT()
 eq('cycle from master', PN.cycle(m, 'master', 1), 'video')
 eq('cycle back', PN.cycle(m, 'retro', -1), PN.TABS[#PN.TABS])
-ok('set active', PN.set_active(m, 'midi')); eq('active_of', PN.active_of(m, 'sample'), 'midi')
+ok('set active', PN.set_active(m, 'harm')); eq('active_of', PN.active_of(m, 'sample'), 'harm')
 eq('cycle single', PN.cycle(m, 'matrix', 1), nil)
 
 -- encode / decode
@@ -221,7 +221,7 @@ do
 end
 -- 11 окт: properties — обязательно своей панелью у item (случай пользователя: H:sprops)
 do
-  local u = PN.decode('h[0.18:v[0.273:ctrl*|0.451:matrix*,notes,visor|0.276:tracks*]|0.656:v[0.111:h[0.871:retro,modulation,scopes,master,grid,garden,sample*,video,macros|0.129:slices*]|0.517:tracker*|0.152:mixer*|0.22:dsp*]|0.164:v[0.43:inst*|0.57:browser*,fxb]] H:sprops,pm,midi,harm,clips Z:')
+  local u = PN.decode('h[0.18:v[0.273:ctrl*|0.451:matrix*,notes,visor|0.276:tracks*]|0.656:v[0.111:h[0.871:retro,modulation,scopes,master,grid,garden,sample*,video,macros|0.129:slices*]|0.517:tracker*|0.152:mixer*|0.22:dsp*]|0.164:v[0.43:inst*|0.57:browser*,fxb]] H:sprops,pm,harm,harm,clips Z:')
   ok('sprops: hidden in the user layout', not PN.visible(u, 'sprops'))
   ok('sprops pin: changed', PN.pin_sprops(u))
   local sl, pl = PN.find(u, 'sample'), PN.find(u, 'sprops')
@@ -235,7 +235,7 @@ do
 end
 -- 11 окт: скринсет старше модулей — add_new ставит их на места, скрытые пользователем не трогает
 do
-  local raw = 'h[0.199:v[0.192:ctrl*|0.565:matrix*|0.242:fxb*]|0.64:v[0.05:retro,modulation,scopes,master,grid,garden,sample,video*|0.8:tracker*|0.15:dsp*]|0.161:v[0.434:inst*|0.133:slices*|0.433:browser*]] H:notes,midi,harm Z:'
+  local raw = 'h[0.199:v[0.192:ctrl*|0.565:matrix*|0.242:fxb*]|0.64:v[0.05:retro,modulation,scopes,master,grid,garden,sample,video*|0.8:tracker*|0.15:dsp*]|0.161:v[0.434:inst*|0.133:slices*|0.433:browser*]] H:notes,harm,harm Z:'
   local m = PN.decode(raw)
   ok('add_new: something added', PN.add_new(m, raw))
   for _, id in ipairs({ 'sprops', 'mixer', 'visor', 'macros', 'automation' }) do ok('add_new: ' .. id .. ' visible', PN.visible(m, id)) end

@@ -58,7 +58,6 @@ PN.PANELS = {
   { id = 'sample',     label = 'item',       key = 'i', hint = 'sample',  side = 'top', tab = true },
   { id = 'automation', label = 'automation', key = 'a', hint = 'automation', side = 'top', tab = true },   -- 12 окт: огибающие по времени (был id modulation)
   { id = 'modulation', label = 'modulation', key = 'u', hint = 'modulation', side = 'top', tab = true, avail = 'merged' },   -- 18 окт: страница automation (M) — сама вкладка не показывается   -- 12 окт: матрица LFO / ACS / link REAPER — своя вкладка
-  { id = 'midi',       label = 'midi',       key = 'M', hint = 'midi',    side = 'top', tab = true },
   { id = 'harm',       label = 'harmonizer', key = 'h', hint = 'harm',    side = 'top', tab = true },
   { id = 'macros',     label = 'macros',     key = 'q', hint = 'macros',  side = 'top', tab = true },   -- 9 окт: записанные / свои / встроенные макросы
   { id = 'scopes',     label = 'scopes',     key = 'c', hint = 'master',  side = 'top', tab = true },
@@ -966,7 +965,7 @@ local BUILD = {
       leaf('tracker'), leaf('mixer'),
       node('h', { 0.18, 0.64, 0.18 },
         leaf('matrix', 'patterns', 'ctrl', 'notes', 'visor', 'renderer', 'harm', 'humanizer', 'reform'),
-        leaf('dsp', 'automation', 'sample', 'macros', 'midi', 'nmod', 'retro', 'sprops'),
+        leaf('dsp', 'automation', 'sample', 'macros', 'nmod', 'retro', 'sprops'),
         leaf('inst', 'tracks', 'slices', 'browser', 'clipboard', 'fxb', 'help', 'undotree'))), hidden = {} })
   end,
   stack = function()
