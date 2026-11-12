@@ -187,7 +187,7 @@ KH.PAGES = {
     { k = '/', d = 'commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)' },
     { k = 'n N *', d = 'next / previous match of the last search, search the name under the cursor' },
     { k = ':', d = 'command line (Tab completes)' },
-    { k = 'Enter', d = 'the values of the field (notes, instruments, vol, commands; on an envelope / MIDI lane - what to insert); PT-mode on the note field: inserts an empty row as Return in ProTracker (Shift - all channels)' },
+    { k = 'Enter', d = 'on a phrase trigger note - the phrase in tracker 2 (opens beside the tracker; Enter there - the main cursor in its source to edit); else the values of the field (notes, instruments, vol, commands; on an envelope / MIDI lane - what to insert); PT-mode on the note field: inserts an empty row as Return in ProTracker (Shift - all channels)' },
     { k = '\\  \\\\', d = '\\ - the menu of what is under the cursor (note, envelope, clip ...); \\\\ - the main menu of everything (v view, P project, o options ...); in a module - its quick menu' },
     { k = '\\ p', t = {}, d = 'phrases: e edit, i insert at the cursor, l the panel, n new from the V block / pattern, r rename, x delete - the phrase of the trigger under the cursor, else picked from a list. A trigger is a box over its length with the name; the notes it plays are dimmer ghosts (they show the transposition)' },
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },

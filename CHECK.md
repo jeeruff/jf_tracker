@@ -2675,3 +2675,4 @@
 - phrases: lib phrase picked - a MIDI key / Shift+note key plays the phrase source (its tracks solo, up to 32 s); Shift+Space on a trigger note plays its transposed copies; armed + INSERT + MIDI key writes the trigger
 - tracker 2: Ctrl+W D on the tracker - a second tracker beside it (another pattern; a phrase if one is picked in the lib); j k J K g G, h l tracks, [ ] next pattern / phrase, p switch, Space listen, Enter - main cursor there (a phrase source opens for editing), Esc; click in it - focus + row; the main tracker unchanged
 - Ctrl+W v t / s t / T t (tracker already open) - tracker 2 too, like D; same for dsp and inputs
+- Enter on a phrase trigger note: tracker 2 opens (or switches) on that phrase, focus there; while the song plays, thin amber bars in tracker 2 mark where each playing copy is in the phrase

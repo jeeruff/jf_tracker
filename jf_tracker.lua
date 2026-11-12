@@ -32187,7 +32187,8 @@ local function frame()
     if c == 13 and not (m.ctrl or m.cmd or m.alt or m.shift) and state.focus == 'tracker' and not vim.picker and not vim.hydra
        and vim.mode ~= 'cmd' and vim.mode ~= 'search' and not vim.hexbuf and not vim.pending and not vim.op
        and not (vim.mode == 'normal' and vim.piano and state.escmode == 'vim') and not (state.ptmode and (vim.cur.field or 1) == 1) then   -- 1 ноя: PT-mode — Enter на поле ноты вставляет строку (vim); в остальных — как было
-      vim.smart(); c = 0
+      -- 12 ноя: Enter на ноте-триггере фразы — фраза во втором трекере (открыть / переключить), иначе smart
+      if not ctx.t2_open_phrase(ctx.phrase_at_cursor()) then vim.smart() end; c = 0
     end
   end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
@@ -35247,6 +35248,51 @@ ctx.t2_span = function(st)
   if (old and old[1]) ~= (extra and extra[1]) or (old and old[2]) ~= (extra and extra[2]) then model.SHOW_EXTRA = extra; model.invalidate() end
   return r0, math.max(r0 + 1, r1)
 end
+-- 12 ноя: нота-триггер фразы под курсором основного трекера → имя фразы (или nil)
+ctx.phrase_at_cursor = function()
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  local cell = f and f.sub and f.sub[vim.cur.row]
+  if cell and (cell.kind == 'cont' or cell.kind == 'off') then cell = cell.of end
+  local tk = cell and cell.kind == 'midi' and cell.take
+  if not (tk and reaper.ValidatePtr(tk, 'MediaItem_Take*')) then return nil end
+  local _, nm = reaper.GetSetMediaItemTakeInfo_String(tk, 'P_NAME', '', false)
+  return (nm or ''):match('^ph:(.+)$')
+end
+-- Enter на триггере: второй трекер показывает эту фразу (нет его — открыть справа), фокус туда; Enter там — правка
+ctx.t2_open_phrase = function(name)
+  if not name then return false end
+  if not (state.panes_ui and state.panes) then vim.msg = ('phrase %s: tracker 2 needs panes (options: panes)'):format(name); return false end
+  local PN, m = draw.panes, state.panes
+  local id = ctx.t2_id()
+  if not id then
+    local nid = ctx.BUF.new('tracker'); if not nid then return false end
+    ctx.buf_init(nid)
+    ctx.pane_do(function() return PN.split(m, 'tracker', nid, 'r', 0.5) end, 'tracker 2: ' .. name)
+    id = nid
+  end
+  local st = ctx.BUF.get(id).st
+  st.mode, st.phr, st.cur = 'phrase', name, -1
+  ctx.pane_focus(id)
+  vim.msg = ('tracker 2: phrase %s - j k rows, Space listen, Enter - edit it in the main tracker, Esc back'):format(name)
+  return true
+end
+-- 12 ноя: копии фразы, которые сейчас звучат в песне → строки её источника (дробные); кэш списка триггеров по правкам
+ctx.t2_playheads = function(name, r)
+  local sc = reaper.GetProjectStateChangeCount(0)
+  local c = ctx.t2_trig
+  if not (c and c.sc == sc and c.name == name) then
+    c = { sc = sc, name = name, list = {} }
+    for _, t in ipairs(ctx.phr_triggers(name)) do
+      c.list[#c.list + 1] = { p0 = reaper.GetMediaItemInfo_Value(t.it, 'D_POSITION'), len = reaper.GetMediaItemInfo_Value(t.it, 'D_LENGTH') }
+    end
+    ctx.t2_trig = c
+  end
+  local out, pp = {}, reaper.GetPlayPosition()
+  for _, t in ipairs(c.list) do
+    if pp >= t.p0 and pp < t.p0 + t.len then out[#out + 1] = model.row_of_time(r.pos + (pp - t.p0), state.lpb) end
+  end
+  return out
+end
 ctx.t2_draw = function(block, info)
   local id = ctx.t2_id()
   if not id then if model.SHOW_EXTRA then model.SHOW_EXTRA = nil; model.invalidate() end; ctx.t2_vis = nil; return end
@@ -35283,6 +35329,17 @@ ctx.t2_draw = function(block, info)
     { __index = info })
   local hover2 = {}
   block(L2, ctx.t2_rows, setmetatable({ row0 = st.row0, hscroll = st.hscroll or 0 }, { __index = state }), info2, hover2)
+  -- 12 ноя: фраза играет в песне — тонкая полоска на строке источника у каждой звучащей копии (их может быть несколько)
+  if st.mode == 'phrase' and reaper.GetPlayState() & 1 == 1 then
+    local r = ctx.phr_find(st.phr)
+    local x0, x1 = L2.matrix_w or 0, L2.total_w or L2.win_w
+    if r and x1 > x0 then
+      U.set(U.AMBER)
+      for _, rf in ipairs(ctx.t2_playheads(st.phr, r)) do
+        if rf >= st.row0 and rf < st.row0 + n then gfx.rect(x0, L2.body_y + math.floor((rf - st.row0) * L2.rh + 0.5), x1 - x0, 1, 1) end
+      end
+    end
+  end
   ctx.t2_vis = { id = id, hv = hover2, rect = L.pn.by_panel[id], r0 = r0, r1 = r1 }
 end
 -- щелчок в листе tracker#2: фокус на него, курсор — на строку под мышью

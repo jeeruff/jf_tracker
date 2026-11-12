@@ -8,6 +8,7 @@ V.CHANGES = {
     'phrases: listen from a MIDI key or Shift + a note key (the phrase tracks solo); Shift+Space on a trigger plays its transposed copies; MIDI rec writes triggers',
     'phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item',
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
+    'phrases: Enter on a trigger note opens the phrase in tracker 2; playing copies show as thin bars in it',
     'tracker 2: Ctrl+W D on the tracker - a second tracker view with its own pattern or phrase; Enter takes the main cursor there to edit (phrase sources too)',
     'DSP: T pins the panel to its track (° after the name), T again - follow the cursor',
     'panes as buffers: Ctrl+W D duplicates a pane with its own state - inputs, and dsp (the copy is pinned to the cursor track, the first follows the cursor); tracker next',
