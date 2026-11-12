@@ -7904,7 +7904,7 @@ function D.pc_end(pc, info, inside)
   D.pc_st[pc.id] = { ep = info.pc_epoch, x = c.x, y = c.y, w = c.w, h = c.h, t = reaper.time_precise(), inside = inside }
 end
 function D.panes_frame(L, snap, state, info, hover, ph)
-  L.pn_dsp = nil
+  L.pn_dsp = nil; L.pn_dsps = nil   -- 12 ноя: все листы dsp (dsp#2)
   local PN, lay = D.panes, L.pn
   local mx, my = gfx.mouse_x, gfx.mouse_y
   local foc = (info.mixfocus and info.focus == 'tracker') and 'mixer' or info.focus   -- 11 окт: фокус микшера
@@ -7924,6 +7924,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       -- 28 окт: кэш — панель скопирована из буфера; прямоугольники для щелчков и фокуса — как при отрисовке
       local ct = c.content
       local rk = PN.BY[id].tab and 'top' or id
+      if PN.base(id) == 'dsp' then rk = id == (info.dsp_buf or 'dsp') and 'dsp' or id end   -- 12 ноя: рамка фокуса dsp — у активного буфера
       if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
       if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
     elseif id then
@@ -8105,8 +8106,9 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       elseif id == 'notes' and info.notes_draw then
         local ok, hn = pcall(info.notes_draw, L, ct.x + L.pad, ct.y, ct.w - 2 * L.pad, ct.h - 2)
         if ok and inside then hover.notes = hn or 'text' end
-      elseif id == 'dsp' then
-        L.pn_dsp = ct                                    -- рисует блок DSP ниже в кадре (его координаты — из листа)
+      elseif PN.base(id) == 'dsp' then   -- 12 ноя: и dsp#2
+        L.pn_dsps = L.pn_dsps or {}; L.pn_dsps[#L.pn_dsps + 1] = { id = id, ct = ct }   -- рисует блок DSP ниже в кадре (координаты — из листа)
+        if id == (info.dsp_buf or 'dsp') then L.pn_dsp = ct end
       elseif id == 'ctrl' then
         -- главный модуль рисует от (0, 0) шириной L.ctrl_w — в буфер 99, сдвиг мыши и меток f по x и y
         local bx, by, bw, bh = ct.x, ct.y, ct.w, ct.h
@@ -8157,6 +8159,7 @@ function D.panes_frame(L, snap, state, info, hover, ph)
       -- 11 окт: 'top' — лист АКТИВНОЙ вкладки (стеков вкладок может быть два: clips сверху, visor слева;
       -- последний нарисованный перетирал, и рамка фокуса стояла не там, куда шли клавиши)
       local rk = PN.BY[id].tab and 'top' or id
+      if PN.base(id) == 'dsp' then rk = id == (info.dsp_buf or 'dsp') and 'dsp' or id end   -- 12 ноя: рамка фокуса dsp — у активного буфера
       if rk ~= 'top' or id == info.toptab or not rects.top then rects[rk] = { ct.x, ct.y, ct.w, ct.h } end
       if PN.BY[id].tab then rects[id] = { ct.x, ct.y, ct.w, ct.h } end
       -- 10 окт: строка клавиш панели (хинты включены) — в самом низу листа
@@ -11768,12 +11771,14 @@ function D.frame(L, snap, rows, state, info)
   -- (dsp#2). Замыкание кадра: локали frame (L, info, mx, my, hover …) видны как раньше; тело не сдвинуто, чтобы
   -- diff и blame остались читаемыми.
   D.dsp_block = function(DX, DY, DH, DR)
+  local dsp_foc = info.focus == 'dsp' and D.dsp_id == (info.dsp_buf or 'dsp')   -- 12 ноя: фокус — только у активного буфера
   -- 28 окт: кэш и для DSP (транспорт стоит — метры стоят): прямоугольник листа
   D.dpc = D.dpc or {}   -- поле D: в draw.frame предел 200 локальных
   D.dpc.c = (DH > 0) and { x = DX or (L.browser_left and L.matrix_w or 0), y = DY, h = DH } or nil
   if D.dpc.c then D.dpc.c.w = DR - D.dpc.c.x end
   D.dpc.inside = D.dpc.c and mx >= D.dpc.c.x and mx < D.dpc.c.x + D.dpc.c.w and my >= D.dpc.c.y and my < D.dpc.c.y + D.dpc.c.h
   D.dpc.b = nil
+  if D.dpc.inside then D.dsp_hover_id = D.dsp_id end   -- 12 ноя: лист DSP под мышью — щелчок делает его буфер активным
   if DH > 0 and info.khelp and info.khelp_draw then
     local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
     local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт)
@@ -11782,10 +11787,10 @@ function D.frame(L, snap, rows, state, info)
     set(D.SEP); gfx.rect(lx0, dy, DR - lx0, D.SEPW, 1)
     hover.khelp = info.khelp_draw(L, xo, dy, DR - xo, DH) or true
     L.dsp_rect = { xo, dy, DR - xo, DH }
-  elseif DH > 0 and not info.pinmx and D.pc_hit('dsp', D.dpc.c, info, D.dpc.inside, info.focus == 'dsp' or info.focus == 'fxb') then
+  elseif DH > 0 and not info.pinmx and D.pc_hit(D.dsp_id, D.dpc.c, info, D.dpc.inside, dsp_foc or info.focus == 'fxb') then
     -- 28 окт: DSP из кэша (L.dsp_rect — с прошлой отрисовки)
   elseif DH > 0 then
-    D.dpc.b = (not info.pinmx) and D.pc_begin('dsp', D.dpc.c) or nil
+    D.dpc.b = (not info.pinmx) and D.pc_begin(D.dsp_id, D.dpc.c) or nil
     local dy = DY                                   -- под строкой подсказок тела (или под верхним модулем)
     local lx0 = DX or (L.browser_left and L.matrix_w or 0)        -- браузер слева до самого низа (7 окт): DSP — правее него
     D.clip = { lx0, DR - 1, DY, DY + DH }                         -- 9 окт: ничего за правый край DSP
@@ -12524,7 +12529,7 @@ function D.frame(L, snap, rows, state, info)
           if rx + L.pad + ms(tip) <= bx + bw - L.pad then text(rx + L.pad, ry, tip, U.GREY) end
           local ey = ry + L.rh + 1
           if by + bh - ey > 2 * L.rh then
-            ed.draw(U, L, bx + 1, ey, bw - 2, by + bh - ey - 1, info.focus == 'dsp', fit, (ed.dirty and 'edited - not applied' or 'code'))
+            ed.draw(U, L, bx + 1, ey, bw - 2, by + bh - ey - 1, dsp_foc, fit, (ed.dirty and 'edited - not applied' or 'code'))
           end
           nfit = 0
         else
@@ -14412,7 +14417,7 @@ function D.frame(L, snap, rows, state, info)
     if (L.hint_h or 0) > 0 then
       local hy3 = dy + DH - L.hint_h
       if fbw > 0 then D.hint_bar(L, 0, hy3, fbw - 1, (info.hint_bars or function() end)(info.notes_draw and 'notes' or 'fxb'), info.focus == 'fxb' or info.focus == 'notes') end
-      D.hint_bar(L, fbw, hy3, DR - fbw, (info.hint_bars or function() end)('dsp'), info.focus == 'dsp')
+      D.hint_bar(L, fbw, hy3, DR - fbw, (info.hint_bars or function() end)('dsp'), dsp_foc)
     end
     L.dsp_rect = { fbw, dy, DR - fbw, DH }
     D.clip = nil
@@ -14421,9 +14426,26 @@ function D.frame(L, snap, rows, state, info)
   end
   end
   do
-    local DX, DY, DH, DR = nil, L.dsp_y, L.dsp_h, L.win_w
-    if L.pn then local r = L.pn_dsp; if r then DX, DY, DH, DR = r.x, r.y, r.h, r.x + r.w else DH = 0 end end
-    D.dsp_block(DX, DY, DH, DR)
+    -- 12 ноя: по листу на буфер (dsp, dsp#2); чужой буфер — подмена состояния и полей info на время отрисовки;
+    -- кэш панели (D.dpc, pc_*) — свой у каждого листа
+    D.dpcs = D.dpcs or {}
+    D.dsp_hover_id = nil
+    local act = info.dsp_buf or 'dsp'
+    local function one(id, DX, DY, DH, DR)
+      D.dsp_id = id; D.dpc = D.dpcs[id] or {}; D.dpcs[id] = D.dpc
+      D.dsp_block(DX, DY, DH, DR)
+    end
+    if L.pn then
+      local list = L.pn_dsps or {}
+      for _, e in ipairs(list) do
+        local other = e.id ~= act and info.buf_switch and info.dsp_fields
+        if other then info.buf_switch(e.id); for k, v in pairs(info.dsp_fields()) do info[k] = v end end
+        one(e.id, e.ct.x, e.ct.y, e.ct.h, e.ct.x + e.ct.w)
+        if other then info.buf_switch(act); for k, v in pairs(info.dsp_fields()) do info[k] = v end end
+      end
+      if #list == 0 then one(act, nil, L.dsp_y, 0, L.win_w) end
+    else one(act, nil, L.dsp_y, L.dsp_h, L.win_w) end
+    D.dsp_id = act; D.dpc = D.dpcs[act] or D.dpc
   end
 
   -- 11 окт: кнопка «<» и протяжка у линии трекер | браузер убраны — размеры и показ панелей у дерева (ручки, Ctrl+W)

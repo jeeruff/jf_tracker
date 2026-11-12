@@ -86,6 +86,14 @@ function B.leave()
   cur = nil
   return true
 end
+function B.current() return cur and cur.b.id or nil end
+-- сменить активный буфер (leave + enter); 'mod' или буфер 1 — просто выйти
+function B.switch(id)
+  B.leave()
+  local b = B.bufs[id]
+  if b and b.n > 1 then return B.enter(id) end
+  return false
+end
 function B.with(id, fn, ...)
   local on = B.enter(id)
   local ok, r = pcall(fn, ...)

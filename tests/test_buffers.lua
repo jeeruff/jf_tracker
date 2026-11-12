@@ -34,6 +34,8 @@ ok(not okc and err == 'boom' and IN.r == 5, 'with: error restores')
 local id3 = B.new('inputs'); ok(id3 == 'inputs#3', 'third')
 ok(#B.list('inputs') == 3 and B.list('inputs')[1] == 'inputs', 'list')
 ok(B.drop(id3) and not B.get(id3) and not B.drop('inputs'), 'drop (never buffer 1)')
+ok(B.current() == nil and B.switch(id2) and B.current() == id2 and IN.r == 7, 'switch in')
+ok(not B.switch('inputs') and B.current() == nil and IN.r == 5, 'switch to buffer 1 = leave')
 -- без defaults — текущие значения модуля
 local RF = { sel = 4 }
 B.register('reform', RF, { 'sel' })

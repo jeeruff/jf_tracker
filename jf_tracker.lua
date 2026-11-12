@@ -1014,6 +1014,28 @@ local function dsp_target()
   end
   return { track = col.track, fx = col.fx or {}, name = col.name, col = col }
 end
+-- 12 ноя: поля info блока DSP от текущего состояния (dsp_sel, DK, закреплённый трек) — те же выражения, что в
+-- таблице info; draw зовёт их для второго листа (dsp#2) после подмены буфера
+local function dsp_fields()
+  local t = dsp_target()
+  local on = state.focus == 'dsp' and (ctx.BUF.current() or 'dsp') == (state.dsp_buf or 'dsp')   -- выбор виден только у активного буфера
+  return {
+    dsp_sel = on and dsp_sel or nil,
+    dsp_range = (on and DK.anchor) and { DK.range(dsp_sel) } or nil,
+    dsp_marks = on and DK.marks or nil,
+    dsp_fxs = t and t.fx or {},
+    dsp_title = t and ((t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' · pinned' or '')) or nil,
+    dsp_is_take = t and t.take or false,
+    dsp_col = t and t.col or nil,
+  }
+end
+-- активный буфер DSP: выйти из прежнего, войти в новый (dsp — без подмены); кэш закреплённого трека — заново
+local function dsp_buf_set(id)
+  ctx.BUF.leave()
+  state.dsp_buf = id
+  if id ~= 'dsp' and not ctx.BUF.enter(id) then state.dsp_buf = 'dsp' end
+  dspt_cache.pin = nil
+end
 -- ретро (2 окт): объявлены до ctx — ctx и hint_go обращаются к ним раньше
 -- определений (иначе это были глобальные nil: a / j k / h l во вкладке retro падали)
 local retro = { sel = { a = 0.5, b = 1.0 }, cur = nil, msg = '', peaks_t = 0, alive_t = 0, put_t = nil, drag = nil, pb_t = 0 }
@@ -6121,6 +6143,7 @@ ctx = {
     do local lf = state.panes and PN.find(state.panes, id); if lf and lf.min then lf.min = nil; state.panes.v = (state.panes.v or 1) + 1 end end   -- 20 окт: фокус на свёрнутую — развернуть
     ctx.pn_prev = ctx.pane_cur()
     if PN.BY[id].tab then PN.set_active(state.panes, id); state.top = true; state.toptab = id; ctx.set_focus('top')
+    elseif PN.base(id) == 'dsp' then PN.set_active(state.panes, id); ctx.dsp_buf_want = id; ctx.set_focus('dsp')   -- 12 ноя: лист dsp#2 — буфер
     else PN.set_active(state.panes, id); ctx.set_focus(id) end   -- 13 окт: и в стеке без tab (tracks у lib) — вкладка активна
     relayout()
   end,
@@ -6387,10 +6410,13 @@ ctx = {
     elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
     elseif ch == 'D' then   -- 12 ноя: D duplicate — ещё один экземпляр панели (буфер, PLAN_BUFFERS): рядом справа, фокус на него
       local nid = ctx.BUF.new(PN.base(id))
-      if nid then ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
-      else vim.msg = ('-- PANE -- D: %s has one instance (so far: inputs)'):format(PN.base(id)) end
+      if nid then
+        local col = cur_col()
+        if PN.base(id) == 'dsp' and col and col.track then ctx.BUF.get(nid).st.pin = reaper.GetTrackGUID(col.track) end   -- dsp#2 закреплён на треке курсора
+        ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
+      else vim.msg = ('-- PANE -- D: %s has one instance (so far: inputs, dsp)'):format(PN.base(id)) end
     elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
-      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); ctx.BUF.drop(id) end   -- 12 ноя: буфер #n — выбросить
+      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); if state.dsp_buf == id then dsp_buf_set('dsp') end; ctx.BUF.drop(id) end   -- 12 ноя: буфер #n — выбросить
     elseif ch == ' ' then
       ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
       local nm = PN.preset(ctx.pn_preset, m)
@@ -15647,6 +15673,10 @@ ctx = {
   end,
   set_focus = function(f)
     if f ~= 'fxb' then ctx.fxb_pad = nil end
+    if f == 'dsp' then   -- 12 ноя: dsp#2 — активный буфер: лист, заданный pane_focus, иначе лист под мышью (щелчок)
+      local want = ctx.dsp_buf_want or draw.dsp_hover_id; ctx.dsp_buf_want = nil
+      if want and want ~= (state.dsp_buf or 'dsp') and (want == 'dsp' or ctx.BUF.get(want)) then dsp_buf_set(want) end
+    end
     if f ~= state.focus then ctx.focus_prev = state.focus == 'top' and state.toptab or state.focus end   -- 3 ноя: прошлый модуль — вторая очередь меток f
     -- 24 окт: опция slicer keys on — фокус в слайсере (вкладка item / slices): клавиатура (m) сама вкл, ушёл — как была
     do
@@ -15672,6 +15702,7 @@ ctx = {
       -- панели (9 окт): фокус — только на видимую панель дерева (вкладки — 'top' + toptab)
       -- скрытая панель при переходе в неё появляется (F-клавиши, Ctrl+Tab, / …), как open в tmux
       local id = f == 'top' and state.toptab or f
+      if f == 'dsp' then id = state.dsp_buf or 'dsp' end   -- 12 ноя: активная вкладка — лист активного буфера
       -- 21 окт: фокус пришёл на свёрнутую (zm) — развернуть (Cmd+hjkl, щелчок, F-клавиши — не только вкладка)
       if f ~= state.focus and draw.panes.BY[id] then
         local lf = draw.panes.find(state.panes, id)
@@ -24634,6 +24665,9 @@ end
 
 local function frame()
   ctx.pix_begin()   -- 6 ноя: пиксельный режим — кадр в половинный буфер
+  -- 12 ноя: активный буфер DSP (dsp#2 — свой выбор, закреплённый трек) подменён на весь кадр; буфера нет — назад к dsp
+  ctx.BUF.leave()
+  if state.dsp_buf and state.dsp_buf ~= 'dsp' and not ctx.BUF.enter(state.dsp_buf) then state.dsp_buf = 'dsp' end
   if edit.after == nil and ctx.edit_after_main then edit.after = ctx.edit_after_main end   -- 7 ноя: см. ctx.edit_after_main
   if ctx.ut_poll then pcall(ctx.ut_poll) end
   -- 16 окт: опция zoom on top — вкладка item ниже трекера: прицел (зум края) над полной волной
@@ -25719,6 +25753,7 @@ local function frame()
       ctx.KCP.draw(U, x, y, w, h, st and function(vk) return st:byte(vk) ~= 0 end, now, reaper.GetOS():match('OSX') or reaper.GetOS():match('mac'))
     end,
     buf_with = function(id, fn, ...) return ctx.BUF.with(id, fn, ...) end,   -- 12 ноя: отрисовка буфера #n с его состоянием
+    dsp_buf = state.dsp_buf or 'dsp', dsp_fields = dsp_fields, buf_switch = function(id) ctx.BUF.switch(id); dspt_cache.pin = nil end,   -- 12 ноя: dsp#2 — второй лист DSP
     in_draw = function(Lx, x, y, w, h, foc) local rows, cols = ctx.in_data(); return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 11 ноя: панель inputs
     phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
@@ -25760,7 +25795,7 @@ local function frame()
       local v = fxv_cache[f]; if not v then v = model.fx_values(col.track, f); fxv_cache[f] = v end; return v end,
     dsp_fxs = (function() local t = dsp_target(); return t and t.fx or {} end)(),
     dsp_title = (function() local t = dsp_target(); if not t then return nil end
-      return t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name end)(),
+      return (t.take and ('take fx: ' .. t.name .. '  (' .. t.col.name .. ')') or t.name) .. (dsp_sel.pin and ' · pinned' or '') end)(),   -- 12 ноя: те же поля — dsp_fields()
     dsp_is_take = (function() local t = dsp_target(); return t and t.take or false end)(),
     dsp_col = (function() local t = dsp_target(); return t and t.col end)(),   -- 8 окт: имя трека в шапке DSP — от цели DSP (при протяжке не меняется)
     ctrl = {
