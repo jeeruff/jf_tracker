@@ -787,6 +787,7 @@ end
 -- ── снимок ────────────────────────────────────────────────────────────────
 local cache = { key = nil, snap = nil, midi = {}, hash_t = 0, hashes = '' }
 local rcache = { key = nil, list = {} }   -- регионы (см. M.regions)
+local cache2 = { key = nil, snap = nil }   -- 12 ноя: снимок второго вида на своё LPB (M.snapshot_at)
 
 local function midi_hashes()
   local parts = {}
@@ -1165,7 +1166,17 @@ function M.snapshot(lpb)
   return cache.snap, true
 end
 
-function M.invalidate() cache.key = nil; rcache.key = nil end
+function M.invalidate() cache.key = nil; rcache.key = nil; cache2.key = nil end
+-- 12 ноя: второй снимок на другое LPB (tracker 2 со своим LPB) — свой слот кэша, иначе два вида пересобирали бы
+-- снимок по очереди каждый кадр. Оба — чтение одного проекта, различается только сетка строк
+function M.snapshot_at(lpb)
+  local key = M.cache_key(lpb)
+  if cache2.key == key and cache2.snap then return cache2.snap, false end
+  cache2.key = key
+  cache2.snap = M.build(lpb)
+  M.snap_n = (M.snap_n or 0) + 1; cache2.snap.sid = M.snap_n
+  return cache2.snap, true
+end
 
 -- ── строки вида ───────────────────────────────────────────────────────────
 -- Описания видимых строк: время, такт/доля. Считаем только для окна вида.

@@ -82,7 +82,7 @@ KH.PAGES = {
     { k = 'X + key  x', d = 'swap with that panel / with the last focused' },
     { k = '+ -  < >  =', d = 'height / width / equal in the parent' },
     { k = 'z', d = 'zoom the pane to the window, again - back (also :big for item)' },
-    { k = 'D', d = 'duplicate (also s / v / T + the letter of an open tracker, dsp, inputs - e.g. v t): on the tracker - tracker 2 (another pattern or a phrase: j k J K g G rows, h l tracks, [ ] next, p pattern / phrase, Space listen, Enter - the main cursor there to edit, Esc back); on other panes one more instance beside it, its own cursor and scroll (inputs for now; q closes the extra one)' },
+    { k = 'D', d = 'duplicate (also s / v / T + the letter of an open tracker, dsp, inputs - e.g. v t): on the tracker - tracker 2 (another pattern or a phrase: j k J K g G rows, h l tracks, [ ] next, p pattern / phrase, + - its own LPB (the time is shared, only the grid differs), Space listen, Enter - the main cursor there to edit, Esc back); on other panes one more instance beside it, its own cursor and scroll (inputs for now; q closes the extra one)' },
     { k = 'q', d = 'hide the pane (g + key brings it back)' },
     { k = 'c + key', t = {}, d = 'custom modules - files in modules/ and Data/jf_tracker_modules/: c f - freesound' },
     { k = 'Space  u', d = 'next layout (main-left, main-right, wide, stack, tracker) / undo' },
@@ -993,7 +993,7 @@ KH.BARS = {
   humanizer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'on/off' }, { '0', 'reset' }, { 'a', 'add dsp param' }, { 'x', 'remove' }, { 'Enter', 'apply' }, { 'f', 'jump' } },
   reform = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { '0', 'reset' }, { 'Space', 'listen' }, { 'Enter', 'keep' }, { 'Esc', 'revert' }, { 'f', 'jump' } },
   renderer = { { 'letter', 'row' }, { 'j k', 'row' }, { 'h l', 'value' }, { 'H L', 'fine' }, { 'N Enter', 'set N' }, { 'Space', 'toggle' }, { '0', 'defaults' }, { 'Enter', 'bounce' }, { 'Esc', 'back' }, { 'f', 'jump' } },
-  tracker2 = { { 'j k', 'rows' }, { 'J K', 'bars' }, { 'h l', 'tracks' }, { '[ ]', 'next' }, { 'p', 'pattern/phrase' }, { 'Space', 'listen' }, { 'Enter', 'edit in main' }, { 'Esc', 'back' } },   -- 12 ноя: tracker 2
+  tracker2 = { { 'j k', 'rows' }, { 'J K', 'bars' }, { 'h l', 'tracks' }, { '[ ]', 'next' }, { 'p', 'pattern/phrase' }, { '+ -', 'LPB' }, { 'Space', 'listen' }, { 'Enter', 'edit in main' }, { 'Esc', 'back' } },   -- 12 ноя: tracker 2
   tracker = { { 'i', 'insert' }, { 'hjkl', 'move' }, { 'x', 'del' }, { 'dd', 'rows' }, { 'yy p', 'copy' }, { 'v', 'select' },
               { '/', 'find' }, { ':', 'cmd' }, { '\\', 'menu' }, { '\\\\', 'context' }, { 'f', 'jump' }, { 'Space', 'play' }, { '?', 'actions' } },
   insert = { { 'q2w3e', 'notes' }, { 'z x', 'oct' }, { 'c C', 'vel' }, { '.', 'repeat' }, { 'Opt+J K', 'inst' }, { 'a', 'step auto' },

@@ -35216,7 +35216,7 @@ ctx.BUF.register('humanizer', ctx.HU, {})   -- то же (hum_s)
 -- 12 ноя: tracker#2 (PLAN_BUFFERS) — второй вид трекера в своём листе: паттерн или фраза, свой курсор и колонки;
 -- v1 — смотреть / ходить / слушать, Enter — основной курсор сюда (там и правка; фраза за =END становится видна)
 ctx.T2 = { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 }
-ctx.BUF.register('tracker', ctx.T2, { 'row0', 'cur', 'mode', 'phr', 'rg', 'hscroll' }, { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 })
+ctx.BUF.register('tracker', ctx.T2, { 'row0', 'cur', 'mode', 'phr', 'rg', 'hscroll', 'lpb' }, { row0 = 0, cur = 0, mode = 'pattern', hscroll = 0 })   -- lpb: своё LPB вида (nil — как у основного)
 -- новый буфер панели — начальное состояние: dsp#2 закреплён на треке курсора; tracker#2 — с курсора, фраза из lib
 ctx.buf_init = function(nid)
   local b = ctx.BUF.get(nid); if not b then return end
@@ -35233,22 +35233,22 @@ ctx.t2_id = function()
   for id, c in pairs(bp) do if id ~= 'tracker' and draw.panes.base(id) == 'tracker' and ctx.BUF.ensure(id) and (c.active_id == nil or c.active_id == id) then return id end end
 end
 -- окно строк вида: [r0, r1) паттерна / фразы; фраза — её источник виден модели (SHOW_EXTRA)
-ctx.t2_span = function(st)
+ctx.t2_span = function(st, lpb2)
   local extra
   local r0, r1
   if st.mode == 'phrase' then
     local r = (st.phr and ctx.phr_find(st.phr)) or ctx.phr_list()[1]
     if r then
       st.phr = r.name; extra = { r.pos, r.rend }
-      r0 = math.floor(model.row_of_time(r.pos, state.lpb) + 1e-6); r1 = math.ceil(model.row_of_time(r.rend, state.lpb) - 1e-6)
+      r0 = math.floor(model.row_of_time(r.pos, lpb2) + 1e-6); r1 = math.ceil(model.row_of_time(r.rend, lpb2) - 1e-6)
     end
   end
   if not r0 then
     if st.mode == 'phrase' then st.mode = 'pattern' end   -- фраз нет — паттерн
     local list, rg = ctx.pl_song(), nil
     for _, p in ipairs(list) do if p.name == st.rg then rg = p; break end end
-    rg = rg or pooled.region_at(regions, edit.row_time(st.cur, state.lpb, 0)) or list[1]
-    if rg then st.rg = rg.name; r0, r1 = math.floor(rg.r0 + 1e-6), math.ceil(rg.r1 - 1e-6) else r0, r1 = 0, 64 end
+    rg = rg or pooled.region_at(regions, edit.row_time(st.cur, lpb2, 0)) or list[1]
+    if rg then st.rg = rg.name; r0, r1 = math.floor(model.row_of_time(rg.pos, lpb2) + 1e-6), math.ceil(model.row_of_time(rg.rgnend, lpb2) - 1e-6) else r0, r1 = 0, 64 end
   end
   local old = model.SHOW_EXTRA
   if (old and old[1]) ~= (extra and extra[1]) or (old and old[2]) ~= (extra and extra[2]) then model.SHOW_EXTRA = extra; model.invalidate() end
@@ -35283,7 +35283,7 @@ ctx.t2_open_phrase = function(name)
   return true
 end
 -- 12 ноя: копии фразы, которые сейчас звучат в песне → строки её источника (дробные); кэш списка триггеров по правкам
-ctx.t2_playheads = function(name, r)
+ctx.t2_playheads = function(name, r, lpb2)
   local sc = reaper.GetProjectStateChangeCount(0)
   local c = ctx.t2_trig
   if not (c and c.sc == sc and c.name == name) then
@@ -35295,21 +35295,33 @@ ctx.t2_playheads = function(name, r)
   end
   local out, pp = {}, reaper.GetPlayPosition()
   for _, t in ipairs(c.list) do
-    if pp >= t.p0 and pp < t.p0 + t.len then out[#out + 1] = model.row_of_time(r.pos + (pp - t.p0), state.lpb) end
+    if pp >= t.p0 and pp < t.p0 + t.len then out[#out + 1] = model.row_of_time(r.pos + (pp - t.p0), lpb2) end
   end
   return out
+end
+-- 12 ноя: линейка (паттерны, маркеры) для вида со своим LPB — строки пересчитаны по времени; кэш по regions и LPB
+ctx.t2_ruler = function(lpb2)
+  local c = ctx.t2_rul
+  if c and c.src == regions and c.lpb == lpb2 then return c.v end
+  local v = { regions = {}, markers = {} }
+  for _, rg in ipairs(regions or {}) do v.regions[#v.regions + 1] = { r0 = model.row_of_time(rg.pos, lpb2), r1 = model.row_of_time(rg.rgnend, lpb2), name = rg.name, idx = rg.idx, rgb = region_rgb(rg.color) } end
+  for _, mk in ipairs((regions and regions.markers) or {}) do v.markers[#v.markers + 1] = { row_f = mk.pos and model.row_of_time(mk.pos, lpb2) or mk.row_f, name = mk.name, idx = mk.idx, rgb = region_rgb(mk.color, 'marker') } end
+  ctx.t2_rul = { src = regions, lpb = lpb2, v = v }
+  return v
 end
 ctx.t2_draw = function(block, info)
   local id = ctx.t2_id()
   if not id then if model.SHOW_EXTRA then model.SHOW_EXTRA = nil; model.invalidate() end; ctx.t2_vis = nil; return end
   local st = ctx.BUF.get(id).st
-  local r0, r1 = ctx.t2_span(st)
+  local lpb2 = st.lpb or state.lpb   -- 12 ноя: своё LPB вида — только сетка строк, время общее (как плейхед и edit-курсор REAPER)
+  local snap2 = (lpb2 == state.lpb) and snap or model.snapshot_at(lpb2)
+  local r0, r1 = ctx.t2_span(st, lpb2)
   st.cur = math.max(r0, math.min(r1 - 1, st.cur or r0))
   local c0 = L.pn.by_panel[id]
-  local key = table.concat({ id, snap and snap.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
+  local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
   if ctx.t2_Lk ~= key then
     draw.layout_leaf = id
-    local ok, L2 = pcall(draw.layout, snap, setmetatable({ hscroll = st.hscroll or 0 }, { __index = state }), #regions)
+    local ok, L2 = pcall(draw.layout, snap2, setmetatable({ hscroll = st.hscroll or 0, lpb = lpb2 }, { __index = state }), #regions)
     draw.layout_leaf = nil
     if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); ctx.t2_vis = nil; return end
     ctx.t2_L, ctx.t2_Lk = L2, key
@@ -35321,9 +35333,9 @@ ctx.t2_draw = function(block, info)
   elseif st.cur > (st.row0 or r0) + n - 2 then st.row0 = st.cur - n + 2 end
   st.row0 = math.max(r0, math.min(st.row0 or r0, math.max(r0, r1 - n)))
   local sc = reaper.GetProjectStateChangeCount(0)
-  local rk = table.concat({ st.row0, n, state.lpb, sc, r0, r1, model.ROW_BASE or 1 }, '|')   -- 12 ноя: без %d — LPB бывает дробным
+  local rk = table.concat({ st.row0, n, lpb2, sc, r0, r1, model.ROW_BASE or 1 }, '|')   -- 12 ноя: без %d — LPB бывает дробным
   if ctx.t2_rk ~= rk then
-    local rows2 = model.rows_build(st.row0, n, state.lpb)
+    local rows2 = model.rows_build(st.row0, n, lpb2)
     for _, r in ipairs(rows2) do if r.row < r0 or r.row >= r1 then r.clip = true; r.label = ''; r.bar = false; r.beat = false end end
     ctx.t2_rows, ctx.t2_rk = rows2, rk
   end
@@ -35332,22 +35344,26 @@ ctx.t2_draw = function(block, info)
   local f0 = L.flat and L.flat[vim.cur.fi]
   if f0 and f0.col then for i, f in ipairs(L2.flat or {}) do if f.col and f.col.guid == f0.col.guid then fi2 = i; break end end end
   local vc = { fi = fi2, row = st.cur, field = 1, sub = vim.cur.sub }
-  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = false, hexbuf = false, typed = false, mixfocus = false, t2 = true },   -- false: nil не затеняет поля основного info
+  -- плейхед и edit-курсор — общие по времени, строки — в LPB вида; окно вида — его паттерн / фраза; линейка пересчитана
+  local ph2 = info.ph_row and model.row_of_time(edit.row_time(info.ph_row, state.lpb, 0), lpb2) or false
+  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = false, hexbuf = false, typed = false, mixfocus = false, t2 = true,   -- false: nil не затеняет поля основного info
+    lpb = lpb2, ph_row = ph2, cur_row = model.row_of_time(reaper.GetCursorPosition(), lpb2), view_clip = { r0, r1 },
+    ruler = lpb2 == state.lpb and info.ruler or ctx.t2_ruler(lpb2) },
     { __index = info })
   local hover2 = {}
-  block(L2, ctx.t2_rows, setmetatable({ row0 = st.row0, hscroll = st.hscroll or 0 }, { __index = state }), info2, hover2)
+  block(L2, ctx.t2_rows, setmetatable({ row0 = st.row0, hscroll = st.hscroll or 0, lpb = lpb2 }, { __index = state }), info2, hover2)
   -- 12 ноя: фраза играет в песне — тонкая полоска на строке источника у каждой звучащей копии (их может быть несколько)
   if st.mode == 'phrase' and reaper.GetPlayState() & 1 == 1 then
     local r = ctx.phr_find(st.phr)
     local x0, x1 = L2.matrix_w or 0, L2.total_w or L2.win_w
     if r and x1 > x0 then
       U.set(U.AMBER)
-      for _, rf in ipairs(ctx.t2_playheads(st.phr, r)) do
+      for _, rf in ipairs(ctx.t2_playheads(st.phr, r, lpb2)) do
         if rf >= st.row0 and rf < st.row0 + n then gfx.rect(x0, L2.body_y + math.floor((rf - st.row0) * L2.rh + 0.5), x1 - x0, 1, 1) end
       end
     end
   end
-  ctx.t2_vis = { id = id, hv = hover2, rect = L.pn.by_panel[id], r0 = r0, r1 = r1 }
+  ctx.t2_vis = { id = id, hv = hover2, rect = L.pn.by_panel[id], r0 = r0, r1 = r1, lpb = lpb2 }
 end
 -- щелчок в листе tracker#2: фокус на него, курсор — на строку под мышью
 ctx.t2_click = function()
@@ -35369,7 +35385,8 @@ ctx.t2_key = function(c)
   local ch = (c > 0 and c < 256) and string.char(c) or ''
   local v = ctx.t2_vis
   local r0, r1 = (v and v.r0) or 0, (v and v.r1) or ((st.cur or 0) + 1)
-  local bar = math.max(1, math.floor(state.lpb * 4 + 0.5))
+  local lpb2 = st.lpb or state.lpb
+  local bar = math.max(1, math.floor(lpb2 * 4 + 0.5))
   local function step_list(d)
     if st.mode == 'phrase' then
       local l = ctx.phr_list(); if #l == 0 then return end
@@ -35393,16 +35410,24 @@ ctx.t2_key = function(c)
   elseif ch == 'l' or c == 1919379572 then st.hscroll = (st.hscroll or 0) + 1
   elseif ch == '[' then step_list(-1)
   elseif ch == ']' then step_list(1)
+  elseif ch == '+' or ch == '-' or ch == '=' then   -- 12 ноя: своё LPB вида (9 здесь, 16 там — время общее); строка курсора — по времени
+    local k = 1
+    for i, v in ipairs(LPBS) do if math.abs(v - lpb2) < 1e-9 then k = i end end
+    local nl = LPBS[math.max(1, math.min(#LPBS, k + (ch == '-' and -1 or 1)))]
+    local t = edit.row_time(st.cur, lpb2, 0)
+    st.lpb = nl ~= state.lpb and nl or nil
+    st.cur = math.floor(model.row_of_time(t, nl) + 1e-6); st.row0 = st.cur - 4
+    vim.msg = ('tracker 2: LPB %s%s'):format(nl < 1 and ('1/' .. math.floor(1 / nl + 0.5)) or tostring(math.floor(nl)), st.lpb and '' or ' (as the main tracker)')
   elseif ch == 'p' then
     st.mode = st.mode == 'phrase' and 'pattern' or 'phrase'; st.phr = st.phr or state.phr_inst; st.cur = -1
     vim.msg = 'tracker 2: ' .. (st.mode == 'phrase' and 'phrases ([ ] - next; Enter - edit it in the main tracker)' or 'patterns')
   elseif c == 32 then
     if st.mode == 'phrase' then ctx.phr_preview(st.phr)
     elseif reaper.GetPlayState() & 1 == 1 then PV.stop()
-    else PV.midi(edit.row_time(st.cur, state.lpb, 0), edit.row_time(r1, state.lpb, 0)); vim.msg = 'tracker 2: playing from the cursor row (Space - stop)' end
+    else PV.midi(edit.row_time(st.cur, lpb2, 0), edit.row_time(r1, lpb2, 0)); vim.msg = 'tracker 2: playing from the cursor row (Space - stop)' end
   elseif c == 13 then
-    vim.cur.row = st.cur
-    state.row0 = math.max(0, st.cur - math.floor((L and L.nrows or 20) / 3))
+    vim.cur.row = math.floor(model.row_of_time(edit.row_time(st.cur, lpb2, 0), state.lpb) + 1e-6)   -- по времени: LPB видов могут отличаться
+    state.row0 = math.max(0, vim.cur.row - math.floor((L and L.nrows or 20) / 3))
     ctx.set_focus('tracker')
     vim.msg = st.mode == 'phrase' and ('phrase ' .. (st.phr or '') .. ': the main cursor is in its source - edit here (copies follow)') or 'the main cursor is here'
   else return false end

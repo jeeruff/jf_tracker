@@ -8,6 +8,7 @@ V.CHANGES = {
     'phrases: listen from a MIDI key or Shift + a note key (the phrase tracks solo); Shift+Space on a trigger plays its transposed copies; MIDI rec writes triggers',
     'phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item',
     'playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help',
+    'tracker 2: its own LPB (+ -) - two grids over the same time, as the REAPER playhead and edit cursor are shared',
     'fix: a layout holding a second pane (tracker 2, dsp 2) was lost on restart; tracker 2 crashed with a fractional LPB',
     'phrases: Enter on a trigger note opens the phrase in tracker 2; playing copies show as thin bars in it',
     'tracker 2: Ctrl+W D on the tracker - a second tracker view with its own pattern or phrase; Enter takes the main cursor there to edit (phrase sources too)',
