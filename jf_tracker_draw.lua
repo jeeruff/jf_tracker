@@ -769,7 +769,7 @@ function D.layout_core(snap, state, nregions)
   L.hr_vp = L.mixer and (L.mix_bottom and 0 or L.mix_rows) or 2
   -- 11 окт: +1 строка уголка — кнопка markers под регионом; кнопки лейнов
   -- (- + a+) — по-прежнему последняя строка шапки, прямо над номерами колонок
-  L.lane_row = 3 + L.hr_vp + L.hr_in + L.hr_info
+  L.lane_row = 4 + L.hr_vp + L.hr_in + L.hr_info   -- 14 ноя: ряд лейнов — самый низ шапки (над номерами колонок), выше — воздух
   -- 12 окт: подписи полей — вертикально обычным шрифтом (как имена дорожек): высота — самое длинное слово
   L.cap_rows = state.captions and math.max(1, math.ceil((ms('delay') + 6) / L.rh)) or 0
   L.header_rows = 5 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows   -- 14 ноя: +1 строка — ряд ø / fx и ряд лейнов (- + a+) слипались, в углу кнопки шли кучей
@@ -9381,7 +9381,7 @@ function D.frame(L, snap, rows, state, info)
           hint('mmfx', fx0, by, fw, bhh + 2, true)
         end
       end
-      local by2 = hy + (L.lane_row - 1) * L.rh + (D.HBX or 0)
+      local by2 = hy + (L.lane_row - 2) * L.rh + (D.HBX or 0)
       local x2 = bx
       local function row2(w) if mixcol or L.hr_info > 0 or x2 + w > c.x + c.w - 1 then return nil end; local x = x2; x2 = x2 + w + 1; return x end
       -- 16 окт: порядок второй строки — sro, ø, … ; ~ (автоматизация) — у правого края шапки (рисуется ниже, после sro)
@@ -10123,7 +10123,7 @@ function D.frame(L, snap, rows, state, info)
     for li, ln in ipairs(c.lanes) do
       -- −+ подколонок — над нотным полем (3 окт; раньше справа в строке лейна);
       -- справа в строке последнего лейна — −+ колонок эффектов (вместо опции fx)
-      local by = hy + L.lane_row * L.rh + 1
+      local by = hy_in + L.lane_row * L.rh + 1
       local G1 = (L.flat[ln.f0] or {}).G or L
       local nx = ln.x + (ln.sx and ln.sx[1] or 0) + (G1.x_note or 0)
       local function pm(x0, kind, onhot)
@@ -10143,7 +10143,7 @@ function D.frame(L, snap, rows, state, info)
       local bw2 = 2 * L.btn_w + 2
       if col.fixed and not c.folded then
         local lname = ln.lane.name ~= '' and ln.lane.name or ('L' .. (ln.lane.idx + 1))
-        text(ln.x + L.pad, hy + L.lane_row * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
+        text(ln.x + L.pad, hy_in + L.lane_row * L.rh + 2, fit(lname, nx - ln.x - 2 * L.pad), U.GREY)
       end
       if not c.folded and not c.master then
         -- 24 окт: [1][−][+] — 1 первой (трек на одном нотном лейне), − + правее; места на три нет — только − +
@@ -10170,7 +10170,7 @@ function D.frame(L, snap, rows, state, info)
           local aw = ms('a+') + 4
           local ax = fx0 - aw - L.pad
           if #c.envs == 0 and not state.ptmode and ax > nx + bw2 + L.pad then
-            local by = hy + L.lane_row * L.rh + 1
+            local by = hy_in + L.lane_row * L.rh + 1
             local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
             set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
             set(U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
@@ -10180,13 +10180,13 @@ function D.frame(L, snap, rows, state, info)
           end
         end
       end
-      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1) end
+      if li > 1 then set(U.DIM); gfx.rect(ln.x - 1, hy_in + L.lane_row * L.rh + 1, 1, L.rh, 1) end
     end
     D.pmark('hdr: envs + captions')
     for _, m in ipairs(c.mls or {}) do
-      text(m.x + L.pad, hy + L.lane_row * L.rh + 2, fit(m.ml.name, m.w - L.pad), U.CYAN)
-      set(U.DIM); gfx.rect(m.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
-      hint('mlane', m.x, hy + L.lane_row * L.rh, m.w, L.rh, m.fi)
+      text(m.x + L.pad, hy_in + L.lane_row * L.rh + 2, fit(m.ml.name, m.w - L.pad), U.CYAN)
+      set(U.DIM); gfx.rect(m.x - 1, hy_in + L.lane_row * L.rh + 1, 1, L.rh, 1)
+      hint('mlane', m.x, hy_in + L.lane_row * L.rh, m.w, L.rh, m.fi)
     end
     -- 11 окт: мастер без показанных огибающих — a+ (любая автоматизация мастера: громкость,
     -- панорама, параметры его FX, Tempo); с огибающими + стоит у последней, как у треков
@@ -10194,7 +10194,7 @@ function D.frame(L, snap, rows, state, info)
       local aw = ms('a+') + 4
       local m = (c.mls or {})[#(c.mls or {})]
       local ax = m and (m.x + m.w - aw - 2) or (c.x + c.w - aw - 2)
-      local by = hy + L.lane_row * L.rh + 1
+      local by = hy_in + L.lane_row * L.rh + 1
       if not m or ax > m.x + ms('cmd') + 2 * L.pad then
         local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
         set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
@@ -10208,7 +10208,7 @@ function D.frame(L, snap, rows, state, info)
       -- 6 окт: справа в шапке лейна − (спрятать лейн; огибающая и точки
       -- остаются), у последнего лейна ещё + (добавить: выбор параметра);
       -- имя — до кнопок, не под ними
-      local ly2 = hy + L.lane_row * L.rh
+      local ly2 = hy_in + L.lane_row * L.rh
       local nb = (ei == #c.envs) and 2 or 1
       local bx0 = ev.x + ev.w - nb * (L.btn_w + 2) - 1
       local room = not c.compact and (bx0 - ev.x - 2 * L.pad) >= ms('WW')
@@ -10232,16 +10232,16 @@ function D.frame(L, snap, rows, state, info)
         end
       end
       -- имя огибающей — своё меню (клик: удалить кривую / очистить точки), 2 окт
-      if not on_btn and mx >= ev.x and mx < ev.x + ev.w and my >= hy + L.lane_row * L.rh and my < hy + (L.lane_row + 1) * L.rh then hover.header_env = { e = ev.e, col = c.col } end
-      hint('env', ev.x, hy + L.lane_row * L.rh, ev.w, L.rh, ev.fi)
-      set(U.DIM); gfx.rect(ev.x - 1, hy + L.lane_row * L.rh + 1, 1, L.rh, 1)
+      if not on_btn and mx >= ev.x and mx < ev.x + ev.w and my >= hy_in + L.lane_row * L.rh and my < hy_in + (L.lane_row + 1) * L.rh then hover.header_env = { e = ev.e, col = c.col } end
+      hint('env', ev.x, hy_in + L.lane_row * L.rh, ev.w, L.rh, ev.fi)
+      set(U.DIM); gfx.rect(ev.x - 1, hy_in + L.lane_row * L.rh + 1, 1, L.rh, 1)
     end
     -- третья строка: что делает каждая подколонка (просьба 1 окт). Подписи
     -- короче ширины поля на символ, чтобы соседние не слипались; полное
     -- описание — в статус-баре при наведении (hover.caption)
     -- 31 окт: f-прыжки на колонки команд (fx 1..N) каждой подколонки — метка в строке лейнов шапки над колонкой
     if not c.folded then
-      local hyl = hy + L.lane_row * L.rh
+      local hyl = hy_in + L.lane_row * L.rh
       for _, ln in ipairs(c.lanes) do
         for si = 1, ln.nsub do
           local fl = L.flat[ln.f0 + si - 1]
@@ -10258,7 +10258,7 @@ function D.frame(L, snap, rows, state, info)
       end
     end
     if not c.folded and state.captions then           -- подписи колонок — опция (Options → column captions)
-      local cy3 = hy + (L.lane_row + 1) * L.rh + 2
+      local cy3 = hy_in + (L.lane_row + 1) * L.rh + 2
       local caph = L.cap_rows * L.rh - 4
       local function cap(x, w, txt, kind)
         -- 12 окт: подпись вертикально, снизу вверх, по центру поля (1x, не мелкий шрифт); ширина — высота строки

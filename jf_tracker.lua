@@ -1634,6 +1634,19 @@ ctx = {
   -- 26 окт: вид — project (весь трек) / section (секция курсора, zS) / pattern (паттерн курсора, zp); транспозиция
   -- и чистка трека берут то, что видно (WYSIWYG, ctx.view_rows)
   view_mode = function(m)
+    -- 14 ноя: zp / zS / кнопки вида из второго трекера — его собственный вид
+    local b2 = ctx.t2_swap_id and ctx.BUF.get(ctx.t2_swap_id)
+    if b2 then
+      local st = b2.st
+      if m == 'phrase' then
+        local rr = ctx.phr_find(state.phr_inst or st.phr or '') or ctx.phr_list()[1]
+        if not rr then vim.msg = 'tracker 2: no phrases in the project'; return end
+        st.phr = rr.name
+      end
+      if m ~= st.mode then st.cg, st.fo = nil, nil; if m == 'phrase' or st.mode == 'phrase' then st.cur = -1 end end
+      st.mode = m; vim.msg = 'tracker 2 view: ' .. m
+      return
+    end
     if m == 'phrase' then return ctx.view_phrase() end   -- 12 ноя: phr — фраза (источник за =END), сразу в лупе
     if state.view_phr then state.view_phr = nil; ctx.extra_set('main', nil) end
     state.view_reg = m ~= 'project'
@@ -1643,7 +1656,11 @@ ctx = {
       section = 'view: the section of the cursor (zS again - the whole project, zp - the pattern)',
       pattern = 'view: the pattern of the cursor only (zp again - the whole project, zS - the section)' })[m]
   end,
-  view_cur = function() return not state.view_reg and 'project' or state.view_phr and 'phrase' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern') end,
+  view_cur = function()
+    local b2 = ctx.t2_swap_id and ctx.BUF.get(ctx.t2_swap_id)
+    if b2 then return b2.st.mode or 'pattern' end
+    return not state.view_reg and 'project' or state.view_phr and 'phrase' or state.view_item and 'item' or (state.view_secmode and 'section' or 'pattern')
+  end,
   -- секция курсора: { pos, rgnend, name } или nil
   section_at = function(t)
     for _, sc in ipairs(regions.sections or {}) do if t >= sc.pos - 1e-6 and t < sc.rgnend - 1e-6 then return sc end end
@@ -37531,6 +37548,7 @@ ctx.pane_nudge = function(id, dir)
   end
   local opp = { l = 'r', r = 'l', u = 'd', d = 'u' }
   local g, sg = edge(dir), (dir == 'r' or dir == 'd') and 1 or -1
+  if state.debug then ctx.dlog(('pane_nudge %s %s: edge %s, grips %d, cell %d,%d %dx%d'):format(tostring(id), dir, g and 'own' or (edge(opp[dir]) and 'opposite' or 'none'), #(L.pn.grips or {}), cl.x, cl.y, cl.w, cl.h)) end
   if not g then g = edge(opp[dir]) end   -- с той стороны соседа нет — край с другой стороны едет туда же: панель меньше
   if not g then vim.msg = 'pane ' .. id .. ': no edge to move that way'; return end
   local before = PN.encode(m)
