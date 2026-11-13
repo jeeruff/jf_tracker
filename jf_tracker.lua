@@ -6167,7 +6167,7 @@ ctx = {
   -- 10 окт: zz в любом модуле (кроме трекера — там Vim) — панель в фокусе на всё окно, повтор — назад
   zz_zoom = function()
     if not (state.panes_ui and L and L.pn) then vim.msg = 'zz: panes are off (options: panes)'; return end
-    local id = ctx.pane_cur()
+    local id = ctx.t2_swap_id or ctx.pane_cur()   -- 13 ноя: zz во втором трекере — он сам (на время клавиши фокус подменён на 'tracker')
     if not id then return false end   -- 10 окт: трекер тоже — zz в трекере = трекер на всё окно
     if id == 'sample' then ctx.sample_big(); return true end
     ctx.pane_do(function() return draw.panes.zoom(state.panes, id) end, state.panes.zoom == id and (id .. ' back in its pane') or (id .. ' zoomed - zz back'))
@@ -33219,6 +33219,7 @@ local function frame()
         return vim.key(c)
       elseif draw.panes.base(state.focus) == 'tracker' and state.focus ~= 'tracker' then   -- 12 ноя: tracker#2 — свои клавиши, правка — в основном
         if vim.mode == 'cmd' or vim.mode == 'search' or c == 58 then return vim.key(c) end   -- : и поиск — у основного
+        if not ctx.t2_id() then ctx.set_focus('tracker'); return vim.key(c) end   -- 13 ноя: второго вида нет на экране (спрятан, под зумом) — клавиша основному
         if not ctx.t2_key(c) and not ctx.t2_swap(state.focus, vim.key, c) then vim.msg = 'tracker 2: not drawn yet - try again' end   -- 13 ноя: остальное — клавиши трекера в его виде
       elseif draw.panes.base(state.focus) == 'inputs' then   -- 11 ноя: панель входов (12 ноя: и буфер inputs#2)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
@@ -35600,8 +35601,9 @@ ctx.t2_swap = function(id, fn, ...)
   for k, v in pairs(st.vcur or {}) do vim.cur[k] = v end
   vim.cur.fi, vim.cur.row = fi, st.cur or 0
   draw.layout_leaf = id   -- relayout внутри клавиши раскладывает лист второго вида
+  ctx.t2_swap_id = id
   local ok, r = pcall(fn, ...)
-  draw.layout_leaf = nil
+  draw.layout_leaf = nil; ctx.t2_swap_id = nil
   local f = L and L.flat and L.flat[vim.cur.fi]
   if f and f.col then
     st.cg = f.col.guid
