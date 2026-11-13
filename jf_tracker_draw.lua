@@ -9233,8 +9233,7 @@ function D.frame(L, snap, rows, state, info)
         if b[4] == 'phase' then
           local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
           -- 20 окт: в рамке, как соседние кнопки (включена — янтарная рамка)
-          set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)
-          set((hot or on) and U.AMBER or U.DIM); gfx.rect(x, by, bwk, bh, 0)
+          if hot then set(D.CURROW); gfx.rect(x, by, bwk, bh, 1) end   -- 14 ноя: без рамки — знак (щелчок тот же); под мышью — подсветка
           text(x + math.floor((bwk - ms('ø')) / 2), tyc, 'ø', (hot or on) and U.AMBER or BTXT)
           if hot then hover.trkio = { col = col, what = 'phase' } end
           hint('trkio', x, by, bwk, bh + 2, { col = col, what = 'phase' })
@@ -9244,8 +9243,7 @@ function D.frame(L, snap, rows, state, info)
         -- (≈ — будущий знак модуляции)
         if b[4] == 'auto' then
           local hot = mx >= x and mx < x + bwk and my >= by and my < by + bh
-          set(hot and D.CURROW or U.PANEL); gfx.rect(x, by, bwk, bh, 1)   -- 20 окт: в рамке
-          set(hot and U.AMBER or (env_shown and U.CYAN or U.DIM)); gfx.rect(x, by, bwk, bh, 0)
+          if hot then set(D.CURROW); gfx.rect(x, by, bwk, bh, 1) end   -- 14 ноя: без рамки — знак
           text(x + math.floor((bwk - ms('~')) / 2), tyc, '~', hot and U.AMBER or (on and (env_shown and U.CYAN or U.TEXT) or U.GREY))
           if hot then hover.btn = { col = col, what = 'auto' } end
           hint('btn', x, by, bwk, bh + 2, { col = col, what = 'auto' })
@@ -9303,11 +9301,11 @@ function D.frame(L, snap, rows, state, info)
       local gap = L.pad
       -- 15 окт: рамки на 15 % больше (просьба); по высоте — до строки громкости, не на неё
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
-      trim_w = math.max(ms('~'), ms('ø')) + 7; trim_x = c.x + c.w - L.pad - trim_w   -- 20 окт: ~ и ø — в рамке, чуть шире
+      trim_w = math.max(ms('~'), ms('ø')) + 3; trim_x = c.x + c.w - L.pad - trim_w   -- 14 ноя: ~ и ø — знаки без рамки, уже (было + 7)
       -- 30 окт: 2 px между строками кнопок (и зоны щелчка без захода на соседнюю строку) — не прицеливаться
       -- 14 ноя: шапка на строку выше — кнопки r i m s /// ø выше на полстроки (буквы влезают), ряды под ними ниже на столько же
       local bhh = L.rh - 3 + (D.HBX or 0)
-      local phw = math.max(ms('~'), ms('ø')) + 7
+      local phw = math.max(ms('~'), ms('ø')) + 3
       local ph_x = trim_x - 1 - phw
       -- 18 окт: узкий трек — r i m s сжимаются (до ширины буквы), чтобы /// влезли в первую строку
       do
