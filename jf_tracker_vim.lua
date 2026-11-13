@@ -2367,6 +2367,18 @@ function V.key_impl(c)
     local cp = (c >= 0x75000000 and c < 0x76000000) and (c - 0x75000000) or c
     local d = OPTDIG[cp] or ((mods.alt and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
+      local raw = d
+      -- 14 ноя: вторая цифра быстрее 0.25 с — двузначный номер: Opt+1 Opt+2 → инструмент 12 (и 1 1 → 11)
+      do
+        local t2 = (reaper and reaper.time_precise) and reaper.time_precise() or os.clock()
+        local o2 = V.optdig
+        if o2 and o2.raw and o2.i == 1 and t2 - o2.t < 0.25 then
+          local n2 = o2.raw * 10 + raw
+          V.optdig = nil
+          if n2 >= 1 and n2 <= (ctx.pool_max and ctx.pool_max() or 99) and ctx.pool_select then ctx.pool_select(n2) end
+          V.count = nil; return
+        end
+      end
       if d == 0 then d = 10 end
       -- 14 ноя: та же цифра ещё раз (до 2 с) — следующий инструмент, чей номер начинается с неё: 1 → 01, 10, 11 … 19, 100 …
       local now = (reaper and reaper.time_precise) and reaper.time_precise() or os.clock()   -- тесты гоняют модуль без REAPER
@@ -2379,7 +2391,7 @@ function V.key_impl(c)
       end
       local i = 1
       if od and od.d == d and now - od.t < 2 then i = od.i % #list + 1 end
-      V.optdig = { d = d, i = i, t = now }
+      V.optdig = { d = d, i = i, t = now, raw = raw }
       if ctx.pool_select then ctx.pool_select(list[i]) end
       V.count = nil; return
     end
