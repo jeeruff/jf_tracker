@@ -35375,7 +35375,7 @@ ctx.t2_open_phrase = function(name)
     id = nid
   end
   local st = ctx.BUF.get(id).st
-  st.mode, st.phr, st.cur = 'phrase', name, -1
+  st.mode, st.phr, st.cur, st.cg = 'phrase', name, -1, nil
   ctx.pane_focus(id)
   vim.msg = ('tracker 2: phrase %s - j k rows, Space listen, Enter - edit it in the main tracker, Esc back'):format(name)
   return true
@@ -35445,15 +35445,49 @@ ctx.t2_draw = function(block, info)
   if type(st.cur) ~= 'number' then st.cur = r0 end   -- 13 ноя: страховка (сохранённая раскладка / старый щелчок)
   st.cur = math.max(r0, math.min(r1 - 1, st.cur))
   local c0 = L.pn.by_panel[id]
-  local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
-  if ctx.t2_Lk ~= key then
-    draw.layout_leaf = id
-    local ok, L2 = pcall(draw.layout, snap2, setmetatable({ hscroll = st.hscroll or 0, lpb = lpb2 }, { __index = state }), #regions)
-    draw.layout_leaf = nil
-    if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); ctx.t2_vis = nil; return end
-    ctx.t2_L, ctx.t2_Lk = L2, key
+  local function lay()
+    local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
+    if ctx.t2_Lk ~= key then
+      draw.layout_leaf = id
+      local ok, L2 = pcall(draw.layout, snap2, setmetatable({ hscroll = st.hscroll or 0, lpb = lpb2 }, { __index = state }), #regions)
+      draw.layout_leaf = nil
+      if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); return nil end
+      ctx.t2_L, ctx.t2_Lk = L2, key
+    end
+    return ctx.t2_L
   end
-  local L2 = ctx.t2_L
+  local L2 = lay()
+  if not L2 then ctx.t2_vis = nil; return end
+  -- 13 ноя: свой курсор колонки (трек по guid): h l ходят по трекам вида, вид прокручивается за курсором (было: колонка
+  -- курсора основного вида + h l крутили вид — курсор уезжал за край и пропадал)
+  local function cols_of() local l, seen = {}, {}; for i, f in ipairs(L2.flat or {}) do local g = f.col and f.col.guid; if g and not seen[g] then seen[g] = true; l[#l + 1] = { g = g, fi = i, ci = f.ci or 0 } end end; return l end
+  local function ci_of(g) for i, c in ipairs(snap2.cols or {}) do if c.guid == g then return i end end end
+  local cl = cols_of()
+  if not st.cg then   -- фраза — её первый трек, иначе трек курсора основного вида
+    local r = st.mode == 'phrase' and ctx.phr_find(st.phr)
+    local best
+    for tr in pairs(r and ctx.phr_tracks(r.pos, r.rend) or {}) do local n = reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER'); if not best or n < best[1] then best = { n, reaper.GetTrackGUID(tr) } end end
+    local f0 = L.flat and L.flat[vim.cur.fi]
+    st.cg = (best and best[2]) or (f0 and f0.col and f0.col.guid) or (cl[1] and cl[1].g)
+  end
+  local want = st.cwant; st.cwant = nil
+  if want then   -- h / l: ближайший видимый трек в ту сторону; нет — прокрутить на колонку и искать снова
+    local oci = ci_of(st.cg) or 0
+    for _ = 1, 64 do
+      local best
+      for _, e in ipairs(cl) do if ((want > 0 and e.ci > oci) or (want < 0 and e.ci < oci)) and (not best or math.abs(e.ci - oci) < math.abs(best.ci - oci)) then best = e end end
+      if best then st.cg = best.g; break end
+      local hs = math.max(1, st.hscroll or 1) + want
+      if hs < 1 or hs > #(snap2.cols or {}) then break end
+      st.hscroll = hs; L2 = lay(); if not L2 then ctx.t2_vis = nil; return end; cl = cols_of()
+    end
+  end
+  local function find(g) for _, e in ipairs(cl) do if e.g == g then return e end end end
+  if st.cg and not find(st.cg) then   -- курсор за краем — вид к нему
+    local ci = ci_of(st.cg)
+    if ci then st.hscroll = ci; L2 = lay(); if not L2 then ctx.t2_vis = nil; return end; cl = cols_of() end
+    if not find(st.cg) then st.cg = cl[1] and cl[1].g end   -- скрытый трек (папка / sel) — первый видимый
+  end
   local n = math.max(1, L2.nrows or 1)
   if r1 - r0 <= n then st.row0 = r0
   elseif st.cur < (st.row0 or r0) then st.row0 = st.cur
@@ -35467,10 +35501,8 @@ ctx.t2_draw = function(block, info)
     ctx.t2_rows, ctx.t2_rk = rows2, rk
   end
   local foc = state.focus == id
-  local fi2 = 1   -- колонка курсора основного вида — та же колонка трека во втором (его раскладка своя)
-  local f0 = L.flat and L.flat[vim.cur.fi]
-  if f0 and f0.col then for i, f in ipairs(L2.flat or {}) do if f.col and f.col.guid == f0.col.guid then fi2 = i; break end end end
-  local vc = { fi = fi2, row = st.cur, field = 1, sub = vim.cur.sub }
+  local e2 = st.cg and find(st.cg)
+  local vc = { fi = e2 and e2.fi or 1, row = st.cur, field = 1 }   -- без sub основного (inst / wave — курсор искал их поле и не рисовался)
   -- плейхед и edit-курсор — общие по времени, строки — в LPB вида; окно вида — его паттерн / фраза; линейка пересчитана
   local ph2 = info.ph_row and model.row_of_time(edit.row_time(info.ph_row, state.lpb, 0), lpb2) or false
   local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = false, hexbuf = false, typed = false, mixfocus = false, t2 = true,   -- false: nil не затеняет поля основного info
@@ -35503,6 +35535,7 @@ ctx.t2_click = function()
   local hr = v.hv.row   -- hover.row тела — таблица строки ({ row = … }), не номер
   if type(hr) == 'table' then hr = hr.row end
   if st and type(hr) == 'number' then st.cur = hr end
+  if st and v.hv.col and v.hv.col.guid then st.cg = v.hv.col.guid end   -- 13 ноя: и колонка — трек под мышью
   ctx.set_focus(v.id)
   vim.msg = 'tracker 2: j k rows, [ ] ' .. ((st and st.mode == 'phrase') and 'phrase' or 'pattern') .. ', p pattern / phrase, Space listen, Enter - the main cursor here, Esc back'
   return true
@@ -35526,7 +35559,7 @@ ctx.t2_key = function(c)
       local k = 1; for i, r in ipairs(l) do if r.name == st.rg then k = i end end
       local rg = l[(k - 1 + d) % #l + 1]; st.rg = rg.name; vim.msg = 'tracker 2: ' .. rg.name
     end
-    st.cur = -1   -- в начало нового окна (t2_draw зажмёт)
+    st.cur = -1; st.cg = nil   -- в начало нового окна (t2_draw зажмёт), колонка — трек фразы
   end
   if c == 27 then ctx.set_focus('tracker')
   elseif ch == 'j' or c == 1685026670 then st.cur = math.min(r1 - 1, st.cur + 1)
@@ -35535,8 +35568,8 @@ ctx.t2_key = function(c)
   elseif ch == 'K' then st.cur = math.max(r0, st.cur - bar)
   elseif ch == 'g' then st.cur = r0
   elseif ch == 'G' then st.cur = r1 - 1
-  elseif ch == 'h' or c == 1818584692 then st.hscroll = math.max(0, (st.hscroll or 0) - 1)
-  elseif ch == 'l' or c == 1919379572 then st.hscroll = (st.hscroll or 0) + 1
+  elseif ch == 'h' or c == 1818584692 then st.cwant = -1   -- 13 ноя: трек влево / вправо (t2_draw прокрутит вид за курсором)
+  elseif ch == 'l' or c == 1919379572 then st.cwant = 1
   elseif ch == '[' then step_list(-1)
   elseif ch == ']' then step_list(1)
   elseif ch == '+' or ch == '-' or ch == '=' then   -- 12 ноя: своё LPB вида (9 здесь, 16 там — время общее); строка курсора — по времени
@@ -35548,7 +35581,7 @@ ctx.t2_key = function(c)
     st.cur = math.floor(model.row_of_time(t, nl) + 1e-6); st.row0 = st.cur - 4
     vim.msg = ('tracker 2: LPB %s%s'):format(nl < 1 and ('1/' .. math.floor(1 / nl + 0.5)) or tostring(math.floor(nl)), st.lpb and '' or ' (as the main tracker)')
   elseif ch == 'p' then
-    st.mode = st.mode == 'phrase' and 'pattern' or 'phrase'; st.phr = st.phr or state.phr_inst; st.cur = -1
+    st.mode = st.mode == 'phrase' and 'pattern' or 'phrase'; st.phr = st.phr or state.phr_inst; st.cur = -1; st.cg = nil
     vim.msg = 'tracker 2: ' .. (st.mode == 'phrase' and 'phrases ([ ] - next; Enter - edit it in the main tracker)' or 'patterns')
   elseif c == 32 then
     if st.mode == 'phrase' then ctx.phr_preview(st.phr)
