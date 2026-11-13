@@ -25521,8 +25521,9 @@ local function frame()
   -- набранные клавиши, фокус, очередь, сообщение); остальное — описание того,
   -- на что наведена мышь (state.status)
   local mode, _, typed = vim.status()   -- 15 окт: набранное — у курсора (info.typed), не в статус и не в слово режима
-  local left = mode ~= '' and mode or (state.focus ~= 'tracker' and '' or (vim.piano and 'KEYS' or 'NORMAL'))   -- 16 окт: клавиатура включена в NORMAL — слово KEYS (ноты на цифрах / F)
-  if state.focus ~= 'tracker' then
+  local trk = draw.panes.base(state.focus) == 'tracker'   -- 13 ноя: tracker 2 — тот же режим трекера (было слово TRACKER)
+  local left = mode ~= '' and mode or (not trk and '' or (vim.piano and 'KEYS' or 'NORMAL'))   -- 16 окт: клавиатура включена в NORMAL — слово KEYS (ноты на цифрах / F)
+  if not trk then
     -- 13 окт: подпись панели из реестра (properties, lib, item), не её id (было «SPROPS», «INST»)
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
     -- 16 окт: без обозначения панели (было TOP:samp) — имя самой вкладки; item — SAMPLER
@@ -33217,8 +33218,8 @@ local function frame()
         end
         return vim.key(c)
       elseif draw.panes.base(state.focus) == 'tracker' and state.focus ~= 'tracker' then   -- 12 ноя: tracker#2 — свои клавиши, правка — в основном
-        if vim.mode == 'cmd' or vim.mode == 'search' or c == 58 then return vim.key(c) end
-        if not ctx.t2_key(c) then vim.msg = 'tracker 2: j k J K g G rows, h l tracks, [ ] next, p pattern / phrase, Space listen, Enter edit in the main tracker, Esc back' end
+        if vim.mode == 'cmd' or vim.mode == 'search' or c == 58 then return vim.key(c) end   -- : и поиск — у основного
+        if not ctx.t2_key(c) and not ctx.t2_swap(state.focus, vim.key, c) then vim.msg = 'tracker 2: not drawn yet - try again' end   -- 13 ноя: остальное — клавиши трекера в его виде
       elseif draw.panes.base(state.focus) == 'inputs' then   -- 11 ноя: панель входов (12 ноя: и буфер inputs#2)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         local rows, cols = ctx.in_data()
@@ -35377,7 +35378,7 @@ ctx.t2_open_phrase = function(name)
   local st = ctx.BUF.get(id).st
   st.mode, st.phr, st.cur, st.cg = 'phrase', name, -1, nil
   ctx.pane_focus(id)
-  vim.msg = ('tracker 2: phrase %s - j k rows, Space listen, Enter - edit it in the main tracker, Esc back'):format(name)
+  vim.msg = ('tracker 2: phrase %s - edit it here (all tracker keys), Space listen, [ ] next, Esc back'):format(name)
   return true
 end
 -- 12 ноя: копии фразы, которые сейчас звучат в песне → строки её источника (дробные); кэш списка триггеров по правкам
@@ -35503,10 +35504,13 @@ ctx.t2_draw = function(block, info)
   end
   local foc = state.focus == id
   local e2 = st.cg and find(st.cg)
-  local vc = { fi = e2 and e2.fi or 1, row = st.cur, field = 1 }   -- без sub основного (inst / wave — курсор искал их поле и не рисовался)
+  local fi2 = e2 and e2.fi or 1
+  do local g = e2 and L2.flat[fi2 + (st.fo or 0)]; if g and g.col and g.col.guid == st.cg then fi2 = fi2 + (st.fo or 0) end end
+  local sv2 = st.vcur or {}
+  local vc = setmetatable({ fi = fi2, row = st.cur, field = sv2.field or 1 }, { __index = sv2 })   -- 13 ноя: поле / подполе — свои (не основного: его inst / wave курсор здесь не находил)
   -- плейхед и edit-курсор — общие по времени, строки — в LPB вида; окно вида — его паттерн / фраза; линейка пересчитана
   local ph2 = info.ph_row and model.row_of_time(edit.row_time(info.ph_row, state.lpb, 0), lpb2) or false
-  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = 'normal', vis = false, hexbuf = false, typed = false, mixfocus = false, t2 = true,   -- false: nil не затеняет поля основного info
+  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = foc and info.vmode or 'normal', vis = false, hexbuf = foc and info.hexbuf or false, typed = foc and info.typed or false, mixfocus = false, t2 = true,   -- false: nil не затеняет поля основного info
     lpb = lpb2, ph_row = ph2, cur_row = model.row_of_time(reaper.GetCursorPosition(), lpb2), view_clip = { r0, r1 },
     ruler = lpb2 == state.lpb and info.ruler or ctx.t2_ruler(lpb2) },
     { __index = info })
@@ -35538,61 +35542,86 @@ ctx.t2_click = function()
   if st and type(hr) == 'number' then st.cur = hr end
   if st and v.hv.col and v.hv.col.guid then st.cg = v.hv.col.guid end   -- 13 ноя: и колонка — трек под мышью
   ctx.set_focus(v.id)
-  vim.msg = 'tracker 2: j k rows, [ ] ' .. ((st and st.mode == 'phrase') and 'phrase' or 'pattern') .. ', p pattern / phrase, Space listen, Enter - the main cursor here, Esc back'
+  vim.msg = 'tracker 2: all tracker keys here; [ ] next pattern / phrase, + - its LPB, Enter - the main cursor here, Esc back'
   return true
 end
+-- 13 ноя: tracker 2 — полный трекер: клавиша идёт в обычный обработчик (vim.key) на время подмены раскладки (L),
+-- снимка (своё LPB), курсора, окна строк и прокрутки — как буфер (B.enter / B.leave). Правка та же: edit пишет в REAPER,
+-- оба вида — отображения таймлайна. vim достаёт L / snap через ctx.L() / ctx.snap(), поэтому подмена локалей работает
+ctx.t2_swap = function(id, fn, ...)
+  local b = ctx.BUF.get(id); local st = b and b.st; local L2 = ctx.t2_L
+  if not (st and L2 and L2.flat and ctx.t2_vis and ctx.t2_vis.id == id) then return false end
+  local lpb2 = st.lpb or state.lpb
+  local first
+  for i, f in ipairs(L2.flat) do if f.x and f.col and f.col.guid == st.cg then first = i; break end end
+  local fi = first or 1
+  local g = first and L2.flat[first + (st.fo or 0)]
+  if g and g.col and g.col.guid == st.cg then fi = first + (st.fo or 0) end
+  local sv_cur = {}; for k, v in pairs(vim.cur) do sv_cur[k] = v end
+  local sv = { L = L, snap = snap, row0 = state.row0, hs = state.hscroll, lpb = state.lpb, focus = state.focus, az = state.autozoom, pt = state.ptmode }
+  L = L2
+  if lpb2 ~= state.lpb then snap = model.snapshot_at(lpb2) end
+  state.row0, state.hscroll, state.lpb, state.focus, state.autozoom, state.ptmode = st.row0 or 0, st.hscroll or 0, lpb2, 'tracker', nil, nil
+  for k, v in pairs(st.vcur or {}) do vim.cur[k] = v end
+  vim.cur.fi, vim.cur.row = fi, st.cur or 0
+  draw.layout_leaf = id   -- relayout внутри клавиши раскладывает лист второго вида
+  local ok, r = pcall(fn, ...)
+  draw.layout_leaf = nil
+  local f = L and L.flat and L.flat[vim.cur.fi]
+  if f and f.col then
+    st.cg = f.col.guid
+    for i, h in ipairs(L.flat) do if h.col and h.col.guid == st.cg then st.fo = vim.cur.fi - i; break end end
+  end
+  st.cur, st.row0, st.hscroll = vim.cur.row, state.row0, state.hscroll
+  st.vcur = {}; for k, v in pairs(vim.cur) do if k ~= 'fi' and k ~= 'row' then st.vcur[k] = v end end
+  if L ~= L2 then ctx.t2_Lk = nil end   -- раскладку пересчитал relayout — t2_draw соберёт свою заново
+  L, snap = sv.L, sv.snap
+  for k in pairs(vim.cur) do vim.cur[k] = nil end
+  for k, v in pairs(sv_cur) do vim.cur[k] = v end
+  state.row0, state.hscroll, state.lpb, state.autozoom, state.ptmode = sv.row0, sv.hs, sv.lpb, sv.az, sv.pt
+  if state.focus == 'tracker' then state.focus = sv.focus end   -- клавиша увела фокус в другую панель — оставить
+  if not ok then error(r, 0) end
+  return true
+end
+-- свои клавиши второго вида (в NORMAL): Esc назад, Enter — основной курсор сюда, [ ] — следующий паттерн / фраза
+-- (один список: паттерны песни, потом фразы), + - своё LPB, Space на фразе — слушать её; остальное — как в трекере
 ctx.t2_key = function(c)
   local id = state.focus
   local b = ctx.BUF.get(id); if not b then return false end
   local st = b.st
+  if vim.mode ~= 'normal' then return false end
   local ch = (c > 0 and c < 256) and string.char(c) or ''
-  local v = ctx.t2_vis
-  local r0, r1 = (v and v.r0) or 0, (v and v.r1) or ((st.cur or 0) + 1)
   local lpb2 = st.lpb or state.lpb
-  local bar = math.max(1, math.floor(lpb2 * 4 + 0.5))
   local function step_list(d)
-    if st.mode == 'phrase' then
-      local l = ctx.phr_list(); if #l == 0 then return end
-      local k = 1; for i, r in ipairs(l) do if r.name == st.phr then k = i end end
-      st.phr = l[(k - 1 + d) % #l + 1].name; vim.msg = 'tracker 2: phrase ' .. st.phr
-    else
-      local l = ctx.pl_song(); if #l == 0 then return end
-      local k = 1; for i, r in ipairs(l) do if r.name == st.rg then k = i end end
-      local rg = l[(k - 1 + d) % #l + 1]; st.rg = rg.name; vim.msg = 'tracker 2: ' .. rg.name
-    end
-    st.cur = -1; st.cg = nil   -- в начало нового окна (t2_draw зажмёт), колонка — трек фразы
+    local l = {}
+    for _, rg in ipairs(ctx.pl_song()) do l[#l + 1] = { mode = 'pattern', name = rg.name } end
+    for _, r in ipairs(ctx.phr_list()) do l[#l + 1] = { mode = 'phrase', name = r.name } end
+    if #l == 0 then return end
+    local k = 1
+    for i, e in ipairs(l) do if e.mode == st.mode and e.name == ((st.mode == 'phrase') and st.phr or st.rg) then k = i end end
+    local e = l[(k - 1 + d) % #l + 1]
+    st.mode = e.mode
+    if e.mode == 'phrase' then st.phr = e.name else st.rg = e.name end
+    vim.msg = 'tracker 2: ' .. e.mode .. ' ' .. e.name
+    st.cur = -1; st.cg = nil; st.fo = nil   -- в начало нового окна (t2_draw зажмёт), колонка — трек фразы
   end
   if c == 27 then ctx.set_focus('tracker')
-  elseif ch == 'j' or c == 1685026670 then st.cur = math.min(r1 - 1, st.cur + 1)
-  elseif ch == 'k' or c == 30064 then st.cur = math.max(r0, st.cur - 1)
-  elseif ch == 'J' then st.cur = math.min(r1 - 1, st.cur + bar)
-  elseif ch == 'K' then st.cur = math.max(r0, st.cur - bar)
-  elseif ch == 'g' then st.cur = r0
-  elseif ch == 'G' then st.cur = r1 - 1
-  elseif ch == 'h' or c == 1818584692 then st.cwant = -1   -- 13 ноя: трек влево / вправо (t2_draw прокрутит вид за курсором)
-  elseif ch == 'l' or c == 1919379572 then st.cwant = 1
   elseif ch == '[' then step_list(-1)
   elseif ch == ']' then step_list(1)
   elseif ch == '+' or ch == '-' or ch == '=' then   -- 12 ноя: своё LPB вида (9 здесь, 16 там — время общее); строка курсора — по времени
     local k = 1
-    for i, v in ipairs(LPBS) do if math.abs(v - lpb2) < 1e-9 then k = i end end
+    for i, x in ipairs(LPBS) do if math.abs(x - lpb2) < 1e-9 then k = i end end
     local nl = LPBS[math.max(1, math.min(#LPBS, k + (ch == '-' and -1 or 1)))]
     local t = edit.row_time(st.cur, lpb2, 0)
     st.lpb = nl ~= state.lpb and nl or nil
     st.cur = math.floor(model.row_of_time(t, nl) + 1e-6); st.row0 = st.cur - 4
     vim.msg = ('tracker 2: LPB %s%s'):format(nl < 1 and ('1/' .. math.floor(1 / nl + 0.5)) or tostring(math.floor(nl)), st.lpb and '' or ' (as the main tracker)')
-  elseif ch == 'p' then
-    st.mode = st.mode == 'phrase' and 'pattern' or 'phrase'; st.phr = st.phr or state.phr_inst; st.cur = -1; st.cg = nil
-    vim.msg = 'tracker 2: ' .. (st.mode == 'phrase' and 'phrases ([ ] - next; Enter - edit it in the main tracker)' or 'patterns')
-  elseif c == 32 then
-    if st.mode == 'phrase' then ctx.phr_preview(st.phr)
-    elseif reaper.GetPlayState() & 1 == 1 then PV.stop()
-    else PV.midi(edit.row_time(st.cur, lpb2, 0), edit.row_time(r1, lpb2, 0)); vim.msg = 'tracker 2: playing from the cursor row (Space - stop)' end
+  elseif c == 32 and st.mode == 'phrase' then ctx.phr_preview(st.phr)
   elseif c == 13 then
     vim.cur.row = math.floor(model.row_of_time(edit.row_time(st.cur, lpb2, 0), state.lpb) + 1e-6)   -- по времени: LPB видов могут отличаться
     state.row0 = math.max(0, vim.cur.row - math.floor((L and L.nrows or 20) / 3))
     ctx.set_focus('tracker')
-    vim.msg = st.mode == 'phrase' and ('phrase ' .. (st.phr or '') .. ': the main cursor is in its source - edit here (copies follow)') or 'the main cursor is here'
+    vim.msg = st.mode == 'phrase' and ('phrase ' .. (st.phr or '') .. ': the main cursor is in its source') or 'the main cursor is here'
   else return false end
   return true
 end
