@@ -9037,6 +9037,7 @@ function D.frame(L, snap, rows, state, info)
   -- 9 ноя: одинаковые имена треков — в сокращённом имени номер трека в конце (иначе не отличить)
   do local cnt = {}; D.hdr_dups = {}; for _, c in ipairs(L.cols or {}) do local n = c.col and c.col.name or ''; cnt[n] = (cnt[n] or 0) + 1; if cnt[n] > 1 then D.hdr_dups[n] = true end end end
   set(U.PANEL); gfx.rect(tx0, hy, W - tx0, L.header_h, 1)
+  D.HBX = math.floor(L.rh / 2)
   local HX = L.hname_x or 0   -- 20 окт: запас строки имени — всё под именем ниже на HX
   hy = hy + HX
   local trsel = info.trsel or {}
@@ -9048,6 +9049,7 @@ function D.frame(L, snap, rows, state, info)
     hcols[#hcols + 1] = { col = snap.master, x = L.master_right and L.cols_r or tx0, w = L.master_right and L.master_w or L.label_w, lanes = {}, envs = {}, mls = {}, master = true }   -- 11 окт: справа
   end
   for _, c in ipairs(hcols) do
+    local hy_in = hy
     D.pmark('hdr: name + bg')
     local col = c.col
     -- фон шапки (3 окт), опция hdrfill: line — полоска цвета под именем,
@@ -9303,7 +9305,8 @@ function D.frame(L, snap, rows, state, info)
       bwh = math.floor(bwh * 1.15 + 0.5); D.hbtn_w = bwh
       trim_w = math.max(ms('~'), ms('ø')) + 7; trim_x = c.x + c.w - L.pad - trim_w   -- 20 окт: ~ и ø — в рамке, чуть шире
       -- 30 окт: 2 px между строками кнопок (и зоны щелчка без захода на соседнюю строку) — не прицеливаться
-      local bhh = L.rh - 3
+      -- 14 ноя: шапка на строку выше — кнопки r i m s /// ø выше на полстроки (буквы влезают), ряды под ними ниже на столько же
+      local bhh = L.rh - 3 + (D.HBX or 0)
       local phw = math.max(ms('~'), ms('ø')) + 7
       local ph_x = trim_x - 1 - phw
       -- 18 окт: узкий трек — r i m s сжимаются (до ширины буквы), чтобы /// влезли в первую строку
@@ -9312,6 +9315,7 @@ function D.frame(L, snap, rows, state, info)
         local bmin = ms('m') + 4
         while bwh > bmin and bx + 4 * (bwh + 1) + 2 * L.pad + sw0 > ph_x - L.pad do bwh = bwh - 1 end
         D.hbtn_w = bwh
+        D.hbtn_g = (bx + 4 * (bwh + 4) + 2 * L.pad + sw0 <= ph_x - L.pad) and 4 or 1   -- 14 ноя: есть место — кнопки свободнее (зазор 4 px)
       end
       -- 16 окт: не влезло в строку кнопок — во вторую, свободную строку над − + (узкий трек: m s ø ~ sro не пропадают)
       local rest = {}
@@ -9319,7 +9323,7 @@ function D.frame(L, snap, rows, state, info)
       local sro0 = ms(D.sroslash and '///' or 'sro') + 4
       D.hfx_row1 = nil
       for k, b in ipairs(c.master and {} or labels) do
-        local x = bx + (k - 1) * (bwh + 1) + (k >= 3 and gap or 0)
+        local x = bx + (k - 1) * (bwh + D.hbtn_g) + (k >= 3 and gap or 0)
         local bwk = bwh
         if b[4] == 'phase' then x, bwk = ph_x, phw end
         if b[4] == 'auto' then x, bwk = trim_x, trim_w end
@@ -9328,7 +9332,7 @@ function D.frame(L, snap, rows, state, info)
           rest[#rest + 1] = b
         elseif b[4] == 'fxen' then D.hfx_row1 = fxw + 1; hbtn(b, x, by, bwk, bhh, false)
         elseif (c.cut and (b[4] == 'auto' or b[4] == 'phase')) then
-        elseif ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + 1) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
+        elseif ((b[4] == 'auto' or b[4] == 'phase') and ph_x < bx + 4 * (bwh + D.hbtn_g) + gap + L.pad) or x + bwk > c.x + c.w - 1 then
           rest[#rest + 1] = b
         elseif not mixcol then hbtn(b, x, by, bwk, bhh, b[4] == 'arm' or b[4] == 'phase') end
       end
@@ -9379,7 +9383,7 @@ function D.frame(L, snap, rows, state, info)
           hint('mmfx', fx0, by, fw, bhh + 2, true)
         end
       end
-      local by2 = hy + (L.lane_row - 1) * L.rh
+      local by2 = hy + (L.lane_row - 1) * L.rh + (D.HBX or 0)
       local x2 = bx
       local function row2(w) if mixcol or L.hr_info > 0 or x2 + w > c.x + c.w - 1 then return nil end; local x = x2; x2 = x2 + w + 1; return x end
       -- 16 окт: порядок второй строки — sro, ø, … ; ~ (автоматизация) — у правого края шапки (рисуется ниже, после sro)
@@ -9455,7 +9459,7 @@ function D.frame(L, snap, rows, state, info)
           if 6 * (D.mcb_h + 2) + rhh <= fh0 then D.sro_col = { rhh = rhh, vert = vert, draw = sro } end
         end
         -- 15 окт: SRO — после M S (фаза ушла к trim)
-        local hw1 = (D.hbtn_w or L.btn_w) + 1
+        local hw1 = (D.hbtn_w or L.btn_w) + (D.hbtn_g or 1)
         local rx = mixcol and bx or (bx + 4 * hw1 + 2 * L.pad + (D.hfx_row1 or 0))
         local lim = mixcol and (c.x + c.w - 1) or (ph_x - L.pad)
         local sw0 = ms(D.sroslash and '///' or 'sro') + 4               -- 16 окт: по настоящей ширине (было по заглавным SRO — не влезало между s и ø)
@@ -9541,6 +9545,7 @@ function D.frame(L, snap, rows, state, info)
       local vol = (live and live.guid == col.guid and live.what == 'vol') and live.v or (col.vol or 1)
       local db = db_of(vol)
       local function lv(what, v) return (live and live.guid == col.guid and live.what == what) and live.v or v end
+      hy = hy_in + (D.HBX or 0)   -- 14 ноя: всё под рядом кнопок — ниже на их прибавку высоты (до конца колонки)
       local py = hy + 2 * L.rh + 1   -- 9 ноя: пан — строкой выше громкости (было ниже)
       local px, pw = sx, sw
       local mixin_y                                   -- 9 окт: строка входа в полосе нижнего микшера
@@ -10282,6 +10287,7 @@ function D.frame(L, snap, rows, state, info)
       for _, ev in ipairs(c.envs) do cap(ev.x + L.pad, ev.w - 2 * L.pad, 'env', 'env') end
     end
     U.TEXT, U.GREY = T0, G0
+    hy = hy_in
     set(U.LINE); gfx.rect(c.x, hy - HX, 1, L.header_h, 1)   -- 1 ноя: от верха шапки (было ниже на запас имени — сверху недорисовано)
     if my >= hy and my < hy + L.header_h and mx >= c.x and mx < c.x + c.w then hover.header_col = col end
     -- 9 окт: фон полосы нижнего микшера — тоже «шапка» (щелчок выделяет трек)
