@@ -15944,6 +15944,12 @@ ctx = {
           { key = 'c', label = 'click while a note is held (INSERT): metronome by the beats' .. (state.holdmetro and '  *' or ''), fn = function()   -- 9 ноя
               state.holdmetro = not state.holdmetro; vim.msg = 'click while holding a note: ' .. (state.holdmetro and 'on' or 'off') end },
         } } end },
+      -- 14 ноя: SPC h — help: m describe (режим / панель в фокусе), h клавиши панели, ? hints, z manual
+      { key = 'h', label = 'help: describe mode / pane, keys, hints, manual', sub = function() return { title = 'help', items = {
+          { key = '?', label = 'hints: what the module under the mouse is', fn = function() ctx.hints_open() end },
+          { key = 'h', label = 'help pane: keys of the pane in focus', fn = function() ctx.toggle_help() end },
+          { key = 'm', label = 'describe the mode / pane in focus', fn = function() ctx.describe() end },
+          { key = 'z', label = 'manual', fn = function() ctx.help_big() end } } } end },
       { key = 'i', label = 'insert: note / slice / whole sample / automation', sub = function() return ctx.insert_hydra() end },
       -- 18 окт: режимы клавиатуры — ноты (m), паттерны на нотах (patternkb); 30 окт: clipkb убран
       { key = 'k', label = 'keyboard: notes / patterns', sub = function() return { title = 'keyboard', items = {
@@ -19798,13 +19804,6 @@ ctx.MODE_ABOUT = {
   cmd = 'COMMAND: type a command after : (Tab completes, Enter runs, Esc cancels).',
   search = 'SEARCH: type what to find, Enter jumps, n / N - next / previous.',
 }
-ctx.help_menu = function()
-  vim.open_hydra({ title = 'help (Space h)', items = {
-    { key = '?', label = 'hints: what the module under the mouse is', fn = function() ctx.hints_open() end },
-    { key = 'h', label = 'help pane: keys of the pane in focus', fn = function() ctx.toggle_help() end },
-    { key = 'm', label = 'describe the mode / pane in focus', fn = function() ctx.describe() end },
-    { key = 'z', label = 'manual', fn = function() ctx.pane_cmd('manual show') end } } })
-end
 ctx.describe = function()
   local PN, m = draw.panes, state.panes
   if not (state.panes_ui and m) then ctx.toggle_help(); return end
@@ -31993,6 +31992,7 @@ local function frame()
     elseif c <= 0 and reaper.JS_VKeys_GetDown and gfx.mouse_cap & 4 ~= 0 and gfx.mouse_cap & 48 == 0 and (gfx.getchar(65536) & 2) ~= 0 then
       local dn = reaper.JS_VKeys_GetDown(ctx.ctrlj_t or (now - 0.05))
       for vk, code in pairs(CM) do if dn and dn:byte(vk) ~= 0 then c = code; ctx.cmdsyn = { c = code, t = now }; break end end
+      if state.debug and c > 0 then ctx.dlog(('cmdsyn: made c=%d from the physical key (cap %d)'):format(c, gfx.mouse_cap)) end
     end
   end
   ctx.ctrlj_t = reaper.time_precise()
@@ -32365,6 +32365,7 @@ local function frame()
   end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
   -- соседа, Cmd+Shift+hjkl — перенести панель туда (как dwm), без режима
+  if state.debug and (c == 8 or c == 72 or c == 104) and gfx.mouse_cap & 4 ~= 0 then ctx.dlog(('cmd+h at the pane block: c=%d cap=%d panes=%s pn=%s picker=%s hydra=%s mode=%s pane_mode=%s'):format(c, gfx.mouse_cap, tostring(state.panes_ui), tostring(L and L.pn ~= nil), tostring(vim.picker ~= nil), tostring(vim.hydra ~= nil), tostring(vim.mode), tostring(state.pane_mode))) end
   if state.panes_ui and L and L.pn and c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local m = ctx.mods()
     if state.pane_mode then ctx.pane_key(c); c = 0

@@ -2062,13 +2062,6 @@ function V.plays_note(c)
 end
 
 function V.key_impl(c)
-  -- 14 ноя: Space h — help (m describe, h клавиши, ? hints, z manual). Space играет сразу (без задержки транспорта);
-  -- h в течение 0.3 с после него — транспорт возвращается как был и открывается меню help
-  if c == ('h'):byte() and V.spc_t and V.mode == 'normal' and not V.pending and not V.op then
-    local dt = reaper.time_precise() - V.spc_t; V.spc_t = nil
-    if dt < 0.3 and ctx.help_menu then ctx.edit.play_stop(); ctx.help_menu(); return end
-  end
-  if c ~= 32 then V.spc_t = nil end
   -- 31 окт: INSERT на hex-поле (лейн CC / PC / AT, команда): d набирался цифрой D, и w после него был простым
   -- движением — dw не удалял. D одна в наборе + w W b e (не hex-цифры) = оператор d, как везде
   -- 1 ноя: и все движения d (dd dp dP dc dC di dt … d пробел), если D набрана строчной d — INSERT работает как NORMAL;
@@ -2640,7 +2633,7 @@ function V.key_impl(c)
       if m.field then V.cur.field = m.field; V.cur.sub = m.sub end
       V.hexbuf = nil; clamp_cur(); ensure_visible(); return
     end
-    if c == 32 then E.play_stop(); V.spc_t = reaper.time_precise(); return end
+    if c == 32 then E.play_stop(); return end
     -- 1 ноя: PT-mode — Enter и в INSERT вставляет пустую строку (Return ProTracker; Shift — все каналы)
     if c == 13 and ctx.state and ctx.state.ptmode and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) and not V.hexbuf and ctx.time_edit then   -- 1 ноя: только поле ноты (в командах Enter — значение)
       ctx.time_edit('insert', V.cur.fi, V.cur.row, 1, ctx.mods and ctx.mods().shift or false); return
