@@ -32382,7 +32382,12 @@ local function frame()
       local ch = CODE[c] or (c < 256 and string.char(c):lower() or '')
       if DIR[ch] then
         local id = ctx.pane_cur()
-        if m.shift or (reaper.JS_Mouse_GetState and reaper.JS_Mouse_GetState(8) & 8 ~= 0) then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе (10 ноя: Shift — и у системы: в mouse_cap его часто нет)
+        -- 14 ноя: Shift — ещё и по физической клавише (VK 0x10): у Cmd+Shift+H его не было ни в mouse_cap, ни у мыши —
+        -- выходил переход фокуса влево (у левой панели — ничего)
+        local sh = m.shift or (reaper.JS_Mouse_GetState and reaper.JS_Mouse_GetState(8) & 8 ~= 0)
+        if not sh and reaper.JS_VKeys_GetState then local vs = reaper.JS_VKeys_GetState(reaper.time_precise() - 1); sh = vs ~= nil and vs:byte(0x10) ~= 0 end
+        if state.debug then ctx.dlog(('cmd+%s: pane %s, shift %s (cap %d)'):format(ch, tostring(id), tostring(sh), gfx.mouse_cap)) end
+        if sh then   -- 6 ноя: Cmd+Shift+hjkl — размер панели в фокусе (10 ноя: Shift — и у системы: в mouse_cap его часто нет)
           ctx.pane_nudge(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
