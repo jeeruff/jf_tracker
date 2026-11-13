@@ -14906,7 +14906,9 @@ function D.frame(L, snap, rows, state, info)
       if tf then
         -- 31 окт: INSERT — рамка по всему модулю трекера (шапки, полоса эффектов, строки): поле строк часть сторон
         -- теряло (верх закрывала полоса эффектов, правый край уходил под соседнюю панель)
-        local fr = ((ins or insany) and rects.tracker) or tf
+        -- 13 ноя: фокус во втором (третьем) трекере — рамка INSERT вокруг него: ноты пишутся туда
+        local tid = (info.focus and D.panes and D.panes.base(info.focus) == 'tracker' and rects[info.focus]) and info.focus or 'tracker'
+        local fr = ((ins or insany) and rects[tid]) or tf
         -- 31 окт: NORMAL — белой рамки поля строк нет (верх модуля уже в рамке фокуса; без полосы эффектов она шла
         -- белой чертой над строками); цветная — только в других режимах
         -- 31 окт: INSERT — чистый красный, не смягчённый под тему (терялся на тёмной панели)

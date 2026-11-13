@@ -19753,7 +19753,53 @@ ctx.hints_draw = function(Lx, x, y, w, h, foc, hv)
   ty = ty + 4
   if ty + Lx.rh <= y + h then U.text(x, ty, draw.fit('\\ - its menu   help pane - its keys   \\ ? - the whole help', w), U.GREY) end
 end
+-- 13 ноя: describe mode / pane (gh, :describe): панель help — где бы она ни была спрятана — показывается (фокус остаётся),
+-- сверху — что это за режим и панель (PN.about), ниже — её клавиши (страница справки идёт за фокусом сама)
+ctx.MODE_ABOUT = {
+  normal = 'NORMAL: move and edit with Vim keys - h j k l, counts, operators (d y c) with motions; note keys do not write.',
+  insert = 'INSERT: note keys write notes at the cursor and step down; hex digits fill the instrument / volume / command fields; Esc - back to NORMAL.',
+  visual = 'VISUAL: a block selection from the anchor to the cursor - operators, reform (gr), interpolate (gi) act on it; Esc - drop it.',
+  vline = 'VISUAL LINE: whole rows across the tracks - d y p move bars and patterns.',
+  cmd = 'COMMAND: type a command after : (Tab completes, Enter runs, Esc cancels).',
+  search = 'SEARCH: type what to find, Enter jumps, n / N - next / previous.',
+}
+ctx.describe = function()
+  local PN, m = draw.panes, state.panes
+  if not (state.panes_ui and m) then ctx.toggle_help(); return end
+  local id = ctx.t2_swap_id or state.focus
+  if id == 'help' then vim.msg = 'describe: focus another pane first'; return end
+  if not PN.visible(m, 'help') then ctx.pane_do(function() return PN.show(m, 'help') end) end
+  PN.set_active(m, 'help'); m.v = (m.v or 1) + 1
+  KH.scroll = 0
+  local p = PN.BY[id]
+  vim.msg = ('describe: %s%s - in the help pane (keys below the text)'):format(draw.tracker_label(id) or (p and p.label) or id, PN.base(id) == 'tracker' and (', ' .. vim.mode:upper()) or '')
+end
 ctx.help_draw = function(Lx, x, y, w, h, foc, hv)
+  -- 13 ноя: describe — сверху режим и панель в фокусе (до 5 строк), когда места хватает
+  if h > 14 * Lx.rh then
+    local id = (state.focus ~= 'help' and state.focus) or ctx.pn_prev or 'tracker'
+    if id == 'top' then id = state.toptab or 'sample' end
+    local PN = draw.panes
+    local trk = PN.base(id) == 'tracker'
+    local key = table.concat({ id, trk and vim.mode or '', w, draw.tracker_label(id) or '' }, '|')
+    if ctx.desc_key ~= key then
+      ctx.desc_key = key
+      local p = PN.BY[id]
+      local out = { { ((draw.tracker_label(id) or (p and p.label) or id) .. (trk and (' - ' .. vim.mode) or '')):upper(), U.AMBER } }
+      local txt = (trk and ctx.MODE_ABOUT[vim.mode] and (ctx.MODE_ABOUT[vim.mode] .. ' ') or '') .. (PN.about(id, ctx) or '')
+      local line = ''
+      for word in txt:gmatch('%S+') do
+        local try = line == '' and word or (line .. ' ' .. word)
+        if draw.measure(try) > w and line ~= '' then out[#out + 1] = { line, U.TEXT }; line = word; if #out >= 6 then break end else line = try end
+      end
+      if #out < 6 and line ~= '' then out[#out + 1] = { line, U.TEXT } elseif #out >= 6 then out[6][1] = ctx.fit(out[6][1] .. ' ...', w) end
+      ctx.desc_lines = out
+    end
+    for i, ln in ipairs(ctx.desc_lines or {}) do U.text(x, y + (i - 1) * Lx.rh, ctx.fit(ln[1], w), ln[2]) end
+    local dh = #(ctx.desc_lines or {}) * Lx.rh + 3
+    U.set(U.LINE); gfx.rect(x, y + dh - 2, w, 1, 1)
+    y, h = y + dh, h - dh
+  end
   if not ctx.DOC then ctx.DOC = dofile(DIR .. '/jf_tracker_doc.lua'); ctx.DOC.init(U, ctx, HELP) end
   local DOC = ctx.DOC
   local sid = ctx.HELP_SEC[KH.page]
