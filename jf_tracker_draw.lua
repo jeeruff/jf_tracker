@@ -772,7 +772,7 @@ function D.layout_core(snap, state, nregions)
   L.lane_row = 3 + L.hr_vp + L.hr_in + L.hr_info
   -- 12 окт: подписи полей — вертикально обычным шрифтом (как имена дорожек): высота — самое длинное слово
   L.cap_rows = state.captions and math.max(1, math.ceil((ms('delay') + 6) / L.rh)) or 0
-  L.header_rows = 4 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows
+  L.header_rows = 5 + L.hr_vp + L.hr_in + L.hr_info + L.cap_rows   -- 14 ноя: +1 строка — ряд ø / fx и ряд лейнов (- + a+) слипались, в углу кнопки шли кучей
   -- 20 окт: имя трека — чуть больше места (+2 px) и опция big trackname x1.5 / x2: шапка выше на запас, кнопки ниже
   L.hname_k = tonumber(state.bigname) or 1
   L.hname_x = math.floor((L.hname_k - 1) * (L.th or L.rh) + 0.5) + 2

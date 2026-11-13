@@ -19753,7 +19753,7 @@ ctx.hints_draw = function(Lx, x, y, w, h, foc, hv)
   ty = ty + 4
   if ty + Lx.rh <= y + h then U.text(x, ty, draw.fit('\\ - its menu   help pane - its keys   \\ ? - the whole help', w), U.GREY) end
 end
--- 13 ноя: describe mode / pane (gh, :describe): панель help — где бы она ни была спрятана — показывается (фокус остаётся),
+-- 13 ноя: describe mode / pane (Space h m, :describe): панель help — где бы она ни была спрятана — показывается (фокус остаётся),
 -- сверху — что это за режим и панель (PN.about), ниже — её клавиши (страница справки идёт за фокусом сама)
 ctx.MODE_ABOUT = {
   normal = 'NORMAL: move and edit with Vim keys - h j k l, counts, operators (d y c) with motions; note keys do not write.',
@@ -19763,6 +19763,13 @@ ctx.MODE_ABOUT = {
   cmd = 'COMMAND: type a command after : (Tab completes, Enter runs, Esc cancels).',
   search = 'SEARCH: type what to find, Enter jumps, n / N - next / previous.',
 }
+ctx.help_menu = function()
+  vim.open_hydra({ title = 'help (Space h)', items = {
+    { key = '?', label = 'hints: what the module under the mouse is', fn = function() ctx.hints_open() end },
+    { key = 'h', label = 'help pane: keys of the pane in focus', fn = function() ctx.toggle_help() end },
+    { key = 'm', label = 'describe the mode / pane in focus', fn = function() ctx.describe() end },
+    { key = 'z', label = 'manual', fn = function() ctx.pane_cmd('manual show') end } } })
+end
 ctx.describe = function()
   local PN, m = draw.panes, state.panes
   if not (state.panes_ui and m) then ctx.toggle_help(); return end
