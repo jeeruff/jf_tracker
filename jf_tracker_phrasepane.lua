@@ -58,6 +58,20 @@ function PHP.draw(U, L, list, x, y, w, h, focused, mx, my, fit)
   U.set(hot and U.AMBER or U.LINE); gfx.rect(x + pad, y, nw, rh - 1, 0)
   U.text(x + 2 * pad, y, nb, hot and U.AMBER or U.GREY)
   if hot then hover = { btn = 'new' } end
+  -- 14 ноя: keyphr — нотные клавиши / MIDI играют фразы (горит, когда включён); не влезает — без кнопки
+  do
+    local kb = 'keyphr'
+    local kw = U.measure(kb) + 2 * pad
+    local kx = x + 2 * pad + nw
+    if kx + kw + pad <= x + w then
+      local khot = mx >= kx and mx < kx + kw and my >= y and my < y + rh
+      if PHP.keyphr then U.set(U.tint(U.CYAN, 0.25)); gfx.rect(kx, y, kw, rh - 1, 1) end
+      U.set(khot and U.AMBER or (PHP.keyphr and U.CYAN or U.LINE)); gfx.rect(kx, y, kw, rh - 1, 0)
+      U.text(kx + pad, y, kb, khot and U.AMBER or (PHP.keyphr and U.CYAN or U.GREY))
+      if khot then hover = { btn = 'keyphr' } end
+      nw = nw + kw + pad
+    end
+  end
   U.text(x + 2 * pad + nw, y, fit(PHP.editing and ('  editing ' .. PHP.editing .. ' - e: back to the song') or '  Enter - at the cursor, e - edit it in the tracker', math.max(0, w - nw - 3 * pad)), PHP.editing and U.AMBER or U.DIM)
   y = y + rh + 2
   if #list == 0 then

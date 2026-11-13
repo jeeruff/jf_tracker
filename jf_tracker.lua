@@ -26013,7 +26013,7 @@ local function frame()
       for i, r in ipairs(rows) do xs[i] = at[r.tr] end
       return ctx.INP.draw(U, Lx, rows, cols, x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit, xs)
     end,   -- 11 ноя: панель inputs
-    phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
+    phr_draw = function(Lx, x, y, w, h, foc) ctx.PHP.editing = state.phr_edit and state.phr_edit.name or nil; ctx.PHP.keyphr = state.keyphr and true or false; return ctx.PHP.draw(U, Lx, ctx.phr_list(), x, y, w, h, foc, gfx.mouse_x, gfx.mouse_y, ctx.fit) end,   -- 31 окт
     lfogen_draw = function(Lx, x, y, w, h, foc)
       local tgt = (LG.to and LG.to ~= 'here') and ctx.lfo_take_target() or ctx.lfo_here_target() or ctx.lfo_target()
       return LG.draw(U, Lx, x, y, w, h, foc, ctx.fit, tgt and tgt.label or nil, ctx.lfo_span_rows())
@@ -28901,7 +28901,8 @@ local function frame()
       click = { t = now2, zone = 'inputs' }
     elseif hover.phr then   -- 31 окт: панель phrases — щелчок строка, двойной — в курсор; new
       ctx.set_focus('phrases')
-      if hover.phr.btn == 'new' then ctx.phr_do({ op = 'new' })
+      if hover.phr.btn == 'keyphr' then ctx.keyphr_cmd()   -- 14 ноя: кнопка keyphr в панели фраз
+      elseif hover.phr.btn == 'new' then ctx.phr_do({ op = 'new' })
       elseif hover.phr.row then
         local same = ctx.PHP.sel == hover.phr.row
         ctx.PHP.sel = hover.phr.row
