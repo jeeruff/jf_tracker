@@ -35385,7 +35385,7 @@ ctx.t2_open_phrase = function(name)
   local st = ctx.BUF.get(id).st
   st.mode, st.phr, st.cur, st.cg = 'phrase', name, -1, nil
   ctx.pane_focus(id)
-  vim.msg = ('tracker 2: phrase %s - edit it here (all tracker keys), Space listen, [ ] next, Esc back'):format(name)
+  vim.msg = ('tracker 2: phrase %s - edit it here (all tracker keys), Space listen, [ ] next'):format(name)
   return true
 end
 -- 12 ноя: копии фразы, которые сейчас звучат в песне → строки её источника (дробные); кэш списка триггеров по правкам
@@ -35566,7 +35566,7 @@ ctx.t2_click = function()
   if st and type(hr) == 'number' then st.cur = hr end
   if st and v.hv.col and v.hv.col.guid then st.cg = v.hv.col.guid end   -- 13 ноя: и колонка — трек под мышью
   ctx.set_focus(v.id)
-  vim.msg = 'tracker 2: all tracker keys here; [ ] next pattern / phrase, + - its LPB, Enter - the main cursor here, Esc back'
+  vim.msg = 'tracker 2: all tracker keys here; [ ] next pattern / phrase, + - its LPB, Enter - the main cursor here'
   return true
 end
 -- 13 ноя: tracker 2 — полный трекер: клавиша идёт в обычный обработчик (vim.key) на время подмены раскладки (L),
@@ -35663,8 +35663,7 @@ ctx.t2_key = function(c)
     vim.msg = 'tracker 2: ' .. e.mode .. ' ' .. e.name
     st.cur = -1; st.cg = nil; st.fo = nil   -- в начало нового окна (t2_draw зажмёт), колонка — трек фразы
   end
-  if c == 27 then ctx.set_focus('tracker')
-  elseif ch == '[' then step_list(-1)
+  if ch == '[' then step_list(-1)   -- 13 ноя: Esc — как в основном (INSERT ↔ NORMAL); назад — Cmd+h j k l / Enter
   elseif ch == ']' then step_list(1)
   elseif ch == '+' or ch == '-' or ch == '=' then   -- 12 ноя: своё LPB вида (9 здесь, 16 там — время общее); строка курсора — по времени
     local k = 1

@@ -905,6 +905,9 @@ function M.build(lpb)
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_gen', '', false)) ~= '' then lane = nil end
         -- 19 окт: слои ноты слоёного инструмента (¥, P_EXT:jf_lof) — часть своей ноты, как копии ретриггера
         if lane and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_lof', '', false)) ~= '' then lane = nil end
+        -- 13 ноя: копии фразы (P_EXT:jf_phrc) — часть своей ноты-триггера: своих ячеек и подколонок нет (PLAN_DISPLAY, шаг 4;
+        -- рядом с триггером вставала «вторая нота-призрак» и трек расширялся); фраза правится в tracker 2 / виде phr
+        if lane and not M.SHOW_PHRC and select(2, R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_phrc', '', false)) ~= '' then lane = nil end
         if lane then
           local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
           local len = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
