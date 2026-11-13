@@ -14907,6 +14907,7 @@ function D.frame(L, snap, rows, state, info)
       -- 28 окт: INSERT — красная рамка поля строк и при фокусе в другой панели (клавиши нот всё ещё пишут)
       local insany = info.vmode == 'insert'
       local tf = ((info.focus == 'tracker' and not info.mixfocus) or insany) and D.trk_field
+      if not tf then D.ins_frame = nil end   -- 14 ноя: рамка INSERT не остаётся от прошлого кадра (вышел из INSERT во втором трекере — красная висела на старом месте)
       if tf then
         -- 31 окт: INSERT — рамка по всему модулю трекера (шапки, полоса эффектов, строки): поле строк часть сторон
         -- теряло (верх закрывала полоса эффектов, правый край уходил под соседнюю панель)
