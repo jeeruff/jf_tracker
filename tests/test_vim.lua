@@ -875,6 +875,13 @@ alt_down = true; V.key(8710); alt_down = false
 eq('slicer open: Option+J still picks the next instrument', last(), 'pool:3')
 alt_down = true; V.key(162); alt_down = false
 eq('slicer open: Option+4 picks instrument 4', last(), 'pool:4')
+-- 14 ноя: Opt+цифра — вторая цифра сразу (< 0.25 с) = двузначный номер; другая клавиша между ними сбрасывает набор
+V.optdig = nil
+alt_down = true; V.key(161); V.key(8482); alt_down = false
+eq('Option+1 Option+2 fast -> instrument 12', last(), 'pool:12')
+alt_down = true; V.key(161); alt_down = false
+eq('Option+1 after a pair -> instrument 1', last(), 'pool:1')
+V.optdig = nil
 state.focus = 'slices'
 V.key(('x'):byte()); eq('slicer open, focus on it: other keys go to the slicer', last(), 'slkey:120')
 state.focus = nil   -- 24 окт: фокус в трекере — клавиши трекеру, не слайсеру

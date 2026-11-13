@@ -2395,6 +2395,7 @@ function V.key_impl(c)
       if ctx.pool_select then ctx.pool_select(list[i]) end
       V.count = nil; return
     end
+    V.optdig = nil   -- другая клавиша между цифрами — набор номера начинается заново
   end
   -- 13 окт: вставить пустую строку (Mac без Insert): Option+Backspace — на месте курсора
   -- (Shift — на всех треках); Ctrl+Option+Cmd+J — под курсором, K — над ним
