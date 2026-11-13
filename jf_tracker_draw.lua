@@ -10466,6 +10466,7 @@ function D.frame(L, snap, rows, state, info)
     local bx, bw = tx0 + 3, L.label_w - 4              -- 9 окт: зазор от границы модуля (2 px) — левая рамка кнопок видна
     local function small(x, y, label, what, on, kind, oc)   -- oc — свой цвет включённой (31 окт: proj sec pat)
       local w1 = ms(label) + 2
+      if x + w1 > bx + bw + 1 then return x end   -- 13 ноя: кнопка угла не выходит за свой блок (prj лез на шапку трека)
       local hot = mx >= x and mx < x + w1 and my >= y and my < y + L.rh
       local cc = oc or U.CYAN
       -- 31 окт: свой цвет (oc) — и выключенная слегка им подкрашена (видно, какая кнопка какой вид)
@@ -10490,10 +10491,18 @@ function D.frame(L, snap, rows, state, info)
     -- 31 окт: место — по настоящим подписям (было с запасом на два «proj» — project не влезал, хотя место было)
     local full = long and (ms(lab('phrase', 'phr')) + ms(lab('pattern', 'pat')) + ms(lab('section', 'sec')) + ms(lab('project', 'prj')) + 4 * 2 + 3 * 2 <= bw)
     if not full then lab = function(_, short) return short end end
-    x0 = small(x0, hy + 1, lab('phrase', 'phr'), 'phr', vm == 'phrase', 'viewbtn', U.CYAN)   -- 12 ноя: фраза — источник, сразу в лупе
-    x0 = small(x0, hy + 1, lab('pattern', 'pat'), 'reg', vm == 'pattern', 'viewbtn', U.GREEN)
-    x0 = small(x0, hy + 1, lab('section', 'sec'), 'sec', vm == 'section', 'viewbtn', U.AMBER)
-    small(x0, hy + 1, lab('project', 'prj'), 'all', vm == 'project', 'viewbtn', U.RED)
+    -- 13 ноя: четыре кнопки всегда в ширину блока: phr pat sec prj → ph pt sc pj → h p s j, зазор 2 → 0
+    local v4 = { { 'phrase', 'phr', 'ph', 'h' }, { 'pattern', 'pat', 'pt', 'p' }, { 'section', 'sec', 'sc', 's' }, { 'project', 'prj', 'pj', 'j' } }
+    local lb4, g4 = {}, 2
+    for lv = 2, 4 do
+      local sum = 0
+      for i, e in ipairs(v4) do lb4[i] = lv == 2 and lab(e[1], e[2]) or e[lv]; sum = sum + ms(lb4[i]) + 2 end
+      if sum + 3 * 2 <= bw then g4 = 2; break elseif sum <= bw then g4 = 0; break end
+    end
+    x0 = small(x0, hy + 1, lb4[1], 'phr', vm == 'phrase', 'viewbtn', U.CYAN) - 2 + g4   -- 12 ноя: фраза — источник, сразу в лупе
+    x0 = small(x0, hy + 1, lb4[2], 'reg', vm == 'pattern', 'viewbtn', U.GREEN) - 2 + g4
+    x0 = small(x0, hy + 1, lb4[3], 'sec', vm == 'section', 'viewbtn', U.AMBER) - 2 + g4
+    small(x0, hy + 1, lb4[4], 'all', vm == 'project', 'viewbtn', U.RED)
     do
       -- 7 окт: router живёт в DSP FX, микшер убран (одно место у инструмента)
       local full = ms('clips') + ms('effects') + ms('param') + 12 <= bw   -- effects словом — только если и param влезает
