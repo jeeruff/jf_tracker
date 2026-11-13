@@ -18389,7 +18389,25 @@ ctx.ain_slider = function(target)
       ctx.ain_dirty = ctx.ain_dirty or {}; ctx.ain_dirty[mod] = true
     end }, mod, r
 end
+-- 14 ноя: курсор основного трекера на ноте-триггере фразы — эта фраза сама выбрана в панели phrases и показана во втором
+-- трекере (если он виден), без Enter; проверка — только когда курсор или проект изменились
+ctx.phr_follow = function()
+  if state.focus ~= 'tracker' or not L then return end
+  local key = vim.cur.fi .. '|' .. vim.cur.row .. '|' .. reaper.GetProjectStateChangeCount(0)
+  if key == ctx.phf_key then return end
+  ctx.phf_key = key
+  local name = ctx.phrase_at_cursor()
+  if not name or name == ctx.phf_name then ctx.phf_name = name or ctx.phf_name; return end
+  ctx.phf_name = name
+  for i, r in ipairs(ctx.phr_list()) do if r.name == name then ctx.PHP.sel = i; break end end
+  local id = ctx.t2_id()
+  local b = id and ctx.BUF.get(id)
+  if b and not (b.st.mode == 'phrase' and b.st.phr == name) then
+    b.st.mode, b.st.phr, b.st.cur, b.st.cg, b.st.fo = 'phrase', name, -1, nil, nil
+  end
+end
 ctx.ain_tick = function()
+  ctx.phr_follow()
   local s = reaper.GetExtState(EXT, 'in')
   if s ~= '' then
     reaper.SetExtState(EXT, 'in', '', false)
