@@ -1368,6 +1368,7 @@ V.COMMANDS = {
   { 'fx', 'N', 'fx command columns (0..4)' }, { 'env', '', 'envelope columns' },
   { 'tempoclean', '', 'tempo map: write every tempo marker again (REAPER rebuilds a stale map - a tempo change without a marker); the patterns stay on their beats' },
   { 'describe', '', 'describe the mode / pane in focus: the help pane opens with what it is and its keys (Space h m; :hm)' },
+  { 'insttrain', '', 'speed test for two-digit instrument numbers (Option+digit Option+digit): 6 pairs set the option inst digits gap' },
   { 'loom', '[man|auto|off]', 'the cursor pattern loops forever while you edit it: auto - edits go straight into it; man - Opt+Enter makes the next turn a new pattern after it (the loop moves there), so the song grows step by step' }, { 'keyphr', '[on|off]', 'the note keys and MIDI notes (C1 = the 1st) play the phrases of the project, as keyspat plays the patterns; while stopped (the phrase tracks solo)' }, { 'keyspat', '[quant|sudden|rec|off]', 'MPC style: the note keys and MIDI notes (C1 = the 1st; MIDI learn pattern pads - your own note) play the patterns of the song (quant - seamless after the playing one, sudden - at once); rec - record the order, rec again - write it after the song (= :pads)' }, { 'seq', 'text|play|stop|write|new [name]|dup|name N|del|next|prev', 'seq - the order of patterns (was chain / playlist; :ch, :pl too): the order as text - A1 A1 B1x2 C1:16 D1-8 D1/2 B2+8 verse 4 (pattern / section name, region number; xN repeat, :N first N rows, /N a part, -N skip N rows, +N then its first N rows again); Tab completes names; play - seamless on whole patterns; write [name] - after the song (name - as a section, a new slot in the matrix and a source for seq)' }, { 'tsec', 'name', 'a section over the REAPER time selection (Tr in the matrix picks a quick name: intro verse chorus drop break …)' }, { 'section', 'name', 'a section (a region without a code) over the selected pattern slots of the matrix (Shift+J K on the names)' }, { 'unstack', '', 'patterns that start at the same place: the extra one becomes a linked repeat after the original' }, { 'human', '[all|nopitch|notime] [N%]', 'humanizer: the notes of the block / track in the region get small random timing, pitch, volume, pan, attack and length' }, { 'scale', 'N', 'bitmap scale x1..3 (Cmd +/- too); x4 is kept for PT-mode' }, { 'options', '', 'all options in one window' }, { 'off', '[all]', 'note off at the cursor row on the whole track (all - on every track); in INSERT ` subcolumn, ~ (Shift+`) all tracks, Ctrl+~ the track' }, { 'repeat', '[all]', 'repeat the part of the region above the cursor down to the region end (Ctrl+Opt+J; all - every track)' }, { 'mac', 'name', 'play a macro by name (saved, built-in or @a) at the cursor; \\ q - all of them in a menu' }, { 'macsave', 'a name', 'keep register a as a named macro (macros tab, Data/jf_tracker_macros.txt)' }, { 'tcolor', '#rrggbb', 'colour of the cursor track by its code (tc - the colour grid)' }, { 'transients', '', 'transient detector module in the item tab (= Opt+D): sensitivity, threshold, min gap, pre-attack, live; Enter slices' }, { 'arr', '[new [name]|name text|dup|clear|del|next|prev|N]', 'arrangements: named sets of the fixed lanes that play (\\ P a)' }, { 'about', '[logo]', 'version, changes and the logo (a name part picks it: marquee, rubble, plum …)' }, { 'theme', 'name', 'reaper (native) | modus-vivendi | modus-operandi | solarized-dark | solarized-light | gruvbox | catppuccin | mono | protracker | impulse' }, { 'name', 'text', 'matrix: rename the cursor region' }, { 'sec', '[show|repeat|copy|loop|move N|copyto N|pooledto N]', 'the section of the cursor slot of the matrix: show it in the tracker, repeat it after itself (pooled) / copy, loop, move before slot N (copy / pooled); no argument - its menu (a click on its strip)' }, { 'gain', '', 'router gain staging: level meters (jf_tracker_probe) before and after every row of the chain, the dB change above the row; again - off (also when the router closes)' }, { 'pal', 'render|playlist|kb', 'palette of the matrix: the picked cells as a new pattern at the end / their patterns to the playlist / clipkb on-off' }, { 'pnote', 'text', 'a note on the pattern (kept in the project, shown under its name in the palette; empty - delete); dblclick a name in the palette' }, { 'len', 'N|Ns|Nb', 'matrix: cursor region length - N steps (LPB), Ns seconds, Nb bars; later regions and items ripple' }, { 'add', '[bars] [name]', 'matrix: new region after the last one, from the next bar (+)' }, { 'space', 'N', 'gap above letters, px' }, { 'tab', 'item|automation|modulation|grid|retro|orca|master', 'top panel tab' }, { 'optsave', 'name', 'save all options as a profile' }, { 'optload', 'name', 'load an options profile' }, { 'optdel', 'name', 'delete an options profile' }, { 'redo', '', 'redo (also Cmd+Shift+Z; Ctrl+R is the rec tab)' }, { 'undo', '', 'undo (also u, Cmd+Z)' }, { 'sig', 'N/D [all|here]', 'time signature for the whole project or this pattern; a longer bar - fill the missing beats empty / with the last beat / keep' }, { 'scopemode', '[scope|spec|sgram]', 'analyzer: scope / spectrum / spectrogram' }, { 'retro', '[add]', 'retro sampler tab; add = jf_rec on cursor track' }, { 'top', '', 'top panel' }, { 'meters', '', 'peak meters over columns (PT style)' }, { 'wave', '[column|note|off]', 'wave: own column (spectral peaks + stretch markers) / in the note field / off' }, { 'xfade', '[on|off|now|ms]', 'x-fade of inserted notes: on/off, crossfade now, length ms' }, { 'mxzoom', '', 'matrix: schema <-> detail' }, { 'scopes', '', 'scopes: JSFX bridge on tracks on/off' }, { 'dsp', '[big]', 'bottom DSP panel (track fx); big - the chain with its routing on the whole window (zz in DSP)' }, { 'learn', '', 'a knob / button of any controller on the tracker by the native REAPER learn: registers the jf_tracker actions (the slider under the cursor, next / prev slider, Enter, reform scale / curve / shift, humanizer amount, slicer knobs and buttons, a pattern of the song by the knob / next / prev) and opens the action list - pick one, Add... MIDI CC / OSC / key; the binding is global (all projects). OSC without learn: /action/str with the command id from the action list (_RS...), the value by /action/<id>/cc 0..1 (Default.ReaperOSC). keyspat on: MIDI Program Change N plays pattern N' }, { 'patorder', '', 'rename the patterns by their order in the song: the first A1, the second B1 ... (a repeat keeps the name of its first place); also the order button in the patterns pane and O in the pattern menu' }, { 'patternize', '1|2|4|8|16|items|markers', 'the empty parts of the project become patterns (regions A1 A2 …): every N bars, by the items of the cursor track, or by markers; existing patterns stay (matrix menu)' }, { 'shiftrec', '', 'shift rec (the shift button under rec): waits for a MIDI note, then records from the cursor row at the project rate (x0.5 - slow, plays back fast); again - cancel / stop' }, { 'punch', '', 'punch: time selection = cursor region, auto-punch' }, { 'recmode', '', 'record mode (hydra)' }, { 'lanes', '', 'cursor track: fixed lanes on/off' },
   { 'z', '<words>', 'zoxide: jump the browser to the most used / recent folder matching the words (last word - in the folder name)' }, { 'zi', '', 'zoxide: pick from the visited folders (fzf), best first' }, { 'pane', '<panel> left|right|top|bottom|with <p>|swap <p>|hide|show|zoom, reset, <layout>', 'panes (tmux / zellij): move, stack, hide, layouts; no argument - layout string' }, { 'rec', '', 'record arm cursor track' }, { 'input', '', 'choose record input (hydra)' }, { 'smartin', '', 'most active input (jf_smart_set_input)' }, { 'slice', '', 'slice instrument (virtual)' },
 { 'vhsround', '', 'the vhs frame: rounded TV corners on / off' },
@@ -1494,6 +1495,7 @@ local function run_cmd(line)
   elseif cmd == 'shot' then if ctx.shot_pane then ctx.shot_pane((arg ~= '' and arg or 'window') .. ' ~/Pictures/Screenshots/jftracker ' .. os.date('%Y-%m-%d %H.%M.%S') .. '.png') end   -- 4 ноя: снимок окна (или панели) в Screenshots
   elseif cmd == 'pixel' then local st2 = ctx.state; st2.pixel = st2.pixel == false; if ctx.draw_set_font then ctx.draw_set_font() end; ctx.relayout(); V.msg = 'pixel mode ' .. (st2.pixel and 'on (half frame x2 - faster)' or 'off (full resolution)')   -- 6 ноя
   elseif cmd == 'autofloat' then if ctx.autofloat_cmd then ctx.autofloat_cmd() end   -- 5 ноя
+  elseif cmd == 'insttrain' then ctx.inst_train = {}; V.msg = 'inst digits test: type a two-digit instrument number with Option, 6 times (e.g. Opt+1 Opt+2)'
   elseif cmd == 'spctrain' then ctx.spc_train = {}; V.msg = 'space trainer: tap Space 8 times as you do for play / stop (nothing plays meanwhile)'
   elseif cmd == 'smk' then if ctx.smk_transients then ctx.smk_transients() end   -- 10 ноя
   elseif cmd == 'log' then if ctx.log_show then ctx.log_show() end   -- 10 ноя: что происходило
@@ -2047,6 +2049,9 @@ function V.mod_note(c)
   local m = ctx.mods and ctx.mods() or {}
   if m.cmd or not (m.ctrl or m.alt) then return false end
   if m.ctrl and not m.shift then return false end   -- 17 окт (2): Ctrl+цифра / - + — шаг, не нота
+  -- 14 ноя: Option+цифра — всегда инструмент (и в INSERT с клавиатурой: двузначный выбор нужен во время набора);
+  -- аккорд через Option — с буквенных рядов
+  if m.alt and not m.ctrl and not m.shift and (OPTDIGCH[c] or (c >= 48 and c <= 57)) then return false end
   if m.ctrl and (c == 45 or c == 61 or c == 95 or c == 43 or c == 31) then return false end
   local b = V.note_key(c, m)
   return ctx.piano[b] ~= nil
@@ -2368,11 +2373,26 @@ function V.key_impl(c)
     local d = OPTDIG[cp] or ((mods.alt and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
       local raw = d
-      -- 14 ноя: вторая цифра быстрее 0.25 с — двузначный номер: Opt+1 Opt+2 → инструмент 12 (и 1 1 → 11)
+      -- 14 ноя: вторая цифра быстрее порога (опция inst digits gap, 250 мс) — двузначный номер: Opt+1 Opt+2 → 12 (и 1 1 → 11)
       do
         local t2 = (reaper and reaper.time_precise) and reaper.time_precise() or os.clock()
         local o2 = V.optdig
-        if o2 and o2.raw and o2.i == 1 and t2 - o2.t < 0.25 then
+        -- тест скорости (опция inst digits speed test / :insttrain): 6 пар цифр — порог чуть выше самой медленной
+        local T = ctx.inst_train
+        if T then
+          if T.t and t2 - T.t < 1.5 then
+            T[#T + 1] = t2 - T.t; T.t = nil
+            if #T >= 6 then
+              local mx = 0; for _, v in ipairs(T) do mx = math.max(mx, v) end
+              ctx.state.instgap = math.max(80, math.min(600, math.floor(mx * 1000 * 1.2 + 20)))
+              ctx.inst_train = nil
+              V.msg = ('inst digits test: your slowest pair %d ms - the gap is now %d ms (option inst digits gap)'):format(math.floor(mx * 1000), ctx.state.instgap)
+            else V.msg = ('inst digits test: pair %d / 6 - %d ms'):format(#T, math.floor(T[#T] * 1000)) end
+          else T.t = t2; V.msg = ('inst digits test: pair %d / 6 - now the second digit'):format(#T + 1) end
+          V.count = nil; return
+        end
+        local gap = (tonumber(ctx.state and ctx.state.instgap) or 250) / 1000
+        if o2 and o2.raw and o2.i == 1 and t2 - o2.t < gap then
           local n2 = o2.raw * 10 + raw
           V.optdig = nil
           if n2 >= 1 and n2 <= (ctx.pool_max and ctx.pool_max() or 99) and ctx.pool_select then ctx.pool_select(n2) end
@@ -2390,7 +2410,7 @@ function V.key_impl(c)
         for k = d * 100, d * 100 + 99 do if k <= mx then list[#list + 1] = k end end
       end
       local i = 1
-      if od and od.d == d and now - od.t < 2 then i = od.i % #list + 1 end
+      if od and od.d == d and now - od.t < 2 then i = od.i % #list + 1 end   -- сюда доходит только пауза длиннее порога
       V.optdig = { d = d, i = i, t = now, raw = raw }
       if ctx.pool_select then ctx.pool_select(list[i]) end
       V.count = nil; return
