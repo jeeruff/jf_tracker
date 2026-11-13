@@ -13454,7 +13454,12 @@ ctx = {
   end,
   -- ── инструменты как объекты Vim (2 окт, jf_tracker_instkeys.lua) ─────
   -- Регистр state.inst_reg = { снимки }; cut кладёт туда вырезанное.
-  inst_select = function(n, go) draw.lib_hdr = nil; pool_select(n, go) end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
+  inst_select = function(n, go) draw.lib_hdr = nil; pool_select(n, go) end,
+  -- 14 ноя: последний номер lib трека курсора (сэмплы + пустые слоты + плагины-инструменты + automation) — для Opt+цифра по кругу
+  pool_max = function()
+    local col = cur_col(); local pool = col and col.pool or {}
+    return #pool + draw.empty_slots(#pool) + ((ctx.inst_total and ctx.inst_total()) or 0) + 1
+  end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
   lib_nav = function() return draw.lib_nav end,
   lib_hdr = function(name) if name ~= nil then draw.lib_hdr = name or nil end; return draw.lib_hdr end,
   inst_listen = function() local col = cur_col(); local e = col and col.pool[vim.inst]; if e then ctx.inst_preview(e, col.track) end end,
@@ -35638,6 +35643,7 @@ ctx.t2_click = function()
   local v = ctx.t2_vis
   local c = v and v.rect
   if not c then return false end
+  c = c.content or c   -- 14 ноя: только содержимое листа — щелчки по вкладкам стека (matrix, notes …) идут панелям
   local mx, my = gfx.mouse_x, gfx.mouse_y
   if not (mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h) then return false end
   local st = ctx.BUF.get(v.id) and ctx.BUF.get(v.id).st

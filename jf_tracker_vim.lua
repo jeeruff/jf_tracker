@@ -2368,7 +2368,19 @@ function V.key_impl(c)
     local d = OPTDIG[cp] or ((mods.alt and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte()) and (c - ('0'):byte()) or nil)
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
       if d == 0 then d = 10 end
-      if ctx.pool_select then ctx.pool_select(d) end
+      -- 14 ноя: та же цифра ещё раз (до 2 с) — следующий инструмент, чей номер начинается с неё: 1 → 01, 10, 11 … 19, 100 …
+      local now = reaper.time_precise()
+      local od = V.optdig
+      local mx = ctx.pool_max and ctx.pool_max() or 10
+      local list = { d }
+      if d < 10 then
+        for k = d * 10, d * 10 + 9 do if k <= mx then list[#list + 1] = k end end
+        for k = d * 100, d * 100 + 99 do if k <= mx then list[#list + 1] = k end end
+      end
+      local i = 1
+      if od and od.d == d and now - od.t < 2 then i = od.i % #list + 1 end
+      V.optdig = { d = d, i = i, t = now }
+      if ctx.pool_select then ctx.pool_select(list[i]) end
       V.count = nil; return
     end
   end
