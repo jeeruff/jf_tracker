@@ -35460,7 +35460,8 @@ ctx.t2_draw = function(block, info)
   if not L2 then ctx.t2_vis = nil; return end
   -- 13 ноя: свой курсор колонки (трек по guid): h l ходят по трекам вида, вид прокручивается за курсором (было: колонка
   -- курсора основного вида + h l крутили вид — курсор уезжал за край и пропадал)
-  local function cols_of() local l, seen = {}, {}; for i, f in ipairs(L2.flat or {}) do local g = f.col and f.col.guid; if g and not seen[g] then seen[g] = true; l[#l + 1] = { g = g, fi = i, ci = f.ci or 0 } end end; return l end
+  -- видимые колонки: L.flat держит и треки за краем листа (x = nil) — их «нашли», и вид не прокручивался
+  local function cols_of() local l, seen = {}, {}; for i, f in ipairs(L2.flat or {}) do local g = f.x and f.col and f.col.guid; if g and not seen[g] then seen[g] = true; l[#l + 1] = { g = g, fi = i, ci = f.ci or 0 } end end; return l end
   local function ci_of(g) for i, c in ipairs(snap2.cols or {}) do if c.guid == g then return i end end end
   local cl = cols_of()
   if not st.cg then   -- фраза — её первый трек, иначе трек курсора основного вида
