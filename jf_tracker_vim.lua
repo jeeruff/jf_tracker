@@ -2369,7 +2369,7 @@ function V.key_impl(c)
     if d and not mods.ctrl and not mods.cmd and V.mode ~= 'cmd' and V.mode ~= 'search' and not V.mod_note(c) then
       if d == 0 then d = 10 end
       -- 14 ноя: та же цифра ещё раз (до 2 с) — следующий инструмент, чей номер начинается с неё: 1 → 01, 10, 11 … 19, 100 …
-      local now = reaper.time_precise()
+      local now = (reaper and reaper.time_precise) and reaper.time_precise() or os.clock()   -- тесты гоняют модуль без REAPER
       local od = V.optdig
       local mx = ctx.pool_max and ctx.pool_max() or 10
       local list = { d }
