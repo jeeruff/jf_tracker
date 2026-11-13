@@ -2034,7 +2034,15 @@ function V.note_key(c, mods)
   local aud = ctx.state and ctx.state.shiftlisten
   if SHOPTCH[cp] then return SHOPTCH[cp]:byte(), aud and 'pitch_aud' or 'cmd' end
   if OPTCH[cp] then return OPTCH[cp]:byte(), 'pitch' end
-  if not aud and (mods.shift or SHIFTED[ch] or ch:match('^%u$')) then return c, 'cmd' end
+  -- 14 ноя: Shift+нота в INSERT (клавиатура, поле ноты) — нота в аккорд, рядом с прежней (держишь Shift и набираешь);
+  -- Option+буква — то же, как было. Вне INSERT и с опцией Shift+keys preview — по-старому
+  if not aud and (mods.shift or SHIFTED[ch] or ch:match('^%u$')) then
+    if V.mode == 'insert' and V.piano and (V.cur.field or 1) == 1 and ctx.piano and not V.pending and not V.op then
+      local b = unshift(c)
+      if ctx.piano[b] ~= nil then return b, 'beside' end
+    end
+    return c, 'cmd'
+  end
   if mods.shift and c > 255 and ctx.piano and ctx.piano[c] then return c, 'audition' end   -- frow: Shift+F (чёрная)
   if SHIFTED[ch] then return SHIFTED[ch]:byte(), 'audition' end
   if ch:match('^[QWERTYUIOP]$') then return ch:lower():byte(), 'audition' end

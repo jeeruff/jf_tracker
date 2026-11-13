@@ -15690,7 +15690,7 @@ ctx = {
     ch.pitches[#ch.pitches + 1] = pitch
     model.invalidate()
     ctx.chord_len(ch, false)
-    vim.msg = ('chord: %d note(s) - Option+note adds, a pause ends it'):format(ch.n)
+    vim.msg = ('chord: %d note(s) - Shift+note (or Option+letter) adds, a pause ends it'):format(ch.n)
   end,
   -- головы аккорда: ноты строки ch.row трека с высотами аккорда
   chtype_heads = function(ch)
