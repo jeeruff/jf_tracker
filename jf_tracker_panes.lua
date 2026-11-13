@@ -575,7 +575,7 @@ end
 
 -- панель — в стек листа другой панели (zellij stack)
 function PN.stack(model, id, into)
-  if PN.base(id) == 'tracker' or PN.base(into) == 'tracker' or id == into then return false end   -- 12 ноя: и tracker#2 не стекается
+  if id == 'tracker' or into == 'tracker' or id == into then return false end   -- 13 ноя: tracker#2 стекается (вкладкой с любой панелью), основной — нет
   local lt = PN.find(model, into)
   if not lt then return false end
   if model.hidden[id] then model.hidden[id] = nil else detach(model, id) end

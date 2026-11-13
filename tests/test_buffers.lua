@@ -61,7 +61,10 @@ ok(lay.by_panel['dsp#2'] ~= nil and lay.by_panel['dsp#2'].content.w > 0, 'dsp#2 
 ok(PN.parse_name('dsp#2') == 'dsp#2', 'parse_name keeps the number')
 local m2 = PN.decode(PN.encode(m))
 ok(m2 and PN.visible(m2, 'dsp#2') and PN.visible(m2, 'tracker'), 'encode/decode keeps dsp#2 (the # was rejected and the whole layout fell back to default)')
-ok(not PN.stack(m, 'inst', 'tracker#2') and not PN.stack(m, 'tracker#2', 'inst'), 'tracker#2 never stacks')
+ok(not PN.stack(m, 'tracker', 'inst') and not PN.stack(m, 'inst', 'tracker'), 'the main tracker never stacks')
+PN.split(m, 'tracker', 'tracker#2', 'r', 0.5)
+ok(PN.stack(m, 'tracker#2', 'inst') and PN.find(m, 'tracker#2') == PN.find(m, 'inst'), 'tracker#2 stacks as a tab (13 Nov)')
+ok(PN.hide(m, 'tracker#2') and m.hidden['tracker#2'] and PN.visible(m, 'tracker'), 'tracker#2 hides, the main one stays')
 
 print(('test_buffers: %d checks, %d failed'):format(n, fail))
 os.exit(fail == 0 and 0 or 1)

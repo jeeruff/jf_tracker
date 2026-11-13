@@ -6198,7 +6198,7 @@ ctx = {
     for _, t in ipairs(c.tabs or {}) do if t.id == id then mine = true end end
     if whole and mine then return nil end                 -- 16 окт: весь пейн — на себя некуда
     if whole and (h.kind == 'tab' or h.kind == 'tabbar') then
-      if draw.panes.base(at) == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz
+      if at == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz (13 ноя: tracker 2 — обычный стек)
       return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
     end
     if h.kind == 'tab' or h.kind == 'tabbar' then
@@ -6207,7 +6207,7 @@ ctx = {
         for i, t in ipairs(c.tabs) do if mx < t.x + t.w / 2 then idx = i; break end end
         return { kind = 'order', at = at, index = idx, rect = { c.tab.x, c.tab.y, c.tab.w, c.tab.h } }
       end
-      if draw.panes.base(at) == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz
+      if at == 'tracker' then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: на трекер — раскрыть, как zz (13 ноя: tracker 2 — обычный стек)
       return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
     end
     local fx, fy = (mx - c.x) / math.max(1, c.w), (my - c.y) / math.max(1, c.h)
@@ -6220,7 +6220,7 @@ ctx = {
       elseif dir == 'u' then r[4] = math.floor(c.h / 2) else r[2] = c.y + math.floor(c.h / 2); r[4] = c.h - math.floor(c.h / 2) end
       return { kind = 'split', at = at, dir = dir, rect = r }
     end
-    if draw.panes.base(at) == 'tracker' and not mine then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: в середину трекера — раскрыть, как zz
+    if at == 'tracker' and not mine then return { kind = 'zoom', at = at, rect = { c.x, c.y, c.w, c.h } } end   -- 12 ноя: в середину трекера — раскрыть, как zz
     if mine or at == 'tracker' then return nil end
     return { kind = 'stack', at = at, rect = { c.x, c.y, c.w, c.h } }
   end,
@@ -6392,7 +6392,7 @@ ctx = {
       -- 12 ноя: s / v / T + буква уже открытой панели, которая умеет второй экземпляр (tracker, dsp, inputs) — новый
       -- буфер ('tracker#2' и т.п.), как D; трекер не стекается — T на нём = рядом справа
       if (pend == 's' or pend == 'v' or pend == 'T') and PN.visible(m, tgt) and ctx.BUF.can_multi(tgt) then
-        if tgt == 'tracker' and ctx.t2_id() then ctx.pane_focus(ctx.t2_id()); vim.msg = 'tracker 2 is already open'; return end   -- 12 ноя: второй вид один
+        if tgt == 'tracker' and ctx.t2_any() then ctx.t2_bring(ctx.t2_any()); return end   -- 12 ноя: второй вид один
         local nid = ctx.BUF.new(tgt)
         if nid then
           ctx.buf_init(nid)
@@ -6454,14 +6454,14 @@ ctx = {
     elseif ch == '=' then ctx.pane_do(function() return PN.equalize(m, id) end, 'panes equal')
     elseif ch == 'z' then ctx.pane_do(function() return PN.zoom(m, id) end, 'zoom ' .. id)
     elseif ch == 'D' then   -- 12 ноя: D duplicate — ещё один экземпляр панели (буфер, PLAN_BUFFERS): рядом справа, фокус на него
-      if PN.base(id) == 'tracker' and ctx.t2_id() then ctx.pane_focus(ctx.t2_id()); vim.msg = 'tracker 2 is already open'; return end   -- 12 ноя: второй вид один
+      if PN.base(id) == 'tracker' and ctx.t2_any() then ctx.t2_bring(ctx.t2_any()); return end   -- 12 ноя: второй вид один (13 ноя: спрятан / вкладкой в стеке — вернуть его)
       local nid = ctx.BUF.new(PN.base(id))
       if nid then
         ctx.buf_init(nid)
         ctx.pane_do(function() return PN.split(m, id, nid, 'r', 0.5) end, 'pane ' .. nid); ctx.pane_focus(nid)
       else vim.msg = ('-- PANE -- D: %s has one instance (so far: tracker, inputs, dsp)'):format(PN.base(id)) end
     elseif ch == 'q' then   -- 2 ноя: скрыть — q (c — custom-модули)
-      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); if state.dsp_buf == id then dsp_buf_set('dsp') end; ctx.BUF.drop(id) end   -- 12 ноя: буфер #n — выбросить
+      if ctx.pane_do(function() return PN.hide(m, id) end, 'pane ' .. id .. ' hidden (g + letter shows it)') then ctx.set_focus('tracker'); if state.dsp_buf == id then dsp_buf_set('dsp') end; if PN.base(id) ~= 'tracker' then ctx.BUF.drop(id) end end   -- 12 ноя: буфер #n — выбросить; 13 ноя: tracker 2 — спрятан, не выброшен (D / Enter на фразе вернут)
     elseif ch == ' ' then
       ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
       local nm = PN.preset(ctx.pn_preset, m)
@@ -35369,6 +35369,7 @@ ctx.t2_open_phrase = function(name)
   if not (state.panes_ui and state.panes) then vim.msg = ('phrase %s: tracker 2 needs panes (options: panes)'):format(name); return false end
   local PN, m = draw.panes, state.panes
   local id = ctx.t2_id()
+  if not id and ctx.t2_any() then id = ctx.t2_any(); ctx.t2_bring(id) end   -- 13 ноя: спрятан / вкладкой в стеке — его
   if not id then
     local nid = ctx.BUF.new('tracker'); if not nid then return false end
     ctx.buf_init(nid)
@@ -35447,10 +35448,11 @@ ctx.t2_draw = function(block, info)
   st.cur = math.max(r0, math.min(r1 - 1, st.cur))
   local c0 = L.pn.by_panel[id]
   local function lay()
-    local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
+    local key = table.concat({ id, lpb2, snap2 and snap2.sid or 0, c0 and c0.x or 0, c0 and c0.y or 0, c0 and c0.w or 0, c0 and c0.h or 0, L.rh, L.cw, #(L.flat or {}), L.total_w or 0, state.wzlevel or 0, st.hscroll or 0, st.master and 1 or 0, st.ruler and 1 or 0, st.jumps and 1 or 0 }, '|')   -- 12 ноя: не tostring(L) — она новая каждый кадр
     if ctx.t2_Lk ~= key then
       draw.layout_leaf = id
-      local ok, L2 = pcall(draw.layout, snap2, setmetatable({ hscroll = st.hscroll or 0, lpb = lpb2 }, { __index = state }), #regions)
+      local ov = ctx.t2_over(st); ov.hscroll, ov.lpb = st.hscroll or 0, lpb2
+      local ok, L2 = pcall(draw.layout, snap2, setmetatable(ov, { __index = state }), #regions)
       draw.layout_leaf = nil
       if not ok then vim.msg = 'tracker 2: ' .. tostring(L2):match('[^\n]*'); return nil end
       ctx.t2_L, ctx.t2_Lk = L2, key
@@ -35537,6 +35539,7 @@ ctx.t2_click = function()
   local mx, my = gfx.mouse_x, gfx.mouse_y
   if not (mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h) then return false end
   local st = ctx.BUF.get(v.id) and ctx.BUF.get(v.id).st
+  if st and v.hv.viewbtn == 'viewmenu' then ctx.set_focus(v.id); ctx.t2_view_menu(v.id); return true end   -- 13 ноя: view второго вида — свои опции
   local hr = v.hv.row   -- hover.row тела — таблица строки ({ row = … }), не номер
   if type(hr) == 'table' then hr = hr.row end
   if st and type(hr) == 'number' then st.cur = hr end
@@ -35548,6 +35551,36 @@ end
 -- 13 ноя: tracker 2 — полный трекер: клавиша идёт в обычный обработчик (vim.key) на время подмены раскладки (L),
 -- снимка (своё LPB), курсора, окна строк и прокрутки — как буфер (B.enter / B.leave). Правка та же: edit пишет в REAPER,
 -- оба вида — отображения таймлайна. vim достаёт L / snap через ctx.L() / ctx.snap(), поэтому подмена локалей работает
+-- 13 ноя: вид второго трекера — свои опции (по умолчанию узко: без мастера, без линейки паттернов / маркеров и прыжков)
+ctx.t2_over = function(st) return { showmaster = st.master == true, ruler = st.ruler == true, jumps = st.jumps == true } end
+ctx.t2_view_menu = function(id)
+  local b = ctx.BUF.get(id); local st = b and b.st
+  if not st then return end
+  local function it(key, f, label)
+    return { key = key, label = label .. (st[f] and '  (on)' or ''), fn = function() st[f] = not st[f] or nil; ctx.t2_Lk = nil; vim.msg = 'tracker 2: ' .. label .. ' ' .. (st[f] and 'on' or 'off'); ctx.t2_view_menu(id) end }
+  end
+  vim.open_hydra({ title = 'tracker 2 view (letter / click - switch, the menu stays)', items = {
+    it('j', 'jumps', 'jump ruler'), it('m', 'master', 'master channel'), it('r', 'ruler', 'patterns / markers ruler') } })
+end
+-- любой tracker#n в раскладке: вкладкой в стеке (не активной) или спрятанный — его, а не новый
+ctx.t2_any = function()
+  local m = state.panes; if not m then return nil end
+  local PN, found = draw.panes, nil
+  local function walk(n)
+    if not n or found then return end
+    for _, id in ipairs(n.panes or {}) do if id ~= 'tracker' and PN.base(id) == 'tracker' and ctx.BUF.ensure(id) then found = id end end
+    for _, k in ipairs(n.kids or {}) do walk(k) end
+  end
+  walk(m.root)
+  if not found then for id in pairs(m.hidden or {}) do if id ~= 'tracker' and PN.base(id) == 'tracker' and ctx.BUF.ensure(id) then found = id end end end
+  return found
+end
+ctx.t2_bring = function(id)
+  local m, PN = state.panes, draw.panes
+  if m and m.hidden and m.hidden[id] then ctx.pane_do(function() return PN.split(m, 'tracker', id, 'r', 0.5) end, 'tracker 2') end
+  ctx.pane_focus(id)
+  vim.msg = 'tracker 2 (Ctrl+W q hides it, Ctrl+W s / v + letter or a tab drag - into a stack)'
+end
 ctx.t2_swap = function(id, fn, ...)
   local b = ctx.BUF.get(id); local st = b and b.st; local L2 = ctx.t2_L
   if not (st and L2 and L2.flat and ctx.t2_vis and ctx.t2_vis.id == id) then return false end
@@ -35559,6 +35592,8 @@ ctx.t2_swap = function(id, fn, ...)
   if g and g.col and g.col.guid == st.cg then fi = first + (st.fo or 0) end
   local sv_cur = {}; for k, v in pairs(vim.cur) do sv_cur[k] = v end
   local sv = { L = L, snap = snap, row0 = state.row0, hs = state.hscroll, lpb = state.lpb, focus = state.focus, az = state.autozoom, pt = state.ptmode }
+  local ov, svo = ctx.t2_over(st), {}
+  for k, v in pairs(ov) do svo[k] = state[k]; state[k] = v end   -- мастер / линейки вида — и для relayout внутри клавиши
   L = L2
   if lpb2 ~= state.lpb then snap = model.snapshot_at(lpb2) end
   state.row0, state.hscroll, state.lpb, state.focus, state.autozoom, state.ptmode = st.row0 or 0, st.hscroll or 0, lpb2, 'tracker', nil, nil
@@ -35579,6 +35614,7 @@ ctx.t2_swap = function(id, fn, ...)
   for k in pairs(vim.cur) do vim.cur[k] = nil end
   for k, v in pairs(sv_cur) do vim.cur[k] = v end
   state.row0, state.hscroll, state.lpb, state.autozoom, state.ptmode = sv.row0, sv.hs, sv.lpb, sv.az, sv.pt
+  for k in pairs(ov) do state[k] = svo[k] end
   if state.focus == 'tracker' then state.focus = sv.focus end   -- клавиша увела фокус в другую панель — оставить
   if not ok then error(r, 0) end
   return true
