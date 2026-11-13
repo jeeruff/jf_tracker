@@ -35344,6 +35344,11 @@ ctx.t2_span = function(st, lpb2)
       r0 = math.floor(model.row_of_time(r.pos, lpb2) + 1e-6); r1 = math.ceil(model.row_of_time(r.rend, lpb2) - 1e-6)
     end
   end
+  if not r0 and st.mode == 'project' then r0, r1 = 0, (snap and snap.last_row or 0) * lpb2 / state.lpb + 1 end   -- 13 ноя: prj — вся песня
+  if not r0 and st.mode == 'section' then
+    local sc = ctx.section_at(edit.row_time(math.max(0, st.cur or 0), lpb2, 0))
+    if sc then st.sec = sc.name; r0, r1 = math.floor(model.row_of_time(sc.pos, lpb2) + 1e-6), math.ceil(model.row_of_time(sc.rgnend, lpb2) - 1e-6) else st.mode = 'pattern' end
+  end
   if not r0 then
     if st.mode == 'phrase' then st.mode = 'pattern' end   -- фраз нет — паттерн
     local list, rg = ctx.pl_song(), nil
@@ -35352,7 +35357,7 @@ ctx.t2_span = function(st, lpb2)
     if rg then st.rg = rg.name; r0, r1 = math.floor(model.row_of_time(rg.pos, lpb2) + 1e-6), math.ceil(model.row_of_time(rg.rgnend, lpb2) - 1e-6) else r0, r1 = 0, 64 end
   end
   ctx.extra_set('t2', extra)
-  return r0, math.max(r0 + 1, r1)
+  return r0, math.max(r0 + 1, math.ceil(r1))
 end
 -- 12 ноя: нота-триггер фразы под курсором основного трекера → имя фразы (или nil)
 ctx.phrase_at_cursor = function()
@@ -35416,6 +35421,8 @@ draw.tracker_label = function(id)
   local b = ctx.BUF.get(id); local st = b and b.st
   if not st then return nil end
   if st.mode == 'phrase' then return 'phrase ' .. (st.phr or '') end
+  if st.mode == 'project' then return 'project' end
+  if st.mode == 'section' then return 'section ' .. (st.sec or '') end
   return 'pattern ' .. (st.rg or '')
 end
 -- 12 ноя: окна за =END, видимые модели (источники фраз): main — вид phr основного трекера, t2 — второй трекер
@@ -35513,7 +35520,7 @@ ctx.t2_draw = function(block, info)
   local vc = setmetatable({ fi = fi2, row = st.cur, field = sv2.field or 1 }, { __index = sv2 })   -- 13 ноя: поле / подполе — свои (не основного: его inst / wave курсор здесь не находил)
   -- плейхед и edit-курсор — общие по времени, строки — в LPB вида; окно вида — его паттерн / фраза; линейка пересчитана
   local ph2 = info.ph_row and model.row_of_time(edit.row_time(info.ph_row, state.lpb, 0), lpb2) or false
-  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = foc and info.vmode or 'normal', vis = false, hexbuf = foc and info.hexbuf or false, typed = foc and info.typed or false, mixfocus = false, t2 = true,   -- false: nil не затеняет поля основного info
+  local info2 = setmetatable({ vcur = vc, focus = foc and 'tracker' or 't2', vmode = foc and info.vmode or 'normal', vis = false, hexbuf = foc and info.hexbuf or false, typed = foc and info.typed or false, mixfocus = false, t2 = true, view_mode = st.mode or 'pattern', view_reg = st.mode ~= 'project',   -- false: nil не затеняет поля основного info
     lpb = lpb2, ph_row = ph2, cur_row = model.row_of_time(reaper.GetCursorPosition(), lpb2), view_clip = { r0, r1 },
     ruler = lpb2 == state.lpb and info.ruler or ctx.t2_ruler(lpb2) },
     { __index = info })
@@ -35540,6 +35547,19 @@ ctx.t2_click = function()
   local mx, my = gfx.mouse_x, gfx.mouse_y
   if not (mx >= c.x and mx < c.x + c.w and my >= c.y and my < c.y + c.h) then return false end
   local st = ctx.BUF.get(v.id) and ctx.BUF.get(v.id).st
+  local vb = st and ({ phr = 'phrase', reg = 'pattern', sec = 'section', all = 'project' })[v.hv.viewbtn or '']
+  if vb then   -- 13 ноя: phr pat sec prj в шапке второго вида — его собственный вид (основной не трогают)
+    if vb == 'phrase' then
+      local nm = state.phr_inst or ctx.phrase_at_cursor() or st.phr
+      local rr = (nm and ctx.phr_find(nm)) or ctx.phr_list()[1]
+      if not rr then vim.msg = 'tracker 2: no phrases in the project'; return true end
+      st.phr = rr.name
+    end
+    if vb ~= st.mode then st.cg, st.fo = nil, nil; if vb == 'phrase' or st.mode == 'phrase' then st.cur = -1 end end
+    st.mode = vb; ctx.set_focus(v.id)
+    vim.msg = 'tracker 2: ' .. (draw.tracker_label(v.id) or vb) .. ' ([ ] - next pattern / phrase)'
+    return true
+  end
   if st and v.hv.viewbtn == 'viewmenu' then ctx.set_focus(v.id); ctx.t2_view_menu(v.id); return true end   -- 13 ноя: view второго вида — свои опции
   local hr = v.hv.row   -- hover.row тела — таблица строки ({ row = … }), не номер
   if type(hr) == 'table' then hr = hr.row end
