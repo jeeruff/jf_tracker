@@ -68,21 +68,36 @@ function PHP.draw(U, L, list, x, y, w, h, focused, mx, my, fit)
   -- 31 окт (lf): широко — три колонки: фразы | что внутри | где стоит
   local lw = w
   local cur = list[PHP.sel]
-  local lf = w >= U.measure('0') * 70 and cur
+  -- 14 ноя: колонки уходят по одной, а не все разом: узко — сначала «что внутри», потом «где стоит» (она с навигацией —
+  -- держится дольше); ширина «где стоит» — по своей строке (не доля панели)
+  local ch = U.measure('0')
+  local uneed = U.measure('Track 00  0000  C-0') + pad
+  local lf = cur and w >= ch * 22 + uneed + pad
+  local mid = lf and w >= ch * (22 + 16) + uneed + 2 * pad
   if lf then
-    lw = math.max(U.measure('0') * 22, math.floor(w * 0.3))
-    local cx, cw2 = x + lw + pad, math.floor((w - lw) * 0.55) - pad
-    local ux, uw = cx + cw2 + pad, x + w - (cx + cw2 + pad)
-    U.set(U.LINE); gfx.rect(cx - math.floor(pad / 2) - 1, y, 1, h - rh - 2, 1); gfx.rect(ux - math.floor(pad / 2) - 1, y, 1, h - rh - 2, 1)
+    local cx, cw2, ux, uw
+    if mid then
+      lw = math.max(ch * 22, math.floor(w * 0.3))
+      cx = x + lw + pad
+      cw2 = math.max(ch * 14, math.min(math.floor((w - lw) * 0.55), w - lw - uneed - 2 * pad) - pad)
+      ux = cx + cw2 + pad
+    else
+      lw = w - uneed - pad
+      ux = x + lw + pad
+    end
+    uw = x + w - ux
+    U.set(U.LINE)
+    if mid then gfx.rect(cx - math.floor(pad / 2) - 1, y, 1, h - rh - 2, 1) end
+    gfx.rect(ux - math.floor(pad / 2) - 1, y, 1, h - rh - 2, 1)
     -- середина: ноты источника строками (номер строки от начала фразы, нота, vel)
-    U.text(cx, y, fit(('%s: %d event(s)'):format(cur.name, #(cur.notes or {})), cw2), U.GREY)
+    if mid then U.text(cx, y, fit(('%s: %d event(s)'):format(cur.name, #(cur.notes or {})), cw2), U.GREY) end
     local nv = math.floor((h - 2 * rh - 2) / rh)
-    for i = 1, math.min(nv, #(cur.notes or {})) do
+    for i = 1, mid and math.min(nv, #(cur.notes or {})) or 0 do
       local n = cur.notes[i]
       local s = n.audio and ('%04d  %s'):format(n.row, n.audio ~= '' and n.audio or 'audio') or ('%04d  %s %02X'):format(n.row, nname(n.pitch), n.vel)
       U.text(cx, y + i * rh, fit(s, cw2), n.muted and U.DIM or (n.audio and U.CYAN or U.TEXT))
     end
-    if #(cur.notes or {}) > nv then U.text(cx, y + (nv + 1) * rh, '...', U.DIM) end
+    if mid and #(cur.notes or {}) > nv then U.text(cx, y + (nv + 1) * rh, '...', U.DIM) end
     -- справа: где стоит (трек, строка, высота триггера); l — сюда, Enter / щелчок — к нему
     U.text(ux, y, fit(('used %dx%s'):format(#(cur.uses or {}), PHP.col == 3 and '' or '  (l)'), uw), U.GREY)
     for i = 1, math.min(nv, #(cur.uses or {})) do
