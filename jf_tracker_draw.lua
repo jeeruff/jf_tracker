@@ -14880,9 +14880,10 @@ function D.frame(L, snap, rows, state, info)
     end
     if L.pn then
       -- 14 ноя: модлайн окна: открыто меню внизу (which-key / команда / список) — полоса поднимается над ним (высота меню — с прошлого кадра)
-      local rise = L.tppos == 'bottom' and (D.pop_h_prev or 0) or 0
-      if rise > 0 then set(U.BG); gfx.rect(0, L.piano_y, gfx.w, L.piano_h, 1) end
-      D.piano_strip(L, 0, L.piano_y - rise, gfx.w, L.piano_h, p, info, hover, st)
+      -- полосу над меню рисует само меню (D.popup, D.tp_redraw): последним, поверх всех листов, во всю ширину, ровно по его высоте
+      local ph = L.piano_h
+      D.tp_redraw = function(y) D.piano_strip(L, 0, y, gfx.w, ph, p, info, {}, st) end   -- без наведения: меню открыто — полоса только видна
+      if (D.pop_h_cur or 0) == 0 then D.piano_strip(L, 0, L.piano_y, gfx.w, L.piano_h, p, info, hover, st) end   -- меню уже нарисовано в этом кадре — не поверх него
     elseif L.tppos == 'tracker' then D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
     else
       -- снаружи трекера: во всю ширину окна без сайдбара, подсказки — своей строкой под ней
@@ -15134,7 +15135,15 @@ function D.popup(L, p, anchor)
     if anchor.above then y = anchor.y - h - 2 >= 2 and (anchor.y - h - 2) or (anchor.y + 3 * L.rh)   -- над ячейкой; транспорт наверху — под полосой (5 окт)
     elseif anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end
-  if dock then x, y = L.pad, gfx.h - (L.status_h or 0) - h - 2; D.pop_h_cur = math.max(D.pop_h_cur or 0, h + 4) end
+  if dock then
+    x, y = L.pad, gfx.h - (L.status_h or 0) - h - 2; D.pop_h_cur = math.max(D.pop_h_cur or 0, h + 4)
+    -- 14 ноя: меню внизу окна — на сплошной подложке во всю ширину (листы под ним не просвечивают), полоса транспорта — сразу над ним
+    if L.pn and L.tppos == 'bottom' and D.tp_redraw and (L.piano_h or 0) > 0 then
+      local top, sb = y - 2, gfx.h - (L.status_h or 0)
+      set(U.PANEL); gfx.rect(0, top, gfx.w, sb - top, 1)
+      D.tp_redraw(top - L.piano_h)
+    end
+  end
   y = math.max(2, math.min(y, gfx.h - h - 2))         -- высокое меню целиком в окне (5 окт)
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)

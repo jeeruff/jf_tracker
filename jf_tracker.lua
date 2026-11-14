@@ -263,7 +263,7 @@ local state = {
   acvzoom = reaper.GetExtState(EXT, 'acvzoom') ~= '0',
   -- 5 ноя: fx as gui (окна плагинов сами при выборе трека) убрана — только кнопка gui / :gui
   offevent = flag('offevent', false),   -- 21 окт: OFF как событие для dw: изнутри ноты / на её OFF — удалить OFF, нота тянется дальше   -- 21 окт: нота MIDI звучит до OFF / следующей / конца паттерна (выкл — один шаг)
-  ttf = (draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off',
+  ttf = reaper.GetExtState(EXT, 'ttf') == '' and 'bigblue' or ((draw.TTF_FACES[reaper.GetExtState(EXT, 'ttf')] or reaper.GetExtState(EXT, 'ttf') == 'custom') and reaper.GetExtState(EXT, 'ttf') or 'off'),   -- 14 ноя: шрифт по умолчанию — bigblue (выбор не сохранён); off — битмап
   ttfcustom = reaper.GetExtState(EXT, 'ttfcustom'), ttfpx = tonumber(reaper.GetExtState(EXT, 'ttfpx')) or 14,   -- свой шрифт (10 окт)   -- 10 окт: любой из draw.TTF_FACES   -- шрифт: битмап или пиксельный TTF (5 окт)
   opt_tab = reaper.GetExtState(EXT, 'opttab') ~= '' and reaper.GetExtState(EXT, 'opttab') or nil,   -- последняя вкладка опций (5 окт)
   -- время и BPM мелко (5 окт, просьба): новый ключ — прежнее «вкл» не тянется
