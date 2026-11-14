@@ -13476,7 +13476,8 @@ ctx = {
   pool_max = function()
     local col = cur_col(); local pool = col and col.pool or {}
     local hid = 0; for _, e in ipairs(pool) do if e.parent then hid = hid + 1 end end   -- 14 ноя: в номерах, что видны в lib
-    return #pool - hid + draw.empty_slots(#pool) + ((ctx.inst_total and ctx.inst_total()) or 0) + 1
+    local nph = ctx.phr_list and #ctx.phr_list() or 0   -- 14 ноя: за automation — midi clips и фразы (как в pool_select): Opt+1 2 → фраза 12
+    return #pool - hid + draw.empty_slots(#pool) + ((ctx.inst_total and ctx.inst_total()) or 0) + 1 + (nph > 0 and (1 + nph) or 0)
   end,
   -- 14 ноя: номер, что виден в lib (01 02 … — слайсы-дети номеров не занимают) → номер для pool_select (место в пуле).
   -- Opt+цифра брала место в пуле: Opt+9 попадал не на «09», а на 9-ю запись пула (слайс → соседний сэмпл / пустой слот)
@@ -27096,6 +27097,7 @@ local function frame()
       if f and f.x and r >= 0 and r < L.nrows then p.anchor = { x = f.x, y = L.body_y + (r + 1) * L.rh + 1, top = L.body_y + r * L.rh }
       else p.anchor = { x = gfx.mouse_x, y = gfx.mouse_y + 4, top = gfx.mouse_y } end
     end
+    MX.SMART.dock = state.popdock   -- 14 ноя: сетки значений (ячейки транспорта, поля трекера) — тоже внизу окна
     MX.SMART.draw({ L = L, set = draw.set, text = draw.text, ms = draw.measure, fit = draw.fit,
       C = { PANEL = U.PANEL, FRAME = U.mix(U.LINE, U.TEXT, 0.45), SEL = draw.CURROW, SELF = U.tint(U.AMBER, 0.45), TEXT = U.TEXT, GREY = U.GREY, AMBER = U.AMBER, CYAN = U.CYAN } })
   end
@@ -34171,7 +34173,9 @@ ctx.space_leader = function(c, from_q)
         if vim.hydra then vim.key(27) end
         return c
       end
-      if S.menu then if vim.hydra and not S.used then vim.key(27) end
+      -- 14 ноя: меню открылось — Space можно отпустить, оно остаётся (прочитать и выбрать без спешки; Esc закрывает).
+      -- Было: отпустил без клавиши — меню закрывалось, приходилось держать Space всё время чтения
+      if S.menu then
       elseif not S.used then table.insert(ctx.keyq, 1, 32) end   -- тап — Space как раньше (из очереди мимо лидера)
       return c
     end

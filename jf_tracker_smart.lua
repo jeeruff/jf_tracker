@@ -142,6 +142,7 @@ function SM.layout(L, ms, W, H)
   local x = math.max(2, math.min(W - w - 2, a.x))
   local y = a.y
   if y + h > H - 2 then y = (a.top or a.y) - h - 2 end
+  if SM.dock then x, y = L.pad, H - (L.status_h or 0) - h - 2 end   -- 14 ноя: опция menus at the bottom — там же, где все меню
   y = math.max(2, math.min(y, H - h - 2))
   return x, y, w, h, cw, rows, crh
 end
