@@ -699,8 +699,9 @@ function D.layout_core(snap, state, nregions)
   -- левее полосы регионов; регионы сдвигаются на неё
   -- 2 ноя: у курсора — его номер строки (как number + relativenumber в Vim): ширина — под номер последней строки проекта
   if state.rowjumps then
-    local nrow = math.floor(reaper.GetProjectLength(0) * reaper.Master_GetTempo() / 60 * (state.lpb or 4)) + (D.ROW_BASE or 1)
-    L.jl_w = ms(('9'):rep(math.max(2, #tostring(nrow)))) + L.pad + 2
+    -- 14 ноя: две цифры — дальше 99 строк не прыгают (на экран столько не влезает); была ширина под номер последней
+    -- строки проекта (пустота в 2-3 знака между номером строки и прыжком)
+    L.jl_w = ms('99') + L.pad + 2
   else L.jl_w = 0 end
   L.ruler_w = L.jl_w + L.rg_w
   -- линейка таймлайна между полосами регионов и номерами (3 окт, опция tlruler): метки REAPER
@@ -11051,8 +11052,9 @@ function D.frame(L, snap, rows, state, info)
     D.EMPTY = af > 0 and U.mix(empty0, D.TEXT90, af) or empty0
     D.EMPTY_UNDER = af > 0 and U.mix(under0, D.TEXT90, af * 0.6) or under0
     if mkline[r.row] then set(mkline[r.row], 0.75); gfx.rect(tx0, y, W - tx0, 1, 1); gfx.a = 1 end
-    if r.bar then set(D.BAR); gfx.rect(tx0, y, W - tx0, 1, 1)
-    elseif r.beat then set(D.BEAT); gfx.rect(tx0, y, W - tx0, 1, 1) end
+    -- 14 ноя: линии такта / доли — от сетки треков, не через номера строк и прыжки (обрывки линий там убраны)
+    if r.bar then set(D.BAR); gfx.rect(tx0 + L.label_w, y, W - tx0 - L.label_w, 1, 1)
+    elseif r.beat then set(D.BEAT); gfx.rect(tx0 + L.label_w, y, W - tx0 - L.label_w, 1, 1) end
     -- до ячеек этой строки: нижний пиксель — уходящему, верхний+1 — следующему
     local eg, en = rgedge[r.row], rgedge[r.row + 1]
     -- 31 окт: граница паттерна — явная (Backspace / Insert живут внутри паттерна): 2 px цветом паттерна,
@@ -11642,7 +11644,9 @@ function D.frame(L, snap, rows, state, info)
       local d = cr and (r.row - cr)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
-        if math.abs(d) < 0.5 then lab = ('%d'):format(math.floor(r.row + 0.5) + (D.ROW_BASE or 1)) end   -- 2 ноя: у курсора — номер его строки, не 0
+        if math.abs(d) < 0.5 then   -- 2 ноя: у курсора — номер его строки, не 0; 14 ноя: длиннее двух цифр — 0 (номер — рядом, в колонке номеров)
+          lab = ('%d'):format(math.floor(r.row + 0.5) + (D.ROW_BASE or 1)); if #lab > 2 then lab = '0' end
+        end
         text(tx0 + L.jl_x + L.jl_w - 3 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
