@@ -1003,6 +1003,7 @@ end
 -- wave_cached(...) = true — картинка готова и выведена; false — нарисуй в неё (S.wc_x / wc_cy — начало в картинке),
 -- потом S.wave_done() выводит её
 S.WAVE_IMG = 796
+S.ZOOM_IMG = 1020   -- 14 ноя: полоса зума (прицел) — готовой картинкой
 function S.wave_cached(kind, pk, e, x, wy, w, wh, va, vb, base, z0, z1, zc, bg, inv)
   S.wc_x, S.wc_cy, S.wc_dx = nil, nil, nil
   if w < 2 or wh < 2 then return false end
@@ -1664,17 +1665,35 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     local zy = zy_top or (wy + wh + 2)
     local W2 = S.zwin or 0.04
     local t0 = zt - W2                     -- край — по центру окна
-    U.set(U.BG); gfx.rect(x, zy, w, ZH, 1)
     -- 16 окт: прицел — бледная сетка трекера (такты / доли / строки) и stretch-маркеры ноты, в секундах окна (по маркерам)
     local zgrid = S.cross and zlab and zlab:match('^cursor') and ctx.aim_grid and ctx.aim_grid(S.cross, t0, t0 + 2 * W2)
-    if zgrid then
+    local smp, n = zoom_samples(e, t0, 2 * W2)
+    -- 14 ноя: фон, сетка и волна полосы зума — картинкой S.ZOOM_IMG (до 8 тыс. gfx.line за кадр: 9-13 мс панели item, jftop).
+    -- Промах — рисуется прямо в картинку (x, zy на время = 0, 0), потом blit; попадание — один blit. Чтения с экрана нет
+    -- (первая версия копировала кусок кадра и брала не то место). Виды spec / sgram не кэшируются
+    local zX, zY, zd0, zhit, zkey = x, zy, nil, false, nil
+    if smp and n and S.view ~= 'sgram' and S.view ~= 'spec' and w >= 2 and ZH >= 2 then
+      local gr = zgrid and zgrid.rows
+      zkey = table.concat({ S.zs and S.zs.key or '', w, ZH, base[1], base[2], base[3], U.BG[1], U.BG[2], U.BG[3], U.TEXT[1],
+        gr and #gr or -1, gr and gr[1] and ('%.5f'):format(gr[1].te) or '', gr and gr[#gr] and ('%.5f'):format(gr[#gr].te) or '' }, '|')
+      if S.zi_key == zkey and S.zi_w == w and S.zi_h == ZH then
+        gfx.a = 1; gfx.mode = 0
+        gfx.blit(S.ZOOM_IMG, 1, 0, 0, 0, w, ZH, x, zy, w, ZH)
+        zhit = true; smp = nil
+      else
+        if S.zi_w ~= w or S.zi_h ~= ZH then gfx.setimgdim(S.ZOOM_IMG, -1, -1); gfx.setimgdim(S.ZOOM_IMG, w, ZH); S.zi_w, S.zi_h = w, ZH end
+        zd0 = gfx.dest; gfx.dest = S.ZOOM_IMG; gfx.mode = 0
+        x, zy = 0, 0
+      end
+    end
+    if not zhit then U.set(U.BG); gfx.rect(x, zy, w, ZH, 1) end
+    if zgrid and not zhit then
       for _, g in ipairs(zgrid.rows) do
         local gx = x + math.floor((g.te - t0) / (2 * W2) * w)
         U.set(U.mix(U.TEXT, U.BG, g.kind == 'bar' and 0.45 or (g.kind == 'beat' and 0.65 or 0.82)))
         gfx.rect(gx, zy, 1, ZH, 1)
       end
     end
-    local smp, n = zoom_samples(e, t0, 2 * W2)
     local zc, zh2 = zy + ZH / 2, ZH / 2 - 2
     -- 10 окт: зум повторяет вид волны — sgram: кусок спектрограммы фоном; spec: окраска по частоте
     local sgz = S.view == 'sgram' and ctx.sgram and ctx.sgram(e)
@@ -1712,7 +1731,13 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         spcol(t0 + (px + 0.5) / w * 2 * W2)
         if mx3 >= mn then gfx.line(x + px, zc - mx3 / pk * zh2, x + px, zc - mn / pk * zh2) end
       end
-    else U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
+    elseif not zhit then U.text(x + 4, zy + rh + 2, 'no audio to read here', U.GREY) end   -- 10 окт: второй строкой (налезало на подпись края)
+    if zd0 then   -- нарисовано в картинку — вернуть место и цель, вывести
+      gfx.dest = zd0; x, zy = zX, zY
+      gfx.a = 1; gfx.mode = 0
+      gfx.blit(S.ZOOM_IMG, 1, 0, 0, 0, w, ZH, x, zy, w, ZH)
+      S.zi_key = zkey
+    end
     -- 11 окт: до нулевого сэмпла item и после его конца — пустота (не звук файла за краями item)
     -- 12 окт: прицел ноты из другого куска файла — край item не граница, звук файла там есть (zoom_samples читает
     -- его напрямую); пустота только до начала файла (маска по краям item затирала всё окно: «не видно»)
