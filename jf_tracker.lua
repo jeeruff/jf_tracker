@@ -34902,6 +34902,9 @@ draw.track_view = function(col)
     if col.track and reaper.ValidatePtr(col.track, 'MediaTrack*') then v = select(2, reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_tview', '', false)) or '' end
     ctx.tview_c[g] = v
   end
+  -- 14 ноя: большая волна на время зума трека (zt) — только в памяти, на трек не пишется: раньше она писалась в
+  -- P_EXT, и после :reload посреди зума трек навсегда оставался без нот (вернуть было некому)
+  if v == '' and ctx.zt_tv == g then return 'big' end
   return v ~= '' and v or nil
 end
 ctx.track_view_set = function(col, v)
@@ -36457,7 +36460,7 @@ ctx.zoom_track = function()
     ctx.zt_saved = nil
     for _, c in ipairs(snap.cols) do ctx.fold(c, zt.folds[c.guid]) end
     state.wlevel, state.trackenvs, state.hscroll = zt.wlevel, zt.trackenvs, zt.hscroll
-    if zt.tv_col then ctx.track_view_set(zt.tv_col, nil) end   -- 11 ноя: большая волна была только на время зума
+    ctx.zt_tv = nil   -- 11 ноя: большая волна была только на время зума (14 ноя: в памяти, не на треке)
     relayout(); vim.msg = 'zt: back'
     return
   end
@@ -36474,7 +36477,7 @@ ctx.zoom_track = function()
   state.trackenvs[cur.guid] = true
   local has_audio = false
   for _, ln in ipairs(cur.lanes or {}) do if ln.audio_sub and next(ln.audio_sub) then has_audio = true end end
-  if has_audio and not draw.track_view(cur) then ctx.track_view_set(cur, 'big'); ctx.zt_saved.tv_col = cur end
+  if has_audio and not draw.track_view(cur) then ctx.zt_tv = cur.guid end
   relayout()
   vim.msg = 'zt: ' .. (cur.name or 'track') .. ' - zoomed, the others folded (zt again - back; zT - its view: big wave / spectrum / notes)'
 end
