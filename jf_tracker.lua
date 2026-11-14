@@ -26686,7 +26686,7 @@ local function frame()
       -- имя — с полосы регионов линейки (цветная черта продолжается в линейку вниз)
       -- 31 окт: кнопки ln нет — номера строк быстрой опцией (line number)
       if not L.ruler_right and (L.rg_w or 0) > 0 and (L.jl_w or 0) > 0 then
-        bx = L.matrix_w + L.jl_w + 3; bw = L.label_w - L.jl_w - 4
+        bx = L.matrix_w + (L.rg_x or 0) + 3; bw = L.label_w - (L.rg_x or 0) - 4   -- 14 ноя: полоса паттернов теперь первой слева
       end
       -- 31 окт: имя паттерна — нижней строкой полосы эффектов, вплотную к линейке: цветная черта продолжается в неё
       local y0 = y0 + math.max(0, L.fxrow_h - L.rh - 1)

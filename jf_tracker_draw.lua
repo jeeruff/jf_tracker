@@ -719,6 +719,10 @@ function D.layout_core(snap, state, nregions)
   L.ruler_right = state.rulerside == 'right' and L.rg_w > 0
   L.rl = L.ruler_right and L.jl_w or L.ruler_w   -- 13 окт: линейка прыжков всегда слева, у номеров;           -- что слева от номеров строк
   L.label_w = L.rl + L.num_w + L.tl_w
+  -- 14 ноя: номера-прыжки — вплотную к номерам строк, правее полосы паттернов / маркеров (были у левого края, через
+  -- полосу от строк). jl_x — их начало от левого края трекера, rg_x — начало полосы паттернов от начала линейки
+  L.jl_x = L.ruler_right and 0 or L.rg_w
+  L.rg_x = L.ruler_right and L.jl_w or 0
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
   -- 5 окт: на 15% выше (больше строк свойств сэмпла)
@@ -11078,7 +11082,7 @@ function D.frame(L, snap, rows, state, info)
       local pn = st or (patb[r.row + 1] and patb[r.row + 1].prv)
       if pn then   -- 2 ноя: рисуются после полосы регионов (её подложка их закрашивала) — D.pat_names ниже
         D.pat_names = D.pat_names or {}
-        D.pat_names[#D.pat_names + 1] = { tx0 + L.jl_w + 3, y, L.rg_w - 5, ty, pn, is_cur_row, st and 1 or -1 }   -- 6 ноя: 1 — начало, -1 — конец
+        D.pat_names[#D.pat_names + 1] = { tx0 + L.rg_x + 3, y, L.rg_w - 5, ty, pn, is_cur_row, st and 1 or -1 }   -- 6 ноя: 1 — начало, -1 — конец
       end
     end
     -- линейка таймлайна: на долях, такт ярче (формат меток — как у линейки
@@ -11625,13 +11629,13 @@ function D.frame(L, snap, rows, state, info)
   if L.jl_w > 0 and #rows > 0 then
     local cr = info.vcur and info.vcur.row          -- курсор трекера (cur_row — edit-курсор REAPER)
     -- 10 окт: как верхняя линейка — подложка опцией jump ruler background, 0 у курсора, цифры приглушены
-    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0 + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
+    set(D.jr_bg and U.PANEL or U.BG); gfx.rect(tx0 + L.jl_x + 1, L.body_y, L.jl_w - 1, #rows * L.rh, 1)
     for i, r in ipairs(rows) do
       local d = cr and (r.row - cr)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
         if math.abs(d) < 0.5 then lab = ('%d'):format(math.floor(r.row + 0.5) + (D.ROW_BASE or 1)) end   -- 2 ноя: у курсора — номер его строки, не 0
-        text(tx0 + L.jl_w - 2 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
+        text(tx0 + L.jl_x + L.jl_w - 2 - (L.jl_x > 0 and 3 or 0) - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
   end
@@ -11639,7 +11643,7 @@ function D.frame(L, snap, rows, state, info)
     local row0, nr = rows[1].row, #rows
     local function ry(row) return L.body_y + (row - row0) * L.rh end
     local bot = L.body_y + nr * L.rh
-    local laneR, laneM = rx0 + L.jl_w + 3, rx0 + L.jl_w + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт); jl_w — линейка прыжков
+    local laneR, laneM = rx0 + L.rg_x + 3, rx0 + L.rg_x + 3 + L.th + 6       -- 2 px зазора: разделитель матрицы виден (3 окт); jl_w — линейка прыжков
     local c0 = info.view_clip and info.view_clip[1] or -math.huge
     local c1 = info.view_clip and info.view_clip[2] or math.huge
     for _, rg in ipairs(info.ruler.regions) do
@@ -11668,7 +11672,7 @@ function D.frame(L, snap, rows, state, info)
       set(c); gfx.rect(laneR, y, L.rg_w - 5, 1, 1); gfx.rect(laneM, y, 2, math.max(2, ynext - y), 1)
       if ynext - y > L.th and state.mknames ~= false then D.vtext(laneM + 3, y + 2, ynext - y - 4, m.mk.name ~= '' and m.mk.name or tostring(m.mk.idx), c, U.BG, true) end
     end
-    if mx >= rx0 + L.jl_w and mx < rx0 + L.ruler_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
+    if mx >= rx0 + L.rg_x and mx < rx0 + L.rg_x + L.rg_w and my >= L.body_y and my < bot then hover.ruler = row0 + math.floor((my - L.body_y) / L.rh) end
   end
   D.acv_frame(L, info, rows)   -- 2 ноя: рамка видимого на холсте кривых (своя функция: здесь предел локалей)
   -- 6 ноя: паттерн курсора — в свободном углу строки номеров колонок, над номерами строк (линия прыжков)
