@@ -25658,6 +25658,9 @@ local function frame()
   local mode, _, typed = vim.status()   -- 15 окт: набранное — у курсора (info.typed), не в статус и не в слово режима
   local trk = draw.panes.base(state.focus) == 'tracker'   -- 13 ноя: tracker 2 — тот же режим трекера (было слово TRACKER)
   local left = mode ~= '' and mode or (not trk and '' or (vim.piano and 'KEYS' or 'NORMAL'))   -- 16 окт: клавиатура включена в NORMAL — слово KEYS (ноты на цифрах / F)
+  -- 14 ноя: major / minor, как в Emacs. Major — модуль в фокусе (TRACKER, MATRIX, LIB …), minor — то, что меняет смысл
+  -- клавиш в нём (NORMAL INSERT VISUAL KEYS KEYSPAT KEYPHR LOOM …): TRACKER INSERT, MATRIX KEYSPAT. left ниже — minor
+  local major = trk and (state.focus == 'tracker' and 'TRACKER' or 'TRACKER 2') or nil
   if not trk then
     -- 13 окт: подпись панели из реестра (properties, lib, item), не её id (было «SPROPS», «INST»)
     local pe = draw.panes.BY and draw.panes.BY[state.focus]
@@ -25666,6 +25669,7 @@ local function frame()
       local te = draw.panes.BY and draw.panes.BY[state.toptab]
       left = state.toptab == 'sample' and 'SAMPLER' or ((te and te.label) or state.toptab or 'top'):upper()
     else left = ((pe and pe.label) or state.focus):upper() end
+    major, left = left, ''
   end   -- 12 окт: фокус в модуле — только его имя (режим трекера тут не действует; было «INSERT BROWSER»)
   -- 18 окт: свой режим клавиатуры: patternkb (ноты — паттерны) в трекере
   if ctx.vl_on then left = 'VIPER ' .. left end   -- 9 ноя: VIPER — только когда слой работает (клавиши из окна REAPER); в трекере — обычный режим
@@ -25679,9 +25683,11 @@ local function frame()
     if kw then
       local n = 0
       if trk and vim.mode == 'normal' then left, n = left:gsub('NORMAL', kw, 1); if n == 0 then left, n = left:gsub('KEYS', kw, 1) end end
-      if n == 0 then left = kw .. ' ' .. left end
+      if n == 0 then left = left == '' and kw or (kw .. ' ' .. left) end
     end
   end
+  draw.mode_major = major
+  left = major .. (left ~= '' and (' ' .. left) or '')
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
   local wf = gfx.getchar(65536)
@@ -25697,7 +25703,7 @@ local function frame()
   if not state.lock and (not state.viper or ctx.vl_on) and ctx.ecur_row ~= vim.cur.row then
     if reaper.GetPlayState() & 1 == 0 then reaper.SetEditCurPos(edit.row_time(vim.cur.row, state.lpb, 0), false, false); ctx.ecur_row = vim.cur.row end
   end
-  if not ctx.win_focus and not ctx.vl_on then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end
+  if not ctx.win_focus and not ctx.vl_on then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or ''); draw.mode_major = nil end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg; if vim.msg ~= ctx.log_msg then ctx.log_msg = vim.msg; ctx.log_add(vim.msg) end end   -- 10 ноя: и в :log
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
@@ -35788,6 +35794,7 @@ ctx.mode_menu = function()
   local function on(f, s) return (f and '* ' or '') .. s end
   local m = vim.mode
   vim.open_hydra({ title = 'mode', items = {
+    { key = ' ', label = 'major mode - the module in focus (' .. tostring(draw.mode_major or '') .. '); below - its minor modes' },
     { key = 'c', label = 'COMMAND - type a command (:)', fn = base(':') },
     { key = 'f', label = on(state.keyphr, 'KEYPHR - the note keys play the phrases'), fn = function() ctx.keyphr_cmd() end },
     { key = 'i', label = on(m == 'insert', 'INSERT - the note keys write notes (Esc)'), fn = base('i') },

@@ -387,7 +387,7 @@ end
 -- ── раскладка ─────────────────────────────────────────────────────────────
 -- панели (9 окт): раскладка дерева — мемо по сигнатуре (модель, окно, шрифт,
 -- доступность панелей); в кадре — только сравнения, без аллокаций
-D.pn_M = { sep = 2, grip = 5 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
+D.pn_M = { sep = 7, grip = 7 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
 D.pn_sig = {}
 function D.panes_layout(state, L, nregions, ncols)
   local M, s = D.pn_M, D.pn_sig
@@ -5466,7 +5466,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   if info and info.status_left then
     local res = 0
     -- 1 ноя: место — по NORMAL / INSERT (частые); длинные слова (KEYS → КЛАВИСИНЪ, VISUAL) сжимаются шрифтом, а не раздвигают полосу
-    for _, mw0 in ipairs({ 'NORMAL', 'INSERT' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end
+    for _, mw0 in ipairs({ 'TRACKER NORMAL', 'TRACKER INSERT' }) do res = math.max(res, (D.draw_mode(L, 0, 0, 1e6, mw0, true))) end   -- 14 ноя: с major
     D.draw_mode(L, x + L.pad, ly + math.floor((math.min(h, 3 * L.rh) - 2 * L.th) / 2) - 2, 3 * res, info.status_left)
     x = x + res + 3 * L.pad; w = w - res - 3 * L.pad
   end
@@ -6958,6 +6958,16 @@ function D.cursor_field_name(f, vc)
 end
 function D.draw_mode(L, sx0, sy0, sw, str, dry)
   local mode = (str or ''):match('^([^|]*)') or ''
+  -- 14 ноя: major (модуль в фокусе) — серым, minor (режим клавиш в нём) — цветом режима: TRACKER INSERT, MATRIX KEYSPAT.
+  -- Major отрезается от начала строки; всё прежнее (цвет, слово COMMAND, шрифт) — по minor. Без minor major — само слово
+  local major = ''
+  do
+    local mj = D.mode_major
+    local m0 = mode:gsub('^[%s%-]+', '')
+    if mj and mj ~= '' and m0:sub(1, #mj) == mj and (m0:sub(#mj + 1, #mj + 1) == ' ' or #m0 == #mj) then
+      major, mode = mj, m0:sub(#mj + 2)
+    elseif dry and m0:match('^TRACKER ') then major, mode = 'TRACKER', m0:sub(9) end
+  end
   -- 15 окт: набор команды / поиска — полем под курсором трекера; здесь только слово режима
   if mode:match('^%s*:') then mode = 'COMMAND' elseif mode:match('^%s*/') then mode = 'SEARCH' elseif mode:match('^%s*rename') then mode = 'RENAME' end
   mode = (mode or ''):gsub('%-%-', ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
@@ -6967,9 +6977,15 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
   local MK = { INSERT = 'insert', VISUAL = 'visual', ['V-LINE'] = 'vline', COMMAND = 'cmd', SEARCH = 'search', RENAME = 'cmd', NORMAL = 'normal', KEYS = 'normal' }
   local mk = MK[mode:match('^[%u%-]+') or '']
   local col = mk and D.MODE_COL[mk] or U.AMBER
+  if mode == '' then major, mode = '', major end   -- модуль без minor — его имя и есть слово (янтарём, как раньше)
   local dx = sx0
   local sy = sy0
   local tr = D.modefont and D.MODE_SCRIPT[D.modefont]
+  if tr and major ~= '' then
+    local w1 = major:match('^([%u%-]+)')
+    if tr[major] then major = tr[major] elseif w1 and tr[w1] then major = tr[w1] .. major:sub(#w1 + 1) end
+  end
+  local mjs = major ~= '' and (major .. ' ') or ''   -- major с пробелом — перед minor
   if tr and mode ~= '' then
     -- 15 окт: целиком (NOTE MOD), иначе первое слово (TOP:item, UNDO …)
     if tr[mode] then mode = tr[mode]
@@ -6983,13 +6999,23 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
     local hpx = math.floor(3 * L.th * (D.MODE_FONT_SCALE[D.modefont] or 1))   -- 13 окт: в полтора раза крупнее (просьба)
     gfx.setfont(4, D.modefont, hpx)
     -- 18 окт: длинное слово (КЛАВИСИНЪ) — сначала мельче, до полутора строк; обрезка — только если и так не влезло
-    while gfx.measurestr(mode) > math.floor(sw / 3) and hpx > math.floor(1.5 * L.th) do hpx = hpx - 1; gfx.setfont(4, D.modefont, hpx) end
+    while gfx.measurestr(mjs .. mode) > math.floor(sw / 3) and hpx > math.floor(1.5 * L.th) do hpx = hpx - 1; gfx.setfont(4, D.modefont, hpx) end
+    while mjs ~= '' and gfx.measurestr(mjs .. mode) > math.floor(sw / 3) do   -- не влезло — сперва режется major (minor важнее)
+      major = major:sub(1, (utf8.offset(major, -1) or 1) - 1); mjs = major ~= '' and (major .. ' ') or ''
+    end
     while mode ~= '' and gfx.measurestr(mode) > math.floor(sw / 3) do mode = mode:sub(1, (utf8.offset(mode, -1) or 1) - 1) end   -- по символам (UTF-8)
+    local jw = mjs ~= '' and gfx.measurestr(mjs) or 0
     local mw, mh = gfx.measurestr(mode)
-    if not dry then set(col); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode) end
+    if not dry then
+      if mjs ~= '' then set(U.GREY); gfx.x, gfx.y = sx0, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mjs) end
+      set(col); gfx.x, gfx.y = sx0 + jw, sy + math.floor((2 * L.th - mh) / 2); gfx.drawstr(mode)
+    end
     gfx.setfont(D.font_id)
-    dx = sx0 + mw
+    dx = sx0 + jw + mw
     mode = ''
+  end
+  if mode ~= '' then
+    while mjs ~= '' and D.big_measure(mjs .. mode, 2) > math.floor(sw / 3) do major = major:sub(1, -2); mjs = major ~= '' and (major .. ' ') or '' end
   end
   while mode ~= '' and D.big_measure(mode, 2) > math.floor(sw / 3) do mode = mode:sub(1, -2) end
   -- 16 окт: REAPER (клавиши у REAPER, не у трекера) — контрастно: белым на чёрном, чёрные косые полоски поверх
@@ -7006,9 +7032,13 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
           for t = 0, 1 do gfx.line(sx0 + k + t, sy + 2 * L.th, sx0 + k + t + 2 * L.th, sy) end
         end
         set({ 1, 1, 1 }); gfx.rect(sx0 - 2, sy - 1, bw2 + 4, 2 * L.th + 2, 0)
-      else D.big_text(sx0, sy, mode, col, 2) end
+      else
+        local jw = mjs ~= '' and D.big_measure(mjs, 2) or 0
+        if mjs ~= '' then D.big_text(sx0, sy, mjs, U.GREY, 2) end
+        D.big_text(sx0 + jw, sy, mode, col, 2)
+      end
     end
-    dx = sx0 + D.big_measure(mode, 2)
+    dx = sx0 + ((not reap and mjs ~= '') and D.big_measure(mjs, 2) or 0) + D.big_measure(mode, 2)
   end
   if not dry then D.mode_rc = { sx0, sy0, math.max(dx - sx0, 4 * L.cw), 2 * L.th } end   -- 14 ноя: щелчок по слову — меню режимов
   return dx - sx0, 2 * L.th
@@ -8229,8 +8259,13 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   end
   D.pmark('panes: lines and grips')
   -- линии раздела и ручки: ручка под мышью — янтарём
-  set(D.SEP)
-  for _, sp in ipairs(lay.seps) do gfx.rect(sp.x, sp.y, sp.w, sp.h, 1) end
+  -- 14 ноя: между модулями — зазор 7 px цветом фона окна, посередине линия 2 px (ярче внутренних линий)
+  for _, sp in ipairs(lay.seps) do
+    set(U.BG); gfx.rect(sp.x, sp.y, sp.w, sp.h, 1)
+    set(D.SEP)
+    if sp.w <= sp.h then gfx.rect(sp.x + math.floor((sp.w - 2) / 2), sp.y, math.min(2, sp.w), sp.h, 1)
+    else gfx.rect(sp.x, sp.y + math.floor((sp.h - 2) / 2), sp.w, math.min(2, sp.h), 1) end
+  end
   for _, g in ipairs(lay.grips) do
     if mx >= g.x and mx < g.x + g.w and my >= g.y and my < g.y + g.h then
       hover.pgrip = g
@@ -14631,7 +14666,8 @@ function D.frame(L, snap, rows, state, info)
     local mword = ((info.status_left or ''):match('^([^|]*)|') or ''):gsub('^[%s%-]+', ''):gsub('[%s%-]+$', '')   -- «-- FADE --» уже с чёрточками
     if mword ~= '' and #mword <= 24 then
       local mt = '-- ' .. mword .. ' --'
-      local mc = (D.MODE_COL and D.MODE_COL[mword:lower()]) or (mword == 'NORMAL' and U.GREY) or U.AMBER
+      local lastw = mword:match('(%S+)$') or mword   -- 14 ноя: цвет — по minor (последнее слово: TRACKER INSERT)
+      local mc = (D.MODE_COL and D.MODE_COL[lastw:lower()]) or (lastw == 'NORMAL' and U.GREY) or U.AMBER
       text(sx + L.pad, sy + 2, mt, mc)
       local mw = ms(mt) + 2 * L.pad
       sx = sx + mw; sw = sw - mw; lw = lw - mw
