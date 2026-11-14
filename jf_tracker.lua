@@ -26895,6 +26895,7 @@ local function frame()
     local wk = (state.pane_mode and ctx.pn_pend == 'c' and ctx.cm_wk()) or (state.pane_mode and MX.WK.get('pane')) or (state.focus == 'tracker' and vim.mode ~= 'insert' and vim.pending == '@' and ctx.mac_wk())   -- 15 окт: @ — список макросов
       or (state.focus == 'tracker' and vim.mode ~= 'insert' and MX.WK.get(vim.pending, vim.op))
       or (ctx.hp_pend and MX.WK.get("'"))
+      or (state.focus == 'matrix' and MX.pending and MX.WK.get('mx_' .. MX.pending))   -- 14 ноя: d y g T в матрице
       or (SL.active and SL.pend_z and MX.WK.get('item_z'))   -- 24 окт: z во вкладке item
       or (state.focus == 'browser' and B.zpend and MX.WK.get('browser_z'))   -- 28 окт: z в браузере
       or (ctx.ACV and ctx.ACV.zpend and MX.WK.get('curve_z'))   -- 2 ноя: z на холсте кривых

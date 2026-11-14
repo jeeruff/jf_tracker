@@ -1093,8 +1093,8 @@ end
 -- В блоке (v / Shift+hjkl): y копия, d x вырезать, m (Ctrl+N) mute.
 MX.pending = nil
 local MX_HINT = {
-  d = 'd: d delete slot (to register) | Esc',
-  y = 'y: y yank slot | Esc',
+  d = 'd: d delete slot (to register), w the cell under the cursor | Esc',
+  y = 'y: y yank slot, w the cell under the cursor, p duplicate the slot | Esc',
   c = 'c: c / w rename region | Esc',
   g = 'g: g first slot | Esc',
   z = 'z: the view menu',
@@ -1158,6 +1158,8 @@ function MX.key(c, regions, snap)
     elseif op == 'd' and ch == 'w' then   -- 1 ноя: dw удаляет всегда: на ячейке трека — её содержимое (как x), на имени — слот (как dd)
       if MX.cur.ci and MX.cur.ci >= 1 then ctx.mx_block('cut') else ctx.slot_delete(pcount) end
     elseif op == 'y' and ch == 'y' then ctx.slot_yank()
+    elseif op == 'y' and ch == 'w' then   -- 14 ноя: yw — ячейка под курсором (пара к dw): на клетке трека — она, на имени — слот (как yy)
+      if MX.cur.ci and MX.cur.ci >= 1 then ctx.mx_block('copy') else ctx.slot_yank() end
     elseif op == 'y' and ch == 'p' then ctx.slot_new('clone')        -- yp — дубль (5 окт: одна клавиша на функцию)
     elseif op == 'g' and ch == 'g' then MX.goto_cell(regions, snap, 1, MX.cur.ci)
     elseif op == 'z' and ch == 'i' then MX.toggle_zoom()

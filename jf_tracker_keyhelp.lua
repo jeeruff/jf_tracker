@@ -384,6 +384,7 @@ KH.PAGES = {
     { k = 'o O', m = 'new slot after / before', g = 'slot', d = 'new empty 1-bar slot after / before' },
     { k = 'dd', m = 'delete slot', g = 'slot', d = 'delete slot: region + its time (goes to register)', t = { 'dd', 'd' } },
     { k = 'yy', m = 'yank slot', g = 'slot', d = 'yank slot into register', t = { 'yy', 'y' } },
+    { k = 'yw dw', m = 'cell: copy / cut', g = 'slot', d = 'the cell under the cursor: yw copies it, dw cuts it (on the name - the whole slot, as yy / dd); p pastes', t = { 'yw', 'dw' } },
     { k = 'yp', m = 'duplicate: free copy', g = 'slot', d = 'duplicate: an exact copy with a new name, not linked (button cln) - like Renoise', t = { 'yp' } },
     { k = 'a', m = 'append: new slot + name', g = 'slot', d = 'as in Vim: a new slot after the cursor and its name at once (o - without the name)' },
     { k = 'c', m = 'change: pattern of the slot', g = 'slot', d = 'as in Vim: change the pattern of the slot - the list of patterns (= Enter on the number)' },

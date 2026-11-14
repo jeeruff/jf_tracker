@@ -57,6 +57,11 @@ local T = {
   dsp_d = { title = 'd - delete', items = { { 'd', 'the fx (v: range)' }, { 'w', 'delete forward (d3w)' }, { 'b', 'the one before' }, 
         { 'm', 'remove modulation' }, { 'a', 'remove automation' } } },
   dsp_y = { title = 'y - copy', items = { { 'y', 'the fx' } } },
+  -- 14 ноя: вторые клавиши матрицы (были только строкой статуса)
+  mx_d = { title = 'd - delete (matrix)', items = { { 'd', 'the slot (3dd - three), to the register' }, { 'w', 'the cell under the cursor (on the name - the slot)' } } },
+  mx_y = { title = 'y - copy (matrix)', items = { { 'y', 'the slot' }, { 'w', 'the cell under the cursor (on the name - the slot)' }, { 'p', 'duplicate the slot after itself' } } },
+  mx_g = { title = 'g - go (matrix)', items = { { 'g', 'the first slot' } } },
+  mx_T = { title = 'T - time selection (matrix)', items = { { 'r', 'the time selection becomes a section (pick a name)' } } },
   dsp_c = { title = 'c - rack / container', items = { { 'c', 'pack the fx (v: range)' }, { 'u', 'unpack: the children into the chain' }, { 'n', 'an empty container after it' }, { 'v', 'view: pads / list (container: wrap / pack / list)' }, { 'b', 'into 3 / 4 / 5 bands' }, { 'f', 'fold the container (with everything inside; again - unfold)' }, { '=', 'parallel to the previous module' }, { '|', 'serial: after the previous' }, { 's', 'size of the drumrs5k pads: s m l' } } },
 }
 
