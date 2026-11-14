@@ -5270,11 +5270,10 @@ ctx = {
     -- 14 ноя: четыре свинга — подпись про свинг трека курсора (буква A..D)
     local i = edit.track_swing(cur_col() and cur_col().track)
     local s = edit.SW[i]
-    local lt = ('ABCD'):sub(i, i)
-    if not s.on then return 'swing ' .. lt .. ' off' end
+    local lt = i > 1 and (('ABCD'):sub(i, i) .. ' ') or ''   -- буква — только у трека со своим свингом (B C D)
     local d = edit.sw.div / 4
     local dv = d > 0 and ('1/%g'):format(math.floor(1 / d * 100 + 0.5) / 100) or '?'
-    return ('swing %s %d%% %s'):format(lt, math.floor(s.amt * 100 + 0.5), dv)
+    return ('swing %s%d%% %s'):format(lt, s.on and math.floor(s.amt * 100 + 0.5) or 0, dv)   -- 14 ноя (2): проценты видны всегда (выкл — 0 %)
   end,
   swing_text = function()
     local s = edit.sw

@@ -5411,8 +5411,10 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
     local sv, st = c.swing_v or {}, c.swing_tr or 1
     local function sl(i) return { i == 1 and 'swingbar' or ('swingbar' .. i), '', nil, slider = { v = sv[i] or 0 } } end
     local function lt(i) return { 'swslot' .. i, ('ABCD'):sub(i, i), i == st and U.AMBER or ((sv[i] or 0) ~= 0 and U.CYAN or U.GREY) } end
-    local head = { 'swing', c.swing_txt or 'swing', c.swing_on and U.CYAN or U.GREY, res = 'swing A -100% 1/16' }
-    if c.tpfull then g[#g + 1] = { { head }, { lt(1), sl(1), lt(2), sl(2) }, { lt(3), sl(3), lt(4), sl(4) } }
+    local head = { 'swing', c.swing_txt or 'swing', c.swing_on and U.CYAN or U.GREY, res = 'swing -100% 1/16' }
+    -- 14 ноя (2): пока один слайдер и проценты в подписи; четыре слайдера A B C D (движок готов) — потом: D.SWING4 = true
+    if not D.SWING4 then g[#g + 1] = { { head }, { sl(1) } }
+    elseif c.tpfull then g[#g + 1] = { { head }, { lt(1), sl(1), lt(2), sl(2) }, { lt(3), sl(3), lt(4), sl(4) } }
     else g[#g + 1] = { { head }, { lt(1), sl(1), lt(2), sl(2), lt(3), sl(3), lt(4), sl(4) } } end
     return g
   end
@@ -6131,7 +6133,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local limit = right - (last and (last.w + sep) or 0)
   -- 14 ноя: свободная ширина — в промежутки между блоками (до 5 pad на каждый): блоки не сливаются
   local xs = 0
-  do local nb = #order + (last and 1 or 0); local spare = right - tx - need(); if spare > 0 and nb > 1 then xs = math.min(5 * L.pad, spare // nb) end end
+  do local nb = #order + (last and 1 or 0); local spare = right - tx - need(); if spare > 0 and nb > 1 then xs = math.min(2 * L.pad, spare // nb) end end   -- 14 ноя (2): плотнее (было до 5 pad) — блоки левее
   local cx = tx
   for i, b in ipairs(order) do
     local start = cx + (i > 1 and (sep + xs) or 0)
