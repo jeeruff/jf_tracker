@@ -2895,6 +2895,9 @@ end
 function E.paste(reg, lpb, row, targets, beside)
   if not reg or #reg.cells == 0 then return end
   E.paste_set = {}
+  -- 14 ноя: ограничитель ввода ноты (E.cap_row — «до следующего события под курсором») к вставке из регистра не относится:
+  -- залипший после сбоя ввода, он обрезал вставленный айтем до одной строки («вставился обрубок»)
+  E.cap_row = nil
   run('paste', function()
     for _, c in ipairs(reg.cells) do
       local tg = targets(c.dfi)

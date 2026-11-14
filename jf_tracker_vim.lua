@@ -3036,8 +3036,8 @@ function V.key_impl(c)
         if cell and cell.kind == 'cont' and cell.of and not tx then E.note_off({ cell.of }, lpb(), V.cur.row)
         elseif cell and (cell.kind == 'audio' or cell.kind == 'midi') then E.keep_empty = true; E.delete({ cell }, lpb()); E.keep_empty = nil end   -- 21 окт: перезапись — клип остаётся
       end
-      if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end
       if ctx.auto_pattern then ctx.auto_pattern(V.cur.row) end   -- 21 окт: свободный такт — сначала паттерн
+      if how ~= 'beside' then E.cap_row, E.cap_lpb = V.next_event_row(f0.sub, V.cur.row), lpb() end   -- 14 ноя: прямо перед вставкой
       E.thru_once = thru
       local okI, it = pcall(E.insert_slice, f0.col.track, f0.col.fixed and lane.idx or nil, lpb(), V.cur.row, inst0.item, k, tx)
       E.cap_row, E.thru_once = nil, nil
@@ -3135,11 +3135,11 @@ function V.key_impl(c)
           end
         end
         local stp = V.step_auto and 1 or V.step
-        if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end
         local src0 = ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)
         local newpat = ctx.auto_pattern and (not E.note_source_ok or E.note_source_ok(f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, src0)) and ctx.auto_pattern(V.cur.row)   -- 21 окт: свободный такт — сначала паттерн; 2 ноя: только если нота встанет (пустой слот — паттерны без нот плодились)
         local sr = ctx.state.notesus and V.sustain_row(f.sub, V.cur.row) or nil   -- 21 окт: опция note until OFF (выкл по умолчанию)
         E.sus_t = sr and ctx.row_time and ctx.row_time(sr) or nil
+        if not beside then E.cap_row, E.cap_lpb = V.next_event_row(f.sub, V.cur.row), lpb() end   -- 14 ноя: прямо перед вставкой — сбой между ними не оставит ограничитель висеть
         local okN, errN = pcall(E.insert_note,f.col.track, f.col.fixed and lane.idx or nil, lpb(), V.cur.row, pitch, (ctx.ins_vel and ctx.ins_vel(V.vel) or V.vel), stp, (ctx.inst_src and ctx.inst_src(f.col, inst) or (inst and inst.item)))
         E.cap_row, E.sus_t = nil, nil
         if not okN then E.beside = false; error(errN, 0) end
