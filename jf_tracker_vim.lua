@@ -4432,6 +4432,34 @@ function V.hydra_key(c)
   if c == 13 and h and h.on_enter then local f = h.on_enter; V.hydra = nil; local ok, e = pcall(f); if not ok then V.msg = tostring(e):match('[^\n]*$') end; return end   -- 1 ноя: Enter Enter
   if c == BS then V.hydra = table.remove(V.hydra_stack); return end
   local ch = (c < 256) and string.char(c) or ''
+  -- 14 ноя: меню и командная строка — одно место (внизу окна). В любом меню: «:» — строка команды, «/» — поиск по всем
+  -- пунктам этого меню и его подменю (набор сужает список, Enter выполняет). Свой пункт на «:» или «/» у меню — он главнее
+  if (ch == ':' or ch == '/') and h then
+    local own = false
+    for _, it in ipairs(h.items or {}) do if it.key == ch then own = true end end
+    if not own and ch == ':' then
+      V.hydra = nil; V.hydra_stack = {}
+      V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil
+      return
+    end
+    if not own then
+      local list, seen = {}, 0
+      local function walk(hh, path, depth)
+        for _, it in ipairs(hh.items or {}) do
+          if seen >= 800 then return end
+          local lab = (path ~= '' and (path .. ' > ') or '') .. (it.key and it.key ~= ' ' and (it.key .. '  ') or '') .. tostring(it.label or '')
+          if it.sub and depth < 4 then
+            local ok, sub = pcall(function() return type(it.sub) == 'function' and it.sub() or it.sub end)
+            if ok and type(sub) == 'table' then walk(sub, (path ~= '' and (path .. ' > ') or '') .. tostring(it.key or '?'), depth + 1) end
+          elseif it.fn then seen = seen + 1; list[#list + 1] = { label = lab, data = it.fn } end
+        end
+      end
+      walk(h, '', 1)
+      V.hydra = nil; V.hydra_stack = {}
+      V.open_picker((h.title or 'menu') .. ' - search', list, function(it) local ok, e = pcall(it.data); if not ok then V.msg = tostring(e):match('[^\n]*$') end end)
+      return
+    end
+  end
   for _, it in ipairs(h.items or {}) do
     if it.key == ch then
       if it.sub then
@@ -4488,6 +4516,7 @@ function V.popup()
     end
     -- 11 окт: хинты включены — внизу меню «как сюда быстро» (h.how): для мышечной памяти
     if V.hydra.how and ctx.state and ctx.state.hints then lines[#lines + 1] = { key = ' ', text = 'fast: ' .. V.hydra.how, col = { 0.55, 0.55, 0.55 } } end
+    lines[#lines + 1] = { key = ': /', text = ': command line    / search this menu    Backspace back    Esc close', col = { 0.55, 0.55, 0.55 } }   -- 14 ноя
     return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
   elseif V.mode == 'cmd' and V.prompt then
     local t = (V.cmdline or ''):sub(#V.prompt.pre + 1)
