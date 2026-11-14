@@ -5810,7 +5810,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local w2 = ms(b[5] or b[2])
       local sb = sub0[i]
       if sb and sb.halves then w2 = math.max(w2, ms('/2') + ms('x2') + 2 * L.pad + 4) elseif sb and sb[1] then w2 = math.max(w2, ms(sb[1] == 'tp_start' and '<<' or sb[2])) end   -- 21 окт: |<< — черта торчит влево, ширину по <<
-      TW[i] = w2 + 2 * L.pad
+      TW[i] = w2 + 4 * L.pad   -- 14 ноя: кнопкам шире (было 2 pad) — полоса во всё окно, визуально свободнее
       if b[1] == 'tp_play' then pi = i end
     end
     local need = 0
@@ -6014,7 +6014,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local bigw = 0
   -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
   local BKT = c.bigbpm and 2 or 1   -- 19 окт: опция big time and BPM — крупно (x2) / обычным текстом на том же месте
-  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], BKT); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', BKT)) end; bigw = bigw + b.w + (i > 1 and 3 * L.pad or 0) end end
+  if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], BKT); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', BKT)) end; bigw = bigw + b.w + (i > 1 and 6 * L.pad or 0) end end   -- 14 ноя: время / BPM / размер не слипаются (было 3 pad)
   local function draw_big(bx)
     local bx0 = bx
     for _, b in ipairs(big) do
@@ -6026,7 +6026,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       D.big_text(bx, ly + ((BKT == 1 and not D.sig_stack) and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT)   -- 4 ноя: стопкой — время в первой строке
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
-      bx = bx + b.w + 3 * L.pad
+      bx = bx + b.w + 6 * L.pad
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
     if c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, D.sig_stack and (ly + L.rh) or (ly + 2 * L.rh + 2 - (L.tp_cut or 0))) end   -- 4 ноя: стопкой — metro, ниже swing
@@ -6061,7 +6061,8 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   -- 4 ноя: клавиатура — сразу справа от слова режима (как было), опция keys in transport — и при панели keys
   -- 6 ноя: опция keys hide — клавиатура не видна, пока keys mode выключен (полоса свободна)
   local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
-  if D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster) then table.insert(order, 1, { pri = 11, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end }) end   -- 6 ноя: панелью keys — в транспорте нет
+  -- 14 ноя: клавиатура — в правом углу полосы (общая полоса окна); узко — как раньше, первой слева
+  local kbblk = (D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster)) and { pri = 11, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } or nil   -- 6 ноя: панелью keys — в транспорте нет
   order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons }
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
@@ -6090,6 +6091,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local last = (by_id.swing and not D.sig_stack and not (D.sig_line and #D.sig_line[1] > 2)) and { w = group_w(by_id.swing), draw = function(gx, gw) draw_group(by_id.swing, gx, gw) end } or nil
   if D.sig_stack and bigblk then last = bigblk end
   local right = x + w - L.pad
+  local right_all = right
+  if kbblk and L.pn and right - kbblk.w - 3 * sep - tx >= btot + 2 * sep then right = right - kbblk.w - 3 * sep
+  elseif kbblk then table.insert(order, 1, kbblk); kbblk = nil end
   -- 6 ноя: не влезает — выпадает по одному блоку, с наименее важного (правый блок — первым), а не всё правее обрыва:
   -- play / запись / прыжки (кнопки) остаются до последнего
   local function need()
@@ -6105,9 +6109,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     else break end
   end
   local limit = right - (last and (last.w + sep) or 0)
+  -- 14 ноя: свободная ширина — в промежутки между блоками (до 5 pad на каждый): блоки не сливаются
+  local xs = 0
+  do local nb = #order + (last and 1 or 0); local spare = right - tx - need(); if spare > 0 and nb > 1 then xs = math.min(5 * L.pad, spare // nb) end end
   local cx = tx
   for i, b in ipairs(order) do
-    local start = cx + (i > 1 and sep or 0)
+    local start = cx + (i > 1 and (sep + xs) or 0)
     if start + b.w > limit then break end
     -- 2 ноя: без разделителей | между блоками (просьба): промежутки и так видны
     b.draw(start, b.w)
@@ -6118,6 +6125,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     local lx = right - last.w
     last.draw(lx, last.w)
   end
+  if kbblk then kbblk.draw(right_all - kbblk.w + L.pad, kbblk.w) end
   -- 15 окт: режим — модлайном в поле трекера (D.draw_mode), в полосе его нет
   return out
 end
