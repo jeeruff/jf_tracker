@@ -9666,6 +9666,9 @@ function D.frame(L, snap, rows, state, info)
         -- оставался в одну строку, а запись ложилась поверх него («микшер сжатый глючит»); теперь раньше уходит в мини-полосу
         local recd0 = (mixcol and not c.master) and math.min(2 * L.rh - 2, fx_w) or 0
         local compact = (((und0 > 0 and not c.master) and (H - und0 * L.rh) or H) - 4 - (4 * L.rh + 7) - recd0) < 3 * L.rh
+        -- 14 ноя (2): большой фейдер с кнобом и столбиком кнопок — только от ~160 px высоты полосы (14.5 строки при x1):
+        -- ниже от него нет толку (фейдер в 3-5 строк), тонкая мини-полоса держится дольше
+        if H < math.floor(14.5 * L.rh) then compact = true end
         if compact then lufs_w = 0; fx_w = D.MINI_W(L) end
         if lufs_w > 0 then sx = sx + lufs_w + 2 end
         -- 10 окт: мастер без эффектов — свёрнут в широкий фейдер (вся полоса;
