@@ -20299,6 +20299,7 @@ function track_actions(col)
     { 'Input … (ti)', key = 'i', fn = function() ctx.input_picker(col) end },
     { 'Smart input: the most active (tI)', key = 'I', fn = function() ctx.smart_input(col) end },
     { 'Fixed lanes on / off (tl)', key = 'l', fn = function() ctx.toggle_lanes() end },
+    { 'Split lanes … to tracks / into a folder (tL)', key = 'L', fn = function() ctx.lanes_split() end },
     { 'Add FX … (tf)', key = 'x', fn = function() ctx.fx_picker() end },
     { 'Routing … (tR)', key = 'R', fn = function() ctx.route_menu(col) end },
     { 'New track after (tt)', key = 't', fn = function() ctx.new_track(1) end },
@@ -35691,6 +35692,21 @@ end
 -- оба вида — отображения таймлайна. vim достаёт L / snap через ctx.L() / ctx.snap(), поэтому подмена локалей работает
 -- 13 ноя: вид второго трекера — свои опции (по умолчанию узко: без мастера, без линейки паттернов / маркеров и прыжков)
 ctx.t2_over = function(st) return { showmaster = st.master == true, ruler = st.ruler == true, jumps = st.jumps == true } end
+-- 14 ноя: tL / :lanesplit — лейны трека курсора отдельными треками (tracks) или внутрь папки (folder); без аргумента — меню
+ctx.lanes_split = function(arg)
+  arg = (arg or ''):match('%a+') or ''
+  local c = ctx.cur_col and ctx.cur_col()
+  if not (c and c.track) then vim.msg = 'lanes: no track under the cursor'; return end
+  if arg == '' then
+    return vim.open_hydra({ title = 'split lanes', items = {
+      { key = 'f', label = 'into a folder: this track becomes the folder (keeps its fx), every lane - a track inside', fn = function() ctx.lanes_split('folder') end },
+      { key = 't', label = 'to tracks: every lane - its own track with a copy of the fx', fn = function() ctx.lanes_split('tracks') end } } })
+  end
+  local n, why
+  edit.run('split lanes', function() n, why = edit.lanes_split(c.track, arg:sub(1, 1) == 'f') end)
+  model.invalidate(); ctx.relayout()
+  vim.msg = n and ('lanes: %d new track(s)%s (u - undo)'):format(n, arg:sub(1, 1) == 'f' and ' in the folder' or '') or ('lanes: ' .. tostring(why))
+end
 -- 14 ноя: меню режимов (щелчок по слову режима, :modes): всё, что меняет смысл клавиш, в одном списке; * — включённое
 ctx.mode_menu = function()
   local pads = ctx.PADS and ctx.PADS.on

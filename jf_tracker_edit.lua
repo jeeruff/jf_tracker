@@ -5507,6 +5507,67 @@ function E.tree_op(what, ids, at)
   return msg, follow
 end
 
+-- 14 ноя: лейны трека → отдельные треки. folder = false: лейны 1..n-1 — новыми треками НАД исходным (копия FX,
+-- громкости, цвета), последний остаётся на нём — глубина папок не меняется. folder = true: исходный трек — папка
+-- (FX остаются на нём, звук детей идёт через него), каждый лейн — пустой по FX трек внутри.
+-- Лейн, который не играл (C_LANEPLAYS = 0), — заглушённый трек. Пустые лейны пропускаются. → число новых треков | nil, причина
+function E.lanes_split(tr, folder)
+  if not (tr and R.ValidatePtr(tr, 'MediaTrack*')) then return nil, 'no track' end
+  if R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2 then return nil, 'the track has no fixed lanes' end
+  local by, order = {}, {}
+  for i = 0, R.CountTrackMediaItems(tr) - 1 do
+    local it = R.GetTrackMediaItem(tr, i)
+    local l = math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE'))
+    if not by[l] then by[l] = {}; order[#order + 1] = l end
+    by[l][#by[l] + 1] = it
+  end
+  table.sort(order)
+  if #order < 2 and not (folder and #order == 1) then return nil, 'items on one lane only - nothing to split' end
+  local _, base = R.GetTrackName(tr)
+  local info = {}
+  for _, l in ipairs(order) do
+    local _, ln = R.GetSetMediaTrackInfo_String(tr, 'P_LANENAME:' .. l, '', false)
+    info[l] = { name = (ln and ln ~= '') and ln or (base .. ' ' .. (l + 1)), plays = R.GetMediaTrackInfo_Value(tr, 'C_LANEPLAYS:' .. l) ~= 0 }
+  end
+  local idx = math.floor(R.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')) - 1
+  local d0 = R.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH')
+  local col = R.GetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR')
+  local made = 0
+  local function fill(nt, l, copy)
+    R.GetSetMediaTrackInfo_String(nt, 'P_NAME', info[l].name, true)
+    if col ~= 0 then R.SetMediaTrackInfo_Value(nt, 'I_CUSTOMCOLOR', col) end
+    if not info[l].plays then R.SetMediaTrackInfo_Value(nt, 'B_MUTE', 1) end
+    if copy then
+      for _, k in ipairs({ 'D_VOL', 'D_PAN', 'I_NCHAN' }) do R.SetMediaTrackInfo_Value(nt, k, R.GetMediaTrackInfo_Value(tr, k)) end
+      for f = 0, R.TrackFX_GetCount(tr) - 1 do R.TrackFX_CopyToTrack(tr, f, nt, f, false) end
+    end
+    for _, it in ipairs(by[l]) do R.MoveMediaItemToTrack(it, nt) end
+    made = made + 1
+  end
+  if folder then
+    for k = #order, 1, -1 do   -- с конца: каждый новый встаёт сразу под исходным, порядок лейнов сохраняется
+      R.InsertTrackAtIndex(idx + 1, false)
+      fill(R.GetTrack(0, idx + 1), order[k], false)
+    end
+    R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 0)
+    if d0 ~= 1 then   -- уже папка — новые треки её первые дети, глубины прежние
+      R.SetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH', 1)
+      R.SetMediaTrackInfo_Value(R.GetTrack(0, idx + #order), 'I_FOLDERDEPTH', d0 - 1)
+    end
+  else
+    for k = 1, #order - 1 do
+      R.InsertTrackAtIndex(idx + k - 1, false)   -- над исходным: он съезжает вниз
+      fill(R.GetTrack(0, idx + k - 1), order[k], true)
+    end
+    local last = order[#order]
+    R.SetMediaTrackInfo_Value(tr, 'I_FREEMODE', 0)
+    R.GetSetMediaTrackInfo_String(tr, 'P_NAME', info[last].name, true)
+    if not info[last].plays then R.SetMediaTrackInfo_Value(tr, 'B_MUTE', 1) end
+  end
+  R.TrackList_AdjustWindows(false); R.UpdateTimeline(); R.UpdateArrange()
+  return made
+end
+
 -- место под новый инструмент: трек LIB, свободный лейн (первый пустой или
 -- новый в конце); возвращает трек, номер лейна, позицию 0
 function E.lib_slot()

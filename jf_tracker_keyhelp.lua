@@ -272,6 +272,7 @@ KH.PAGES = {
     { k = 'tA', d = 'autoarm on every track, new ones too - the track under the cursor records (= option rec follows selection); again - off; the autoarm all button over the row numbers too' },
     { k = 'tI', d = 'track input: the active source - play it within 0.6 s (a MIDI key -> that device and channel, else the audio input that started sounding last, stereo if its pair sounds too); your jf_smart_set_input.lua' },
     { k = 'tl tf', d = 'track: fixed lanes on / off / add fx (fzf)' },
+    { k = 'tL', d = 'track: split its lanes - t to tracks (each with a copy of the fx), f into a folder (:lanesplit tracks | folder)' },
     { k = 'tR', d = 'track routing: sends S, receives R, hw outs O (popup)' },
     { k = 'tj tk', d = 'move the track right / left (3tj - three places)' },
     { k = 'mouse', d = 'right drag: select a block (a right click without moving: the menu); left drag: move the event or the selected block under the mouse; Shift+drag: extend the block (option select block with = left swaps the buttons)' },
