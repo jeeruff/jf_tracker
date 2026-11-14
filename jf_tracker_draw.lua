@@ -9721,7 +9721,8 @@ function D.frame(L, snap, rows, state, info)
           -- мастер: имя слева и dB справа — строкой во всю полосу, эффекты под ней
           local vw = ms(vtxt)
           text(c.x + c.w - L.pad - vw, y1, vtxt, U.GREY)
-          text(c.x + L.pad, y1, 'Σ', U.AMBER)   -- 14 ноя: знак суммы вместо обрезанного «mas» (имя мастера уже есть в шапке)
+          -- 14 ноя: имя целиком, если влезает; иначе знак суммы (обрезанного «mas» больше нет)
+          text(c.x + L.pad, y1, ms('master') <= c.w - 3 * L.pad - vw and 'master' or 'Σ', U.AMBER)
         elseif ms(vtxt) <= fx_w then text(sx + math.floor((fx_w - ms(vtxt)) / 2), y1, vtxt, U.GREY) end
         local pyy = y1 + L.rh
         -- 9 окт: узкий фейдер — панорама кнобом (две строки, тянуть вверх /
@@ -10052,7 +10053,7 @@ function D.frame(L, snap, rows, state, info)
               set(sepc); gfx.rect(sepx, ly0, 1, (L.mix_bottom and L.mix_h or H + 1), 1)
             else local o = (c.master and lufs_w > 0) and L.rh or 0; set(U.LINE); gfx.rect(ex - 2, ey + o, 1, eh - o, 1) end   -- не через строку имени мастера
             if c.master then
-              if lufs_w == 0 then text(ex + 2, ey, 'Σ', U.AMBER) end   -- 14 ноя: знак суммы, не имя
+              if lufs_w == 0 then text(ex + 2, ey, ms('master') <= ew - 2 and 'master' or 'Σ', U.AMBER) end   -- 14 ноя: не влезает — знак суммы
               ey, eh = ey + L.rh, eh - L.rh                       -- строка имени (с LUFS — во всю полосу, выше)
             end   -- имя — над эффектами мастера (с LUFS — строкой сверху)
           else
