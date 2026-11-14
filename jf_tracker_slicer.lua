@@ -1003,7 +1003,7 @@ end
 -- wave_cached(...) = true — картинка готова и выведена; false — нарисуй в неё (S.wc_x / wc_cy — начало в картинке),
 -- потом S.wave_done() выводит её
 S.WAVE_IMG = 796
-S.ZOOM_IMG = 1020   -- 14 ноя: полоса зума (прицел) — готовой картинкой
+S.ZOOM_IMG = 88   -- 14 ноя: полоса зума (прицел) — готовой картинкой; 1020 — буфер самой верхней панели (номер совпал: вместо волны рисовалась её копия)
 function S.wave_cached(kind, pk, e, x, wy, w, wh, va, vb, base, z0, z1, zc, bg, inv)
   S.wc_x, S.wc_cy, S.wc_dx = nil, nil, nil
   if w < 2 or wh < 2 then return false end
