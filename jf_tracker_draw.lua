@@ -9662,7 +9662,10 @@ function D.frame(L, snap, rows, state, info)
         local lufs_w = (c.master and col.track) and 3 * math.max(3, math.floor(L.cw / 2)) or 0
         -- 11 окт: низкий микшер (фейдер короче 3 строк) — мини-полоса, как у свёрнутой колонки
         local und0 = tonumber(D.mix_under) or 0
-        local compact = (((und0 > 0 and not c.master) and (H - und0 * L.rh) or H) - 4 - (4 * L.rh + 7)) < 3 * L.rh
+        -- 14 ноя: в счёт идёт и круглая кнопка записи под фейдером (2 строки, 16 окт) — без неё при сжатой панели фейдер
+        -- оставался в одну строку, а запись ложилась поверх него («микшер сжатый глючит»); теперь раньше уходит в мини-полосу
+        local recd0 = (mixcol and not c.master) and math.min(2 * L.rh - 2, fx_w) or 0
+        local compact = (((und0 > 0 and not c.master) and (H - und0 * L.rh) or H) - 4 - (4 * L.rh + 7) - recd0) < 3 * L.rh
         if compact then lufs_w = 0; fx_w = D.MINI_W(L) end
         if lufs_w > 0 then sx = sx + lufs_w + 2 end
         -- 10 окт: мастер без эффектов — свёрнут в широкий фейдер (вся полоса;
