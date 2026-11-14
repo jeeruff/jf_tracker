@@ -25633,8 +25633,15 @@ local function frame()
   if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
   if state.loom then left = 'LOOM ' .. state.loom:upper() .. ' ' .. left end   -- 12 ноя
-  if state.focus == 'tracker' and state.keyphr and vim.mode == 'normal' then left = 'PHRASEKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '') end   -- 12 ноя
-  if state.focus == 'tracker' and ctx.PADS and ctx.PADS.on and (vim.mode == 'normal' or vim.mode == 'insert') then left = 'PATTERNKB' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or '')
+  -- 14 ноя: keyspat / keyphr видны при любом фокусе (было: только фокус в главном трекере, словами PATTERNKB / PHRASEKB):
+  -- в трекере в NORMAL — вместо слова режима, иначе — перед ним (KEYSPAT INSERT, KEYSPAT MATRIX)
+  do
+    local kw = (state.keyphr and 'KEYPHR') or (ctx.PADS and ctx.PADS.on and 'KEYSPAT') or nil
+    if kw then
+      local n = 0
+      if trk and vim.mode == 'normal' then left, n = left:gsub('NORMAL', kw, 1); if n == 0 then left, n = left:gsub('KEYS', kw, 1) end end
+      if n == 0 then left = kw .. ' ' .. left end
+    end
   end
   -- 15 окт: окно трекера без клавиатуры (клик в REAPER, его окно / диалог) — клавиши идут в REAPER (reaper-keys):
   -- слово режима — REAPER, рамки фокуса гаснут; печатать вслепую не придётся
@@ -27974,6 +27981,11 @@ local function frame()
     else ctx.hum_drag = nil; if ctx.hum_dirty then ctx.hum_dirty = nil; ctx.hum_save() end end
   end
   if U.click and ctx.t2_click and ctx.t2_click() then U.click = false end   -- 12 ноя: щелчок в tracker#2
+  -- 14 ноя: щелчок по слову режима — меню всех режимов
+  if U.click and draw.mode_rc and not vim.hydra and not vim.picker then
+    local r = draw.mode_rc
+    if gfx.mouse_x >= r[1] and gfx.mouse_x < r[1] + r[3] and gfx.mouse_y >= r[2] and gfx.mouse_y < r[2] + r[4] then ctx.mode_menu(); U.click = false end
+  end
   if U.click and hover.dspkitmap then   -- 18 окт: карта пэдов: щелчок — пэд (семплер справа) и страница с ним; Opt — mute, Shift — solo
     local km = hover.dspkitmap
     local kid = km.f and km.f.kids[km.ki]
@@ -35679,6 +35691,36 @@ end
 -- оба вида — отображения таймлайна. vim достаёт L / snap через ctx.L() / ctx.snap(), поэтому подмена локалей работает
 -- 13 ноя: вид второго трекера — свои опции (по умолчанию узко: без мастера, без линейки паттернов / маркеров и прыжков)
 ctx.t2_over = function(st) return { showmaster = st.master == true, ruler = st.ruler == true, jumps = st.jumps == true } end
+-- 14 ноя: меню режимов (щелчок по слову режима, :modes): всё, что меняет смысл клавиш, в одном списке; * — включённое
+ctx.mode_menu = function()
+  local pads = ctx.PADS and ctx.PADS.on
+  local function trk() if draw.panes.base(state.focus) ~= 'tracker' then ctx.set_focus('tracker') end end
+  local function base(k)
+    return function()
+      trk(); vim.pending, vim.op, vim.hexbuf, vim.count = nil, nil, nil, nil
+      if vim.mode ~= 'normal' then vim.mode = 'normal' end
+      if k then vim.key(k:byte()) end
+    end
+  end
+  local function on(f, s) return (f and '* ' or '') .. s end
+  local m = vim.mode
+  vim.open_hydra({ title = 'mode', items = {
+    { key = 'c', label = 'COMMAND - type a command (:)', fn = base(':') },
+    { key = 'f', label = on(state.keyphr, 'KEYPHR - the note keys play the phrases'), fn = function() ctx.keyphr_cmd() end },
+    { key = 'i', label = on(m == 'insert', 'INSERT - the note keys write notes (Esc)'), fn = base('i') },
+    { key = 'k', label = on(vim.piano, 'KEYS - the note keys play the instrument in NORMAL (m)'), fn = function() if ctx.toggle_piano then ctx.toggle_piano(true) end end },
+    { key = 'l', label = on(state.loom, 'LOOM - the cursor pattern loops while you edit it' .. (state.loom and (' (' .. state.loom .. ')') or '')), fn = function() ctx.loom_cmd('') end },
+    { key = 'n', label = on(m == 'normal' and not state.keyphr and not pads and not vim.piano, 'NORMAL - the keys are commands'), fn = function()
+        if state.keyphr then ctx.keyphr_cmd('off') end
+        if ctx.PADS and ctx.PADS.on then ctx.pads_cmd('off') end
+        base()(); vim.msg = 'NORMAL' end },
+    { key = 'p', label = on(pads, 'KEYSPAT - the note keys play the patterns of the song'), fn = function() ctx.pads_cmd(pads and 'off' or '') end },
+    { key = 'v', label = on(m == 'visual', 'VISUAL - select a block'), fn = base('v') },
+    { key = 'V', label = on(m == 'vline', 'V-LINE - select whole rows'), fn = base('V') },
+    { key = 'w', label = on(state.pane_mode, 'PANE - the keys move and split panes (Ctrl+W)'), fn = function()
+        if state.panes_ui then state.pane_mode = true; vim.msg = '-- PANE -- hjkl focus, HJKL move, g s v T + letter, z zoom, c hide, Esc' end end },
+  } })
+end
 ctx.t2_view_menu = function(id)
   local b = ctx.BUF.get(id); local st = b and b.st
   if not st then return end

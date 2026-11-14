@@ -6154,7 +6154,8 @@ local MW = {
   VISOR      = { 'ЗЕРЦАЛО',         '视觉',       'مرئيات',           'legh' },
   TOP        = { 'ВЕРХЪ',           '顶部',       'أعلى',             'Dung' },
   -- 18 окт: новые режимы и панели
-  PATTERNKB  = { 'УЗОРКЛАВЪ',       '图案键',     'أنماط',            "mIr leQ" },   -- ноты играют паттерны (MPC)
+  KEYSPAT    = { 'УЗОРКЛАВЪ',       '图案键',     'أنماط',            "mIr leQ" },   -- ноты играют паттерны (MPC); 14 ноя: было PATTERNKB
+  KEYPHR     = { 'РѢЧЕКЛАВЪ',       '乐句键',     'عبارات',           "mu'tlhegh leQ" },   -- 14 ноя: ноты играют фразы
   PERFORMANCE = { 'УСИЛІЕ',         '性能',       'أداء',             'HoS' },
   ACTIONS    = { 'ДѢЯНІЯ',          '动作',       'إجراءات',          "ta'" },
   HELP       = { 'ПОМОЩЬ',          '帮助',       'مساعدة',           'QaH' },
@@ -7003,6 +7004,7 @@ function D.draw_mode(L, sx0, sy0, sw, str, dry)
     end
     dx = sx0 + D.big_measure(mode, 2)
   end
+  if not dry then D.mode_rc = { sx0, sy0, math.max(dx - sx0, 4 * L.cw), 2 * L.th } end   -- 14 ноя: щелчок по слову — меню режимов
   return dx - sx0, 2 * L.th
 end
 

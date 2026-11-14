@@ -194,7 +194,7 @@ KH.PAGES = {
     { k = '\\ o o', t = {}, d = 'the options window (all options, also :options)' },
     { k = 'tg  t}  t+ t-', t = {}, d = 'manual Euclid / polymeter by item geometry: tg glues every item of the cursor track in the pattern into one; t} on a row of it - the loop ends here, the item repeats it to the pattern end (k notes in n rows = Euclid); t+ / t- - the item rate x2 / /2' },
     { k = '\\ q', t = {}, d = 'quit REAPER (as File: Quit - it asks to save a changed project)' },
-    { k = '\\ k', t = {}, d = 'keyboard modes: m - notes, p - keyspat (the note keys play the patterns); the mode word shows it (УЗОРКЛАВЪ)' },
+    { k = '\\ k', t = {}, d = 'keyboard modes: m - notes, p - keyspat (the note keys play the patterns); the mode word shows it (KEYSPAT / KEYPHR) in any pane; a click on the mode word (:modes) - a menu of all modes' },
     { k = '\\\\', d = 'the context menu: what can be done with what is under the cursor (the same as the right click)' },
     { k = '?', d = 'any REAPER action in the tracker style (fuzzy, the recent ones on top)' },
     { k = 'help', d = 'the help (all modules): the help button of the main module - j k line by line through all sections, J K section, / search, o - the help in the browser; :tutorial - the tour (no hotkey: F1 is free)' },
