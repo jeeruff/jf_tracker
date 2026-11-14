@@ -14692,7 +14692,9 @@ function D.frame(L, snap, rows, state, info)
   if sh > 0 then
     -- 14 ноя: модлайн, как doom-modeline: светлее фона, без рамки и без «-- … --»; слева полоса цвета режима, режим
     -- (major тише, minor цветом), сообщение; справа, к правому краю — описание того, что под мышью (тише)
-    set(D.MODELINE or U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
+    -- транспорт прямо над статусом (общая полоса внизу окна) — один блок: тот же фон, без линии между ними, режим один раз (крупно в полосе)
+    local merged = L.pn and L.tppos == 'bottom' and (L.piano_h or 0) > 0
+    set(merged and U.PANEL or D.MODELINE or U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
     local left = (info.status_left or ''):match('^[^|]*|(.*)$') or ''   -- «РЕЖИМ | сообщение»: режим — до первой |
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
@@ -14702,7 +14704,7 @@ function D.frame(L, snap, rows, state, info)
     local barw = math.max(3, L.pad)
     set(mc); gfx.rect(sx, sy, barw, sh, 1)
     sx = sx + barw + L.pad; sw = sw - barw - L.pad
-    if mword ~= '' and #mword <= 24 then
+    if mword ~= '' and #mword <= 24 and not merged then
       local major = mword:sub(1, #mword - #lastw)
       if major ~= '' then text(sx + L.pad, sy + 2, major, U.GREY) end
       text(sx + L.pad + ms(major), sy + 2, lastw, lastw == 'NORMAL' and U.TEXT or mc)
