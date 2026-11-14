@@ -4529,6 +4529,12 @@ function V.popup()
         end
       end
     end
+    -- 14 ноя: клавиши — тем же списком (одно место поиска: команды, история, клавиши): слова запроса в клавише / описании
+    do
+      local ks = ctx.keys_search and ctx.keys_search(typed, 8) or {}
+      if #ks > 0 then lines[#lines + 1] = { key = 'keys', text = 'press them in the module (shown here to find; Enter runs commands only)', col = GRY } end
+      for _, e in ipairs(ks) do lines[#lines + 1] = { key = e.k, text = e.d .. '  [' .. e.page .. ']', col = GRY } end
+    end
     -- 13 окт: совпадений нет — строкой (иначе окно сжималось до «:i» и казалось, что набор сбросился)
     if #lines == 0 then lines[1] = { key = ' ', text = 'no such command - Backspace, or :! for REAPER actions', col = { 0.6, 0.6, 0.6 } } end
     -- 15 окт: набранное — в поле над списком, не заголовком

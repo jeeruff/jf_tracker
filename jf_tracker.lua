@@ -35719,6 +35719,34 @@ end
 -- оба вида — отображения таймлайна. vim достаёт L / snap через ctx.L() / ctx.snap(), поэтому подмена локалей работает
 -- 13 ноя: вид второго трекера — свои опции (по умолчанию узко: без мастера, без линейки паттернов / маркеров и прыжков)
 ctx.t2_over = function(st) return { showmaster = st.master == true, ruler = st.ruler == true, jumps = st.jumps == true } end
+-- 14 ноя: клавиши — в том же списке, что команды (палитра «:»): все слова запроса — в клавише или описании; первой —
+-- страница модуля в фокусе. → { { k, d, page } … } (не больше max)
+ctx.keys_search = function(q, max)
+  local words = {}
+  for w in (q or ''):lower():gmatch('%S+') do words[#words + 1] = w end
+  if #words == 0 or (#words == 1 and #words[1] < 2) then return {} end
+  local out, seen = {}, {}
+  local first = ctx.help_page and ctx.help_page() or nil
+  local order = {}
+  if first and KH.PAGES[first] then order[1] = first end
+  local rest = {}
+  for pg in pairs(KH.PAGES) do if pg ~= first then rest[#rest + 1] = pg end end
+  table.sort(rest)
+  for _, pg in ipairs(rest) do order[#order + 1] = pg end
+  for _, pg in ipairs(order) do
+    for _, e in ipairs(KH.PAGES[pg].e or {}) do
+      local hay = ((e.k or '') .. ' ' .. (e.m or '') .. ' ' .. (e.d or '')):lower()
+      local ok = true
+      for _, w in ipairs(words) do if not hay:find(w, 1, true) then ok = false; break end end
+      if ok and not seen[e.k .. '\0' .. (e.d or '')] then
+        seen[e.k .. '\0' .. (e.d or '')] = true
+        out[#out + 1] = { k = e.k, d = KH.short(e), page = pg }
+        if #out >= (max or 8) then return out end
+      end
+    end
+  end
+  return out
+end
 -- 14 ноя: tL / :lanesplit — лейны трека курсора отдельными треками (tracks) или внутрь папки (folder); без аргумента — меню
 ctx.lanes_split = function(arg)
   arg = (arg or ''):match('%a+') or ''
