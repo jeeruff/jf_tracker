@@ -5377,10 +5377,24 @@ ctx = {
   dlog_path = reaper.GetResourcePath() .. '/jf_tracker_debug.log',
   dlog = function(s)
     if not state.debug then return end
-    local f = io.open(ctx.dlog_path, 'a'); if not f then return end
-    f:write(os.date('%H:%M:%S'), ('.%03d '):format(math.floor(reaper.time_precise() * 1000) % 1000), s, '\n'); f:close()
-    ctx.dlog_n = (ctx.dlog_n or 0) + 1
-    if ctx.dlog_n % 200 == 0 then
+    -- 14 ноя: строки копятся и пишутся разом не чаще 4 раз в секунду (было: файл открывался и закрывался на каждую
+    -- строку — с debug трекер заметно тормозил). Время строки — её, не записи. Ошибки — сразу (лог нужен после падения)
+    local now = reaper.time_precise()
+    local B = ctx.dlog_buf; if not B then B = { t = now }; ctx.dlog_buf = B end
+    B[#B + 1] = os.date('%H:%M:%S') .. ('.%03d '):format(math.floor(now * 1000) % 1000) .. tostring(s) .. '\n'
+    if #B >= 100 or now - B.t > 0.25 or tostring(s):find('rror', 1, true) or tostring(s):find('traceback', 1, true) then ctx.dlog_flush() end
+  end,
+  dlog_flush = function()
+    local B = ctx.dlog_buf
+    if not B then return end
+    B.t = reaper.time_precise()
+    if #B == 0 then return end
+    local f = io.open(ctx.dlog_path, 'a')
+    if f then f:write(table.concat(B)); f:close() end
+    ctx.dlog_n = (ctx.dlog_n or 0) + #B
+    for i = #B, 1, -1 do B[i] = nil end
+    if ctx.dlog_n >= 200 then
+      ctx.dlog_n = 0
       local fr = io.open(ctx.dlog_path, 'r'); local all = fr and fr:read('a'); if fr then fr:close() end
       if all and #all > 1000000 then local fw = io.open(ctx.dlog_path, 'w'); if fw then fw:write(all:sub(-500000)); fw:close() end end
     end
@@ -25706,6 +25720,7 @@ local function frame()
   if not ctx.win_focus and not ctx.vl_on then left = 'REAPER' .. ((left:match('|.*$')) and (' ' .. left:match('|.*$')) or ''); draw.mode_major = nil end
   if MX.queued then left = left .. ' | queue: ' .. (MX.queued.name ~= '' and MX.queued.name or MX.queued.idx) end
   if vim.msg ~= '' then left = left .. ' | ' .. vim.msg; if vim.msg ~= ctx.log_msg then ctx.log_msg = vim.msg; ctx.log_add(vim.msg) end end   -- 10 ноя: и в :log
+  if ctx.dlog_buf and #ctx.dlog_buf > 0 and reaper.time_precise() - ctx.dlog_buf.t > 0.25 then ctx.dlog_flush() end   -- 14 ноя: хвост лога
   if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
     left = left .. string.format(' | %.0f fps | key %d @%s | peaks %d', fps.v, state.last_key, ctx.last_trace or '-', model.peaks_cache_size())
   end
@@ -27542,7 +27557,8 @@ local function frame()
     local d = ctx.hover_dump(hover, true)
     if d ~= '' then state.status = 'dbg ' .. d .. ((state.status or '') ~= '' and ('  |  ' .. state.status) or '') end
   end
-  if state.debug or reaper.GetExtState(EXT, 'dbgon') == '1' then
+  if (state.debug or reaper.GetExtState(EXT, 'dbgon') == '1') and reaper.time_precise() - (ctx.dbg_ext_t or 0) > 0.25 then   -- 14 ноя: 4 раза в секунду, не каждый кадр
+    ctx.dbg_ext_t = reaper.time_precise()
     local ks = {}; for k in pairs(hover) do ks[#ks + 1] = k end; table.sort(ks)
     if hover.matrix then for k, v in pairs(hover.matrix) do ks[#ks + 1] = 'mx.' .. k .. '=' .. tostring(v) end end
     reaper.SetExtState(EXT, 'dbg', ('%d,%d %s | %s || pool: %s'):format(math.floor(gfx.mouse_x), math.floor(gfx.mouse_y), table.concat(ks, ' '), state.status, (draw.pool_dbg or '') .. ' || ' .. tostring(SL.dbg)), false)
@@ -40843,7 +40859,7 @@ ctx.mx_more = function()
 end
 -- 28 окт: :reload — dofile в том же Lua; atexit на каждый запуск держал старый save_win, а с ним весь прежний
 -- трекер (после десятков :reload — 1.3 ГБ живой кучи, сборщик гонял её каждый кадр). Один atexit на процесс
-JF_TRACKER_SAVE_WIN = function() pcall(ctx.vlayer_release); pcall(edit.item_drag_end); pcall(ctx.arm_restore); pcall(ctx.vkb_restore); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: арм / вход прослушки — вернуть при выходе   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
+JF_TRACKER_SAVE_WIN = function() pcall(ctx.dlog_flush); pcall(ctx.vlayer_release); pcall(edit.item_drag_end); pcall(ctx.arm_restore); pcall(ctx.vkb_restore); save_win(); pcall(ctx.fxgui_close_all) end   -- 7 ноя: арм / вход прослушки — вернуть при выходе   -- 7 ноя: и незакрытый блок undo протяжки   -- 5 ноя: при выходе — и окна плагинов закрыть
 if not JF_TRACKER_ATEXIT then JF_TRACKER_ATEXIT = true; reaper.atexit(function() if JF_TRACKER_SAVE_WIN then JF_TRACKER_SAVE_WIN() end end) end
 -- заметки открыты с прошлого раза — загрузить текст (4 окт: после рестарта были пустыми)
 if state.notes_open then pcall(ctx.notes_load) end
