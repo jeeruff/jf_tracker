@@ -16313,6 +16313,9 @@ edit.after = function(desc)
   local hard = state.hardedges == true and ctx.view_cur() == 'pattern'   -- 10 ноя: жёсткие края — только в виде pat (контекст паттерна); proj / sec — нота идёт насквозь
   if not hard and ((desc or ''):match('^insert note') or (desc or ''):match('^insert slice')) then pcall(ctx.pat_cut_over, edit.changed_items()) end
   if state.hardedges and not hard then ctx.log_add('  hard pattern edges: off in the ' .. ctx.view_cur() .. ' view - nothing cut') end   -- только вставка (продление Ctrl+Shift+J K — без разреза)   -- 9 ноя: вид pattern — режем на начале следующего паттерна
+  -- 14 ноя: регионы — свежие: правка могла сдвинуть их (темп, вставка времени), а список кадра ещё старый — синк копий
+  -- клал айтемы по прежним секундам (копия паттерна «неровно», хвосты в соседнем паттерне)
+  if state.autosync or hard then model.invalidate(); regions = model.regions(state.lpb) end
   if not regions or #regions == 0 or not (state.autosync or hard) then return end
   -- новый регион пуст: синк не нужен, только жёсткие границы
   if desc == 'add region' then if hard then model.invalidate(); pooled.trim(model.regions(state.lpb), edit.changed_items()) end; return end
@@ -16391,6 +16394,16 @@ ctx.log_show = function()
   for i = #ctx.LOG, 1, -1 do local e = ctx.LOG[i]; items[#items + 1] = { label = e.at .. '  ' .. e.t } end
   if #items == 0 then items[1] = { label = 'nothing yet' } end
   vim.open_picker('log - newest first (/ search, Esc close)', items, function() end)
+end
+-- 14 ноя: :dedup — убрать точные дубли айтемов (та же позиция, длина, лейн, содержимое), один шаг undo
+ctx.dedup = function()
+  local n, nt = 0, 0
+  local hook = edit.after; edit.after = nil
+  local ok, err = pcall(edit.run, 'remove duplicate items', function() n, nt = pooled.dedup() end)
+  edit.after = hook
+  if not ok then vim.msg = 'dedup: ' .. tostring(err); return end
+  model.invalidate()
+  vim.msg = n > 0 and ('dedup: %d duplicate item(s) removed on %d track(s) - u brings them back'):format(n, nt) or 'dedup: no exact duplicates'
 end
 ctx.pat_cut_over = function(items)
   if not items or ctx.view_cur() == 'pattern' or not regions or #regions == 0 then return end   -- 9 ноя: pat — контекст паттерна, не режем; proj / sec — продолжение в следующем

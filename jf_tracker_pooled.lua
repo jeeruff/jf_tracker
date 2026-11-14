@@ -125,7 +125,49 @@ local function copy_span(tr, src, dst, tag, link)
 end
 
 A.copy_span = copy_span          -- заполнение долей последней долей (:sig, 5 окт)
-A.items_in = items_in
+-- 14 ноя: дубли — айтемы трека на той же позиции, той же длины и лейна, с тем же содержимым: MIDI — те же ноты
+-- (высота, velocity, канал) и те же CC (без сдвигов в тиках: копии копий расходятся на 1-3 тика и имеют свой пул);
+-- аудио — тот же файл, смещение, скорость, высота. Остаётся первый. Библиотека не трогается. Без своего undo-блока.
+-- → сколько удалено, на скольких треках
+local function dedup_key(it)
+  local tk = R.GetActiveTake(it)
+  if not tk then return 'empty' end
+  if R.TakeIsMIDI(tk) then
+    local _, nn, nc = R.MIDI_CountEvts(tk)
+    local p = { 'midi', nn or 0, nc or 0 }
+    for i = 0, math.min(nn or 0, 512) - 1 do local _, _, mu, _, _, ch, pitch, vel = R.MIDI_GetNote(tk, i); p[#p + 1] = ('%s.%d.%d.%d'):format(mu and 'm' or '', ch or 0, pitch or 0, vel or 0) end
+    for i = 0, math.min(nc or 0, 512) - 1 do local _, _, _, _, msg, ch, m2, m3 = R.MIDI_GetCC(tk, i); p[#p + 1] = ('c%d.%d.%d.%d'):format(msg or 0, ch or 0, m2 or 0, m3 or 0) end
+    return table.concat(p, ' ')
+  end
+  local src = R.GetMediaItemTake_Source(tk)
+  local fn = src and R.GetMediaSourceFileName(src, '') or ''
+  return ('audio %s %.4f %.5f %.3f'):format(fn, R.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS'), R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'), R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH'))
+end
+function A.dedup()
+  local removed, ntr = 0, 0
+  for _, tr in ipairs(tracks()) do
+    local buckets = {}
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local k = ('%.5f|%.5f|%d'):format(R.GetMediaItemInfo_Value(it, 'D_POSITION'), R.GetMediaItemInfo_Value(it, 'D_LENGTH'), math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')))
+      local b = buckets[k]; if not b then b = {}; buckets[k] = b end
+      b[#b + 1] = it
+    end
+    local kill = {}
+    for _, b in pairs(buckets) do
+      if #b > 1 then
+        local seen = {}
+        for _, it in ipairs(b) do
+          local key = dedup_key(it)
+          if seen[key] then kill[#kill + 1] = it else seen[key] = true end
+        end
+      end
+    end
+    for _, it in ipairs(kill) do R.DeleteTrackMediaItem(tr, it) end
+    if #kill > 0 then removed = removed + #kill; ntr = ntr + 1 end
+  end
+  return removed, ntr
+end
 
 -- items трека, что ПЕРЕСЕКАЮТ [t0, t1) (не только начинаются в нём);
 -- (отрезок mlr берёт и item, что начался до него)
