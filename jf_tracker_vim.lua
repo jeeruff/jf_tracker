@@ -614,8 +614,9 @@ local function event_end(fi, row)
   return row
 end
 
--- 14 ноя: `e` как в Vim — на ПОСЛЕДНЮЮ строку события под курсором; курсор уже на ней (или в пустоте) — на последнюю
--- строку следующего события. n — счётчик (3e). nil — колонка огибающей / лейна (там e — следующая точка)
+-- 14 ноя: `e` — на строку ПОСЛЕ события под курсором (граница, как было); курсор уже за событием (или в пустоте) —
+-- на строку после следующего: повторное e идёт дальше, как в Vim (было — стояло). n — счётчик (3e).
+-- nil — колонка огибающей / лейна (там e — следующая точка)
 local function event_last(fi, row, n)
   local f = flat()[fi]
   if not f or f.env or f.ml then return nil end
@@ -624,34 +625,34 @@ local function event_last(fi, row, n)
     local cand
     for _, sub in ipairs(subs_of(f)) do
       local h = head_of(sub[r])
-      local e = h and (h.row0 + (h.rows or 1) - 1)
+      local e = h and (h.row0 + (h.rows or 1))
       if e and e > r and (not cand or e < cand) then cand = e end
     end
     if not cand then
       local nr = next_ev(fi, r, 1)
       if not nr then break end
-      cand = nr
+      cand = nr + 1
       for _, sub in ipairs(subs_of(f)) do
         local h = head_of(sub[nr])
-        if h and h.row0 == nr then cand = math.max(cand, nr + (h.rows or 1) - 1); break end
+        if h and h.row0 == nr then cand = nr + (h.rows or 1); break end
       end
     end
     r = cand
   end
   return r
 end
--- 14 ноя: `ge` как в Vim — последняя строка предыдущего события колонки (выше курсора)
+-- 14 ноя: `ge` — строка после предыдущего события колонки (та же граница, что у e, но выше курсора)
 local function event_prev_last(fi, row, n)
   local f = flat()[fi]
   if not f or f.env or f.ml then return nil end
   local r = row
   for _ = 1, n or 1 do
     local found
-    local rr = r - 1
+    local rr = r - 2
     while rr >= 0 and not found do
       for _, sub in ipairs(subs_of(f)) do
         local h = head_of(sub[rr])
-        if h and h.row0 + (h.rows or 1) - 1 == rr then found = rr; break end
+        if h and h.row0 + (h.rows or 1) - 1 == rr then found = rr + 1; break end
       end
       rr = rr - 1
     end
@@ -846,7 +847,7 @@ function motion(c, n, op)
     -- 14 ноя: движение (и в VISUAL) — как в Vim: конец этого события, ещё раз — конец следующего; оператор (de ce ye) —
     -- как было: до конца события под курсором
     local el = (not op) and event_last(cur.fi, cur.row, n)
-    if el then return { fi = cur.fi, row = el, linewise = true } end
+    if el then return { fi = cur.fi, row = el, linewise = true, exclusive = true } end
     return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true, exclusive = true }   -- 19 окт: граница — строка после события, оператор её не берёт
   elseif c == ('E'):byte() then
     -- 15 окт: E — конец нижнего видимого события трека (последнее, что начинается на экране)

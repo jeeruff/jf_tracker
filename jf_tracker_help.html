@@ -736,8 +736,8 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>field left / row down / row up / field right</td></tr>
 <tr><td><kbd>arrows</kbd> <kbd>+</kbd> <kbd>mods</kbd></td><td>arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - its size, Cmd+Opt - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl</td></tr>
 <tr><td><kbd>Opt+H</kbd> <kbd>Opt+L</kbd></td><td>previous / next track</td></tr>
-<tr><td><kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd></td><td>next / previous event of the track (all its columns and envelope points, like words in Vim); e - the last row of the event, again - of the next one (3e - the third), as in Vim; dw yw cw de - this column</td></tr>
-<tr><td><kbd>ge</kbd></td><td>the last row of the previous event of the column (3ge - the third above)</td></tr>
+<tr><td><kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd></td><td>next / previous event of the track (all its columns and envelope points, like words in Vim); e - the row after the event, again - after the next one (3e - the third); dw yw cw de - this column</td></tr>
+<tr><td><kbd>ge</kbd></td><td>the row after the previous event of the column (3ge - the third above)</td></tr>
 <tr><td><kbd>E</kbd></td><td>the end of the lowest visible event of the track (the last one that starts on screen); dE - up to there</td></tr>
 <tr><td><kbd>W</kbd> <kbd>B</kbd></td><td>next / previous event on ANY track - a note, an item, an automation point, a lane event (w b - the cursor track only)</td></tr>
 <tr><td><kbd>env:</kbd> <kbd>w</kbd> <kbd>b</kbd> <kbd>e</kbd> <kbd>dd</kbd> <kbd>y</kbd> <kbd>p</kbd></td><td>envelope points are events: motions, delete / yank / paste points (value + shape)</td></tr>

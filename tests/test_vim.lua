@@ -207,15 +207,15 @@ keysin('w');   eq('w → hat', V.cur.row, 16)
 keysin('w');   eq('w stays at last', V.cur.row, 16)
 keysin('b');   eq('b → snare', V.cur.row, 8)
 keysin('2b');  eq('2b → kick', V.cur.row, 0)
--- 14 ноя: e как в Vim — последняя строка события; ещё раз — последняя строка следующего
-keysin('e');   eq('e → the last row of kick', V.cur.row, 3)
-keysin('e');   eq('e again → the last row of snare', V.cur.row, 9)
-keysin('e');   eq('e → hat (one row)', V.cur.row, 16)
-keysin('e');   eq('e stays at the last event', V.cur.row, 16)
-V.cur.row = 5; keysin('e'); eq('e from an empty row → the end of the next event', V.cur.row, 9)
-V.cur.row = 0; keysin('2e'); eq('2e → the end of the second event', V.cur.row, 9)
-V.cur.row = 1; keysin('e'); eq('e inside kick → its last row', V.cur.row, 3)
-V.cur.row = 0; keysin('ve'); eq('ve selects the kick to its last row', V.cur.row, 3); keysin('e'); eq('ve e extends to the end of snare', V.cur.row, 9); V.key(27)
+-- 14 ноя: e — на строку после события; ещё раз — на строку после следующего (как в Vim: повторное e идёт дальше)
+keysin('e');   eq('e → the row after kick', V.cur.row, 4)
+keysin('e');   eq('e again → the row after snare', V.cur.row, 10)
+keysin('e');   eq('e → the row after hat (one row)', V.cur.row, 17)
+keysin('e');   eq('e stays after the last event', V.cur.row, 17)
+V.cur.row = 5; keysin('e'); eq('e from an empty row → after the next event', V.cur.row, 10)
+V.cur.row = 0; keysin('2e'); eq('2e → after the second event', V.cur.row, 10)
+V.cur.row = 1; keysin('e'); eq('e inside kick → the row after it', V.cur.row, 4)
+V.cur.row = 0; keysin('ve'); eq('ve: the cursor after the kick', V.cur.row, 4); keysin('e'); eq('ve e extends past the snare', V.cur.row, 10); V.key(27)
 -- 14 ноя: сверка с Vim — курсор после b / ge / w изнутри события и из пустоты
 V.cur.fi, V.cur.field = 1, 1
 V.cur.row = 2;  keysin('b');  eq('b inside kick → its start (Vim: b inside a word)', V.cur.row, 0)
@@ -224,9 +224,9 @@ V.cur.row = 5;  keysin('b');  eq('b from an empty row → the event above on the
 V.cur.fi = 1; V.cur.row = 8;  keysin('b');  eq('b on a start → the previous start of the track', V.cur.fi * 100 + V.cur.row, 202)
 V.cur.fi = 1
 V.cur.row = 2;  keysin('w');  eq('w inside kick → the next start of the track (ov)', V.cur.fi * 100 + V.cur.row, 202)
-V.cur.fi = 1; V.cur.row = 8;  keysin('ge'); eq('ge → the last row of the previous event', V.cur.row, 3)
-V.cur.fi = 1; V.cur.row = 12; keysin('ge'); eq('ge from an empty row → the last row of the event above', V.cur.row, 9)
-V.cur.fi = 1; V.cur.row = 9;  keysin('ge'); eq('ge inside snare → the end of kick', V.cur.row, 3)
+V.cur.fi = 1; V.cur.row = 8;  keysin('ge'); eq('ge → the row after the previous event', V.cur.row, 4)
+V.cur.fi = 1; V.cur.row = 12; keysin('ge'); eq('ge from an empty row → the row after the event above', V.cur.row, 10)
+V.cur.fi = 1; V.cur.row = 9;  keysin('ge'); eq('ge inside snare → the row after kick', V.cur.row, 4)
 V.cur.fi = 1; V.cur.row = 0;  keysin('3w'); eq('3w counts events', V.cur.row >= 8, true)
 V.cur.fi, V.cur.field = 1, 1
 V.cur.row = 4
