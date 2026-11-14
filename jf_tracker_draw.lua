@@ -15029,6 +15029,17 @@ function D.popup(L, p, anchor)
     if ln.hk and D.hints_on then hw = math.max(hw, ms(ln.hk)) end   -- 23 окт: колонка хоткеев — только с hints
   end
   tw = math.min(tw, ms(string.rep('W', 60)))          -- длинные описания — обрезаются (fit), меню не во весь экран
+  -- 14 ноя: все меню — в одном месте, внизу окна над статусом (опция menus at the bottom; было у курсора / кнопки —
+  -- взгляд прыгал). Меню с буквами (hydra, which-key) — низкой полосой в несколько колонок: столько колонок, сколько
+  -- влезает по ширине, строк — от 6. Списки с выбором (поиск, палитра) — одной колонкой, как были. Ввод имени — у курсора
+  local dock = D.pop_bottom and p.kind ~= 'prompt' and not (anchor and anchor.box)
+  if dock and p.kind == 'hydra' and not p.groups and not p.full then
+    local hw0 = hw > 0 and (hw + 2 * L.pad) or 0
+    local cw0 = L.pad + kw + 2 * L.pad + hw0 + tw + 2 * L.pad
+    local fitc = math.max(1, math.floor((W - 3 * L.pad) / math.max(1, cw0)))
+    nrow = math.min(maxrows, math.max(math.min(n, 6), math.ceil(n / fitc)))
+    ncol = math.max(1, math.ceil(n / nrow))
+  end
   -- колонка хоткеев (5 окт): своя ширина, без наложений; описания ужимаются
   local hcol = hw > 0 and (hw + 2 * L.pad) or 0
   local maxcol = math.floor((W - 3 * L.pad) / ncol)
@@ -15080,6 +15091,7 @@ function D.popup(L, p, anchor)
     if anchor.above then y = anchor.y - h - 2 >= 2 and (anchor.y - h - 2) or (anchor.y + 3 * L.rh)   -- над ячейкой; транспорт наверху — под полосой (5 окт)
     elseif anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end
+  if dock then x, y = L.pad, gfx.h - (L.status_h or 0) - h - 2 end
   y = math.max(2, math.min(y, gfx.h - h - 2))         -- высокое меню целиком в окне (5 окт)
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
