@@ -14,7 +14,7 @@
 
 local TH = {}
 
-TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'solarized-dark', 'solarized-light', 'gruvbox', 'catppuccin', 'mono', 'rednight', 'greennight', 'protracker', 'impulse' }
+TH.LIST = { 'reaper', 'modus-vivendi', 'modus-operandi', 'solarized-dark', 'solarized-light', 'gruvbox', 'gruber-darker', 'catppuccin', 'mono', 'rednight', 'greennight', 'protracker', 'impulse' }
 
 local function hex(s)
   local r, g, b = s:match('#?(%x%x)(%x%x)(%x%x)')
@@ -38,6 +38,10 @@ TH.PAL = {
     amber = '#cb4b16', cyan = '#2aa198', green = '#859900', red = '#dc322f', hdr = '#eee8d5', hdrsel = '#ddd6c1' },
   gruvbox = { bg = '#282828', panel = '#32302f', text = '#ebdbb2', grey = '#a89984', dim = '#3c3836', line = '#665c54',
     amber = '#fe8019', cyan = '#8ec07c', green = '#b8bb26', red = '#fb4934', hdr = '#3c3836', hdrsel = '#504945' },
+  -- 14 ноя: Gruber Darker (Alexey Kutepov a.k.a. rexim / Tsoding, по Gruber Dark Джейсона Блевинса; MIT): цвета как есть —
+  -- bg / bg-1 / bg+1 / bg+2, fg, quartz (приглушённый), niagara-2 / -1 (сетка / рамки), yellow — акцент, niagara, green, red
+  ['gruber-darker'] = { bg = '#181818', panel = '#101010', text = '#e4e4ef', grey = '#95a99f', dim = '#303540', line = '#565f73',
+    amber = '#ffdd33', cyan = '#96a6c8', green = '#73c936', red = '#f43841', hdr = '#282828', hdrsel = '#453d41' },
   catppuccin = { bg = '#1e1e2e', panel = '#181825', text = '#cdd6f4', grey = '#a6adc8', dim = '#313244', line = '#585b70',
     amber = '#fab387', cyan = '#94e2d5', green = '#a6e3a1', red = '#f38ba8', hdr = '#313244', hdrsel = '#45475a' },
   mono = { bg = '#101010', panel = '#181818', text = '#d8d8d8', grey = '#969696', dim = '#2c2c2c', line = '#5c5c5c',

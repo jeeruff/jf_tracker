@@ -717,11 +717,12 @@ function D.layout_core(snap, state, nregions)
   L.num_w = math.max(ms('0000'), L.united and ms('999.4') or 0) + 2 * L.pad
   -- 13 окт: линейка (регионы / маркеры, прыжки) — слева от номеров или справа, у мастера (опция ruler side)
   L.ruler_right = state.rulerside == 'right' and L.rg_w > 0
-  L.rl = L.ruler_right and L.jl_w or L.ruler_w   -- 13 окт: линейка прыжков всегда слева, у номеров;           -- что слева от номеров строк
-  L.label_w = L.rl + L.num_w + L.tl_w
+  -- 14 ноя (2): номера-прыжки — правее номеров строк, вплотную к сетке треков: полоса паттернов | время | номер | прыжки
+  L.rl = L.ruler_right and 0 or L.rg_w              -- что слева от номеров строк (только полоса паттернов / маркеров)
+  L.label_w = L.rl + L.num_w + L.tl_w + L.jl_w
   -- 14 ноя: номера-прыжки — вплотную к номерам строк, правее полосы паттернов / маркеров (были у левого края, через
   -- полосу от строк). jl_x — их начало от левого края трекера, rg_x — начало полосы паттернов от начала линейки
-  L.jl_x = L.ruler_right and 0 or L.rg_w
+  L.jl_x = L.label_w - L.jl_w
   L.rg_x = L.ruler_right and L.jl_w or 0
   -- верхняя панель (как в Renoise 2): контрол | скоупы | инструменты трека
   -- верхняя панель: +15 % (просьба 1 окт) — место под монтаж mono-модуля
@@ -11098,7 +11099,7 @@ function D.frame(L, snap, rows, state, info)
     local in_body = not r.clip and my >= y and my < y + L.rh and my >= L.body_y and my < L.body_y + L.nrows * L.rh and mx < W
     if in_body then hover.row = r end
     -- номера шагов (2 окт): протяжка = time selection REAPER
-    if in_body and mx >= tx0 + L.rl and mx < tx0 + L.label_w then hover.rownum = r.row end
+    if in_body and mx >= tx0 + L.rl and mx < tx0 + L.label_w - L.jl_w then hover.rownum = r.row end
     for _, c in ipairs(L.cols) do
       -- 21 окт: трек уходит под мастер — его текст не дальше границы мастера
       local clip_k = D.clip
@@ -11635,7 +11636,7 @@ function D.frame(L, snap, rows, state, info)
       if d and not r.clip and math.abs(d) < 100 then
         local lab = ('%d'):format(math.floor(math.abs(d) + 0.5))   -- 10 окт: целым (строки приходят дробными — было «5.0»)
         if math.abs(d) < 0.5 then lab = ('%d'):format(math.floor(r.row + 0.5) + (D.ROW_BASE or 1)) end   -- 2 ноя: у курсора — номер его строки, не 0
-        text(tx0 + L.jl_x + L.jl_w - 2 - (L.jl_x > 0 and 3 or 0) - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
+        text(tx0 + L.jl_x + L.jl_w - 3 - ms(lab), L.body_y + (i - 1) * L.rh + 1, lab, d == 0 and U.AMBER or U.mix(d < 0 and U.CYAN or U.GREY, U.BG, 0.35))
       end
     end
   end
@@ -11726,7 +11727,7 @@ function D.frame(L, snap, rows, state, info)
       -- авто-панч (5 окт): та же зона красным — запись только в ней
       local grey = info.punch and U.RED or { 0.80, 0.80, 0.80 }
       set(grey)
-      gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.rl + 2, y0, L.label_w - L.rl - 3, y1 - y0, 1)
+      gfx.a = info.punch and 0.30 or 0.16; gfx.rect(tx0 + L.rl + 2, y0, L.label_w - L.jl_w - L.rl - 3, y1 - y0, 1)
       -- 1 ноя: бледная заливка всего поля (a 0.05, ~3 мс на кадр: полупрозрачная площадь во весь трекер) — заменена
       -- линиями границ выделения поперёк треков
       gfx.a = 0.35
