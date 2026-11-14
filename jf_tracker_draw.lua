@@ -460,6 +460,7 @@ function D.layout_core(snap, state, nregions)
   -- модули вплотную (8 окт: опция module gap убрана — она обрезала модули):
   -- между соседями одна линия 1 px; активный — рамка внутри своих границ
   D.SEPW = 1
+  D.MODELINE = U.mix(U.BG, U.TEXT, 0.12)   -- 14 ноя: фон строки статуса (модлайн) — чуть светлее фона окна, без рамки
   D.SEP = U.mix(U.BG, U.TEXT, 0.55)   -- 14 ноя: граница модулей ярче внутренних линий (U.LINE 0.42); было 0.38 — тише их
   gfx.setfont(D.font_id)
   local L = {}
@@ -14689,34 +14690,34 @@ function D.frame(L, snap, rows, state, info)
     if L.matrix_w > 0 and not L.lside_rect and not L.mx_ext and not state.mx_hidden then set(U.PANEL); gfx.rect(0, sy, L.matrix_w, sh, 1) end
   end
   if sh > 0 then
-    set(U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
-    set(D.SEP); gfx.rect(sx, sy, sw, D.SEPW, 1)
-    -- слева режим/сообщение (не шире трети), дальше — описание того, на что
-    -- наведена мышь, во всю оставшуюся ширину
-    -- 15 окт: режим — в полосе трекера (modeline); здесь — то, что после «|» (сообщение), без слова режима
+    -- 14 ноя: модлайн, как doom-modeline: светлее фона, без рамки и без «-- … --»; слева полоса цвета режима, режим
+    -- (major тише, minor цветом), сообщение; справа, к правому краю — описание того, что под мышью (тише)
+    set(D.MODELINE or U.PANEL); gfx.rect(sx, sy, sw, sh, 1)
     local left = (info.status_left or ''):match('^[^|]*|(.*)$') or ''   -- «РЕЖИМ | сообщение»: режим — до первой |
     local desc = info.status_right or ''
     if desc == '' then desc = D.aw_status or '' end
-    -- 2 ноя: сообщению — всё, что не занято описанием справа (не меньше трети); пусто справа — вся строка (подсказки z: обрубались)
-    local lw = desc == '' and (sw - 2 * L.pad) or math.max(sw / 3, sw - 2 * L.pad - math.min(ms(desc), sw * 2 / 3) - 4 * L.pad)
-    -- 6 ноя: слово режима — и в статусе слева, как -- INSERT -- в Vim (просьба: дублировать), цветом режима
-    local mword = ((info.status_left or ''):match('^([^|]*)|') or ''):gsub('^[%s%-]+', ''):gsub('[%s%-]+$', '')   -- «-- FADE --» уже с чёрточками
+    local mword = ((info.status_left or ''):match('^([^|]*)|') or ''):gsub('^[%s%-]+', ''):gsub('[%s%-]+$', '')   -- «-- FADE --» — без чёрточек
+    local lastw = mword:match('(%S+)$') or mword   -- цвет — по minor (последнее слово: TRACKER INSERT)
+    local mc = mword == '' and U.GREY or (D.MODE_COL and D.MODE_COL[lastw:lower()]) or (lastw == 'NORMAL' and U.GREY) or U.AMBER
+    local barw = math.max(3, L.pad)
+    set(mc); gfx.rect(sx, sy, barw, sh, 1)
+    sx = sx + barw + L.pad; sw = sw - barw - L.pad
     if mword ~= '' and #mword <= 24 then
-      local mt = '-- ' .. mword .. ' --'
-      local lastw = mword:match('(%S+)$') or mword   -- 14 ноя: цвет — по minor (последнее слово: TRACKER INSERT)
-      local mc = (D.MODE_COL and D.MODE_COL[lastw:lower()]) or (lastw == 'NORMAL' and U.GREY) or U.AMBER
-      text(sx + L.pad, sy + 2, mt, mc)
-      local mw = ms(mt) + 2 * L.pad
-      sx = sx + mw; sw = sw - mw; lw = lw - mw
+      local major = mword:sub(1, #mword - #lastw)
+      if major ~= '' then text(sx + L.pad, sy + 2, major, U.GREY) end
+      text(sx + L.pad + ms(major), sy + 2, lastw, lastw == 'NORMAL' and U.TEXT or mc)
+      local mw = ms(mword) + 3 * L.pad
+      sx = sx + mw; sw = sw - mw
     end
+    -- сообщению — всё, что не занято описанием справа (не меньше трети); пусто справа — вся строка
+    local dw = desc == '' and 0 or math.min(ms(desc), math.floor(sw * 2 / 3))
+    local lw = math.max(math.floor(sw / 3), sw - 2 * L.pad - dw - (dw > 0 and 4 * L.pad or 0))
     left = fit((left:gsub('^%s+', '')), lw)
     key_text(sx + L.pad, sy + 2, left, lw, U.AMBER)
-    local hx = sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0)
     D.aw_status = nil                    -- DSP спрятан — строка не залипает
-    D.aw_status = nil
     if desc ~= '' then
-      if left ~= '' then set(D.SEP); gfx.rect(hx - 2 * L.pad + L.pad // 2, sy + 2, 1, sh - 2, 1) end
-      key_text(hx, sy + 2, desc, sx + sw - hx - L.pad, U.TEXT)
+      local hx = math.max(sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0), sx + sw - L.pad - ms(desc))
+      key_text(hx, sy + 2, desc, sx + sw - hx - L.pad, U.GREY)
     end
   end
   if L.side_w > 0 then set(D.SEP); gfx.rect((L.side_x or L.win_w) - 2, 0, D.SEPW, gfx.h - L.status_h, 1) end
