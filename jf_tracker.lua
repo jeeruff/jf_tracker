@@ -25229,7 +25229,33 @@ local function frame()
   if state.libtabs then
     local cc = cur_col()
     local sec = state.auto_inst and 'automation' or (state.midi_inst and 'midi') or ((cc and ctx.inst_fx(cc)) and 'instruments') or 'audio'
-    if ctx.libsec_prev ~= sec then ctx.libsec_prev = sec; state.libtab = sec end
+    if ctx.libsec_prev ~= sec then ctx.libsec_prev = sec; state.libtab = sec; ctx.libtab_prev = sec end
+    -- 14 ноя: вкладку сменили руками (щелчок, F4, Opt+Tab), а выбранный инструмент остался в прежнем разделе — курсора
+    -- в списке не было. Выбор идёт за вкладкой: audio — последний сэмпл, instruments — свой плагин трека (чужой —
+    -- только когда auto select выкл: иначе курсор трекера ушёл бы на другой трек), automation / midi — их строка
+    if sec == 'audio' then ctx.lib_audio_last = vim.inst end
+    if ctx.libtab_prev ~= state.libtab then
+      ctx.libtab_prev = state.libtab
+      ctx.libtab_pick = state.libtab ~= sec and { tab = state.libtab, n = 0 } or nil
+    end
+    local pk = ctx.libtab_pick
+    if pk then
+      pk.n = pk.n + 1
+      local hit, first
+      if pk.n > 1 then   -- список этой вкладки строит отрисовка — он готов со следующего кадра
+        for _, r in ipairs((L and L.pool_rows) or {}) do
+          if r.sec == pk.tab and not r.sub and not r.slxk then
+            if pk.tab == 'audio' and r.i then first = first or r.i; if r.i == ctx.lib_audio_last then hit = r.i end
+            elseif pk.tab == 'instruments' and r.instfx and r.num then
+              if not r.col then hit = hit or r.num elseif not state.libauto then first = first or r.num end
+            elseif (pk.tab == 'automation' and r.auto) or (pk.tab == 'midi' and r.midi) then hit = hit or r.num end
+          end
+        end
+        hit = hit or first
+      end
+      if hit or pk.n > 3 then ctx.libtab_pick = nil end
+      if hit then ctx.inst_select(hit) end
+    end
   end
   do local sr = ctx.slice_root(); state.slices_on = ((sr and not sr.file) or state.slicespos == 'split' or state.midi_inst) and true or false end
   local tq1 = reaper.time_precise()
