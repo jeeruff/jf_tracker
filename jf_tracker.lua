@@ -13325,6 +13325,12 @@ ctx = {
       local sl = src and reaper.GetMediaSourceLength(src) or 0
       return sl > 0 and reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS') / sl or nil
     end
+    if k == 'len' then   -- 14 ноя: слайдер длины — доля от того, что осталось в источнике после start offset (с учётом rate)
+      local src = reaper.GetMediaItemTake_Source(tk)
+      local sl = src and reaper.GetMediaSourceLength(src) or 0
+      local mx = (sl - reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) / math.max(1e-3, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'))
+      return mx > 1e-3 and math.max(0, math.min(1, len / mx)) or nil
+    end
     return nil
   end,
   -- протяжка слайдера: доля → значение (всем нотам инструмента, как колесо)
@@ -13361,6 +13367,11 @@ ctx = {
       local src = reaper.GetMediaItemTake_Source(tk)
       local sl = src and reaper.GetMediaSourceLength(src) or 0
       if sl > 0 then P('take:D_STARTOFFS', fr * sl, 'abs', 'start offset') end
+    elseif k == 'len' then   -- 14 ноя: до конца источника (дальше — тишина / луп)
+      local src = reaper.GetMediaItemTake_Source(tk)
+      local sl = src and reaper.GetMediaSourceLength(src) or 0
+      local mx = (sl - reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) / math.max(1e-3, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'))
+      if mx > 1e-3 then P('D_LENGTH', math.max(0.01, fr * mx), 'abs', 'length') end
     end
     PV.live(items)                                  -- звучащее превью — сразу с новым питчем / rate / громкостью (6 окт)
     model.invalidate()
