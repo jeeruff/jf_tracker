@@ -5257,12 +5257,24 @@ ctx = {
   end,
   -- свинг (6 окт): сетка проекта REAPER — вкл / величина / деление; кнопка
   -- swing на транспорте открывает выпадашку, колесо ±1 %, :swing N | on | off
+  swing_vals = function()   -- 14 ноя: величины четырёх свингов для полосы (одна таблица на все кадры)
+    local v = ctx.sw_v or {}; ctx.sw_v = v
+    for i = 1, 4 do local s = edit.SW[i]; v[i] = s.on and s.amt or 0 end
+    return v
+  end,
+  pos_time = function(t)   -- время позиции: м:сс.ммм
+    t = math.max(0, t or 0)
+    return ('%d:%06.3f'):format(math.floor(t / 60), t % 60)
+  end,
   swing_label = function()
-    local s = edit.sw
-    if not s.on then return 'swing off' end
-    local d = s.div / 4
+    -- 14 ноя: четыре свинга — подпись про свинг трека курсора (буква A..D)
+    local i = edit.track_swing(cur_col() and cur_col().track)
+    local s = edit.SW[i]
+    local lt = ('ABCD'):sub(i, i)
+    if not s.on then return 'swing ' .. lt .. ' off' end
+    local d = edit.sw.div / 4
     local dv = d > 0 and ('1/%g'):format(math.floor(1 / d * 100 + 0.5) / 100) or '?'
-    return ('swing %d%% %s'):format(math.floor(s.amt * 100 + 0.5), dv)
+    return ('swing %s %d%% %s'):format(lt, math.floor(s.amt * 100 + 0.5), dv)
   end,
   swing_text = function()
     local s = edit.sw
@@ -11450,7 +11462,9 @@ ctx = {
     ratebar = 'play rate: click - a slider (drag it; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2), double click - x1, wheel +-0.05',
     ratepop = 'play rate slider: drag; the dots snap to x0.25 x0.5 x0.75 x1 x1.5 x2; a click elsewhere closes it',
     swing = 'swing of the grid: how late every second step plays (33 % - triplet feel). Click - the menu',
-    swingbar = 'swing amount: drag left / right from the middle',
+    swingbar = 'swing A (the REAPER grid swing): drag left / right from the middle, dblclick - off',
+    swingbar2 = 'swing B: drag left / right from the middle, dblclick - off', swingbar3 = 'swing C: drag left / right from the middle, dblclick - off', swingbar4 = 'swing D: drag left / right from the middle, dblclick - off',
+    swslot1 = 'swing A for the cursor track (click)', swslot2 = 'swing B for the cursor track (click)', swslot3 = 'swing C for the cursor track (click)', swslot4 = 'swing D for the cursor track (click)',
     velbar = 'velocity of the inserted notes 1..127: drag; { } (qwerty: c C) - step 8',
     mk1 = 'go to marker 1', mk2 = 'go to marker 2', mk3 = 'go to marker 3', mk4 = 'go to marker 4', mk5 = 'go to marker 5', mk6 = 'go to marker 6', mk7 = 'go to marker 7', mk8 = 'go to marker 8', mk9 = 'go to marker 9', mk10 = 'go to marker 10 (0)',
     holdroll = 'held note key in INSERT: hold - the note lasts as long as you hold (an OFF where you let go); roll - a drum roll: while you hold, the same note on every next row at the speed of the rows, no OFF. Opt+` switches',
@@ -24250,6 +24264,19 @@ function ctrl_action(name, delta)
       else ctx.pane_do(function() return PNm.hide(m, 'perf') end, 'performance pane hidden'); if state.focus == 'perf' then ctx.set_focus('tracker') end end
     end
     vim.msg = ctx.PERF.active and ((ctx.PERF.jftop and 'jftop' or 'performance') .. ' pane: n - REAPER performance meter, t - jftop / performance, j k scroll, Esc - back') or 'performance closed'
+  elseif name == 'swingbar2' or name == 'swingbar3' or name == 'swingbar4' then
+    -- 14 ноя: свинги B C D — те же щелчок / протяжка / колесо
+    local i = tonumber(name:sub(-1))
+    if delta == 0 then ctx.swdrag = i
+    else local s = edit.SW[i]; edit.swing_slot_set(i, (s.on and s.amt or 0) + delta / 100); vim.msg = ('swing %s %d%%'):format(('ABCD'):sub(i, i), math.floor(edit.SW[i].amt * 100 + 0.5)) end
+  elseif name:match('^swslot[1-4]$') then
+    -- 14 ноя: буква свинга — назначить его треку курсора
+    local i = tonumber(name:sub(-1))
+    local col = cur_col()
+    if col and col.track then
+      edit.run('track swing', function() edit.set_track_swing(col.track, i) end)
+      vim.msg = ('%s: swing %s (%d%%) - new notes and quantize on this track follow it'):format(col.name ~= '' and col.name or 'track', ('ABCD'):sub(i, i), math.floor((edit.SW[i].on and edit.SW[i].amt or 0) * 100 + 0.5))
+    else vim.msg = 'swing: put the cursor on a track' end
   elseif name == 'swingbar' then
     -- 9 окт: слайдер свинга — щелчок / протяжка: значение по x (ctx.swdrag), колесо — ±1 %
     if delta == 0 then ctx.swdrag = true
@@ -25405,12 +25432,17 @@ local function frame()
   end
   -- 9 окт: протяжка слайдера свинга в транспорте (ячейка swingbar)
   if ctx.swdrag then
-    local r = draw.strip_cell and draw.strip_cell.swingbar
+    local si = type(ctx.swdrag) == 'number' and ctx.swdrag or 1   -- 14 ноя: какой из четырёх
+    local r = draw.strip_cell and draw.strip_cell[si == 1 and 'swingbar' or ('swingbar' .. si)]
     if gfx.mouse_cap & 1 == 1 and r then
       local sw2 = 8 * L.cw
       local v = math.max(-1, math.min(1, ((gfx.mouse_x - r[1]) / sw2) * 2 - 1))
       if math.abs(v) < 0.02 then v = 0 end
-      if math.abs(v - ((edit.sw.on and edit.sw.amt) or 0)) > 0.004 then edit.swing_set(v ~= 0, v); vim.msg = ctx.swing_text() end
+      local s0 = edit.SW[si]
+      if math.abs(v - ((s0.on and s0.amt) or 0)) > 0.004 then
+        if si == 1 then edit.swing_set(v ~= 0, v); vim.msg = ctx.swing_text()
+        else edit.swing_slot_set(si, v); vim.msg = ('swing %s %d%%'):format(('ABCD'):sub(si, si), math.floor(v * 100 + 0.5)) end
+      end
     else ctx.swdrag = nil end
   end
   -- 9 окт: аккорд вводом — курсор за новой нотой, пауза 1.5 с / курсор ушёл — конец
@@ -26149,7 +26181,7 @@ local function frame()
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       ptabs = state.ptabs and ctx.ptabs_info() or nil,   -- 12 ноя: опрос 4 Гц (был перебор проектов каждый кадр)
-      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.sw.on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.SW[edit.track_swing(cur_col() and cur_col().track)].on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, swing_v = ctx.swing_vals(), swing_tr = edit.track_swing(cur_col() and cur_col().track), time = ctx.pos_time(playpos or curpos), marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = ctx.punch_on(),
@@ -30088,6 +30120,9 @@ local function frame()
       -- 20 окт: двойной клик по скорости — x1, слайдер закрыть
       reaper.CSurf_OnPlayRateChange(1); ctx.rate_pop, ctx.ratedrag = nil, nil; vim.msg = 'playrate x1.00'
       click = { t = 0, zone = 'ctrl' }
+    elseif type(hover.ctrl) == 'string' and hover.ctrl:match('^swingbar[2-4]$') and dbl and click.zone == hover.ctrl then
+      local i = tonumber(hover.ctrl:sub(-1)); edit.swing_slot_set(i, 0); vim.msg = 'swing ' .. ('ABCD'):sub(i, i) .. ' off'; ctx.swdrag = nil   -- 14 ноя
+      click = { t = 0, zone = 'ctrl' }
     elseif (hover.ctrl == 'swingbar' or hover.ctrl == 'velbar') and dbl and click.zone == hover.ctrl then
       -- 6 ноя: двойной щелчок по слайдеру — по умолчанию: свинг выкл, velocity 100
       if hover.ctrl == 'swingbar' then edit.swing_set(false, 0); vim.msg = 'swing off' else vim.vel = 100; vim.msg = 'velocity 100' end
@@ -30096,7 +30131,7 @@ local function frame()
     elseif hover.ctrl then
       if hover.ctrl ~= 'beats' then state.ctrl_sel = hover.ctrl end     -- курсор клавиатуры — на нажатую ячейку
       ctrl_action(hover.ctrl, 0)
-      click = { t = now2, zone = (hover.ctrl == 'ratebar' or hover.ctrl == 'swingbar' or hover.ctrl == 'velbar') and hover.ctrl or 'ctrl' }
+      click = { t = now2, zone = (hover.ctrl == 'ratebar' or hover.ctrl == 'swingbar' or hover.ctrl == 'velbar' or (type(hover.ctrl) == 'string' and hover.ctrl:match('^swingbar[2-4]$'))) and hover.ctrl or 'ctrl' }
     elseif hover.scopes_on then
       ctx.toggle_scopes(true); click = { t = now2, zone = 'scopes_on' }
     elseif hover.scope then

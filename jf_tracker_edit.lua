@@ -386,6 +386,38 @@ function E.swing_read()
   E.sw.amt = math.max(-1, math.min(1, amt or 0))
   E.sw.on = (mode or 0) == 1 and math.abs(E.sw.amt) > 1e-6
   E.sw.div = (div or 0.0625) * 4
+  -- 14 ноя: свинги B C D — раз в ~30 вызовов (вызов — каждый кадр), значения — в проекте
+  E.sw_n = (E.sw_n or 0) + 1
+  if E.sw_n % 30 == 1 then E.swing_slots_read() end
+end
+-- 14 ноя: четыре свинга. A — свинг сетки проекта REAPER (родной), B C D — свои (величина в ExtState проекта, деление —
+-- то же, что у сетки); трек выбирает свой: P_EXT:jf_swing = 2..4, пусто — A. Применяется, как и раньше, к вставке и
+-- квантизации (стоящие события не двигаются)
+E.SW = { E.sw, { on = false, amt = 0 }, { on = false, amt = 0 }, { on = false, amt = 0 } }
+function E.swing_slots_read()
+  for i = 2, 4 do
+    local _, v = R.GetProjExtState(0, 'jf_tracker', 'swing' .. i)
+    local a = math.max(-1, math.min(1, tonumber(v) or 0))
+    E.SW[i].amt, E.SW[i].on = a, math.abs(a) > 1e-6
+  end
+end
+function E.swing_slot_set(i, amt)
+  amt = math.max(-1, math.min(1, amt or 0))
+  if math.abs(amt) < 1e-6 then amt = 0 end
+  if i == 1 then return E.swing_set(amt ~= 0, amt) end
+  if not E.SW[i] then return end
+  R.SetProjExtState(0, 'jf_tracker', 'swing' .. i, amt ~= 0 and ('%.4f'):format(amt) or '')
+  E.SW[i].amt, E.SW[i].on = amt, amt ~= 0
+  R.MarkProjectDirty(0)
+end
+function E.track_swing(tr)
+  if not (tr and R.ValidatePtr(tr, 'MediaTrack*')) then return 1 end
+  local _, v = R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_swing', '', false)
+  local i = tonumber(v)
+  return (i and E.SW[i]) and i or 1
+end
+function E.set_track_swing(tr, i)
+  if tr and R.ValidatePtr(tr, 'MediaTrack*') then R.GetSetMediaTrackInfo_String(tr, 'P_EXT:jf_swing', (i and i > 1) and tostring(i) or '', true) end
 end
 -- on / amt (−1..1) / div (доля целой ноты, как у REAPER: 1/16 = 0.0625); nil — как есть
 function E.swing_set(on, amt, div)
@@ -396,10 +428,10 @@ function E.swing_set(on, amt, div)
   R.UpdateTimeline()
   E.swing_read()
 end
-function E.swing_qn(q)
-  local s = E.sw
-  if not s.on or s.div <= 0 then return q end
-  local g = s.div
+function E.swing_qn(q, track)
+  local s = track and E.SW[E.track_swing(track)] or E.sw
+  local g = E.sw.div
+  if not s.on or g <= 0 then return q end
   local p0 = math.floor(q / (2 * g) + 1e-9) * 2 * g
   local x = q - p0
   local m = g * (1 + math.max(-0.99, math.min(0.99, s.amt)))   -- сдвинутая середина пары
@@ -415,9 +447,10 @@ function E.set_item_swing(it, on)
   if it and R.ValidatePtr(it, 'MediaItem*') then R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_noswing', on and '' or '1', true) end
 end
 -- время строки со свингом; item со свингом off — ровно
-function E.swing_time(row, lpb, item)
+function E.swing_time(row, lpb, item, track)
   if item and not E.item_swing(item) then return row_time(row, lpb, 0) end
-  return R.TimeMap2_QNToTime(0, E.swing_qn(row / lpb))
+  if not track and item and R.ValidatePtr(item, 'MediaItem*') then track = R.GetMediaItem_Track(item) end   -- 14 ноя: свинг трека
+  return R.TimeMap2_QNToTime(0, E.swing_qn(row / lpb, track))
 end
 -- время → строка и задержка xx/256 (3 окт: точный стык слайсов при шаге auto)
 function E.row_of_time(t, lpb)
@@ -691,7 +724,7 @@ end
 -- 16 окт: микротоны нот, начавшихся в строке row трека (аккорд гармонизатора в натуральном строе):
 -- pmap = { [pitch] = m }; MIDI-тейки, что покрывают строку, — через micro_sync
 function E.micro_set_at(track, row, lpb, pmap)
-  local t0 = E.swing_time(row, lpb)
+  local t0 = E.swing_time(row, lpb, nil, track)
   for i = 0, R.CountTrackMediaItems(track) - 1 do
     local it = R.GetTrackMediaItem(track, i)
     local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
@@ -2665,7 +2698,7 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
   local slices, base = E.item_slices(inst_item)
   if #slices == 0 then return end
   k = math.max(1, math.min(#slices, k))
-  local t0 = t_exact or E.swing_time(row, lpb)           -- t_exact: стык с концом предыдущего слайса; свинг (6 окт)
+  local t0 = t_exact or E.swing_time(row, lpb, nil, track)           -- t_exact: стык с концом предыдущего слайса; свинг (6 окт)
   local made
   run('insert slice ' .. k, function()
     if E.playthru(inst_item) then E.ghost_prepare(track, lane_idx, t0) end   -- 15 окт: старые ghost — до вставки (иначе копились и обрезали ноту)
@@ -2794,7 +2827,7 @@ end
 -- новый item из источника. pos — явная позиция вместо строки (депо).
 function E.insert_span(track, lane_idx, lpb, row, entry, t0, t1, pos)
   if not entry or t1 <= t0 then return end
-  local t = pos or E.swing_time(row, lpb)
+  local t = pos or E.swing_time(row, lpb, nil, track)
   local it
   run(('insert span %.2fs'):format(t1 - t0), function()
     if entry.item then
@@ -2900,12 +2933,12 @@ end
 -- 2 ноя: нота встанет? (сэмпл / плагин или MIDI-клип в строке) — до неё ничего не создавать (паттерн в свободном такте)
 function E.note_source_ok(track, lane_idx, lpb, row, depot_item)
   if depot_item then return true end
-  return midi_item_at(track, lane_idx, E.swing_time(row, lpb)) ~= nil
+  return midi_item_at(track, lane_idx, E.swing_time(row, lpb, nil, track)) ~= nil
 end
 function E.insert_note(track, lane_idx, lpb, row, pitch, vel, len_rows, depot_item, force_audio)
   local force_midi = depot_item == 'midi'                 -- 9 окт: выбран плагин-инструмент — нота MIDI
   if force_midi then depot_item = nil end
-  local t0 = E.swing_time(row, lpb)                       -- свинг (6 окт)
+  local t0 = E.swing_time(row, lpb, nil, track)                       -- свинг (6 окт)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   local made
   run('insert note', function()
@@ -3163,7 +3196,7 @@ end
 -- ── запись с MIDI-входа (INSERT + R на треке) ───────────────────────────
 -- нота всегда MIDI (даже на треке с аудио): в MIDI-item строки или новый на такт
 function E.rec_note(track, lane_idx, lpb, row, pitch, vel, len_rows)
-  local t0 = E.swing_time(row, lpb)
+  local t0 = E.swing_time(row, lpb, nil, track)
   local t1 = row_time(row + math.max(1, len_rows or 1), lpb, 0)
   run('rec note', function() insert_midi(track, lane_idx, t0, t1, pitch, vel, 0, false); if E.mono_on(track) then E.mono_cut_at(track, lane_idx, t0) end end)
 end
@@ -6111,7 +6144,7 @@ function E.quant_plan(item, hits, prm)
     if h.t > 0.005 and h.t < len - 0.005 then
       local q = R.TimeMap2_timeToQN(0, pos + h.t)
       local tq = math.floor(q / step + 0.5) * step
-      if E.item_swing(item) then tq = E.swing_qn(tq) end          -- свинг сетки проекта (6 окт)
+      if E.item_swing(item) then tq = E.swing_qn(tq, R.ValidatePtr(item, 'MediaItem*') and R.GetMediaItem_Track(item) or nil) end          -- свинг сетки проекта (6 окт)
       if tq <= qn0 + 1e-6 then skipped[#skipped + 1] = { t = h.t, why = 'start' }; tq = nil
       elseif math.abs(tq - q) > step * window then skipped[#skipped + 1] = { t = h.t, why = 'far' }; tq = nil end
       if tq then
