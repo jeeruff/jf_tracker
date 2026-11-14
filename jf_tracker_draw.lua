@@ -393,7 +393,8 @@ function D.panes_layout(state, L, nregions, ncols)
   local M, s = D.pn_M, D.pn_sig
   local m = state.panes
   if m then D.panes.pin_mixer(m); D.panes.pin_sprops(m) end   -- 11 окт: и properties — всегда своей панелью у item   -- 11 окт: mixer — всегда прямо под трекером (полоски — под его колонками)
-  local H = gfx.h - L.status_h
+  local H = gfx.h - L.status_h - (L.tppos == 'bottom' and (L.tp_gh or 0) or 0)
+  local Y0 = (D.top_inset or 0) + (L.tppos == 'top' and (L.tp_gh or 0) or 0)
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
   local mxa = (state.mixer and state.mixpos == 'bottom') and 1 or 0
   -- 10 окт: properties — только когда вкладка item активна в своём стеке
@@ -401,10 +402,11 @@ function D.panes_layout(state, L, nregions, ncols)
   do local lf = D.panes.find(m, 'sample'); if state.propsitem == false or (lf and lf.panes[lf.active] == 'sample') then it = 1 end end   -- опция properties with item
   if state.sp_none then it = 0 end                      -- 11 окт: сэмпла нет — нечего показывать
   local lo = state.loop_on and 1 or 0
-  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.lo == lo and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == D.hint_mode(state) then
+  if D.pn_lay and s.m == m and s.v == m.v and s.w == gfx.w and s.h == H and s.y0 == Y0 and s.rh == L.rh and s.cw == L.cw and s.sl == sl and s.gr == gr and s.dv == dv and s.it == it and s.lo == lo and s.mxa == mxa and s.ab == (state.tababc and 1 or 0) and s.hi == D.hint_mode(state) then
     return D.pn_lay
   end
   s.m, s.v, s.w, s.h, s.rh, s.cw, s.sl, s.gr, s.dv = m, m.v, gfx.w, H, L.rh, L.cw, sl, gr, dv
+  s.y0 = Y0
   s.ab = state.tababc and 1 or 0
   s.it = it
   s.lo = lo
@@ -435,7 +437,7 @@ function D.panes_layout(state, L, nregions, ncols)
     if a == 'merged' then return false end              -- 18 окт: modulation — страница automation
     return true
   end
-  D.pn_lay = D.panes.layout(m, gfx.w, H, M, D.top_inset or 0)   -- 28 окт: без рамки — всё на 1 px ниже (верхняя линия видна)
+  D.pn_lay = D.panes.layout(m, gfx.w, H, M, Y0)   -- 28 окт: без рамки — всё на 1 px ниже (верхняя линия видна)
   return D.pn_lay
 end
 
@@ -746,7 +748,7 @@ function D.layout_core(snap, state, nregions)
   -- положение полосы транспорта (5 окт): tracker — под трекером (как было),
   -- top — во всю ширину над верхней панелью, bottom — под DSP над статусом;
   -- снаружи трекера — со своей строкой подсказок под ней
-  L.tppos = (state.transpos == 'top' or state.transpos == 'bottom') and state.transpos or 'tracker'
+  L.tppos = state.transpos == 'top' and 'top' or 'bottom'   -- 14 ноя: полоса транспорта — общая, внизу окна (опция — наверху); «под трекером» убрано
   L.tp_h = L.tppos ~= 'tracker' and ((2 * L.rh + 6 + (L.kbstat and (2 * L.rh + 2) or 0)) + (state.hints and (L.rh + 1) or 0) + (state.tpstyle == 'full' and (2 * L.rh + 6) or 0)) or 0   -- 15 окт: full — 4 строки   -- 11 окт: full — строка |<< freeze slow >>| dub
   L.top_first = L.toppos == 'top'
   L.jr_h = state.jumps and L.rh or 0
@@ -885,6 +887,8 @@ function D.layout_core(snap, state, nregions)
     -- zellij: подсказки клавиш панели в фокусе — одной строкой внизу окна, над статусом
     L.pn_keys = (state.hints and state.hintpos == 'status') and (L.rh + 1) or 0
     L.status_h = (L.rh + 4) + L.pn_keys
+    -- 14 ноя: полоса транспорта — модлайн всего окна (как в Emacs): во всю ширину над статусом (или наверху), листы — в остатке
+    L.tp_gh = L.piano_h; L.tp_h = 0
     local lay = D.panes_layout(state, L, nregions, #snap.cols)
     L.pn = lay
     local c = lay.by_panel[D.layout_leaf or 'tracker']   -- 12 ноя: tracker#2 — раскладка на свой лист
@@ -923,7 +927,7 @@ function D.layout_core(snap, state, nregions)
     end
     L.mode_y = L.hsb_y + L.hsb_h
     L.piano_y = L.mode_y + L.mode_h
-    if L.tppos == 'top' then L.piano_y = tr.y elseif L.tppos == 'bottom' then L.piano_y = bot - L.tp_h end
+    if L.tppos == 'top' then L.piano_y = D.top_inset or 0 else L.piano_y = gfx.h - L.status_h - L.tp_gh end   -- 14 ноя: общая полоса окна
     L.stat_y = L.body_y + L.body_h + L.low_h
     L.under_y = L.stat_y + L.status_in
     L.trk_bot = bot
@@ -9015,6 +9019,7 @@ function D.blood(L, x0, y0, w, h)
   gfx.a = 1
 end
 function D.frame(L, snap, rows, state, info)
+  D.pop_h_prev, D.pop_h_cur = D.pop_h_cur or 0, 0   -- 14 ноя: высота меню внизу окна за прошлый кадр — на неё поднимается полоса транспорта
   D.fsnap, D.finfo = snap, info   -- 12 ноя: снимок и info кадра — для помощников вне frame (D.phr_num)
   D.clip = nil                                          -- граница модуля (9 окт) — только внутри своего блока
   D.SBW = math.max(1, math.min(12, tonumber(state.sbw) or 3))
@@ -14862,7 +14867,12 @@ function D.frame(L, snap, rows, state, info)
     if L.kbstat or (info.ctrl and info.ctrl.bigstatus) then
       st = { info.status_left or '', ((info.status_right or '') ~= '' and info.status_right) or D.aw_status or '', small = L.kbstat }
     end
-    if L.tppos == 'tracker' then D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
+    if L.pn then
+      -- 14 ноя: модлайн окна: открыто меню внизу (which-key / команда / список) — полоса поднимается над ним (высота меню — с прошлого кадра)
+      local rise = L.tppos == 'bottom' and (D.pop_h_prev or 0) or 0
+      if rise > 0 then set(U.BG); gfx.rect(0, L.piano_y, gfx.w, L.piano_h, 1) end
+      D.piano_strip(L, 0, L.piano_y - rise, gfx.w, L.piano_h, p, info, hover, st)
+    elseif L.tppos == 'tracker' then D.piano_strip(L, tx0, L.piano_y, W - tx0, L.piano_h, p, info, hover, st)
     else
       -- снаружи трекера: во всю ширину окна без сайдбара, подсказки — своей строкой под ней
       D.piano_strip(L, 0, L.piano_y, L.win_w, L.piano_h, p, info, hover, st)
@@ -15113,7 +15123,7 @@ function D.popup(L, p, anchor)
     if anchor.above then y = anchor.y - h - 2 >= 2 and (anchor.y - h - 2) or (anchor.y + 3 * L.rh)   -- над ячейкой; транспорт наверху — под полосой (5 окт)
     elseif anchor.y + h <= bottom then y = anchor.y else y = math.max(2, anchor.y - L.rh - h) end
   end
-  if dock then x, y = L.pad, gfx.h - (L.status_h or 0) - h - 2 end
+  if dock then x, y = L.pad, gfx.h - (L.status_h or 0) - h - 2; D.pop_h_cur = math.max(D.pop_h_cur or 0, h + 4) end
   y = math.max(2, math.min(y, gfx.h - h - 2))         -- высокое меню целиком в окне (5 окт)
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
