@@ -8266,12 +8266,25 @@ function D.panes_frame(L, snap, state, info, hover, ph)
   end
   D.pmark('panes: lines and grips')
   -- линии раздела и ручки: ручка под мышью — янтарём
-  -- 14 ноя: между модулями — зазор 7 px цветом фона окна, посередине линия 2 px (ярче внутренних линий)
-  for _, sp in ipairs(lay.seps) do
-    set(U.BG); gfx.rect(sp.x, sp.y, sp.w, sp.h, 1)
-    set(D.SEP)
-    if sp.w <= sp.h then gfx.rect(sp.x + math.floor((sp.w - 2) / 2), sp.y, math.min(2, sp.w), sp.h, 1)
-    else gfx.rect(sp.x, sp.y + math.floor((sp.h - 2) / 2), sp.w, math.min(2, sp.h), 1) end
+  -- 14 ноя: между модулями — зазор 7 px цветом фона окна, посередине линия 2 px (ярче внутренних линий). Линия длиннее
+  -- зазора на его половину с обоих концов: у перекрёстка доходит до середины поперечного зазора и встречает его линию
+  -- (обрывалась на 3 px раньше — «линии не дорисовываются»). Сперва весь фон, потом все линии — фон соседа линию не затирает
+  set(U.BG)
+  for _, sp in ipairs(lay.seps) do gfx.rect(sp.x, sp.y, sp.w, sp.h, 1) end
+  set(D.SEP)
+  do
+    local Hm = gfx.h - (L.status_h or 0)
+    for _, sp in ipairs(lay.seps) do
+      if sp.w <= sp.h then
+        local e = math.ceil(sp.w / 2)
+        local y0, y1 = math.max(0, sp.y - e), math.min(Hm, sp.y + sp.h + e)
+        gfx.rect(sp.x + math.floor((sp.w - 2) / 2), y0, math.min(2, sp.w), y1 - y0, 1)
+      else
+        local e = math.ceil(sp.h / 2)
+        local x0, x1 = math.max(0, sp.x - e), math.min(gfx.w, sp.x + sp.w + e)
+        gfx.rect(x0, sp.y + math.floor((sp.h - 2) / 2), x1 - x0, math.min(2, sp.h), 1)
+      end
+    end
   end
   for _, g in ipairs(lay.grips) do
     if mx >= g.x and mx < g.x + g.w and my >= g.y and my < g.y + g.h then
@@ -9180,7 +9193,9 @@ function D.frame(L, snap, rows, state, info)
         -- 8 ноя: [pin] — мастер всегда справа (вкл) / обычный крайний трек: виден, когда треки справа кончились (выкл)
         local pw = ms('pin') + 4
         local px = c.x + c.w - pw - 2
-        if px > c.x + ms('∑ master') + 2 * L.pad then
+        -- 14 ноя: ширина имени — та, какой оно нарисовано (крупное x1.5 / x2 шире: pin наезжал на «master»)
+        local nmw = (mk > 1 and D.big_measure('∑ master', mk) <= c.w - 2 * L.pad) and D.big_measure('∑ master', mk) or ms('∑ master')
+        if px > c.x + nmw + 2 * L.pad then
           local phot = mx >= px and mx < px + pw and my >= hy and my < hy + L.rh
           local pon = state.mpin ~= false
           set(pon and U.tint(U.CYAN, 0.25) or (phot and D.CURROW or U.PANEL)); gfx.rect(px, hy + 1, pw, L.rh - 2, 1)
@@ -14716,7 +14731,8 @@ function D.frame(L, snap, rows, state, info)
   -- граница матрица | трекер — на всю высоту модуля трекера: тело, статус в
   -- нём, строка подсказок (3 окт: обрывалась у низа тела, статус её закрывал);
   -- рисуется после статуса и подсказок, ровно до следующего модуля
-  if L.matrix_w > 0 and not state.mx_hidden then set(D.SEP); gfx.rect(L.matrix_w - 2, L.header_y, D.SEPW, (L.trk_bot or gfx.h) - L.header_y, 1) end
+  -- 14 ноя: с панелями этой линии нет — границу даёт зазор панелей (была второй линией рядом с ней: «три линии»)
+  if L.matrix_w > 0 and not state.mx_hidden and not L.pn then set(D.SEP); gfx.rect(L.matrix_w - 2, L.header_y, D.SEPW, (L.trk_bot or gfx.h) - L.header_y, 1) end
   -- браузер эффектов в фокусе (3 окт): во всю левую колонку — от верха матрицы
   -- до низа окна (матрица и главный модуль под ним), рисуется последним, мышь
   -- над ним не достаёт до того, что под ним
