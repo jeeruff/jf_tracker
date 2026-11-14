@@ -5448,6 +5448,7 @@ function D.kb_pane_kw(L, w, lw, info)
   return math.max(4, math.min(cap, (D.PIANO_SMALL or D.PIANO_RENOISE) and (ms('W') + 4) or (2 * ms('W') + 8)))
 end
 -- 6 ноя: короткие формы подписей главного модуля (крупный шрифт, узкая колонка)
+D.TPGAP = 2   -- 14 ноя: зазор между кнопками транспорта (было 4 px — просьба: меньше); одно число на оба ряда
 D.SHORT = { whichkey = 'wkey', preview = 'prev', options = 'opts', tutorial = 'tut', screensets = 'sets', ['col names'] = 'cols',
   autofocus = 'afoc', ['one click'] = '1clk', performance = 'perf', ['follow playhead'] = 'follow', ['lock to REAPER'] = 'lock',
   ['fixed cursor'] = 'fixcur', ['dB marks'] = 'dB', scopes = 'scope', router = 'route', matrix = 'mtx', listen = 'lstn',
@@ -5815,13 +5816,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       -- 31 окт (2): тоглы — сразу за x1.00 (rate без своей колонки), прижаты к правому краю кнопок; группа шире, только если не влезли
       need = ms('pun') + ms('pre') + ms('slo*') + ms('qtz') + 8 * L.pad
       local pre = -2
-      for i = 1, (pi or 2) - 1 do pre = pre + TW[i] + 4 end
+      for i = 1, (pi or 2) - 1 do pre = pre + TW[i] + D.TPGAP end
       need = math.min(pre + 2, math.floor((TW[1] + ms('mark')) / 2) + 2 * L.pad) + ms('x1.00') + 2 * L.pad + need
     end
     D.tp_play_i = pi
     local _ = wide   -- 19 окт: play — только по своему содержимому (/2 x2 под ним), без растяжки под строку тоглов
-    btot = -4
-    for i = 1, #blist do btot = btot + TW[i] + 4 end   -- 6 ноя: зазор 4 px, как в нижнем ряду (ряды разъезжались)
+    btot = -D.TPGAP
+    for i = 1, #blist do btot = btot + TW[i] + D.TPGAP end   -- 6 ноя: зазор — как в нижнем ряду (ряды разъезжались); 14 ноя: D.TPGAP
     -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
     if need > 0 then btot = math.max(btot, need) end   -- тоглы записи длиннее колонок справа от play — группа шире
   end
@@ -5859,7 +5860,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       end
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, by, bw, bh, b[1])
-      bx = bx + bw + 4   -- 6 ноя: 4 px, как нижний ряд
+      bx = bx + bw + D.TPGAP   -- 6 ноя: как нижний ряд
     end
     -- 11 окт: full — строка кнопок под транспортом (|<< freeze · slow >>| dub), колонка в колонку
     if c.tpfull then
@@ -5899,7 +5900,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           if hot then hover.ctrl = b[1] end
           hint('ctrl', sx, sy, tw, L.rh, b[1])
         end
-        sx = sx + tw + 4   -- 4 ноя: зазор 4 px между кнопками / вкладками
+        sx = sx + tw + D.TPGAP   -- 4 ноя: зазор между кнопками
       end
     end
     D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
@@ -5907,7 +5908,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- под rec и дальше — тоглы записи (punch pre-roll rec>lib slow; не влезли — короче)
     if c.tpfull then
       local ry = ly + 2 * L.rh + 2   -- 15 окт: маркеры / punch — третьей строкой (кнопки в одну строку)
-      local colx = function(i) local x2 = bx0; for k = 1, i - 1 do x2 = x2 + (TW[k] or tbw) + 4 end; return x2 end   -- 19 окт: колонки разной ширины
+      local colx = function(i) local x2 = bx0; for k = 1, i - 1 do x2 = x2 + (TW[k] or tbw) + D.TPGAP end; return x2 end   -- 19 окт: колонки разной ширины
       local function cellb(id, lab, x0, w0, on, dimc)
         local hot = cell_hot(x0, ry, w0, L.rh)
         if hot then set(D.CURROW); gfx.rect(x0 - 1, ry, w0 + 2, L.rh, 1); hover.ctrl = id end
