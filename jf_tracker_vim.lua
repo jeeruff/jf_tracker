@@ -4492,6 +4492,12 @@ function V.hydra_key(c)
   local ch = (c < 256) and string.char(c) or ''
   -- 14 ноя: меню и командная строка — одно место (внизу окна). В любом меню: «:» — строка команды, «/» — поиск по всем
   -- пунктам этого меню и его подменю (набор сужает список, Enter выполняет). Свой пункт на «:» или «/» у меню — он главнее
+  -- 14 ноя: Space в открытом меню лидера (Space, Space) — строка команды: как «:» (история и подсказки команд — в ней)
+  if c == 32 and h then
+    local own = false
+    for _, it in ipairs(h.items or {}) do if it.key == ' ' or it.key == 'Space' then own = true end end
+    if not own then ch = ':' end
+  end
   if (ch == ':' or ch == '/') and h then
     local own = false
     for _, it in ipairs(h.items or {}) do if it.key == ch then own = true end end
