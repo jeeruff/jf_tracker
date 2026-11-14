@@ -937,7 +937,8 @@ local function pool_select(n, go)   -- 6 ноя: go — выбрать и чуж
       -- 6 ноя: auto select выкл (кнопка auto в lib) — lib обычный список: курсор встаёт на чужой инструмент, трекер
       -- остаётся на своём треке; Enter — перейти на его трек и выбрать
       if col and oc.guid ~= col.guid and not state.libauto and not go then
-        vim.msg = ('inst %02d: %s on %s - Enter: go to the track and pick it (auto - follow at once)'):format(n, ctx.track_insts(oc)[k].name or '?', oc.name or '?')
+        local hid = 0; for _, e in ipairs(pool) do if e.parent then hid = hid + 1 end end   -- 14 ноя: номер — как в lib
+        vim.msg = ('inst %02d: %s on %s - Enter: go to the track and pick it (auto - follow at once)'):format(n - hid, ctx.track_insts(oc)[k].name or '?', oc.name or '?')
         return
       end
       if col and oc.guid ~= col.guid then ctx.goto_col(oc) end
@@ -13459,7 +13460,18 @@ ctx = {
   -- 14 ноя: последний номер lib трека курсора (сэмплы + пустые слоты + плагины-инструменты + automation) — для Opt+цифра по кругу
   pool_max = function()
     local col = cur_col(); local pool = col and col.pool or {}
-    return #pool + draw.empty_slots(#pool) + ((ctx.inst_total and ctx.inst_total()) or 0) + 1
+    local hid = 0; for _, e in ipairs(pool) do if e.parent then hid = hid + 1 end end   -- 14 ноя: в номерах, что видны в lib
+    return #pool - hid + draw.empty_slots(#pool) + ((ctx.inst_total and ctx.inst_total()) or 0) + 1
+  end,
+  -- 14 ноя: номер, что виден в lib (01 02 … — слайсы-дети номеров не занимают) → номер для pool_select (место в пуле).
+  -- Opt+цифра брала место в пуле: Opt+9 попадал не на «09», а на 9-ю запись пула (слайс → соседний сэмпл / пустой слот)
+  pool_num = function(num)
+    local col = cur_col(); local pool = col and col.pool or {}
+    local nr, hid = 0, 0
+    for i, e in ipairs(pool) do
+      if e.parent then hid = hid + 1 else nr = nr + 1; if nr == num then return i end end
+    end
+    return num + hid
   end,   -- 27 окт: выбор сэмпла снимает курсор с имени папки
   lib_nav = function() return draw.lib_nav end,
   lib_hdr = function(name) if name ~= nil then draw.lib_hdr = name or nil end; return draw.lib_hdr end,

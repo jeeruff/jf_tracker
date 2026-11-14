@@ -2405,7 +2405,7 @@ function V.key_impl(c)
         if o2 and o2.raw and o2.i == 1 and t2 - o2.t < gap then
           local n2 = o2.raw * 10 + raw
           V.optdig = nil
-          if n2 >= 1 and n2 <= (ctx.pool_max and ctx.pool_max() or 99) and ctx.pool_select then ctx.pool_select(n2) end
+          if n2 >= 1 and n2 <= (ctx.pool_max and ctx.pool_max() or 99) and ctx.pool_select then ctx.pool_select(ctx.pool_num and ctx.pool_num(n2) or n2, true) end
           V.count = nil; return
         end
       end
@@ -2422,7 +2422,7 @@ function V.key_impl(c)
       local i = 1
       if od and od.d == d and now - od.t < 2 then i = od.i % #list + 1 end   -- сюда доходит только пауза длиннее порога
       V.optdig = { d = d, i = i, t = now, raw = raw }
-      if ctx.pool_select then ctx.pool_select(list[i]) end
+      if ctx.pool_select then ctx.pool_select(ctx.pool_num and ctx.pool_num(list[i]) or list[i], true) end   -- 14 ноя: номер как в lib; true — и чужой инструмент сразу (номер набран явно)
       V.count = nil; return
     end
     V.optdig = nil   -- другая клавиша между цифрами — набор номера начинается заново
