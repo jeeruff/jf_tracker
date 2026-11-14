@@ -614,6 +614,52 @@ local function event_end(fi, row)
   return row
 end
 
+-- 14 ноя: `e` как в Vim — на ПОСЛЕДНЮЮ строку события под курсором; курсор уже на ней (или в пустоте) — на последнюю
+-- строку следующего события. n — счётчик (3e). nil — колонка огибающей / лейна (там e — следующая точка)
+local function event_last(fi, row, n)
+  local f = flat()[fi]
+  if not f or f.env or f.ml then return nil end
+  local r = row
+  for _ = 1, n or 1 do
+    local cand
+    for _, sub in ipairs(subs_of(f)) do
+      local h = head_of(sub[r])
+      local e = h and (h.row0 + (h.rows or 1) - 1)
+      if e and e > r and (not cand or e < cand) then cand = e end
+    end
+    if not cand then
+      local nr = next_ev(fi, r, 1)
+      if not nr then break end
+      cand = nr
+      for _, sub in ipairs(subs_of(f)) do
+        local h = head_of(sub[nr])
+        if h and h.row0 == nr then cand = math.max(cand, nr + (h.rows or 1) - 1); break end
+      end
+    end
+    r = cand
+  end
+  return r
+end
+-- 14 ноя: `ge` как в Vim — последняя строка предыдущего события колонки (выше курсора)
+local function event_prev_last(fi, row, n)
+  local f = flat()[fi]
+  if not f or f.env or f.ml then return nil end
+  local r = row
+  for _ = 1, n or 1 do
+    local found
+    local rr = r - 1
+    while rr >= 0 and not found do
+      for _, sub in ipairs(subs_of(f)) do
+        local h = head_of(sub[rr])
+        if h and h.row0 + (h.rows or 1) - 1 == rr then found = rr; break end
+      end
+      rr = rr - 1
+    end
+    if not found then break end
+    r = found
+  end
+  return r
+end
 -- 11 ноя: подколонка — только волна (вид трека zT): одна остановка курсора — волна (нота под ней не видна)
 local function wave_only(fi)
   local f = flat()[fi]
@@ -797,6 +843,10 @@ function motion(c, n, op)
     end
     return { fi = fi, row = r, field = 1, exclusive = dir > 0 or nil, linewise = true }
   elseif c == ('e'):byte() then
+    -- 14 ноя: движение (и в VISUAL) — как в Vim: конец этого события, ещё раз — конец следующего; оператор (de ce ye) —
+    -- как было: до конца события под курсором
+    local el = (not op) and event_last(cur.fi, cur.row, n)
+    if el then return { fi = cur.fi, row = el, linewise = true } end
     return { fi = cur.fi, row = event_end(cur.fi, cur.row), linewise = true, exclusive = true }   -- 19 окт: граница — строка после события, оператор её не берёт
   elseif c == ('E'):byte() then
     -- 15 окт: E — конец нижнего видимого события трека (последнее, что начинается на экране)
@@ -3261,6 +3311,12 @@ function V.key_impl(c)
         -- (20 окт: gt «следующая вкладка» отменён — это уже Tab)
         local k = V.count; V.count = nil; finish_move()
         if c == ('t'):byte() then if ctx.tab_menu then ctx.tab_menu(k) end elseif ctx.project_menu then ctx.project_menu(k) end
+        return
+      end
+      if c == ('e'):byte() and not V.op then   -- 14 ноя: ge — конец предыдущего события (как в Vim; 3ge — третьего выше)
+        local r = event_prev_last(V.cur.fi, V.cur.row, V.count or 1)
+        if r and r ~= V.cur.row then V.cur.row = r; if V.ensure_visible then V.ensure_visible() end else V.msg = 'ge: no event above in this column' end
+        V.count = nil; finish_move()
         return
       end
       if (c == ('q'):byte() or c == ('Q'):byte()) and not V.op then

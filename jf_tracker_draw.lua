@@ -387,6 +387,7 @@ end
 -- ── раскладка ─────────────────────────────────────────────────────────────
 -- панели (9 окт): раскладка дерева — мемо по сигнатуре (модель, окно, шрифт,
 -- доступность панелей); в кадре — только сравнения, без аллокаций
+function D.U_selinv(on) U.SEL_INV = on and true or false end   -- 14 ноя: опция selection inverted
 D.pn_M = { sep = 7, grip = 7 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
 D.pn_sig = {}
 function D.panes_layout(state, L, nregions, ncols)
@@ -460,6 +461,8 @@ function D.layout_core(snap, state, nregions)
   -- модули вплотную (8 окт: опция module gap убрана — она обрезала модули):
   -- между соседями одна линия 1 px; активный — рамка внутри своих границ
   D.SEPW = 1
+  -- 14 ноя: выделение инверсией (как в терминале): каждый пиксель → 1 - пиксель; видно в любой теме, и в монохромной
+  U.invert = U.invert or function(x, y, w, h) if w > 0 and h > 0 then gfx.muladdrect(x, y, w, h, -1, -1, -1, 1, 1, 1, 1, 0) end end
   D.MODELINE = U.mix(U.BG, U.TEXT, 0.12)   -- 14 ноя: фон строки статуса (модлайн) — чуть светлее фона окна, без рамки
   D.SEP = U.mix(U.BG, U.TEXT, 0.55)   -- 14 ноя: граница модулей ярче внутренних линий (U.LINE 0.42); было 0.38 — тише их
   gfx.setfont(D.font_id)
@@ -810,7 +813,7 @@ function D.layout_core(snap, state, nregions)
   -- (не больше зазора между строками: текст второй строки не налезает на третью)
   -- 15 окт: кнопки — одни символы в одну строку: полоса — 3 строки (кнопки, |<< freeze …, маркеры / punch)
   L.tp_cut = 0
-  L.piano_h = 2 * L.rh + 8 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and L.rh or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками   -- 31 окт: +4 px — хвост p (pitch) у некоторых шрифтов срезался низом полосы
+  L.piano_h = 2 * L.rh + 8 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and L.rh or 0) + ((state.panes_ui and state.tpstyle == 'full') and math.ceil(L.rh / 2) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками   -- 31 окт: +4 px — хвост p (pitch) у некоторых шрифтов срезался низом полосы
   -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
   L.mode_h = 0   -- 16 окт: модлайна нет (смысла не было) — режим и место курсора в полосе транспорта
   L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
@@ -6046,7 +6049,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 14 ноя: общая полоса окна — под позицией время, под BPM метроном и счётчик долей
     if L.pn and c.tpfull and D.sig_line and not D.sig_stack then
       local y3 = ly + 2 * L.rh + 2 - (L.tp_cut or 0)
-      if c.time then text(bx0 + D.big_measure('> ', BKT), y3 + 1, c.time, U.GREY) end
+      if c.time then D.big_text(bx0 + D.big_measure('> ', BKT), y3, c.time, U.TEXT, 1.5) end   -- 14 ноя (3): время крупнее (x1.5), полоса на полстроки выше
       draw_group(D.sig_line, bpm_x, bigw - (bpm_x - bx0), y3)
     elseif c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, D.sig_stack and (ly + L.rh) or (ly + 2 * L.rh + 2 - (L.tp_cut or 0))) end   -- 4 ноя: стопкой — metro, ниже swing
   end
@@ -10996,7 +10999,7 @@ function D.frame(L, snap, rows, state, info)
         y0 = y0 or yy; y1 = yy + L.rh
       end
     end
-    if y0 then
+    if y0 and not U.SEL_INV then
       for fi = vis.f0, vis.f1 do
         local f = L.flat[fi]
         if f and f.x then
@@ -11475,6 +11478,24 @@ function D.frame(L, snap, rows, state, info)
         end
         for fi, f in ipairs(L.flat) do
           if f.ml and f.x and (line or (f.ml.ev and f.ml.ev[r.row] ~= nil)) then hint('cell', f.x, y, f.w or L.cw * 3, L.rh, { fi = fi, row = r.row, field = 1 }) end
+        end
+      end
+    end
+  end
+  -- 14 ноя: выделение VISUAL инверсией — поверх строк (ноты, волна, огибающие): видно, что именно выделено
+  if vis and U.SEL_INV then
+    local y0, y1
+    for i, r in ipairs(rows) do
+      if not r.clip and r.row >= vis.r0 and r.row <= vis.r1 then local yy = L.body_y + (i - 1) * L.rh; y0 = y0 or yy; y1 = yy + L.rh end
+    end
+    if y0 then
+      for fi = vis.f0, vis.f1 do
+        local f = L.flat[fi]
+        if f and f.x then
+          if vis.field and not f.env and not f.ml then
+            local fx2, fw2 = D.field_rect(f.G or L, vis.field)
+            if fx2 then U.invert(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0) end
+          else U.invert(f.x, y0, f.w, y1 - y0); if f.fxx then U.invert(f.x + f.fxx, y0, f.fxw, y1 - y0) end end
         end
       end
     end

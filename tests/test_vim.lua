@@ -207,7 +207,29 @@ keysin('w');   eq('w → hat', V.cur.row, 16)
 keysin('w');   eq('w stays at last', V.cur.row, 16)
 keysin('b');   eq('b → snare', V.cur.row, 8)
 keysin('2b');  eq('2b → kick', V.cur.row, 0)
-keysin('e');   eq('e → boundary after kick', V.cur.row, 4)
+-- 14 ноя: e как в Vim — последняя строка события; ещё раз — последняя строка следующего
+keysin('e');   eq('e → the last row of kick', V.cur.row, 3)
+keysin('e');   eq('e again → the last row of snare', V.cur.row, 9)
+keysin('e');   eq('e → hat (one row)', V.cur.row, 16)
+keysin('e');   eq('e stays at the last event', V.cur.row, 16)
+V.cur.row = 5; keysin('e'); eq('e from an empty row → the end of the next event', V.cur.row, 9)
+V.cur.row = 0; keysin('2e'); eq('2e → the end of the second event', V.cur.row, 9)
+V.cur.row = 1; keysin('e'); eq('e inside kick → its last row', V.cur.row, 3)
+V.cur.row = 0; keysin('ve'); eq('ve selects the kick to its last row', V.cur.row, 3); keysin('e'); eq('ve e extends to the end of snare', V.cur.row, 9); V.key(27)
+-- 14 ноя: сверка с Vim — курсор после b / ge / w изнутри события и из пустоты
+V.cur.fi, V.cur.field = 1, 1
+V.cur.row = 2;  keysin('b');  eq('b inside kick → its start (Vim: b inside a word)', V.cur.row, 0)
+V.cur.row = 9;  keysin('b');  eq('b inside snare → its start', V.cur.row, 8)
+V.cur.row = 5;  keysin('b');  eq('b from an empty row → the event above on the track (ov, 2nd subcolumn: w b walk the whole track)', V.cur.fi * 100 + V.cur.row, 202)
+V.cur.fi = 1; V.cur.row = 8;  keysin('b');  eq('b on a start → the previous start of the track', V.cur.fi * 100 + V.cur.row, 202)
+V.cur.fi = 1
+V.cur.row = 2;  keysin('w');  eq('w inside kick → the next start of the track (ov)', V.cur.fi * 100 + V.cur.row, 202)
+V.cur.fi = 1; V.cur.row = 8;  keysin('ge'); eq('ge → the last row of the previous event', V.cur.row, 3)
+V.cur.fi = 1; V.cur.row = 12; keysin('ge'); eq('ge from an empty row → the last row of the event above', V.cur.row, 9)
+V.cur.fi = 1; V.cur.row = 9;  keysin('ge'); eq('ge inside snare → the end of kick', V.cur.row, 3)
+V.cur.fi = 1; V.cur.row = 0;  keysin('3w'); eq('3w counts events', V.cur.row >= 8, true)
+V.cur.fi, V.cur.field = 1, 1
+V.cur.row = 4
 keysin('2j');  eq('2j', V.cur.row, 6)
 keysin('k');   eq('k', V.cur.row, 5)
 keysin('l');   eq('l → vol field', V.cur.field, 2); eq('l same sub', V.cur.fi, 1)

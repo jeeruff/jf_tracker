@@ -861,9 +861,15 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
       end
       if MX.anchor then
         local r0, r1, c0, c1 = MX.block()
-        if ri >= r0 and ri <= r1 and ci >= c0 and ci <= c1 then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1 end
+        if ri >= r0 and ri <= r1 and ci >= c0 and ci <= c1 then
+          if U.SEL_INV and U.invert then U.invert(x, y, L.mx_cell_w, rh)   -- 14 ноя: выделение инверсией (видно и в монохромной теме)
+          else U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1 end
+        end
       end
-      if MX.picks[ri .. ':' .. ci] then U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1; gfx.rect(x, y, L.mx_cell_w, rh, 0) end
+      if MX.picks[ri .. ':' .. ci] then
+        if U.SEL_INV and U.invert then U.invert(x, y, L.mx_cell_w, rh) else U.set(U.AMBER); gfx.a = 0.22; gfx.rect(x, y, L.mx_cell_w, rh, 1); gfx.a = 1 end
+        U.set(U.AMBER); gfx.rect(x, y, L.mx_cell_w, rh, 0)
+      end
       if MX.cur.ri == ri and MX.cur.ci == ci then
         MX.cur_rect = { x = x, y = y, w = L.mx_cell_w, h = rh }      -- 12 окт: якорь смарт-панели клетки
         -- 18 окт (2): без фокуса — тот же янтарь, тише; внутри тёмная кромка — рамка видна и на белой (полной) ячейке
