@@ -16313,6 +16313,36 @@ edit.after = function(desc)
   local hard = state.hardedges == true and ctx.view_cur() == 'pattern'   -- 10 ноя: жёсткие края — только в виде pat (контекст паттерна); proj / sec — нота идёт насквозь
   if not hard and ((desc or ''):match('^insert note') or (desc or ''):match('^insert slice')) then pcall(ctx.pat_cut_over, edit.changed_items()) end
   if state.hardedges and not hard then ctx.log_add('  hard pattern edges: off in the ' .. ctx.view_cur() .. ' view - nothing cut') end   -- только вставка (продление Ctrl+Shift+J K — без разреза)   -- 9 ноя: вид pattern — режем на начале следующего паттерна
+  -- 14 ноя: СТРОГО один MIDI-клип на паттерн (на лейн трека): MIDI-айтемы, которые правка создала / сдвинула, сливаются
+  -- с клипами своего паттерна в один на весь паттерн (клип через границу — режется на ней). Библиотека и паттерны-
+  -- фразы (ph:) — мимо; лупы (Евклид) pat_merge не трогает. До синка копий — копии получают уже слитое
+  if regions and #regions > 0 and not (desc or ''):match('^merge') then
+    local ok, err = pcall(function()
+      model.invalidate(); regions = model.regions(state.lpb)
+      local lib = edit.lib_track and edit.lib_track(false)
+      local done = {}
+      for it in pairs(edit.changed_items() or {}) do
+        if reaper.ValidatePtr(it, 'MediaItem*') then
+          local tr, tk = reaper.GetMediaItem_Track(it), reaper.GetActiveTake(it)
+          local _, tname = reaper.GetTrackName(tr)
+          local store = tr == lib or tname == model.DEPOT or (model.is_lib_name and model.is_lib_name(tname))   -- хранилища инструментов — мимо
+          if not store and tk and reaper.TakeIsMIDI(tk) then
+            local p0 = reaper.GetMediaItemInfo_Value(it, 'D_POSITION')
+            local p1 = p0 + reaper.GetMediaItemInfo_Value(it, 'D_LENGTH')
+            local fm = reaper.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+            local lane = fm and reaper.GetMediaItemInfo_Value(it, 'I_FIXEDLANE') or nil
+            for ri, rg in ipairs(regions) do
+              if not rg.lib and not rg.gap and not (rg.name or ''):match('^ph:') and rg.pos < p1 - 1e-6 and rg.rgnend > p0 + 1e-6 then
+                local key = tostring(tr) .. '|' .. tostring(lane) .. '|' .. ri
+                if not done[key] then done[key] = true; edit.pat_merge(tr, lane, rg.pos, rg.rgnend, true) end
+              end
+            end
+          end
+        end
+      end
+    end)
+    if not ok then ctx.log_add('  one clip per pattern: ' .. tostring(err)) end
+  end
   -- 14 ноя: регионы — свежие: правка могла сдвинуть их (темп, вставка времени), а список кадра ещё старый — синк копий
   -- клал айтемы по прежним секундам (копия паттерна «неровно», хвосты в соседнем паттерне)
   if state.autosync or hard then model.invalidate(); regions = model.regions(state.lpb) end
@@ -17020,7 +17050,7 @@ MX.ruler = state.mxruler
 MX.stack = state.mxstack
 MX.fold = false                                 -- 9 окт: fold убран, кнопка — sel
 edit.human = state.human or 0                   -- 9 окт: human слайсов (опция)
-edit.pat_item = function() return state.patitem ~= false end   -- 31 окт: новый MIDI-айтем — на весь паттерн
+edit.pat_item = function() return true end   -- 14 ноя: строго один MIDI-клип на паттерн — опция больше не выключает   -- 31 окт: новый MIDI-айтем — на весь паттерн
 edit.mono = state.slicemono                     -- 9 окт: mono слайсера
 B.init(ctx, (ext('browse', '') ~= '' and ext('browse', '')) or nil)
 SL.init(ctx)
@@ -25754,6 +25784,7 @@ local function frame()
   if ctx.vl_on then left = 'VIPER ' .. left end   -- 9 ноя: VIPER — только когда слой работает (клавиши из окна REAPER); в трекере — обычный режим
   if ctx.cm_seen and reaper.time_precise() - ctx.cm_seen < 0.3 then left = 'CONTROL' end   -- 2 ноя: жест Ctrl+Opt — слово режима CONTROL
   if state.phr_edit then left = 'PHRASE ' .. state.phr_edit.name .. ' ' .. left end   -- 31 окт: правка фразы
+  if ctx.LOOM_OFF then state.loom = nil end
   if state.loom then left = 'LOOM ' .. state.loom:upper() .. ' ' .. left end   -- 12 ноя
   -- 14 ноя: keyspat / keyphr видны при любом фокусе (было: только фокус в главном трекере, словами PATTERNKB / PHRASEKB):
   -- в трекере в NORMAL — вместо слова режима, иначе — перед ним (KEYSPAT INSERT, KEYSPAT MATRIX)
@@ -35889,7 +35920,6 @@ ctx.mode_menu = function()
     { key = 'f', label = on(state.keyphr, 'KEYPHR - the note keys play the phrases'), fn = function() ctx.keyphr_cmd() end },
     { key = 'i', label = on(m == 'insert', 'INSERT - the note keys write notes (Esc)'), fn = base('i') },
     { key = 'k', label = on(vim.piano, 'KEYS - the note keys play the instrument in NORMAL (m)'), fn = function() if ctx.toggle_piano then ctx.toggle_piano(true) end end },
-    { key = 'l', label = on(state.loom, 'LOOM - the cursor pattern loops while you edit it' .. (state.loom and (' (' .. state.loom .. ')') or '')), fn = function() ctx.loom_cmd('') end },
     { key = 'n', label = on(m == 'normal' and not state.keyphr and not pads and not vim.piano, 'NORMAL - the keys are commands'), fn = function()
         if state.keyphr then ctx.keyphr_cmd('off') end
         if ctx.PADS and ctx.PADS.on then ctx.pads_cmd('off') end
@@ -40470,7 +40500,9 @@ ctx.sec_show = function(sc)
 end
 -- 12 ноя: loom (PLAN_LOOM.md) — паттерн курсора крутится по кругу, трек ткётся правками на ходу.
 -- auto — просто крутит (правки сразу в паттерне); man — Opt+Enter: копия паттерна следом (новое имя), луп и курсор — на неё
+ctx.LOOM_OFF = true   -- 14 ноя: loom выключен целиком (работал неправильно) — код оставлен до переделки; вернуть: false
 ctx.loom_cmd = function(arg)
+  if ctx.LOOM_OFF then state.loom = nil; vim.msg = 'loom is switched off for now'; return end
   arg = (arg or ''):match('%a+') or ''
   if arg == 'off' or (arg == '' and state.loom) then
     state.loom = nil; reaper.GetSetRepeat(0); vim.msg = 'loom off'; return
@@ -40483,6 +40515,7 @@ ctx.loom_cmd = function(arg)
   vim.msg = ('loom %s: %s loops; %s'):format(state.loom, rg.name or '', state.loom == 'man' and 'Opt+Enter - the next turn as a new pattern after it' or 'edits go straight into it')
 end
 ctx.loom_next = function()
+  if ctx.LOOM_OFF then state.loom = nil; return end
   local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0))
   if not rg then vim.msg = 'loom: no pattern at the cursor'; return end
   local t1

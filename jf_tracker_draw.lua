@@ -5376,12 +5376,10 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
   g[#g + 1] = { boxed = true,   -- 15 окт: без вертикальной скобки — подпись step под цифрой
                 { { 'step', stxt, big = true, res = (#stxt <= 2) and '16' or nil, vlab = 'step', vlab_rows = 2 }, { 'lpb', ('LPB %s%s'):format(D.lpb_s(c.lpb or 4), ((c.lpb or 0) % 3 == 0 and ' T') or ((c.lpb or 0) % 5 == 0 and ' D') or ''), res = col2 },   -- 1 ноя: T триоли, D квинтоли
                   { 'holdroll', c.holdroll and 'roll' or 'hold', c.holdroll and U.CYAN or U.GREY, res = col3 },   -- 28 окт: Opt+`
-                  { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 },
-                  { 'loom', 'loom', c.loom and U.CYAN or U.GREY, res = col3 } },   -- 12 ноя: loom — паттерн по кругу (man / auto)
+                  { 'legato', 'lgto', c.legato and U.CYAN or U.GREY, res = col3 } },   -- 14 ноя: loom убран (выключен целиком)   -- 12 ноя: loom — паттерн по кругу (man / auto)
                 { { '_', '', w = stepw }, { 'pitch', (c.pitchmode == 'resample') and 'rsmp' or 'shft', res = col2 },
                   { 'ripple', ({ [0] = 'ripp', 'ripp', 'rip*' })[c.ripple or 0], (c.ripple or 0) > 0 and U.CYAN or U.GREY, res = col3 },   -- 31 окт: ripple — под roll, словом целиком (было rip у записи)
-                  { 'human', 'hmnz', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 },
-                  { 'loomnext', c.loom == 'auto' and 'auto' or 'next', c.loom and U.TEXT or U.DIM, res = col3 } } }   -- 12 ноя: man — следующий виток (= Opt+Enter); auto — пометка   -- 15 окт: human — тайминг, высота, velocity
+                  { 'human', 'hmnz', (c.human or 0) > 0 and U.CYAN or U.GREY, res = col3 } } }   -- 12 ноя: man — следующий виток (= Opt+Enter); auto — пометка   -- 15 окт: human — тайминг, высота, velocity
   -- 12 окт: listen — что звучит при правке: insert (вставленное), step (строка курсора, его трек), sel (выделение), line (строка, все треки).
   -- Полный транспорт: третьей строкой под step / vel (подпись listen — под клавиатурой), иначе своей группой
   -- 15 окт: третья строка — подпись step под цифрой; четвёртая — listen и что слушать (два «step» не рядом)
@@ -7299,8 +7297,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
     end
   end
+  -- 14 ноя: automation из lib убрана (номер за ней остаётся — нумерация midi / фраз не едет); вернуть: D.LIB_AUTO = true
+  if D.LIB_AUTO then
   rows[#rows + 1] = { hdr = 'automation', name = '' }
-  rows[#rows + 1] = { auto = true, num = nsamp + gn + 1 }   -- automation как инструмент (5 окт); 21 окт: после всех инструментов проекта
+  rows[#rows + 1] = { auto = true, num = nsamp + gn + 1 }
+  end   -- automation как инструмент (5 окт); 21 окт: после всех инструментов проекта
   rows[#rows + 1] = { hdr = 'midi', name = '' }
   rows[#rows + 1] = { midi = true, num = nsamp + gn + 2 }   -- MIDI-клипы трека / проекта (10 окт)
   -- 11 ноя: фразы — разделом lib (как automation / midi): выбрал — клавиши нот ставят её триггер, высота транспонирует
@@ -7445,7 +7446,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- вкладки lib (10 окт): как вкладки панелей — рамками встык, активная янтарём
     local ty = iy + 2 + 2 * L.rh + LEG
     local tx = ix + 2
-    for _, nm in ipairs({ 'audio', 'instruments', 'automation', 'midi' }) do
+    for _, nm in ipairs(D.LIB_AUTO and { 'audio', 'instruments', 'automation', 'midi' } or { 'audio', 'instruments', 'midi' }) do
       local tw2 = ms(nm) + 2 * L.pad
       if tx + tw2 > ix + w - 2 then break end
       local on = (info.libtab or 'audio') == nm
