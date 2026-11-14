@@ -32454,7 +32454,7 @@ local function frame()
   end
   -- панели (9 окт, бета): Ctrl+W — режим PANE (липкий); Cmd+hjkl — фокус в
   -- соседа, Cmd+Shift+hjkl — перенести панель туда (как dwm), без режима
-  if state.debug and (c == 8 or c == 72 or c == 104) and gfx.mouse_cap & 4 ~= 0 then ctx.dlog(('cmd+h at the pane block: c=%d cap=%d panes=%s pn=%s picker=%s hydra=%s mode=%s pane_mode=%s'):format(c, gfx.mouse_cap, tostring(state.panes_ui), tostring(L and L.pn ~= nil), tostring(vim.picker ~= nil), tostring(vim.hydra ~= nil), tostring(vim.mode), tostring(state.pane_mode))) end
+  if state.debug and (c_raw == 8 or c == 72 or c == 104) and (gfx.mouse_cap & 4 ~= 0 or c_raw == 8) then ctx.dlog(('cmd+h at the pane block: c=%d raw=%d cap=%d focus=%s panes=%s pn=%s picker=%s hydra=%s mode=%s pane_mode=%s letter=%s smart=%s np=%s'):format(c, c_raw, gfx.mouse_cap, tostring(state.focus), tostring(state.panes_ui), tostring(L and L.pn ~= nil), tostring(vim.picker ~= nil), tostring(vim.hydra ~= nil), tostring(vim.mode), tostring(state.pane_mode), tostring(ctx.cmd_letter(c, ctx.mods())), tostring(MX.SMART.p ~= nil), tostring(ctx.NP ~= nil))) end   -- 14 ноя: и без бита Cmd, и съеденное раньше (c = 0)
   if state.panes_ui and L and L.pn and c > 0 and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
     local m = ctx.mods()
     if state.pane_mode then ctx.pane_key(c); c = 0
@@ -32480,7 +32480,7 @@ local function frame()
           ctx.pane_nudge(id, DIR[ch])
         elseif id == 'map' and B.map_zone_step and B.map_zone_step(DIR[ch]) then   -- 27 окт (8): части панели map — сначала внутри
         elseif state.focus == 'top' and state.toptab == 'automation' and mod_pane == 'curve' and ctx.acv_zone_step(DIR[ch]) then   -- 1 ноя: холст <-> список кривых
-        else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end end
+        else local to = draw.panes.focus_dir(L.pn, id, DIR[ch]); if to then ctx.pane_focus(to) end; if state.debug then ctx.dlog(('cmd+%s: %s -> %s, focus now %s'):format(ch, tostring(id), tostring(to), tostring(state.focus))) end end
         c = 0
       end
     end
