@@ -585,8 +585,8 @@ ctrl_down, alt_down = false, false
 V.key(27)
 V.cur.field = 1
 V.cur.row = 13
-V.key(1);          eq('^A nudges +1/64', last(), 'envnudge:Volume@13:+0.0156')
-keysin('2'); V.key(24); eq('2^X nudges −2/64', last(), 'envnudge:Volume@13:-0.0312')
+V.key(1);          eq('^A nudges +1 of 255 (one hex unit, 15 ноя)', last(), 'envnudge:Volume@13:+0.0039')
+keysin('2'); V.key(24); eq('2^X nudges −2/64', last(), 'envnudge:Volume@13:-0.0078')
 keysin(':ramp 40 2b'); V.key(13); eq(':ramp 40 2b → 8 rows', last(), 'envramp:Volume@13-21:cur>0.25')
 keysin(':ramp ff 3'); V.key(13); eq(':ramp ff 3 → 3 rows', last(), 'envramp:Volume@13-16:cur>1.00')
 V.cur.row = 0; keysin('V'); keysin('6j'); keysin(':ramp 00'); V.key(13)

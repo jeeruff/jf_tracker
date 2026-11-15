@@ -4124,11 +4124,13 @@ function V.key_impl(c)
     if ctx.time_edit then ctx.time_edit(c == BS and 'delete' or 'insert', V.cur.fi, V.cur.row, n, all) end
     finish_edit()
   elseif env_of(V.cur.fi) and (ch == 'x' or c == BS or c == DEL or c == ctrl('a') or c == ctrl('x')) then
-    -- колонка огибающей в NORMAL: x/BS — удалить точку, ^A/^X — ±1/64
+    -- колонка огибающей в NORMAL: x/BS — удалить точку, ^A/^X — ±1 (hex), Shift — ±10 (hex)
     local env = env_of(V.cur.fi)
     if (V.cur.field or 1) == 2 and nfields() >= 2 and (c == ctrl('a') or c == ctrl('x')) then ctx.env_shape_step(env, V.cur.row, c == ctrl('a') and 1 or -1)
-    elseif c == ctrl('a') then ctx.env_nudge(env, V.cur.row, n / 64)
-    elseif c == ctrl('x') then ctx.env_nudge(env, V.cur.row, -n / 64)
+    -- 15 ноя: шаг — одна единица того, что видно (hex 00..FF): C7 → C6 (было 1/64 = четыре единицы: C7 → C3); Shift — 16
+    elseif c == ctrl('a') or c == ctrl('x') then
+      local big = ctx.mods and ctx.mods().shift
+      ctx.env_nudge(env, V.cur.row, (c == ctrl('a') and 1 or -1) * n * (big and 16 or 1) / 255)
     else for r = V.cur.row, V.cur.row + n - 1 do ctx.env_del(env, r) end end
     -- 31 окт: Ctrl+Opt+A / X и на огибающей — курсор на шаг step вниз (лесенка), как на лейнах и командах
     if (c == ctrl('a') or c == ctrl('x')) and ctx.mods and ctx.mods().alt then

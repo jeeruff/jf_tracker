@@ -5532,7 +5532,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       hint('ctrl', x + L.pad, vy, vw, L.rh, 'vel')
       D.strip_cell.vel = { x + L.pad, vy, vw }
       -- 15 окт: короче — правый конец у настоящего края клавиатуры (та же ширина клавиши, что ниже), не залезает на step
-      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4 + (L.pn and math.floor(ms('W') * 0.75) or 0), (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
+      local kwv = math.floor(math.min(((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4 + (L.pn and math.floor(ms('W') * 1.5) or 0), (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
       if info and info.kbd_only then kwv = D.kb_pane_kw(L, w, lw, info) end   -- 2 ноя: панель keys — та же ширина клавиши
       -- 2 ноя: слайдер + $pt + ped — ровно под клавишами: от первой белой (после колёс pitch / mod) до последней
       local k0 = kx + ((info and info.wheels) and (2 * (math.max(6, math.floor(L.cw * 0.9)) + L.pad) + L.pad) or 0)
@@ -5578,7 +5578,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     end
     -- 8 окт: клавиша на символ шире буквы (так читалось); опция small piano —
     -- впритык к букве (для крупного битмапа x2 и узких окон)
-    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4 + (L.pn and math.floor(ms('W') * 0.75) or 0)   -- 14 ноя: в общей полосе окна клавиши шире;  -- 14 окт: renoise — 2 октавы, узко
+    local kw0 = ((D.PIANO_SMALL or D.PIANO_RENOISE) and 0 or ms('W')) + ms('W') + 4 + (L.pn and math.floor(ms('W') * 1.5) or 0)   -- 14 ноя: в общей полосе окна клавиши шире;  -- 14 окт: renoise — 2 октавы, узко
     local kw = math.floor(math.min(kw0, (w - lw - L.pad) / (#D.PIANO_WHITE + 12)))
     -- 2 ноя: панель keys — клавиши на всю её ширину (без запаса под транспорт), small piano — уже; буквы видны
     if info and info.kbd_only then kw = D.kb_pane_kw(L, w, lw, info) end
