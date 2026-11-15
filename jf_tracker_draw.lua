@@ -1150,6 +1150,16 @@ function D.layout_core(snap, state, nregions)
         -- минимум подколонок задаёт пользователь кнопками -/+ над лейном (1 окт)
         local nsub = math.max(1, #lane.subs, (state.subs_min or {})[col.guid .. ':' .. tostring(lane.idx)] or 0)
         if lvl and lvl > 3 + L.MAXFX and li == 1 then nsub = math.max(nsub, 1 + lvl - 3 - L.MAXFX) end   -- шире всех fx — подколонки нот
+        -- 15 ноя (2): трек сужают — первыми уходят ПУСТЫЕ подколонки нот (заданные кнопками - + сверх занятых), и только
+        -- потом поля: каждый шаг «уже» сначала снимает одну пустую подколонку, уровень полей на столько же выше
+        local llvl = lvl
+        do
+          local base = 3 + math.min(L.MAXFX, L.nfx or 0)
+          if lvl and lvl >= 2 and lvl < base and not c.compact and D.SMART_COLS ~= false then
+            local spare = nsub - math.max(1, #lane.subs)
+            if spare > 0 then local rm = math.min(spare, base - lvl); nsub = nsub - rm; llvl = lvl + rm end
+          end
+        end
         local ln = { lane = lane, x = lx, nsub = nsub, f0 = #L.flat + 1, sx = {} }
         local off = 0
         local parts = {}
@@ -1157,7 +1167,7 @@ function D.layout_core(snap, state, nregions)
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           if narrow and lvl == L.MAXLVL and not c.compact then narrow = false end   -- 4 ноя: самый широкий уровень колеса — у каждой колонки нот свои поля и эффекты (MPE)
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
-          if lvl and lvl >= 2 and not narrow then G = (nsub == 1 and D.SMART_COLS ~= false and L.smartG(lane, lvl)) or L.GL[math.min(lvl, 3 + L.MAXFX)] end   -- 15 ноя: одна подколонка — пустые поля уходят первыми
+          if llvl and llvl >= 2 and not narrow then G = (nsub == 1 and D.SMART_COLS ~= false and L.smartG(lane, llvl)) or L.GL[math.min(llvl, 3 + L.MAXFX)] end   -- 15 ноя: одна подколонка — пустые поля уходят первыми
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
           if lane.has_micro then G = L.microG(G) end   -- 2 ноя: шире — только этот лейн
