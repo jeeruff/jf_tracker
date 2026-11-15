@@ -387,6 +387,29 @@ end
 -- ── раскладка ─────────────────────────────────────────────────────────────
 -- панели (9 окт): раскладка дерева — мемо по сигнатуре (модель, окно, шрифт,
 -- доступность панелей); в кадре — только сравнения, без аллокаций
+-- 15 ноя: самый узкий уровень ширины, при котором видны все занятые колонки трека: 1 — событий нет, 2 — нота + vol,
+-- 3 — есть delay, 3 + k — занято k колонок команд. Кэш — на таблицу колонки снимка (новый снимок — новые таблицы)
+D.used_c = setmetatable({}, { __mode = 'k' })
+function D.col_used_level(col, maxfx)
+  local v = D.used_c[col]
+  if v ~= nil then return v or nil end
+  local used, any, dly = 0, false, false
+  for _, ln in ipairs(col.lanes or {}) do
+    for _, sub in ipairs(ln.subs or {}) do
+      for _, c in pairs(sub) do
+        if type(c) == 'table' then
+          if c.kind == 'midi' or c.kind == 'audio' then any = true; if (c.delay or 0) > 0 then dly = true end end
+          if c.fx and (c.kind == 'midi' or c.kind == 'audio' or c.kind == 'cont') then
+            for i = #c.fx, 1, -1 do if c.fx[i] and c.fx[i] ~= '' then if i > used then used = i end; break end end
+          end
+        end
+      end
+    end
+  end
+  v = (not any and 1) or (used > 0 and (3 + math.min(maxfx or 4, used))) or (dly and 3) or 2
+  D.used_c[col] = v
+  return v
+end
 function D.U_selinv(on) U.SEL_INV = on and true or false end   -- 14 ноя: опция selection inverted
 D.pn_M = { sep = 7, grip = 7 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
 D.pn_sig = {}
@@ -1031,6 +1054,12 @@ function D.layout_core(snap, state, nregions)
       local own = state.wlevel and state.wlevel[col.guid]
       local nat = own or (fs == 'mini' and 0) or (fs == true and 1) or nil
       lvl = nat and math.min(nat, state.wzlevel) or state.wzlevel
+      -- 15 ноя: треки ужимаются — сначала уходят колонки БЕЗ данных: уровень трека не шире последней занятой колонки
+      -- (пустые delay / команды справа). Трек курсора и трек со своей шириной (z, z.) — как есть: в пустую колонку можно писать
+      if not own and col.guid ~= state.cur_guid then
+        local u = D.col_used_level(col, L.MAXFX)
+        if u and u < lvl and (nat == nil or u >= nat) then lvl = u end
+      end
     end
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать

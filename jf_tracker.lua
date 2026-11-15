@@ -761,6 +761,7 @@ local function relayout()
   draw.sroslash = state.sroslash and true or false   -- 16 окт: /// по умолчанию; выкл — буквы s r o
   draw.micro = (state.micro or model.seen_micro) and true or nil; draw.micro_tag = model.micro_tag   -- 16 окт: микротоны — шире колонка нот
   local f_old = L and L.flat[vim.cur.fi] or nil   -- 20 окт: поле курсора до новой раскладки (27 окт: всегда — LPB, раскрытые ноты, лейны)
+  state.cur_guid = f_old and f_old.col and f_old.col.guid or nil   -- 15 ноя: трек курсора — раскладке (его пустые колонки не прячутся)
   L = draw.layout(snap, state, #regions)
   -- 20 окт: autozoom — общая ширина треков сама: самая широкая, при которой влезают все треки,
   -- но не уже ноты и волны (уровень 1); ручной уровень (Cmd+колесо) — после выключения
