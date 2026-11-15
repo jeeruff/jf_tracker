@@ -3990,6 +3990,7 @@ ctx = {
   tab_menu = function(n)
     local PN = draw.panes
     local tabs, cur = {}, ctx.pane_cur()
+    local hidden
     -- 19 окт: все модули раскладки (dsp, fx, lib …), не только верхние вкладки; без панелей — верхние вкладки
     local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
     if bp then
@@ -4000,7 +4001,9 @@ ctx = {
         else
           local alt
           for id in pairs(bp) do if id ~= p.id and PN.base(id) == p.id and (not alt or id < alt) then alt = id end end
-          if alt then tabs[#tabs + 1] = alt end
+          if alt then tabs[#tabs + 1] = alt
+          -- 15 ноя (2): спрятанный модуль (Ctrl+W q, не в раскладке) — тоже в меню: gtd всегда ведёт в DSP, переход его показывает
+          elseif p.key and draw.pn_M and (not draw.pn_M.avail or draw.pn_M.avail(p.id)) then tabs[#tabs + 1] = p.id; hidden = hidden or {}; hidden[p.id] = true end
         end
       end
     else for _, id in ipairs(ctx.top_tabs()) do if PN.BY[id] then tabs[#tabs + 1] = id end end end
@@ -4008,7 +4011,7 @@ ctx = {
     local items = {}
     for i, id in ipairs(tabs) do
       local pb = PN.BY[id] or PN.BY[PN.base(id)]
-      items[#items + 1] = { key = pb.key, label = ((id == cur or PN.base(id) == cur) and '* ' or '') .. pb.label, fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
+      items[#items + 1] = { key = pb.key, label = ((id == cur or PN.base(id) == cur) and '* ' or '') .. pb.label .. ((hidden and hidden[id]) and '  (hidden - opens it)' or ''), fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
     end
     vim.open_hydra({ title = 'go to module', items = items })
   end,
