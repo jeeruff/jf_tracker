@@ -7239,6 +7239,11 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     tbtn('auto', info.libauto, 'libautobtn')   -- 6 ноя: auto select — трекер за инструментом чужого трека
     -- 4 ноя: layer — слой (¥) выбранному инструменту: другой звук lib звучит с ним одной нотой (= L); 6 ноя: внизу
     tbtn('layer', false, 'poollayer')
+    -- 15 ноя: ‹ ξ › (случайный сэмпл по папке выбранного, назад / вперёд по выпавшим) — здесь, рядом с layer
+    do
+      local xw = 3 * (ms('W') + 7)
+      if bx + xw <= ix + w - L.pad then D.lib_xi_btns(L, bx + xw, by - 1, mx, my, hover); bx = bx + xw + L.pad end
+    end
     -- 6 ноя: bsync — под колонкой bs (правый край кнопки — у правого края значений bs), не влезает — следом
     do
       local bsr = ix + w - L.pad - 4 - (ms('88.88s') + L.pad)
@@ -7626,7 +7631,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов
       -- 13 окт: «16$» — отдельно, не обрезается вместе с именем
       local lcol = sel and U.AMBER or (e.muted and U.GREY or (here and U.TEXT or U.GREY))
-      local xiw = (sel and not child) and (3 * (ms('W') + 7) + 2) or 0   -- 11 ноя: ‹ ξ › — в правой части имени: имя короче на их ширину
+      local xiw = 0   -- 15 ноя: ‹ ξ › переехали вниз, к layer — имя во всю ширину
+      local _ = (sel and not child) and (3 * (ms('W') + 7) + 2) or 0   -- 11 ноя: ‹ ξ › — в правой части имени: имя короче на их ширину
       local head = fit(pre .. body, math.max(ms('W'), label_w - 6 - ms(suf) - xiw))
       text(ix + 6, y + 1, head, lcol)
       if suf ~= '' then text(ix + 6 + ms(head), y + 1, suf, lcol) end
@@ -7709,7 +7715,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- зоны (9 окт): ~ — огибающие take (вкладка automation), волна — вкладка item
       if rowhot then hover.pool = { ci = info.pool_ci, i = i, tenv = tenv_hot, wave = (mx >= wx and npix > 8) or nil } end
       hint('pool', ix + 2, y, w - 4, L.rh, i)
-      if sel and not child then D.lib_xi_btns(L, ix + 6 + label_w, y, mx, my, hover) end   -- 11 ноя: у правого края имени (не на превью)   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
+      -- 15 ноя: ‹ ξ › — внизу lib, рядом с layer (было: у правого края имени выбранной строки)   -- 11 ноя: у правого края имени (не на превью)   -- 27 окт (5): ‹ ξ › — случайный сэмпл и назад / вперёд
       if drag and my >= y and my < y + L.rh then
         if my < y + L.rh / 2 then D.lib_drop, drop_y = { before = i }, y
         else
