@@ -4012,7 +4012,7 @@ ctx = {
     local items = {}
     for i, id in ipairs(tabs) do
       local pb = PN.BY[id] or PN.BY[PN.base(id)]
-      items[#items + 1] = { key = pb.key, label = ((id == cur or PN.base(id) == cur) and '* ' or '') .. pb.label .. ((hidden and hidden[id]) and '  (hidden - opens it)' or ''), fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
+      items[#items + 1] = { key = pb.key, label = ((id == cur or PN.base(id) == cur) and '* ' or '') .. pb.label, fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
     end
     vim.open_hydra({ title = 'go to module', items = items })
   end,
