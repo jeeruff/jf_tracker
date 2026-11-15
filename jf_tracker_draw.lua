@@ -394,7 +394,11 @@ function D.panes_layout(state, L, nregions, ncols)
   local M, s = D.pn_M, D.pn_sig
   local m = state.panes
   if m then D.panes.pin_mixer(m); D.panes.pin_sprops(m) end   -- 11 окт: и properties — всегда своей панелью у item   -- 11 окт: mixer — всегда прямо под трекером (полоски — под его колонками)
-  local H = gfx.h - L.status_h - (L.tppos == 'bottom' and (L.tp_gh or 0) or 0)
+  -- 15 ноя: меню внизу окна (which-key / команда / список) не ложится поверх, а поджимает листы вверх, как минибуфер
+  -- Emacs: высота меню — с прошлого кадра (D.pop_h_cur ставит D.popup; раскладка идёт до отрисовки кадра)
+  local poph = (L.tppos == 'bottom' and D.pop_bottom) and (D.pop_h_cur or 0) or 0
+  L.pop_lift = poph
+  local H = gfx.h - L.status_h - (L.tppos == 'bottom' and (L.tp_gh or 0) or 0) - poph
   local Y0 = (D.top_inset or 0) + (L.tppos == 'top' and (L.tp_gh or 0) or 0)
   local sl, gr, dv = state.slices_on and 1 or 0, state.gridtab and 1 or 0, state.dev and 1 or 0
   local mxa = (state.mixer and state.mixpos == 'bottom') and 1 or 0
@@ -931,7 +935,7 @@ function D.layout_core(snap, state, nregions)
     end
     L.mode_y = L.hsb_y + L.hsb_h
     L.piano_y = L.mode_y + L.mode_h
-    if L.tppos == 'top' then L.piano_y = D.top_inset or 0 else L.piano_y = gfx.h - L.status_h - L.tp_gh end   -- 14 ноя: общая полоса окна
+    if L.tppos == 'top' then L.piano_y = D.top_inset or 0 else L.piano_y = gfx.h - L.status_h - L.tp_gh - (L.pop_lift or 0) end   -- 14 ноя: общая полоса окна; 15 ноя: над меню
     L.stat_y = L.body_y + L.body_h + L.low_h
     L.under_y = L.stat_y + L.status_in
     L.trk_bot = bot
@@ -11528,7 +11532,11 @@ function D.frame(L, snap, rows, state, info)
     for _, rg in ipairs((vc and info.ruler and info.ruler.regions) or {}) do if vc.row >= rg.r0 - 1e-6 and vc.row < rg.r1 - 1e-6 then D.pcol = rg.rgb end end
   end
   for _, e in ipairs(D.pat_lines or {}) do
-    set(D.pcol or e[4]); gfx.rect(e[1], e[2], e[3], 1, 1)   -- 1 px (2 — слишком жирно для разметки), верх строки = линия такта
+    -- 15 ноя: 3 px: сверху — цвет паттерна, который кончается, посередине (по линии такта) — серая разделительная,
+    -- снизу — цвет паттерна, который начинается (в 1 px граница была слабее обычной линии такта)
+    set(e[7] or U.GREY); gfx.rect(e[1], e[2] - 1, e[3], 1, 1)
+    set(D.SEP or U.GREY); gfx.rect(e[1], e[2], e[3], 1, 1)
+    set(e[4] or U.GREY); gfx.rect(e[1], e[2] + 1, e[3], 1, 1)
     local gx = L.matrix_w + L.pad
     if e[5] then local s5 = e[5]; text(gx, e[2] - 2 - L.th, s5, e[7] or U.GREY, U.BG) end
     if e[6] then text(gx, e[2] + 2, e[6], e[4], U.BG) end
