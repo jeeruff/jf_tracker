@@ -807,6 +807,20 @@ local function relayout()
     if best then vim.cur.fi = best end
   end
 end
+-- 15 ноя: замер раскладки при debug: сколько полных проходов draw.layout за вызов и сменился ли снимок (рывки ~25 мс)
+do
+  local raw = relayout
+  relayout = function()
+    if not state.debug then return raw() end
+    local n, orig, s0 = 0, draw.layout, snap
+    draw.layout = function(...) n = n + 1; return orig(...) end
+    local ok, e = pcall(raw)
+    draw.layout = orig
+    draw.rl_n, draw.rl_newsnap = n, (draw.rl_snap ~= s0)
+    draw.rl_snap = s0
+    if not ok then error(e, 0) end
+  end
+end
 local function cur_col() local f = L and L.flat[vim.cur.fi]; return f and f.col end
 local function playing() return reaper.GetPlayState() & 1 == 1 end
 
@@ -25378,7 +25392,7 @@ local function frame()
   ctx.hdr_poll()                                       -- sync track header size (6 окт)
   local tq2 = reaper.time_precise()
   relayout()
-  if state.debug and reaper.time_precise() - tq0 > 0.02 then ctx.dlog(('slow pre: slice_root %.1f hdr_poll %.1f relayout %.1f ms'):format((tq1 - tq0) * 1000, (tq2 - tq1) * 1000, (reaper.time_precise() - tq2) * 1000)) end
+  if state.debug and reaper.time_precise() - tq0 > 0.02 then ctx.dlog(('slow pre: slice_root %.1f hdr_poll %.1f relayout %.1f ms; layout passes %d, new snapshot %s, autozoom %s, tracks %d, flat %d'):format((tq1 - tq0) * 1000, (tq2 - tq1) * 1000, (reaper.time_precise() - tq2) * 1000, draw.rl_n or -1, tostring(draw.rl_newsnap), tostring(state.autozoom), snap and #snap.cols or -1, L and L.flat and #L.flat or -1)) end
   if ctx.goto_track and L and L.flat then             -- tt: курсор на новый трек, как только он в раскладке
     for i, f in ipairs(L.flat) do if f.col and f.col.track == ctx.goto_track and not f.env then vim.cur.fi = i; ctx.goto_track = nil; break end end
   end
