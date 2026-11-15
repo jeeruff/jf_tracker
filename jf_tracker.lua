@@ -3955,12 +3955,23 @@ ctx = {
     local tabs, cur = {}, ctx.pane_cur()
     -- 19 окт: все модули раскладки (dsp, fx, lib …), не только верхние вкладки; без панелей — верхние вкладки
     local bp = state.panes and draw.pn_lay and draw.pn_lay.by_panel
-    if bp then for _, p in ipairs(PN.PANELS) do if bp[p.id] then tabs[#tabs + 1] = p.id end end
+    if bp then
+      -- 15 ноя: модуль в раскладке может стоять буфером (dsp#2 вместо dsp) — тогда его id нет в by_panel, и модуль
+      -- пропадал из меню (DSP из go to module). Берётся буфер с тем же основанием
+      for _, p in ipairs(PN.PANELS) do
+        if bp[p.id] then tabs[#tabs + 1] = p.id
+        else
+          local alt
+          for id in pairs(bp) do if id ~= p.id and PN.base(id) == p.id and (not alt or id < alt) then alt = id end end
+          if alt then tabs[#tabs + 1] = alt end
+        end
+      end
     else for _, id in ipairs(ctx.top_tabs()) do if PN.BY[id] then tabs[#tabs + 1] = id end end end
-    if n then local id = tabs[n]; if id then ctx.pane_focus(id); vim.msg = 'tab ' .. n .. ': ' .. PN.BY[id].label else vim.msg = ('gt: %d tabs'):format(#tabs) end; return end
+    if n then local id = tabs[n]; if id then ctx.pane_focus(id); vim.msg = 'tab ' .. n .. ': ' .. (PN.BY[id] or PN.BY[PN.base(id)]).label else vim.msg = ('gt: %d tabs'):format(#tabs) end; return end
     local items = {}
     for i, id in ipairs(tabs) do
-      items[#items + 1] = { key = PN.BY[id].key, label = (id == cur and '* ' or '') .. PN.BY[id].label, fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
+      local pb = PN.BY[id] or PN.BY[PN.base(id)]
+      items[#items + 1] = { key = pb.key, label = ((id == cur or PN.base(id) == cur) and '* ' or '') .. pb.label, fn = function() ctx.pane_focus(id) end }   -- 20 окт: без номеров (Ngt — вкладки)
     end
     vim.open_hydra({ title = 'go to module', items = items })
   end,
