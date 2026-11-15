@@ -16535,7 +16535,7 @@ ctx.dedup = function()
   edit.after = hook
   if not ok then vim.msg = 'dedup: ' .. tostring(err); return end
   model.invalidate()
-  vim.msg = n > 0 and ('dedup: %d duplicate item(s) removed on %d track(s) - u brings them back'):format(n, nt) or 'dedup: no exact duplicates'
+  vim.msg = n > 0 and ('dedup: %d duplicate / empty stacked item(s) removed on %d track(s) - u brings them back'):format(n, nt) or 'dedup: no duplicates, no empty MIDI clips stacked on another'
 end
 ctx.pat_cut_over = function(items)
   if not items or ctx.view_cur() == 'pattern' or not regions or #regions == 0 then return end   -- 9 ноя: pat — контекст паттерна, не режем; proj / sec — продолжение в следующем

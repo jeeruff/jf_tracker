@@ -163,6 +163,29 @@ function A.dedup()
         end
       end
     end
+    -- 16 ноя: пустые MIDI-клипы (ни нот, ни CC, ни текста), стоящие в одной точке с другим MIDI-клипом трека — лишние
+    -- («лесенка» пустых клипов разной длины в начале паттерна). Есть непустой — уходят все пустые; все пустые —
+    -- остаётся самый длинный
+    local dead = {}
+    for _, it in ipairs(kill) do dead[it] = true end
+    local at = {}
+    for i = 0, R.CountTrackMediaItems(tr) - 1 do
+      local it = R.GetTrackMediaItem(tr, i)
+      local tk = R.GetActiveTake(it)
+      if not dead[it] and tk and R.TakeIsMIDI(tk) then
+        local k = ('%.5f'):format(R.GetMediaItemInfo_Value(it, 'D_POSITION'))
+        local b = at[k]; if not b then b = {}; at[k] = b end
+        local _, nn, nc, nt = R.MIDI_CountEvts(tk)
+        b[#b + 1] = { it = it, empty = (nn or 0) == 0 and (nc or 0) == 0 and (nt or 0) == 0, len = R.GetMediaItemInfo_Value(it, 'D_LENGTH') }
+      end
+    end
+    for _, b in pairs(at) do
+      if #b > 1 then
+        local full, keep = false, nil
+        for _, e in ipairs(b) do if not e.empty then full = true elseif not keep or e.len > keep.len then keep = e end end
+        for _, e in ipairs(b) do if e.empty and (full or e ~= keep) then kill[#kill + 1] = e.it end end
+      end
+    end
     for _, it in ipairs(kill) do R.DeleteTrackMediaItem(tr, it) end
     if #kill > 0 then removed = removed + #kill; ntr = ntr + 1 end
   end
