@@ -143,9 +143,34 @@ local function cell_of(col, lanes, rg, rgb_of, model, idx)
       -- сетка строится на весь проект после каждой пересборки, и десятки
       -- Envelope_Evaluate на огибающую в каждой клетке давали пик ~110 мс
       local envsrc = (model and model.env_samples and col.envs and #col.envs > 0) and { col = col, pos = rg.pos, e1 = rg.rgnend } or nil
-      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envsrc = envsrc, xin = xin, xout = xout }
+      return { state = has and (all_muted and 'muted' or 'has') or 'empty', cov = math.min(1, covered / span), ev = ev, envsrc = envsrc, er = envsrc, xin = xin, xout = xout }
 end
 
+-- 16 ноя: есть ли в клетке точки автоматизации (в её отрезке времени). Огибающая трека тянется через всю песню —
+-- раньше любая клетка трека с огибающей считалась непустой и стояла без точек («темнота» ниже паттернов)
+function MX.cell_envhere(g)
+  if g.envhere ~= nil then return g.envhere end
+  local r, v = g.er, false
+  if r and r.col and r.col.envs then
+    for _, e in ipairs(r.col.envs) do
+      local env = e.env
+      if env and reaper.ValidatePtr(env, 'TrackEnvelope*') then
+        local i = reaper.GetEnvelopePointByTime(env, r.e1 - 1e-6)
+        if i and i >= 0 then local ok, t = reaper.GetEnvelopePoint(env, i); if ok and t >= r.pos - 1e-6 then v = true; break end end
+        if reaper.CountAutomationItems(env) > 0 then
+          for k = 0, reaper.CountAutomationItems(env) - 1 do
+            local p0 = reaper.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false)
+            local p1 = p0 + reaper.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false)
+            if p0 < r.e1 - 1e-6 and p1 > r.pos + 1e-6 then v = true; break end
+          end
+          if v then break end
+        end
+      end
+    end
+  end
+  g.envhere = v
+  return v
+end
 function MX.cell_envs(g)
   if g.envs or not g.envsrc then return g.envs end
   local src, envs = g.envsrc, {}
@@ -781,7 +806,7 @@ function MX.draw(L, snap, regions, info, Y, Wd, Hd)
         end
       end
       -- 4 ноя: как в трекере — пустая клетка точками, без рамки; с событиями — схема (ниже)
-      if #(g.ev or {}) == 0 and not g.envs and not g.envsrc then
+      if #(g.ev or {}) == 0 and not MX.cell_envhere(g) then
         local dt = ('.'):rep(math.max(1, math.min(3, math.floor((L.mx_cell_w - 4) / math.max(1, U.measure('.'))))))
         U.text(x + math.floor((L.mx_cell_w - U.measure(dt)) / 2), y + math.floor((rh - L.rh) / 2) + 1, dt, U.DIM)
       end
