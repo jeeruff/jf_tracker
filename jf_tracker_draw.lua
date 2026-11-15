@@ -410,6 +410,26 @@ function D.col_used_level(col, maxfx)
   D.used_c[col] = v
   return v
 end
+-- 15 ноя: в каких полях лейна есть данные: [2] vol, [3] delay, [3 + i] команда i. Кэш — на таблицу лейна снимка
+D.lane_c = setmetatable({}, { __mode = 'k' })
+function D.lane_data(lane, maxfx)
+  local d = D.lane_c[lane]
+  if d then return d end
+  d = {}
+  for _, sub in ipairs(lane.subs or {}) do
+    for _, c in pairs(sub) do
+      if type(c) == 'table' then
+        if c.kind == 'midi' or c.kind == 'audio' then
+          if c.vol and c.vol ~= '' and c.vol ~= '..' then d[2] = true end
+          if (c.delay or 0) > 0 then d[3] = true end
+        end
+        if c.fx then for i = 1, maxfx or 4 do if c.fx[i] and c.fx[i] ~= '' then d[3 + i] = true end end end
+      end
+    end
+  end
+  D.lane_c[lane] = d
+  return d
+end
 function D.U_selinv(on) U.SEL_INV = on and true or false end   -- 14 ноя: опция selection inverted
 D.pn_M = { sep = 7, grip = 7 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
 D.pn_sig = {}
@@ -684,6 +704,41 @@ function D.layout_core(snap, state, nregions)
     for i = 1, k do t.x_fx[i] = xx; xx = xx + L.w_fx + L.pad end
     fold_tail(t, xx)
     L.GL[3 + k] = setmetatable(t, { __index = L })
+  end
+  -- 15 ноя: уровень ширины убирает сначала ПУСТЫЕ колонки. Уровень k = нота + (k - 1) полей; из vol, delay, команд
+  -- остаются сперва те, где есть данные (по порядку), потом пустые. Номера полей прежние (2 vol, 3 delay, 4.. команды),
+  -- спрятанное поле — G.hid[n], его x — за экраном (рисование и щелчки его не видят, курсор обходит — vim: vorder)
+  L.SGc = {}
+  local OFFX = -100000
+  function L.smartG(lane, lvl)
+    local full = 3 + L.MAXFX
+    lvl = math.min(lvl, full)
+    if lvl < 2 or L.x_pan then return L.GL[lvl] end
+    local d = D.lane_data(lane, L.MAXFX)
+    local m, show, n = lvl - 1, {}, 0
+    for f = 2, full do if n < m and d[f] then show[f] = true; n = n + 1 end end
+    for f = 2, full do if n < m and not show[f] then show[f] = true; n = n + 1 end end
+    local prefix, key, K = true, '', 0
+    for f = 2, full do
+      if (show[f] or false) ~= (f <= lvl) then prefix = false end
+      key = key .. (show[f] and '1' or '0')
+      if show[f] and f > 3 then K = f - 3 end
+    end
+    if prefix then return L.GL[lvl] end
+    local t = L.SGc[key]
+    if t then return t end
+    local top = 2
+    for f = 2, full do if show[f] then top = f end end
+    t = { nfx = K, x_fx = {}, nfields = top, hid = {} }
+    local xx = L.x_vol
+    if show[2] then xx = xx + L.w_vol + L.pad else t.x_vol = OFFX; t.hid[2] = true end
+    if show[3] then t.x_del = xx; xx = xx + L.w_del + L.pad else t.x_del = OFFX; t.hid[3] = true end
+    for i = 1, K do
+      if show[3 + i] then t.x_fx[i] = xx; xx = xx + L.w_fx + L.pad else t.x_fx[i] = OFFX; t.hid[3 + i] = true end
+    end
+    fold_tail(t, xx)
+    L.SGc[key] = setmetatable(t, { __index = L })
+    return L.SGc[key]
   end
   -- 11 окт: wave only — аудио-подколонка полосой волны; ширина по зуму трека (кэш по ширине)
   L.GW = {}
@@ -1056,10 +1111,6 @@ function D.layout_core(snap, state, nregions)
       lvl = nat and math.min(nat, state.wzlevel) or state.wzlevel
       -- 15 ноя: треки ужимаются — сначала уходят колонки БЕЗ данных: уровень трека не шире последней занятой колонки
       -- (пустые delay / команды справа). Трек курсора и трек со своей шириной (z, z.) — как есть: в пустую колонку можно писать
-      if not own and col.guid ~= state.cur_guid then
-        local u = D.col_used_level(col, L.MAXFX)
-        if u and u < lvl and (nat == nil or u >= nat) then lvl = u end
-      end
     end
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать
@@ -1106,7 +1157,7 @@ function D.layout_core(snap, state, nregions)
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
           if narrow and lvl == L.MAXLVL and not c.compact then narrow = false end   -- 4 ноя: самый широкий уровень колеса — у каждой колонки нот свои поля и эффекты (MPE)
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
-          if lvl and lvl >= 2 and not narrow then G = L.GL[math.min(lvl, 3 + L.MAXFX)] end
+          if lvl and lvl >= 2 and not narrow then G = (nsub == 1 and D.SMART_COLS ~= false and L.smartG(lane, lvl)) or L.GL[math.min(lvl, 3 + L.MAXFX)] end   -- 15 ноя: одна подколонка — пустые поля уходят первыми
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
           if lane.has_micro then G = L.microG(G) end   -- 2 ноя: шире — только этот лейн

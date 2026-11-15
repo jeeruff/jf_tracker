@@ -161,8 +161,17 @@ end
 local function vorder(fi)   -- 4 ноя: delay теперь сразу за vol (draw f3741ff): нота, vol, delay, fx1..n
   local nf = nfields(fi)
   local o = {}
-  for k = 1, nf do o[k] = k end
+  -- 15 ноя: уровень ширины может спрятать поле из середины (пустое — раньше занятых): курсор по нему не ходит
+  local f = flat()[fi]
+  local hid = f and f.G and f.G.hid
+  for k = 1, nf do if not (hid and hid[k]) then o[#o + 1] = k end end
+  if #o == 0 then o[1] = 1 end
   return o
+end
+-- поле спрятано уровнем ширины?
+local function fld_hidden(fi, fld)
+  local f = flat()[fi]
+  return (f and f.G and f.G.hid and f.G.hid[fld]) and true or false
 end
 local function vpos(fi, fld)
   for i, f in ipairs(vorder(fi)) do if f == fld then return i end end
@@ -880,6 +889,28 @@ function motion(c, n, op)
   elseif c == ('0'):byte() and not V.count then return { fi = 1, row = cur.row, field = 1 }
   end
   return nil
+end
+
+-- 15 ноя: поля, спрятанные уровнем ширины: цель движения на таком поле сдвигается на ближайшее видимое по ходу;
+-- курсор, оказавшийся на спрятанном (трек только что сузили), сперва встаёт на видимое
+do
+  local raw = motion
+  local function near(fi, fld, dir)
+    local o = vorder(fi)
+    if dir > 0 then for _, k in ipairs(o) do if k > fld then return k end end; return o[#o] end
+    for i = #o, 1, -1 do if o[i] < fld then return o[i] end end
+    return o[1]
+  end
+  motion = function(c, n, op)
+    if fld_hidden(V.cur.fi, V.cur.field or 1) then V.cur.field = near(V.cur.fi, V.cur.field or 1, -1); V.cur.sub = nil end
+    local t = raw(c, n, op)
+    if t and type(t.field) == 'number' and fld_hidden(t.fi or V.cur.fi, t.field) then
+      local same = (t.fi or V.cur.fi) == V.cur.fi
+      t.field = near(t.fi or V.cur.fi, t.field, (not same or t.field >= (V.cur.field or 1)) and 1 or -1)
+      t.sub = nil
+    end
+    return t
+  end
 end
 
 -- ── операторы ─────────────────────────────────────────────────────────────
