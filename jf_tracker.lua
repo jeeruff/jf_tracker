@@ -2068,6 +2068,43 @@ ctx = {
       if p.fx and k1 and k1.rs5k_i and p.fx ~= k1.rs5k_i and p.fx ~= k1.i then A.SetParamNormalized(track, p.fx, p.i, v); return end
       for _, kid in ipairs(f.kids) do A.SetParamNormalized(track, kid.rs5k_i or kid.i, p.i, v) end
     else A.SetParamNormalized(track, p.fx or f.i, p.i, v) end
+    -- 15 ноя: DSP в фокусе + INSERT — движение параметра пишется в автоматизацию: точка в строке курсора трекера
+    -- (идёт игра — в строке, которая сейчас звучит). Огибающей нет — создаётся. Только FX трека (не take FX, не кит all)
+    if state.focus == 'dsp' and vim.mode == 'insert' and not (f and f.kit and f.kit_all) then pcall(ctx.fx_rec_point, track, p.fx or f.i, p, f) end
+  end,
+  -- запись точки автоматизации параметра (см. fx_write): без своего шага undo на каждое движение — один шаг,
+  -- когда слайдер отпущен (ctx.fx_rec_flush в кадре, через 0.6 с тишины)
+  fx_rec_point = function(track, id, p, f)
+    if not reaper.ValidatePtr(track, 'MediaTrack*') then return end
+    local env = reaper.GetFXEnvelope(track, id, p.i, true)
+    if not env then return end
+    local val = reaper.TrackFX_GetParam(track, id, p.i)
+    if not val then return end
+    local row
+    if reaper.GetPlayState() & 1 == 1 then row = math.floor(model.row_of_time(reaper.GetPlayPosition(), state.lpb) + 1e-6) else row = vim.cur.row end
+    local t = edit.row_time(row, state.lpb, 0)
+    local tol = (edit.row_time(row + 1, state.lpb, 0) - t) / 2
+    local hit
+    for i = 0, reaper.CountEnvelopePoints(env) - 1 do
+      local ok, pt = reaper.GetEnvelopePoint(env, i)
+      if ok and math.abs(pt - t) < tol then hit = i; break end
+      if ok and pt > t + tol then break end
+    end
+    if hit then reaper.SetEnvelopePoint(env, hit, t, val, 1, nil, nil, true)
+    else reaper.InsertEnvelopePoint(env, t, val, 1, 0, false, true) end
+    reaper.Envelope_SortPoints(env)
+    state.envs = true
+    local now = reaper.time_precise()
+    ctx.fxw_undo_t = now
+    if now - (ctx.fxw_inv_t or 0) > 0.1 then ctx.fxw_inv_t = now; model.invalidate() end
+    vim.msg = ('rec: %s / %s at row %04d - a point in its automation (leave INSERT to stop writing)'):format(f and f.name or 'fx', p.name or 'param', row + 1)
+  end,
+  fx_rec_flush = function()
+    if ctx.fxw_undo_t and reaper.time_precise() - ctx.fxw_undo_t > 0.6 then
+      ctx.fxw_undo_t = nil
+      reaper.Undo_OnStateChangeEx2(0, 'jf_tracker: record parameter automation', -1, -1)
+      model.invalidate()
+    end
   end,
   dsp_value = function(k, pi, d, coarse)
     local col, f = ctx.dsp_fx(k)
@@ -25364,6 +25401,7 @@ local function frame()
   draw.lib_zone = nil                     -- зона слайса на мини-волне lib: ставит вкладка item (3 окт)
   draw.vbars = {}                         -- скролл-бары списков: заполняет отрисовка кадра (4 окт)
  draw.pop_bottom = state.popdock
+ if ctx.fxw_undo_t then ctx.fx_rec_flush() end   -- 15 ноя: запись параметра DSP в автоматизацию — шаг undo после движения
  state.transpos = state.tptop and 'top' or 'bottom'
  draw.U_selinv(state.selinv)
   draw.hints_on = state.hints              -- 23 окт: колонка хоткеев в меню — только с hints
