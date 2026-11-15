@@ -1155,9 +1155,10 @@ function D.layout_core(snap, state, nregions)
         local llvl = lvl
         do
           local base = 3 + math.min(L.MAXFX, L.nfx or 0)
-          if lvl and lvl >= 2 and lvl < base and not c.compact and D.SMART_COLS ~= false then
+          if lvl and lvl < base and D.SMART_COLS ~= false then
             local spare = nsub - math.max(1, #lane.subs)
-            if spare > 0 then local rm = math.min(spare, base - lvl); nsub = nsub - rm; llvl = lvl + rm end
+            if spare > 0 and lvl >= 2 and not c.compact then local rm = math.min(spare, base - lvl); nsub = nsub - rm; llvl = lvl + rm
+            elseif spare > 0 then nsub = nsub - spare end   -- компактный вид (нота + волна) и уже — пустых подколонок нет вовсе
           end
         end
         local ln = { lane = lane, x = lx, nsub = nsub, f0 = #L.flat + 1, sx = {} }
