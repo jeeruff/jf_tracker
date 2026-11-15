@@ -15146,7 +15146,7 @@ function D.popup(L, p, anchor)
   -- 14 ноя: все меню — в одном месте, внизу окна над статусом (опция menus at the bottom; было у курсора / кнопки —
   -- взгляд прыгал). Меню с буквами (hydra, which-key) — низкой полосой в несколько колонок: столько колонок, сколько
   -- влезает по ширине, строк — от 6. Списки с выбором (поиск, палитра) — одной колонкой, как были. Ввод имени — у курсора
-  local dock = D.pop_bottom and p.kind ~= 'prompt' and not (anchor and anchor.box)
+  local dock = D.pop_bottom and p.kind ~= 'prompt' and not (anchor and (anchor.box or anchor.nodock))   -- 15 ноя: nodock — список у своего места (пресеты)
   if dock and p.kind == 'hydra' and not p.groups and not p.full then
     local hw0 = hw > 0 and (hw + 2 * L.pad) or 0
     local cw0 = L.pad + kw + 2 * L.pad + hw0 + tw + 2 * L.pad

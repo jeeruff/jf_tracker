@@ -14978,7 +14978,7 @@ ctx = {
         return
       end
       vim.open_picker('Surge XT patch (' .. #list .. ')', list, function(it) ctx.surge_load(t.track, f.i, it) end)
-      state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+      state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4, nodock = true }   -- 15 ноя: список пресетов — у пресета, не внизу окна
       return
     end
     if what == 'prevdir' or what == 'nextdir' then vim.msg = f.name .. ': REAPER keeps its presets in one list - no folders (Shift+Opt+J K - preset)'; return end
@@ -15002,7 +15002,7 @@ ctx = {
       local ok = A.SetPreset(t.track, f.i, it.data)
       vim.msg = ok and (f.name .. ': ' .. it.data) or (f.name .. ': could not load ' .. it.data)
     end)
-    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4, nodock = true }   -- 15 ноя: у пресета
   end,
   -- 11 окт: + в шапке эффекта — меню последнего тронутого параметра ЭТОГО эффекта (то же, что ПКМ по параметру)
   dsp_lastparam_menu = function(k)
@@ -26993,7 +26993,7 @@ local function frame()
     elseif pa and pa.kind == 'box' then
       anchor = { box = { pa.x, pa.y, pa.w, pa.h } }
     elseif pa and pa.kind == 'xy' then
-      anchor = { x = pa.x, y = pa.y }
+      anchor = { x = pa.x, y = pa.y, nodock = pa.nodock }
     elseif pa and pa.kind == 'strip' then
       -- ячейка полосы транспорта: всплывашка сразу над ней (5 окт)
       local r = draw.strip_cell and draw.strip_cell[pa.id]
