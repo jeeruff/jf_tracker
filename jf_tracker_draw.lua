@@ -7403,7 +7403,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   do
     C.XPW, C.XBW, C.DW = ms('-12.5') + L.pad, ms('16b') + L.pad, ms('88.88s') + L.pad
     C.len = ix + w - L.pad - 4
-    C.bs = C.len - C.DW
+    C.LPW = ms('lp') + 2 * L.pad                 -- 15 ноя: колонка lp — луп источника, тумблер
+    C.lp = C.len - C.DW
+    C.bs = C.lp - C.LPW
     C.pt = C.bs - C.XBW
     C.tx = C.pt - C.XPW - tew + L.pad          -- ~
     C.wx0 = ix + 6 + label_w + L.pad
@@ -7424,6 +7426,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if tew > 0 then cols_h[#cols_h + 1] = { '~', C.tx, false, TILDE, nil } end
       cols_h[#cols_h + 1] = { 'pt', C.pt - C.XPW + L.pad, false, 'pt', nil, C.pt }
       cols_h[#cols_h + 1] = { 'bs', C.bs - C.XBW + L.pad, false, 'bs', nil, C.bs }
+      cols_h[#cols_h + 1] = { 'lp', C.lp - C.LPW + L.pad, false, 'lp', nil, C.lp }
       cols_h[#cols_h + 1] = { 'len', C.len - C.DW + L.pad, sort == 'len', 'len', 'len', C.len }
     end
     -- type (9 окт): у правого края строки заголовков — сортировка по типу
@@ -7650,6 +7653,15 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         text(C.pt - ms(ps), y + 1, ps, (math.abs(e.pitch or 0) >= 0.005) and U.TEXT or U.DIM)
         local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
         text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+        -- 15 ноя: lp — луп источника: ∞ вкл / - выкл; щелчок переключает (всем нотам инструмента, как строка loop в свойствах)
+        if e.item and not child then
+          local lx = C.lp - C.LPW
+          local lhot = mx >= lx and mx < C.lp + 1 and my >= y and my < y + L.rh
+          local lt = e.loop and '∞' or '-'
+          if lhot then set(D.CURROW); gfx.rect(lx, y, C.LPW + 1, L.rh, 1) end
+          text(C.lp - ms(lt), y + 1, lt, lhot and U.AMBER or (e.loop and U.CYAN or U.DIM))
+          if lhot then hover.liblp = e; hover.pool = nil end
+        end
         local ntenv = tew > 0 and info.pool_tenv(e) or 0
         if ntenv > 0 then
           local th = rowhot and mx >= C.tx and mx < C.tx + tew

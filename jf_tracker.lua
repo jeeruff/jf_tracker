@@ -13385,6 +13385,8 @@ ctx = {
       local src = reaper.GetMediaItemTake_Source(tk)
       local sl = src and reaper.GetMediaSourceLength(src) or 0
       local mx = (sl - reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) / math.max(1e-3, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'))
+      -- 15 ноя: у нарезанного — лёгкая защёлка на границах срезов (1.2 % хода); Shift — без неё
+      if gfx.mouse_cap & 8 == 0 then for _, mf in ipairs(ctx.len_marks(e) or {}) do if math.abs(fr - mf) < 0.012 then fr = mf; break end end end
       if mx > 1e-3 then P('D_LENGTH', math.max(0.01, fr * mx), 'abs', 'length') end
     end
     PV.live(items)                                  -- звучащее превью — сразу с новым питчем / rate / громкостью (6 окт)
@@ -13432,7 +13434,22 @@ ctx = {
   RATE_LO = math.log(0.2, 2), RATE_HI = math.log(5, 2),
   RATE_MARKS = { 0.2, 0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1, 1.5, 2, 3, 4, 5 },
   rate_frac = function(r) return (math.log(math.max(1e-3, r), 2) - ctx.RATE_LO) / (ctx.RATE_HI - ctx.RATE_LO) end,
-  sp_marks = function(k)
+  -- 15 ноя: засечки слайдера длины — границы срезов нарезанного сэмпла (доли полного хода); нет нарезки — nil
+  len_marks = function(e)
+    local it, tk = e and e.item, e and e.take
+    if not (it and tk and reaper.ValidatePtr(it, 'MediaItem*')) then return nil end
+    local sl = edit.item_slices(it)
+    if not sl or #sl < 2 then return nil end
+    local src = reaper.GetMediaItemTake_Source(tk)
+    local slen = src and reaper.GetMediaSourceLength(src) or 0
+    local mx = (slen - reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')) / math.max(1e-3, reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE'))
+    if mx <= 1e-3 then return nil end
+    local out = {}
+    for _, t in ipairs(sl) do if type(t) == 'number' and t > 1e-4 and t < mx - 1e-4 then out[#out + 1] = t / mx end end
+    return #out > 0 and out or nil
+  end,
+  sp_marks = function(k, e)
+    if k == 'len' then return ctx.len_marks(e) end
     if k ~= 'rate' then return nil end
     local out = {}
     for _, m in ipairs(ctx.RATE_MARKS) do out[#out + 1] = ctx.rate_frac(m) end
@@ -30226,6 +30243,13 @@ local function frame()
       local hl = ctx.sl_layer_hot
       if dbl and click.zone == 'sllayer' then ctx.layer_menu(hl.root, hl.k) else ctx.layer_listen(hl.root.layers[hl.k]) end
       click = { t = now2, zone = 'sllayer' }
+    elseif hover.liblp then   -- 15 ноя: колонка lp в lib — луп источника вкл / выкл
+      local e = hover.liblp
+      if e.item and reaper.ValidatePtr(e.item, 'MediaItem*') then
+        e.loop = reaper.GetMediaItemInfo_Value(e.item, 'B_LOOPSRC') == 1
+        ctx.sp_adjust(e, 'loop', 1)
+        vim.msg = ('%s: loop %s'):format(e.name or 'sample', e.loop and 'off' or 'on')
+      end
     elseif hover.libxi then   -- 27 окт (5): ‹ ξ › выбранного сэмпла lib
       ctx.set_focus('inst'); ctx.lib_random(hover.libxi == 'prev' and -1 or (hover.libxi == 'next' and 1 or nil))
     elseif hover.libdirh then   -- 27 окт: заголовок папки lib — свернуть / развернуть

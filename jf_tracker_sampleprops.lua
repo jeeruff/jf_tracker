@@ -190,7 +190,7 @@ function SP.draw(L, x, y, w, h, e, focused)
       -- метки привязки (rate: ×½ ×1.5 ×2 …) — чёрточки под дорожкой
       if ctx.sp_marks then
         U.set(U.GREY)
-        for _, mf in ipairs(ctx.sp_marks(r.k) or {}) do gfx.rect(sx + math.floor(mf * sw + 0.5), ry + L.rh - 3, 1, 2, 1) end
+        for _, mf in ipairs(ctx.sp_marks(r.k, e) or {}) do gfx.rect(sx + math.floor(mf * sw + 0.5), ry + L.rh - 3, 1, 2, 1) end
       end
       U.text(x + lw, ry, vt, foc and U.AMBER or U.TEXT)
       if onbar then SP.slider = { k = r.k, x = sx, w = sw } end
