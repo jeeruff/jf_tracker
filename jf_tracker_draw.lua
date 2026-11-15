@@ -430,6 +430,19 @@ function D.lane_data(lane, maxfx)
   D.lane_c[lane] = d
   return d
 end
+-- 15 ноя: есть ли у трека автоматизация с данными (больше одной точки или automation item). Кэш — на таблицу колонки снимка
+D.envd_c = setmetatable({}, { __mode = 'k' })
+function D.col_env_data(col)
+  local v = D.envd_c[col]
+  if v ~= nil then return v end
+  v = false
+  for _, e in ipairs(col.envs or {}) do
+    if e.env and reaper.ValidatePtr(e.env, 'TrackEnvelope*') and (reaper.CountEnvelopePoints(e.env) > 1 or reaper.CountAutomationItems(e.env) > 0) then v = true; break end
+  end
+  if not v then for _, ml in ipairs(col.mlanes or {}) do if ml.ev and next(ml.ev) then v = true; break end end end
+  D.envd_c[col] = v
+  return v
+end
 function D.U_selinv(on) U.SEL_INV = on and true or false end   -- 14 ноя: опция selection inverted
 D.pn_M = { sep = 7, grip = 7 }   -- 14 ноя: иерархия линий — между модулями 2 px и ярче (D.SEP), внутри модуля 1 px (U.LINE), сетка тише
 D.pn_sig = {}
@@ -1251,7 +1264,9 @@ function D.layout_core(snap, state, nregions)
       if show_env == nil then show_env = state.envs end
       if c.compact and show_env ~= false then show_env = true end         -- свёрнутый: автоматизация видна, схемой; 2 ноя: a выключил — нет
       -- уровни: автоматизация — последней, когда колонка шире 50 знаков; 24 окт: a на треке (огибающие трека явно вкл.) — видна всегда
-      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw end
+      -- 15 ноя: суженный трек: автоматизация С ДАННЫМИ (точки, automation items) остаётся — уходит только пустая
+      -- (после правила «пустые колонки первыми» треки стали уже 50 знаков, и колонка с точками пропадала)
+      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw or (show_env and D.col_env_data(col)) or false end
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
         -- 24 окт: по умолчанию — узко (значение в 3 знака): правка — во вкладке automation или точками; опция envwide — как было
