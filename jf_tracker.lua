@@ -11207,6 +11207,7 @@ ctx = {
       else edit.time_delete(tracks, t1, rg.rgnend, math.huge) end
       -- 12 окт: длина свободного такта создаёт паттерн (следующая буква с 1): у такта появляется код
       if rg.gap then rg.code = model.SEC.next_family(regions); reaper.AddProjectMarker2(0, true, rg.pos, t1, rg.code, -1, 0) end
+      if not rg.gap then pooled.pat_ai_fit(rg.pos, t1) end   -- 16 ноя: automation items паттерна — на его новую длину
     end)
     edit.after = hook
     ctx.mx_refresh()
@@ -16509,6 +16510,24 @@ ctx.log_show = function()
   vim.open_picker('log - newest first (/ search, Esc close)', items, function() end)
 end
 -- 14 ноя: :dedup — убрать точные дубли айтемов (та же позиция, длина, лейн, содержимое), один шаг undo
+-- 16 ноя: :patai [all] — автоматизация паттерна курсора (all — всех паттернов) в automation items на весь паттерн;
+-- AI повторов паттерна связываются с ним (общий пул). Один шаг undo
+ctx.patai = function(arg)
+  local all = (arg or ''):match('all') ~= nil
+  model.invalidate(); regions = model.regions(state.lpb)
+  local rgs = {}
+  if all then rgs = regions else local rg = pooled.region_at(regions, edit.row_time(vim.cur.row, state.lpb, 0)); if rg then rgs[1] = rg end end
+  if #rgs == 0 then vim.msg = 'patai: no pattern at the cursor'; return end
+  local made, fit, linked = 0, 0, 0
+  local hook = edit.after; edit.after = nil
+  local ok, err = pcall(edit.run, 'automation into pattern items', function()
+    made, fit = pooled.pat_ai_wrap(rgs)
+    for _, rg in ipairs(rgs) do linked = linked + pooled.pat_ai_link(regions, rg) end
+  end)
+  edit.after = hook
+  model.invalidate()
+  vim.msg = ok and ('patai: %d automation item(s) made, %d fitted to the pattern, %d linked into repeats - u back'):format(made, fit, linked) or ('patai: ' .. tostring(err))
+end
 ctx.dedup = function()
   local n, nt = 0, 0
   local hook = edit.after; edit.after = nil

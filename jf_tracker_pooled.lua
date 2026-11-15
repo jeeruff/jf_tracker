@@ -169,6 +169,75 @@ function A.dedup()
   return removed, ntr
 end
 
+-- ── автоматизация паттерна = automation item (16 ноя, первый шаг, по команде :patai) ─────────────────────────────
+-- Правило: автоматизация паттерна живёт в automation item ровно на паттерн (как один MIDI-клип на паттерн). Здесь —
+-- основа: завернуть точки паттерна в AI, держать длину AI по длине паттерна, связать AI повторов (общий пул REAPER:
+-- правка в одном меняет все). Ввод точек в колонках трекера пока пишет в огибающую трека — это следующий шаг.
+local function each_env(fn)
+  for _, tr in ipairs(tracks()) do
+    for ei = 0, R.CountTrackEnvelopes(tr) - 1 do fn(R.GetTrackEnvelope(tr, ei), tr) end
+  end
+end
+-- AI огибающей, начинающийся в t (± 1 мс); → индекс | nil
+local function ai_at(env, t)
+  for k = 0, R.CountAutomationItems(env) - 1 do
+    if math.abs(R.GetSetAutomationItemInfo(env, k, 'D_POSITION', 0, false) - t) < 1e-3 then return k end
+  end
+  return nil
+end
+A.ai_at = ai_at
+-- паттерны rgs: точки огибающих внутри паттерна — в AI на весь паттерн (InsertAutomationItem с пулом -1 собирает
+-- точки отрезка в новый AI). AI в начале паттерна уже есть — только длина. Без своего undo-блока. → создано, подогнано
+function A.pat_ai_wrap(rgs)
+  local made, fit = 0, 0
+  for _, rg in ipairs(rgs) do
+    if rg.pos and rg.rgnend and not rg.lib and not rg.gap and not (rg.name or ''):match('^ph:') and not (rg.name or ''):match('^=') then
+      local len = rg.rgnend - rg.pos
+      each_env(function(env)
+        local k = ai_at(env, rg.pos)
+        if k then
+          if math.abs(R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false) - len) > 1e-4 then R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', len, true); fit = fit + 1 end
+        else
+          local any = false
+          for pi = 0, R.CountEnvelopePoints(env) - 1 do
+            local ok, pt = R.GetEnvelopePoint(env, pi)
+            if ok and pt >= rg.pos - EPS and pt < rg.rgnend - EPS then any = true; break end
+            if ok and pt >= rg.rgnend then break end
+          end
+          if any then R.InsertAutomationItem(env, -1, rg.pos, len); made = made + 1 end
+        end
+      end)
+    end
+  end
+  return made, fit
+end
+-- длина паттерна изменилась: AI, начинающиеся в его начале, — на новую длину. → сколько подогнано
+function A.pat_ai_fit(pos, rgnend)
+  local n, len = 0, rgnend - pos
+  each_env(function(env)
+    local k = ai_at(env, pos)
+    if k and math.abs(R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', 0, false) - len) > 1e-4 then R.GetSetAutomationItemInfo(env, k, 'D_LENGTH', len, true); n = n + 1 end
+  end)
+  return n
+end
+-- повторы паттерна src (то же имя): у повтора в начале нет AI, у src есть — вставить связанный (тот же пул). → вставлено
+function A.pat_ai_link(regions, src)
+  if not src or (src.name or '') == '' then return 0 end
+  local n = 0
+  for _, dst in ipairs(regions) do
+    if dst ~= src and dst.name == src.name and dst.idx ~= src.idx and not dst.lib then
+      each_env(function(env)
+        local ks = ai_at(env, src.pos)
+        if ks and not ai_at(env, dst.pos) then
+          local pool = math.floor((R.GetSetAutomationItemInfo(env, ks, 'D_POOL_ID', 0, false) or 0) + 0.5)
+          R.InsertAutomationItem(env, pool, dst.pos, dst.rgnend - dst.pos); n = n + 1
+        end
+      end)
+    end
+  end
+  return n
+end
+
 -- items трека, что ПЕРЕСЕКАЮТ [t0, t1) (не только начинаются в нём);
 -- (отрезок mlr берёт и item, что начался до него)
 function A.items_over(tr, t0, t1)
