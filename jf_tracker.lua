@@ -27759,6 +27759,37 @@ local function frame()
   end
   if (state.debug or reaper.GetExtState(EXT, 'dbgon') == '1') and reaper.time_precise() - (ctx.dbg_ext_t or 0) > 0.25 then   -- 14 ноя: 4 раза в секунду, не каждый кадр
     ctx.dbg_ext_t = reaper.time_precise()
+    -- 16 ноя: ловушка «кто плодит айтемы»: число айтемов проекта выросло — строка в журнал: на каком треке, какой айтем
+    -- (позиция, длина, MIDI / пустой), последняя правка трекера, фокус, режим, идёт ли игра / запись
+    if state.debug then
+      local okT = pcall(function()
+        local nall = reaper.CountMediaItems(0)
+        if ctx.dbg_items and nall > ctx.dbg_items then
+          local per = {}
+          for ti = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, ti); per[ti + 1] = reaper.CountTrackMediaItems(tr) end
+          local where = {}
+          for ti, c in ipairs(per) do
+            local was = ctx.dbg_items_per and ctx.dbg_items_per[ti] or 0
+            if c > was then
+              local tr = reaper.GetTrack(0, ti - 1)
+              local it = reaper.GetTrackMediaItem(tr, c - 1)
+              local tk = it and reaper.GetActiveTake(it)
+              local kind = 'no take'
+              if tk and reaper.TakeIsMIDI(tk) then local _, nn, nc = reaper.MIDI_CountEvts(tk); kind = ('midi %d notes %d cc'):format(nn or 0, nc or 0) elseif tk then kind = 'audio' end
+              where[#where + 1] = ('track %d +%d (last: pos %.3f len %.3f, %s)'):format(ti, c - was, it and reaper.GetMediaItemInfo_Value(it, 'D_POSITION') or -1, it and reaper.GetMediaItemInfo_Value(it, 'D_LENGTH') or -1, kind)
+            end
+          end
+          ctx.dlog(('ITEMS +%d (now %d): %s | last edit "%s" | focus %s mode %s play %d'):format(nall - ctx.dbg_items, nall, table.concat(where, '; '), tostring(edit.last_desc or ''), tostring(state.focus), tostring(vim.mode), reaper.GetPlayState()))
+          ctx.dbg_items_per = per
+        elseif not ctx.dbg_items_per or nall ~= ctx.dbg_items then
+          local per = {}
+          for ti = 0, reaper.CountTracks(0) - 1 do per[ti + 1] = reaper.CountTrackMediaItems(reaper.GetTrack(0, ti)) end
+          ctx.dbg_items_per = per
+        end
+        ctx.dbg_items = nall
+      end)
+      if not okT then ctx.dbg_items = nil end
+    end
     local ks = {}; for k in pairs(hover) do ks[#ks + 1] = k end; table.sort(ks)
     if hover.matrix then for k, v in pairs(hover.matrix) do ks[#ks + 1] = 'mx.' .. k .. '=' .. tostring(v) end end
     reaper.SetExtState(EXT, 'dbg', ('%d,%d %s | %s || pool: %s'):format(math.floor(gfx.mouse_x), math.floor(gfx.mouse_y), table.concat(ks, ' '), state.status, (draw.pool_dbg or '') .. ' || ' .. tostring(SL.dbg)), false)
