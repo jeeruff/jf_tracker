@@ -5633,6 +5633,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           local lb = D.key_label and D.key_label(k[2]) or k[2]               -- русская раскладка — кириллицей (5 окт)
           text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, U.readable(U.BG, kf, dim and 2.0 or 4.5), kf)
           out.letters = out.letters + 1
+          -- 15 ноя: keyspat / keyphr — на клавише имя паттерна / фразы, которую она запускает (над буквой клавиши)
+          local tg = info and info.ctrl and info.ctrl.key_tags and info.ctrl.key_tags[k[1]]
+          if tg and kh >= 2 * L.rh then
+            local ts = fit(tg, kw - 2)
+            text(bx + math.max(0, math.floor((kw - 1 - ms(ts)) / 2)), ky + 1, ts, U.readable(U.AMBER, kf, 3.0), kf)
+          end
         end
       end
       local bw, bh = math.max(3, math.min(kw - 2, math.max(ms('W') + 2, math.floor(kw * 0.6)))), math.floor(kh * 0.6)   -- 8 окт: цифра на чёрной видна и в минимальной

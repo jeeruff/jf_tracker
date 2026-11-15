@@ -26269,7 +26269,7 @@ local function frame()
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       ptabs = state.ptabs and ctx.ptabs_info() or nil,   -- 12 ноя: опрос 4 Гц (был перебор проектов каждый кадр)
-      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.SW[edit.track_swing(cur_col() and cur_col().track)].on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, swing_v = ctx.swing_vals(), swing_tr = edit.track_swing(cur_col() and cur_col().track), time = ctx.pos_time(playpos or curpos), marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.SW[edit.track_swing(cur_col() and cur_col().track)].on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, swing_v = ctx.swing_vals(), key_tags = ctx.key_tags(), swing_tr = edit.track_swing(cur_col() and cur_col().track), time = ctx.pos_time(playpos or curpos), marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = ctx.punch_on(),
@@ -35261,6 +35261,16 @@ end
 MX.vismetro = true   -- 19 окт: визуальный метроном матрицы всегда (кнопка убрана)   -- 18 окт: метроном в клетках матрицы (кнопка vismetro)
 ctx.PADS = dofile(DIR .. '/jf_tracker_padseq.lua')
 ctx.pad_list = function() return ctx.PADS.list(ctx.sequence()) end
+-- 15 ноя: подписи на клавишах полосы: keyphr — имя фразы клавиши, keyspat — имя паттерна (смещение от C → имя); иначе nil
+ctx.key_tags = function()
+  local list
+  if state.keyphr then list = ctx.phr_list() elseif ctx.PADS and ctx.PADS.on then list = ctx.pad_list() end
+  if not list or #list == 0 then return nil end
+  local t = ctx.key_tags_t or {}; ctx.key_tags_t = t
+  for k in pairs(t) do t[k] = nil end
+  for i, r in ipairs(list) do if i > 24 then break end; t[i - 1] = r.name end
+  return t
+end
 ctx.pad_key = function(name)
   local P = ctx.PADS
   if not P.on then return nil end
