@@ -16528,6 +16528,14 @@ ctx.patai = function(arg)
   model.invalidate()
   vim.msg = ok and ('patai: %d automation item(s) made, %d fitted to the pattern, %d linked into repeats - u back'):format(made, fit, linked) or ('patai: ' .. tostring(err))
 end
+-- 16 ноя: кнопки (hover-ключи), щелчок по которым «.» повторяет; клетки, вкладки, слайдеры, списки — нет
+ctx.REP_BTNS = { 'ctrl', 'btn', 'dspbtn', 'dspab', 'envpm', 'fxcolbtn', 'insprevbtn', 'lanebtn', 'lanemono', 'libautobtn', 'libgrpbtn',
+  'liblp', 'libxi', 'mixmode', 'monobtn', 'mxctl', 'poolbsync', 'poolkit', 'poollayer', 'poolload', 'poolpprev', 'poolsort', 'recbtn',
+  'retrobtn', 'rgbtn', 'sidectl', 'snapc', 'swapbtn', 'trsbtn', 'viewbtn', 'scopemode', 'scopes_on', 'pinmx', 'mixsnap', 'prevbtn' }
+ctx.click_repeat = function(lr, n)
+  ctx.click_replay = { x = lr.x, y = lr.y, sig = lr.sig, n = math.max(1, n or 1) }
+  vim.msg = '. ' .. tostring(lr.label or '')
+end
 ctx.dedup = function()
   local n, nt = 0, 0
   local hook = edit.after; edit.after = nil
@@ -25264,6 +25272,16 @@ local function frame()
   gfx.clear = -1
   ctx.kept = ctx.keep_screen
   U.begin_frame(ctx.kept)
+  -- 16 ноя: «.» повторяет щелчок по кнопке: в этом кадре мышь «стоит» там же и нажата (gfx.mouse_x / y — подмена на кадр);
+  -- под ней должна оказаться та же кнопка (проверка у разбора щелчка), иначе повтор отменяется
+  do
+    local cr = ctx.click_replay
+    if cr and cr.n > 0 then
+      cr.real = cr.real or { gfx.mouse_x, gfx.mouse_y }
+      local ok = pcall(function() gfx.mouse_x, gfx.mouse_y = cr.x, cr.y end)
+      if ok then U.click = true; ctx.click_replaying = cr else ctx.click_replay = nil; vim.msg = 'repeat: this click cannot be replayed' end
+    end
+  end
   prof.input = U.click or U.rclick         -- клик этого кадра (U.click гасится по ходу разбора)
   -- 8 окт: колесо и протяжка (кнопка зажата, мышь сдвинулась) — тоже ввод:
   -- прокрутка / выделение видны в этом же тике, а не в следующем
@@ -27798,6 +27816,19 @@ local function frame()
   -- мышь
   draw.pmark('mouse, hover status, drags')
   local t_3 = reaper.time_precise()
+  -- 16 ноя: щелчок по кнопке (не по клетке, не протяжка) — запомнить для «.»; повтор — та же кнопка под мышью или отмена
+  if U.click then
+    local BTN = ctx.REP_BTNS
+    local k, v
+    for _, key in ipairs(BTN) do if hover[key] ~= nil and hover[key] ~= false then k = key; v = hover[key]; break end end
+    local sig = k and (k .. '=' .. ((type(v) == 'table') and tostring(v.id or v.name or v.k or v[1] or v.key or '') or tostring(v))) or nil
+    local cr = ctx.click_replaying
+    if cr then
+      if sig ~= cr.sig then U.click = false; ctx.click_replay = nil; vim.msg = 'repeat: the button is not under the same place any more (' .. tostring(cr.sig) .. ')' end
+    elseif sig and vim.mode ~= 'cmd' then
+      vim.last_rep = { kind = 'click', x = gfx.mouse_x, y = gfx.mouse_y, sig = sig, label = sig }
+    end
+  end
   -- перетаскивание токена на Orca: нажатие на инструмент / имя региона
   if U.click and not tok_drag then
     if hover.pool and not hover.pool.empty and hover.pool.i then tok_drag = { kind = 'inst', v = hover.pool.i, x0 = gfx.mouse_x, y0 = gfx.mouse_y }
@@ -32261,6 +32292,16 @@ local function frame()
   end
   ctx.pix_present()   -- 6 ноя: пиксельный режим — половинный кадр на экран ×2
   U.end_frame()
+  do   -- 16 ноя: конец кадра повтора щелчка — мышь назад, кнопка «отпущена» (следующий повтор — новым нажатием)
+    local cr = ctx.click_replaying
+    if cr then
+      ctx.click_replaying = nil
+      if cr.real then pcall(function() gfx.mouse_x, gfx.mouse_y = cr.real[1], cr.real[2] end) end
+      U.mdown = false
+      cr.n = cr.n - 1
+      if cr.n <= 0 or ctx.click_replay ~= cr then ctx.click_replay = nil end
+    end
+  end
   -- gfx.update — каждый тик: без него клавиши и мышь приходили только с кадром отрисовки (28 окт: трекер залипал)
   gfx.update()
   local t_4 = reaper.time_precise()

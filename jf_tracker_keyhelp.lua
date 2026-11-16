@@ -340,7 +340,7 @@ KH.PAGES = {
     { k = 'qwerty: z x', t = { 'z', 'x' }, d = 'octave down / up' },
     { k = 'vel  human', d = 'under the keyboard: vel - a slider of the inserted velocity (drag); in the step block human - every inserted note a little different: timing +-10 ms, pitch +-8 cents, velocity +-12 / volume +-1 dB at 100 % (click: 0 / 25 / 50 / 100 %)' },
     { k = 'qwerty: c C', t = { 'c', 'C' }, d = 'velocity -8 / +8' },
-    { k = '.', d = 'repeat the last action: an edit, a command line, a menu item, a pick in a list (a REAPER action, a preset ...); 3. - three times; the instrument - Opt+J / K' },
+    { k = '.', d = 'repeat the last action: an edit, a command line, a menu item, a pick in a list (a REAPER action, a preset ...), a click on a button; 3. - three times; the instrument - Opt+J / K' },
     { k = 'qwerty: ;', t = { ';' }, d = 'the whole sample at the cursor' },
     { k = 'qwerty: a', t = { 'a' }, d = 'step auto: jump past the inserted item' },
     { k = 's', d = 'select from here (visual; the edit returns to INSERT); Shift+hjkl extends' },

@@ -4261,6 +4261,7 @@ function V.key_impl(c)
     -- 15 окт: счётчик — до повторов (иначе первый повтор брал его сам: 2. давало три раза)
     local lr = V.last_rep
     if lr and lr.kind == 'cmd' then V.cmdbuf = {}; V.count = nil; for _ = 1, n do V.run_cmd(lr.line) end; if (V.msg or '') == '' then V.msg = '. :' .. lr.line end
+    elseif lr and lr.kind == 'click' and ctx.click_repeat then V.cmdbuf = {}; V.count = nil; ctx.click_repeat(lr, n)   -- 16 ноя: щелчок по кнопке
     elseif lr and lr.kind == 'fn' then
       V.cmdbuf = {}; V.count = nil; V.rep_running = true
       for _ = 1, n do local ok, e = pcall(lr.fn); if not ok then V.msg = tostring(e):match('[^\n]*$'); break end end
