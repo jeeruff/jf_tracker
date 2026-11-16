@@ -1264,9 +1264,9 @@ function D.layout_core(snap, state, nregions)
       if show_env == nil then show_env = state.envs end
       if c.compact and show_env ~= false then show_env = true end         -- свёрнутый: автоматизация видна, схемой; 2 ноя: a выключил — нет
       -- уровни: автоматизация — последней, когда колонка шире 50 знаков; 24 окт: a на треке (огибающие трека явно вкл.) — видна всегда
-      -- 15 ноя: суженный трек: автоматизация С ДАННЫМИ (точки, automation items) остаётся — уходит только пустая
-      -- (после правила «пустые колонки первыми» треки стали уже 50 знаков, и колонка с точками пропадала)
-      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw or (show_env and D.col_env_data(col)) or false end
+      -- 16 ноя: суженный трек прячет колонки автоматизации (как раньше): что она есть в строке — показывает «~» у ноты
+      -- (место дороже; правка 15 ноя «с данными — остаётся» откачена по просьбе)
+      if lvl and not (state.trackenvs and state.trackenvs[col.guid] == true) then show_env = (lx - (c.x or 0)) >= 50 * L.cw end
       if state.ptmode then show_env = false end     -- PT-mode: только ноты
       if show_env and col.envs then
         -- 24 окт: по умолчанию — узко (значение в 3 знака): правка — во вкладке automation или точками; опция envwide — как было
