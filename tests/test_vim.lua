@@ -261,6 +261,10 @@ keysin(':transpose\r'); eq(':transpose opens the transpose popup', (last() or ''
 SMART_P.on_pick({ v = 3 }); eq('popup +3 transposes the note of the row', (last() or ''):match('^transpose:.*:%+3$') ~= nil or (last() or ''):match('^smart') ~= nil, true)
 -- 16 ноя: @: — повтор последней команды строки (как в Vim)
 calls[#calls + 1] = 'marker'; keysin('@:'); eq('@: runs the last command line again', (last() or ''):match('^smart:transpose') ~= nil, true)
+-- 16 ноя: «.» — любое последнее действие: команда строки, пункт меню
+calls[#calls + 1] = 'marker'; keysin('.'); eq('. repeats the last command line', (last() or ''):match('^smart:transpose') ~= nil, true)
+do local hits = 0; V.open_hydra({ title = 't', items = { { key = 'x', label = 'thing', fn = function() hits = hits + 1 end } } }); keysin('x'); eq('menu item ran', hits, 1); keysin('.'); eq('. repeats the menu item', hits, 2); keysin('3.'); eq('3. - three more', hits, 5) end
+do local hits = 0; V.open_hydra({ title = 't', items = { { key = 'm', label = 'opens a menu', fn = function() V.open_hydra({ title = 'inner', items = {} }) end }, { key = 'y', label = 'y', fn = function() hits = hits + 1 end } } }); keysin('m'); V.key(27); keysin('.'); eq('an item that opened a menu is not the repeat target', V.hydra, nil) end
 V.cur.row = 20
 keysin('zz');  eq('zz', state.row0, 12)
 

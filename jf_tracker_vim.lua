@@ -1186,8 +1186,16 @@ local function record(c)
 end
 
 local function finish_edit()
-  if V.replaying == 0 and #V.cmdbuf > 0 then V.last_edit = { table.unpack(V.cmdbuf) } end
+  if V.replaying == 0 and #V.cmdbuf > 0 then V.last_edit = { table.unpack(V.cmdbuf) }; V.last_rep = { kind = 'keys' } end
   V.cmdbuf = {}
+end
+-- 16 ноя: «.» повторяет ЛЮБОЕ последнее действие: правку клавишами (как было), команду строки, пункт меню, выбор в
+-- списке (действие REAPER, пресет …). Пункт, который открыл следующее меню / список, — не действие: не запоминается
+V.last_rep = nil
+function V.rep_fn(fn, label)
+  if V.replaying ~= 0 or V.rep_running then return end
+  if V.hydra or V.picker or V.mode == 'cmd' or V.mode == 'search' then return end
+  V.last_rep = { kind = 'fn', fn = fn, label = label }
 end
 local function finish_move() V.cmdbuf = {} end
 
@@ -2407,6 +2415,7 @@ function V.key_impl(c)
         while #V.hist > 200 do table.remove(V.hist, 1) end
         if ctx.cmd_hist_save then ctx.cmd_hist_save(V.hist) end
         V.last_cmdline = line   -- 16 ноя: для @: (повтор команды)
+        if not ({ q = 1, reload = 1, debug = 1, wq = 1 })[line:match('^%s*(%S+)') or ''] then V.last_rep = { kind = 'cmd', line = line } end   -- и для «.»
       end
       return run_cmd(line)
     elseif c == TAB and ctx.pl_words and ((V.cmdline or ''):match('^pl ') or (V.cmdline or ''):match('^playlist ') or (V.cmdline or ''):match('^ch ') or (V.cmdline or ''):match('^chain ')) then
@@ -4250,7 +4259,14 @@ function V.key_impl(c)
   elseif c == ctrl('r') and not (ctx.mods and (ctx.mods().ctrl or ctx.mods().alt or ctx.mods().cmd)) then for _ = 1, n do E.redo() end; finish_move()   -- 5 окт: Ctrl+R — вкладка rec (main); 15 окт: со счётчиком
   elseif ch == '.' then
     -- 15 окт: счётчик — до повторов (иначе первый повтор брал его сам: 2. давало три раза)
-    if V.last_edit then local keys = V.last_edit; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end
+    local lr = V.last_rep
+    if lr and lr.kind == 'cmd' then V.cmdbuf = {}; V.count = nil; for _ = 1, n do V.run_cmd(lr.line) end; if (V.msg or '') == '' then V.msg = '. :' .. lr.line end
+    elseif lr and lr.kind == 'fn' then
+      V.cmdbuf = {}; V.count = nil; V.rep_running = true
+      for _ = 1, n do local ok, e = pcall(lr.fn); if not ok then V.msg = tostring(e):match('[^\n]*$'); break end end
+      V.rep_running = nil
+      if (V.msg or '') == '' then V.msg = '. ' .. tostring(lr.label or '') end
+    elseif V.last_edit then local keys = V.last_edit; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end
   elseif ch == '[' then V.octave = math.max(0, V.octave - n)   -- 15 окт: счётчик — на N
   elseif ch == ']' then V.octave = math.min(8, V.octave + n)
   elseif ch == '(' then ctx.pool_select(V.inst - n)
@@ -4475,7 +4491,10 @@ function V.picker_key(c)
   elseif c == ENTER then
     local it = pk.matches[pk.sel]
     V.picker = nil
-    if it and pk.on_pick then local ok, e = pcall(pk.on_pick, it); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
+    if it and pk.on_pick then
+      local cb = pk.on_pick
+      local ok, e = pcall(cb, it); if not ok then V.msg = tostring(e):match('[^\n]*$') else V.rep_fn(function() return cb(it) end, it.label) end
+    end
   elseif c == BS then pk.query = TX.bs(pk.query); picker_filter()
   elseif c == 14 or c == DOWN or c == 10 then pk.sel = math.min(#pk.matches, pk.sel + 1); pk.moved = true
   elseif c == 16 or c == UP or c == 11 then pk.sel = math.max(1, pk.sel - 1); pk.moved = true
@@ -4577,7 +4596,7 @@ function V.hydra_key(c)
         V.hydra = V.hydra_fix(type(it.sub) == 'function' and it.sub() or it.sub)
       else
         V.hydra = nil
-        if it.fn then local ok, e = pcall(it.fn); if not ok then V.msg = tostring(e):match('[^\n]*$') end end
+        if it.fn then local ok, e = pcall(it.fn); if not ok then V.msg = tostring(e):match('[^\n]*$') else V.rep_fn(it.fn, it.label) end end
       end
       return
     end
