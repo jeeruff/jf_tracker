@@ -2406,6 +2406,7 @@ function V.key_impl(c)
         V.hist[#V.hist + 1] = line
         while #V.hist > 200 do table.remove(V.hist, 1) end
         if ctx.cmd_hist_save then ctx.cmd_hist_save(V.hist) end
+        V.last_cmdline = line   -- 16 ноя: для @: (повтор команды)
       end
       return run_cmd(line)
     elseif c == TAB and ctx.pl_words and ((V.cmdline or ''):match('^pl ') or (V.cmdline or ''):match('^playlist ') or (V.cmdline or ''):match('^ch ') or (V.cmdline or ''):match('^chain ')) then
@@ -3541,6 +3542,17 @@ function V.key_impl(c)
       if c >= ('a'):byte() and c <= ('z'):byte() then V.macro = { name = string.char(c), keys = {} }; V.msg = 'recording @' .. string.char(c) end
       V.count = nil; finish_move(); return
     elseif p == '@' then
+      -- 16 ноя: @: — повторить последнюю команду строки (как в Vim), 3@: — три раза; потом @@ повторяет её же
+      if c == (':'):byte() or (c == ('@'):byte() and V.last_macro == ':') then
+        local line = V.last_cmdline or (V.hist and V.hist[#V.hist])
+        V.count = nil; finish_move()
+        if not line then V.msg = '@: no command yet'; return end
+        V.last_macro = ':'
+        local r
+        for _ = 1, n do r = V.run_cmd(line) end
+        if not V.msg or V.msg == '' then V.msg = ':' .. line .. (n > 1 and ('  x' .. n) or '') end
+        return r
+      end
       local name = (c == ('@'):byte()) and V.last_macro or string.char(c)
       local keys = name and V.regs['@' .. name]
       if keys then V.last_macro = name; V.cmdbuf = {}; V.count = nil; for _ = 1, n do replay(keys) end end   -- 15 окт: счётчик — до повторов (2@a было три раза)
@@ -4953,7 +4965,7 @@ local PENDING_HINT = {
   r = 'r: note key sets pitch | hex digits set field | Esc',
   q = 'q: a..z record macro into register',
   da = 'da: e automation | l the row | j below | k above | h all but the row - the track; E L J K H - all tracks (E - in the pattern) | Esc',
-  ['@'] = '@: a..z play macro | @ repeat last',
+  ['@'] = '@: a..z play macro | @ repeat last | : repeat the last command line',
 }
 function V.pending_hint()
   if not V.pending then return nil end

@@ -259,6 +259,8 @@ keysin('20j'); eq('scroll follows cursor', state.row0, 20 - 16 + 1)
 keysin('zb');  eq('zb: cursor row to the bottom (Vim; zt - track view since 6 ноя)', state.row0, 20 - 16 + 1)
 keysin(':transpose\r'); eq(':transpose opens the transpose popup', (last() or ''):match('^smart:transpose') ~= nil, true)
 SMART_P.on_pick({ v = 3 }); eq('popup +3 transposes the note of the row', (last() or ''):match('^transpose:.*:%+3$') ~= nil or (last() or ''):match('^smart') ~= nil, true)
+-- 16 ноя: @: — повтор последней команды строки (как в Vim)
+calls[#calls + 1] = 'marker'; keysin('@:'); eq('@: runs the last command line again', (last() or ''):match('^smart:transpose') ~= nil, true)
 V.cur.row = 20
 keysin('zz');  eq('zz', state.row0, 12)
 
