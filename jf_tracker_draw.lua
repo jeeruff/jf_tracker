@@ -1047,7 +1047,9 @@ function D.layout_core(snap, state, nregions)
   -- 11 окт: мастер справа (по умолчанию, как в Renoise) — правый угол под него зарезервирован, каналы до него
   L.mstrip_w = L.label_w + (L.ruler_right and L.rg_w or 0)   -- ширина полосы мастера (как было с линейкой слева)
   L.master_right = L.mix_bottom and snap.master and snap.master.vol and state.masterpos ~= 'left' and L.mstrip_w >= 6 * L.cw or false
-  L.master_w = L.master_right and math.min(L.mstrip_w, 10 * L.cw + 2 * L.pad) or 0   -- 13 окт: полоса мастера экономнее (дальше — по его колонкам)
+  -- 17 ноя: мастер не шире своих колонок: пол — подпись «∑ master» (кнопки шапки, что не влезли, не рисуются); колонок
+  -- больше (огибающие, chord, visor) — шире сам
+  L.master_w = L.master_right and math.min(L.mstrip_w, ms('∑ master') + 2 * L.pad + 2) or 0   -- 13 окт: полоса мастера экономнее
   -- 11 окт: колонка мастера (как show master track в REAPER, по умолчанию вкл) — его огибающие; нет огибающих — пустая дорожка
   L.mtrack = state.showmaster ~= false and snap.master and snap.master.track and not state.ptmode or false
   if L.mtrack then
@@ -1064,7 +1066,7 @@ function D.layout_core(snap, state, nregions)
     L.menv_of = mew
     local ew = 0
     for _, e in ipairs(snap.master.envs or {}) do ew = ew + mew(e) + 1 end
-    if #(snap.master.envs or {}) == 0 then ew = L.env_w + 1 end
+    if #(snap.master.envs or {}) == 0 and L.cmd_w == 0 and L.vis_w == 0 and (L.chd_w or 0) == 0 then ew = L.env_w + 1 end   -- 17 ноя: пустая дорожка — только когда колонок нет совсем
     L.master_w = math.max(L.master_w, ew + 1 + (L.cmd_w > 0 and (L.cmd_w + 1) or 0) + (L.vis_w > 0 and (L.vis_w + 1) or 0) + ((L.chd_w or 0) > 0 and (L.chd_w + 1) or 0))
   end
   -- 17 окт: мастер сложен (кнопка fold в его шапке; опция auto fold master — сам, когда треки не влезают):
