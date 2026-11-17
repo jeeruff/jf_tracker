@@ -10,6 +10,9 @@ function KR.step(c, from_q, env)
   if d <= 0 or not reaper.JS_VKeys_GetState then KR.krep = nil; return c end
   local now = reaper.time_precise()
   local R = KR.krep
+  -- 17 ноя: долгий кадр (загрузка плагина, большой пересчёт) — повтор не стреляет сразу за ним: пауза заново
+  if R and KR.last_t and now - KR.last_t > 0.2 then R.nxt = now + d / 1000 end
+  KR.last_t = now
   local function held(r)
     local up = reaper.JS_VKeys_GetUp and reaper.JS_VKeys_GetUp((r.evt or r.t0) - 0.005)
     local why
@@ -50,7 +53,9 @@ function KR.step(c, from_q, env)
       or ((c == 13 or c == 9 or c == 8) and c) or (c >= 1 and c <= 26) and (c + 64) or KR.ARROW[c]
     if c == 27 then vk = nil end
     local note = env.is_note and env.is_note(c)
-    if vk and not note then KR.krep = { c = c, vk = vk, t0 = now, down = now, nxt = now + d / 1000 } else KR.krep = nil end
+    -- 17 ноя: Enter — держится (системные повторы гасятся), но сам не повторяется: зажатый в долгом кадре (загрузка
+    -- плагина) добавлял эффект три раза
+    if vk and not note then KR.krep = { c = c, vk = vk, t0 = now, down = now, nxt = now + d / 1000, norep = c == 13 } else KR.krep = nil end
     KR.krep_stop = nil
     return c
   end
@@ -62,7 +67,7 @@ function KR.step(c, from_q, env)
       for i = #q, 1, -1 do if q[i] == R.c then table.remove(q, i) end end
       return c
     end
-    if now >= R.nxt and held(R) == true then
+    if not R.norep and now >= R.nxt and held(R) == true then
       local step = 1 / math.max(1, env.rate or 30)
       R.nxt = R.nxt + step
       if now >= R.nxt then R.nxt = now + step end   -- без догонялок: медленный кадр не копит шаги

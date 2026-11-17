@@ -87,4 +87,9 @@ do
   local m = run({ { 0.1, 0.15 } }, 1, 65, function(t) return t < 0.2 and 0.3 or 0.03 end, 2, false, true)
   eq('Ctrl+A once, release lost: one action', m, 1)
 end
+-- 17 ноя: Enter, зажатый на 0.6 с при кадрах по 1 с (загрузка плагина) — одно действие, не три
+do
+  local m = run({ { 0.1, 0.7 } }, 13, 13, function(t) return t < 3 and 1.0 or 0.03 end, 4, true)
+  eq('Enter held in slow frames: one action', m, 1)
+end
 print(('%d checks, %d failed'):format(checks, fails)); os.exit(fails == 0 and 0 or 1)
