@@ -48,7 +48,7 @@ KH.PAGES = {
     { k = 'Ctrl+Opt+H L', d = 'playrate of the selected instrument slower / faster (a count - N steps); on an fx column - fewer / more command columns of the track' },
     { k = 'Ctrl+Cmd+F1 F2', d = 'transpose the selected instrument of the lib -1 / +1 semitone (Shift - an octave)' },
     { k = 'Opt+1..0', d = 'instrument 1..10 of the lib; plugin instruments are numbered across the project (as in REAPER, any track - any instrument): one on another track takes the cursor to that track' },
-    { k = 'Cmd+1..0', d = 'jump to channel 1..10 (Ctrl+O - back), in INSERT too (Cmd is never a note)' },
+    { k = 'Cmd+1..0', d = 'jump to track (channel) 1..10 (Ctrl+O - back), in INSERT too (Cmd is never a note); two digits within 0.25 s - a two-digit track number (Cmd+1 Cmd+2 - track 12)' },
     { k = 'Ctrl+0..9', d = 'step length 0..9 rows (0 - the cursor stays); step auto / next off' },
     { k = 'Ctrl+Shift+J K', d = 'the note under the cursor: its end a row later / earlier (a count - N rows) (not stretched; past the sample the instrument loop plays)' },
     { k = 'Shift+Opt+Cmd+J K', d = 'NORMAL: slip: the sound inside the note under the cursor a row down / up (the note stays; looped - wraps)' },

@@ -2745,7 +2745,13 @@ function V.key_impl(c)
   -- 10 окт: ⌘+цифра — прыжок на канал N (1..9, 0 = 10) в любом режиме (было —
   -- инструмент, теперь он только на Option+цифре); Ctrl+O — назад
   if mods.cmd and not mods.shift and c >= ('0'):byte() and c <= ('9'):byte() and V.mode ~= 'cmd' and V.mode ~= 'search' then   -- 17 окт: и в INSERT (Cmd — не нота)
-    local k = c - ('0'):byte(); if k == 0 then k = 10 end
+    local dg = c - ('0'):byte()
+    local k = dg == 0 and 10 or dg
+    -- 17 ноя: две цифры быстро (за 0,25 с) — двузначный номер трека: Cmd+1, Cmd+2 → трек 12 (первая цифра уже перенесла
+    -- курсор на трек 1 — вторая уточняет)
+    local now = reaper.time_precise()
+    if V.cmdnum and now - V.cmdnum.t < 0.25 then k = V.cmdnum.d * 10 + dg; V.cmdnum = nil
+    else V.cmdnum = { d = dg, t = now } end
     local to
     for i, f in ipairs(flat()) do if f.ci == k and not f.env then to = i; break end end
     if to then
