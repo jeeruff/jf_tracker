@@ -94,6 +94,7 @@ KH.PAGES = {
     { k = 'h j k l', d = 'field left / row down / row up / field right' },
     { k = 'arrows + mods', d = 'arrows = h j k l with any modifier: Cmd+arrows - focus the pane there (Cmd+Shift - its size, Cmd+Opt - move it), Opt+Left / Right - track, Opt+Up / Down - instrument, Shift+arrows - select (H J K L), Ctrl+arrows - as Ctrl+hjkl' },
     { k = 'Opt+H Opt+L', d = 'previous / next track' },
+    { k = ',', d = 'transport menu: h l rewind / forward, H L start / end, p pause, f freeze, s stop here, o loop, r play rate (the keys are shown under the transport buttons with hints)' },
     { k = 'w b e', d = 'next / previous event of the track (all its columns and envelope points, like words in Vim); e - the row after the event, again - after the next one (3e - the third); dw yw cw de - this column' },
     { k = 'ge', d = 'the row after the previous event of the column (3ge - the third above)' },
     { k = 'E', d = 'the end of the lowest visible event of the track (the last one that starts on screen); dE - up to there' },

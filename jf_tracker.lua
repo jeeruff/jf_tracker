@@ -16598,6 +16598,15 @@ end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
 ctx.tp_do = function(id, d) return ctrl_action(id, d or 0) end   -- 17 ноя: кнопка транспорта командой (:rate)
+-- 17 ноя: «,» — меню транспорта: кнопки полосы с клавиатуры (буквы — те же, что подсказки под кнопками)
+ctx.TP_KEYS = { tp_rew = 'h', tp_fwd = 'l', tp_start = 'H', tp_end = 'L', tp_pause = 'p', freeze = 'f', loop = 'o', rate = 'r', stophere = 's' }
+ctx.transport_menu = function()
+  local function it(k, label, id) return { key = k, label = label, fn = function() ctrl_action(id, 0) end } end
+  vim.open_hydra({ title = 'transport', items = {
+    it('h', 'rewind', 'tp_rew'), it('l', 'fast forward', 'tp_fwd'), it('H', 'to the start', 'tp_start'), it('L', 'to the end', 'tp_end'),
+    it('p', 'pause', 'tp_pause'), it('f', 'freeze (a short loop at the play position)', 'freeze'), it('s', 'stop here (as Esc)', 'stophere'),
+    it('o', 'loop on / off', 'loop'), it('r', 'play rate ...', 'rate') } })
+end
 ctx.bpm_pick = function()
   local items = {}
   for _, it in ipairs(BPM_LIST) do items[#items + 1] = { label = it[1], data = it[2] } end
@@ -33480,6 +33489,8 @@ local function frame()
     end
     if not HN.active then ctx.glide = nil end
     c = 0
+  elseif c == (','):byte() and not vim.count and vim.mode == 'normal' and state.focus == 'tracker' and not vim.hydra and not vim.picker and not vim.pending and not vim.op then
+    ctx.transport_menu(); c = 0   -- 17 ноя: , — меню транспорта (кнопки полосы с клавиатуры)
   elseif c == (','):byte() and vim.count and vim.mode == 'normal' and not vim.hydra and not vim.picker then
     ctx.glide_unit = 'beat'; vim.msg = vim.count .. ' beat(s): f + a dB mark - the fader glides'; c = 0   -- 2,f — ход за 2 доли
   elseif c == ('f'):byte() and (vim.mode == 'normal' or vim.mode == 'visual' or vim.mode == 'vline' or ctx.f_in_insert()

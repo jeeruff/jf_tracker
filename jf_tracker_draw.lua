@@ -6022,7 +6022,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if b.halves then for _, h in ipairs(b.halves) do def[h[1]] = { h[2], h[3] } end
         elseif b[1] then def[b[1]] = { b[2], b[4] or b[3] } end
       end
-      local KEYS = { tp_play = 'spc', rec = 'o-r', stophere = 'esc', rate = ':rate' }
+      local KEYS = { tp_play = 'spc', rec = 'o-r', stophere = 'esc', rate = ',r', tp_rew = ',h', tp_fwd = ',l', tp_start = ',H', tp_end = ',L', tp_pause = ',p', freeze = ',f', loop = ',o' }   -- 17 ноя: «,» — меню транспорта
       local rv = c.rate or 1
       def.rate = { ('x%.2f'):format(rv), math.abs(rv - 1) > 1e-3 and U.AMBER or U.GREY }   -- 17 ноя (4): скорость — рядом с play (вместо /2 x2)
       D.tp2_list = {}
