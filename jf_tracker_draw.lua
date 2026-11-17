@@ -3001,7 +3001,13 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if L.wave_only then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
     local head = cell and (cell.kind == 'cont' and cell.of or cell)
-    if head and head.kind == 'audio' then draw_wave(L, head, cell.kind == 'cont' and cell.i or 0, x, y, head.muted, false)
+    if head and head.kind == 'audio' then
+      draw_wave(L, head, cell.kind == 'cont' and cell.i or 0, x, y, head.muted, false)
+      -- 17 ноя: на строке начала — имя ноты поверх волны / спектрограммы (с каймой фона)
+      if cell.kind ~= 'cont' and head.note then
+        local nm = D.micro_spell(head.note, head.micro)
+        D.halo(x + L.pad, ty, nm); D.note_text(x + L.pad, ty, nm, head.muted and U.GREY or U.TEXT, U.DIM)
+      end
     elseif head and head.note then text(x + L.pad, ty, head.note, U.TEXT)   -- нота MIDI в аудио-подколонке — как есть
     else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
     return
