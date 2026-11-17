@@ -10703,7 +10703,12 @@ function D.frame(L, snap, rows, state, info)
   end
   D.pmark('hdr: after columns')
   -- 1 ноя: правая граница последнего трека — и в шапке (в строках она есть; в шапке была порвана)
-  do local lc = L.cols and L.cols[#L.cols]; if lc and lc.x and not lc.master then set(U.LINE); gfx.rect(lc.x + lc.w, hy - HX, 1, L.header_h, 1) end end
+  -- 17 ноя: и строка подписей (имя инструмента, номера подколонок) до строк — там она обрывалась; уходит под мастер — не рисуется
+  do local lc = L.cols and L.cols[#L.cols]
+    if lc and lc.x and not lc.master and lc.x + lc.w <= (L.cols_r or W) then
+      set(U.LINE); gfx.rect(lc.x + lc.w, hy - HX, 1, math.max(L.header_h, (L.body_y or 0) - (hy - HX)), 1)
+    end
+  end
   set(D.SEP); gfx.rect(tx0, hy - HX + L.header_h - 2, W - tx0, 1, 1)
   -- 9 окт: линейка прыжков (опция jumps) — между клипами и строками, как relativenumber в
   -- Vim по горизонтали: у каждого трека — сколько до него от курсора (3L / 3H
@@ -10854,6 +10859,11 @@ function D.frame(L, snap, rows, state, info)
         text(mx0 + math.floor((mw0 - ms(lab)) / 2), jy, lab, U.mix(U.GREY, U.BG, 0.35))
       end
     end
+  end
+  -- 17 ноя: правая граница последнего трека — и через линейку прыжков (номера подколонок): подложка линейки её стирала
+  if (L.jr_h or 0) > 0 then
+    local lc = L.cols and L.cols[#L.cols]
+    if lc and lc.x and not lc.master and lc.x + lc.w <= (L.cols_r or W) then set(U.LINE); gfx.rect(lc.x + lc.w, L.body_y - L.jr_h, 1, L.jr_h, 1) end
   end
   if L.mix_bottom and ((L.route_h or 0) > 0 or D.rt_need == 0) then D.route_strip(L, info, hover, L.matrix_w or 0, W) end
   -- 9 окт: попап маршрутизации открыт — каналы-получатели (S голубой),

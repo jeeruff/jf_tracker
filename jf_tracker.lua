@@ -33921,7 +33921,7 @@ local function frame()
         if r == 'leave' then ctx.set_focus('tracker') elseif r == 'eval' then ctx.con_run(false) elseif r == 'evalall' then ctx.con_run(true) end
       elseif state.focus == 'notes' and state.notes_open then
         if NT.key(c) == 'leave' then ctx.notes_save(); ctx.set_focus('tracker') end
-      elseif state.focus == 'fxb' and state.dsp and state.fxb then
+      elseif state.focus == 'fxb' and (state.panes_ui or (state.dsp and state.fxb)) then   -- 17 ноя: панели — без старых флагов (поиск / уходил в трекер)
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end
         if c == 58 and FB.query == '' then return vim.key(c) end   -- 18 окт: : в пустом поиске — строка команды (тест набрал :pane в поиск и Enter добавил эффект)
         FB.enter_wait = state.fxbenter

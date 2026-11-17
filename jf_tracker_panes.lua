@@ -447,20 +447,25 @@ end
 -- сосед по направлению (tmux select-pane -LDUR): лист за ребром с
 -- наибольшим перекрытием; dir — 'l' 'r' 'u' 'd'
 function PN.focus_dir(lay, id, dir)
+  -- 17 ноя: сосед — ближайший за ребром (любой зазор: строка подсказок, гидра внизу и т. п. раздвигают панели), при равном
+  -- зазоре — с наибольшим перекрытием; было «не дальше 8 px» — Cmd+J из трекера вниз не находил панель под ним
   local c = lay.by_panel[id]
   if not c then return nil end
-  local best, bo = nil, 0
+  local best, bgap, bo = nil, math.huge, 0
   for _, o in ipairs(lay.cells) do
     if o ~= c then
-      local ov, adj
+      local ov, gap
       if dir == 'l' or dir == 'r' then
         ov = math.min(c.y + c.h, o.y + o.h) - math.max(c.y, o.y)
-        adj = dir == 'l' and (o.x + o.w <= c.x and o.x + o.w >= c.x - 8) or (dir == 'r' and o.x >= c.x + c.w and o.x <= c.x + c.w + 8)
+        gap = dir == 'l' and (c.x - (o.x + o.w)) or (o.x - (c.x + c.w))
       else
         ov = math.min(c.x + c.w, o.x + o.w) - math.max(c.x, o.x)
-        adj = dir == 'u' and (o.y + o.h <= c.y and o.y + o.h >= c.y - 8) or (dir == 'd' and o.y >= c.y + c.h and o.y <= c.y + c.h + 8)
+        gap = dir == 'u' and (c.y - (o.y + o.h)) or (o.y - (c.y + c.h))
       end
-      if adj and ov > bo then best, bo = o, ov end
+      if ov > 0 and gap >= -2 then
+        gap = math.max(0, gap)
+        if gap < bgap - 8 or (gap <= bgap + 8 and ov > bo) then best, bgap, bo = o, math.min(gap, bgap), ov end
+      end
     end
   end
   return best and best.active_id
