@@ -1406,10 +1406,16 @@ function D.spell(s)
   return f and (f .. s:sub(3)) or s
 end
 local text
+-- 17 ноя: знак диеза на экране — :sharp (# ¨ ˆ ˙ ˚); место знака — всегда ширина «-», знак по центру (нота 3 знака)
+D.SHARP = '#'
 function D.note_text(x, y, s, col, dim)
   local l, a, o = (s or ''):match('^([A-G])([%-#b])(.+)$')
   if not l then text(x, y, s, col); return end
-  text(x, y, l, col); text(x + ms(l), y, a, dim); text(x + ms(l .. a), y, o, col)
+  local sw = ms('-')
+  if a == '#' then a = D.SHARP or '#' end
+  text(x, y, l, col)
+  text(x + ms(l) + math.floor((sw - ms(a)) / 2), y, a, dim)
+  text(x + ms(l) + sw, y, o, col)
 end
 function text(x, y, s, col, bg)
   if s == nil or s == '' then return end

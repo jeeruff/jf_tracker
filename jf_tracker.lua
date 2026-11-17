@@ -94,6 +94,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
 MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+draw.SHARP = (function() local v = reaper.GetExtState('jf_tracker', 'sharp'); return v ~= '' and v or '#' end)()   -- 17 ноя: знак диеза (:sharp)
 draw.HM = MMX.HM   -- 17 ноя: лад для написания нот в колонке (Db4 в бемольных ладах)
 MMX.PRS = dofile(DIR .. '/jf_tracker_presets.lua')   -- 16 окт: пресеты инструментов — шаблоны треков по папкам
 MMX.SRG = dofile(DIR .. '/jf_tracker_surge.lua')   -- 16 окт: патчи Surge XT через чанк трека
@@ -16623,6 +16624,15 @@ ctx.env_show_next = function(col)
 end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
+-- 17 ноя: :sharp — знак диеза в колонке нот (только вид: набор и разбор — как были)
+ctx.sharp_menu = function()
+  local items = {}
+  for i, g in ipairs({ '#', '¨', 'ˆ', '˙', '˚' }) do
+    items[#items + 1] = { key = tostring(i), label = ('%s%s   C%s4  F%s3'):format(draw.SHARP == g and '* ' or '  ', g, g, g), fn = function()
+      draw.SHARP = g; reaper.SetExtState(EXT, 'sharp', g, true); vim.msg = 'sharp sign: ' .. g end }
+  end
+  vim.open_hydra({ title = 'sharp sign in the note column', items = items })
+end
 ctx.tp_do = function(id, d) return ctrl_action(id, d or 0) end   -- 17 ноя: кнопка транспорта командой (:rate)
 -- 17 ноя: «,» — меню транспорта: кнопки полосы с клавиатуры (буквы — те же, что подсказки под кнопками)
 ctx.TP_KEYS = { tp_rew = 'h', tp_fwd = 'l', tp_start = 'H', tp_end = 'L', tp_pause = 'p', freeze = 'f', loop = 'o', rate = 'r', stophere = 's' }
