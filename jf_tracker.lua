@@ -16627,7 +16627,7 @@ ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
 -- 17 ноя: :sharp — знак диеза в колонке нот (только вид: набор и разбор — как были)
 ctx.sharp_menu = function()
   local items = {}
-  for i, g in ipairs({ '#', '¨', 'ˆ', '˙', '˚' }) do
+  for i, g in ipairs({ '#', 'ˆ', '˚' }) do   -- ˙ ¨ — микротоны у чёрных клавиш
     items[#items + 1] = { key = tostring(i), label = ('%s%s   C%s4  F%s3'):format(draw.SHARP == g and '* ' or '  ', g, g, g), fn = function()
       draw.SHARP = g; reaper.SetExtState(EXT, 'sharp', g, true); vim.msg = 'sharp sign: ' .. g end }
   end

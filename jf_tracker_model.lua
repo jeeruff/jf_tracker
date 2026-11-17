@@ -35,7 +35,7 @@ function M.note_name(n)
   return NAMES[n % 12 + 1] .. tostring(o)
 end
 
--- 16 окт: микротоны — 72-EDO, ступень ^ / v = 1/6 тона (16.7 ц); m = −3..+3 ступени от ноты 12-EDO.
+-- 16 окт: микротоны — 72-EDO, ступень ^ / v = 1/6 полутона (16.7 ц); m = −3..+3 ступени от ноты 12-EDO.
 -- Метка после октавы: C-4^ C-4^^ C-4^3, вниз — v (буквами, без значков); 0 — пусто
 M.MICRO_STEP = 100 / 6
 function M.micro_of_cents(c) local m = math.floor((c or 0) / M.MICRO_STEP + 0.5); if m == 0 then return nil end; return math.max(-3, math.min(3, m)) end

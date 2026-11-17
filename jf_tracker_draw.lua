@@ -1185,7 +1185,8 @@ function D.layout_core(snap, state, nregions)
           if llvl and llvl >= 2 and not narrow then G = (nsub == 1 and D.SMART_COLS ~= false and L.smartG(lane, llvl)) or L.GL[math.min(llvl, 3 + L.MAXFX)] end   -- 15 ноя: одна подколонка — пустые поля уходят первыми
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)
           if lane.has_tfx and not narrow then G = L.tfxG(G) end
-          if lane.has_micro then G = L.microG(G) end   -- 2 ноя: шире — только этот лейн
+          -- 17 ноя: микротон — на месте знака (D.micro_spell), нота всегда 3 знака: лейн больше не шире
+          -- if lane.has_micro then G = L.microG(G) end   -- 2 ноя: шире — только этот лейн
           -- 21 окт: волна — только когда есть что показать (аудио в лейне или кит с сэмплами); tw — выбор трека (D.wave_pref:
           -- true / false / nil = авто). Пул lib общий на все треки — по нему не судить (так колонка не уходила никогда)
           if not narrow then
@@ -1406,15 +1407,32 @@ function D.spell(s)
   return f and (f .. s:sub(3)) or s
 end
 local text
--- 17 ноя: знак диеза на экране — :sharp (# ¨ ˆ ˙ ˚); место знака — всегда ширина «-», знак по центру (нота 3 знака)
+-- 17 ноя: знак диеза на экране — :sharp (# ˆ ˚); место знака — всегда ширина «-», знак по центру (нота 3 знака)
 D.SHARP = '#'
+-- 17 ноя: микротон (72-EDO, шаг 1/6 полутона) — одним знаком на месте знака ноты, без цвета. От белой клавиши:
+-- ^ " + вверх 1 2 3 шага, v w d вниз (+ / d — четвертьтон); от чёрной: ˙ ¨ вверх 1 2, . : вниз 1 2;
+-- чёрная ±3 = четвертьтон от белой соседки: C# +3 → Dd, C# −3 → C+
+local MU_W = { [1] = '^', [2] = '"', [3] = '+', [-1] = 'v', [-2] = 'w', [-3] = 'd' }
+local MU_B = { [1] = '˙', [2] = '¨', [-1] = '.', [-2] = ':' }
+local NEXT_WHITE = { C = 'D', D = 'E', F = 'G', G = 'A', A = 'B' }
+function D.micro_spell(s, m)
+  if not m or m == 0 then return D.spell(s) end
+  local l, a, o = (s or ''):match('^([A-G])([%-#])(%d)$')
+  if not l then return s end
+  if a == '-' then return l .. MU_W[m] .. o end
+  if m == 3 then return (NEXT_WHITE[l] or l) .. 'd' .. o end
+  if m == -3 then return l .. '+' .. o end
+  return l .. (MU_B[m] or '#') .. o
+end
+local PLAIN_SIGN = { ['-'] = true, ['#'] = true, b = true }
 function D.note_text(x, y, s, col, dim)
-  local l, a, o = (s or ''):match('^([A-G])([%-#b])(.+)$')
+  local l, a, o = (s or ''):match('^([A-G])([%z\1-\127\194-\244][\128-\191]*)(%d)$')
   if not l then text(x, y, s, col); return end
   local sw = ms('-')
+  local plain = PLAIN_SIGN[a]
   if a == '#' then a = D.SHARP or '#' end
   text(x, y, l, col)
-  text(x + ms(l) + math.floor((sw - ms(a)) / 2), y, a, dim)
+  text(x + ms(l) + math.floor((sw - ms(a)) / 2), y, a, plain and dim or col)   -- микротон — цветом ноты (виден), знак — тусклый
   text(x + ms(l) + sw, y, o, col)
 end
 function text(x, y, s, col, bg)
@@ -3062,7 +3080,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     local offkey = D.key_pcs and cell.pitch and not cell.video and not D.key_pcs[math.floor(cell.pitch + 0.5) % 12]   -- 21 окт: нота вне лада (:key mark)
-    local nname = cell.video and 'VID' or D.spell(cell.note)
+    local nname = cell.video and 'VID' or D.micro_spell(cell.note, cell.micro)
     if D.on_wave then D.halo(x + L.x_note, ty, nname) end   -- 17 ноя: имя ноты поверх волны — с каймой фона
     D.note_text(x + L.x_note, ty, nname, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))), c(1, U.DIM))   -- видео-событие (9 окт)
     if cell.micro and L.micro_w and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
