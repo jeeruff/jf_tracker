@@ -4215,7 +4215,7 @@ function V.key_impl(c)
       ctx.razor_from(f0, f1, r0, r1); V.mode = 'normal'; finish_move(); done = true
     elseif c == ('T'):byte() then V.transpose_smart('sel'); done = true   -- 26 окт: Shift+T и в VISUAL — транспозитор выделения
     elseif (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte() or c == ('c'):byte()
-        or c == ('M'):byte() or c == ('s'):byte()) and not (V.vfield and (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte())) then   -- 23 окт: поле-колонка — своя ветка ниже (было — удалялись ноты целиком)
+        or c == ('M'):byte() or c == ('s'):byte()) and not (V.vfield_one() and (c == ('d'):byte() or c == ('x'):byte() or c == ('y'):byte())) then   -- 23 окт: поле-колонка — своя ветка ниже (было — удалялись ноты целиком)
       local e = apply(c == ('M'):byte() and 'm' or string.char(c), f0, f1, r0, r1)
       V.cur.fi, V.cur.row = f0, r0
       if V.mode ~= 'insert' then V.mode = 'normal' end
@@ -4274,7 +4274,7 @@ function V.key_impl(c)
       if n > 0 and ctx.edit.retime then ctx.edit.retime(list, lpb(), rows, nil, 'quantize to the grid'); finish_edit() else finish_move() end
       V.msg = n > 0 and ('Q: %d note(s) to the nearest row (of %d)'):format(n, #hs) or ('Q: %d note(s), all on the grid already'):format(#hs)
       V.cur.fi, V.cur.row = f0, r0; V.mode = 'normal'; V.vfield = nil; done = true
-    elseif V.vfield and (c == ('y'):byte() or c == ('d'):byte() or c == ('x'):byte()) then
+    elseif V.vfield_one() and (c == ('y'):byte() or c == ('d'):byte() or c == ('x'):byte()) then
       -- 19 окт: поле-колонка: y — значения поля в регистр, d / x — очистить поле (ноты остаются)
       local fld = V.vfield
       if c == ('y'):byte() then
@@ -5260,6 +5260,11 @@ function V.smart_expand(dir)
   V.vbox = { f0, f1, r0, r1, at = { fi = V.cur.fi, row = V.cur.row } }   -- рамка выделения; курсор на месте
   V.msg = ('select: %s (a - wider, i - narrower, Esc - off)'):format(SX[o.step])
 end
+-- 17 ноя: поле-колонка (v на громкости / delay / команде) — пока курсор на том же поле; ушёл на другое поле —
+-- обычный прямоугольник от угла, где начал, до курсора (диагональ)
+function V.vfield_one()
+  return V.vfield and (V.cur.field or 1) == V.vfield or false   -- курсор на том же поле (в любой колонке) — поле-колонка
+end
 function V.visual_range()
   local vb = V.vbox
   if vb and V.mode == 'visual' and vb.at.fi == V.cur.fi and vb.at.row == V.cur.row then return vb[1], vb[2], vb[3], vb[4] end
@@ -5276,7 +5281,7 @@ function V.visual_range()
   -- 17 ноя: WYSIWYG — у лейна с несколькими колонками нот команды стоят блоком ПОСЛЕ всех нот: выделение подколонки с
   -- командами на экране тянется через соседние колонки нот до её команд — они и выделены (было: выделялись только её нота
   -- и её команды, пустое место между ними — нет)
-  if V.mode == 'visual' and not V.vtrack then
+  if V.mode == 'visual' and not V.vtrack and a.fi ~= b.fi then   -- 17 ноя (2): только когда выделение уже в разных колонках
     local F = flat()
     local fa, fb = F[f0], F[f1]
     if fa and fb and fa.col and fa.col == fb.col and fa.li and fa.li == fb.li then

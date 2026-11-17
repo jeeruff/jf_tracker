@@ -26355,7 +26355,14 @@ local function frame()
   local vis
   if vim.mode == 'visual' or vim.mode == 'vline' then
     local f0, f1, r0, r1 = vim.visual_range()
-    vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1, field = vim.mode == 'visual' and vim.vfield or nil }   -- 19 окт: поле-колонка
+    -- 17 ноя: поля — только в одной колонке: от поля, где начал, до поля курсора; разные колонки — колонки целиком
+    local fld, fld2
+    if vim.mode == 'visual' and vim.vfield_one and vim.vfield_one() then fld = vim.vfield   -- то же поле — поле-колонка (и через колонки)
+    elseif vim.mode == 'visual' and f0 == f1 and vim.anchor and vim.anchor.fi == vim.cur.fi then
+      local fa, fb = vim.vfield or (vim.anchor.field or 1), vim.cur.field or 1
+      if fa ~= fb then fld, fld2 = math.min(fa, fb), math.max(fa, fb) end   -- в одной колонке — поля от угла до курсора
+    end
+    vis = { f0 = f0, f1 = f1, r0 = r0, r1 = r1, field = fld, field2 = fld2 }   -- 19 окт: поле-колонка
     ctx.rf_lastvis = { f0, f1, r0, r1, vim.mode == 'visual' and vim.vfield or nil }   -- 19 окт: для reform из панели
     ctx.vis_sync(vis)
   else ctx.vis_key = nil end

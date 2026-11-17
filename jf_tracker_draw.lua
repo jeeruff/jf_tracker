@@ -11559,8 +11559,10 @@ function D.frame(L, snap, rows, state, info)
         if f and f.x then
           if f.env then set(U.TEXT, 0.10) else set(U.CYAN, 0.16) end
           if vis.field and not f.env and not f.ml then   -- 19 окт: v на поле — только оно
-            local fx2, fw2 = D.field_rect(f.G or L, vis.field)
-            if fx2 then gfx.rect(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0, 1) end
+            for fl = vis.field, vis.field2 or vis.field do   -- 17 ноя: поля от угла до курсора
+              local fx2, fw2 = D.field_rect(f.G or L, fl)
+              if fx2 then gfx.rect(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0, 1) end
+            end
           else gfx.rect(f.x, y0, f.w, y1 - y0, 1); if f.fxx then gfx.rect(f.x + f.fxx, y0, f.fxw, y1 - y0, 1) end end   -- 4 ноя: и блок команд
         end
       end
@@ -12063,8 +12065,10 @@ function D.frame(L, snap, rows, state, info)
         local f = L.flat[fi]
         if f and f.x then
           if vis.field and not f.env and not f.ml then
-            local fx2, fw2 = D.field_rect(f.G or L, vis.field)
-            if fx2 then U.invert(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0) end
+            for fl = vis.field, vis.field2 or vis.field do   -- 17 ноя: поля от угла до курсора
+              local fx2, fw2 = D.field_rect(f.G or L, fl)
+              if fx2 then U.invert(f.x + fx2 - 1, y0, fw2 + 2, y1 - y0) end
+            end
           else U.invert(f.x, y0, f.w, y1 - y0); if f.fxx then U.invert(f.x + f.fxx, y0, f.fxw, y1 - y0) end end
         end
       end
