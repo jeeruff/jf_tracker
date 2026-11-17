@@ -222,7 +222,7 @@ KH.PAGES = {
     { k = 'zb', d = 'the cursor row to the bottom (as in Vim)' },
     { k = 'zt', d = 'zoom the track: the cursor track bigger - all fields of its columns, automation, MIDI lanes, audio as a big wave - the others folded; zt again - back' },
     { k = 'Opt+T f / o', t = { 'T' }, m = 'take fx: add / open', d = 'Opt+T f - add a take fx to the note under the cursor, Opt+T o - its take fx chain in DSP' },
-    { k = 'Opt+T p', t = { 'T' }, m = 'slice pitch', d = 'pitch of the slice of the note under the cursor (note = slice): - = a semitone, [ ] an octave, t - type it (:slpitch N); every note of that slice follows, a note pitched on its own keeps its +/- (in the lib: Shift+T on a slice row)' },
+    { k = 'Opt+T (slice note)', t = {}, m = 'slice pitch', d = 'on a slice note (and on a slice row in the lib) - the pitch of that slice: - = a semitone, [ ] an octave, t - type it (:slpitch N); every note of that slice follows; f / o - take fx as on other notes' },
     { k = 'tT', m = 'track from template', d = 'a track from a template after the cursor track' },
     { k = 'tFf', m = 'into left folder', d = 'the cursor track goes into the folder of the track to the left' },
     { k = 'tFu', m = 'unpack folder', d = 'unpack the folder (the cursor track or its parent): the tracks stay where they are, the folder is gone' },

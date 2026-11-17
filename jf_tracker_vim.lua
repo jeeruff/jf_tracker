@@ -3779,7 +3779,7 @@ function V.key_impl(c)
       local ch = string.char(c < 256 and c or 0)
       if ch == 'f' and ctx.dsp_take_slice then ctx.dsp_take_slice()
       elseif ch == 'o' and ctx.take_fx_open then ctx.take_fx_open()
-      elseif ch == 'p' and ctx.slp_hydra then ctx.slp_hydra() end   -- 17 ноя: T p — высота слайса ноты под курсором (Shift+T занят транспозитором)
+      end   -- 17 ноя: высота слайса — сам Opt+T на ноте-слайсе (T p снят)
       finish_move(); V.count = nil; return
     elseif p == 't' then
       -- 16 окт: t + цифры — номера треков (как в REAPER, 0 = 10), потом a: t123a — запись у треков 1 2 3
@@ -4371,7 +4371,19 @@ function V.key_impl(c)
     return
   elseif ch == 'R' and V.mode == 'normal' and ctx.retro_insert then ctx.retro_insert(); V.count = nil; return   -- 21 окт: R — последнее сыгранное (ретро-буфер MIDI REAPER) с курсора
   elseif ch == 'T' and V.mode == 'normal' then V.transpose_smart(); return   -- 26 окт: Shift+T — транспозитор (выпадашка, как :tr)
-  elseif c == 8224 and V.mode == 'normal' then V.pending = 'T'; return   -- 26 окт: Opt+T — take ноты под курсором (было T; t — трек)
+  elseif c == 8224 and V.mode == 'normal' then   -- 26 окт: Opt+T — take ноты под курсором (было T; t — трек)
+    -- 17 ноя: на ноте-слайсе Opt+T — сразу высота слайса (Option = звук); f / o take fx — в том же меню
+    local sr, sk
+    if ctx.slp_target then sr, sk = ctx.slp_target() end
+    if sr and sk and ctx.slp_hydra then
+      ctx.slp_hydra(sr, sk)
+      if V.hydra and V.hydra.items then
+        V.hydra.items[#V.hydra.items + 1] = { key = 'f', label = 'take fx: add to this note', fn = function() if ctx.dsp_take_slice then ctx.dsp_take_slice() end end }
+        V.hydra.items[#V.hydra.items + 1] = { key = 'o', label = 'take fx: its chain in DSP', fn = function() if ctx.take_fx_open then ctx.take_fx_open() end end }
+      end
+      return
+    end
+    V.pending = 'T'; return
   elseif V.is_mac_key(c) and V.mode ~= 'insert' and ctx.mac_panel then V.count = nil; ctx.mac_panel(n); return   -- 16 окт: Option+Shift+2 — большая панель макросов у курсора (@a — регистр, как в Vim)
   elseif ch == 'g' or ch == 'z' or ch == 'r' or ch == '@' or ch == "'" then V.pending = ch; return   -- ' — harpoon (9 окт)
   elseif ch == 'q' then

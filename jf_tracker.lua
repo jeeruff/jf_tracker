@@ -41044,7 +41044,7 @@ ctx.lib_tree_key = function(c)
       if c == 13 or ch == 'i' then ctx.slice_list_do('insert'); return true end
       if ch == 'x' or ch == 'd' then ctx.slice_list_do('delete'); return true end
       if ch == 'e' or ch == 'l' then ctx.slice_list_do('edit'); return true end
-      if ch == 'T' and e then ctx.slp_hydra(e.parent or e, cs.k); return true end   -- 17 ноя: высота слайса (в трекере — Opt+T p)
+      if c == 8224 and e then ctx.slp_hydra(e.parent or e, cs.k); return true end   -- 17 ноя: высота слайса — Opt+T (как в трекере; одна клавиша)
     end
     return false
   end
