@@ -1551,9 +1551,17 @@ function V.cands(typed)
   local cc = V.cand_cache
   if cc and cc.q == typed then return cc.list, cc.argmode end
   local list, argmode = {}, false
-  local first = typed:match('^%s*(%S+)%s')
   local RN = run_names()
-  if typed:match('^%s*!') then
+  -- 17 ноя: «.» перед командой — под курсором; «=» — номер строки: строка выполняется как набрана
+  local dotcmd = typed:match('^%s*%.(%a[%w_]*)')
+  local first = typed:match('^%s*%.?(%S+)%s')
+  if typed:match('^%s*%.?=%s*$') then
+    argmode = true
+    list[1] = { head = true, key = '=', text = 'the cursor row: number, bar.beat, time - Enter' }
+  elseif dotcmd and RN[dotcmd] then
+    argmode = true
+    list[1] = { head = true, key = '.' .. dotcmd, text = 'at the cursor only (bpm - a tempo change on this row, sig - this pattern) - Enter runs it' }
+  elseif typed:match('^%s*!') then
     argmode = true
     list[1] = { head = true, key = 'REAPER action', text = 'Enter - the actions list' }
   elseif first then
@@ -1655,8 +1663,19 @@ local function run_cmd(line)
   -- :!текст — действия REAPER (отдельно от команд трекера): fzf с запросом
   local bang = line:match('^%s*!%s*(.*)$')
   if bang then if ctx.reaper_actions then ctx.reaper_actions(bang) end; return end
+  -- 17 ноя: := — номер строки курсора (как в Vim): строка, такт.доля, время
+  if line:match('^%s*%.?=%s*$') then V.msg = ctx.row_info and ctx.row_info(V.cur.row) or ('row ' .. V.cur.row); return end
+  -- 17 ноя: «.» перед командой — только под курсором (диапазон Vim «текущая строка»): :.bpm 140 — смена темпа на строке,
+  -- :.sig 7/8 — размер паттерна под курсором
+  local here = false
+  do local rest = line:match('^%s*%.(%a.*)$'); if rest then here = true; line = rest end end
   local cmd, arg = line:match('^%s*(%S+)%s*(.*)$')
   if not cmd then return end
+  if here then
+    if cmd == 'bpm' and tonumber(arg) and ctx.tempo_here then ctx.tempo_here(tonumber(arg)); return end
+    if cmd == 'sig' then ctx.sig_cmd((arg or '') .. ' here'); return end
+    V.msg = ':.' .. cmd .. ' - «.» (at the cursor) works with bpm and sig; ran it as usual'
+  end
   local n = tonumber(arg)
   if cmd == 'q' then return 'quit'
   elseif cmd == 'chcol' then if ctx.chain_col_hex then ctx.chain_col_hex(arg) end   -- 28 окт: свой цвет цепочки

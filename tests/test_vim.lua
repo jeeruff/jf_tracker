@@ -1274,5 +1274,11 @@ do
   eq('Ivy: dedu - the first pick is :dedup', f and f.cmd, 'dedup')
   V.key(27)
 end
+-- 17 ноя: «.» и «=» в командной строке — строка как набрана (не выбор из списка)
+do
+  reset()
+  local _, am = V.cands('.bpm 140'); eq(':.bpm 140 - runs as typed', am, true)
+  local _, am2 = V.cands('='); eq(':= - runs as typed', am2, true)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -16670,6 +16670,22 @@ ctx.env_show_next = function(col)
 end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
+-- 17 ноя: :.bpm N — смена темпа на строке курсора (как Opt+Enter в поле BPM)
+ctx.tempo_here = function(v)
+  v = math.max(20, math.min(400, v))
+  local t = edit.row_time(vim.cur.row, state.lpb, 0)
+  edit.run('tempo change', function() edit.keep_markers_qn(function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, false) end) end)
+  reaper.UpdateTimeline(); model.invalidate()
+  vim.msg = ('tempo change %.2f BPM at row %d'):format(v, vim.cur.row)
+end
+-- 17 ноя: := — где курсор: строка, такт.доля (как в колонке строк), время
+ctx.row_info = function(row)
+  local t = edit.row_time(row, state.lpb, 0)
+  local _, meas, _, fullbeats = reaper.TimeMap2_timeToBeats(0, t)
+  local bt = reaper.TimeMap2_timeToBeats(0, t)
+  local s = math.floor(t * 1000 + 0.5)
+  return ('row %d  bar %d.%d  %d:%02d.%03d  (last row %d)'):format(row, (meas or 0) + 1, math.floor(bt or 0) + 1, s // 60000, (s // 1000) % 60, s % 1000, (snap and snap.last_row) or 0)
+end
 -- 17 ноя: :sharp — знак диеза в колонке нот (только вид: набор и разбор — как были)
 ctx.sharp_menu = function()
   local items = {}
