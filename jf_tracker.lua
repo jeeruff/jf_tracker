@@ -2964,8 +2964,9 @@ ctx = {
         for _, p2 in ipairs(f.params) do if p2.show == 'note' and p2.name == 'note lo' then local _, sl = A.GetFormattedParamValue(col.track, p2.fx or f.i, p2.i, ''); lo = tonumber(sl) or 0 end end
         cur = cur and (lo - cur)
       end
-      draw.notepop = { k = k, pi = pi, x = x or math.floor(gfx.w / 2), y = y or math.floor(gfx.h * 0.7), cur = cur and math.floor(cur + 0.5), name = p.name, root = p.show == 'root', lo = lo }
-      vim.msg = p.name .. ': click a key or h l / j k, type D5 (Enter, Esc)'
+      -- 17 ноя: нота параметра — списком внизу (набор D5 / C#3 фильтрует, Enter), вместо окна-клавиатуры
+      local root = p.show == 'root'
+      ctx.note_pick(p.name, cur and math.floor(cur + 0.5), function(n) ctx.dsp_type_value(k, pi, root and (lo - n) or n) end)
       return
     end
     if not (p.kind == 'steps' and p.nsteps) then vim.msg = (p.name or 'param') .. ': i - type a value'; return end
@@ -16603,6 +16604,16 @@ ctx.bpm_pick = function()
     elseif type(it.data) == 'number' then set_bpm(it.data) end
   end)
 end
+-- 17 ноя: выбор ноты списком внизу: все 128, текущая — первой строкой выделена; набор (D5, C#, 60) фильтрует
+ctx.note_pick = function(name, cur, setfn)
+  local items, sel = {}, 1
+  for n = 0, 127 do
+    items[#items + 1] = { label = ('%s  %d'):format(model.note_name(n), n), data = n }
+    if cur == n then sel = #items end
+  end
+  vim.open_picker((name or 'note') .. ' - type a note (D5) or a number, Enter', items, function(it) if it.data then setfn(it.data) end end)
+  if vim.picker then vim.picker.sel = sel end
+end
 ctx.dedup = function()
   local n, nt = 0, 0
   local hook = edit.after; edit.after = nil
@@ -22204,9 +22215,7 @@ function ctx.slx_do(h)
   -- 31 окт: root — клавиатурой (щелчок по клавише = нота среза 1), как ноты у параметров DSP
   if it.kind == 'val' and it.name == 'Base note' then
     local v = ctx.slx_param(fi, 'Base note')
-    draw.notepop = { x = gfx.mouse_x, y = gfx.mouse_y + 4, cur = v and math.floor(v + 0.5), name = 'root (slice 1)',
-      set = function(n) setp('Base note', n); vim.msg = 'slixer root: ' .. n end }
-    vim.msg = 'slixer root: click a key or h l / j k, type D5 (Enter, Esc)'
+    ctx.note_pick('root (slice 1)', v and math.floor(v + 0.5), function(n) setp('Base note', n); vim.msg = 'slixer root: ' .. model.note_name(n) end)   -- 17 ноя: списком внизу
     return
   end
   if it.kind == 'menu' then
