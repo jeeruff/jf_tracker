@@ -11539,7 +11539,7 @@ ctx = {
     ls_step = 'listen step (Opt+Cmd+Space): the row the cursor lands on plays on the cursor track only (stopped transport)',
     ls_sel = 'listen sel: a selection (v / V) plays its rows on its tracks only (the other tracks quiet while it plays)',
     ls_line = 'listen line (Shift+Cmd+Space): the row the cursor lands on plays, all tracks, one row long (stopped transport). = option step listen',
-    pitch = 'pitch mode of the cursor track: shift - a note changes the pitch only, its length stays (time-stretch); resample - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
+    pitch = 'pitch mode of the cursor track: keep - a note changes the pitch only, its length stays (time-stretch); tape - pitch and speed together, like a tape or an old sampler (higher = shorter). Click - switch',
     lpb = 'LPB, lines per beat: how many rows make one beat (4 - a row is a 16th note, 8 - a 32nd). More rows = finer grid. Click / wheel - change',
     inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; ( ) or Opt+J / K do the same (qwerty INSERT: , .)',
     oct = 'octave of the note keys (1 2 3 ... = C D E ...): [ - lower, ] - higher (qwerty: z x); wheel changes it too',
@@ -25672,7 +25672,7 @@ local function frame()
     local si = type(ctx.swdrag) == 'number' and ctx.swdrag or 1   -- 14 ноя: какой из четырёх
     local r = draw.strip_cell and draw.strip_cell[si == 1 and 'swingbar' or ('swingbar' .. si)]
     if gfx.mouse_cap & 1 == 1 and r then
-      local sw2 = 8 * L.cw
+      local sw2 = r[3] or 8 * L.cw   -- 17 ноя: ширина ячейки (слайдер стал шире)
       local v = math.max(-1, math.min(1, ((gfx.mouse_x - r[1]) / sw2) * 2 - 1))
       if math.abs(v) < 0.02 then v = 0 end
       local s0 = edit.SW[si]
