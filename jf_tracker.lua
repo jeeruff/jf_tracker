@@ -26646,6 +26646,7 @@ local function frame()
     },
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
+    lib_kit = (function() local c, f, k = ctx.lib_kit_get(); return f and { kids = f.kids, sel = k.sel, name = f.name } or nil end)(),   -- 17 ноя: пэды drumrs5k
     libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol, lib_dir = (ctx.lib_dir and ctx.lib_dir == vim.inst) and ctx.lib_dir or nil,   -- 17 ноя: подпапка lib
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
@@ -30647,6 +30648,10 @@ local function frame()
       ctx.set_focus('inst')
       if dbl and click.zone == 'poolphr' and state.phr_inst == hover.pool.phr then ctx.phr_do({ op = 'edit', name = hover.pool.phr }) else ctx.phr_select(hover.pool.phr) end
       click = { t = now2, zone = 'poolphr' }
+    elseif hover.libpad then   -- 17 ноя: пэд drumrs5k в lib — выбрать и послушать
+      local col2, f2, k2 = ctx.lib_kit_get()
+      if k2 then k2.sel = hover.libpad; local kid = f2.kids[k2.sel]; if kid and kid.note then ctx.preview(col2.track, kid.note, 'midi') end end
+      ctx.set_focus('inst')
     elseif hover.libroot then ctx.lib_seccol = true; ctx.set_focus('inst'); vim.msg = 'lib: j k - a section, l / Enter - into it'   -- 17 ноя: путь «lib» — к разделам
     elseif hover.libtab then
       state.libtab = hover.libtab; ctx.lib_seccol = nil; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. '  (h - up to the sections)'
@@ -33896,11 +33901,12 @@ local function frame()
             elseif c == 27 then ctx.lib_seccol = nil; ctx.set_focus('tracker'); return
             elseif ch == 'h' or c == LF then return end
           elseif (ch == 'h' or c == LF) and not (ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(vim.inst)))
-             and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur()) and not (ctx.lib_dir and ctx.lib_dir == vim.inst)
+             and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur()) and not (ctx.lib_dir and ctx.lib_dir == vim.inst) and not ctx.lib_kit_get()
              and not (function() local cc = cur_col(); local e = cc and cc.pool and cc.pool[vim.inst or 0]; return e and draw.LIBO and draw.LIBO[e.gkey or ''] end)() then   -- открытая папка слайсов / слоёв — h её сворачивает
             ctx.lib_seccol = true; vim.msg = 'lib: j k - a section, l / Enter - into it'; return
           end
         end
+        if ctx.lib_kit_key(c) then return end   -- 17 ноя: пэды drumrs5k подпапкой
         if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
         local col = cur_col()
         local n = #(col and col.pool or {})
@@ -40597,6 +40603,47 @@ ctx.lib_kids = function(e)
   return t
 end
 ctx.lib_sub_cur = function() return draw.LIBSUB end
+-- 17 ноя: lib — пэды drumrs5k подпапкой: ctx.lib_kit = { inst, guid, fx, sel }; кит — строка instruments под курсором
+ctx.lib_kit_cur = function()
+  for _, r in ipairs((L and L.pool_rows) or {}) do
+    if r.instfx and r.num == vim.inst then
+      local c = r.col or cur_col()
+      for _, f in ipairs(c and c.fx or {}) do if f.i == r.instfx and f.kit and f.kids then return c, f end end
+      return nil
+    end
+  end
+end
+ctx.lib_kit_get = function()
+  local k = ctx.lib_kit
+  if not k or k.inst ~= vim.inst or not snap then return nil end
+  for _, c in ipairs(snap.cols) do
+    if c.guid == k.guid then for _, f in ipairs(c.fx or {}) do if f.i == k.fx and f.kids then return c, f, k end end end
+  end
+end
+ctx.lib_kit_key = function(c)
+  local ch = c < 256 and string.char(c) or ''
+  local col, f, k = ctx.lib_kit_get()
+  if not f then
+    if (ch == 'l' or c == keys.right) and state.libtabs then
+      local c2, f2 = ctx.lib_kit_cur()
+      if f2 then ctx.lib_kit = { inst = vim.inst, guid = c2.guid, fx = f2.i, sel = 1 }; vim.msg = f2.name .. ': its pads - j k, Space listen, h up'; return true end
+    end
+    return false
+  end
+  local n = #f.kids
+  if ch == 'j' or c == keys.down then k.sel = math.min(n, k.sel + 1)
+  elseif ch == 'k' or c == keys.up then k.sel = math.max(1, k.sel - 1)
+  elseif ch == 'g' then k.sel = 1
+  elseif ch == 'G' then k.sel = n
+  elseif ch == 'h' or c == keys.left or c == 27 then ctx.lib_kit = nil; vim.msg = f.name .. '  (h - up to the sections)'; return true
+  elseif ch == ' ' or c == 13 then
+    local kid = f.kids[k.sel]
+    if kid and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+  else return false end
+  local kid = f.kids[k.sel]
+  if kid then vim.msg = ('pad %02d %s - Space listen'):format(k.sel, (kid.file and kid.file:match('[^/]+$')) or kid.name or '') end
+  return true
+end
 ctx.lib_dir_on = function() return ctx.lib_dir ~= nil and ctx.lib_dir == vim.inst end   -- 17 ноя: внутри подпапки lib
 ctx.lib_sub_go = function(i, kid)
   draw.LIBSUB = kid and { i = i, kind = kid.kind, k = kid.k } or nil

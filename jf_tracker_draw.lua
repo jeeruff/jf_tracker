@@ -7707,6 +7707,12 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     for sk = 1, #(e.slices or {}) do out[#out + 1] = { sub = 's', i = info.lib_dir, k = sk, sec = 'audio' } end
     rows = out
   end
+  -- 17 ноя: пэды drumrs5k подпапкой (l на ките в instruments): строка — пэд (нота, файл)
+  if info.libtabs and info.lib_kit then
+    local out = {}
+    for k, kid in ipairs(info.lib_kit.kids or {}) do out[#out + 1] = { pad = kid, padk = k, sec = 'instruments' } end
+    rows = out
+  end
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
@@ -7837,7 +7843,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local nm = info.libtab or 'audio'
       local nn = D.lib_sec_n and D.lib_sec_n[nm]
       local dir = info.lib_dir and pool[info.lib_dir]
-      local p = '› ' .. (GL[nm] or '') .. ' ' .. nm .. (dir and (' › ' .. (dir.name or '?')) or (nn and ('  ' .. nn) or ''))
+      local dname = (info.lib_kit and info.lib_kit.name) or (dir and dir.name)
+      local p = '› ' .. (GL[nm] or '') .. ' ' .. nm .. (dname and (' › ' .. dname) or (nn and ('  ' .. nn) or ''))
       text(tx, ty + 1, fit(p, ix + w - L.pad - ms('h - up ') - tx), U.AMBER)
       text(ix + w - L.pad - ms('h - up'), ty + 1, 'h - up', U.DIM)
     else text(ix + w - L.pad - ms('l - into'), ty + 1, 'l - into', U.DIM) end
@@ -7874,6 +7881,18 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
     if row.gap then
       -- пустая строка перед секцией
+    elseif row.pad then   -- 17 ноя: пэд drumrs5k (подпапка кита): нота, файл; Space — слушать
+      local sel = info.lib_kit and info.lib_kit.sel == row.padk
+      local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      local n = row.pad.note
+      local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
+      local nm = n and (NN[n % 12 + 1] .. math.max(0, n // 12 - 1)) or '---'
+      D.note_text(ix + 6, y + 1, nm, sel and U.AMBER or U.TEXT, U.DIM)
+      local fname = (row.pad.file and row.pad.file:match('[^/]+$')) or row.pad.name or ''
+      text(ix + 6 + ms('C-4  '), y + 1, fit(('%02d  '):format(row.padk) .. fname, w - 12 - ms('C-4  ')), sel and U.AMBER or U.GREY)
+      if hot then hover.libpad = row.padk end
     elseif row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
