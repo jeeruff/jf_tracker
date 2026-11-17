@@ -2251,25 +2251,11 @@ function V.key_impl(c)
     -- 1 ноя: Opt+W (Shift+Opt+w, „) — курсор на мастер (было Opt+w); Opt+w / Opt+b (∑ ∫) — следующая / предыдущая нота
     -- этой подколонки, мимо OFF, команд и соседних подколонок (w / b — по всему треку)
     if (cpd == 8222 or (m1.alt and m1.shift and (c == 87 or c == 119))) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' and ctx.master_jump then ctx.master_jump(); return end
-    -- 1 ноя: Opt+Space — сомкнуть пустоту: строки от курсора до следующей ноты подколонки уходят, нота (и всё ниже
-    -- в паттерне) подтягивается к курсору; на ноте — пустота после неё. Это dd по числу пустых строк
-    if (cpd == 160 or (m1.alt and c == 32)) and V.mode == 'normal' and not V.piano and st.focus == 'tracker' then
-      local f = flat()[V.cur.fi]
-      local sub = f and not f.env and not f.ml and f.sub
-      if not sub then V.msg = 'Opt+Space: a note column'; return end
-      local c0 = sub[V.cur.row]
-      local from = (c0 and (c0.kind == 'midi' or c0.kind == 'audio' or c0.kind == 'cont' or c0.kind == 'off')) and V.cur.row + 1 or V.cur.row
-      if c0 and c0.kind == 'cont' then   -- внутри длинной ноты — от её конца
-        local r = V.cur.row; while sub[r + 1] and sub[r + 1].kind == 'cont' do r = r + 1 end; from = r + 1
-      end
-      local nr
-      for rr, cell in pairs(sub) do if rr >= from and (cell.kind == 'midi' or cell.kind == 'audio') and (not nr or rr < nr) then nr = rr end end
-      if not nr or nr == from then V.msg = nr and 'Opt+Space: no gap' or 'Opt+Space: no note below'; return end
-      local row0 = V.cur.row
-      V.cur.row = from; V.count = nr - from
-      V.key_impl(('d'):byte()); V.key_impl(('d'):byte())
-      V.cur.row = row0
-      V.msg = ('Opt+Space: %d empty row(s) closed - the note came up (u - undo)'):format(nr - from)
+    -- 17 ноя: Opt+Space — курсор на шаг (step) вниз во всех режимах (в INSERT j — нота); счётчик — N шагов.
+    -- Сомкнуть пустоту (было здесь) — g Space
+    if (cpd == 160 or (m1.alt and c == 32)) and (V.mode == 'normal' or V.mode == 'insert' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' then
+      V.cur.row = V.cur.row + (V.count or 1) * math.max(1, V.step or 1)
+      clamp_cur(); ensure_visible(); V.count = nil; finish_move()
       return
     end
     if (cpd == 8721 or cpd == 8747 or (m1.alt and not m1.shift and (c == 119 or c == 98))) and (V.mode == 'normal' or V.mode == 'visual' or V.mode == 'vline') and not V.piano and st.focus == 'tracker' then
@@ -3360,6 +3346,7 @@ function V.key_impl(c)
         if c == ('t'):byte() then if ctx.tab_menu then ctx.tab_menu(k) end elseif ctx.project_menu then ctx.project_menu(k) end
         return
       end
+      if c == 32 and not V.op then V.close_gap(); V.count = nil; finish_move(); return end   -- 17 ноя: g Space — сомкнуть пустоту
       if c == ('e'):byte() and not V.op then   -- 14 ноя: ge — конец предыдущего события (как в Vim; 3ge — третьего выше)
         local r = event_prev_last(V.cur.fi, V.cur.row, V.count or 1)
         if r and r ~= V.cur.row then V.cur.row = r; if V.ensure_visible then V.ensure_visible() end else V.msg = 'ge: no event above in this column' end
@@ -4294,6 +4281,27 @@ function V.key_impl(c)
   end
   V.count = nil
   ensure_visible()
+end
+
+-- 1 ноя: сомкнуть пустоту: строки от курсора до следующей ноты подколонки уходят, нота (и всё ниже в паттерне)
+-- подтягивается к курсору; на ноте — пустота после неё (dd по числу пустых строк). 17 ноя: g Space (было Opt+Space)
+function V.close_gap()
+  local f = flat()[V.cur.fi]
+  local sub = f and not f.env and not f.ml and f.sub
+  if not sub then V.msg = 'g Space: a note column'; return end
+  local c0 = sub[V.cur.row]
+  local from = (c0 and (c0.kind == 'midi' or c0.kind == 'audio' or c0.kind == 'cont' or c0.kind == 'off')) and V.cur.row + 1 or V.cur.row
+  if c0 and c0.kind == 'cont' then   -- внутри длинной ноты — от её конца
+    local r = V.cur.row; while sub[r + 1] and sub[r + 1].kind == 'cont' do r = r + 1 end; from = r + 1
+  end
+  local nr
+  for rr, cell in pairs(sub) do if rr >= from and (cell.kind == 'midi' or cell.kind == 'audio') and (not nr or rr < nr) then nr = rr end end
+  if not nr or nr == from then V.msg = nr and 'g Space: no gap' or 'g Space: no note below'; return end
+  local row0 = V.cur.row
+  V.cur.row = from; V.count = nr - from
+  V.key_impl(('d'):byte()); V.key_impl(('d'):byte())
+  V.cur.row = row0
+  V.msg = ('g Space: %d empty row(s) closed - the note came up (u - undo)'):format(nr - from)
 end
 
 -- ── поиск (/) ─────────────────────────────────────────────────────────────
