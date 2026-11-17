@@ -2999,8 +2999,16 @@ local function draw_cell(L, cell, x, y, ty, inv)
   D.on_wave = nil   -- 17 ноя: ставит ветка волны режима note (имя ноты поверх волны — с каймой)
   -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
   if L.wave_only then
-    if D.cur_box then D.cur_box(); D.cur_box = nil end
+    -- 17 ноя: курсор в виде трека (волна / спектрограмма) — рамкой во всю ширину колонки ПОВЕРХ волны (заливка под ней
+    -- пропадала под спектрограммой)
+    local cb = D.cur_box; D.cur_box = nil
     local head = cell and (cell.kind == 'cont' and cell.of or cell)
+    local function cur_frame()
+      if not cb then return end
+      set(D.CUR_ACC or U.AMBER)
+      local fx, fw = x + (L.x_wave or L.pad) - 1, (L.w_wave or L.sub_w or 8) + 2
+      gfx.rect(fx, y, fw, L.rh, 0); gfx.rect(fx + 1, y + 1, fw - 2, L.rh - 2, 0)
+    end
     if head and head.kind == 'audio' then
       draw_wave(L, head, cell.kind == 'cont' and cell.i or 0, x, y, head.muted, false)
       -- 17 ноя: на строке начала — имя ноты поверх волны / спектрограммы (с каймой фона)
@@ -3010,6 +3018,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
       end
     elseif head and head.note then text(x + L.pad, ty, head.note, U.TEXT)   -- нота MIDI в аудио-подколонке — как есть
     else text(x + L.x_wave + math.floor(L.w_wave / 2) - math.floor(ms('.') / 2), ty, '.', D.EMPTY) end
+    cur_frame()
     return
   end
   DCS.L, DCS.cell, DCS.x, DCS.ty, DCS.inv, DCS.ghost = L, cell, x, ty, inv, cell and cell.ghost   -- 15 окт: ghost-слайс (playthru + q) — бледно, как подсказка
