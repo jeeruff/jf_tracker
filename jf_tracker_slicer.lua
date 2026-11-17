@@ -170,6 +170,13 @@ function S.mouse_move(frac)
     -- 10 окт: Shift — fine, как в зуме: мышь двигает линию в 10 раз медленнее от места, где нажат Shift;
     -- отпустил Shift — линия не прыгает к мыши, смещение остаётся
     local d, len = S.drag, S.entry.len
+    -- 17 ноя: щелчок по линии — только выбор: линия не двигается, пока мышь не ушла на 5 px; потом идёт за мышью
+    -- от места, где сдвиг начался (не прыгает к курсору)
+    if not d.moved then
+      if math.abs(gfx.mouse_x - (d.mx0 or gfx.mouse_x)) < 5 then return end
+      d.moved = true
+      d.off = (d.t0 or S.slices[k]) - frac * len
+    end
     local t
     if (gfx.mouse_cap & 8) == 8 then
       if not d.fa then d.fa, d.ft = frac, S.slices[k] end
@@ -198,7 +205,7 @@ function S.mouse_up()
       if ctx.set_last_slice then ctx.set_last_slice(k) end
       return k
     end
-    if math.abs(gfx.mouse_x - (d.mx0 or gfx.mouse_x)) < 3 then
+    if not d.moved then
       if d.t0 then S.slices[d.k] = d.t0 end
       S.msg = ('slice S%02X selected'):format(keep(S.slices[d.k]))
       return d
