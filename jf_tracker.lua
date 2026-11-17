@@ -36893,9 +36893,22 @@ ctx.sf_enter = function()
   return true
 end
 ctx.sf_len = {}
+-- 17 ноя: отмена Shift+F (Esc в браузере): заготовка в трекере убирается, поиск закрыт, фокус — трекеру
+ctx.sf_cancel = function()
+  if not ctx.sf_target then return false end
+  local t = ctx.sf_target
+  ctx.sf_target = nil
+  B.filtering = false; B.filter = ''; if B.set_all then B.set_all(B.all) end
+  ctx.set_focus('tracker')
+  if t.fi and L.flat[t.fi] then vim.cur.fi, vim.cur.row = t.fi, t.row end
+  vim.msg = 'sample find: cancelled'
+  return true
+end
 ctx.sf_ghost = function()
   local t = ctx.sf_target
   if not t then return nil end
+  -- ушли из браузера (щелчок в трекер, другой модуль) — заготовка тоже уходит
+  if state.focus ~= 'browser' then ctx.sf_target = nil; return nil end
   local p = ctx.sf_path()
   if not p then return { fi = t.fi, row = t.row, rows = 1, name = '?' } end
   local len = ctx.sf_len[p]

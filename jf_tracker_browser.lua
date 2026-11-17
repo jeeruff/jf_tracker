@@ -1929,6 +1929,8 @@ function B.refilter_soon() if R.time_precise then B.filter_due = R.time_precise(
 -- клавиши в фокусе браузера; true — съедена
 function B.key(c)
   local ch = c < 256 and string.char(c) or ''
+  -- 17 ноя: Shift+F (поиск сэмпла на место) — Esc отменяет всё сразу: заготовку в трекере, поиск, назад в трекер
+  if c == 27 and ctx.sf_cancel and ctx.sf_cancel() then return true end
   if B.filtering then
     -- набор запроса: символы сужают список (fzf), стрелки ходят по результатам,
     -- Enter — закончить набор (результаты остаются), Esc — сбросить, BS — стереть
