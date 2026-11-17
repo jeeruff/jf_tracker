@@ -13482,7 +13482,8 @@ ctx = {
   end,
   sp_set_value = function(arg)
     local k, txt = (arg or ''):match('^(%S+)%s*(.*)$')
-    local e = ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])
+    local e = ctx.sp_override_e or ctx.sp_sel or (cur_col() and (cur_col().pool or {})[vim.inst])   -- 17 ноя: свойства ноты (гидра) — её запись
+    ctx.sp_override_e = nil
     if not (k and e and e.item and e.take and reaper.ValidatePtr(e.item, 'MediaItem*')) then return end
     local it, tk = e.item, e.take
     local items = e.multi or (e.note_scope and { e.item }) or ctx.inst_group(e)
@@ -17537,14 +17538,79 @@ ctx.np_open = function(item, at)
     if #multi < 2 then multi = nil end
   end
   if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then vim.msg = 'Ctrl+Enter: put the cursor on an audio note'; return end
-  ctx.NP = { item = item, multi = multi, sel = (ctx.NP and ctx.NP.sel) or 1, at = at or ctx.cursor_anchor() }
+  -- 17 ноя: свойства ноты — гидрой внизу (было окно у ноты): буква свойства, дальше - + [ ] / значение числом / список
+  ctx.np_hydra(item, multi)
+end
+-- 17 ноя: буква пункта — первая свободная буква подписи (a-z), иначе цифра
+ctx.hydra_keys = function(labels)
+  local used, out = {}, {}
+  for i, lb in ipairs(labels) do
+    local k
+    for ch in lb:lower():gmatch('%l') do if not used[ch] then k = ch; break end end
+    if not k then for d = 1, 9 do if not used[tostring(d)] then k = tostring(d); break end end end
+    used[k or ''] = true; out[i] = k
+  end
+  return out
+end
+-- шаг значения гидрой: - + на шаг, [ ] крупно, t — числом (если есть), меню остаётся открытым; Esc / Backspace — назад
+ctx.step_hydra = function(title, get, step, typed, back)
+  local function again() ctx.step_hydra(title, get, step, typed, back) end
+  local items = {
+    { key = '-', label = 'less', fn = function() step(-1); again() end }, { key = '=', label = 'more (+)', fn = function() step(1); again() end },
+    { key = '[', label = 'much less', fn = function() step(-1, true); again() end }, { key = ']', label = 'much more', fn = function() step(1, true); again() end } }
+  if typed then items[#items + 1] = { key = 't', label = 'type a value ...', fn = typed } end
+  if back then items[#items + 1] = { key = 'b', label = 'back to the list', fn = back } end
+  vim.open_hydra({ title = title .. ': ' .. tostring(get() or ''), items = items })
+end
+ctx.np_hydra = function(item, multi)
+  if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end
+  local e = model.entry_of(item)
+  if not e then vim.msg = 'note: no properties'; return end
+  e.note_scope = true
+  if multi then e.multi = multi; e.name = ('%d notes: %s'):format(#multi, e.name or '') end
+  local rows = SPROP.ROWS
+  local labels = {}
+  for i, r in ipairs(rows) do labels[i] = r.label end
+  local ks = ctx.hydra_keys(labels)
+  local function back() ctx.np_hydra(item, multi) end
+  local items = {}
+  for i, r in ipairs(rows) do
+    local val = SPROP.value and SPROP.value(e, r.k) or ''
+    items[#items + 1] = { key = ks[i], label = ('%-16s %s'):format(r.label, val), fn = function()
+      if ctx.sp_menu(e, r.k) then return end
+      if ctx.sp_frac(e, r.k) ~= nil or r.k == 'len' or r.k == 'rate' then
+        ctx.step_hydra(r.label, function() return SPROP.value and SPROP.value(model.entry_of(item) or e, r.k) end,
+          function(d, big) for _ = 1, big and 10 or 1 do ctx.sp_adjust(e, r.k, d) end; model.invalidate() end,
+          function() ctx.sp_override_e = e; ctx.sp_value_prompt(e, r.k) end, back)
+      else ctx.sp_adjust(e, r.k, 1); model.invalidate(); back() end
+    end }
+  end
+  items[#items + 1] = { key = 'W', label = 'REAPER item properties window', fn = function() select_item_in_reaper(item); reaper.Main_OnCommand(40009, 0) end }
+  vim.open_hydra({ title = 'note: ' .. (e.name or ''), items = items })
 end
 -- 30 окт: СВОЙСТВА MIDI-НОТЫ (Ctrl+Enter на MIDI-ноте): j k строка, h l значение (H L — крупно), Esc / Enter — закрыть
 ctx.NPM_ROWS = { { k = 'note', label = 'note' }, { k = 'vel', label = 'velocity' }, { k = 'len', label = 'length (rows)' },
   { k = 'delay', label = 'delay /256' }, { k = 'ch', label = 'channel' }, { k = 'muted', label = 'mute' } }
 ctx.npm_open = function(cell, f, at)
   ctx.NPM = { row = vim.cur.row, fi = vim.cur.fi, ppq = cell.ppq, pitch = cell.pitch, sel = (ctx.NPM and ctx.NPM.sel) or 1, at = at or ctx.cursor_anchor() }
-  vim.msg = 'MIDI note: j k row, h l value (H L big step), Esc / Enter close'
+  -- 17 ноя: свойства MIDI-ноты — гидрой внизу (окно не рисуется: NPM — только адрес ноты для npm_adjust)
+  ctx.npm_hydra()
+end
+ctx.npm_hydra = function()
+  local h = ctx.npm_head(); local v = h and ctx.npm_vals(h)
+  if not v then ctx.NPM = nil; return end
+  local R2 = ctx.NPM_ROWS
+  local keys2 = { note = 'n', vel = 'v', len = 'l', delay = 'd', ch = 'c', muted = 'm' }
+  local BIG = { note = 12, vel = 10, len = 4, delay = 4, ch = 4 }
+  local items = {}
+  for _, r in ipairs(R2) do
+    items[#items + 1] = { key = keys2[r.k], label = ('%-14s %s'):format(r.label, v[r.k] or ''), fn = function()
+      if r.k == 'muted' then ctx.npm_adjust('muted', 1); ctx.npm_hydra(); return end
+      ctx.step_hydra('MIDI ' .. r.label, function() local h2 = ctx.npm_head(); local v2 = h2 and ctx.npm_vals(h2); return v2 and v2[r.k] end,
+        function(d, big) ctx.npm_adjust(r.k, d * (big and (BIG[r.k] or 4) or 1)) end, nil, function() ctx.npm_hydra() end)
+    end }
+  end
+  vim.open_hydra({ title = 'MIDI note ' .. v.note, items = items })
 end
 ctx.npm_head = function()
   local M = ctx.NPM
@@ -27268,7 +27334,7 @@ local function frame()
   end
   -- 18 окт: попапы не наслаиваются — меню из окна ноты встаёт рядом справа (не влезает — слева), окно ноты под ним
   if ctx.NP then ctx.np_draw() end   -- 13 окт: свойства ноты
-  if ctx.NPM then ctx.npm_draw() end   -- 30 окт: свойства MIDI-ноты
+  -- 17 ноя: свойства MIDI-ноты — гидрой (ctx.npm_hydra); окно ctx.npm_draw не рисуется
   local nr = ctx.NP and ctx.np_rect
   if pop and nr and not (anchor and anchor.box) then anchor = { x = nr[1] + nr[3] + 4, y = nr[5] or nr[2], right = nr[1] - 4 } end
   draw.popup(L, pop, anchor); ctx.pop_last = { pop, anchor }
@@ -32793,7 +32859,7 @@ local function frame()
   end
   -- 13 окт: свойства ноты — Ctrl+Enter на ноте, пока открыта — клавиши её
   if ctx.NP and c > 0 and not vim.picker and not vim.hydra then ctx.np_key(c); c = 0 end
-  if ctx.NPM and c > 0 and not vim.picker and not vim.hydra then ctx.npm_key(c); c = 0 end   -- 30 окт
+  -- 17 ноя: свойства MIDI-ноты — гидрой; клавиши у неё (ctx.npm_key не перехватывает)
   if c == 13 and ctx.mods().ctrl and not ctx.mods().cmd and state.focus == 'tracker' and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then ctx.np_open(); c = 0 end
   do
     local m = ctx.mods()
@@ -33603,6 +33669,11 @@ local function frame()
         if vim.mode == 'cmd' or vim.mode == 'search' then return vim.key(c) end   -- 13 окт: строка : ела h j k l
         if c == 27 then ctx.set_focus('tracker')
         elseif c == 118 then ctx.sprops_fit()            -- v — лист растёт, пока все свойства не влезут
+        elseif c == 13 and se and SPROP.ROWS and SPROP.ROWS[SPROP.sel] then   -- 17 ноя: Enter — своё свойство (было: уходил в трекер — ввод ноты)
+          local k = SPROP.ROWS[SPROP.sel].k
+          if not ctx.sp_menu(se, k) then
+            if ctx.sp_frac(se, k) ~= nil or k == 'len' or k == 'rate' or k == 'bsync' then ctx.sp_value_prompt(se, k) else ctx.sp_adjust(se, k, 1) end
+          end
         elseif not SPROP.key(c, se, true) then vim.key(c) end   -- 17 окт: буква — прыжок на строку
       elseif state.focus == 'slices' and state.slices_on then
         -- модуль слайсов (4 окт): j k — слайс (звучит), J K — по 8, g G — край, Esc — в трекер
