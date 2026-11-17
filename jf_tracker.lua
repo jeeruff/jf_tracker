@@ -470,7 +470,7 @@ local state = {
   foldfast = reaper.GetExtState(EXT, 'foldfast2') ~= '0',   -- 2 ноя: по умолчанию вкл — быстрые ноты всегда сложены   -- 19 окт: fold быстрых нот (кнопка fd)   -- 19 окт: BS / Ins — в паттерне (Renoise) / по дорожке   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   popdock = reaper.GetExtState(EXT, 'popdock') ~= '0',   -- 14 ноя: меню / which-key / списки — всегда внизу окна (по умолчанию вкл)
-  libtabs = reaper.GetExtState(EXT, 'libtabs') == '1',   -- 25 окт: lib — одним списком с папками разделов (вкладки — опцией)
+  libtabs = true,   -- 17 ноя: lib — всегда вкладками (одним списком было два курсора); 25 окт: опцией
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
@@ -13977,7 +13977,6 @@ ctx = {
       flag('selinv', 'selection inverted', 'the VISUAL selection and the matrix block are shown by inverting the colours under them (clear in any theme, in a one-colour one too); off - a faint tint, as before'),
       flag('tptop', 'transport on top', 'the transport bar (mode, keyboard, transport buttons) is one bar of the whole window: at the bottom over the status line (default; an open menu lifts it), on - at the top of the window'),
       flag('popdock', 'menus at the bottom', 'every menu, which-key and pick list opens in one place - at the bottom of the window, over the status line (the eyes do not jump); off - at the cursor / the button, as before'),
-      flag('libtabs', 'lib tabs', 'the lib as tabs audio / instruments / automation / midi (F4 switches them while the lib has the focus) instead of one list with separators'),
       flag('propsitem', 'properties with item', 'the properties pane shows only while the item tab is the active one in its stack (its space goes to the neighbours otherwise)'),
       { key = 'glitch', label = 'reaper glitch', kind = 'toggle', desc = 'while REAPER has the keyboard the tracker glitches: bands of the window tear sideways, odd colour scan lines, the mode word REAPER is torn white-on-black - impossible to miss that the keys go elsewhere. Off - REAPER is written in the mode font like NORMAL', get = function() return state.glitch end, set = function(v) state.glitch = v; reaper.SetExtState(EXT, 'glitch2', v and '1' or '0', true) end },
       { key = 'dimidle', label = 'dim when inactive', kind = 'toggle', desc = 'experiment: while REAPER has the keyboard (the tracker window is not active) the whole tracker is 15 % dimmer - you see at once that keys go to REAPER', get = function() return state.dimidle end, set = function(v) state.dimidle = v; reaper.SetExtState(EXT, 'dimidle', v and '1' or '0', true) end },
@@ -14156,7 +14155,7 @@ ctx = {
     -- раздела — как в option_items; без раздела — в «other»
     local SECT = {
       { 'look', { 'fps', 'title', 'sbw', 'hdrmeter', 'bigbpm', 'bigstatus', 'tintmute', 'insred', 'ctxdim', 'dotbright', 'dotcolor', 'sskeeplook' } },
-      { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'popdock', 'tptop', 'selinv', 'libtabs', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'kbhide2', 'dsp_big', 'measure' } },
+      { 'panes and bars', { 'autoadd', 'snappanes', 'zoomtop', 'dimidle', 'panecol', 'shadehue', 'focusbeacon', 'dimfocus', 'panes_ui', 'pmpane', 'ptabs', 'tababc', 'propsitem', 'popdock', 'tptop', 'selinv', 'tlrp', 'hintpos', 'hints', 'whichkey', 'hidereaper', 'pianokeys', 'pianosmall', 'kbhide2', 'dsp_big', 'measure' } },
       { 'leader key', { 'spcleader', 'spcmenu', 'spcdelay' } },
       { 'instrument keys', { 'instgap', 'instgaptest' } },
       { 'cursor and editing', { 'noautofloat', 'pixel', 'knob', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
@@ -16816,7 +16815,7 @@ ctx.inner_tab_cycle = function(dir)
     B.click(m); vim.msg = 'browser: ' .. B.tab_label(m) .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
   elseif f == 'inst' and state.libtabs then
-    state.libtab = nxt({ 'audio', 'instruments', 'automation', 'midi' }, state.libtab)
+    state.libtab = nxt(draw.lib_tab_list(), state.libtab)
     vim.msg = 'lib: ' .. state.libtab .. '  (Opt+Tab / Opt+Shift+Tab)'
     return true
   elseif f == 'top' and state.toptab == 'automation' then
@@ -25730,7 +25729,7 @@ local function frame()
   -- 10 окт: lib вкладками — выбор ушёл в другую секцию (Cmd+цифра, , .) — вкладка за ним
   if state.libtabs then
     local cc = cur_col()
-    local sec = state.auto_inst and 'automation' or (state.midi_inst and 'midi') or ((cc and ctx.inst_fx(cc)) and 'instruments') or 'audio'
+    local sec = state.auto_inst and 'automation' or (state.midi_inst and 'midi') or (state.phr_inst and 'phrases') or ((cc and ctx.inst_fx(cc)) and 'instruments') or 'audio'
     if ctx.libsec_prev ~= sec then ctx.libsec_prev = sec; state.libtab = sec; ctx.libtab_prev = sec end
     -- 14 ноя: вкладку сменили руками (щелчок, F4, Opt+Tab), а выбранный инструмент остался в прежнем разделе — курсора
     -- в списке не было. Выбор идёт за вкладкой: audio — последний сэмпл, instruments — свой плагин трека (чужой —
@@ -25750,7 +25749,7 @@ local function frame()
             if pk.tab == 'audio' and r.i then first = first or r.i; if r.i == ctx.lib_audio_last then hit = r.i end
             elseif pk.tab == 'instruments' and r.instfx and r.num then
               if not r.col then hit = hit or r.num elseif not state.libauto then first = first or r.num end
-            elseif (pk.tab == 'automation' and r.auto) or (pk.tab == 'midi' and r.midi) then hit = hit or r.num end
+            elseif (pk.tab == 'automation' and r.auto) or (pk.tab == 'midi' and r.midi) or (pk.tab == 'phrases' and r.phr) then hit = hit or r.num end
           end
         end
         hit = hit or first
@@ -33122,7 +33121,7 @@ local function frame()
     local tab = FTAB[c]
     -- 10 окт: lib вкладками — F4 листает их (Shift+F4 назад) и ставит фокус в lib (16 окт: когда фокус в lib)
     if libf and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
-      local LT = { 'audio', 'instruments', 'automation', 'midi' }
+      local LT = draw.lib_tab_list()
       local i = 1
       for k, t in ipairs(LT) do if t == state.libtab then i = k end end
       state.libtab = LT[(i - 1 + (ctx.mods().shift and -1 or 1)) % #LT + 1]

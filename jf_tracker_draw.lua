@@ -1399,6 +1399,8 @@ local FLAT_TONIC = { [5] = true, [10] = true, [3] = true, [8] = true, [1] = true
 -- 17 ноя (3): лад — лада проекта (:key, видно в транспорте справа от размера); не задан — всегда диезы.
 -- Лад → его мажор (родительский): минор +3, дорийский −2, фригийский −4, лидийский −5, миксолидийский −7, локрийский −11
 local MODE_OFF = { major = 0, minor = 9, harmmin = 9, melmin = 9, dorian = 2, phrygian = 4, lydian = 5, mixo = 7, locrian = 11, phrygdom = 4, majpent = 0, minpent = 9, blues = 9 }
+-- 17 ноя: lib — всегда вкладками (жёстко): audio, instruments, midi, phrases (automation — только с D.LIB_AUTO)
+function D.lib_tab_list() return D.LIB_AUTO and { 'audio', 'instruments', 'automation', 'midi', 'phrases' } or { 'audio', 'instruments', 'midi', 'phrases' } end
 function D.flats()
   local r, id = nil, nil
   if D.key_get then r, id = D.key_get() end
@@ -7647,6 +7649,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 10 окт: секции audio / instruments / automation / midi; опция lib tabs — вкладками (F4),
   -- иначе разделителями с пустой строкой перед каждой
   local SECS = { instruments = true, automation = true, midi = true, phrases = true }
+  local inst_is_plug = false   -- 17 ноя: выбран плагин-инструмент (по номеру) — свой плагин трека тогда не горит (было два курсора)
+  for _, row in ipairs(rows) do if row.instfx and row.num and row.num == inst then inst_is_plug = true end end
   do
     local sec, out = 'audio', {}
     for _, row in ipairs(rows) do
@@ -7783,7 +7787,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     -- вкладки lib (10 окт): как вкладки панелей — рамками встык, активная янтарём
     local ty = iy + 2 + 2 * L.rh + LEG
     local tx = ix + 2
-    for _, nm in ipairs(D.LIB_AUTO and { 'audio', 'instruments', 'automation', 'midi' } or { 'audio', 'instruments', 'midi' }) do
+    for _, nm in ipairs(D.lib_tab_list()) do
       local tw2 = ms(nm) + 2 * L.pad
       if tx + tw2 > ix + w - 2 then break end
       local on = (info.libtab or 'audio') == nm
@@ -7870,7 +7874,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if hot then hover.pool = { ci = info.pool_ci, slxk = row.slxk, slxnote = row.slxnote } end
     elseif row.instfx then
       local rc = row.col or col
-      local sel = (info.inst_fx and info.inst_fx(rc) == row.instfx and not row.col) or (row.num ~= nil and row.num == inst and not info.auto_inst and not info.midi_inst and not info.phr_inst)   -- 17 ноя: и выбранный по номеру (плагин другого трека)
+      local nomode = not info.auto_inst and not info.midi_inst and not info.phr_inst
+      local sel = nomode and inst_is_plug and row.num == inst   -- один курсор: только выбранный номер   -- 17 ноя: и выбранный по номеру (плагин другого трека)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then sel_drawn = r; set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
