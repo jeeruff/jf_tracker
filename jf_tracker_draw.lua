@@ -7835,7 +7835,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     label_w = math.max(label_w, math.min(pre_w + lc.long + L.pad, w - 12 - cols))
     -- 17 ноя (2): имя — не больше ~трети ширины (не уже номера + 12 знаков), остальное — превью волны (было: имя во всю длину,
     -- превью — полоска в несколько знаков)
-    label_w = math.min(label_w, math.max(pre_w + 12 * L.cw, math.floor(w * (w < 64 * L.cw and 0.36 or 0.34))))
+    label_w = math.min(label_w, math.max(pre_w + 16 * L.cw, math.floor(w * 0.4)))   -- (3): имени видно не меньше 16 знаков (было 12 вместе с номером и «▸ 16$» — оставалось 5)
     D.lib_kids = lc.kids
   end
   -- колонка ~ (9 окт): у item есть точки в огибающих take — щелчок открывает
