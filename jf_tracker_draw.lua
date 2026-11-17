@@ -7638,6 +7638,24 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   if #inst_rows > 0 then rows[#rows + 1] = { hdr = 'instruments', name = '' } end
   for _, o in ipairs(inst_rows) do
     rows[#rows + 1] = o
+    -- 17 ноя (дерево): drumrs5k — папка: пэды, у пэда — его эффекты (D.LIBK[кит] / D.LIBK[кит:пэд] — открыто)
+    do
+      local kc = o.col or col
+      local kf
+      for _, f in ipairs(kc and kc.fx or {}) do if f.i == o.instfx and f.kit and f.kids then kf = f end end
+      if kf then
+        o.kitkey = (kc.guid or '') .. ':' .. kf.i
+        if D.LIBK and D.LIBK[o.kitkey] then
+          for k, kid in ipairs(kf.kids) do
+            rows[#rows + 1] = { pad = kid, padk = k, kitkey = o.kitkey, kitnum = o.num }
+            if D.LIBK[o.kitkey .. ':' .. k] then
+              for sk, sl in ipairs(kid.slots or {}) do rows[#rows + 1] = { pslot = sl, sk = sk, padk = k, kitkey = o.kitkey, kitnum = o.num } end
+              if #(kid.slots or {}) == 0 then rows[#rows + 1] = { pslot = false, sk = 0, padk = k, kitkey = o.kitkey, kitnum = o.num } end
+            end
+          end
+        end
+      end
+    end
     -- 5 ноя: выбранный slixer — его срезы папкой (S01 нота длина); щелчок — срез в slixer
     if not o.col and info.slx_slices and info.inst_fx and info.inst_fx(col) == o.instfx then
       local sl = info.slx_slices(col, o.instfx)
@@ -7681,7 +7699,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     else
       for i, row in ipairs(rows) do
         if row.hdr and SECS[row.hdr] and i > 1 then out[#out + 1] = { gap = true, sec = row.sec } end
-        out[#out + 1] = row
+        -- 17 ноя (дерево): раздел — папка (▾ / ▸): свёрнут — только его заголовок
+        local is_sec = row.hdr and not row.folder and (SECS[row.hdr] or row.hdr == 'audio')
+        if is_sec then row.sechdr = true end
+        if is_sec or not (D.LIBSEC_CLOSED and D.LIBSEC_CLOSED[row.sec]) then out[#out + 1] = row end
       end
     end
     rows = out
@@ -7721,6 +7742,21 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     rows = out
   end
   L.pool_rows = rows
+  -- 17 ноя (дерево): остановки курсора по всему списку, как он нарисован (разделы, звуки, слайсы, инструменты, пэды, эффекты)
+  D.lib_nav2 = {}
+  for _, r in ipairs(rows) do
+    local s
+    if r.sechdr then s = { sec = r.hdr }
+    elseif r.pad then s = { pad = true, key = r.kitkey, k = r.padk, kitnum = r.kitnum }
+    elseif r.pslot ~= nil and r.sk and r.sk > 0 then s = { slot = true, key = r.kitkey, pk = r.padk, sk = r.sk, kitnum = r.kitnum }
+    elseif r.i and r.sub then s = { i = r.i, kind = r.sub, k = r.k }
+    elseif r.i then s = { i = r.i }
+    elseif r.empty then s = { num = r.empty }
+    elseif r.instfx and r.num then s = { num = r.num, kitkey = r.kitkey }
+    elseif r.midi then s = { midi = true }
+    elseif r.phr then s = { phr = r.phr } end
+    if s then D.lib_nav2[#D.lib_nav2 + 1] = s end
+  end
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
   local TBH = info.libtabs and (L.rh + 2) or 0   -- строка пути lib (lib › раздел)
@@ -7728,6 +7764,15 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
   for r, row in ipairs(rows) do if (not info.auto_inst and not info.midi_inst and not info.phr_inst and (row.i == inst or row.empty == inst or (cur and cur.parent and pool[row.i or 0] == cur.parent))) or (info.auto_inst and row.auto) or (info.midi_inst and row.midi) or (info.phr_inst and row.phr == info.phr_inst) then sel_r = r end end
+  do   -- 17 ноя (дерево): курсор на разделе / пэде / эффекте пэда — прокрутка к нему
+    local ts = info.lib_tsel
+    if ts then
+      for r, row in ipairs(rows) do
+        if (ts.kind == 'sec' and row.sechdr and row.hdr == ts.sec) or (ts.kind == 'pad' and row.pad and row.kitkey == ts.key and row.padk == ts.k)
+           or (ts.kind == 'slot' and row.pslot and row.kitkey == ts.key and row.padk == ts.pk and row.sk == ts.sk) then sel_r = r end
+      end
+    end
+  end
   local hdr_r = sel_r
   while hdr_r > 1 and not rows[hdr_r].hdr do hdr_r = hdr_r - 1 end
   -- за курсором — только когда он сдвинулся (4 окт): полосой / колесом можно листать
@@ -7890,34 +7935,45 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- пустая строка перед секцией
     elseif row.pslot ~= nil then   -- 17 ноя: эффект пэда (подпапка пэда): имя, категория; обойдён — тускло
       local sl = row.pslot
-      if not sl then text(ix + 6, y + 1, fit('no effects - a adds one', w - 12), U.DIM)
+      local sx = ix + 6 + (row.kitkey and 6 * L.cw or 0)   -- 17 ноя (дерево): отступ под пэдом
+      if not sl then text(sx, y + 1, fit('no effects - a adds one', ix + w - 6 - sx), U.DIM)
       else
-        local sel = info.lib_kit and (info.lib_kit.slot or 1) == row.sk
+        local ts = info.lib_tsel
+        local sel = (ts and ts.kind == 'slot' and ts.key == row.kitkey and ts.pk == row.padk and ts.sk == row.sk) or (info.lib_kit and (info.lib_kit.slot or 1) == row.sk)
         local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
         if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
         elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
         local cat = sl.cat and not tostring(sl.cat):match('^x%d') and tostring(sl.cat) or ''
         local on = sl.enabled ~= false
-        text(ix + 6, y + 1, fit(('%02d  '):format(row.sk) .. (sl.name or '?') .. (on and '' or '  (bypassed)'), w - 12 - ms(cat) - L.pad), sel and U.AMBER or (on and U.TEXT or U.DIM))
+        text(sx, y + 1, fit((sl.name or '?') .. (on and '' or '  (bypassed)'), ix + w - 6 - sx - ms(cat) - L.pad), sel and U.AMBER or (on and U.TEXT or U.DIM))
         if cat ~= '' then text(ix + w - L.pad - 4 - ms(cat), y + 1, cat, U.GREY) end
       end
     elseif row.pad then   -- 17 ноя: пэд drumrs5k (подпапка кита): нота, файл; Space — слушать
-      local sel = info.lib_kit and info.lib_kit.sel == row.padk
+      local ts = info.lib_tsel
+      local sel = (ts and ts.kind == 'pad' and ts.key == row.kitkey and ts.k == row.padk) or (info.lib_kit and info.lib_kit.sel == row.padk)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local n = row.pad.note
       local NN = { 'C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-' }
       local nm = n and (NN[n % 12 + 1] .. math.max(0, n // 12 - 1)) or '---'
-      D.note_text(ix + 6, y + 1, nm, sel and U.AMBER or U.TEXT, U.DIM)
+      local px = ix + 6 + (row.kitkey and 2 * L.cw or 0)   -- 17 ноя (дерево): отступ под китом
+      local fg = row.kitkey and (((D.LIBK and D.LIBK[row.kitkey .. ':' .. row.padk]) and '▾ ') or '▸ ') or ''
+      if fg ~= '' then text(px, y + 1, fg, U.GREY); px = px + ms(fg) end
+      D.note_text(px, y + 1, nm, sel and U.AMBER or U.TEXT, U.DIM)
       local fname = (row.pad.file and row.pad.file:match('[^/]+$')) or row.pad.name or ''
-      text(ix + 6 + ms('C-4  '), y + 1, fit(('%02d  '):format(row.padk) .. fname, w - 12 - ms('C-4  ')), sel and U.AMBER or U.GREY)
-      if hot then hover.libpad = row.padk end
+      text(px + ms('C-4  '), y + 1, fit(fname, ix + w - 6 - px - ms('C-4  ')), sel and U.AMBER or U.GREY)
+      if hot then hover.libpad = row.padk; hover.libpadkey = row.kitkey; hover.libpadnum = row.kitnum end
     elseif row.hdr then
       local hrgb = trgb[row.name] or U.LINE
       set(hrgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
       -- 26 окт: значок типа — в заголовке раздела, не в каждой строке
       local glyph = ({ audio = '@ ', instruments = '# ', midi = D.mu() .. ' ', automation = '~ ', phrases = '" ' })[row.hdr] or ''
+      if row.sechdr then   -- 17 ноя (дерево): раздел — папка; курсор на нём (lib_tsel)
+        glyph = ((D.LIBSEC_CLOSED and D.LIBSEC_CLOSED[row.hdr]) and '▸ ' or '▾ ') .. glyph
+        local ts = info.lib_tsel
+        if ts and ts.kind == 'sec' and ts.sec == row.hdr then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      end
       local tw = ms(glyph .. row.hdr)
       local hcol = U.TEXT
       if row.folder then   -- 27 окт: заголовок папки lib — щелчок сворачивает / разворачивает; курсор в свёрнутой — подсветка
@@ -7973,7 +8029,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif row.instfx then
       local rc = row.col or col
       local nomode = not info.auto_inst and not info.midi_inst and not info.phr_inst
-      local sel = nomode and inst_is_plug and row.num == inst   -- один курсор: только выбранный номер   -- 17 ноя: и выбранный по номеру (плагин другого трека)
+      local sel = nomode and inst_is_plug and row.num == inst and not info.lib_tsel   -- один курсор: только выбранный номер (не когда курсор на пэде / разделе)   -- 17 ноя: и выбранный по номеру (плагин другого трека)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then sel_drawn = r; set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
@@ -7981,7 +8037,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if kd == 'kit' then kd = '#' end                   -- 16 окт: # — drumrs5k / кит RS5K
       if row.col and row.col.rgb then set(row.col.rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1) end   -- чужой трек — его цветом
       local kw = math.min(ms(kd), math.floor(w * 0.35))
-      text(ix + 6, y + 1, fit((row.num and ('%02d '):format(row.num) or '-- ') .. row.name, w - 12 - kw - L.pad), sel and U.CYAN or (row.col and U.GREY or U.TEXT))
+      local kg = row.kitkey and (((D.LIBK and D.LIBK[row.kitkey]) and '▾ ') or '▸ ') or ''   -- 17 ноя: кит — папка пэдов
+      text(ix + 6, y + 1, fit((row.num and ('%02d '):format(row.num) or '-- ') .. kg .. row.name, w - 12 - kw - L.pad), sel and U.CYAN or (row.col and U.GREY or U.TEXT))
       text(ix + w - L.pad - 4 - kw, y + 1, fit(kd, kw), sel and U.CYAN or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, instfx = row.instfx, col = row.col } end
       hint('poolinst', ix + 2, y, w - 4, L.rh, row.instfx)
@@ -8031,7 +8088,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local i = row.i
       local e = pool[i]
       local rgb = e.rgb or (e.tracks and trgb[e.tracks[1]]) or (col and col.rgb) or U.GREY
-      local sel = (i == inst or (cur and cur.parent == e)) and not D.lib_hdr   -- выбран слайс — горит исходник; 27 окт: курсор на имени папки — строка не горит (было двойное выделение)
+      local sel = (i == inst or (cur and cur.parent == e)) and not D.lib_hdr and not info.lib_tsel   -- выбран слайс — горит исходник; 27 окт: курсор на имени папки — строка не горит (было двойное выделение)
       if D.lib_marks and D.lib_marks[i] then set(U.tint(U.CYAN, 0.3)); gfx.rect(ix + 1, y, w - 2, L.rh, 1); set(U.CYAN); gfx.rect(ix + 1, y, 2, L.rh, 1) end   -- 27 окт: отмечен (m); 31 окт: бирюзой, как отметки fx / tracks
       local rr = info.inst_range                -- диапазон v (2 окт)
       local inr = rr and i >= rr[1] and i <= rr[2] and not sel
@@ -8061,7 +8118,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 26 окт: число слайсов — сразу после + / - («01+ 16$ amenbro»), не в конце строки
       -- 27 окт: отмечен (m) — «*» между номером и именем, как в lf
       local mk = (D.lib_marks and D.lib_marks[i]) and '*' or ' '
-      local pre = ('%02d%s%s '):format(e.num or i, mk, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '-' or '+') .. (' %2d$'):format(nkids)) or (D.lib_kids and '     ' or ''))
+      local pre = ('%02d%s%s '):format(e.num or i, mk, nkids > 0 and (((D.LIBO or {})[e.gkey or ''] and '▾' or '▸') .. (' %2d$'):format(nkids)) or (D.lib_kids and '     ' or ''))
       if nkids > 0 and mx >= ix + 6 + ms('00 ') and mx < ix + 6 + ms('00 +') + 2 and my >= y and my < y + L.rh then hover.libfold = e.gkey end
       local suf = ''   -- 11 окт: нарезан — «15$» = 15 слайсов (было « /15») .. ((e.muted and not e.depot) and ' (muted)' or '')
       if not child then body = (e.kit and '& ' or (e.layers and '¥ ' or '')) .. fit(e.name or '', math.max(ms('W'), label_w - 6 - ms(pre) - ms(suf) - ms('& '))) end   -- 26 окт: @ — в заголовке audio   -- 16 окт: @ — аудио, & — набор файлов

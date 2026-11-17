@@ -472,7 +472,7 @@ local state = {
   popdock = reaper.GetExtState(EXT, 'popdock') ~= '0',   -- 14 ноя: меню / which-key / списки — всегда внизу окна (по умолчанию вкл)
   vipersel = reaper.GetExtState(EXT, 'vipersel') == 'exclusive' and 'exclusive' or 'cursor',   -- 17 ноя: viper — выделение ведёт курсор (exclusive — прячет треки)
   mwide = tonumber(reaper.GetExtState(EXT, 'mwide')) or 0,   -- 17 ноя: ширина мастера сверх колонок (шаги по 2 знака)
-  libtabs = true,   -- 17 ноя: lib — всегда вкладками (одним списком было два курсора); 25 окт: опцией
+  libtabs = false,   -- 17 ноя (3): lib — одним деревом (разделы, звуки, киты, пэды — папки); вкладки / lf сняты
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
   propsitem = reaper.GetExtState(EXT, 'propsitem') ~= '0',   -- 10 окт: properties видны только с вкладкой item
@@ -26646,6 +26646,7 @@ local function frame()
     },
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
+    lib_tsel = ctx.lib_tsel,   -- 17 ноя (дерево): курсор на разделе / пэде / эффекте пэда
     lib_kit = (function() local c, f, k = ctx.lib_kit_get(); return f and { kids = f.kids, sel = k.sel, name = f.name, inpad = k.inpad, slot = k.slot } or nil end)(),   -- 17 ноя: пэды drumrs5k (inpad — эффекты пэда)
     libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol, lib_dir = (ctx.lib_dir and ctx.lib_dir == vim.inst) and ctx.lib_dir or nil,   -- 17 ноя: подпапка lib
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
@@ -30649,8 +30650,11 @@ local function frame()
       if dbl and click.zone == 'poolphr' and state.phr_inst == hover.pool.phr then ctx.phr_do({ op = 'edit', name = hover.pool.phr }) else ctx.phr_select(hover.pool.phr) end
       click = { t = now2, zone = 'poolphr' }
     elseif hover.libpad then   -- 17 ноя: пэд drumrs5k в lib — выбрать и послушать
-      local col2, f2, k2 = ctx.lib_kit_get()
-      if k2 then k2.sel = hover.libpad; local kid = f2.kids[k2.sel]; if kid and kid.note then ctx.preview(col2.track, kid.note, 'midi') end end
+      ctx.lib_tsel = { kind = 'pad', key = hover.libpadkey, k = hover.libpad, kitnum = hover.libpadnum }
+      if hover.libpadnum and vim.inst ~= hover.libpadnum then ctx.inst_select(hover.libpadnum) end
+      for _, c2 in ipairs(snap and snap.cols or {}) do for _, f2 in ipairs(c2.fx or {}) do
+        if f2.kids and (tostring(c2.guid or '') .. ':' .. f2.i) == hover.libpadkey then local kid = f2.kids[hover.libpad]; if kid and kid.note then ctx.preview(c2.track, kid.note, 'midi') end end
+      end end
       ctx.set_focus('inst')
     elseif hover.libroot then ctx.lib_seccol = true; ctx.set_focus('inst'); vim.msg = 'lib: j k - a section, l / Enter - into it'   -- 17 ноя: путь «lib» — к разделам
     elseif hover.libtab then
@@ -30697,6 +30701,7 @@ local function frame()
       ctx.inst_fx_pick(pc or cur_col(), hover.pool.instfx, dbl and click.zone == 'poolinst' and click.row == hover.pool.instfx)
       click = { t = now2, zone = 'poolinst', row = hover.pool.instfx }
     elseif hover.pool then
+      ctx.lib_tsel = nil   -- 17 ноя (дерево): щелчок по строке lib — курсор дерева на неё
       ctx.set_focus('inst')
       -- 19 окт: Shift+щелчок — несколько инструментов: диапазон от выбранного до щёлкнутого (как v)
       -- 31 окт: Cmd+щелчок — отметить / снять (как m): dd / x / yy — по отметкам
@@ -33906,6 +33911,7 @@ local function frame()
             ctx.lib_seccol = true; vim.msg = 'lib: j k - a section, l / Enter - into it'; return
           end
         end
+        if ctx.lib_tree_nav(c) then return end   -- 17 ноя (дерево): j k по всему дереву, папки разделов / китов / пэдов
         if ctx.lib_kit_key(c) then return end   -- 17 ноя: пэды drumrs5k подпапкой
         if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
         local col = cur_col()
@@ -40718,6 +40724,124 @@ ctx.lib_kit_key = function(c)
   else return false end
   local kid = f.kids[k.sel]
   if kid then vim.msg = ('pad %02d %s - Space listen'):format(k.sel, (kid.file and kid.file:match('[^/]+$')) or kid.name or '') end
+  return true
+end
+-- 17 ноя (дерево): lib одним деревом — j k по draw.lib_nav2 (всё, как нарисовано), курсор на разделе / пэде / эффекте —
+-- ctx.lib_tsel; l — открыть папку (раздел, звук со слайсами, кит, пэд), h — закрыть / к родителю
+local function lib_kit_by_key(key)
+  for _, c in ipairs(snap and snap.cols or {}) do
+    for _, f in ipairs(c.fx or {}) do if f.kids and (tostring(c.guid or '') .. ':' .. f.i) == key then return c, f end end
+  end
+end
+ctx.lib_tree_nav = function(c)
+  if state.libtabs then return false end
+  local ch = c < 256 and string.char(c) or ''
+  local DN, UPk, LF, RT = keys.down, keys.up, keys.left, keys.right
+  local nav = draw.lib_nav2 or {}
+  local t = ctx.lib_tsel
+  draw.LIBK = draw.LIBK or {}; draw.LIBSEC_CLOSED = draw.LIBSEC_CLOSED or {}
+  local function cur_pos()
+    for k, s in ipairs(nav) do
+      if t then
+        if (t.kind == 'sec' and s.sec == t.sec) or (t.kind == 'pad' and s.pad and s.key == t.key and s.k == t.k)
+           or (t.kind == 'slot' and s.slot and s.key == t.key and s.pk == t.pk and s.sk == t.sk) then return k end
+      else
+        local sub = draw.LIBSUB
+        if state.phr_inst then if s.phr == state.phr_inst then return k end
+        elseif state.midi_inst then if s.midi then return k end
+        elseif sub then if s.kind and s.i == sub.i and s.kind == sub.kind and s.k == sub.k then return k end
+        elseif (s.i and not s.kind and s.i == vim.inst) or (s.num and s.num == vim.inst) then return k end
+      end
+    end
+  end
+  local function go(s)
+    if s.sec then ctx.lib_tsel = { kind = 'sec', sec = s.sec }; vim.msg = s.sec .. ': l open, h fold'
+    elseif s.pad then ctx.lib_tsel = { kind = 'pad', key = s.key, k = s.k, kitnum = s.kitnum }; if s.kitnum and vim.inst ~= s.kitnum then ctx.inst_select(s.kitnum) end
+      vim.msg = ('pad %02d: Space listen, l its effects, f find a sample, < > one like it'):format(s.k)
+    elseif s.slot then ctx.lib_tsel = { kind = 'slot', key = s.key, pk = s.pk, sk = s.sk, kitnum = s.kitnum }; if s.kitnum and vim.inst ~= s.kitnum then ctx.inst_select(s.kitnum) end
+      vim.msg = 'pad effect: Enter window, b bypass, x remove, a add, h up'
+    else
+      ctx.lib_tsel = nil
+      if s.phr then ctx.phr_select(s.phr)
+      elseif s.midi then ctx.midi_select()
+      elseif s.kind then ctx.inst_select(s.i); ctx.lib_sub_go(s.i, { kind = s.kind, k = s.k })
+      elseif s.i then ctx.inst_select(s.i); ctx.lib_sub_go(s.i, nil)
+      elseif s.num then ctx.inst_select(s.num) end
+    end
+  end
+  if ch == 'j' or c == DN or ch == 'k' or c == UPk then
+    local p = cur_pos(); if not p then return false end
+    local s = nav[p + ((ch == 'j' or c == DN) and 1 or -1)]
+    if s then go(s) end
+    return true
+  end
+  if not t then
+    -- кит (строка инструмента): l — открыть пэды, h — свернуть
+    local kitkey
+    for _, s in ipairs(nav) do if s.kitkey and s.num == vim.inst then kitkey = s.kitkey end end
+    if kitkey and not draw.LIBSUB then
+      if ch == 'l' or c == RT then draw.LIBK[kitkey] = true; return true end
+      if (ch == 'h' or c == LF) and draw.LIBK[kitkey] then draw.LIBK[kitkey] = nil; return true end
+    end
+    return false
+  end
+  if c == 27 then ctx.lib_tsel = nil; return false end
+  if t.kind == 'sec' then
+    if ch == 'l' or c == RT or c == 13 then draw.LIBSEC_CLOSED[t.sec] = nil; return true end
+    if ch == 'h' or c == LF then draw.LIBSEC_CLOSED[t.sec] = true; return true end
+    return false
+  end
+  local col, f = lib_kit_by_key(t.key)
+  if not f then ctx.lib_tsel = nil; return false end
+  if t.kind == 'pad' then
+    local kid = f.kids[t.k]
+    local pk = t.key .. ':' .. t.k
+    if ch == 'l' or c == RT then draw.LIBK[pk] = true
+    elseif ch == 'h' or c == LF then if draw.LIBK[pk] then draw.LIBK[pk] = nil else ctx.lib_tsel = nil end   -- закрыть эффекты / на кит
+    elseif ch == ' ' or c == 13 then if kid and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+    elseif ch == 'f' or ch == 'F' then
+      if not (kid and kid.rs5k_i) then vim.msg = 'pad: no sampler in this pad'; return true end
+      ctx.sample_find(nil, { guid = col.guid, fx = f.i, ki = t.k, label = ('pad %02d'):format(t.k) })
+      vim.msg = ('pad %02d: type a name, j k - listen, Enter - the new sample, Esc - cancel'):format(t.k)
+    elseif ch == '<' or ch == '>' then
+      if not (kid and kid.rs5k_i) then vim.msg = 'pad: no sampler in this pad'; return true end
+      local path, H = ctx.pad_pick(col.track, kid, t.k, ch == '>' and 1 or -1)
+      if not path then vim.msg = 'ξ: ' .. tostring(H); return true end
+      edit.run('pad: similar sample', function() ctx.pad_load(col.track, kid, path) end)
+      model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+      if ctx.preview_file then ctx.preview_file(path) end
+      vim.msg = ('pad %02d: %s (%d/%d)'):format(t.k, path:match('[^/]+$'), H.i, #H.list)
+    else return false end
+    return true
+  end
+  -- эффект пэда
+  local kid = f.kids[t.pk]
+  local sl = kid and kid.slots or {}
+  local s = sl[t.sk]
+  if ch == 'h' or c == LF then ctx.lib_tsel = { kind = 'pad', key = t.key, k = t.pk, kitnum = t.kitnum }
+  elseif (c == 13 or ch == ' ' or ch == 'l' or c == RT) and s then reaper.TrackFX_Show(col.track, s.i, 3)
+  elseif ch == 'b' and s then
+    local on = reaper.TrackFX_GetEnabled(col.track, s.i)
+    reaper.TrackFX_SetEnabled(col.track, s.i, not on); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = s.name .. (on and ': bypassed' or ': on')
+  elseif ch == 'x' and s then
+    edit.drum_slot_del(col.track, s.i); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    vim.msg = 'removed ' .. s.name; ctx.lib_tsel = { kind = 'pad', key = t.key, k = t.pk, kitnum = t.kitnum }
+  elseif ch == 'a' then
+    local tr, fi, ki = col.track, f.i, t.pk
+    local function put(name)
+      if edit.drum_slot_add(tr, fi, ki - 1, name, 1 + #sl) then vim.msg = ('+ %s into pad %02d'):format(FB.short(name), ki); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+      else vim.msg = 'could not add into the pad' end
+      ctx.set_focus('inst')
+    end
+    if state.panes_ui and state.panes then
+      if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+      FB.query, FB.cur, FB.scroll = '', 1, 0
+      ctx.fxb_pad = put
+      ctx.pane_cmd('fxb show')
+      FB.typing, FB.col = true, 2
+    else vim.open_picker(('fx into pad %02d'):format(ki), ctx.fx_list(), function(x) put(x.data or x.label) end) end
+  else return false end
   return true
 end
 ctx.lib_dir_on = function() return ctx.lib_dir ~= nil and ctx.lib_dir == vim.inst end   -- 17 ноя: внутри подпапки lib
