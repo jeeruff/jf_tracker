@@ -29,7 +29,7 @@ local T = {
         { 'a', 'fold / open the track' }, { 'E', 'hide empty columns' }, 
         { 'e', 'instrument window' }, { 'C', 'monitor FX' }, { '!', '1-char strip' }, { 'f', 'fold / folders …' }, { 'k', 'folder: kids narrow' },
         { 'F', 'free item positioning' }, { '_', 'minimize the pane' }, { 'm', 'mixer' }, { 'M', 'master' },
-        { '> <', 'all wider / narrower' }, { '. ,', 'track wider / narrower' }, { 'x', 'crossfade editor' }, { 'X', 'mixer taller' },
+        { '. ,', 'all wider / narrower' }, { '> <', 'track wider / narrower' }, { 'x', 'crossfade editor' }, { 'X', 'mixer taller' },
         { 'u', 'unfold fast notes' }, { 'p', 'pattern / project' }, { 's', 'zoom the selection (VISUAL / time sel.)' }, { 'S', 'section / project' }, { 'r', 'router' },
         { 'R', 'big router' } } },
   pane = { title = 'PANE (Ctrl+W) - Esc out', items = { { 'a p e f i', 'audio / song / edit / files / info' }, { 'h j k l', 'focus neighbour' }, { 'H J K L', 'move pane' },

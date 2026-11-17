@@ -3642,17 +3642,17 @@ function V.key_impl(c)
       elseif c == ('_'):byte() then if ctx.pane_min then ctx.pane_min() end   -- 1 ноя: z_ (было zm) — свернуть панель в фокусе (микшер — F3)
       elseif c == ('m'):byte() then if ctx.toggle_mixer then ctx.toggle_mixer() end   -- 1 ноя (2): zm — микшер (= F3)
       elseif c == ('M'):byte() then if ctx.master_menu then ctx.master_menu() end   -- 1 ноя (2): zM — свойства мастера
-      -- 9 окт: ширина по шагу, как Cmd+колесо: z> z< — все треки, z. z, — трек курсора (счётчик: 3z>)
+      -- 9 окт: ширина по шагу, как Cmd+колесо; 17 ноя: z. z, — ВСЕ треки, z> z< — трек курсора (было наоборот) (счётчик: 3z.)
       elseif (c == ('>'):byte() or c == ('<'):byte() or c == ('.'):byte() or c == (','):byte()) and ctx.width_step then
         local d = (c == ('>'):byte() or c == ('.'):byte()) and 1 or -1
         local f = flat()[V.cur.fi]
         local col = f and f.col
-        for _ = 1, n do ctx.width_step(d, (c == ('.'):byte() or c == (','):byte()) and 'cur' or nil) end
+        for _ = 1, n do ctx.width_step(d, (c == ('>'):byte() or c == ('<'):byte()) and 'cur' or nil) end
         if col then for i, g in ipairs(flat()) do if g.col == col then V.cur.fi = i; break end end end
         clamp_cur()
         -- 2 ноя: после z> z< — дальше > < без z, пока не нажата другая клавиша (. , не трогаем: в Vim это повторы)
         V.zrep = true; V.zrep_all = c == ('>'):byte() or c == ('<'):byte()
-        if V.zrep_all then V.msg = (V.msg or '') .. '  (> < again - more, without z)' end
+        if V.zrep_all then V.msg = (V.msg or '') .. '  (> < again - more, without z; the cursor track)' end
       elseif c == ('E'):byte() then if ctx.hide_empty then ctx.hide_empty() end   -- 2 ноя: пустые колонки и лейны всех треков; 5 ноя: zE (empty, было zA)
       elseif c == ('F'):byte() then if ctx.free_items_toggle then ctx.free_items_toggle() end   -- 11 ноя: zF — free item positioning трека (свернуть все — zfF)
       end

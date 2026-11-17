@@ -299,7 +299,7 @@ for _, c in ipairs({ { 'ty', 'tdup' }, { '3tj', 'tmove:1:3' }, { 'tk', 'tmove:-1
   reset(); keysin(c[1]); eq('t-op ' .. c[1], last(), c[2]); eq('t-op ' .. c[1] .. ' clears pending', V.pending, nil)
 end
 -- z> z< z. z, (9 окт): ширина по шагу
-for _, c in ipairs({ { 'z>', 'w:1:all' }, { 'z<', 'w:-1:all' }, { 'z.', 'w:1:cur' }, { 'z,', 'w:-1:cur' } }) do
+for _, c in ipairs({ { 'z>', 'w:1:cur' }, { 'z<', 'w:-1:cur' }, { 'z.', 'w:1:all' }, { 'z,', 'w:-1:all' } }) do   -- 17 ноя: z. z, — все треки, z> z< — трек курсора
   reset(); keysin(c[1]); eq('width ' .. c[1], last(), c[2])
 end
 reset(); keysin('3z>'); eq('3z> - three steps', #calls, 3)
