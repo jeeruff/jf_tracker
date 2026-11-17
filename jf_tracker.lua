@@ -127,12 +127,12 @@ local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
 -- 17 ноя: спектрограмма вида трека (zT g): задание на ИСТОЧНИК (WAV — по файлу: все item этого файла делят одну
 -- картинку, item берёт свой кусок по offs / rate), не WAV — по take (аудио-аксессор, время item); время — до 2048 строк
-ctx.sg_path = setmetatable({}, { __mode = 'k' })   -- 17 ноя (ревизия): источник → путь (звалось на каждую строку каждого кадра)
+local SG_PATH = setmetatable({}, { __mode = 'k' })   -- 17 ноя (ревизия): источник → путь (звалось на каждую строку каждого кадра); не ctx — он ещё не объявлен
 draw.sgram_job = function(head)
   local src = head and head.src
   if not src then return nil end
-  local path = ctx.sg_path[src]
-  if path == nil then path = reaper.GetMediaSourceFileName(src, '') or ''; ctx.sg_path[src] = path end
+  local path = SG_PATH[src]
+  if path == nil then path = reaper.GetMediaSourceFileName(src, '') or ''; SG_PATH[src] = path end
   if path and path:lower():match('%.wav$') then
     local key = 'v:f:' .. path
     local j = SL.sg.jobs[key]
