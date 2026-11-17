@@ -470,6 +470,7 @@ local state = {
   foldfast = reaper.GetExtState(EXT, 'foldfast2') ~= '0',   -- 2 ноя: по умолчанию вкл — быстрые ноты всегда сложены   -- 19 окт: fold быстрых нот (кнопка fd)   -- 19 окт: BS / Ins — в паттерне (Renoise) / по дорожке   -- 19 окт: пэды рэка zss / zsm / zsl   -- 19 окт: тонкий метр под v в шапке (по умолчанию вкл)
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   popdock = reaper.GetExtState(EXT, 'popdock') ~= '0',   -- 14 ноя: меню / which-key / списки — всегда внизу окна (по умолчанию вкл)
+  vipersel = reaper.GetExtState(EXT, 'vipersel') == 'exclusive' and 'exclusive' or 'cursor',   -- 17 ноя: viper — выделение ведёт курсор (exclusive — прячет треки)
   libtabs = true,   -- 17 ноя: lib — всегда вкладками (одним списком было два курсора); 25 окт: опцией
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
@@ -39347,7 +39348,8 @@ ctx.viper_toggle = function()
       end
     end
     relayout()
-    vim.msg = 'VIPER: the tracks of the items selected in REAPER, the cursor follows the REAPER cursor; Cmd+F10 / :viper - back'
+    vim.msg = state.vipersel == 'exclusive' and 'VIPER exclusive: only the tracks of the items selected in REAPER; :viper cursor - every track, the cursor goes to the item; Cmd+F10 - back'
+      or 'VIPER: a selected item moves the cursor to its track; :viper exclusive - only the selected tracks; Cmd+F10 - back'
   else
     local bk = ctx.viper_back or {}
     state.viper = nil; state.mxonly = nil
@@ -39360,12 +39362,28 @@ ctx.viper_toggle = function()
 end
 ctx.viper_tick = function()
   if not (state.viper and snap) then return end
-  local only, any = {}, false
-  for i = 0, reaper.CountSelectedMediaItems(0) - 1 do
-    local tr = reaper.GetMediaItem_Track(reaper.GetSelectedMediaItem(0, i))
-    for _, c in ipairs(snap.cols) do if c.track == tr then only[c.guid] = true; any = true end end
+  -- 17 ноя: выделение REAPER — по умолчанию курсор трекера переходит на трек (и строку) выделенного айтема, остальные
+  -- треки видны (vipersel cursor); exclusive — как было: видны только треки выделенных айтемов (:viper exclusive)
+  if state.vipersel == 'exclusive' then
+    local only, any = {}, false
+    for i = 0, reaper.CountSelectedMediaItems(0) - 1 do
+      local tr = reaper.GetMediaItem_Track(reaper.GetSelectedMediaItem(0, i))
+      for _, c in ipairs(snap.cols) do if c.track == tr then only[c.guid] = true; any = true end end
+    end
+    state.mxonly = any and only or nil
+  else
+    state.mxonly = nil
+    local it = reaper.CountSelectedMediaItems(0) > 0 and reaper.GetSelectedMediaItem(0, 0) or nil
+    if it ~= ctx.viper_selit then
+      ctx.viper_selit = it
+      if it and (state.focus ~= 'tracker' or not ctx.win_focus) then   -- выделили в REAPER (не своим ходом в трекере)
+        local tr = reaper.GetMediaItem_Track(it)
+        for _, c in ipairs(snap.cols) do if c.track == tr then ctx.goto_col(c); break end end
+        vim.cur.row = math.max(0, math.floor(model.row_of_time(reaper.GetMediaItemInfo_Value(it, 'D_POSITION'), state.lpb) + 1e-6))
+        if L and L.nrows and (vim.cur.row < state.row0 or vim.cur.row >= state.row0 + L.nrows) then state.row0 = math.max(0, vim.cur.row - math.floor(L.nrows / 2)) end
+      end
+    end
   end
-  state.mxonly = any and only or nil
   local cp = reaper.GetCursorPosition()
   if cp ~= ctx.viper_cp then
     ctx.viper_cp = cp

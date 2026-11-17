@@ -1484,7 +1484,7 @@ V.COMMANDS = {
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 ({ } with frow, c C with qwerty)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
-  { 'sharp', '', 'the sharp sign in the note column: # ˆ ˚ $ * % ¨ ˙ (only the look; typing as before)' }, { 'rate', '[x]', 'the play rate: :rate 0.5; without a number - the list (also a click on x1.00 next to play)' }, { 'bpm', '[N]', 'the project tempo: :bpm 174; without a number - the list (also a click on BPM)' }, { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
+  { 'viper', '[exclusive|cursor]', 'viper - the tracker as a REAPER panel (Cmd+F10); cursor (default) - an item selected in REAPER moves the cursor to its track, every track stays; exclusive - only the tracks of the selected items' }, { 'sharp', '', 'the sharp sign in the note column: # ˆ ˚ $ * % ¨ ˙ (only the look; typing as before)' }, { 'rate', '[x]', 'the play rate: :rate 0.5; without a number - the list (also a click on x1.00 next to play)' }, { 'bpm', '[N]', 'the project tempo: :bpm 174; without a number - the list (also a click on BPM)' }, { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
   { 'ramp', 'xx [len]', 'envelope ramp to xx (hex) over len rows / Nb beats; VISUAL: selection' },
   { 'fade', 'in|out [len]', 'fade of audio event over len rows / Nb beats' },
 }
@@ -1672,6 +1672,7 @@ local function run_cmd(line)
     local w = {}; for t in (arg or ''):gmatch('%S+') do w[#w + 1] = tonumber(t) end
     if not w[1] then V.msg = ':eu k [n] [r] - k hits in n rows (n: default 16), rotated by r; a looped MIDI item from the cursor to the pattern end'
     elseif ctx.euclid_here then ctx.euclid_here(w[1], w[2], w[3]) end
+  elseif cmd == 'viper' and (arg == 'exclusive' or arg == 'cursor') then st.vipersel = arg; reaper.SetExtState('jf_tracker', 'vipersel', arg, true); V.msg = arg == 'exclusive' and 'viper: only the tracks of the selected items' or 'viper: a selected item moves the cursor to its track, every track stays'   -- 17 ноя
   elseif cmd == 'viper' then if ctx.viper_toggle then ctx.viper_toggle() end   -- 29 окт: viper — трекер как часть REAPER
   elseif cmd == 'manual' or cmd == 'help' then if ctx.help_big then ctx.help_big() end   -- 29 окт: справка панелью
   elseif cmd == 'console' then if ctx.console_open then ctx.console_open() end   -- 28 окт: консоль Strudel
