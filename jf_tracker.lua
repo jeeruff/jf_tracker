@@ -37115,6 +37115,22 @@ ctx.fit_width = function()
   state.autozoom = nil; reaper.SetExtState(EXT, 'autozoom', '0', true)
   state.wlevel = {}; state.wzlevel = nil; state.hscroll = 0
   ctx.fold_all(false)   -- 11 ноя: свёрнутые (zF / za) ширину не слушали — zw их разворачивает, свернёт сам, если не влезут
+  -- 17 ноя: приоритет — данные, не картинка: вид трека (волна / спектрограмма) — узко, у остальных раскрыты все свои колонки
+  -- нот (каждая — шагом ширины), в разумных пределах (до 8 сверх полной); не влезут — сужаются ниже
+  do
+    local full0 = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+    for _, c in ipairs(snap and snap.cols or {}) do
+      if c.guid then
+        if draw.track_view and draw.track_view(c) then state.wlevel[c.guid] = 2
+        else
+          local ns = 1
+          for _, ln in ipairs(c.lanes or {}) do ns = math.max(ns, #(ln.subs or {})) end
+          if ns > 1 then state.wlevel[c.guid] = 3 + (L.MAXFX or 4) + math.min(8, ns - 1) end
+        end
+      end
+    end
+    local _ = full0
+  end
   relayout()
   if L.cols_cut or L.hs_cut then
     -- 11 ноя: сужается самый широкий трек, по шагу, пока не влезут все (раньше — общий уровень всем: один трек с
@@ -37127,7 +37143,10 @@ ctx.fit_width = function()
       for _, c in ipairs(L.cols or {}) do
         local g = c.col and c.col.guid
         local lv = g and (state.wlevel[g] or full)
-        if g and not c.master and lv > 1 and (not ww or (c.w or 0) > ww) then wide, ww = c, c.w or 0 end
+        -- 17 ноя: вид трека (волна / спектрограмма) сужается первым — он картинка, не данные
+        local tv = g and draw.track_view and draw.track_view(c.col)
+        local score = (c.w or 0) + (tv and 1e6 or 0)
+        if g and not c.master and lv > 1 and (not ww or score > ww) then wide, ww = c, score end
       end
       -- за краем (hs_cut) ширина не посчитана — тогда самый широкий из видимых, иначе — общий уровень ниже
       if not wide then break end
