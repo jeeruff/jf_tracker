@@ -5267,6 +5267,18 @@ function V.visual_range()
     while f0 > 1 and F[f0 - 1] and F[f0 - 1].col == c0 do f0 = f0 - 1 end
     while F[f1 + 1] and F[f1 + 1].col == c1 do f1 = f1 + 1 end
   end
+  -- 17 ноя: WYSIWYG — у лейна с несколькими колонками нот команды стоят блоком ПОСЛЕ всех нот: выделение подколонки с
+  -- командами на экране тянется через соседние колонки нот до её команд — они и выделены (было: выделялись только её нота
+  -- и её команды, пустое место между ними — нет)
+  if V.mode == 'visual' and not V.vtrack then
+    local F = flat()
+    local fa, fb = F[f0], F[f1]
+    if fa and fb and fa.col and fa.col == fb.col and fa.li and fa.li == fb.li then
+      local hasfx = false
+      for i = f0, f1 do local g = F[i] and F[i].G; if g and (g.nfx or 0) > 0 then hasfx = true end end
+      if hasfx then while F[f1 + 1] and F[f1 + 1].col == fa.col and F[f1 + 1].li == fa.li and not F[f1 + 1].env do f1 = f1 + 1 end end
+    end
+  end
   return f0, f1, math.min(a.row, b.row), math.max(a.row, b.row)
 end
 
