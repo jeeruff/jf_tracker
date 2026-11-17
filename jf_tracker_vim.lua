@@ -4712,7 +4712,12 @@ function V.open_hydra(h)
   V.hydra = V.hydra_fix(h); V.hydra_stack = {}
   -- 27 окт: открыто щелчком (кнопка мыши нажата) и место не задано — меню у мыши, не у курсора трекера
   local st = ctx.state
-  if st and not st.popup_at and gfx and (gfx.mouse_cap or 0) & 3 ~= 0 then st.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
+  -- 17 ноя: открыто мышью (ЛКМ / ПКМ) — выпадашкой у мыши, не внизу окна (с учётом краёв экрана)
+  V.hydra_mouse = nil   -- подменю (буква в меню) — там же, у мыши
+  if gfx and (gfx.mouse_cap or 0) & 3 ~= 0 then
+    V.hydra_mouse = { x = gfx.mouse_x, y = gfx.mouse_y + 4 }
+    if st then st.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4, mouse = true } end
+  end
 end
 
 function V.hydra_key(c)
@@ -4818,7 +4823,7 @@ function V.popup()
     -- 11 окт: хинты включены — внизу меню «как сюда быстро» (h.how): для мышечной памяти
     if V.hydra.how and ctx.state and ctx.state.hints then lines[#lines + 1] = { key = ' ', text = 'fast: ' .. V.hydra.how, col = { 0.55, 0.55, 0.55 } } end
     lines[#lines + 1] = { key = ': /', text = ': command line    / search this menu    Backspace back    Esc close', col = { 0.55, 0.55, 0.55 } }   -- 14 ноя
-    return { title = V.hydra.title or '', lines = lines, kind = 'hydra' }
+    return { title = V.hydra.title or '', lines = lines, kind = 'hydra', by_mouse = V.hydra_mouse }
   elseif V.mode == 'cmd' and V.prompt then
     local t = (V.cmdline or ''):sub(#V.prompt.pre + 1)
     local b = utf8.offset(t, V.prompt.pos + 1) or (#t + 1)

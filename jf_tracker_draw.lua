@@ -15684,7 +15684,8 @@ function D.popup(L, p, anchor)
   -- 14 ноя: все меню — в одном месте, внизу окна над статусом (опция menus at the bottom; было у курсора / кнопки —
   -- взгляд прыгал). Меню с буквами (hydra, which-key) — низкой полосой в несколько колонок: столько колонок, сколько
   -- влезает по ширине, строк — от 6. Списки с выбором (поиск, палитра) — одной колонкой, как были. Ввод имени — у курсора
-  local dock = D.pop_bottom and p.kind ~= 'prompt' and not (anchor and (anchor.box or anchor.nodock))   -- 15 ноя: nodock — список у своего места (пресеты)
+  if p.by_mouse then anchor = { x = p.by_mouse.x, y = p.by_mouse.y } end   -- 17 ноя: открыто мышью — у мыши (подменю тоже)
+  local dock = D.pop_bottom and p.kind ~= 'prompt' and not p.by_mouse and not (anchor and (anchor.box or anchor.nodock))   -- 15 ноя: nodock — список у своего места (пресеты)
   -- 17 ноя: внизу окна — как which-key Emacs: без рамки, «клавиша : описание», заголовок (префикс) — нижней строкой
   local wk = dock and p.kind == 'hydra'
   local kw0 = kw
