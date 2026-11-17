@@ -493,7 +493,7 @@ eq('latin passthrough', keys.translate(104), 104)
 
 -- ── : подсказка и Tab, / поиск, hydra ─────────────────────────────────────
 reset()
-keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); local nm = 0; for _, ln in ipairs(pp.lines) do if not ln.col then nm = nm + 1 end end; eq('cmd matches l* (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo, log, learn, loom, lanesplit)', nm, 14); eq('palette full width', pp.full, true)
+keysin(':l');  local pp = V.popup(); eq('cmd popup kind', pp and pp.kind, 'cmd'); local nm = 0; for _, ln in ipairs(pp.lines) do if (ln.key or ''):match('^  :l') then nm = nm + 1 end end; eq('cmd matches l* first (lpb, lanes, lock, len, loop, loops, legato, libsave, libdir, logo, log, learn, loom, lanesplit; 17 ноя: и всё со словом ниже)', nm >= 14, true); eq('palette full width', pp.full, true)
 V.key(9);      eq('tab completes lpb', V.cmdline, 'lpb ')
 V.key(27)
 keysin(':');   pp = V.popup(); eq('empty palette ends with all', pp.lines[#pp.lines].key, '  all'); eq('empty palette: history section', (function() for _, ln in ipairs(pp.lines) do if ln.key:match('history$') then return true end end end)(), true)
@@ -1253,6 +1253,22 @@ do   -- 31 окт: dw на пустой строке перед свободны
   V.mode = 'normal'; V.cur = { fi = 1, row = 22, field = 1 }
   keysin('dw'); eq('dw before a free OFF deletes that OFF (31 окт)', got, 'alloffdel@24')
   sub[24] = nil
+end
+-- 17 ноя: строка команды как Ivy — стрелки двигают выбор и не трогают набранное; Enter — выбранное
+do
+  reset()
+  keysin(':lo')
+  V.key(1685026670)   -- ↓
+  eq('Ivy: Down keeps the typed line', V.cmdline, 'lo')
+  local list = V.cands('lo')
+  local sel = V.csel
+  eq('Ivy: Down picks the second selectable line', sel ~= nil and not list[sel].head and sel > V.cand_step(list, nil, 1), true)
+  V.key(30064)        -- ↑
+  eq('Ivy: Up back to the first', V.csel, V.cand_step(list, nil, 1))
+  V.key(27)
+  keysin(':dedu'); local l2 = V.cands('dedu'); local f = l2[V.cand_step(l2, nil, 1)]
+  eq('Ivy: dedu - the first pick is :dedup', f and f.cmd, 'dedup')
+  V.key(27)
 end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

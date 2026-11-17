@@ -10769,6 +10769,20 @@ ctx = {
     end
     vim.msg = 'action not found: ' .. nm
   end,
+  -- 17 ноя: все действия REAPER (для поиска строки команды); перечисляются один раз
+  act_all = function()
+    if not ctx.act_items and reaper.CF_EnumerateActions then
+      local items, i = {}, 0
+      while true do
+        local id, name = reaper.CF_EnumerateActions(0, i, '')
+        if not id or id <= 0 then break end
+        if name and name ~= '' then items[#items + 1] = { label = name, data = id } end
+        i = i + 1
+      end
+      ctx.act_items = items
+    end
+    return ctx.act_items or {}
+  end,
   act_recent = function(n)
     local out = {}
     for nm in (reaper.GetExtState(EXT, 'act_recent') or ''):gmatch('[^\n]+') do out[#out + 1] = nm; if #out >= (n or 5) then break end end
@@ -36304,7 +36318,7 @@ ctx.keys_search = function(q, max)
       for _, w in ipairs(words) do if not hay:find(w, 1, true) then ok = false; break end end
       if ok and not seen[e.k .. '\0' .. (e.d or '')] then
         seen[e.k .. '\0' .. (e.d or '')] = true
-        out[#out + 1] = { k = e.k, d = KH.short(e), page = pg }
+        out[#out + 1] = { k = e.k, d = KH.short(e), full = e.d, m = e.m, page = pg }
         if #out >= (max or 8) then return out end
       end
     end

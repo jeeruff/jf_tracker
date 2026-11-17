@@ -1525,6 +1525,131 @@ function V.cmd_matches(line)
   return out, word
 end
 
+-- 17 ноя: строка команды как Ivy / Helm — набранное фильтрует ВСЁ (команды, история, клавиши трекера с описаниями,
+-- действия REAPER) словами в любом порядке; ↑ ↓ (Ctrl+N / P, Ctrl+J / K) двигают выбор, строку не трогают;
+-- Enter — выбранное (первое по умолчанию), Tab — дописать выбранное в строку. «команда аргумент» (первое слово —
+-- точно команда, дальше пробел) — режим аргумента: Enter выполняет строку как набрана
+local function snippet(s, w, n)
+  s = (s or ''):gsub('%s+', ' ')
+  local p = w and s:lower():find(w, 1, true)
+  if p and p > 24 then s = '…' .. s:sub(p - 18) end
+  if #s > (n or 140) then s = s:sub(1, n or 140) .. '…' end
+  return s
+end
+-- все имена, которые понимает run_cmd (в т. ч. не в списке V.COMMANDS: transpose, mcmd, pl …) — из исходника, один раз
+local RUN_NAMES
+local function run_names()
+  if RUN_NAMES then return RUN_NAMES end
+  RUN_NAMES = {}
+  local src = debug.getinfo(1, 'S').source:match('^@(.*)$')
+  local f = src and io.open(src, 'r')
+  if f then local t = f:read('a'); f:close(); for nm in t:gmatch("cmd == '([^']+)'") do RUN_NAMES[nm] = true end end
+  for _, c in ipairs(V.COMMANDS) do RUN_NAMES[c[1]] = true end
+  return RUN_NAMES
+end
+function V.cands(typed)
+  local cc = V.cand_cache
+  if cc and cc.q == typed then return cc.list, cc.argmode end
+  local list, argmode = {}, false
+  local first = typed:match('^%s*(%S+)%s')
+  local RN = run_names()
+  if typed:match('^%s*!') then
+    argmode = true
+    list[1] = { head = true, key = 'REAPER action', text = 'Enter - the actions list' }
+  elseif first then
+    for _, c in ipairs(V.COMMANDS) do
+      if c[1] == first then
+        argmode = true
+        list[1] = { head = true, key = 'argument', text = 'Enter runs the line as typed' }
+        list[2] = { key = c[1] .. (c[2] ~= '' and (' ' .. c[2]) or ''), text = c[3], kind = 'line' }
+        break
+      end
+    end
+    if not argmode and RN[first] then
+      argmode = true
+      list[1] = { head = true, key = 'argument', text = ':' .. first .. ' - Enter runs the line as typed' }
+    end
+  end
+  if not argmode then
+    local words = {}
+    for w in typed:lower():gmatch('%S+') do words[#words + 1] = w end
+    local function ok(hay) hay = hay:lower(); for _, w in ipairs(words) do if not hay:find(w, 1, true) then return false end end; return true end
+    local w1 = words[1]
+    local function group(title, items)
+      if #items == 0 then return end
+      list[#list + 1] = { head = true, key = title, text = '' }
+      for _, it in ipairs(items) do list[#list + 1] = it end
+    end
+    -- набрано имя команды, которой нет в списке (transpose, mcmd …) — она первой, как набрана
+    local w0 = typed:match('^%s*(%S+)%s*$')
+    local listed = false
+    for _, c in ipairs(V.COMMANDS) do if c[1] == w0 then listed = true; break end end
+    if w0 and RN[w0] and not listed then group('run', { { key = ':' .. w0, text = 'run as typed', kind = 'hist', line = w0 } }) end
+    -- команды: точное имя, начало имени, имя содержит, описание
+    local cm = {}
+    for i, c in ipairs(V.COMMANDS) do
+      local hay = c[1] .. ' ' .. (c[2] or '') .. ' ' .. (c[3] or '')
+      if ok(hay) then
+        local nm = c[1]:lower()
+        local sc = (#words == 1 and nm == w1) and 0 or ((w1 and nm:sub(1, #w1) == w1) and 1 or ((w1 and nm:find(w1, 1, true)) and 2 or 3))
+        cm[#cm + 1] = { c = c, sc = sc, i = i }
+      end
+    end
+    table.sort(cm, function(a, b) if a.sc ~= b.sc then return a.sc < b.sc end return a.i < b.i end)
+    local items = {}
+    for k, e in ipairs(cm) do
+      if k > 40 then break end
+      local c = e.c
+      local need = (c[2] or '') ~= '' and not c[2]:match('^%[') and e.sc ~= 0   -- набрано имя целиком — выполнить (аргумент — через пробел)
+      items[#items + 1] = { key = ':' .. c[1] .. ((c[2] or '') ~= '' and (' ' .. c[2]) or ''), text = snippet(c[3], w1), kind = need and 'fill' or 'cmd', cmd = c[1], fill = c[1] .. ((c[2] or '') ~= '' and ' ' or '') }
+    end
+    group('commands', items)
+    -- история
+    items = {}
+    local seen, hist = {}, V.hist or {}
+    for i = #hist, 1, -1 do
+      local l = hist[i]
+      if not seen[l] and ok(l) then seen[l] = true; items[#items + 1] = { key = ':' .. l, text = '', kind = 'hist', line = l }; if #items >= 8 then break end end
+    end
+    group('history', items)
+    -- клавиши трекера (справка): клавиша и описание
+    items = {}
+    for _, e in ipairs(ctx.keys_search and ctx.keys_search(typed, 30) or {}) do
+      local plain = e.k:match('^[%w%p]+$') and not e.k:find('+', 1, true) and #e.k <= 4
+      items[#items + 1] = { key = e.k, text = snippet(e.full or e.d, w1) .. '  [' .. e.page .. ']', kind = plain and 'keys' or 'keyinfo', keys = e.k }
+    end
+    group('keys', items)
+    -- действия REAPER: недавние, а от 3 букв — и все совпавшие
+    items = {}
+    local aseen = {}
+    for _, nm in ipairs(ctx.act_recent and ctx.act_recent(30) or {}) do
+      if ok(nm) then aseen[nm] = true; items[#items + 1] = { key = '! ' .. nm, text = 'recent', kind = 'act', act = nm } end
+    end
+    if #typed >= 3 and ctx.act_all then
+      for _, it in ipairs(ctx.act_all()) do
+        if #items >= 15 then break end
+        if not aseen[it.label] and ok(it.label) then aseen[it.label] = true; items[#items + 1] = { key = '! ' .. it.label, text = '', kind = 'act', act = it.label } end
+      end
+    end
+    group('REAPER actions', items)
+    if #list == 0 then list[1] = { head = true, key = 'nothing', text = 'no command, key or action has these words - Backspace' } end
+  end
+  V.cand_cache = { q = typed, list = list, argmode = argmode }
+  return list, argmode
+end
+-- первая / следующая выбираемая строка
+function V.cand_step(list, i, d)
+  local n = #list
+  if n == 0 then return nil end
+  local j = i or (d > 0 and 0 or n + 1)
+  for _ = 1, n do
+    j = j + d
+    if j < 1 or j > n then return i end
+    if not list[j].head then return j end
+  end
+  return i
+end
+
 local function run_cmd(line)
   local st = ctx.state
   -- :!текст — действия REAPER (отдельно от команд трекера): fzf с запросом
@@ -2373,15 +2498,12 @@ function V.key_impl(c)
     if V.pal and c ~= UP and c ~= DOWN then V.pal = nil end
     -- 6 ноя: набрано (не листаем историю) — ↑ ↓ по списку совпадений палитры, выбранная — в строку (как Tab);
     -- пустая строка — ↑ ↓ история; Ctrl+P / N — всегда история
-    if (c == UP or c == DOWN) and not V.hist_pos and ((V.cmd_base or V.cmdline or ''):gsub('^:', '')) ~= '' then
-      V.cmd_base = V.cmd_base or V.cmdline
-      local matches = V.cmd_matches(V.cmd_base)
-      if #matches > 0 then
-        local d = c == UP and -1 or 1
-        V.cmd_cycle = (((V.cmd_cycle or (d > 0 and 0 or 1)) - 1 + d) % #matches) + 1
-        local m = matches[V.cmd_cycle]
-        V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
-      end
+    -- 17 ноя: набрано — ↑ ↓ / Ctrl+N P / Ctrl+J K двигают выбор по списку (строка не меняется), как в Ivy
+    local typed_now = ((V.cmdline or ''):gsub('^:', ''))
+    if typed_now ~= '' and not V.prompt and (c == UP or c == DOWN or c == 14 or c == 16 or c == 10 or c == 11) then
+      local list = V.cands(typed_now)
+      local d = (c == UP or c == 16 or c == 11) and -1 or 1
+      V.csel = V.cand_step(list, V.csel or V.cand_step(list, nil, 1), d) or V.csel   -- выбор с первого (он выбран и без стрелок)
       return
     end
     if c == 16 or c == 14 then
@@ -2404,7 +2526,28 @@ function V.key_impl(c)
       return
     end
     if c ~= UP and c ~= DOWN then V.hist_pos, V.hist_pre = nil, nil end
-    if c == ESC then V.mode = back; V.cmdline = nil; V.cmd_cycle = nil; V.cmd_base = nil
+    if c == ESC then V.mode = back; V.cmdline = nil; V.cmd_cycle = nil; V.cmd_base = nil; V.csel = nil
+    elseif c == ENTER and typed_now ~= '' and not V.prompt and not V.enter_raw then
+      -- 17 ноя: выбранное в списке (по умолчанию — первое); режим аргумента — строка как набрана
+      local list, argmode = V.cands(typed_now)
+      local it = not argmode and list[V.csel or V.cand_step(list, nil, 1) or 0] or nil
+      V.csel = nil
+      if it and not it.head then
+        if it.kind == 'fill' then V.cmdline = it.fill; V.cand_cache = nil; return end
+        if it.kind == 'act' then V.mode = back; V.cmdline = nil; if ctx.act_run_name then ctx.act_run_name(it.act) end; return end
+        if it.kind == 'keys' then
+          V.mode = back; V.cmdline = nil
+          for ch in it.keys:gmatch('.') do V.key(ch:byte()) end
+          return
+        end
+        if it.kind == 'keyinfo' then V.mode = back; V.cmdline = nil; V.msg = 'press ' .. it.keys .. ' in its module'; return end
+        if it.kind == 'cmd' then V.cmdline = it.cmd elseif it.kind == 'hist' then V.cmdline = it.line end
+      end
+      V.enter_raw = true
+      local ok, r = pcall(V.key, 13)
+      V.enter_raw = nil
+      if not ok then error(r) end
+      return r
     elseif c == ENTER then
       local line = V.cmdline or ''
       V.mode = back; V.cmdline = nil; V.cmd_cycle = nil; V.cmd_base = nil
@@ -2433,17 +2576,17 @@ function V.key_impl(c)
         pc.last = V.cmdline; V.pl_comp = pc
         if #pc.list > 1 then V.msg = table.concat(pc.list, ' ') end
       end
-    elseif c == TAB then
-      V.cmd_base = nil
-      local matches, word = V.cmd_matches(V.cmdline)
-      if #matches > 0 then
-        V.cmd_cycle = ((V.cmd_cycle or 0) % #matches) + 1
-        local m = matches[V.cmd_cycle]
-        V.cmdline = m[1] .. (m[2] ~= '' and ' ' or '')
+    elseif c == TAB then   -- 17 ноя: Tab — выбранное (первое) в строку: команда с пробелом под аргумент, история — целиком
+      local list = V.cands(typed_now)
+      local it = list[V.csel or V.cand_step(list, nil, 1) or 0]
+      if it and not it.head then
+        if it.kind == 'cmd' or it.kind == 'fill' then V.cmdline = it.fill
+        elseif it.kind == 'hist' or it.kind == 'line' then V.cmdline = it.line or V.cmdline end
+        V.csel = nil
       end
-    elseif c == BS then V.cmdline = TX.bs(V.cmdline); V.cmd_cycle = nil; V.cmd_base = nil
+    elseif c == BS then V.cmdline = TX.bs(V.cmdline); V.cmd_cycle = nil; V.cmd_base = nil; V.csel = nil
     elseif c == 47 and ctx.name_suggest and ctx.name_suggest(V.cmdline or '') then V.cmd_cycle = nil   -- «/» в имени — подсказки
-    elseif TX.char(c) then V.cmdline = (V.cmdline or '') .. TX.char(c); V.cmd_cycle = nil; V.cmd_base = nil end   -- 20 окт: и кириллица
+    elseif TX.char(c) then V.cmdline = (V.cmdline or '') .. TX.char(c); V.cmd_cycle = nil; V.cmd_base = nil; V.csel = nil end   -- 20 окт: и кириллица
     return
   end
 
@@ -4699,32 +4842,14 @@ function V.popup()
       lines[#lines + 1] = { key = '  all', text = 'type to search every command (Up / Down walk the matches), Tab completes, :! - REAPER actions', col = GRY }
       return { title = 'commands', lines = lines, kind = 'cmd', full = true, hl = hl }
     end
-    for i, c in ipairs(matches) do
-      if i > 14 then break end
-      lines[#lines + 1] = { key = c[1] .. (c[2] ~= '' and (' ' .. c[2]) or ''), text = c[3] }
+    -- 17 ноя: как Ivy — всё, что подходит (команды, история, клавиши, действия REAPER), группами; выбор — подсветкой
+    local list, argmode = V.cands(typed)
+    local sel = not argmode and (V.csel or V.cand_step(list, nil, 1)) or nil
+    for _, it in ipairs(list) do
+      if it.head then lines[#lines + 1] = { key = it.key, text = it.text, col = AMB }
+      else lines[#lines + 1] = { key = '  ' .. it.key, text = it.text } end
     end
-    do   -- история, что начинается с набранного
-      local seen, nr = {}, 0
-      for i = #hist, 1, -1 do
-        local l = hist[i]
-        if not seen[l] and l:sub(1, #typed) == typed and l ~= typed then
-          seen[l] = true; nr = nr + 1
-          if nr == 1 then lines[#lines + 1] = { key = 'recent', text = '', col = GRY } end
-          lines[#lines + 1] = { key = ':' .. l, text = '', col = GRY }
-          if nr >= 5 then break end
-        end
-      end
-    end
-    -- 14 ноя: клавиши — тем же списком (одно место поиска: команды, история, клавиши): слова запроса в клавише / описании
-    do
-      local ks = ctx.keys_search and ctx.keys_search(typed, 8) or {}
-      if #ks > 0 then lines[#lines + 1] = { key = 'keys', text = 'press them in the module (shown here to find; Enter runs commands only)', col = GRY } end
-      for _, e in ipairs(ks) do lines[#lines + 1] = { key = e.k, text = e.d .. '  [' .. e.page .. ']', col = GRY } end
-    end
-    -- 13 окт: совпадений нет — строкой (иначе окно сжималось до «:i» и казалось, что набор сбросился)
-    if #lines == 0 then lines[1] = { key = ' ', text = 'no such command - Backspace, or :! for REAPER actions', col = { 0.6, 0.6, 0.6 } } end
-    -- 15 окт: набранное — в поле над списком, не заголовком
-    return { title = 'commands - Tab completes', lines = lines, kind = 'cmd', hl = #matches > 0 and V.cmd_cycle or nil, full = true }
+    return { title = argmode and 'Enter runs the line' or 'Up / Down pick, Enter run, Tab into the line', lines = lines, kind = 'cmd', hl = sel, full = true }
   elseif V.mode == 'search' then
     return { title = '/' .. (V.searchline or ''), lines = { { key = 'Enter', text = 'find next' }, { key = 'n / N', text = 'next / previous' }, { key = '*', text = 'search name under cursor' } }, kind = 'search' }
   end
