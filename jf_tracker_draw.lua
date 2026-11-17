@@ -6032,8 +6032,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if d then
           local lab = d[1]
           if id == 'tp_play' then lab = lab:gsub('%s', '') end
+          if id == 'loop' then lab = 'lp' end   -- 17 ноя: «oo» битмапа слишком жирный для одного знака
           local w = ms(lab)
-          D.tp2_list[#D.tp2_list + 1] = { id = id, lab = lab, col = d[2], dx = sx, w = w, key = KEYS[id] }
+          local wk = D.hints_on and KEYS[id] and ms(KEYS[id]) or 0   -- подсказка шире кнопки — кнопка шире (не налезают)
+          D.tp2_list[#D.tp2_list + 1] = { id = id, lab = lab, col = d[2], dx = sx + math.floor((math.max(w, wk) - w) / 2), w = w, key = KEYS[id] }
+          w = math.max(w, wk)
           sx = sx + w + L.cw
         end
       end
