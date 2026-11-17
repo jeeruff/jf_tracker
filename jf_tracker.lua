@@ -40637,7 +40637,7 @@ ctx.lib_sub_cur = function() return draw.LIBSUB end
 -- 17 ноя: lib — пэды drumrs5k подпапкой: ctx.lib_kit = { inst, guid, fx, sel }; кит — строка instruments под курсором
 ctx.lib_kit_cur = function()
   for _, r in ipairs((L and L.pool_rows) or {}) do
-    if r.instfx and r.num == vim.inst then
+    if r.instfx and r.num and ctx.pool_num(r.num) == vim.inst then   -- 17 ноя: номер на экране → место в пуле
       local c = r.col or cur_col()
       for _, f in ipairs(c and c.fx or {}) do if f.i == r.instfx and f.kit and f.kids then return c, f end end
       return nil

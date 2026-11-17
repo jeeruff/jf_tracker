@@ -7501,6 +7501,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local SW, ix0 = 0, ix
   local col = info.pool_col
   local pool = col and col.pool or {}
+  -- 17 ноя: vim.inst — МЕСТО В ПУЛЕ (с детьми-слайсами), номер на экране (row.num) — без них; плагин выбран, когда
+  -- row.num + HID == inst (было row.num == inst — горели два: плагин 11 и сэмпл, чей слайс-ребёнок на 11-м месте)
+  local HID = 0
+  for _, e in ipairs(pool) do if e.parent then HID = HID + 1 end end
   local inst = info.inst or 1
   local cur = pool[inst]
   local nroots = 0
@@ -7647,10 +7651,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         o.kitkey = (kc.guid or '') .. ':' .. kf.i
         if D.LIBK and D.LIBK[o.kitkey] then
           for k, kid in ipairs(kf.kids) do
-            rows[#rows + 1] = { pad = kid, padk = k, kitkey = o.kitkey, kitnum = o.num }
+            rows[#rows + 1] = { pad = kid, padk = k, kitkey = o.kitkey, kitnum = o.num + HID }
             if D.LIBK[o.kitkey .. ':' .. k] then
-              for sk, sl in ipairs(kid.slots or {}) do rows[#rows + 1] = { pslot = sl, sk = sk, padk = k, kitkey = o.kitkey, kitnum = o.num } end
-              if #(kid.slots or {}) == 0 then rows[#rows + 1] = { pslot = false, sk = 0, padk = k, kitkey = o.kitkey, kitnum = o.num } end
+              for sk, sl in ipairs(kid.slots or {}) do rows[#rows + 1] = { pslot = sl, sk = sk, padk = k, kitkey = o.kitkey, kitnum = o.num + HID } end
+              if #(kid.slots or {}) == 0 then rows[#rows + 1] = { pslot = false, sk = 0, padk = k, kitkey = o.kitkey, kitnum = o.num + HID } end
             end
           end
         end
@@ -7682,7 +7686,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- иначе разделителями с пустой строкой перед каждой
   local SECS = { instruments = true, automation = true, midi = true, phrases = true }
   local inst_is_plug = false   -- 17 ноя: выбран плагин-инструмент (по номеру) — свой плагин трека тогда не горит (было два курсора)
-  for _, row in ipairs(rows) do if row.instfx and row.num and row.num == inst then inst_is_plug = true end end
+  for _, row in ipairs(rows) do if row.instfx and row.num and row.num + HID == inst then inst_is_plug = true end end
   do
     local sec, out = 'audio', {}
     for _, row in ipairs(rows) do
@@ -7752,7 +7756,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif r.i and r.sub then s = { i = r.i, kind = r.sub, k = r.k }
     elseif r.i then s = { i = r.i }
     elseif r.empty then s = { num = r.empty }
-    elseif r.instfx and r.num then s = { num = r.num, kitkey = r.kitkey }
+    elseif r.instfx and r.num then s = { num = r.num + HID, kitkey = r.kitkey }   -- место в пуле (как vim.inst)
     elseif r.midi then s = { midi = true }
     elseif r.phr then s = { phr = r.phr } end
     if s then D.lib_nav2[#D.lib_nav2 + 1] = s end
@@ -8029,7 +8033,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif row.instfx then
       local rc = row.col or col
       local nomode = not info.auto_inst and not info.midi_inst and not info.phr_inst
-      local sel = nomode and inst_is_plug and row.num == inst and not info.lib_tsel   -- один курсор: только выбранный номер (не когда курсор на пэде / разделе)   -- 17 ноя: и выбранный по номеру (плагин другого трека)
+      local sel = nomode and inst_is_plug and row.num + HID == inst and not info.lib_tsel   -- один курсор: только выбранный номер (не когда курсор на пэде / разделе)   -- 17 ноя: и выбранный по номеру (плагин другого трека)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
       if sel then sel_drawn = r; set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
