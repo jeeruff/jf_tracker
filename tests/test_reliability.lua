@@ -137,10 +137,10 @@ do
   NOW = 0.1; eq(half({ halfplay = 2 }, 2)[3], TEXT, 'x2 on: lit')
   NOW = 0.6; eq(half({ halfplay = 0.5 }, 1)[3], nil, 'x0.5 on: dark in the second half (blinks)')
   eq(slow({})[4], nil, 'slow: no fixed bright text colour')
-  local function smart(c) for _, b in ipairs(D.transport_sub(c)) do if b[1] == 'shiftrec' then return b end end end
-  eq(smart({ shiftrec = 'rec' })[3], RED, 'shift rec recording: red')
-  eq(smart({ shiftrec = 'rec' })[2], '^O^', 'shift rec: the button is ^O^ (15 окт; was ^O, shift, smart)')
-  eq(smart({})[3], nil, 'smart off: plain')
+  -- 17 ноя: shift rec — Shift + щелчок по O; кнопки ^O^ нет, O красная, пока shift rec пишет
+  local function recb(c) for _, b in ipairs(D.transport_buttons(c)) do if b[1] == 'rec' then return b end end end
+  eq(recb({ tptext = true, shiftrec = 'rec' })[3] ~= nil, true, 'shift rec recording: O lit')
+  eq(recb({ tptext = true })[3], nil, 'rec off: O plain')
 end
 
 -- ── 4. колонка cmd мастера: маркеры по строкам ─────────────────────────────
