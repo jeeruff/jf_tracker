@@ -1484,7 +1484,7 @@ V.COMMANDS = {
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 ({ } with frow, c C with qwerty)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
-  { 'viper', '[exclusive|cursor]', 'viper - the tracker as a REAPER panel (Cmd+F10); cursor (default) - an item selected in REAPER moves the cursor to its track, every track stays; exclusive - only the tracks of the selected items' }, { 'sharp', '', 'the sharp sign in the note column: # ˆ ˚ $ * % ¨ ˙ (only the look; typing as before)' }, { 'rate', '[x]', 'the play rate: :rate 0.5; without a number - the list (also a click on x1.00 next to play)' }, { 'bpm', '[N]', 'the project tempo: :bpm 174; without a number - the list (also a click on BPM)' }, { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
+  { 'occur', 'text', 'every place in the song with this note / sample / command, as a list; Enter - go there (Emacs occur)' }, { 'describe', '', 'describe a key: the next key is not run - what it does here and on other pages (also g?)' }, { 'winner', '[u|r]', 'undo / redo the pane layout (Emacs winner-mode; in PANE mode u U)' }, { 'viper', '[exclusive|cursor]', 'viper - the tracker as a REAPER panel (Cmd+F10); cursor (default) - an item selected in REAPER moves the cursor to its track, every track stays; exclusive - only the tracks of the selected items' }, { 'sharp', '', 'the sharp sign in the note column: # ˆ ˚ $ * % ¨ ˙ (only the look; typing as before)' }, { 'rate', '[x]', 'the play rate: :rate 0.5; without a number - the list (also a click on x1.00 next to play)' }, { 'bpm', '[N]', 'the project tempo: :bpm 174; without a number - the list (also a click on BPM)' }, { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
   { 'ramp', 'xx [len]', 'envelope ramp to xx (hex) over len rows / Nb beats; VISUAL: selection' },
   { 'fade', 'in|out [len]', 'fade of audio event over len rows / Nb beats' },
 }
@@ -1740,6 +1740,9 @@ local function run_cmd(line)
   elseif cmd == 'smk' then if ctx.smk_transients then ctx.smk_transients() end   -- 10 ноя
   elseif cmd == 'log' then if ctx.log_show then ctx.log_show() end   -- 10 ноя: что происходило
   elseif cmd == 'dedup' then if ctx.dedup then ctx.dedup() end   -- 14 ноя
+  elseif cmd == 'occur' then V.occur(arg)   -- 17 ноя: Emacs occur
+  elseif cmd == 'describe' then if ctx.describe_arm then ctx.describe_arm() end   -- 17 ноя: Emacs describe-key
+  elseif cmd == 'winner' then if ctx.winner then ctx.winner((arg or ''):match('^r') and 1 or -1) end   -- 17 ноя: Emacs winner-mode
   elseif cmd == 'sharp' then if ctx.sharp_menu then ctx.sharp_menu() end   -- 17 ноя: знак диеза
   elseif cmd == 'rate' then   -- 17 ноя: :rate — список скоростей, :rate 0.5 — сразу
     if tonumber(arg) then reaper.CSurf_OnPlayRateChange(math.max(0.25, math.min(4, tonumber(arg)))); V.msg = ('playrate x%.2f'):format(tonumber(arg)) elseif ctx.tp_do then ctx.tp_do('rate') end
@@ -2520,6 +2523,37 @@ function V.key_impl(c)
     -- пустая строка — ↑ ↓ история; Ctrl+P / N — всегда история
     -- 17 ноя: набрано — ↑ ↓ / Ctrl+N P / Ctrl+J K двигают выбор по списку (строка не меняется), как в Ivy
     local typed_now = ((V.cmdline or ''):gsub('^:', ''))
+    -- 17 ноя: Ctrl+O на выбранной подсказке — меню других действий с ней (Emacs embark): выполнить, под курсором, в строку, справка
+    if typed_now ~= '' and not V.prompt and c == 15 then
+      local list, argmode = V.cands(typed_now)
+      local it = not argmode and list[V.csel or V.cand_step(list, nil, 1) or 0]
+      if not it or it.head then V.msg = 'Ctrl+O: pick a line first (Up / Down)'; return end
+      local function run_line(l) V.cmdline = l; V.cand_cache = nil; V.enter_raw = true; local ok, e = pcall(V.key, ENTER); V.enter_raw = nil; if not ok then V.msg = tostring(e) end end
+      local items = {}
+      local function add(k, label, fn) items[#items + 1] = { key = k, label = label, fn = fn } end
+      if it.kind == 'cmd' or it.kind == 'fill' then
+        add('r', 'run :' .. it.cmd, function() run_line(it.cmd) end)
+        add('.', 'run at the cursor only (:.' .. it.cmd .. ')', function() run_line('.' .. it.cmd) end)
+        add('i', 'into the line (add an argument)', function() V.mode = 'cmd'; V.cmdline = it.fill; V.cand_cache = nil end)
+        add('h', 'what it does', function() V.mode = back; V.cmdline = nil; V.msg = ':' .. it.cmd .. ' - ' .. (it.text or '') end)
+      elseif it.kind == 'hist' or it.kind == 'line' then
+        add('r', 'run it again', function() run_line(it.line) end)
+        add('e', 'edit it in the line', function() V.mode = 'cmd'; V.cmdline = it.line; V.cand_cache = nil end)
+        add('x', 'remove from the history', function()
+          for i = #V.hist, 1, -1 do if V.hist[i] == it.line then table.remove(V.hist, i) end end
+          if ctx.cmd_hist_save then ctx.cmd_hist_save(V.hist) end
+          V.cand_cache = nil; V.mode = 'cmd'; V.msg = 'removed from the history'
+        end)
+      elseif it.kind == 'keys' or it.kind == 'keyinfo' then
+        if it.kind == 'keys' then add('p', 'press ' .. it.keys, function() V.mode = back; V.cmdline = nil; for ch in it.keys:gmatch('.') do V.key(ch:byte()) end end) end
+        add('h', 'what it does', function() V.mode = back; V.cmdline = nil; V.msg = it.keys .. ' - ' .. (it.text or '') end)
+      elseif it.kind == 'act' then
+        add('r', 'run the REAPER action', function() V.mode = back; V.cmdline = nil; if ctx.act_run_name then ctx.act_run_name(it.act) end end)
+      end
+      if #items == 0 then return end
+      V.open_hydra({ title = 'act on: ' .. (it.key or ''), items = items })
+      return
+    end
     if typed_now ~= '' and not V.prompt and (c == UP or c == DOWN or c == 14 or c == 16 or c == 10 or c == 11) then
       local list = V.cands(typed_now)
       local d = (c == UP or c == 16 or c == 11) and -1 or 1
@@ -3520,6 +3554,7 @@ function V.key_impl(c)
         return
       end
       if c == 32 and not V.op then V.close_gap(); V.count = nil; finish_move(); return end   -- 17 ноя: g Space — сомкнуть пустоту
+      if c == ('?'):byte() and not V.op then if ctx.describe_arm then ctx.describe_arm() end; V.count = nil; finish_move(); return end   -- 17 ноя: g? — что делает клавиша
       if c == ('e'):byte() and not V.op then   -- 14 ноя: ge — конец предыдущего события (как в Vim; 3ge — третьего выше)
         local r = event_prev_last(V.cur.fi, V.cur.row, V.count or 1)
         if r and r ~= V.cur.row then V.cur.row = r; if V.ensure_visible then V.ensure_visible() end else V.msg = 'ge: no event above in this column' end
@@ -4492,6 +4527,29 @@ local function head_matches(h, q)
   return false
 end
 
+-- 17 ноя: :occur текст — все места в песне, где он есть (нота C-4, имя сэмпла, команда 0S06), списком; Enter — туда (Emacs occur)
+function V.occur(q)
+  q = (q or ''):match('^%s*(.-)%s*$')
+  if q == '' then V.msg = ':occur text - every place with it (a note C-4, a sample name, a command 0S06)'; return end
+  local items = {}
+  for fi, f in ipairs(flat()) do
+    if not f.env and not f.ml then
+      for _, sub in ipairs(subs_of(f)) do
+        for r, c in pairs(sub) do
+          if type(r) == 'number' and is_head(c) and head_matches(c, q) then
+            items[#items + 1] = { label = ('%04d  %-10s %s  %s'):format(r, (f.col and f.col.name or ''):sub(1, 10), c.note or '', c.name or ''), data = { fi = fi, row = r }, ord = r * 1000 + fi }
+          end
+        end
+      end
+    end
+  end
+  table.sort(items, function(a, b) return a.ord < b.ord end)
+  if #items == 0 then V.msg = 'occur: nothing with ' .. q; return end
+  V.open_picker(('occur %s - %d place(s), Enter - go there'):format(q, #items), items, function(it)
+    V.cur.fi, V.cur.row, V.cur.field = it.data.fi, it.data.row, 1
+    if V.ensure_visible then V.ensure_visible() end
+  end)
+end
 function V.find_next(dir)
   local q = V.search
   if not q or q == '' then V.msg = 'no search'; return false end

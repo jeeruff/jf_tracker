@@ -6499,6 +6499,7 @@ ctx = {
       ctx.pn_undo = ctx.pn_undo or {}
       table.insert(ctx.pn_undo, before)
       if #ctx.pn_undo > 20 then table.remove(ctx.pn_undo, 1) end
+      ctx.pn_redo = {}   -- 17 ноя: новое изменение — вперёд больше некуда (winner)
       relayout()
       if msg then vim.msg = msg end
       return true
@@ -6616,9 +6617,8 @@ ctx = {
       ctx.pn_preset = PN.next_preset(ctx.pn_preset or 'main-left')
       local nm = PN.preset(ctx.pn_preset, m)
       ctx.pane_do(function() state.panes = nm; return true end, 'layout: ' .. ctx.pn_preset)
-    elseif ch == 'u' then
-      local u = ctx.pn_undo and table.remove(ctx.pn_undo)
-      if u then local v = m.v; state.panes = PN.decode(u); state.panes.v = v + 1; relayout(); vim.msg = 'pane: undo' end
+    elseif ch == 'u' then ctx.winner(-1)   -- 17 ноя: и вперёд — U (winner)
+    elseif ch == 'U' then ctx.winner(1)
     end
   end,
   -- аранжировки (9 окт): \ P a, :arr, < имя > в матрице. what: new [имя] |
@@ -16670,6 +16670,53 @@ ctx.env_show_next = function(col)
 end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
+-- 17 ноя: g? / :describe — следующая клавиша не выполняется: что она делает (справка: страница модуля в фокусе — первой)
+ctx.describe_arm = function() ctx.describe_next = true; vim.msg = 'describe: press a key (it is not run)' end
+ctx.describe_key = function(c)
+  ctx.describe_next = nil
+  local m = ctx.mods()
+  local NAMES = { [13] = 'Enter', [27] = 'Esc', [9] = 'Tab', [32] = 'Space', [8] = 'Backspace',
+    [1818584692] = 'Left', [1919379572] = 'Right', [30064] = 'Up', [1685026670] = 'Down' }
+  for i = 1, 12 do NAMES[26160 + i] = 'F' .. i end
+  local base = NAMES[c] or (c < 256 and string.char(c)) or keys.label and keys.label(c) or tostring(c)
+  local pre = (m.cmd and 'Cmd+' or '') .. (m.ctrl and 'Ctrl+' or '') .. (m.alt and 'Opt+' or '') .. ((m.shift and #base > 1) and 'Shift+' or '')
+  local name = pre .. base
+  local first = ctx.help_page and ctx.help_page() or nil
+  local order = {}
+  if first and KH.PAGES[first] then order[1] = first end
+  local rest = {}
+  for pg in pairs(KH.PAGES) do if pg ~= first then rest[#rest + 1] = pg end end
+  table.sort(rest)
+  for _, pg in ipairs(rest) do order[#order + 1] = pg end
+  local items, lname = {}, name:lower()
+  for _, pg in ipairs(order) do
+    for _, e in ipairs(KH.PAGES[pg].e or {}) do
+      local hit = false
+      for tok in (e.k or ''):gmatch('[^%s,/]+') do
+        local t = tok:lower()
+        if t == lname or (#name == 1 and tok:sub(1, 1) == name and #tok <= 3) then hit = true; break end
+      end
+      if hit then items[#items + 1] = { label = ('[%s] %s - %s'):format(pg, e.k, (e.d or ''):gsub('%s+', ' ')), data = pg } end
+      if #items >= 40 then break end
+    end
+  end
+  if #items == 0 then vim.msg = 'describe ' .. name .. ': nothing in the help (a free key?)'; return end
+  vim.open_picker(('%s - %d place(s); the page of this module first'):format(name, #items), items, function() end)
+end
+-- 17 ноя: winner (Emacs winner-mode) — отмена / возврат раскладки панелей: :winner u / r, в PANE u / U
+ctx.winner = function(d)
+  local PN = draw.panes
+  if not (state.panes and PN) then return end
+  ctx.pn_undo, ctx.pn_redo = ctx.pn_undo or {}, ctx.pn_redo or {}
+  local from, to = d < 0 and ctx.pn_undo or ctx.pn_redo, d < 0 and ctx.pn_redo or ctx.pn_undo
+  local u = table.remove(from)
+  if not u then vim.msg = d < 0 and 'winner: nothing to undo' or 'winner: nothing to redo'; return end
+  table.insert(to, PN.encode(state.panes))
+  local v = state.panes.v or 0
+  state.panes = PN.decode(u); state.panes.v = v + 1
+  relayout()
+  vim.msg = d < 0 and 'layout: back (:winner r - forward)' or 'layout: forward'
+end
 -- 17 ноя: :.bpm N — смена темпа на строке курсора (как Opt+Enter в поле BPM)
 ctx.tempo_here = function(v)
   v = math.max(20, math.min(400, v))
@@ -32692,6 +32739,7 @@ local function frame()
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end else ctx.bf_key(c) end
     c = 0
   end
+  if ctx.describe_next and c > 0 and c ~= 27 then ctx.describe_key(c); c = 0 elseif ctx.describe_next and c == 27 then ctx.describe_next = nil; vim.msg = ''; c = 0 end   -- 17 ноя: g? — следующая клавиша не выполняется
   if ctx.IS and c > 0 and not HN.active and ctx.is_key(c) then c = 0 end   -- 6 ноя: режим ITEMS
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
   -- 17 ноя: [ ] — ТОЛЬКО октава клавиатуры, глобально, в любом модуле (свои [ ] модулей сняты: «все только для октавы»);

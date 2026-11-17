@@ -1280,5 +1280,11 @@ do
   local _, am = V.cands('.bpm 140'); eq(':.bpm 140 - runs as typed', am, true)
   local _, am2 = V.cands('='); eq(':= - runs as typed', am2, true)
 end
+-- 17 ноя: :occur — список мест; пусто — сообщение
+do
+  reset()
+  V.occur('zzzz-nothing'); eq('occur: nothing found - message', (V.msg or ''):match('^occur: nothing') ~= nil, true)
+  local _, am = V.cands('occur C-4'); eq(':occur C-4 runs as typed', am, true)
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)
