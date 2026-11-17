@@ -1409,11 +1409,17 @@ local FLAT_TONIC = { [5] = true, [10] = true, [3] = true, [8] = true, [1] = true
 local MODE_OFF = { major = 0, minor = 9, harmmin = 9, melmin = 9, dorian = 2, phrygian = 4, lydian = 5, mixo = 7, locrian = 11, phrygdom = 4, majpent = 0, minpent = 9, blues = 9 }
 -- 17 ноя: lib — всегда вкладками (жёстко): audio, instruments, midi, phrases (automation — только с D.LIB_AUTO)
 function D.lib_tab_list() return D.LIB_AUTO and { 'audio', 'instruments', 'automation', 'midi', 'phrases' } or { 'audio', 'instruments', 'midi', 'phrases' } end
+-- 17 ноя (ревизия): ответ держится 0,5 с — D.spell зовёт это на каждую ноту с диезом каждый кадр, а лад читается из
+-- ProjExtState (вызов API): было до сотен вызовов API за кадр
+local flats_c = { t = -1, v = false, g = nil }
 function D.flats()
+  local now = os.clock()
+  if flats_c.g == D.key_get and now - flats_c.t < 0.5 and now >= flats_c.t then return flats_c.v end
   local r, id = nil, nil
   if D.key_get then r, id = D.key_get() end
-  if not r then return false end
-  return FLAT_TONIC[(r - (MODE_OFF[id] or 0)) % 12] or false
+  flats_c.t, flats_c.g = now, D.key_get
+  flats_c.v = r and (FLAT_TONIC[(r - (MODE_OFF[id] or 0)) % 12] or false) or false
+  return flats_c.v
 end
 function D.spell(s)
   -- 17 ноя (2): бемоли — только когда лад проекта задан (:key / клик по ладу в транспорте) и он бемольный; иначе диез

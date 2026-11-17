@@ -42,7 +42,7 @@ function G.get(key, reader, len, sr, cols, rows, vert)
   if vert then img = VIMG0 + next_vimg; next_vimg = (next_vimg + 1) % VIMGN
   else img = IMG0 + next_img; next_img = (next_img + 1) % IMGN end
   -- картинку с тем же номером держало другое задание — оно уходит
-  for k, o in pairs(G.jobs) do if o.img == img then G.jobs[k] = nil end end
+  for k, o in pairs(G.jobs) do if o.img == img then if o.free then pcall(o.free) end; G.jobs[k] = nil end end
   j = { key = key, reader = reader, len = math.max(1e-3, len), sr = sr or 44100, cols = cols, rows = rows, col = 0, img = img, done = false, vert = vert }
   -- строка → диапазон бинов (лог-частота 30 Гц .. Найквист)
   j.bins = {}
@@ -121,7 +121,7 @@ function G.take_reader(take)
     local rv = R.GetAudioAccessorSamples(acc, sr, 1, st + math.max(0, t), n, a)
     if not rv or rv < 0 then return nil end
     return a.table()
-  end, sr, (R.GetAudioAccessorEndTime(acc) - st)
+  end, sr, (R.GetAudioAccessorEndTime(acc) - st), function() if acc then R.DestroyAudioAccessor(acc); acc = nil end end
 end
 
 -- WAV-файл (PCM 16 / 24 / 32, float 32): моно — первый канал

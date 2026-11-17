@@ -127,10 +127,12 @@ local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
 -- 17 ноя: спектрограмма вида трека (zT g): задание на ИСТОЧНИК (WAV — по файлу: все item этого файла делят одну
 -- картинку, item берёт свой кусок по offs / rate), не WAV — по take (аудио-аксессор, время item); время — до 2048 строк
+ctx.sg_path = setmetatable({}, { __mode = 'k' })   -- 17 ноя (ревизия): источник → путь (звалось на каждую строку каждого кадра)
 draw.sgram_job = function(head)
   local src = head and head.src
   if not src then return nil end
-  local path = reaper.GetMediaSourceFileName(src, '')
+  local path = ctx.sg_path[src]
+  if path == nil then path = reaper.GetMediaSourceFileName(src, '') or ''; ctx.sg_path[src] = path end
   if path and path:lower():match('%.wav$') then
     local key = 'v:f:' .. path
     local j = SL.sg.jobs[key]
@@ -145,10 +147,12 @@ draw.sgram_job = function(head)
   local key = 'v:t:' .. tostring(head.guid) .. ('%.4f'):format(head.len or 0)
   local j = SL.sg.jobs[key]
   if j then return j end
-  local rd, sr, len = SL.sg.take_reader(head.take)
+  local rd, sr, len, free = SL.sg.take_reader(head.take)
   if not rd then return nil end
   len = head.len or len or 1
-  return SL.sg.get(key, rd, len, sr, math.max(16, math.min(2048, math.floor(len * 40))), 96, true)
+  j = SL.sg.get(key, rd, len, sr, math.max(16, math.min(2048, math.floor(len * 40))), 96, true)
+  j.free = free   -- 17 ноя (ревизия): аксессор закрывается, когда задание вытеснено (копились)
+  return j
 end
 edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
@@ -23160,6 +23164,7 @@ ctx.key_hydra = function()
 end
 ctx.key_set = function(root, id)
   reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
+  draw.key_get = function() return ctx.key_get() end   -- новая функция — кэш D.flats сброшен сразу
   ctx.key_t = nil
   if root and MMX.HM then MMX.HM.root = root; MMX.HM.minor = (id == 'minor' or id == 'harmmin' or id == 'melmin' or id == 'dorian' or id == 'phrygian' or id == 'locrian') end
 end
