@@ -1402,7 +1402,8 @@ function D.flats()
   return FLAT_TONIC[H.minor and ((H.root or 0) + 3) % 12 or (H.root or 0)] or false
 end
 function D.spell(s)
-  if type(s) ~= 'string' or s:sub(2, 2) ~= '#' or not D.flats() then return s end
+  -- 17 ноя (2): бемоли по ладу сняты — в колонке всегда диез («это ж просто полутон»); D.FLATS_BY_KEY = true — вернуть
+  if not D.FLATS_BY_KEY or type(s) ~= 'string' or s:sub(2, 2) ~= '#' or not D.flats() then return s end
   local f = SH2FL[s:sub(1, 1)]
   return f and (f .. s:sub(3)) or s
 end
@@ -7799,6 +7800,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local drag = D.lib_drag and D.lib_drag.active
   D.lib_drop = nil
   local drop_y
+  local sel_drawn = false   -- 17 ноя: строка-курсор нарисована (иначе — запасной курсор ниже)
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
     local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
@@ -7826,7 +7828,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif row.auto then
       local sel = info.auto_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       text(ix + 6, y + 1, fit(('%02d    automation'):format(row.num or 0) .. (info.auto_n and (' /' .. info.auto_n) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, auto = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'auto')
@@ -7839,7 +7841,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     elseif row.midi then
       local sel = info.midi_inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       text(ix + 6, y + 1, fit(('%02d    midi clips'):format(row.num or 0) .. (info.midi_n and (' /' .. info.midi_n .. ' ' .. (info.midi_scope or '')) or ''), w - 12), sel and U.AMBER or U.GREY)
       if hot then hover.pool = { ci = info.pool_ci, midi = true } end
       hint('pool', ix + 2, y, w - 4, L.rh, 'midi')
@@ -7847,7 +7849,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- 11 ноя: фраза — номер, имя, длина в четвертях, сколько раз стоит в песне
       local sel = info.phr_inst == row.phr
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local tail = ('%.1fq %dx'):format(row.lenq or 0, row.uses or 0)
       text(ix + 6, y + 1, fit(('%02d    %s'):format(row.num or 0, row.phr), w - 18 - ms(tail)), sel and U.AMBER or U.TEXT)
       text(ix + w - 6 - ms(tail), y + 1, tail, U.GREY)
@@ -7863,9 +7865,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       if hot then hover.pool = { ci = info.pool_ci, slxk = row.slxk, slxnote = row.slxnote } end
     elseif row.instfx then
       local rc = row.col or col
-      local sel = info.inst_fx and info.inst_fx(rc) == row.instfx and not row.col
+      local sel = (info.inst_fx and info.inst_fx(rc) == row.instfx and not row.col) or (row.num ~= nil and row.num == inst and not info.auto_inst and not info.midi_inst and not info.phr_inst)   -- 17 ноя: и выбранный по номеру (плагин другого трека)
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if sel then set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      if sel then sel_drawn = r; set(U.tint(U.CYAN, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       local kd = row.kind or 'fx'
       if kd == 'kit' then kd = '#' end                   -- 16 окт: # — drumrs5k / кит RS5K
@@ -7912,7 +7914,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       -- пустой слот: номер и «..»; выбранный — подсветка, бросок сюда — в библиотеку трека
       local sel = row.empty == inst
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif hot and info.dragging then set(U.tint(U.CYAN, 0.25)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       text(ix + 6, y + 1, ('%02d    ..'):format(row.num or row.empty), sel and U.AMBER or U.DIM)
       if hot then hover.pool = { ci = info.pool_ci, i = row.empty, empty = true } end
@@ -7927,7 +7929,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local inr = rr and i >= rr[1] and i <= rr[2] and not sel
       local here = col and e.track_set and e.track_set[col.name]
       local lib = e.depot and not (e.tracks and e.tracks[1])
-      if sel then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+      if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
       elseif inr then set(U.tint(U.CYAN, 0.22)); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
       if D.lib_layer_t == i then set(U.CYAN); gfx.rect(ix + 1, y, w - 2, L.rh, 0) end   -- 19 окт: сюда — слоем
       set(rgb); gfx.rect(ix + 2, y + 1, 2, L.rh - 2, 1)
@@ -8062,6 +8064,17 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
   end
   if drop_y then set(U.AMBER); gfx.rect(ix + 2, drop_y - 1, w - 4, 2, 1) end
+  -- 17 ноя: курсор lib не пропадает (жалоба третий раз): выбранного в списке нет (инструмент другого трека, трек без
+  -- инструмента, пустой выбор) — рамка на последней строке-курсоре (или на той, куда указывает выбор)
+  if sel_drawn then D.lib_cursor_r = sel_drawn
+  elseif #rows > 0 then
+    local r = D.lib_cursor_r or sel_r
+    if not rows[r] or rows[r].hdr or rows[r].gap then r = sel_r end
+    if r > D.pool_scroll and r <= D.pool_scroll + nvis then
+      local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
+      set(U.AMBER); gfx.rect(ix + 1, y, w - 2, L.rh, 0)
+    end
+  end
   D.vbar('lib', ix + w - 4, iy + 2 + 2 * L.rh + LEG + TBH, 3, nvis * L.rh, D.pool_scroll, nvis, #rows)
   if LEG > 0 then
     set(U.PANEL); gfx.rect(ix + 1, iy + 2 + 2 * L.rh, w - 2, LEG, 1)
