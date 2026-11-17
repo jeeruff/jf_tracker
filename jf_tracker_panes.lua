@@ -462,7 +462,10 @@ function PN.focus_dir(lay, id, dir)
         ov = math.min(c.x + c.w, o.x + o.w) - math.max(c.x, o.x)
         gap = dir == 'u' and (c.y - (o.y + o.h)) or (o.y - (c.y + c.h))
       end
-      if ov > 0 and gap >= -2 then
+      -- 17 ноя: пустой лист (микшер без полосок — пара пикселей между трекером и DSP) — пропускается: Cmd+J уводил
+      -- фокус в него (это трекер с флагом микшера), и hjkl оставались у трекера
+      local thin = (dir == 'u' or dir == 'd') and o.h < 16 or ((dir == 'l' or dir == 'r') and o.w < 16)
+      if ov > 0 and gap >= -2 and not thin then
         gap = math.max(0, gap)
         if gap < bgap - 8 or (gap <= bgap + 8 and ov > bo) then best, bgap, bo = o, math.min(gap, bgap), ov end
       end
