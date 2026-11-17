@@ -7700,6 +7700,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     rows = out
   end
+  -- 17 ноя: подпапка, как в lf — внутри звука (l): список — только его слои и слайсы, путь «lib › audio › имя»
+  if info.libtabs and info.lib_dir and pool[info.lib_dir] then
+    local e, out = pool[info.lib_dir], {}
+    for lk = 1, #(e.layers or {}) do out[#out + 1] = { sub = 'y', i = info.lib_dir, k = lk, sec = 'audio' } end
+    for sk = 1, #(e.slices or {}) do out[#out + 1] = { sub = 's', i = info.lib_dir, k = sk, sec = 'audio' } end
+    rows = out
+  end
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
@@ -7829,7 +7836,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     if not info.lib_seccol then
       local nm = info.libtab or 'audio'
       local nn = D.lib_sec_n and D.lib_sec_n[nm]
-      text(tx, ty + 1, '› ' .. (GL[nm] or '') .. ' ' .. nm .. (nn and ('  ' .. nn) or ''), U.AMBER)
+      local dir = info.lib_dir and pool[info.lib_dir]
+      local p = '› ' .. (GL[nm] or '') .. ' ' .. nm .. (dir and (' › ' .. (dir.name or '?')) or (nn and ('  ' .. nn) or ''))
+      text(tx, ty + 1, fit(p, ix + w - L.pad - ms('h - up ') - tx), U.AMBER)
       text(ix + w - L.pad - ms('h - up'), ty + 1, 'h - up', U.DIM)
     else text(ix + w - L.pad - ms('l - into'), ty + 1, 'l - into', U.DIM) end
     set(U.LINE); gfx.rect(ix + 2, ty + L.rh, w - 4, 1, 1)

@@ -162,6 +162,7 @@ function IK.key(c, cur, n, nslots, ninst)
   if (ch == 'j' or c == DOWN) and cur >= nslots and ctx.auto_select then ctx.auto_select()
   elseif (ch == 'j' or c == DOWN) and nav_step(cur, 1) == true then   -- 27 окт: по строкам экрана, с именами папок
   elseif (ch == 'k' or c == UP) and nav_step(cur, -1) == true then
+  elseif (ch == 'j' or c == DOWN or ch == 'k' or c == UP) and ctx.lib_dir_on and ctx.lib_dir_on() then   -- 17 ноя: в подпапке — не выходить за её края
   elseif ch == 'j' or c == DOWN then   -- 27 окт: свёрнутые папки — мимо
     local i = cur + 1
     while i < nslots and ctx.lib_hidden and ctx.lib_hidden(i) do i = i + 1 end

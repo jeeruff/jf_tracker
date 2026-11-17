@@ -26646,7 +26646,7 @@ local function frame()
     },
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
-    libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol,
+    libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol, lib_dir = (ctx.lib_dir and ctx.lib_dir == vim.inst) and ctx.lib_dir or nil,   -- 17 ноя: подпапка lib
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
@@ -33896,7 +33896,7 @@ local function frame()
             elseif c == 27 then ctx.lib_seccol = nil; ctx.set_focus('tracker'); return
             elseif ch == 'h' or c == LF then return end
           elseif (ch == 'h' or c == LF) and not (ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(vim.inst)))
-             and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur())
+             and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur()) and not (ctx.lib_dir and ctx.lib_dir == vim.inst)
              and not (function() local cc = cur_col(); local e = cc and cc.pool and cc.pool[vim.inst or 0]; return e and draw.LIBO and draw.LIBO[e.gkey or ''] end)() then   -- открытая папка слайсов / слоёв — h её сворачивает
             ctx.lib_seccol = true; vim.msg = 'lib: j k - a section, l / Enter - into it'; return
           end
@@ -40597,6 +40597,7 @@ ctx.lib_kids = function(e)
   return t
 end
 ctx.lib_sub_cur = function() return draw.LIBSUB end
+ctx.lib_dir_on = function() return ctx.lib_dir ~= nil and ctx.lib_dir == vim.inst end   -- 17 ноя: внутри подпапки lib
 ctx.lib_sub_go = function(i, kid)
   draw.LIBSUB = kid and { i = i, kind = kid.kind, k = kid.k } or nil
   if not kid then return end
@@ -40625,7 +40626,7 @@ ctx.lib_tree_key = function(c)
     if (ch == 'j' or c == keys.down or ch == 'k' or c == keys.up) and draw.lib_nav then return false end
     if ch == 'j' or c == keys.down then if kids[at + 1] then ctx.lib_sub_go(vim.inst, kids[at + 1]) end; return true end
     if ch == 'k' or c == keys.up then if at > 1 then ctx.lib_sub_go(vim.inst, kids[at - 1]) else draw.LIBSUB = nil end; return true end
-    if ch == 'h' or c == keys.left or c == 27 then draw.LIBSUB = nil; vim.msg = (e and e.name or '') .. ' (h - close the folder)'; return true end
+    if ch == 'h' or c == keys.left or c == 27 then draw.LIBSUB = nil; ctx.lib_dir = nil; vim.msg = (e and e.name or '') .. '  (h - up to the sections)'; return true end   -- 17 ноя: из подпапки — вверх
     if cs.kind == 'y' then
       local l = e.layers and e.layers[cs.k]
       if ch == ' ' then ctx.layer_listen(l); return true end
@@ -40650,10 +40651,13 @@ ctx.lib_tree_key = function(c)
   if lfo and (ch == 'h' or c == keys.left) and not draw.LIBO[e.gkey or ''] and not ctx.lib_hidden(vim.inst) then ctx.lib_fold(lfo, true); return true end
   if ch == 'l' or c == keys.right then
     if #kids == 0 then vim.msg = (e.name or '') .. ': no layers or slices inside (L - a layer, s - slice it)'; return true end
+    -- 17 ноя: как lf — внутрь: список становится его слоями / слайсами (было: дети строками под ним)
+    if state.libtabs then ctx.lib_dir = vim.inst; draw.LIBO[e.gkey or ''] = nil; ctx.lib_sub_go(vim.inst, kids[1]); return true end
     if not draw.LIBO[e.gkey or ''] then draw.LIBO[e.gkey or ''] = true else ctx.lib_sub_go(vim.inst, kids[1]) end
     return true
   end
   if ch == 'h' or c == keys.left then
+    if ctx.lib_dir then ctx.lib_dir = nil; return true end   -- 17 ноя: из подпапки — вверх
     if draw.LIBO[e.gkey or ''] then draw.LIBO[e.gkey or ''] = nil; return true end
     return true
   end
