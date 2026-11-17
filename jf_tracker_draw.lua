@@ -15007,7 +15007,12 @@ function D.frame(L, snap, rows, state, info)
     key_text(sx + L.pad, sy + 2, left, lw, U.AMBER)
     D.aw_status = nil                    -- DSP спрятан — строка не залипает
     if desc ~= '' then
-      local hx = math.max(sx + L.pad + (left ~= '' and (ms(left) + 3 * L.pad) or 0), sx + sw - L.pad - ms(desc))
+      -- 17 ноя: описание — сразу за сообщением (было прижато вправо: пустой проём посреди строки); то, что уже есть в
+      -- сообщении слева (имя трека: «@ Track 1» и «Track 1 [rec] - …»), второй раз не пишется
+      local head = desc:match('^(.-)%s+[%[%-:(]') or desc:match('^(%S+)%s')
+      if head and #head > 2 and left:find(head, 1, true) then desc = desc:sub(#head + 1):gsub('^%s+', '') end
+      local hx = sx + L.pad + (left ~= '' and (ms(left) + 2 * L.pad) or 0)
+      if left ~= '' then text(hx, sy + 2, '|', U.DIM); hx = hx + ms('|') + 2 * L.pad end
       key_text(hx, sy + 2, desc, sx + sw - hx - L.pad, U.GREY)
     end
   end
