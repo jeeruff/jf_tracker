@@ -7710,7 +7710,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   -- 17 ноя: пэды drumrs5k подпапкой (l на ките в instruments): строка — пэд (нота, файл)
   if info.libtabs and info.lib_kit then
     local out = {}
-    for k, kid in ipairs(info.lib_kit.kids or {}) do out[#out + 1] = { pad = kid, padk = k, sec = 'instruments' } end
+    local lk = info.lib_kit
+    if lk.inpad then   -- 17 ноя: эффекты пэда (слоты после сэмплера)
+      local kid = lk.kids and lk.kids[lk.sel]
+      for k, sl in ipairs(kid and kid.slots or {}) do out[#out + 1] = { pslot = sl, sk = k, sec = 'instruments' } end
+      if #out == 0 then out[1] = { pslot = false, sk = 0, sec = 'instruments' } end
+    else
+      for k, kid in ipairs(lk.kids or {}) do out[#out + 1] = { pad = kid, padk = k, sec = 'instruments' } end
+    end
     rows = out
   end
   L.pool_rows = rows
@@ -7843,7 +7850,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       local nm = info.libtab or 'audio'
       local nn = D.lib_sec_n and D.lib_sec_n[nm]
       local dir = info.lib_dir and pool[info.lib_dir]
-      local dname = (info.lib_kit and info.lib_kit.name) or (dir and dir.name)
+      local dname = (info.lib_kit and (info.lib_kit.name .. (info.lib_kit.inpad and (' › pad %02d'):format(info.lib_kit.sel) or ''))) or (dir and dir.name)
       local p = '› ' .. (GL[nm] or '') .. ' ' .. nm .. (dname and (' › ' .. dname) or (nn and ('  ' .. nn) or ''))
       text(tx, ty + 1, fit(p, ix + w - L.pad - ms('h - up ') - tx), U.AMBER)
       text(ix + w - L.pad - ms('h - up'), ty + 1, 'h - up', U.DIM)
@@ -7881,6 +7888,19 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
     if row.gap then
       -- пустая строка перед секцией
+    elseif row.pslot ~= nil then   -- 17 ноя: эффект пэда (подпапка пэда): имя, категория; обойдён — тускло
+      local sl = row.pslot
+      if not sl then text(ix + 6, y + 1, fit('no effects - a adds one', w - 12), U.DIM)
+      else
+        local sel = info.lib_kit and (info.lib_kit.slot or 1) == row.sk
+        local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh
+        if sel then sel_drawn = r; set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, y, w - 2, L.rh, 1)
+        elseif hot then set(D.CURROW); gfx.rect(ix + 1, y, w - 2, L.rh, 1) end
+        local cat = sl.cat and not tostring(sl.cat):match('^x%d') and tostring(sl.cat) or ''
+        local on = sl.enabled ~= false
+        text(ix + 6, y + 1, fit(('%02d  '):format(row.sk) .. (sl.name or '?') .. (on and '' or '  (bypassed)'), w - 12 - ms(cat) - L.pad), sel and U.AMBER or (on and U.TEXT or U.DIM))
+        if cat ~= '' then text(ix + w - L.pad - 4 - ms(cat), y + 1, cat, U.GREY) end
+      end
     elseif row.pad then   -- 17 ноя: пэд drumrs5k (подпапка кита): нота, файл; Space — слушать
       local sel = info.lib_kit and info.lib_kit.sel == row.padk
       local hot = mx >= ix and mx < ix + w and my >= y and my < y + L.rh

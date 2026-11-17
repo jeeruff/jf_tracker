@@ -26646,7 +26646,7 @@ local function frame()
     },
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
-    lib_kit = (function() local c, f, k = ctx.lib_kit_get(); return f and { kids = f.kids, sel = k.sel, name = f.name } or nil end)(),   -- 17 ноя: пэды drumrs5k
+    lib_kit = (function() local c, f, k = ctx.lib_kit_get(); return f and { kids = f.kids, sel = k.sel, name = f.name, inpad = k.inpad, slot = k.slot } or nil end)(),   -- 17 ноя: пэды drumrs5k (inpad — эффекты пэда)
     libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol, lib_dir = (ctx.lib_dir and ctx.lib_dir == vim.inst) and ctx.lib_dir or nil,   -- 17 ноя: подпапка lib
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
@@ -40655,7 +40655,42 @@ ctx.lib_kit_key = function(c)
     end
     return false
   end
+  -- 17 ноя: внутри пэда — его эффекты (слоты после сэмплера): j k, Enter / Space — окно, b — bypass, x — убрать, a — добавить
+  if k.inpad then
+    local kid = f.kids[k.sel]
+    local sl = kid and kid.slots or {}
+    local s = sl[k.slot or 1]
+    if ch == 'j' or c == keys.down then k.slot = math.min(math.max(1, #sl), (k.slot or 1) + 1)
+    elseif ch == 'k' or c == keys.up then k.slot = math.max(1, (k.slot or 1) - 1)
+    elseif ch == 'h' or c == keys.left or c == 27 then k.inpad = nil; vim.msg = ('pad %02d'):format(k.sel); return true
+    elseif (c == 13 or ch == ' ' or ch == 'l') and s then reaper.TrackFX_Show(col.track, s.i, 3); vim.msg = s.name .. ': window'
+    elseif ch == 'b' and s then
+      local on = reaper.TrackFX_GetEnabled(col.track, s.i)
+      reaper.TrackFX_SetEnabled(col.track, s.i, not on); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+      vim.msg = s.name .. (on and ': bypassed' or ': on')
+    elseif ch == 'x' and s then
+      edit.drum_slot_del(col.track, s.i); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+      vim.msg = 'removed ' .. s.name; k.slot = math.max(1, (k.slot or 1) - 1)
+    elseif ch == 'a' then
+      local tr, fi, ki = col.track, f.i, k.sel
+      local function put(name)
+        if edit.drum_slot_add(tr, fi, ki - 1, name, 1 + #sl) then vim.msg = ('+ %s into pad %02d'):format(FB.short(name), ki); model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+        else vim.msg = 'could not add into the pad' end
+        ctx.set_focus('inst')
+      end
+      if state.panes_ui and state.panes then
+        if state.focus ~= 'fxb' then state.fxb_back = state.focus end
+        FB.query, FB.cur, FB.scroll = '', 1, 0
+        ctx.fxb_pad = put
+        ctx.pane_cmd('fxb show')
+        FB.typing, FB.col = true, 2
+        vim.msg = ('fx into pad %02d: type to search, Enter - add, Esc back'):format(ki)
+      else vim.open_picker(('fx into pad %02d'):format(ki), ctx.fx_list(), function(x) put(x.data or x.label) end) end
+    else return false end
+    return true
+  end
   local n = #f.kids
+  if (ch == 'l' or c == keys.right) and f.kids[k.sel] then k.inpad = true; k.slot = 1; vim.msg = ('pad %02d: its effects - j k, Enter window, b bypass, x remove, a add, h up'):format(k.sel); return true end
   if ch == 'j' or c == keys.down then k.sel = math.min(n, k.sel + 1)
   elseif ch == 'k' or c == keys.up then k.sel = math.max(1, k.sel - 1)
   elseif ch == 'g' then k.sel = 1
