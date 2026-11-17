@@ -471,6 +471,7 @@ local state = {
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   popdock = reaper.GetExtState(EXT, 'popdock') ~= '0',   -- 14 ноя: меню / which-key / списки — всегда внизу окна (по умолчанию вкл)
   vipersel = reaper.GetExtState(EXT, 'vipersel') == 'exclusive' and 'exclusive' or 'cursor',   -- 17 ноя: viper — выделение ведёт курсор (exclusive — прячет треки)
+  mwide = tonumber(reaper.GetExtState(EXT, 'mwide')) or 0,   -- 17 ноя: ширина мастера сверх колонок (шаги по 2 знака)
   libtabs = true,   -- 17 ноя: lib — всегда вкладками (одним списком было два курсора); 25 окт: опцией
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
@@ -21616,6 +21617,14 @@ function ctx.width_step(d, which)
     local c2 = cur_col(); if c2 then list[1] = c2 end
   end
   local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
+  -- 17 ноя: мастер — шире / уже, как обычный трек (z> z<, Opt+Shift+L H, Cmd+колесо): шаг — 2 знака сверх его колонок
+  if which == 'cur' and #list == 1 and snap and list[1] == snap.master then
+    state.mwide = math.max(0, math.min(16, (state.mwide or 0) + d))
+    reaper.SetExtState(EXT, 'mwide', tostring(state.mwide), true)
+    relayout()
+    vim.msg = 'width of master ' .. (d > 0 and 'wider' or 'narrower') .. (state.mwide == 0 and ' (as narrow as its columns)' or (' (+' .. 2 * state.mwide .. ')'))
+    return
+  end
   if #list > 0 then
     state.wlevel = state.wlevel or {}
     for _, c2 in ipairs(list) do

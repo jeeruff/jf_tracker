@@ -1072,6 +1072,7 @@ function D.layout_core(snap, state, nregions)
   -- 17 окт: мастер сложен (кнопка fold в его шапке; опция auto fold master — сам, когда треки не влезают):
   -- два символа — стерео-метр и подавление компрессора / лимитера мастера, колонок нет
   -- 20 окт: auto — сложен, пока курсор не на мастере (state.m_peek — раскрыт: клик, Opt+W, l с последнего поля)
+  if L.master_w > 0 and (state.mwide or 0) > 0 then L.master_w = L.master_w + 2 * state.mwide * L.cw end   -- 17 ноя: шире — как обычный трек (z> z<)
   L.mfold = L.mtrack and (state.mfold or state.mfoldauto) and not state.m_peek or false
   L.master_w_full = L.master_w
   if L.mfold then L.master_w = 6 * ms('W') + 2 * L.pad + 2 end   -- 20 окт: стерео-пики + RMS по бокам (4 знака — узко)
