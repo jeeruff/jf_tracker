@@ -16692,10 +16692,16 @@ end
 ctx.bpm_pick = function()
   local items = {}
   for _, it in ipairs(BPM_LIST) do items[#items + 1] = { label = it[1], data = it[2] } end
-  vim.open_picker(('BPM %.1f - type to filter, Enter (a number: :bpm N)'):format(reaper.Master_GetTempo()), items, function(it)
+  local pk
+  vim.open_picker(('BPM %.1f - type a number and Enter, or pick'):format(reaper.Master_GetTempo()), items, function(it)
+    -- 17 ноя: набрано число (190, 87.5) — это и есть темп, что бы ни совпало в списке (было: фильтр не находил — Enter ничего)
+    local q = pk and tonumber((pk.query or ''):match('^%s*([%d%.]+)%s*$') or '')
+    if q then set_bpm(math.max(20, math.min(400, q))); return end
     if it.data == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end
     elseif type(it.data) == 'number' then set_bpm(it.data) end
   end)
+  pk = vim.picker
+  if pk then pk.free = true end   -- число, которого нет в списке, — своей строкой (Enter на ней тоже работает)
 end
 -- 17 ноя: выбор ноты списком внизу: все 128, текущая — первой строкой выделена; набор (D5, C#, 60) фильтрует
 ctx.note_pick = function(name, cur, setfn)
