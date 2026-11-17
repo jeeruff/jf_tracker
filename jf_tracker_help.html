@@ -828,7 +828,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>ze</kbd></td><td>on a note column: the window of the track instrument (slixer too; again - close it). On an envelope column: the effect and parameter it drives in the title, e - that effect window; its view - c curve, v values (like a command column), s steps (a fader on every row, as a 303 step sequencer: square points, drag across the rows with the mouse in any mode), b values and bars (the number and a line under it, longer - more, as MIDI CC). On a MIDI lane (PAT CC PB AT): b values and bars, s steps, v values, c the curve canvas</td></tr>
 <tr><td><kbd>Enter</kbd> <kbd>(envelope</kbd> <kbd>selection)</kbd></td><td>VISUAL on an envelope column, Enter - curves as cells with a preview (dim - now, bright - after): u ramp up, d down, e exp, g log, s s-curve, w sine, t triangle, a saw, q square, r random (in the range of the values; a flat line - from 0 to it), i invert, x reverse, m more, n less, k j up / down a step, o smooth, p 8 steps, f flat; h - draw by hand (the column as steps, drag with the mouse); u - undo</td></tr>
 <tr><td><kbd>&gt;</kbd> <kbd>&lt;</kbd> <kbd>N&gt;</kbd></td><td>loop: item to region / region to item / N rows</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd> <kbd>(</kbd> <kbd>)</kbd></td><td>octave down / up, instrument previous / next</td></tr>
+<tr><td><kbd>[</kbd> <kbd>]</kbd> <kbd>(</kbd> <kbd>)</kbd></td><td>octave down / up - in every module, the only meaning of [ ]; instrument previous / next</td></tr>
 <tr><td><kbd>/</kbd></td><td>commands at the cursor (fzf): the actions of the cell, the keys of the module, :commands - content is found with f (jump labels)</td></tr>
 <tr><td><kbd>n</kbd> <kbd>N</kbd> <kbd>*</kbd></td><td>next / previous match of the last search, search the name under the cursor</td></tr>
 <tr><td><kbd>:</kbd></td><td>command line (Tab completes)</td></tr>
@@ -1041,7 +1041,6 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>x</kbd></td><td>cut cell (or block) to clipboard</td></tr>
 <tr><td><kbd>n</kbd></td><td>rename region</td></tr>
 <tr><td><kbd>=</kbd></td><td>type length: N steps, Ns seconds, Nb bars</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>length -1 / +1 bar (later slots move)</td></tr>
 <tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>length -1 / +1 step</td></tr>
 <tr><td><kbd>C-S-h</kbd> <kbd>C-S-l</kbd></td><td>pattern of the slot: previous / next (as Ctrl+Left / Right in Renoise)</td></tr>
 <tr><td><kbd>:keyspat</kbd></td><td>MPC style (the keyspat button; = :pads): the note keys play the patterns of the song - 1 f1 2 ... = the 1st 2nd 3rd pattern, the key shows by its name; MIDI notes too - C1 (36) the 1st, then by semitones (another note: MIDI learn pattern pads in the midi tab - works without keyspat); quant - seamless when the playing one ends (REAPER smooth seek), sudden - at once at the same place inside (a short gap: the render-ahead buffer refills); rec - record the order, again - write it after the song as linked repeats; off</td></tr>
@@ -1094,7 +1093,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>!</kbd></td><td>Shift+1 anywhere: listen to the selected instrument (its length, through the cursor track); in the lib and the item tab ! slices at transients instead</td></tr>
 <tr><td><kbd>m</kbd> <kbd>Cmd+click</kbd></td><td>mark / unmark an instrument (several, not in a row; Shift+click - a range): dd / x cut the marked, yy yanks them, u unmarks</td></tr>
 <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>instrument down / up (and onto the name of a lib folder: h / l / Enter - fold / open)</td></tr>
-<tr><td><kbd>R</kbd> <kbd>[</kbd> <kbd>]</kbd> <kbd>Opt+Shift+H</kbd> <kbd>L</kbd></td><td>ξ - a random sample for the selected instrument (Opt+Shift+L - forward, past the end a new one; Opt+Shift+H - back): like the name of its lib folder (kick), else the first word of its name, from the map index (open the map pane once on your samples); [ ] - back / forward through what came up (back from the first - the original sound); also the &lt; ξ &gt; buttons on the row</td></tr>
+<tr><td><kbd>R</kbd> <kbd>&lt;</kbd> <kbd>&gt;</kbd> <kbd>Opt+Shift+H</kbd> <kbd>L</kbd></td><td>ξ - a random sample for the selected instrument (Opt+Shift+L - forward, past the end a new one; Opt+Shift+H - back): like the name of its lib folder (kick), else the first word of its name, from the map index (open the map pane once on your samples); [ ] - back / forward through what came up (back from the first - the original sound); also the &lt; ξ &gt; buttons on the row</td></tr>
 <tr><td><kbd>m</kbd> <kbd>u</kbd> <kbd>r</kbd> <kbd>(lf)</kbd></td><td>as in lf: m - mark the instrument and go down (amber), u - unmark all (no marks - u is undo), dd / x - cut the marked, yy - yank them, r - rename</td></tr>
 <tr><td><kbd>h</kbd> <kbd>l</kbd> <kbd>(folders)</kbd></td><td>lib folders (option lib folders): the cursor in a folder - h folds it (only &gt;kicks 5 is left, j k skip it), l opens it; a click on the folder row - the same; the lib menu: save this folder as a lib, load a lib into the folder (its samples join the folder whatever their names)</td></tr>
 <tr><td><kbd>J</kbd> <kbd>K</kbd></td><td>move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)</td></tr>
@@ -1413,7 +1412,6 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>j</kbd> <kbd>k</kbd> <kbd>g</kbd> <kbd>G</kbd> <kbd>C-d</kbd> <kbd>C-u</kbd></td><td>move; h l - the groups on the left / the list (as lf)</td></tr>
 <tr><td><kbd>/</kbd></td><td>find: letters in order, words in any order (pnc finds Pan Centre); whole words and word starts go first; Esc clears</td></tr>
 <tr><td><kbd>Enter</kbd> <kbd>/</kbd> <kbd>dblclick</kbd></td><td>run the action (main; the MIDI editor sections - in the last MIDI editor); it goes to recent (shared with \ a)</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>section: main, midi editor, event list, inline midi, media explorer (also the tabs on top)</td></tr>
 <tr><td><kbd>groups</kbd></td><td>all, favourites, recent, then by the word before the colon (Script, Item, Track, SWS ...) - the biggest first</td></tr>
 <tr><td><kbd>f</kbd></td><td>favourite on / off (* before the name)</td></tr>
 <tr><td><kbd>a</kbd> <kbd>x</kbd></td><td>add a shortcut (the REAPER dialog) / remove the first one (asks)</td></tr>
@@ -1496,7 +1494,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>x</kbd> <kbd>BS</kbd></td><td>remove the points of the row (with v - of the range)</td></tr>
 <tr><td><kbd>v</kbd></td><td>anchor: the range from here to the cursor; Esc - off</td></tr>
 <tr><td><kbd>f</kbd> <kbd>r</kbd> <kbd>R</kbd> <kbd>s</kbd> <kbd>t</kbd> <kbd>q</kbd> <kbd>n</kbd></td><td>fill the range (or the grid cell under the cursor) with a shape per cell: flat, ramp up, ramp down, sine, triangle, square, noise; the height - the curve value at the cursor (0 - full); n again - another noise</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>grid finer / coarser (1/8 row .. a bar; finer than a row - points between the rows of an envelope)</td></tr>
+<tr><td><kbd>Opt+-</kbd> <kbd>Opt+=</kbd></td><td>grid finer / coarser (1/8 row .. a bar; finer than a row - points between the rows of an envelope)</td></tr>
 <tr><td><kbd>Opt+drag</kbd> <kbd>(mouse)</kbd></td><td>between two points of an envelope: bend the segment - up / down makes it curve above / below the straight line (Shift - fine); Opt+double click - straight again; one undo</td></tr>
 <tr><td><kbd>Ctrl+Opt</kbd> <kbd>(draw</kbd> <kbd>/</kbd> <kbd>line</kbd> <kbd>/</kbd> <kbd>erase)</kbd></td><td>CONTROL on the canvas: the finger on the trackpad draws the stroke from the canvas cursor (Shift - fine); let Ctrl+Opt go - written, one undo</td></tr>
 <tr><td><kbd>dd</kbd> <kbd>dw</kbd> <kbd>yy</kbd> <kbd>y</kbd> <kbd>p</kbd></td><td>as in the tracker: dd / dw delete the point (with v - every point in it; an empty row - the next one), yy / v … y copy, p paste from the cursor</td></tr>
@@ -1508,12 +1506,12 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>vel</kbd></td><td>the cursor on the vel field of a note column - the canvas shows the velocities of its notes as a curve: draw / line / shape / sel / hum change the velocity of the notes under the stroke (no new notes), j k - nudge, 0-9 - level</td></tr>
 <tr><td><kbd>T</kbd></td><td>sel - select and transform: drag - rows; diamonds on the frame: corners tilt the top / bottom, the middles of the sides stretch in time (left / right) or scale the values (top / bottom), inside - move; written on release, one undo; Esc - off</td></tr>
 <tr><td><kbd>hum</kbd></td><td>the button in the header: humanize - the values of the selection (sel) or of the cell under the cursor +-8 % at random; again - another spread</td></tr>
-<tr><td><kbd>S</kbd></td><td>snap: the stroke goes by grid cells (on) or by rows (off); the grid - [ ] or the buttons [ 1/4 ] in the header (a click on the value - the list)</td></tr>
+<tr><td><kbd>S</kbd></td><td>snap: the stroke goes by grid cells (on) or by rows (off); the grid - Opt+- / Opt+= or the buttons [ 1/4 ] in the header (a click on the value - the list)</td></tr>
 <tr><td><kbd>Space</kbd> <kbd>(list)</kbd></td><td>in the curve list (Cmd+H): the curve into the stack - the canvas splits into lanes, one per marked curve under the active one (4-5 fit); Space again - out; Shift+click does the same. Other curves are not drawn behind (option curves behind)</td></tr>
-<tr><td><kbd>z,</kbd> <kbd>z.</kbd></td><td>grid finer / coarser (as [ ])</td></tr>
+<tr><td><kbd>z,</kbd> <kbd>z.</kbd></td><td>grid finer / coarser (as Opt+- / Opt+=)</td></tr>
 <tr><td><kbd>wheel</kbd> <kbd>z0</kbd></td><td>zoom the canvas at the mouse (trackpad pinch / scroll), sideways - scroll; a frame on the envelope column in the tracker shows the visible part; z0 - the whole span (option curve zoom)</td></tr>
 <tr><td><kbd>H</kbd> <kbd>L</kbd> <kbd>drag</kbd></td><td>select rows from the cursor (Shift+h / l, or drag with cur on empty space); then d y p, Esc drops it</td></tr>
-<tr><td><kbd>zg</kbd></td><td>the grid list: even (1/192 .. 1/2) or uneven - p = a cell per pattern, s = per section; { } go cell to cell, [ ] back to even</td></tr>
+<tr><td><kbd>zg</kbd></td><td>the grid list: even (1/192 .. 1/2) or uneven - p = a cell per pattern, s = per section; { } go cell to cell, Opt+- / Opt+= back to even</td></tr>
 <tr><td><kbd>zp</kbd></td><td>the whole project / back to the span (the bar at the cursor, the region, the time selection) - automation and modulation over the song</td></tr>
 <tr><td><kbd>Tab</kbd> <kbd>S-Tab</kbd></td><td>the active curve: the lane under the cursor, every envelope of the track, the take envelopes of the samples selected in the lib (v there) and the envelopes of their tracks, note mod slots, LFO / ACS curves; a click on the legend too</td></tr>
 <tr><td><kbd>w</kbd> <kbd>b</kbd></td><td>next / previous point of the active curve</td></tr>
@@ -1556,7 +1554,6 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>H</kbd> <kbd>L</kbd></td><td>value less / more (colour: hue)</td></tr>
 <tr><td><kbd>0</kbd></td><td>parameter to its default, modulation off</td></tr>
 <tr><td><kbd>m</kbd></td><td>modulation: none &gt; LFO &gt; track peak (picks a track) &gt; none</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>modulation depth</td></tr>
 <tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>LFO rate</td></tr>
 <tr><td><kbd>w</kbd></td><td>LFO shape: sin tri saw sqr ramp rise fall</td></tr>
 <tr><td><kbd>R</kbd></td><td>random values for the row</td></tr>
@@ -1584,7 +1581,7 @@ the pattern, <kbd>Cmd+Enter</kbd> every line. <code>s("1 3 ~ 5")</code> slices, 
 <tr><td><kbd>+</kbd></td><td>add channel</td></tr>
 <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>channel down / up</td></tr>
 <tr><td><kbd>h</kbd> <kbd>l</kbd></td><td>move window</td></tr>
-<tr><td><kbd>[</kbd> <kbd>]</kbd> <kbd>{</kbd> <kbd>}</kbd></td><td>start / end edges</td></tr>
+<tr><td><kbd>{</kbd> <kbd>}</kbd></td><td>start / end edges</td></tr>
 <tr><td><kbd>bb</kbd></td><td>the bb button: the capture becomes drum MIDI on a new track (beatbox, = :bb)</td></tr>
 <tr><td><kbd>Esc</kbd></td><td>back to tracker</td></tr>
 </table>

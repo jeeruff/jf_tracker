@@ -6273,12 +6273,12 @@ ctx = {
     local f = L and L.flat and L.flat[vim.cur.fi]
     local col = f and snap and snap.cols[f.ci]
     if col and col.track then state.kslider = { col = col, what = 'vol', mix = true }
-      vim.msg = ('mixer: %s  k j volume, h l pan (Shift fine), 0 reset, [ ] track, Esc tracker'):format(col.name or '') end
+      vim.msg = ('mixer: %s  k j volume, h l pan (Shift fine), 0 reset, H L track, Esc tracker'):format(col.name or '') end
   end,
   mixer_key = function(c)
     if c == 27 or c == 13 then ctx.set_focus('tracker'); vim.msg = ''; return true end
-    if c == 91 or c == 93 or c == 9 then
-      vim.key((c == 91 and 'H' or 'L'):byte()); ctx.mixer_arm(); return true
+    if c == 9 then   -- 17 ноя: [ ] — октава (глобально), трек — H L
+      vim.key(('L'):byte()); ctx.mixer_arm(); return true
     end
     if not (state.kslider and state.kslider.mix) then ctx.mixer_arm() end
     if state.kslider and ctx.kslider_key(c) then return true end
@@ -32638,6 +32638,19 @@ local function frame()
   end
   if ctx.IS and c > 0 and not HN.active and ctx.is_key(c) then c = 0 end   -- 6 ноя: режим ITEMS
   -- 1 ноя: окно Options открыто — клавиатура только ему, сразу (ниже клавиши забирали трекер, панели, ноты, Enter)
+  -- 17 ноя: [ ] — ТОЛЬКО октава клавиатуры, глобально, в любом модуле (свои [ ] модулей сняты: «все только для октавы»);
+  -- не при наборе текста / числа, не в открытом меню; трекер — сам (там те же [ ], и f[ t[ и т. п. ждут символ)
+  if (c == 91 or c == 93) and not HN.active and not vim.picker and not vim.hydra and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+    local m = ctx.mods()
+    local typing = B.filtering or (FB and FB.typing) or state.focus == 'notes' or state.focus == 'console' or ctx.cm_typing() or DK.ins
+      or OPT.typing or OPT.ask.active or (draw.TL and draw.TL.typing) or (ctx.DOC and ctx.DOC.typing) or (ctx.AC and ctx.AC.typing) or MX.ch_type
+      or SL.gpend or vim.pending or vim.op
+    if not (m.cmd or m.ctrl or m.alt) and not typing and (state.focus ~= 'tracker' or state.mixfocus) then
+      vim.octave = c == 91 and math.max(0, vim.octave - 1) or math.min(8, vim.octave + 1)
+      vim.msg = 'octave ' .. vim.octave
+      c = 0
+    end
+  end
   if ctx.opt_k() and c ~= 0 and not OPT.ask.active and not vim.hydra and not vim.picker and not (OPT.pane and (ctx.mods().cmd or ctx.cmd_letter(c, ctx.mods()))) and not (OPT.pane and (c == 9 or c == 25) and not ctx.mods().alt and not OPT.typing) then   -- 6 ноя: Tab панелью — по модулям, как везде; вкладки опций — Opt+Tab   -- 1 ноя: панелью — Cmd+hjkl уводят фокус; 6 ноя: и Cmd+Shift+hjkl (Cmd не виден в mouse_cap — по коду 8 10 11 12)
     if HN.active then local r = HN.key(c); if type(r) == 'table' then pcall(hint_go, r) end
     elseif OPT.zpend or (OPT.pane and c == 122 and not OPT.typing and not OPT.numbuf and OPT.page ~= 'about') then ctx.opt_zmenu(c)   -- 1 ноя: z в панели опций — своё z-меню
@@ -33725,18 +33738,6 @@ local function frame()
         local AR = { [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l' }
         local m1 = ctx.mods()
         if AR[c] and not (m1.ctrl or m1.cmd or m1.alt) then c = (m1.shift and AR[c]:upper() or AR[c]):byte() end
-      end
-      -- 17 ноя: [ ] — октава клавиатуры в любом модуле (глобально), кроме тех, у кого [ ] свои: матрица (длина такта),
-      -- lib (случайный), options (вкладки), item / automation / visor / theme / rec (обрезка, сетка, …), actions, manual
-      if not typing and state.focus ~= 'tracker' and (c == 91 or c == 93) and not (ctx.mods().cmd or ctx.mods().ctrl or ctx.mods().alt) then
-        local OWN = { matrix = true, inst = true, options = true, actions = true, manual = true, help = true, mixer = true }
-        local own = OWN[state.focus] or (state.focus == 'top' and ({ sample = true, automation = true, visor = true, theme = true, retro = true })[state.toptab or ''])
-          or (state.focus == 'dsp' and DK.pads)
-        if not own then
-          vim.octave = c == 91 and math.max(0, vim.octave - 1) or math.min(8, vim.octave + 1)
-          vim.msg = 'octave ' .. vim.octave
-          return
-        end
       end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       -- 27 окт: открыта выпадашка / пикер — клавиша ей, в любом модуле (DSP, lib … забирали цифры KEYS нотами)

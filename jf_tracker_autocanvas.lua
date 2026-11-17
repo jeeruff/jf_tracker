@@ -350,12 +350,13 @@ function ACV.key(c, st, mods)
     ACV.cur = (ACV.cur - 1 + (shift and -1 or 1)) % n + 1
     return true
   elseif ch == 'v' then ACV.anchor = ACV.anchor and nil or ACV.row; return true
-  elseif ch == '[' or ch == ']' then
-    if lfo then return { op = 'lfo', key = 'lfo.speed', mul = ch == '[' and 0.5 or 2 } end
+  elseif ch == '[' or ch == ']' or c == 8211 or c == 8800 then   -- 17 ноя: с клавиатуры — Opt+- / Opt+= (и z, z.); [ ] — октава
+    local fine = ch == '[' or c == 8211
+    if lfo then return { op = 'lfo', key = 'lfo.speed', mul = fine and 0.5 or 2 } end
     if ACV.gmode then ACV.gmode = nil; return true end   -- 2 ноя: из сетки паттернов — к ровной
     local g = ACV.grid
     -- 30 окт: мельче строки — до 1/8 строки (точки между строками огибающей)
-    if ch == '[' then g = g > 1 and g // 2 or math.max(0.125, g / 2) else g = math.min((st.lpb or 4) * 4, g * 2) end
+    if fine then g = g > 1 and g // 2 or math.max(0.125, g / 2) else g = math.min((st.lpb or 4) * 4, g * 2) end
     ACV.grid = g
     return true
   elseif ch == 'w' or ch == 'b' then

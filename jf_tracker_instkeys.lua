@@ -121,7 +121,7 @@ function IK.key(c, cur, n, nslots, ninst)
       if right then if not ctx.lib_random(1) then ctx.lib_random() end; return true end
     end
   end
-  if (ch == '[' or ch == ']') and ctx.lib_random then ctx.lib_random(ch == '[' and -1 or 1); return true end
+  if (ch == '<' or ch == '>') and ctx.lib_random then ctx.lib_random(ch == '<' and -1 or 1); return true end   -- 17 ноя: ξ — < > ([ ] — октава)
   if ch == 'x' and IK.nmarks() > 0 then ctx.inst_cut_ask(marked_desc()); IK.clear_marks(); return true end
   if ch == 'x' then
     local r0, r1 = IK.range(cur)
