@@ -234,7 +234,7 @@ KH.PAGES = {
     { k = 'tu', m = 'unsolo / unmute all', d = 'every track: solo and mute off' },
     { k = 'th tH tU', m = 'hide / show hidden / unhide', d = 'th - hide the cursor track in the tracker (it stays in REAPER); tH - show the hidden ones with dim names, again - hide them; tU - unhide the cursor track if hidden, else all' },
     { k = 'g?', d = 'describe a key: the next key is not run - a list of what it does, the page of the module in focus first (Emacs describe-key; also :describe)' },
-    { k = ':occur', d = 'every place in the song with a note / sample / command (:occur C-4, :occur amen, :occur 0S06; :occur 05 - the notes of instrument 05; :occur . - what is under the cursor) as a list, Enter - go there; every place gets a frame, n N walk them, Esc - marks off (Emacs occur)' },
+    { k = ':occur', d = 'every place in the song with a note / sample / command (:occur C-4, :occur amen, :occur 0S06; :occur 05 - the notes of instrument 05; :occur . - what is under the cursor; v / V a selection, then :occur - every place with the same notes of the same instruments) as a list, Enter - go there; every place gets a frame, n N walk them, Esc - marks off (Emacs occur)' },
     { k = 'Ctrl+O (command line)', d = 'on the picked line - other actions with it: run, run at the cursor (.), into the line, what it does; history - edit, remove (Emacs embark)' },
     { k = ':winner u / r', d = 'undo / redo the pane layout (in PANE mode, Ctrl+W: u U) - Emacs winner-mode' },
     { k = ':.cmd  :=', d = 'a dot before a command - at the cursor only (as the current line range in Vim): :.bpm 140 - a tempo change on the cursor row, :.sig 7/8 - the pattern under the cursor; := - the cursor row: number, bar.beat, time' },

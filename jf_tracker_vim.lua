@@ -4546,6 +4546,19 @@ end
 -- 17 ноя: :occur текст — все места в песне, где он есть (нота C-4, имя сэмпла, команда 0S06), списком; Enter — туда (Emacs occur)
 function V.occur(q)
   q = (q or ''):match('^%s*(.-)%s*$')
+  -- 17 ноя: из выделения (v / V, потом :occur без слов) — все места с теми же нотами того же инструмента, что в выделении
+  local want
+  if q == '' and (V.cmd_from == 'visual' or V.cmd_from == 'vline') then
+    local f0, f1, r0, r1 = V.visual_range()
+    want = {}
+    local nk = 0
+    for _, h in ipairs(V.heads_in(f0, f1, r0, r1)) do
+      local k = tostring(ctx.cell_inst_num and ctx.cell_inst_num(h) or h.name or '') .. '|' .. tostring(h.note or '')
+      if not want[k] then want[k] = true; nk = nk + 1 end
+    end
+    if nk == 0 then V.msg = 'occur: no notes in the selection'; return end
+    q = ('the selection (%d kind(s))'):format(nk)
+  end
   -- 17 ноя: «.» — то, что под курсором: номер инструмента, иначе нота, иначе имя
   if q == '.' then
     local f = flat()[V.cur.fi]
@@ -4555,13 +4568,17 @@ function V.occur(q)
     local n = ctx.cell_inst_num and ctx.cell_inst_num(c)
     q = n and ('%02d'):format(n) or c.note or c.name or ''
   end
-  if q == '' then V.msg = ':occur text - every place with it (a note C-4, a sample name, a command 0S06)'; return end
+  if q == '' then V.msg = ':occur text - every place with it (a note C-4, a sample name, a command 0S06); from a selection - its notes'; return end
   local items = {}
+  local function hit(c)
+    if want then return want[tostring(ctx.cell_inst_num and ctx.cell_inst_num(c) or c.name or '') .. '|' .. tostring(c.note or '')] == true end
+    return head_matches(c, q)
+  end
   for fi, f in ipairs(flat()) do
     if not f.env and not f.ml then
       for _, sub in ipairs(subs_of(f)) do
         for r, c in pairs(sub) do
-          if type(r) == 'number' and is_head(c) and head_matches(c, q) then
+          if type(r) == 'number' and is_head(c) and hit(c) then
             items[#items + 1] = { label = ('%04d  %-10s %s  %s'):format(r, (f.col and f.col.name or ''):sub(1, 10), c.note or '', c.name or ''), data = { fi = fi, row = r }, ord = r * 1000 + fi }
           end
         end
