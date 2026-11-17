@@ -13883,7 +13883,7 @@ ctx = {
       { key = 'zoomtop', label = 'aim zoom on top', kind = 'toggle', desc = 'when the item tab sits under the tracker, the aim zoom (the edge close-up) goes above the full wave - nearer to the tracker, where the eye already is; the slixer panel in DSP puts its aim above the slices too', get = function() return state.zoomtop ~= false end, set = function(v) state.zoomtop = v; reaper.SetExtState(EXT, 'zoomtop', v and '1' or '0', true) end },
       { key = 'snappanes', label = 'snap pane lines', kind = 'toggle', desc = 'dragging a line between panes sticks it to a line of another pane on the same axis within 8 px, so the panes line up (Shift while dragging - no snap)', get = function() return state.snappanes ~= false end, set = function(v) state.snappanes = v; reaper.SetExtState(EXT, 'snappanes', v and '1' or '0', true) end },
       flag('sroslash', 'routing as ///', 'the routing button shows three slashes /// in colours (as in REAPER) instead of the letters s r o: sends, receives, hardware outputs; lit - the track has them'),
-      { key = 'envmark', label = 'mark automation rows', kind = 'toggle', desc = 'a ~ at the right edge of the note column on every row where the track has automation - a point of any envelope (shown or hidden) or an automation item; in the same narrow column as the + of folded notes: both on a row - +~ side by side (the column gets 2 chars), or ~ under + when rows are tall', get = function() return state.envmark end, set = function(v) state.envmark = v; model.ENVMARK = v; model.invalidate(); relayout() end },
+      -- 17 ноя: опция envmark убрана («~» у ноты больше не рисуется; скрытую автоматизацию показывает подсвеченный + в шапке)
       { key = 'foldfast', label = 'fold fast notes', kind = 'toggle', desc = 'a fast note (shorter than a row) with no free column folds into its row - a + at the right edge of the note column (where the folded notes unfold) instead of a new lane (the fold button); zoom in (LPB +) to see it on its own row; edits of the row include it', get = function() return state.foldfast end, set = function(v) state.foldfast = v; model.FOLD = v; model.invalidate(); relayout() end },
       { key = 'bsmode', label = 'backspace mode (BS)', kind = 'cycle', values = { 'view', 'pattern', 'track' }, desc = 'Backspace / Opt+Backspace (delete / insert rows) move: view (default) - what you see: the pattern view (zp) - only the pattern, the section view (zs) - the section, the project view - the whole track to =END; pattern - always the pattern; track - always the whole track', get = function() return state.bsmode end, set = function(v) state.bsmode = v; reaper.SetExtState(EXT, 'bsmode2', v, true) end },
       flag('hdrmeter', 'header meter', 'a thin meter under v in the track header (armed audio - the input level; MIDI on the track input - a yellow flash); the yellow MIDI bar on the track itself stays'),
@@ -16535,6 +16535,35 @@ ctx.REP_BTNS = { 'ctrl', 'btn', 'dspbtn', 'dspab', 'envpm', 'fxcolbtn', 'insprev
 ctx.click_repeat = function(lr, n)
   ctx.click_replay = { x = lr.x, y = lr.y, sig = lr.sig, n = math.max(1, n or 1) }
   vim.msg = '. ' .. tostring(lr.label or '')
+end
+-- 17 ноя: скрытая автоматизация трека с данными (больше одной точки или automation item), огибающая не видна в REAPER.
+-- Кэш на таблицу колонки снимка (новый снимок — пересчёт). → список огибающих
+ctx.envh_c = setmetatable({}, { __mode = 'k' })
+ctx.env_hidden_list = function(col)
+  if not (col and col.track and reaper.ValidatePtr(col.track, 'MediaTrack*')) then return {} end
+  local l = ctx.envh_c[col]
+  if l then return l end
+  l = {}
+  for i = 0, reaper.CountTrackEnvelopes(col.track) - 1 do
+    local env = reaper.GetTrackEnvelope(col.track, i)
+    local _, vis = reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false)
+    if vis == '0' and (reaper.CountEnvelopePoints(env) > 1 or reaper.CountAutomationItems(env) > 0) then l[#l + 1] = env end
+  end
+  ctx.envh_c[col] = l
+  return l
+end
+ctx.env_show_next = function(col)
+  local env = ctx.env_hidden_list(col)[1]
+  if not env then return false end
+  local _, nm = reaper.GetEnvelopeName(env, '')
+  edit.run('show envelope ' .. (nm or ''), function() reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true); reaper.TrackList_AdjustWindows(false) end)
+  ctx.envh_c[col] = nil
+  state.trackenvs = state.trackenvs or {}; if col.guid then state.trackenvs[col.guid] = true end
+  model.invalidate()
+  local left = #ctx.env_hidden_list(col)
+  ctx.envh_c[col] = nil
+  vim.msg = ('%s shown%s'):format(nm or 'envelope', left > 0 and (' - %d more hidden (+ again)'):format(left) or ' - all automation of the track is visible')
+  return true
 end
 ctx.dedup = function()
   local n, nt = 0, 0
@@ -26271,6 +26300,7 @@ local function frame()
     loop_cells = MX.loops and ctx.loop_cells() or nil, loop_text = GD.cell_text,
     env_values = env_values, pool_col = cur_col(), inst = vim.inst,
     pool_tenv = function(e) return e and e.item and #ctx.take_envs(e.item) or 0 end,   -- колонка ~ в lib (9 окт)
+    env_hidden = function(col) return #ctx.env_hidden_list(col) end,   -- 17 ноя: подсветка + в шапке трека
     track_insts = ctx.track_insts, inst_fx = ctx.inst_fx, slx_slices = ctx.slx_slices,      -- 9 окт: плагины-инструменты в lib
     perf_draw = (ctx.PERF and ctx.PERF.active and not state.panes_ui) and function(Lx, x, y, w, h) ctx.PERF.draw(U, Lx, x, y, w, h, ctx.hb_last, ctx.fit) end or nil,
     rf_draw = function(Lx, x, y, w, h, foc)   -- 19 окт: без сессии — сколько нот в выделении (возьмётся при первом движении)
@@ -27631,7 +27661,7 @@ local function frame()
       or (math.abs(v) < 0.005 and 'C' or ('%s%d'):format(v < 0 and 'L' or 'R', math.floor(math.abs(v) * 100 + 0.5))))
     state.status = ('%s %s %s - drag, wheel: fine, dblclick: reset; pan mode = REAPER track pan mode'):format(hover.trs.col.name, names[hover.trs.what] or hover.trs.what, vs)
   elseif hover.fxcolbtn then state.status = ('command columns of %s: %d - click - / + (0..4); keys z. / z, on the cursor track'):format(hover.fxcolbtn.col and hover.fxcolbtn.col.name or 'the track', ctx.fx_cols_of(hover.fxcolbtn.col))
-  elseif hover.envpm then state.status = hover.envpm.d > 0 and 'add an automation lane: pick a parameter of the track or its fx'
+  elseif hover.envpm then state.status = hover.envpm.d > 0 and ((hover.envpm.hid or 0) > 0 and ('hidden automation with points: %d - click shows the next one'):format(hover.envpm.hid) or 'add an automation lane: pick a parameter of the track or its fx')
     or ((hover.envpm.e and hover.envpm.e.name or 'envelope') .. ': hide this lane (the envelope and its points stay; + shows it again)')
   elseif hover.lanemono then state.status = '1: the track on one note lane - a new note cuts the sounding one, overlaps trimmed (' .. (ctx.mono_on(hover.lanemono.col) and 'on' or 'off') .. ')'
   elseif hover.lanebtn then state.status = ('lane columns: %d - click -/+ (min columns; more appear when items overlap)'):format(hover.lanebtn.n or 1)
@@ -29729,7 +29759,8 @@ local function frame()
       click = { t = now2, zone = 'fxcolbtn' }
     elseif hover.envmark then ctx.toggle_track_envs(hover.envmark); click = { t = now2, zone = 'envmark' }   -- 31 окт: «~» в строке — огибающие трека
     elseif hover.envpm then
-      if hover.envpm.d > 0 then ctx.automation_picker(hover.envpm.col) else ctx.env_hide(hover.envpm.e) end
+      -- 17 ноя: + — сначала по одной показывает скрытую автоматизацию трека (с точками / items); всё видно — выбор параметра
+      if hover.envpm.d > 0 then if not ctx.env_show_next(hover.envpm.col) then ctx.automation_picker(hover.envpm.col) end else ctx.env_hide(hover.envpm.e) end
       click = { t = now2, zone = 'envpm' }
     elseif hover.lanemono then ctx.mono_toggle(hover.lanemono.col, hover.lanemono.lane); click = { t = now2, zone = 'lanemono' }   -- 24 окт: 1
     elseif hover.lanebtn then

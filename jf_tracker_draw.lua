@@ -571,7 +571,8 @@ function D.layout_core(snap, state, nregions)
   -- 19 окт: fold — узкая колонка знака «o» справа (строка со сложенными быстрыми нотами)
   -- 27 окт: вместо колонки +N справа — знак «+» перед нотой (как папка в lf); место только у лейнов со сложенным (L.foldG)
   L.fold_on = state.foldfast and true or false; L.x_fold = nil; L.w_fold = ms('+')
-  L.envmark = (state.envmark and not state.ptmode) and true or false   -- 1 ноя: в PT-mode «~» нет;  -- 27 окт: «~» строк с автоматизацией — в той же колонке
+  L.envmark = false   -- 17 ноя: «~» у ноты убран (лишняя сущность и 3-4 знака места); скрытую автоматизацию показывает подсвеченный + в шапке
+  local _ = (state.envmark and not state.ptmode)   -- 1 ноя: в PT-mode «~» нет;  -- 27 окт: «~» строк с автоматизацией — в той же колонке
   L.sub_w = x
   -- узкая подколонка (2 окт): ноты аккорда MIDI — только нота и velocity,
   -- без волны, fx и delay; отдельный лейн — только фиксированная дорожка REAPER
@@ -10418,10 +10419,11 @@ function D.frame(L, snap, rows, state, info)
           if #c.envs == 0 and not state.ptmode and ax > nx + bw2 + L.pad then
             local by = hy_in + L.lane_row * L.rh + 1
             local ahot = mx >= ax and mx < ax + aw and my >= by and my < by + L.rh - 1
-            set(ahot and D.CURROW or U.PANEL); gfx.rect(ax, by, aw, L.rh - 2, 1)
-            set(U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
-            text(ax + 2, by, 'a+', ahot and U.AMBER or BTXT)
-            if ahot then hover.envpm = { col = col, d = 1 } end
+            local hid = info.env_hidden and info.env_hidden(col) or 0   -- 17 ноя: есть скрытая автоматизация с данными — подсвечен
+            set(ahot and D.CURROW or (hid > 0 and U.tint(U.AMBER, 0.35) or U.PANEL)); gfx.rect(ax, by, aw, L.rh - 2, 1)
+            set(hid > 0 and U.AMBER or U.DIM); gfx.rect(ax, by, aw, L.rh - 2, 0)
+            text(ax + 2, by, 'a+', (ahot or hid > 0) and U.AMBER or BTXT)
+            if ahot then hover.envpm = { col = col, d = 1, hid = hid } end
             hint('envpm', ax, by, aw, L.rh, { col = col, d = 1 })
           end
         end
@@ -10470,10 +10472,11 @@ function D.frame(L, snap, rows, state, info)
         for k, b in ipairs(nb == 2 and { { '+', 1 }, { '-', -1 } } or { { '-', -1 } }) do
           local bx, by = bx0 + (k - 1) * (L.btn_w + 2), ly2 + 1
           local bhot = mx >= bx and mx < bx + L.btn_w and my >= by and my < by + L.rh - 1
-          set(bhot and D.CURROW or U.PANEL); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
-          set(U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
-          text(bx + 2, by, b[1], bhot and U.AMBER or BTXT)
-          if bhot then hover.envpm = { col = c.col, e = ev.e, d = b[2] }; on_btn = true end
+          local hid = (b[2] > 0 and info.env_hidden) and info.env_hidden(c.col) or 0   -- 17 ноя: + подсвечен, пока есть скрытая автоматизация
+          set(bhot and D.CURROW or (hid > 0 and U.tint(U.AMBER, 0.35) or U.PANEL)); gfx.rect(bx, by, L.btn_w, L.rh - 2, 1)
+          set(hid > 0 and U.AMBER or U.DIM); gfx.rect(bx, by, L.btn_w, L.rh - 2, 0)
+          text(bx + 2, by, b[1], (bhot or hid > 0) and U.AMBER or BTXT)
+          if bhot then hover.envpm = { col = c.col, e = ev.e, d = b[2], hid = hid }; on_btn = true end
           hint('envpm', bx, by, L.btn_w, L.rh, { col = c.col, e = ev.e, d = b[2] })
         end
       end
@@ -11149,6 +11152,20 @@ function D.frame(L, snap, rows, state, info)
     end
   end
   D.pmark('draw: rows')
+  -- 17 ноя: треков нет — подсказка посреди поля трекера (крупно, тихо)
+  do
+    local any = false
+    for _, c in ipairs(L.cols or {}) do if not c.master then any = true; break end end
+    if not any and L.body_h and L.body_h > 4 * L.rh then
+      local x0 = L.matrix_w + L.label_w
+      local w0 = (L.win_w or gfx.w) - x0
+      local t1, t2 = 'press t t for a new track', 'or : then a REAPER action, or drop a file here'
+      local k = (D.big_measure(t1, 2) <= w0 - 4 * L.pad) and 2 or 1
+      local cy = L.body_y + math.floor(L.body_h / 2) - k * L.rh
+      D.big_text(x0 + math.floor((w0 - D.big_measure(t1, k)) / 2), cy, t1, U.GREY, k)
+      text(x0 + math.floor((w0 - ms(t2)) / 2), cy + k * L.rh + L.rh, t2, U.DIM)
+    end
+  end
   -- граница регионов (5 окт): тонкие линии цвета регионов у линии такта —
   -- уходящий над ней, следующий под ней; фоном, items рисуются поверх
   local rgedge = {}
