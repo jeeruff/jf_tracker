@@ -1003,6 +1003,8 @@ end
 -- wave_cached(...) = true — картинка готова и выведена; false — нарисуй в неё (S.wc_x / wc_cy — начало в картинке),
 -- потом S.wave_done() выводит её
 S.WAVE_IMG = 796
+-- 17 ноя: фон прицела и того, что он берёт на волне, — чуть светлее фона окна
+function S.zoom_bg(U) return U.mix(U.BG, U.TEXT, 0.07) end
 S.ZOOM_IMG = 88   -- 14 ноя: полоса зума (прицел) — готовой картинкой; 1020 — буфер самой верхней панели (номер совпал: вместо волны рисовалась её копия)
 function S.wave_cached(kind, pk, e, x, wy, w, wh, va, vb, base, z0, z1, zc, bg, inv)
   S.wc_x, S.wc_cy, S.wc_dx = nil, nil, nil
@@ -1265,6 +1267,12 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
     wy, wh = wy + RH, wh - RH
   end
   U.set(U.PANEL); gfx.rect(x, wy, w, wh, 1)
+  -- 17 ноя: то, что берёт прицел, — фоном самого прицела (чуть светлее чёрного), под волной
+  if ZH > 0 and zt then
+    local W2 = S.zwin or 0.04
+    local a, b = math.max(va, zt - W2), math.min(vb, zt + W2)
+    if b > va and a < vb then local xa = tx(a); U.set(S.zoom_bg(U)); gfx.rect(xa, wy, math.max(1, tx(b) - xa), wh, 1) end
+  end
   local cy, hh = wy + wh / 2, wh / 2 - 1
   local base = U.readable(U.theme('col_tr1_peaks', { 0.55, 0.62, 0.70 }), U.BG, 4.0)
   if e.muted and not e.depot then base = U.mix(base, U.BG, 0.45) end   -- заглушённый — тусклее; 10 окт: кроме lib (там заглушено всё — волна была тусклой всегда)
@@ -1656,7 +1664,8 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.8)
       gfx.rect(xa, wy, 1, wh, 1); gfx.rect(xb - 1, wy, 1, wh, 1)
       local cw = math.min(6, math.floor((xb - xa) / 3))
-      gfx.rect(xa, wy, cw, 1, 1); gfx.rect(xb - cw, wy, cw, 1, 1); gfx.rect(xa, wy + wh - 1, cw, 1, 1); gfx.rect(xb - cw, wy + wh - 1, cw, 1, 1)
+      -- 17 ноя: сверху ушки наружу (к прицелу над волной — «отсюда туда»), снизу — внутрь, как были
+      gfx.rect(xa - cw + 1, wy, cw, 1, 1); gfx.rect(xb - 1, wy, cw, 1, 1); gfx.rect(xa, wy + wh - 1, cw, 1, 1); gfx.rect(xb - cw, wy + wh - 1, cw, 1, 1)
       gfx.a = 1
     end
     if zt >= va and zt <= vb then gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.45); gfx.rect(tx(zt), wy, 1, wh, 1); gfx.a = 1 end
@@ -1686,7 +1695,7 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
         x, zy = 0, 0
       end
     end
-    if not zhit then U.set(U.BG); gfx.rect(x, zy, w, ZH, 1) end
+    if not zhit then U.set(S.zoom_bg(U)); gfx.rect(x, zy, w, ZH, 1) end   -- 17 ноя: фон прицела — чуть светлее чёрного
     if zgrid and not zhit then
       for _, g in ipairs(zgrid.rows) do
         local gx = x + math.floor((g.te - t0) / (2 * W2) * w)
