@@ -11623,6 +11623,7 @@ ctx = {
     inst = 'instrument that new notes use: its number in the lib (01 02 ...). Click / wheel - next / previous; ( ) or Opt+J / K do the same (qwerty INSERT: , .)',
     oct = 'octave of the note keys (1 2 3 ... = C D E ...): [ - lower, ] - higher (qwerty: z x); wheel changes it too',
     sig = 'time signature: beats per bar / beat length (4/4, 3/4, 7/8 ...). Click - type it',
+    key = 'key of the song (:key): click - pick the tonic and the mode, ? - from the notes; in flat keys the notes are written with flats',
     metro = 'metronome on / off; click - the menu (pattern, pre-roll, settings)',
     beats = 'where the play position is: bar and beat; the squares are the beats of this bar',
     rate = 'project play rate (speed x tempo, pitch too): x1 - normal. Click - the list, wheel - +-0.05',
@@ -22981,6 +22982,37 @@ ctx.voice2_cmd = function(arg)
   model.invalidate()
   vim.msg = n > 0 and ('second voice: %d note(s), a %s %s in %s %s'):format(n, math.abs(iv) == 3 and 'third' or 'sixth', iv > 0 and 'above' or 'below', MMX.CH.NAMES[r + 1], MMX.TH.BY[id].name) or 'voice2: no MIDI notes here (select with v / V)'
 end
+draw.key_get = function() return ctx.key_get() end   -- 17 ноя: лад проекта для бемолей (после local ctx)
+-- 17 ноя: лад одним словом для транспорта (Am, D dor, F#); кэш на 0.5 с
+ctx.songkey_label = function()
+  local now = reaper.time_precise()
+  if ctx.key_lab_t and now - ctx.key_lab_t < 0.5 then return ctx.key_lab end
+  ctx.key_lab_t = now
+  local r, id = ctx.key_get()
+  if not r then ctx.key_lab = nil; return nil end
+  local SH = { major = '', minor = 'm', dorian = ' dor', phrygian = ' phr', lydian = ' lyd', mixo = ' mix', locrian = ' loc', harmmin = 'm hrm', melmin = 'm mel', phrygdom = ' phd', majpent = ' pen', minpent = 'm pen', blues = ' blu', wholetone = ' wt', octatonic = ' oct' }
+  local nm = MMX.CH.NAMES[r + 1]
+  if draw.flats and draw.flats() then nm = ({ ['C#'] = 'Db', ['D#'] = 'Eb', ['F#'] = 'Gb', ['G#'] = 'Ab', ['A#'] = 'Bb' })[nm] or nm end
+  ctx.key_lab = nm .. (SH[id] or (' ' .. id))
+  return ctx.key_lab
+end
+-- 17 ноя: щелчок по ладу в транспорте / :key без слов в меню — гидра: тоника, потом лад; n — снять, ? — по нотам
+ctx.key_hydra = function()
+  local function modes(pc)
+    local it = {}
+    for i, m in ipairs({ { 'j', 'major' }, { 'n', 'minor' }, { 'd', 'dorian' }, { 'p', 'phrygian' }, { 'l', 'lydian' }, { 'x', 'mixo' }, { 'c', 'locrian' }, { 'h', 'harmmin' }, { 'm', 'melmin' } }) do
+      it[i] = { key = m[1], label = MMX.TH.BY[m[2]].name, fn = function() ctx.key_set(pc, m[2]); ctx.key_lab_t = nil; vim.msg = ('key: %s %s'):format(MMX.CH.NAMES[pc + 1], MMX.TH.BY[m[2]].name) end }
+    end
+    return it
+  end
+  local items = {}
+  for _, r in ipairs({ { 'c', 0, 'C' }, { 'C', 1, 'C# / Db' }, { 'd', 2, 'D' }, { 'D', 3, 'D# / Eb' }, { 'e', 4, 'E' }, { 'f', 5, 'F' }, { 'F', 6, 'F# / Gb' }, { 'g', 7, 'G' }, { 'G', 8, 'G# / Ab' }, { 'a', 9, 'A' }, { 'A', 10, 'A# / Bb' }, { 'b', 11, 'B' } }) do
+    items[#items + 1] = { key = r[1], label = r[3] .. ' …', sub = { title = 'key: ' .. r[3] .. ' -', items = modes(r[2]) } }
+  end
+  items[#items + 1] = { key = '?', label = 'from the notes of the song', fn = function() ctx.key_cmd(''); ctx.key_lab_t = nil end }
+  items[#items + 1] = { key = 'n', label = 'none (sharps everywhere)', fn = function() ctx.key_set(nil); ctx.key_lab_t = nil; vim.msg = 'key of the song: none' end }
+  vim.open_hydra({ title = 'key of the song (flats in flat keys)', items = items })
+end
 ctx.key_set = function(root, id)
   reaper.SetProjExtState(0, EXT, 'key', root and (root .. ' ' .. id) or '')
   ctx.key_t = nil
@@ -24582,6 +24614,7 @@ function ctrl_action(name, delta)
     end
     vim.open_hydra({ title = 'slow rec speed (the red slow button records): play slowly, it lands in tempo (MIDI)', items = items })
     state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y - (#items + 2) * L.rh }
+  elseif name == 'key' then if ctx.key_hydra then ctx.key_hydra() end   -- 17 ноя: лад песни
   elseif name == 'bpm' then
     if delta ~= 0 then
       local bpm = reaper.Master_GetTempo() + delta
@@ -26599,6 +26632,7 @@ local function frame()
       preroll = (function() local p = ctx.rec_cmd('preroll'); return p and reaper.GetToggleCommandState(p) == 1 end)(),   -- 12 ноя: id один раз (rec_cmd)
       ripple = ctx.ripple_mode(),   -- 16 окт: ripple editing REAPER (0 off, 1 per track, 2 all tracks)
       -- размер и доли (2 окт): такт, доля в такте, строк на такт
+      key_label = ctx.songkey_label and ctx.songkey_label() or nil,   -- 17 ноя: лад в транспорте (не ctx.key_label — это подписи клавиш)
       sig_num = beat_info.num, sig_den = beat_info.den, bar = beat_info.bar, beat = beat_info.beat, rows_bar = beat_info.rows_bar,
     },
     tabs = ctx.top_tabs(),
@@ -33691,6 +33725,18 @@ local function frame()
         local AR = { [1818584692] = 'h', [1685026670] = 'j', [30064] = 'k', [1919379572] = 'l' }
         local m1 = ctx.mods()
         if AR[c] and not (m1.ctrl or m1.cmd or m1.alt) then c = (m1.shift and AR[c]:upper() or AR[c]):byte() end
+      end
+      -- 17 ноя: [ ] — октава клавиатуры в любом модуле (глобально), кроме тех, у кого [ ] свои: матрица (длина такта),
+      -- lib (случайный), options (вкладки), item / automation / visor / theme / rec (обрезка, сетка, …), actions, manual
+      if not typing and state.focus ~= 'tracker' and (c == 91 or c == 93) and not (ctx.mods().cmd or ctx.mods().ctrl or ctx.mods().alt) then
+        local OWN = { matrix = true, inst = true, options = true, actions = true, manual = true, help = true, mixer = true }
+        local own = OWN[state.focus] or (state.focus == 'top' and ({ sample = true, automation = true, visor = true, theme = true, retro = true })[state.toptab or ''])
+          or (state.focus == 'dsp' and DK.pads)
+        if not own then
+          vim.octave = c == 91 and math.max(0, vim.octave - 1) or math.min(8, vim.octave + 1)
+          vim.msg = 'octave ' .. vim.octave
+          return
+        end
       end
       -- макро-вид: j k J K g G — по тактам, Enter / Esc — назад в трекер
       -- 27 окт: открыта выпадашка / пикер — клавиша ей, в любом модуле (DSP, lib … забирали цифры KEYS нотами)

@@ -1396,14 +1396,18 @@ local function rawset_col(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 -- знак (- # b) рисуется тусклым, буква и октава — своим цветом. Ширина та же — 3 знака
 local SH2FL = { C = 'Db', D = 'Eb', F = 'Gb', G = 'Ab', A = 'Bb' }
 local FLAT_TONIC = { [5] = true, [10] = true, [3] = true, [8] = true, [1] = true, [6] = true }
+-- 17 ноя (3): лад — лада проекта (:key, видно в транспорте справа от размера); не задан — всегда диезы.
+-- Лад → его мажор (родительский): минор +3, дорийский −2, фригийский −4, лидийский −5, миксолидийский −7, локрийский −11
+local MODE_OFF = { major = 0, minor = 9, harmmin = 9, melmin = 9, dorian = 2, phrygian = 4, lydian = 5, mixo = 7, locrian = 11, phrygdom = 4, majpent = 0, minpent = 9, blues = 9 }
 function D.flats()
-  local H = D.HM
-  if not H then return false end
-  return FLAT_TONIC[H.minor and ((H.root or 0) + 3) % 12 or (H.root or 0)] or false
+  local r, id = nil, nil
+  if D.key_get then r, id = D.key_get() end
+  if not r then return false end
+  return FLAT_TONIC[(r - (MODE_OFF[id] or 0)) % 12] or false
 end
 function D.spell(s)
-  -- 17 ноя (2): бемоли по ладу сняты — в колонке всегда диез («это ж просто полутон»); D.FLATS_BY_KEY = true — вернуть
-  if not D.FLATS_BY_KEY or type(s) ~= 'string' or s:sub(2, 2) ~= '#' or not D.flats() then return s end
+  -- 17 ноя (2): бемоли — только когда лад проекта задан (:key / клик по ладу в транспорте) и он бемольный; иначе диез
+  if type(s) ~= 'string' or s:sub(2, 2) ~= '#' or not D.flats() then return s end
   local f = SH2FL[s:sub(1, 1)]
   return f and (f .. s:sub(3)) or s
 end
@@ -6322,6 +6326,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     { 'play', '> ' .. (c.pos or ''), c.playing and U.GREEN or U.TEXT },
     { 'bpm', c.bpm_edit and ((c.bpm_edit ~= '' and c.bpm_edit or '...') .. ' BPM') or ('%.1f BPM'):format(c.bpm or 0), c.bpm_edit and U.AMBER or U.TEXT },   -- 16 окт: при вводе слово BPM остаётся
     { 'sig', (c.sig_num and c.sig_den) and ('%d/%d'):format(c.sig_num, c.sig_den) or '4/4', U.TEXT },   -- 15 окт: размер — крупно справа от BPM
+    { 'key', c.key_label or 'key', c.key_label and U.TEXT or U.DIM },   -- 17 ноя: лад песни (:key; щелчок — выбор); по нему пишутся бемоли
   } or nil
   local bigw = 0
   -- 16 окт: BPM — постоянная ширина (по «000.0 BPM»): ввод числа и смена темпа не двигают соседей
