@@ -15545,6 +15545,15 @@ function D.popup(L, p, anchor)
   -- 6 ноя: p.full — палитра команд во всю ширину окна (над строкой ввода), одной колонкой
   if p.full then
     ncol, nrow = 1, math.min(n, maxrows)
+    -- 17 ноя: палитра команд — постоянной высоты 160 px (не прыгает при наборе / листании); длинный список
+    -- прокручивается так, чтобы выбранная строка была видна
+    nrow = math.max(3, math.floor((160 - 2 * L.pad) / L.rh) - 1)
+    if #p.lines > nrow then
+      local first = (p.hl and p.hl > nrow) and (p.hl - nrow + 1) or 1
+      local sl = {}
+      for i = first, math.min(#p.lines, first + nrow - 1) do sl[#sl + 1] = p.lines[i] end
+      p = setmetatable({ lines = sl, hl = p.hl and (p.hl - first + 1) or nil }, { __index = p })
+    end
     w = W - 2 * L.pad; colw = w
     tw = math.max(ms('WWWW'), w - (L.pad + kw + 2 * L.pad + hcol + 2 * L.pad))
   end
