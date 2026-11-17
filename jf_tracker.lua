@@ -16597,6 +16597,7 @@ ctx.env_show_next = function(col)
 end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
+ctx.tp_do = function(id, d) return ctrl_action(id, d or 0) end   -- 17 ноя: кнопка транспорта командой (:rate)
 ctx.bpm_pick = function()
   local items = {}
   for _, it in ipairs(BPM_LIST) do items[#items + 1] = { label = it[1], data = it[2] } end

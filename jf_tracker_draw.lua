@@ -5515,9 +5515,10 @@ function D.transport_groups(c, L)   -- 15 окт: L — для ширины ве
     local anym = false
     for k = 1, 10 do if c.marks and c.marks[k] then anym = true end end
     local rv = c.rate or 1
-    g[#g + 1] = { id = 'tpx',   -- 17 ноя (2): одной строкой под кнопками транспорта
-      { { 'markers', 'mark', anym and U.GREY or U.DIM }, { 'rate', ('x%.2f'):format(rv), math.abs(rv - 1) > 1e-3 and U.AMBER or U.GREY },
-        { 'punch', 'pun', c.punch and U.CYAN or U.GREY }, { 'preroll', 'pre', c.preroll and U.CYAN or U.GREY },
+    local _ = rv
+    g[#g + 1] = { id = 'tpx',   -- 17 ноя (4): блоком справа от кнопок: mark pun pre / slo qtz (скорость — у play)
+      { { 'markers', 'mark', anym and U.GREY or U.DIM }, { 'punch', 'pun', c.punch and U.CYAN or U.GREY }, { 'preroll', 'pre', c.preroll and U.CYAN or U.GREY } },
+      {
         { 'slow', c.slowrate and 'slo*' or 'slo', c.slowrec and U.RED or (c.slowrate and U.CYAN or U.GREY) }, { 'qtz', 'qtz', c.qtz and U.CYAN or U.GREY } } }
   elseif c.tpfull then
     -- 15 окт: listen — третьей строкой, под цифрой (слева — вертикальная подпись step на весь блок)
@@ -6021,10 +6022,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         if b.halves then for _, h in ipairs(b.halves) do def[h[1]] = { h[2], h[3] } end
         elseif b[1] then def[b[1]] = { b[2], b[4] or b[3] } end
       end
-      local KEYS = { tp_play = 'spc', rec = 'o-r', stophere = 'esc', slowplay = 's-c-spc' }
+      local KEYS = { tp_play = 'spc', rec = 'o-r', stophere = 'esc', rate = ':rate' }
+      local rv = c.rate or 1
+      def.rate = { ('x%.2f'):format(rv), math.abs(rv - 1) > 1e-3 and U.AMBER or U.GREY }   -- 17 ноя (4): скорость — рядом с play (вместо /2 x2)
       D.tp2_list = {}
       local sx = 0
-      for _, id in ipairs({ 'tp_start', 'tp_rew', 'tp_pause', 'freeze', 'stophere', 'slowplay', 'tp_play', 'fastplay', 'loop', 'rec', 'tp_fwd', 'tp_end' }) do
+      for _, id in ipairs({ 'tp_start', 'tp_rew', 'tp_pause', 'freeze', 'stophere', 'tp_play', 'rate', 'loop', 'rec', 'tp_fwd', 'tp_end' }) do
         local d = def[id]
         if d then
           local lab = d[1]
@@ -6046,6 +6049,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         text(hx, ly + 1, e.lab, hot and U.AMBER or (e.col or U.TEXT))
         hint('ctrl', hx, ly, e.w, L.rh, e.id)
         if D.hints_on and e.key then text(hx + math.floor((e.w - ms(e.key)) / 2), ly + L.rh + 2, e.key, U.DIM) end
+        if e.id == 'rate' then D.strip_cell.rate = { hx, ly, e.w } end
       end
       D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
       return
@@ -6329,7 +6333,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
   -- 14 ноя: клавиатура — в правом углу полосы (общая полоса окна); узко — как раньше, первой слева
   local kbblk = (D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster)) and { pri = 11, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } or nil   -- 6 ноя: панелью keys — в транспорте нет
-  if D.TP2 and by_id.tpx and not D.hints_on then   -- 17 ноя (2): кнопки одной строкой, под ними mark x1.00 pun pre slo qtz (с подсказками — под кнопками клавиши, а этот ряд — блоком справа)
+  if false and D.TP2 and by_id.tpx then   -- 17 ноя (4): ряд mark pun … — всегда блоком справа от кнопок (под кнопками — их клавиши при подсказках)
     local gx2 = by_id.tpx
     local bw2 = math.max(btot, group_w(gx2))
     order[#order + 1] = { pri = 10, w = bw2, draw = function(gx) draw_buttons(gx); draw_group(gx2, gx, bw2, ly + L.rh + 2) end }
