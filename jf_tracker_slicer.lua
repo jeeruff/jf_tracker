@@ -1669,10 +1669,11 @@ function S.draw_in(U, L, x, y, w, h, e, track, zone)
       local xa, xb = tx(a), math.max(tx(a) + 1, tx(b))
       -- 10 ноя: без заливки (волна под ней пропадала) — только края окна, сверху и снизу уголками
       gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.8)
-      gfx.rect(xa, wy, 1, wh, 1); gfx.rect(xb - 1, wy, 1, wh, 1)
-      local cw = math.min(6, math.floor((xb - xa) / 3))
-      -- 17 ноя: сверху ушки наружу (к прицелу над волной — «отсюда туда»), снизу — внутрь, как были
-      gfx.rect(xa - cw + 1, wy, cw, 1, 1); gfx.rect(xb - 1, wy, cw, 1, 1); gfx.rect(xa, wy + wh - 1, cw, 1, 1); gfx.rect(xb - cw, wy + wh - 1, cw, 1, 1)
+      -- 17 ноя (2): не во всю высоту — только уголки сверху, отогнутые наружу (к прицелу над волной); что берёт прицел —
+      -- видно фоном под волной
+      local cw = math.min(6, math.max(2, math.floor((xb - xa) / 3)))
+      gfx.rect(xa, wy, 1, cw, 1); gfx.rect(xb - 1, wy, 1, cw, 1)
+      gfx.rect(xa - cw + 1, wy, cw, 1, 1); gfx.rect(xb - 1, wy, cw, 1, 1)
       gfx.a = 1
     end
     if zt >= va and zt <= vb then gfx.set(U.AMBER[1], U.AMBER[2], U.AMBER[3], 0.45); gfx.rect(tx(zt), wy, 1, wh, 1); gfx.a = 1 end
