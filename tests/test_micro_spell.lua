@@ -16,7 +16,7 @@ local D = dofile(DIR .. '/jf_tracker_draw.lua')
 local fails = 0
 local function eq(a, b) if a ~= b then fails = fails + 1; print('FAIL', a, b) end end
 eq(D.micro_spell('C-4', nil), 'C-4'); eq(D.micro_spell('C-4', 1), 'C^4'); eq(D.micro_spell('C-4', 3), 'C+4'); eq(D.micro_spell('D-4', -3), 'Dd4')
-eq(D.micro_spell('C#4', 3), 'Dd4'); eq(D.micro_spell('C#4', -3), 'C+4'); eq(D.micro_spell('C#4', -2), 'C:4'); eq(D.micro_spell('C#4', 1), 'C˙4')
+eq(D.micro_spell('C#4', 3), 'Dd4'); eq(D.micro_spell('C#4', -3), 'C+4'); eq(D.micro_spell('C#4', -2), 'C≤4'); eq(D.micro_spell('C#4', 1), 'C>4'); eq(D.micro_spell('F#3', 2), 'F≥3'); eq(D.micro_spell('G#2', -1), 'G<2')
 eq(D.micro_spell('A#3', 3), 'Bd3'); eq(D.micro_spell('E-4', -2), 'Ew4')
 D.HM = { root = 5, minor = false }; eq(D.micro_spell('C#4', 0), 'Db4'); eq(D.micro_spell('C#4', nil), 'Db4')
 print(fails == 0 and 'micro spell ok' or 'micro spell FAILED'); os.exit(fails == 0 and 0 or 1)
