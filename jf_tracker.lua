@@ -10744,6 +10744,36 @@ ctx = {
   end,
   -- ? (6 окт): действия REAPER в стиле трекера — fzf на всю матрицу,
   -- недавние сверху (ExtState jf_tracker/act_recent)
+  -- 17 ноя: действие REAPER по имени (история палитры :, Space Space) — запуск и наверх в недавние
+  act_run_name = function(nm)
+    if not reaper.CF_EnumerateActions then vim.msg = 'actions: needs SWS (CF_EnumerateActions)'; return end
+    if not ctx.act_items then
+      local items, i = {}, 0
+      while true do
+        local id, name = reaper.CF_EnumerateActions(0, i, '')
+        if not id or id <= 0 then break end
+        if name and name ~= '' then items[#items + 1] = { label = name, data = id } end
+        i = i + 1
+      end
+      ctx.act_items = items
+    end
+    for _, it in ipairs(ctx.act_items) do
+      if it.label == nm then
+        reaper.Main_OnCommand(it.data, 0)
+        local rec = { nm }
+        for n2 in (reaper.GetExtState(EXT, 'act_recent') or ''):gmatch('[^\n]+') do if n2 ~= nm and #rec < 30 then rec[#rec + 1] = n2 end end
+        reaper.SetExtState(EXT, 'act_recent', table.concat(rec, '\n'), true)
+        vim.msg = 'action: ' .. nm
+        return true
+      end
+    end
+    vim.msg = 'action not found: ' .. nm
+  end,
+  act_recent = function(n)
+    local out = {}
+    for nm in (reaper.GetExtState(EXT, 'act_recent') or ''):gmatch('[^\n]+') do out[#out + 1] = nm; if #out >= (n or 5) then break end end
+    return out
+  end,
   actions_picker = function()
     if not reaper.CF_EnumerateActions then vim.msg = 'actions: needs SWS (CF_EnumerateActions)'; return end
     if not ctx.act_items then

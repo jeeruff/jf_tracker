@@ -1497,6 +1497,11 @@ function V.pal_lists()
     local l = hist[i]
     if not seen[l] and l:match('%S') then seen[l] = true; table.insert(H, 1, { cmd = l, run = true }); if #H >= 10 then break end end
   end
+  -- 17 ноя: и недавние действия REAPER (! имя) — над командами, свежее ниже
+  if ctx.act_recent then
+    local ar = ctx.act_recent(5)
+    for i = 1, #ar do table.insert(H, 1, { cmd = '! ' .. ar[i], act = ar[i], run = true }) end
+  end
   local here, where = {}, nil
   if ctx.cmd_here then here, where = ctx.cmd_here() end
   local E = {}
@@ -2352,11 +2357,15 @@ function V.key_impl(c)
         local it = L[V.pal.i]
         V.pal = nil
         if not it then return end
+        if it.act and ctx.act_run_name then V.mode = back; V.cmdline = ''; ctx.act_run_name(it.act); return end   -- 17 ноя: действие REAPER из истории
         if it.run then V.cmdline = it.cmd; return V.key(ENTER) end
         V.cmdline = it.cmd; return
       end
-      if #L == 0 then return end
       local d = c == UP and -1 or 1
+      -- 17 ноя: ↓ за концом history — в here (команды модуля), ↑ над началом here — в history: один список
+      if V.pal.sec == 'hist' and d > 0 and V.pal.i and V.pal.i >= #L and #P.here > 0 then V.pal.sec, V.pal.i = 'here', 1; return end
+      if V.pal.sec == 'here' and d < 0 and V.pal.i and V.pal.i <= 1 and #P.hist > 0 then V.pal.sec, V.pal.i = 'hist', #P.hist; return end
+      if #L == 0 then return end
       if not V.pal.i then V.pal.i = (V.pal.sec == 'hist') and #L or 1
       else V.pal.i = math.max(1, math.min(#L, V.pal.i + d)) end
       return
@@ -4574,7 +4583,13 @@ function V.hydra_key(c)
   if c == 32 and h then
     local own = false
     for _, it in ipairs(h.items or {}) do if it.key == ' ' or it.key == 'Space' then own = true end end
-    if not own then ch = ':' end
+    if not own then   -- 17 ноя: Space Space — строка команды сразу с курсором на последней из истории (команды и действия REAPER)
+      V.hydra = nil; V.hydra_stack = {}
+      V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = ''; V.prompt = nil; V.count = nil
+      local P = V.pal_lists()
+      V.pal = #P.hist > 0 and { sec = 'hist', i = #P.hist } or nil
+      return
+    end
   end
   if (ch == ':' or ch == '/') and h then
     local own = false
