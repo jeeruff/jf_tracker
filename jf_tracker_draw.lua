@@ -15258,6 +15258,15 @@ end
 function D.popup(L, p, anchor)
   D.popup_hot, D.popup_rect, D.popup_pick, D.popup_group, D.popup_gcols = nil, nil, nil, nil, nil
   if not p or not p.lines then return end
+  -- 17 ноя: внизу окна строка-подсказка меню («: команда / поиск …») — не пунктом, а рядом с заголовком в нижней строке
+  local tail
+  if D.pop_bottom and p.kind == 'hydra' and not (anchor and (anchor.box or anchor.nodock)) and p.lines[#p.lines] and p.lines[#p.lines].key == ': /' then
+    local l2 = {}
+    for i = 1, #p.lines - 1 do l2[i] = p.lines[i] end
+    tail = p.lines[#p.lines].text
+    local p2 = {}; for k, v in pairs(p) do p2[k] = v end
+    p2.lines = l2; p = p2
+  end
   local W = gfx.w
   local sy = L.body_y + L.body_h
   local n = #p.lines
@@ -15276,6 +15285,10 @@ function D.popup(L, p, anchor)
   -- взгляд прыгал). Меню с буквами (hydra, which-key) — низкой полосой в несколько колонок: столько колонок, сколько
   -- влезает по ширине, строк — от 6. Списки с выбором (поиск, палитра) — одной колонкой, как были. Ввод имени — у курсора
   local dock = D.pop_bottom and p.kind ~= 'prompt' and not (anchor and (anchor.box or anchor.nodock))   -- 15 ноя: nodock — список у своего места (пресеты)
+  -- 17 ноя: внизу окна — как which-key Emacs: без рамки, «клавиша : описание», заголовок (префикс) — нижней строкой
+  local wk = dock and p.kind == 'hydra'
+  local kw0 = kw
+  if wk then kw = kw + ms(' :') end
   if dock and p.kind == 'hydra' and not p.groups and not p.full then
     local hw0 = hw > 0 and (hw + 2 * L.pad) or 0
     local cw0 = L.pad + kw + 2 * L.pad + hw0 + tw + 2 * L.pad
@@ -15346,8 +15359,11 @@ function D.popup(L, p, anchor)
   y = math.max(2, math.min(y, gfx.h - h - 2))         -- высокое меню целиком в окне (5 окт)
   D.popup_rect = { x, y, w, h }
   set(U.PANEL); gfx.rect(x, y, w, h, 1)
-  -- рамка поярче (2 окт): видна поверх любого модуля
-  set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0)
+  -- рамка поярче (2 окт): видна поверх любого модуля; 17 ноя: внизу окна — без рамки (как which-key: только нужное)
+  if not dock then set(U.mix(U.LINE, U.TEXT, 0.45)); gfx.rect(x, y, w, h, 0); gfx.rect(x + 1, y + 1, w - 2, h - 2, 0) end
+  -- строка заголовка / поиска: внизу окна — последней (как минибуфер Emacs), иначе — первой
+  local trow, roff = 0, 1
+  if dock then trow, roff = nrow, 0 end
   if p.kind == 'prompt' then
     local t = p.title or ''
     local tx, ty = x + L.pad, y + L.pad
@@ -15359,7 +15375,7 @@ function D.popup(L, p, anchor)
   end
   if p.search_head then
     -- 18 окт: поиск выбора — набранное, мигающий курсор; пусто — тусклое приглашение
-    local tx, ty = x + L.pad, y + L.pad
+    local tx, ty = x + L.pad, y + L.pad + trow * L.rh
     local head = fit(p.search_head, w - 2 * L.pad)
     text(tx, ty, head, U.CYAN); tx = tx + ms(head)
     if p.search ~= '' then
@@ -15371,7 +15387,9 @@ function D.popup(L, p, anchor)
     if p.search == '' then local ph = 'type to search'; text(tx, ty, ph, U.DIM); tx = tx + ms(ph) end
     text(tx, ty, fit(p.search_tail or '', math.max(0, x + w - L.pad - tx)), U.GREY)   -- не за рамку
   else
-    text(x + L.pad, y + L.pad, fit(p.title or '', w - 2 * L.pad), p.kind == 'hydra' and U.AMBER or U.CYAN)
+    local tt = fit((p.title or '') .. (wk and '-' or ''), w - 2 * L.pad)
+    text(x + L.pad, y + L.pad + trow * L.rh, tt, p.kind == 'hydra' and (wk and U.GREY or U.AMBER) or U.CYAN)
+    if tail then local tx2 = x + L.pad + ms(tt) + 3 * L.pad; text(tx2, y + L.pad + trow * L.rh, fit('[' .. tail .. ']', math.max(0, x + w - L.pad - tx2)), U.DIM) end
   end
   if p.groups then
     local cx = x
@@ -15381,14 +15399,14 @@ function D.popup(L, p, anchor)
       for i, t in ipairs(G.lines) do
         if i > nrow then break end
         local gi = G.first + i - 1
-        local ly = y + L.pad + i * L.rh
+        local ly = y + L.pad + (i - 1 + roff) * L.rh
         local on = gi == G.sel
         local mhot = gfx.mouse_x >= cx + L.pad and gfx.mouse_x < cx + cw and gfx.mouse_y >= ly and gfx.mouse_y < ly + L.rh
         if mhot then D.popup_group = { k, gi } end
         if on or mhot then set(on and (foc and D.CURROW or U.tint(U.AMBER, 0.15)) or D.CURROW); gfx.rect(cx + L.pad, ly, cw - 2 * L.pad, L.rh, 1) end
         text(cx + 2 * L.pad, ly + 1, fit(t, cw - 3 * L.pad), on and U.AMBER or (foc and U.TEXT or U.GREY))
       end
-      set(U.LINE); gfx.rect(cx + cw - L.pad, y + L.pad + L.rh, 1, h - 2 * L.pad - L.rh, 1)
+      set(U.LINE); gfx.rect(cx + cw - L.pad, y + L.pad + roff * L.rh, 1, h - 2 * L.pad - L.rh, 1)
       D.popup_gcols = D.popup_gcols or {}; D.popup_gcols[#D.popup_gcols + 1] = { x0 = cx, x1 = cx + cw, k = k, sel = G.sel, n = G.n or #G.lines }   -- 25 окт: колесо — своя колонка
       cx = cx + cw
     end
@@ -15397,7 +15415,7 @@ function D.popup(L, p, anchor)
     local ci = math.floor((i - 1) / nrow)
     local ri = (i - 1) % nrow
     local lx = x + L.pad + ci * colw + gw
-    local ly = y + L.pad + (ri + 1) * L.rh
+    local ly = y + L.pad + (ri + roff) * L.rh
     if lx + colw > x + w + L.pad + 1 and ci > 0 then break end
     -- мышь (5 окт): строка гидры под мышью подсвечена, клик — её буква
     -- 10 окт: и пикер (fzf-список) — строка под мышью подсвечена, клик — выбор
@@ -15408,6 +15426,7 @@ function D.popup(L, p, anchor)
     if p.hl == i and p.kind == 'picker' then set(U.tint(U.AMBER, 0.3)); gfx.rect(lx, ly, colw - L.pad, L.rh, 1)   -- 18 окт: выбранное в поиске — заметно
     elseif p.hl == i or mhot then set(D.CURROW); gfx.rect(lx, ly, colw - L.pad, L.rh, 1) end
     text(lx + L.pad, ly + 1, ln.key or '', p.kind == 'hydra' and U.AMBER or U.TEXT)
+    if wk and (ln.key or '') ~= '' and (ln.text or '') ~= '' then text(lx + L.pad + kw0 + ms(' '), ly + 1, ':', U.DIM) end
     if ln.hk and D.hints_on then text(lx + L.pad + kw + 2 * L.pad, ly + 1, fit(ln.hk, hw), U.CYAN) end
     if ln.chips then   -- 16 окт: «клавиша имя» подряд, клавиша — янтарём
       local cx = lx + L.pad + kw + 2 * L.pad + hcol
