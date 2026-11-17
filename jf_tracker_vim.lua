@@ -2749,7 +2749,7 @@ function V.key_impl(c)
     local k = dg == 0 and 10 or dg
     -- 17 ноя: две цифры быстро (за 0,25 с) — двузначный номер трека: Cmd+1, Cmd+2 → трек 12 (первая цифра уже перенесла
     -- курсор на трек 1 — вторая уточняет)
-    local now = reaper.time_precise and reaper.time_precise() or os.clock()
+    local now = (reaper and reaper.time_precise) and reaper.time_precise() or os.clock()
     if V.cmdnum and now - V.cmdnum.t < 0.25 then k = V.cmdnum.d * 10 + dg; V.cmdnum = nil
     else V.cmdnum = { d = dg, t = now } end
     local to
