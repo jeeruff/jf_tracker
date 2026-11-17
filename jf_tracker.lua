@@ -94,6 +94,7 @@ local MMX = dofile(DIR .. '/jf_tracker_modmatrix.lua')
 MMX.CH = dofile(DIR .. '/jf_tracker_chord.lua')   -- аккорды: анализатор / гармонайзер (8 окт); полем MMX — предел локальных
 draw.CH = MMX.CH
 MMX.HM = dofile(DIR .. '/jf_tracker_harm.lua')   -- вкладка harmonizer (8 окт)
+draw.HM = MMX.HM   -- 17 ноя: лад для написания нот в колонке (Db4 в бемольных ладах)
 MMX.PRS = dofile(DIR .. '/jf_tracker_presets.lua')   -- 16 окт: пресеты инструментов — шаблоны треков по папкам
 MMX.SRG = dofile(DIR .. '/jf_tracker_surge.lua')   -- 16 окт: патчи Surge XT через чанк трека
 MMX.CM = dofile(DIR .. '/jf_tracker_ctrlmouse.lua')   -- мышь с Ctrl: универсальная ручка, Cmd / Shift-выделение, XY (8 окт)

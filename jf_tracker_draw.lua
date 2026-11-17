@@ -532,7 +532,7 @@ function D.layout_core(snap, state, nregions)
   L.pad = math.max(ms(' '), 2)   -- 6 ноя: битмап меряет пробел как 0 — в пиксельном режиме текст ложился на рамки кнопок
   if L.pad < 2 then L.pad = math.max(3, math.floor(ms('W') / 2)) end
   L.cw = ms('W')
-  L.w_note = ms('C#4')   -- 2 ноя: место под метку микротона (^^) — только у лейна, где микротоны есть (L.microG)
+  L.w_note = math.max(ms('C#4'), ms('Db4'), ms('C-4'))   -- 17 ноя: нота — всегда 3 знака (C-4 C#4 Db4)   -- 2 ноя: место под метку микротона (^^) — только у лейна, где микротоны есть (L.microG)
   EMPTY[1] = '...'
   L.w_vol = ms('FF')
   L.w_del = ms('FF')
@@ -1391,7 +1391,27 @@ D.set = set
 local function rawset_col(c, a) gfx.set(c[1], c[2], c[3], a or 1) end
 -- bg — непрозрачная подложка (для инверсного курсора); без bg при масштабе
 -- >1 текст блитится аддитивно (чёрный фон картинки не виден)
-local function text(x, y, s, col, bg)
+-- 17 ноя: имя ноты по ладу — в бемольных ладах (F Bb Eb Ab Db Gb мажор и их миноры, лад из модуля гармонии: D.HM) C#4 → Db4;
+-- знак (- # b) рисуется тусклым, буква и октава — своим цветом. Ширина та же — 3 знака
+local SH2FL = { C = 'Db', D = 'Eb', F = 'Gb', G = 'Ab', A = 'Bb' }
+local FLAT_TONIC = { [5] = true, [10] = true, [3] = true, [8] = true, [1] = true, [6] = true }
+function D.flats()
+  local H = D.HM
+  if not H then return false end
+  return FLAT_TONIC[H.minor and ((H.root or 0) + 3) % 12 or (H.root or 0)] or false
+end
+function D.spell(s)
+  if type(s) ~= 'string' or s:sub(2, 2) ~= '#' or not D.flats() then return s end
+  local f = SH2FL[s:sub(1, 1)]
+  return f and (f .. s:sub(3)) or s
+end
+local text
+function D.note_text(x, y, s, col, dim)
+  local l, a, o = (s or ''):match('^([A-G])([%-#b])(.+)$')
+  if not l then text(x, y, s, col); return end
+  text(x, y, l, col); text(x + ms(l), y, a, dim); text(x + ms(l .. a), y, o, col)
+end
+function text(x, y, s, col, bg)
   if s == nil or s == '' then return end
   -- 9 окт, стандарт: текст не выходит за модуль. D.clip = { x0, x1 } ставит
   -- отрисовка модуля; всё, что правее x1, обрезается (fit), левее x0 — нет
@@ -3015,8 +3035,9 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     local offkey = D.key_pcs and cell.pitch and not cell.video and not D.key_pcs[math.floor(cell.pitch + 0.5) % 12]   -- 21 окт: нота вне лада (:key mark)
-    if D.on_wave then D.halo(x + L.x_note, ty, cell.video and 'VID' or cell.note) end   -- 17 ноя: имя ноты поверх волны — с каймой фона
-    text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))))   -- видео-событие (9 окт)
+    local nname = cell.video and 'VID' or D.spell(cell.note)
+    if D.on_wave then D.halo(x + L.x_note, ty, nname) end   -- 17 ноя: имя ноты поверх волны — с каймой фона
+    D.note_text(x + L.x_note, ty, nname, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))), c(1, U.DIM))   -- видео-событие (9 окт)
     if cell.micro and L.micro_w and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
     if L.narrow or L.notes_only then
