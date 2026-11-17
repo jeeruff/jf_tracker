@@ -10983,7 +10983,28 @@ ctx = {
     elseif not state.popup_at then state.popup_at = { kind = 'xy', x = gfx.mouse_x, y = gfx.mouse_y + 4 } end
   end,
   -- 18 окт: размер — выпадашка (крупно N/D, таблица, область), не строка :sig; rg — паттерн из матрицы
-  sig_prompt = function(rg)
+  -- 17 ноя: размер — гидрой внизу, всё с клавиатуры (было окно-сетка с кнопками): цифра — частый размер, p — паттерн /
+  -- весь проект, c — свой N/D строкой (:sig). Старое окно — ctx.sig_prompt_grid
+  sig_prompt = function(rg) return ctx.sig_hydra(rg) end,
+  sig_hydra = function(rg, scope)
+    local t = rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0)
+    local n, d = ctx.sig_at(t)
+    local here = rg or pooled.region_at(regions, t)
+    scope = scope or (rg and 'here' or 'all')
+    if not here then scope = 'all' end
+    if rg and scope == 'here' then state.sig_rgs = ctx.mx_sel_rgs() end
+    local sl = scope == 'here' and ('this pattern ' .. (here.name ~= '' and here.name or '')) or 'whole project'
+    local function pick(nn, dd) return function() state.sig_rg = (scope == 'here' and here) and here.idx or nil; ctx.sig_cmd(('%d/%d %s'):format(nn, dd, scope)) end end
+    local items = {}
+    for _, e in ipairs({ { '2', 2, 4 }, { '3', 3, 4 }, { '4', 4, 4 }, { '5', 5, 4 }, { '6', 6, 8 }, { '7', 7, 8 }, { '9', 9, 8 }, { '0', 12, 8 },
+                         { 'f', 5, 8 }, { 's', 7, 4 }, { 't', 3, 8 }, { 'x', 6, 4 } }) do
+      items[#items + 1] = { key = e[1], label = ('%d/%d'):format(e[2], e[3]) .. ((e[2] == n and e[3] == d) and '  *' or ''), fn = pick(e[2], e[3]) }
+    end
+    items[#items + 1] = { key = 'p', label = 'for: ' .. sl .. ' (p - switch)', fn = function() ctx.sig_hydra(rg, scope == 'here' and 'all' or 'here') end }
+    items[#items + 1] = { key = 'c', label = 'custom N/D ...', fn = function() vim.open_prompt('sig ', ('%d/%d %s'):format(n, d, scope)) end }
+    vim.open_hydra({ title = ('time signature %d/%d - %s'):format(n, d, sl), items = items })
+  end,
+  sig_prompt_grid = function(rg)
     local t = rg and rg.pos or edit.row_time(vim.cur.row, state.lpb, 0)
     local n, d = ctx.sig_at(t)
     local here = rg or pooled.region_at(regions, t)
@@ -16565,6 +16586,16 @@ ctx.env_show_next = function(col)
   vim.msg = ('%s shown%s'):format(nm or 'envelope', left > 0 and (' - %d more hidden (+ again)'):format(left) or ' - all automation of the track is visible')
   return true
 end
+-- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
+ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
+ctx.bpm_pick = function()
+  local items = {}
+  for _, it in ipairs(BPM_LIST) do items[#items + 1] = { label = it[1], data = it[2] } end
+  vim.open_picker(('BPM %.1f - type to filter, Enter (a number: :bpm N)'):format(reaper.Master_GetTempo()), items, function(it)
+    if it.data == 'item' then local b, why = bpm_from_item(); if b then set_bpm(b, why) else vim.msg = 'BPM: ' .. why end
+    elseif type(it.data) == 'number' then set_bpm(it.data) end
+  end)
+end
 ctx.dedup = function()
   local n, nt = 0, 0
   local hook = edit.after; edit.after = nil
@@ -20445,8 +20476,7 @@ local function hint_go(t)
     vim.msg = (d == 'ratebar' and 'playrate' or 'swing') .. ': h l change (H L fine), 0 reset, Esc done'
   elseif t.kind == 'ctrl' and d == 'bpm' then   -- 24 окт: f на BPM — его выпадашка (как щелчок): j k Enter, цифры — ввод числа
     ctx.set_focus('ctrl'); state.ctrl_sel = 'bpm'   -- 25 окт: и фокус — на BPM (модуль транспорта, курсор на нём)
-    bpm_menu = { sel = 1 }
-    vim.msg = 'BPM: j k Enter - pick, digits - type the tempo, Esc'
+    ctx.bpm_pick()
   elseif t.kind == 'ctrl' and ctx.ctrl_menu and ctx.ctrl_menu(d) then   -- 12 окт: f на ячейке транспорта — её выпадашка (выбор с клавиатуры)
   elseif t.kind == 'ctrl' then ctrl_action(d, 0)
   elseif t.kind == 'pool' and d == 'auto' then ctx.set_focus('inst'); ctx.auto_select()
@@ -30368,7 +30398,7 @@ local function frame()
       ::dsp_click_done::
     elseif hover.ctrl == 'bpm' then
       if dbl and click.zone == 'bpm' then bpm_menu = nil; state.bpm_edit = ''
-      else bpm_menu = bpm_menu and nil or { sel = 1 } end
+      else ctx.bpm_pick() end   -- 17 ноя: список внизу
       click = { t = now2, zone = 'bpm' }
     elseif hover.ctrl == 'ratebar' and dbl and click.zone == 'ratebar' then
       -- 20 окт: двойной клик по скорости — x1, слайдер закрыть
@@ -31188,7 +31218,7 @@ local function frame()
   elseif U.rclick and hover.matrix and hover.matrix.secloop then ctx.sec_menu(hover.matrix.secloop); U.rclick = false   -- 18 окт: меню секции — ПКМ
   elseif U.rclick and hover.tlist then local c2 = snap and snap.cols[hover.tlist.ci]; if c2 then ctx.track_menu(c2) end   -- 11 окт: tracks — меню трека (скрыть — столбец T)
   elseif U.rclick and hover.poolbsync then ctx.set_focus('inst'); ctx.bsync_menu()
-  elseif U.rclick and hover.ctrl == 'bpm' then bpm_menu = bpm_menu and nil or { sel = 1 }   -- 25 окт: ПКМ на BPM — его выпадашка (как щелчок)
+  elseif U.rclick and hover.ctrl == 'bpm' then ctx.bpm_pick()   -- 25 окт: ПКМ на BPM — его выпадашка (как щелчок)
   elseif U.rclick and hover.ctrl == 'freeze' then ctx.freeze_menu()
   elseif U.rclick and (hover.ctrl == 'slowbtn' or hover.ctrl == 'slowplay') then ctrl_action('slow', 0)
   elseif U.rclick and (hover.ctrl == 'rec' or hover.ctrl == 'tp_play') then

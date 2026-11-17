@@ -5866,7 +5866,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local function cw_of(it)
     if it.big then return math.max(D.big_measure(it[2], 2), it.res and D.big_measure(it.res, 2) or 0) + (it.vlab and (L.th + L.pad) or 0) end   -- 15 окт: vlab — подпись вертикально слева
     if it.w then return it.w end
-    return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (math.max(it.beats.num, it.bres or 0) * (math.max(4, L.rh - 2) + 2) + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
+    return math.max(ms(it[2]), it.res and ms(it.res) or 0) + (it.beats and (math.max(it.beats.num, it.bres or 0) * ms('!') + L.pad) or 0) + (it.slider and (8 * L.cw) or 0) end
   -- 12 окт: boxed — ячейки в рамках, промежуток шире (step / inst / LPB / vel / pitch / listen)
   local function gap_of(g) return g.boxed and (gap + 3) or gap end
   -- 12 окт: bracket — группа в квадратных скобках, слева её имя вертикально (step)
@@ -5918,11 +5918,12 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         elseif it.big then D.big_text(cx, cy, it[2], hot and U.AMBER or (it[3] or U.TEXT), 2)
         elseif it[1] ~= '_' then text(cx, cy + 1, it[2], hot and U.AMBER or (it[3] or U.TEXT)) end
         if it.beats then
-          local bs = math.max(4, L.rh - 2)   -- 14 ноя: счётчик долей крупнее (было rh - 6)
+          -- 17 ноя: доли текстом, как в трекере: «.!..» — «!» на текущей доле (было квадратиками)
           local bx = cx + ms(it[2]) + L.pad
+          local cw1 = ms('!')
           for k = 1, (it.bres and math.min(it.beats.num, it.bres) or it.beats.num) do   -- 25 окт: не шире зарезервированного
-            set(k == it.beats.cur and U.AMBER or U.DIM)
-            gfx.rect(bx + (k - 1) * (bs + 2), cy + math.floor((L.rh - bs) / 2), bs, bs, k == it.beats.cur and 1 or 0)
+            local on = k == it.beats.cur
+            text(bx + (k - 1) * cw1, cy + 1, on and '!' or '.', on and U.AMBER or U.GREY)
           end
         end
         if it.slider and it.slider.rate then
@@ -6207,9 +6208,9 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local BKT = c.bigbpm and 2 or 1   -- 19 окт: опция big time and BPM — крупно (x2) / обычным текстом на том же месте
   if big then for i, b in ipairs(big) do b.w = D.big_measure(b[2], BKT); if b[1] == 'bpm' then b.w = math.max(b.w, D.big_measure('000.0 BPM', BKT)) end
     -- 17 ноя: две строки — время справа от позиции (второй строкой), метроном и доли справа от размера
-    if D.TP2 and b[1] == 'play' and c.time then b.w = b.w + 2 * L.pad + ms('00:00.000') end
+    if D.TP2 and b[1] == 'play' then b.w = math.max(ms(b[2]), ms(c.time or '0:00.000')) end   -- 17 ноя (2): позиция обычным шрифтом, время под ней
     if D.TP2 and b[1] == 'sig' then b.w = math.max(b.w, D.big_measure('12/16', BKT)) + 2 * L.pad + math.max(ms('metro'), 4 * (L.rh) + L.pad) end
-    bigw = bigw + b.w + (i > 1 and 6 * L.pad or 0) end end   -- 14 ноя: время / BPM / размер не слипаются (было 3 pad)
+    bigw = bigw + b.w + (i > 1 and (D.TP2 and 3 or 6) * L.pad or 0) end end   -- 14 ноя: время / BPM / размер не слипаются (было 3 pad)
   local function draw_big(bx)
     local bx0 = bx
     local bpm_x = bx
@@ -6220,10 +6221,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local kbd = info.focus == 'ctrl' and info.ctrl_sel == b[1]
       if kbd then set(U.tint(U.AMBER, 0.35)); gfx.rect(bx - 2, ly, b.w + 4, 2 * L.rh, 1) end
       D.ctrl_rect = D.ctrl_rect or {}; D.ctrl_rect[b[1]] = { bx, ly + L.rh, b.w, L.rh }
-      D.big_text(bx, ly + ((BKT == 1 and not D.sig_stack) and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT)   -- 4 ноя: стопкой — время в первой строке
+      if D.TP2 and b[1] == 'play' then text(bx, ly + 1, b[2], (hot or kbd) and U.AMBER or b[3])
+      else D.big_text(bx, ly + ((BKT == 1 and not D.sig_stack) and math.floor(L.rh / 2) or 0), b[2], (hot or kbd) and U.AMBER or b[3], BKT) end   -- 4 ноя: стопкой — время в первой строке
       if hot then hover.ctrl = b[1] end
       hint('ctrl', bx, ly, b.w, 2 * L.rh, b[1])
-      bx = bx + b.w + 6 * L.pad
+      bx = bx + b.w + (D.TP2 and 3 or 6) * L.pad
     end
     -- 11 окт: full — размер, метроном и доли одной строкой под крупными временем и BPM
     -- 14 ноя: общая полоса окна — под позицией время, под BPM метроном и счётчик долей
@@ -6231,7 +6233,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       for _, b in ipairs(big) do
         local cr = D.ctrl_rect and D.ctrl_rect[b[1]]
         local bx2 = cr and cr[1] or bx0
-        if b[1] == 'play' and c.time then text(bx2 + b.w - ms(c.time), ly + L.rh + 1, c.time, U.GREY) end
+        if b[1] == 'play' and c.time then text(bx2, ly + L.rh + 1, c.time, U.mix(U.GREY, U.DIM, 0.4)) end   -- 17 ноя (2): под позицией, тише
         if b[1] == 'sig' and D.sig_line then
           local mx2 = bx2 + math.max(D.big_measure(b[2], BKT), D.big_measure('12/16', BKT)) + 2 * L.pad
           draw_group(D.sig_line, mx2, bx2 + b.w - mx2, ly)
@@ -6248,7 +6250,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   for _, g in ipairs(D.transport_groups(c, L)) do by_id[g.id or g[1][1][1]] = g end
   local order = {}
   -- 6 ноя: pri — что выпадает первым, когда полоса не влезает (меньше — раньше); кнопки транспорта — последними
-  local PRI = { step = 11, listen = 3, play = 7, rate = 2, sig = 2, punch = 1 }   -- 11 ноя: step и клавиатура — до последнего (кнопки транспорта 10 выпадают раньше: Space и так играет)
+  local PRI = { step = 11, listen = 3, play = 7, rate = 2, sig = 2, punch = 1, swing = 6, tpx = 8 }   -- 17 ноя: свинг и mark / pun … не выпадают первыми   -- 11 ноя: step и клавиатура — до последнего (кнопки транспорта 10 выпадают раньше: Space и так играет)
   local function addg(id) if by_id[id] then order[#order + 1] = { pri = PRI[id] or 2, w = group_w(by_id[id]), draw = function(gx, gw) draw_group(by_id[id], gx, gw) end } end end
   -- 16 окт: где курсор — у клавиатуры (был модлайн): трек, ниже колонка и строка
   do

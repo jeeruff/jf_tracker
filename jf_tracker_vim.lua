@@ -1484,7 +1484,7 @@ V.COMMANDS = {
   { 'loops', '', 'matrix loops layer: cells show item loop periods, digits+Enter / > < + - edit them' },
   { 'vel', 'N', 'velocity of inserted notes 1..127 ({ } with frow, c C with qwerty)' },
   { 'loop', '[N|region|off]', 'loop item to region end (>), N = loop period in rows (N>), region = region to item end (<), off' },
-  { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
+  { 'bpm', '[N]', 'the project tempo: :bpm 174; without a number - the list (also a click on BPM)' }, { 'patai', '[all]', 'wrap the automation of the cursor pattern (all - of every pattern) into automation items the length of the pattern; repeats of the pattern get linked items' }, { 'dedup', '', 'remove exact duplicate items (same track, position, length, lane and content) - one undo step' }, { 'deltime', '[N] [all]', 'delete N rows of time in region (Backspace / Shift)' }, { 'instime', '[N] [all]', 'insert N rows of time in region (Opt+Backspace; Shift - all tracks)' },
   { 'ramp', 'xx [len]', 'envelope ramp to xx (hex) over len rows / Nb beats; VISUAL: selection' },
   { 'fade', 'in|out [len]', 'fade of audio event over len rows / Nb beats' },
 }
@@ -1590,6 +1590,7 @@ local function run_cmd(line)
   elseif cmd == 'smk' then if ctx.smk_transients then ctx.smk_transients() end   -- 10 ноя
   elseif cmd == 'log' then if ctx.log_show then ctx.log_show() end   -- 10 ноя: что происходило
   elseif cmd == 'dedup' then if ctx.dedup then ctx.dedup() end   -- 14 ноя
+  elseif cmd == 'bpm' then if tonumber(arg) and ctx.set_bpm then ctx.set_bpm(math.max(10, math.min(960, tonumber(arg)))) elseif ctx.bpm_pick then ctx.bpm_pick() end   -- 17 ноя
   elseif cmd == 'patai' then if ctx.patai then ctx.patai(arg) end   -- 16 ноя
   elseif cmd == 'debug' then if (arg or ''):match('^%s*share') then if ctx.debug_share then ctx.debug_share() end else st.debug = not st.debug end   -- 5 ноя: :debug share
   elseif cmd == 'fold' then ctx.fold_all(true)
