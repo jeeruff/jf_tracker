@@ -1744,6 +1744,8 @@ function B.enter()
     R.Main_openProject(e.path); if ctx.msg then ctx.msg('opened ' .. e.name .. ' - File > Save as to keep it as the project') end; return
   end
   if e.db then B.db = e; B.cur = 1; B.filter = ''; B.refresh_db()
+    if e.file then R.SetExtState('jf_tracker', 'sfdb', e.file, true) end   -- 17 ноя: база запоминается (Shift+F, после :reload тоже)
+    if B.on_db_pick then local f = B.on_db_pick; B.on_db_pick = nil; f() end
   elseif e.pmdir then B.pmdir = e.pmdir; B.cur = 1; B.filter = ''; B.refresh_pm()
   elseif e.pmfolder then B.pmfolder = e.pmfolder; B.pm = nil; B.cur = 1; B.filter = ''; B.set_all(B.read_pm())   -- папка проектов (без jf_pm)
   elseif e.dir then

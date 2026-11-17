@@ -36848,8 +36848,14 @@ ctx.sample_find = function(mode)
   -- 20 окт: Shift+F — поиск в базе (Media Explorer; база запоминается), Shift+Opt+F — сначала выбрать базу
   if B.mode ~= 'db' then B.set_mode('db') end
   ctx.pane_focus('browser')
+  -- 17 ноя: база — прошлая (ExtState sfdb: не терялась при переходе во files и после :reload); выбор — только Shift+Opt+F
+  if not B.db and mode ~= 'pickdb' then
+    local want = reaper.GetExtState(EXT, 'sfdb')
+    if want ~= '' then for _, d in ipairs(B.read_dbs() or {}) do if d.file == want then B.db = d; B.cur = 1; B.filter = ''; B.refresh_db(); break end end end
+  end
   if mode == 'pickdb' or not B.db then
     B.db = nil; B.cur = 1; B.filter = ''; B.refresh_db()
+    B.on_db_pick = function() if ctx.sf_target then B.start_find() end end   -- база выбрана — сразу строка поиска
     vim.msg = ('sample find for %s @ %04d: pick a database (Enter), then / to find, j k listen, Enter - put it there, Esc - cancel'):format(f.col.name ~= '' and f.col.name or 'track', vim.cur.row)
     return
   end
