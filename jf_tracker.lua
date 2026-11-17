@@ -40955,10 +40955,14 @@ ctx.lib_tree_nav = function(c)
     return false
   end
   if c == 27 then ctx.lib_tsel = nil; return false end
+  -- 17 ноя (ревизия): курсор на разделе / пэде / эффекте — клавиши lib для ЗВУКА (x d p s L o …) не доходят до выбранного
+  -- инструмента (на ките x удалял бы весь кит, когда курсор стоит на пэде)
+  local GUARD = { x = 1, d = 1, D = 1, p = 1, P = 1, c = 1, s = 1, L = 1, o = 1, v = 1, y = 1, J = 1, K = 1 }
+  local function guard() if GUARD[ch] then vim.msg = ('%s: not on a %s (h - up to the sound)'):format(ch, t.kind == 'sec' and 'section' or 'pad'); return true end return false end
   if t.kind == 'sec' then
     if ch == 'l' or c == RT or c == 13 then draw.LIBSEC_CLOSED[t.sec] = nil; return true end
     if ch == 'h' or c == LF then draw.LIBSEC_CLOSED[t.sec] = true; return true end
-    return false
+    return guard()
   end
   local col, f = lib_kit_by_key(t.key)
   if not f then ctx.lib_tsel = nil; return false end
@@ -40980,7 +40984,7 @@ ctx.lib_tree_nav = function(c)
       model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
       if ctx.preview_file then ctx.preview_file(path) end
       vim.msg = ('pad %02d: %s (%d/%d)'):format(t.k, path:match('[^/]+$'), H.i, #H.list)
-    else return false end
+    else return guard() end
     return true
   end
   -- эффект пэда
@@ -41010,7 +41014,7 @@ ctx.lib_tree_nav = function(c)
       ctx.pane_cmd('fxb show')
       FB.typing, FB.col = true, 2
     else vim.open_picker(('fx into pad %02d'):format(ki), ctx.fx_list(), function(x) put(x.data or x.label) end) end
-  else return false end
+  else return guard() end
   return true
 end
 ctx.lib_dir_on = function() return ctx.lib_dir ~= nil and ctx.lib_dir == vim.inst end   -- 17 ноя: внутри подпапки lib
