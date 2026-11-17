@@ -11539,7 +11539,7 @@ ctx = {
     bpm = 'tempo, beats per minute. Wheel - +-1, click - type it',
     tp_rew = 'rewind', tp_fwd = 'fast forward', tp_pause = 'pause (play goes on from here)',
     tp_play = 'play / stop (Space) - starts at the tracker cursor row',
-    rec = 'record (Option+R): the cursor track, from the cursor row',
+    rec = 'record (Option+R): the cursor track, from the cursor row; Shift+click - shift rec: waits for a MIDI note, then records (:shiftrec)',
     loop = 'loop on / off: playback repeats the time selection (the loop)',
     tp_start = 'to the project start', tp_end = 'to the project end',
     freeze = 'freeze: a short loop around the play position, like a DJ repeater. f + its label - the lengths (1/32 .. 2 bars, digits pick), wheel - shorter / longer; while playing a new length starts when the current loop ends. Click - on / off (back as it was)',
@@ -24487,6 +24487,7 @@ function ctrl_action(name, delta)
   elseif name == 'autofocus' then state.autofocus = not state.autofocus; vim.msg = 'autofocus ' .. (state.autofocus and 'on' or 'off')
   elseif name == 'nofloat' then state.nofloat = not state.nofloat; ctx.FF.reset(); vim.msg = 'no auto FX windows ' .. (state.nofloat and 'on' or 'off')
   -- блок записи (5 окт): rec, punch (авто-панч по time selection), pre-roll, rec→lib
+  elseif name == 'rec' and (ctx.shiftrec or ctx.mods().shift) and ctx.shift_rec then ctx.shift_rec()   -- 17 ноя: Shift + O — shift rec (кнопки ^O^ больше нет); ждёт / пишет — O снимает
   elseif name == 'rec' then
     if reaper.GetPlayState() & 4 == 4 then if state.rec_sess then ctx.rec_stop(32) else reaper.Main_OnCommand(1016, 0) end
     else ctx.rec_start('tracker') end

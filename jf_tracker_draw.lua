@@ -909,7 +909,7 @@ function D.layout_core(snap, state, nregions)
   -- (не больше зазора между строками: текст второй строки не налезает на третью)
   -- 15 окт: кнопки — одни символы в одну строку: полоса — 3 строки (кнопки, |<< freeze …, маркеры / punch)
   L.tp_cut = 0
-  L.piano_h = 2 * L.rh + 8 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and L.rh or 0) + ((state.panes_ui and state.tpstyle == 'full') and math.ceil(L.rh / 2) or 0)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками   -- 31 окт: +4 px — хвост p (pitch) у некоторых шрифтов срезался низом полосы
+  L.piano_h = 2 * L.rh + 8 + (L.kbstat and (2 * L.rh + 2) or 0) + (state.tpstyle == 'full' and L.rh or 0)   -- 17 ноя: без лишних полстроки (время — обычным шрифтом)   -- 15 окт: full — 4 строки + режим (2) без пустых   -- 15 окт: full — 4-я строка ({ } под vel, rate под кнопками, swing под метрономом)   -- 12 окт: статус — две строки (режим x2), под рядом кнопок   -- 11 окт: full — строка под кнопками   -- 31 окт: +4 px — хвост p (pitch) у некоторых шрифтов срезался низом полосы
   -- 15 окт: модлайн — своя строка под полем (как в Emacs): режим крупно, справа где курсор; без наложения на строки
   L.mode_h = 0   -- 16 окт: модлайна нет (смысла не было) — режим и место курсора в полосе транспорта
   L.low_h = L.mix_h + L.hsb_h + L.mode_h + (L.tppos == 'tracker' and L.piano_h or 0)   -- всё, что под телом в модуле трекера (микшер снизу — первым)
@@ -5434,7 +5434,7 @@ function D.transport_buttons(c)
     return { { 'tp_rew', 'rew', nil, nil, '<<' }, { 'tp_pause', 'pause', ps & 2 == 2 and U.AMBER or nil, nil, '||' },
              { 'tp_play', playing and 'stop' or 'play', playing and U.GREEN or nil, nil, playing and '[]' or '>' },
              { 'loop', 'loop', c.loop and U.CYAN or nil, nil, (D.ttf or D.hybrid) and '∞' or 'oo' },   -- 19 окт: loop — рядом с play, ff — крайний справа
-             { 'rec', 'rec', c.recording and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' } }
+             { 'rec', 'rec', (c.recording or c.shiftrec == 'rec' or (c.shiftrec == 'wait' and math.floor(reaper.time_precise() * 2) % 2 == 0)) and D.REC or nil, D.REC, 'O' }, { 'tp_fwd', 'ff', nil, nil, '>>' } }   -- 17 ноя: shift rec ждёт ноту — O мигает
   end
   if not c.tpbuttons then
     return { { 'rec', 'rec', c.recording and U.RED or nil, U.RED }, { 'loop', D.ttf and '∞' or 'loop', c.loop and U.CYAN or nil } }
@@ -5455,7 +5455,7 @@ function D.transport_sub(c)
              { 'slowplay', '/2', (c.halfplay == 0.5 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil },
              { 'fastplay', 'x2', (c.halfplay == 2 and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0) and U.TEXT or nil } } },
            { 'freeze', frz, c.frz and U.CYAN or nil },
-           { 'shiftrec', '^O^', (c.shiftrec == 'rec' or (c.shiftrec == 'wait' and reaper and reaper.time_precise and math.floor(reaper.time_precise() * 2) % 2 == 0)) and U.RED or nil },   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
+           {},   -- 17 ноя: ^O^ (shift rec) убрана — это Shift + щелчок по O (колонка остаётся: сетка рядов)   -- 12 окт: shift rec (была smart); ждёт ноту — мигает
            { 'tp_end', '>>|' } }
 end
 function D.transport_groups(c, L)   -- 15 окт: L — для ширины вертикальной подписи step
@@ -5584,6 +5584,7 @@ D.SHORT = { whichkey = 'wkey', preview = 'prev', options = 'opts', tutorial = 't
   debug = 'dbg', input = 'in', names = 'name', notes = 'note', about = 'abt', colours = 'col', browser = 'brws', meters = 'mtrs',
   ['end stop'] = 'end', ['auto instrument'] = 'ainst', ['rec follows sel'] = 'recf', measure = 'meas', ['title bar'] = 'title' }
 function D.piano_strip(L, x, y, w, h, p, info, hover, st)
+  D.TP_MIN = L.pn and true or false   -- 17 ноя: общая полоса окна — кнопки транспорта только текстом
   local out = { white = 0, black = 0, letters = 0 }
   D.strip_cols = {}
   local mx, my = gfx.mouse_x, gfx.mouse_y
@@ -5975,11 +5976,16 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
       local hot = mx >= bx and mx < bx + bw and my >= by and my < by + bh
       local on = b[3] ~= nil
       local tc = hot and U.AMBER or (b[4] or b[3] or U.TEXT)
+      -- 17 ноя: минимализм (общая полоса окна) — кнопки без рамок и заливки: только символ, цвет — состояние, под мышью — подложка
+      if D.TP_MIN then
+        if hot then set(D.CURROW); gfx.rect(bx, by, bw, bh, 1) end
+      else
       set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(bx, by, bw, bh, 1)
       local fr = hot and U.AMBER or (on and b[3] or U.LINE)
       set(fr); gfx.rect(bx, by, bw, bh, 0)
       if bi == 1 then cut(bx, by, 1, 1, fr); if not sub_on then cut(bx, by + bh - 1, 1, -1, fr) end end
       if bi == #blist then cut(bx + bw - 1, by, -1, 1, fr); if not sub_on then cut(bx + bw - 1, by + bh - 1, -1, -1, fr) end end
+      end
       local sym = b[5] or ''
       if b[1] == 'loop' and (D.ttf or D.hybrid) then
         -- 16 окт: ∞ лупа — крупнее строки (свой шрифт, слот 6; создаётся раз на размер), по центру кнопки
@@ -6010,8 +6016,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
             local w2 = k == 2 and (tw - hw - 2) or hw
             local hot = mx >= hx and mx < hx + w2 and my >= sy and my < sy + L.rh
             local on = h[3] ~= nil
+            if D.TP_MIN then if hot then set(D.CURROW); gfx.rect(hx, sy, w2, L.rh, 1) end
+            else
             set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(h[3], 0.3) or U.BG)); gfx.rect(hx, sy, w2, L.rh, 1)
             set(hot and U.AMBER or (on and h[3] or U.LINE)); gfx.rect(hx, sy, w2, L.rh, 0)
+            end
             text(hx + math.floor((w2 - ms(h[2])) / 2), sy + 1, fit(h[2], w2 - 2), hot and U.AMBER or (h[3] or U.GREY))
             if hot then hover.ctrl = h[1] end
             hint('ctrl', hx, sy, w2, L.rh, h[1])
@@ -6019,11 +6028,14 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         elseif b[1] then
           local hot = mx >= sx and mx < sx + tw and my >= sy and my < sy + L.rh
           local on = b[3] ~= nil
+          if D.TP_MIN then if hot then set(D.CURROW); gfx.rect(sx, sy, tw, L.rh, 1) end
+          else
           set(hot and U.tint(U.AMBER, 0.3) or (on and U.tint(b[3], 0.3) or U.BG)); gfx.rect(sx, sy, tw, L.rh, 1)
           local fr2 = hot and U.AMBER or (on and b[3] or U.LINE)
           set(fr2); gfx.rect(sx, sy, tw, L.rh, 0)
           if si == 1 then cut(sx, sy + L.rh - 1, 1, -1, fr2) end
           if si == #sub then cut(sx + tw - 1, sy + L.rh - 1, -1, -1, fr2) end
+          end
           -- 15 окт: |<< прижат влево, >>| вправо (к своему краю); у ^O буква O — красная, как у rec
           local lab, lc = fit(b[2], tw - 2), hot and U.AMBER or (b[4] or b[3] or U.GREY)
           local tx = sx + math.floor((tw - ms(lab)) / 2)
@@ -6164,7 +6176,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     -- 14 ноя: общая полоса окна — под позицией время, под BPM метроном и счётчик долей
     if L.pn and c.tpfull and D.sig_line and not D.sig_stack then
       local y3 = ly + 2 * L.rh + 2 - (L.tp_cut or 0)
-      if c.time then D.big_text(bx0 + D.big_measure('> ', BKT), y3, c.time, U.TEXT, 1.5) end   -- 14 ноя (3): время крупнее (x1.5), полоса на полстроки выше
+      if c.time then text(bx0 + D.big_measure('> ', BKT), y3 + 1, c.time, U.TEXT) end   -- 14 ноя (3): время крупнее (x1.5), полоса на полстроки выше
       draw_group(D.sig_line, bpm_x, bigw - (bpm_x - bx0), y3)
     elseif c.tpfull and D.sig_line then draw_group(D.sig_line, bx0, bigw, D.sig_stack and (ly + L.rh) or (ly + 2 * L.rh + 2 - (L.tp_cut or 0))) end   -- 4 ноя: стопкой — metro, ниже swing
   end
