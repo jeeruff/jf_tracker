@@ -11,6 +11,8 @@ local U, ctx
 function A.init(u, c) U, ctx = u, c end
 
 function A.open(title, text, choices)
+  -- 17 ноя: вопрос — гидрой внизу окна (как все меню): клавиша выбора, Enter / Esc — первый; окно посреди — без хука
+  if A.to_hydra and choices and #choices > 0 then A.active = false; return A.to_hydra(title or '', text or '', choices) end
   A.title, A.text, A.choices = title or '', text or '', choices or {}
   A.active = #A.choices > 0
 end

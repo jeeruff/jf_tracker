@@ -4553,7 +4553,7 @@ end
 
 function V.hydra_key(c)
   local h = V.hydra
-  if c == ESC then V.hydra = nil; return end
+  if c == ESC then V.hydra = nil; if h and h.on_esc then local ok, e = pcall(h.on_esc); if not ok then V.msg = tostring(e):match('[^\n]*$') end end; return end   -- 17 ноя: вопрос — Esc выбирает умолчание
   if c == 13 and h and h.on_enter then local f = h.on_enter; V.hydra = nil; local ok, e = pcall(f); if not ok then V.msg = tostring(e):match('[^\n]*$') end; return end   -- 1 ноя: Enter Enter
   if c == BS then V.hydra = table.remove(V.hydra_stack); return end
   local ch = (c < 256) and string.char(c) or ''

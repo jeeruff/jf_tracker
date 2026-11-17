@@ -74,6 +74,13 @@ local vim = dofile(DIR .. '/jf_tracker_vim.lua')
 local OPT = dofile(DIR .. '/jf_tracker_options.lua')   -- окно Options (1 окт)
 OPT.tour = dofile(DIR .. '/jf_tracker_tour.lua')         -- интерактивный тур tutorial (4 окт); полем OPT: предел локальных
 OPT.ask = dofile(DIR .. '/jf_tracker_ask.lua')           -- вопрос посреди окна (3 окт); полем OPT: главный чанк у предела локальных
+-- 17 ноя: вопросы — гидрой внизу (с клавиатуры, без окна с кнопками): первый выбор — Enter и Esc, как было
+OPT.ask.to_hydra = function(title, text, choices)
+  local items = {}
+  for i, ch in ipairs(choices) do items[#items + 1] = { key = ch.key, label = (ch.label or '') .. (i == 1 and '  (Enter)' or ''), fn = ch.fn or function() end } end
+  local first = choices[1].fn or function() end
+  vim.open_hydra({ title = title .. ((text ~= '' and (' - ' .. text)) or ''), items = items, on_enter = first, on_esc = first })
+end
 local VER = dofile(DIR .. '/jf_tracker_version.lua')    -- версия и изменения (Options → about)
 local SPROP = dofile(DIR .. '/jf_tracker_sampleprops.lua')  -- панель свойств сэмпла (вкладка Sample)
 draw.sprops_rows = #SPROP.ROWS                         -- 9 окт, панели: лист с item не ниже, чем нужно всем параметрам
