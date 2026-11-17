@@ -26646,7 +26646,7 @@ local function frame()
     },
     tabs = ctx.top_tabs(),
     lib_feed = (function() draw.lib_folders_on = state.libfolders; draw.lib_seps = ctx.lib_seps_get(); if state.libfolders and draw.lib_disorder then pcall(ctx.lib_regroup) end end)(),   -- 10 окт: папки / разделители lib
-    libtabs = state.libtabs, libtab = state.libtab,
+    libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol,
     toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
@@ -33880,6 +33880,26 @@ local function frame()
         -- 13 окт: вид tracks в lib — клавиши дерева (как в lf), остальное — прежние клавиши lib
         if state.libtree == true and (draw.TL.typing or ctx.tlist_key(c)) then if draw.TL.typing then ctx.tlist_key(c) end; return end
         if c == ('c'):byte() and vim.mode ~= 'cmd' then ctx.slices_render_menu(); return end   -- 13 окт: convert — и во вкладке lib
+        -- 17 ноя: lib как lf — h уходит в колонку разделов (из папки — сначала свернуть), там j k — раздел, l / Enter — в него
+        if state.libtabs then
+          local ch = c < 256 and string.char(c) or ''
+          local DN, UPk, LF, RT = 1685026670, 30064, 1818584692, 1919379572
+          if ctx.lib_seccol then
+            local LT = draw.lib_tab_list()
+            if ch == 'j' or c == DN or ch == 'k' or c == UPk then
+              local k = 1
+              for i, nm in ipairs(LT) do if nm == state.libtab then k = i end end
+              k = math.max(1, math.min(#LT, k + ((ch == 'j' or c == DN) and 1 or -1)))
+              state.libtab = LT[k]; vim.msg = 'lib: ' .. state.libtab .. '  (l / Enter - into it)'; return
+            elseif ch == 'l' or c == RT or c == 13 then ctx.lib_seccol = nil; vim.msg = ''; return
+            elseif c == 27 then ctx.lib_seccol = nil; ctx.set_focus('tracker'); return
+            elseif ch == 'h' or c == LF then return end
+          elseif (ch == 'h' or c == LF) and not (ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(vim.inst)))
+             and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur())
+             and not (function() local cc = cur_col(); local e = cc and cc.pool and cc.pool[vim.inst or 0]; return e and draw.LIBO and draw.LIBO[e.gkey or ''] end)() then   -- открытая папка слайсов / слоёв — h её сворачивает
+            ctx.lib_seccol = true; vim.msg = 'lib sections: j k - the section, l / Enter - into it'; return
+          end
+        end
         if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
         local col = cur_col()
         local n = #(col and col.pool or {})

@@ -7488,6 +7488,13 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   set(U.PANEL); gfx.rect(ix, iy, w, H, 1)
   set(D.SEP); gfx.rect(ix - 2, iy, D.SEPW, H, 1)
   L.inst_rect = { ix, iy, w, H - 2 }
+  -- 17 ноя: lib как lf — слева колонка разделов (audio / instruments / midi / phrases), справа — их содержимое
+  -- (вместо строки вкладок); h — в разделы, j k — раздел, l / Enter — в него
+  local SW, ix0 = 0, ix
+  if info.libtabs and w >= 24 * L.cw then
+    SW = ms('" phrases 99') + 2 * L.pad + 2
+    ix, w = ix + SW, w - SW
+  end
   local col = info.pool_col
   local pool = col and col.pool or {}
   local inst = info.inst or 1
@@ -7662,6 +7669,8 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
     if info.libtabs then
       local want = info.libtab or 'audio'
+      D.lib_sec_n = {}
+      for _, row in ipairs(rows) do if not row.hdr and not row.gap then D.lib_sec_n[row.sec] = (D.lib_sec_n[row.sec] or 0) + 1 end end
       for _, row in ipairs(rows) do
         if row.sec == want and not (row.hdr and (SECS[row.hdr] or row.hdr == 'audio')) then out[#out + 1] = row end
       end
@@ -7690,7 +7699,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
-  local TBH = info.libtabs and (L.rh + 2) or 0             -- строка вкладок lib
+  local TBH = (info.libtabs and SW == 0) and (L.rh + 2) or 0   -- строка вкладок lib (узкий lib; иначе — колонка разделов)
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG - TBH) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
@@ -7785,6 +7794,24 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
       end
     end
     set(U.DIM); gfx.rect(ix + 2, hy2 + L.rh - 1, w - 4, 1, 1)
+  end
+  if SW > 0 then   -- 17 ноя: колонка разделов (как родительская колонка lf)
+    local GL = { audio = '@', instruments = '#', automation = '~', midi = D.mu(), phrases = '"' }
+    set(U.LINE); gfx.rect(ix - 2, iy + 2, 1, H - 4, 1)
+    for k, nm in ipairs(D.lib_tab_list()) do
+      local ty = iy + 2 + k * L.rh
+      local on = (info.libtab or 'audio') == nm
+      local cur = on and info.lib_seccol
+      local hot = mx >= ix0 and mx < ix - 2 and my >= ty and my < ty + L.rh
+      if cur then set(U.tint(U.AMBER, 0.35)); gfx.rect(ix0 + 1, ty, SW - 4, L.rh, 1)
+      elseif on then set(U.tint(U.AMBER, 0.15)); gfx.rect(ix0 + 1, ty, SW - 4, L.rh, 1)
+      elseif hot then set(D.CURROW); gfx.rect(ix0 + 1, ty, SW - 4, L.rh, 1) end
+      local nn = D.lib_sec_n and D.lib_sec_n[nm]
+      local lab = (GL[nm] or ' ') .. ' ' .. (nm == 'instruments' and 'instr' or nm)
+      text(ix0 + L.pad, ty + 1, fit(lab, SW - 2 * L.pad - ms(' 99')), on and U.AMBER or (hot and U.TEXT or U.GREY))
+      if nn then local t = tostring(nn); text(ix - 4 - L.pad - ms(t), ty + 1, t, U.DIM) end
+      if hot then hover.libtab = nm end
+    end
   end
   if TBH > 0 then
     -- вкладки lib (10 окт): как вкладки панелей — рамками встык, активная янтарём
