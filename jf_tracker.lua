@@ -36877,10 +36877,14 @@ end
 -- 20 окт: Shift+F в трекере — найти сэмпл для этого места: браузер db (база Media Explorer; нет — файлы) с поиском,
 -- курсор по списку слушает (preview on select), на канале — призрак: волна выбранного на её длину в строках;
 -- Enter — закончить набор, j k — выбрать (слушать), Enter — сэмпл на запомненное место (drop_to), Esc — отмена
-ctx.sample_find = function(mode)
+ctx.sample_find = function(mode, pad)
   local f = L and L.flat[vim.cur.fi]
+  if pad then ctx.sf_target = { pad = pad, name = pad.label }   -- 17 ноя: сэмпл пэда drumrs5k из lib
+  else
   if not (f and f.col and not f.env and not f.ml) then vim.msg = 'sample find: put the cursor on a track column'; return end
   ctx.sf_target = { fi = vim.cur.fi, row = vim.cur.row, guid = f.col.guid, name = f.col.name, sampler = mode == 'sampler' }
+  end
+  f = f or {}; f.col = f.col or { name = pad and pad.label or '' }
   -- 20 окт: Shift+F — поиск в базе (Media Explorer; база запоминается), Shift+Opt+F — сначала выбрать базу
   if B.mode ~= 'db' then B.set_mode('db') end
   ctx.pane_focus('browser')
@@ -36912,6 +36916,26 @@ ctx.sf_enter = function()
   if not t then return false end
   local p = ctx.sf_path()
   if not p then return false end
+  if t.pad then   -- 17 ноя: пэд drumrs5k — его сэмпл заменить (одна отмена), назад в lib
+    ctx.sf_target = nil
+    local pd = t.pad
+    for _, c in ipairs(snap and snap.cols or {}) do
+      if c.guid == pd.guid then
+        for _, f in ipairs(c.fx or {}) do
+          local kid = f.i == pd.fx and f.kids and f.kids[pd.ki]
+          if kid and kid.rs5k_i then
+            local path = edit.media_copy(p)
+            local num = tonumber((kid.name or ''):match('^S(%x%x)') or '', 16)
+            edit.run('drumrs5k pad sample', function() edit.drum_pad_set(c.track, kid.rs5k_i, path, nil, num) end)
+            model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+            vim.msg = ('pad %02d: %s'):format(pd.ki, path:match('[^/]+$') or path)
+          end
+        end
+      end
+    end
+    ctx.set_focus('inst')
+    return true
+  end
   local fi = t.fi
   local f = L.flat[fi]
   if not (f and f.col and f.col.guid == t.guid) then
@@ -36937,12 +36961,13 @@ ctx.sf_cancel = function()
   B.filtering = false; B.filter = ''; if B.set_all then B.set_all(B.all) end
   ctx.set_focus('tracker')
   if t.fi and L.flat[t.fi] then vim.cur.fi, vim.cur.row = t.fi, t.row end
+  if t.pad then ctx.set_focus('inst') end
   vim.msg = 'sample find: cancelled'
   return true
 end
 ctx.sf_ghost = function()
   local t = ctx.sf_target
-  if not t then return nil end
+  if not t or t.pad then return nil end
   -- ушли из браузера (щелчок в трекер, другой модуль) — заготовка тоже уходит
   if state.focus ~= 'browser' then ctx.sf_target = nil; return nil end
   local p = ctx.sf_path()
@@ -40626,7 +40651,7 @@ ctx.lib_kit_key = function(c)
   if not f then
     if (ch == 'l' or c == keys.right) and state.libtabs then
       local c2, f2 = ctx.lib_kit_cur()
-      if f2 then ctx.lib_kit = { inst = vim.inst, guid = c2.guid, fx = f2.i, sel = 1 }; vim.msg = f2.name .. ': its pads - j k, Space listen, h up'; return true end
+      if f2 then ctx.lib_kit = { inst = vim.inst, guid = c2.guid, fx = f2.i, sel = 1 }; vim.msg = f2.name .. ': its pads - j k, Space listen, f - find a new sample, < > - one like it, h up'; return true end
     end
     return false
   end
@@ -40639,6 +40664,22 @@ ctx.lib_kit_key = function(c)
   elseif ch == ' ' or c == 13 then
     local kid = f.kids[k.sel]
     if kid and kid.note then ctx.preview(col.track, kid.note, 'midi') end
+  elseif ch == 'f' or ch == 'F' or ch == 'r' then   -- 17 ноя: заменить сэмпл пэда — поиск в базе (как Shift+F): набрал, j k слушать, Enter — в пэд
+    local kid = f.kids[k.sel]
+    if not (kid and kid.rs5k_i) then vim.msg = 'pad: no sampler in this pad'; return true end
+    ctx.sample_find(nil, { guid = col.guid, fx = f.i, ki = k.sel, label = ('pad %02d'):format(k.sel) })
+    vim.msg = ('pad %02d: type a name, j k - listen, Enter - the new sample, Esc - cancel'):format(k.sel)
+    return true
+  elseif ch == '<' or ch == '>' then   -- 17 ноя: похожий сэмпл (того же класса: kick, snare …) назад / вперёд
+    local kid = f.kids[k.sel]
+    if not (kid and kid.rs5k_i) then vim.msg = 'pad: no sampler in this pad'; return true end
+    local path, H = ctx.pad_pick(col.track, kid, k.sel, ch == '>' and 1 or -1)
+    if not path then vim.msg = 'ξ: ' .. tostring(H); return true end
+    edit.run('pad: similar sample', function() ctx.pad_load(col.track, kid, path) end)
+    model.fx_gen = (model.fx_gen or 0) + 1; model.invalidate()
+    if ctx.preview_file then ctx.preview_file(path) end
+    vim.msg = ('pad %02d: %s (%d/%d, < > - more like it, f - find)'):format(k.sel, path:match('[^/]+$'), H.i, #H.list)
+    return true
   else return false end
   local kid = f.kids[k.sel]
   if kid then vim.msg = ('pad %02d %s - Space listen'):format(k.sel, (kid.file and kid.file:match('[^/]+$')) or kid.name or '') end
