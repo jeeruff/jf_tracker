@@ -33021,7 +33021,12 @@ local function frame()
       if ctx.inst_transpose then ctx.inst_transpose(TK[c] * (m.shift and 12 or 1)) end
       c = 0
     end
-    -- 16 окт: Cmd+F1 / F2 — микротон 1/6 тона (v / ^) у выделения или ноты строки
+    -- 17 ноя: Opt+Cmd+F1 / F2 — четвертьтон (3 ступени 72-EDO: + / d) у выделения или ноты строки; Shift — трек
+    if (c == 26161 or c == 26162) and m.cmd and m.alt and not m.ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
+      if vim.transpose_scope(m.shift and 'track' or 'sel', TK[c] * 3, true) then model.invalidate() end
+      c = 0
+    end
+    -- 16 окт: Cmd+F1 / F2 — микротон 1/6 полутона (v / ^) у выделения или ноты строки
     if (c == 26161 or c == 26162) and m.cmd and not m.alt and not m.ctrl and not vim.picker and vim.mode ~= 'cmd' and vim.mode ~= 'search' then
       if vim.transpose_scope(m.shift and 'track' or 'sel', TK[c], true) then model.invalidate() end
       c = 0
