@@ -124,6 +124,31 @@ MX.PTFX = dofile(DIR .. '/jf_tracker_ptfx.lua')   -- 1 ноя: команды Pr
 MX.SMART = dofile(DIR .. '/jf_tracker_smart.lua')       -- смарт-панель: сетка значений у ячейки, gs / средний щелчок (9 окт); полем MX: предел локальных
 local SL = dofile(DIR .. '/jf_tracker_slicer.lua')
 SL.sg = dofile(DIR .. '/jf_tracker_sgram.lua')
+-- 17 ноя: спектрограмма вида трека (zT g): задание на ИСТОЧНИК (WAV — по файлу: все item этого файла делят одну
+-- картинку, item берёт свой кусок по offs / rate), не WAV — по take (аудио-аксессор, время item); время — до 2048 строк
+draw.sgram_job = function(head)
+  local src = head and head.src
+  if not src then return nil end
+  local path = reaper.GetMediaSourceFileName(src, '')
+  if path and path:lower():match('%.wav$') then
+    local key = 'v:f:' .. path
+    local j = SL.sg.jobs[key]
+    if j then return j end
+    local rd, sr, len = SL.sg.wav_reader(path)
+    if not rd then return nil end
+    j = SL.sg.get(key, rd, len, sr, math.max(16, math.min(2048, math.floor(len * 40))), 96, true)
+    j.file = true
+    return j
+  end
+  if not (head.take and reaper.ValidatePtr(head.take, 'MediaItem_Take*')) then return nil end
+  local key = 'v:t:' .. tostring(head.guid) .. ('%.4f'):format(head.len or 0)
+  local j = SL.sg.jobs[key]
+  if j then return j end
+  local rd, sr, len = SL.sg.take_reader(head.take)
+  if not rd then return nil end
+  len = head.len or len or 1
+  return SL.sg.get(key, rd, len, sr, math.max(16, math.min(2048, math.floor(len * 40))), 96, true)
+end
 edit.open_on_add = reaper.GetExtState(EXT, 'fxopen') == '1'          -- спектрограмма (5 окт): вид sgram, импульс ReaVerb
 local CM = dofile(DIR .. '/jf_tracker_cmds.lua')
 local HN = dofile(DIR .. '/jf_tracker_hints.lua')
@@ -35311,7 +35336,7 @@ ctx.track_view_set = function(col, v)
   reaper.GetSetMediaTrackInfo_String(col.track, 'P_EXT:jf_tview', v or '', true)
   ctx.tview_c[col.guid] = nil
   model.invalidate(); ctx.relayout()
-  vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zT n - notes)' or (v == 'spec' and 'spectral peaks (zT n - notes)' or 'notes'))
+  vim.msg = ('%s: %s'):format(col.name ~= '' and col.name or 'track', v == 'big' and 'big wave (zT n - notes)' or (v == 'spec' and 'spectral peaks (zT n - notes)' or (v == 'sgram' and 'spectrogram (zT n - notes)' or 'notes')))
 end
 -- 7 ноя: авто-панч — команда ищется один раз, состояние — раз в 0.25 с (было дважды за кадр, с поиском по списку действий)
 ctx.punch_on = function()
@@ -35330,6 +35355,7 @@ ctx.track_view_menu = function()
   vim.open_hydra({ title = 'zT - view of ' .. (col.name ~= '' and col.name or 'the track'), items = {
     { key = 'n', label = mark(nil) .. 'notes (normal)', fn = function() ctx.track_view_set(col, nil) end },
     { key = 's', label = mark('spec') .. 'spectral peaks, wide (stretch markers on it)', fn = function() ctx.track_view_set(col, 'spec') end },
+    { key = 'g', label = mark('sgram') .. 'spectrogram: time down, low to high frequencies left to right (. , wider / narrower)', fn = function() ctx.track_view_set(col, 'sgram') end },
     { key = 'w', label = mark('big') .. 'big wave instead of the dots (stretch markers on it; . , wider / narrower)', fn = function() ctx.track_view_set(col, 'big') end },
   } })
 end

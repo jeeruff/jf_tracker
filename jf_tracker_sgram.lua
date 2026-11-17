@@ -30,15 +30,20 @@ for i = 0, N - 1 do win[i + 1] = 0.5 - 0.5 * math.cos(2 * math.pi * i / (N - 1))
 
 -- задание: key — что считаем; reader(t, n) → таблица n сэмплов или nil;
 -- len — секунды; sr — частота дискретизации для оси частот
-function G.get(key, reader, len, sr, cols, rows)
+-- 17 ноя: vert — вертикальная (вид трека трекера): время сверху вниз (cols — высота картинки), частота слева направо;
+-- свои картинки VIMG0.. (кольцо VIMGN — у трекера несколько файлов на экране сразу)
+local VIMG0, VIMGN = 779, 16
+local next_vimg = 0
+function G.get(key, reader, len, sr, cols, rows, vert)
   local j = G.jobs[key]
   if j and j.cols == cols and j.rows == rows then return j end
   if j then G.jobs[key] = nil end
-  local img = IMG0 + next_img
-  next_img = (next_img + 1) % IMGN
+  local img
+  if vert then img = VIMG0 + next_vimg; next_vimg = (next_vimg + 1) % VIMGN
+  else img = IMG0 + next_img; next_img = (next_img + 1) % IMGN end
   -- картинку с тем же номером держало другое задание — оно уходит
   for k, o in pairs(G.jobs) do if o.img == img then G.jobs[k] = nil end end
-  j = { key = key, reader = reader, len = math.max(1e-3, len), sr = sr or 44100, cols = cols, rows = rows, col = 0, img = img, done = false }
+  j = { key = key, reader = reader, len = math.max(1e-3, len), sr = sr or 44100, cols = cols, rows = rows, col = 0, img = img, done = false, vert = vert }
   -- строка → диапазон бинов (лог-частота 30 Гц .. Найквист)
   j.bins = {}
   local ny = j.sr / 2
@@ -50,9 +55,9 @@ function G.get(key, reader, len, sr, cols, rows)
     j.bins[r] = { b0, b1 }
   end
   local d0 = gfx.dest
-  gfx.setimgdim(img, cols, rows)
+  if vert then gfx.setimgdim(img, rows, cols) else gfx.setimgdim(img, cols, rows) end
   gfx.dest = img
-  gfx.set(PAL[1][1], PAL[1][2], PAL[1][3], 1); gfx.rect(0, 0, cols, rows, 1)
+  gfx.set(PAL[1][1], PAL[1][2], PAL[1][3], 1); gfx.rect(0, 0, vert and rows or cols, vert and cols or rows, 1)
   gfx.dest = d0
   G.jobs[key] = j
   return j
@@ -82,7 +87,7 @@ local function column(j)
       local db = m > 1e-9 and 20 * math.log(m / (N / 4), 10) or -150
       local cr, cg, cb = colour((db + 90) / 90)
       gfx.set(cr, cg, cb, 1)
-      gfx.rect(j.col, j.rows - 1 - r, 1, 1, 1)
+      if j.vert then gfx.rect(r, j.col, 1, 1, 1) else gfx.rect(j.col, j.rows - 1 - r, 1, 1, 1) end
     end
   end
   gfx.dest = d0

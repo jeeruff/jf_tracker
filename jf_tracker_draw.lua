@@ -144,7 +144,7 @@ local tcache, next_img = {}, 100
 -- вертикальные имена матрицы и подписи линейки). 100..799 текст, 800..959
 -- вертикальный текст, 960..1017 спектрограммы анализатора, 1018..1019 лупа big fixed cursor, 1022 логотип about, 1023 черновик поворота
 -- 82 надписи VHS, 83 / 84 кинескоп VHS, 85 трещины (:cracks), 86 замер глифов SMuFL (стан harmonizer), 88 полоса зума вкладки item (jf_tracker_slicer S.ZOOM_IMG), 89 схема роутера DSP (dspbig), 1020 буфер верхней панели / вида трекера в панели, 1000..1022 кэш текста, 90..97 спектрограммы вкладки item (jf_tracker_sgram), 99 главный модуль; номера gfx — только 0..1023
-local IMG_FIRST, IMG_LAST = 100, 794   -- 8 ноя: 795 — буфер панели options; 2 ноя: 796 — кэш волны вкладки item (jf_tracker_slicer S.WAVE_IMG); 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
+local IMG_FIRST, IMG_LAST = 100, 778   -- 17 ноя: 779..794 — вертикальные спектрограммы вида трека (jf_tracker_sgram, zT g); 8 ноя: 795 — буфер панели options; 2 ноя: 796 — кэш волны вкладки item (jf_tracker_slicer S.WAVE_IMG); 16 окт: 797 — чистый кадр fps-буфера (наложения не копятся); 10 окт: 799 — превью шрифтов вкладки theme (90..97 — спектрограммы); 11 окт: 798 — буфер панели (pn_buffered)
 -- кольцо картинок текста (6 окт): по половинам — при входе в половину
 -- выселяются только её строки (и их ×2-копии e.ov); раньше переполнение
 -- сбрасывало весь кэш, и экран из сотен строк (pm cards) перезапекался
@@ -1222,7 +1222,7 @@ function D.layout_core(snap, state, nregions)
             -- 11 ноя: вид трека — шаг колеса мягче: 16 знаков на первом раскрытом уровне, +6 за шаг (было 40 и +8: из
             -- свёрнутого в пол-экрана одним шагом); без уровня — 40, как раньше
             if tv then ww = L.cw * (lvl and (lvl <= 1 and 3 or (lvl == 2 and 10 or (16 + 6 * (lvl - 3)))) or 40) end   -- 11 ноя: 3 знака (как свёрнутая колонка MIDI) — шаг перед полоской
-            local wm = (tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks'
+            local wm = tv == 'sgram' and 'sgram' or ((tv == 'spec' or (not tv and state.wavemode == 'column')) and 'spec' or 'peaks')   -- 17 ноя: sgram — спектрограмма
             local gk = ww .. wm
             L.GW[gk] = L.GW[gk] or setmetatable({ wave_only = true, notes_only = true, nfields = 1, nfx = 0,   -- 11 ноя: nfields 1 — курсор не ходит по спрятанным за волной полям
               x_fx = {}, x_inst = false, x_slc = false, w_wave = ww, x_wave = L.pad,
@@ -2661,6 +2661,27 @@ local function draw_wave(L, head, i, x, y, muted, inv)
   if column then inv = nil end
   local pk
   -- 10 ноя: волна фоном (тёмная) — контрастная кайма; спектр (вид spec) — цветом каймы
+  -- 17 ноя: вид трека «спектрограмма» (zT g) — кусок вертикальной картинки задания (время вниз, частота вправо, низ слева)
+  if column and mode == 'sgram' then
+    local p0 = math.max(0, off - i * L.rh)
+    local p1 = math.min(L.rh, total - (i * L.rh - off))
+    local j = p1 > p0 and D.sgram_job and D.sgram_job(head)
+    if j then
+      local rate = (head.rate and head.rate > 0) and head.rate or 1
+      local function src_y(q)   -- пиксель от начала item → строка картинки
+        local t = q / total * (head.len or 0)
+        if j.file then t = (head.offs or 0) + t * rate end
+        return t / j.len * j.cols
+      end
+      local q0 = i * L.rh + p0 - off
+      local sy0, sy1 = src_y(q0), src_y(q0 + p1 - p0)
+      local mode0 = gfx.mode; gfx.mode = 0; gfx.a = 1
+      gfx.blit(j.img, 1, 0, 0, sy0, j.rows, math.max(0.01, sy1 - sy0), x + L.x_wave, y + p0, L.w_wave, p1 - p0)
+      gfx.mode = mode0
+      if muted then set(U.BG, 0.5); gfx.rect(x + L.x_wave, y + p0, L.w_wave, p1 - p0, 1); gfx.a = 1 end
+    end
+    return
+  end
   local back = D.PEAK == D.PEAKB
   local bspec = back and L.base and L.base.wave == 'spec'
   local frm = column and L.wavefrm and not inv   -- 11 ноя: колонка с каймой — заливка тёмная, край яркий (спектр — цветом края)

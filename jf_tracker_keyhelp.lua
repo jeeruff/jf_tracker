@@ -216,7 +216,7 @@ KH.PAGES = {
     { k = 'Shift+F1 F2', d = 'transpose the track in the pattern -1 / +1; Shift+F11 F12 - by octave' },
     { k = 'Ctrl+F1 F2', d = 'transpose the whole pattern (every track) -1 / +1; Ctrl+F11 F12 - by octave' },
     { k = 'Ctrl+Shift+F1 F2', d = 'transpose the column (subcolumn) in the pattern -1 / +1; + F11 F12 - by octave' },
-    { k = 'zT', d = 'view of the cursor track: w - a big wave instead of the dots (stretch markers on it), s - spectral peaks, n - notes (normal)' },
+    { k = 'zT', d = 'view of the cursor track: w - a big wave instead of the dots (stretch markers on it), s - spectral peaks, g - spectrogram (time down, low to high frequencies left to right), n - notes (normal)' },
     { k = 'zo', d = 'overview: the tracker itself from afar - LPB below 1 (a row = half a bar ... 16 bars), the whole song on one screen, waves and items as usual; - + zoom on, zo again - back to the LPB you had' },
     { k = 'zb', d = 'the cursor row to the bottom (as in Vim)' },
     { k = 'zt', d = 'zoom the track: the cursor track bigger - all fields of its columns, automation, MIDI lanes, audio as a big wave - the others folded; zt again - back' },
