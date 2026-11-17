@@ -16710,8 +16710,22 @@ ctx.note_pick = function(name, cur, setfn)
     items[#items + 1] = { label = ('%s  %d'):format(model.note_name(n), n), data = n }
     if cur == n then sel = #items end
   end
-  vim.open_picker((name or 'note') .. ' - type a note (D5) or a number, Enter', items, function(it) if it.data then setfn(it.data) end end)
-  if vim.picker then vim.picker.sel = sel end
+  local pk
+  vim.open_picker((name or 'note') .. ' - type a note (D5) or a number, Enter', items, function(it)
+    -- 17 ноя: набранное — само значение (60 / D5 / C#4 / Db3), а не первое совпадение фильтра (61 находил «A#6 106»)
+    local q = pk and (pk.query or ''):match('^%s*(.-)%s*$') or ''
+    local n = tonumber(q:match('^(%d+)$') or '')
+    if not n then
+      local l, a, o = q:match('^([A-Ga-g])([#b%-]?)(%-?%d)$')
+      if l then
+        n = ({ c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11 })[l:lower()] + (a == '#' and 1 or (a == 'b' and -1 or 0)) + (tonumber(o) + 1) * 12
+      end
+    end
+    if n and n >= 0 and n <= 127 then setfn(n); return end
+    if it.data then setfn(it.data) end
+  end)
+  pk = vim.picker
+  if pk then pk.sel = sel; pk.free = true end
 end
 ctx.dedup = function()
   local n, nt = 0, 0
