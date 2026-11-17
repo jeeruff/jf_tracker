@@ -1166,7 +1166,10 @@ function D.layout_core(snap, state, nregions)
       for li, lane in ipairs(col.lanes) do
         -- минимум подколонок задаёт пользователь кнопками -/+ над лейном (1 окт)
         local nsub = math.max(1, #lane.subs, (state.subs_min or {})[col.guid .. ':' .. tostring(lane.idx)] or 0)
-        if lvl and lvl > 3 + L.MAXFX and li == 1 then nsub = math.max(nsub, 1 + lvl - 3 - L.MAXFX) end   -- шире всех fx — подколонки нот
+        -- 17 ноя: шире полной ширины — ПО ОДНОЙ колонке нот за шаг: сначала раскрываются свои (узкие) подколонки, потом
+        -- добавляются новые (было: 3 шага добавляли пустые, которых у трека и так хватало — без изменений, потом все разом)
+        local kx = (lvl and lvl > 3 + L.MAXFX) and (lvl - 3 - L.MAXFX) or 0
+        if kx > 0 and li == 1 then nsub = math.max(nsub, 1 + kx) end   -- шире всех fx — подколонки нот
         -- 15 ноя (2): трек сужают — первыми уходят ПУСТЫЕ подколонки нот (заданные кнопками - + сверх занятых), и только
         -- потом поля: каждый шаг «уже» сначала снимает одну пустую подколонку, уровень полей на столько же выше
         local llvl = lvl
@@ -1183,7 +1186,9 @@ function D.layout_core(snap, state, nregions)
         local parts = {}
         for si = 1, nsub do
           local narrow = si > 1 and not (lane.audio_sub and lane.audio_sub[si])
-          if narrow and lvl == L.MAXLVL and not c.compact then narrow = false end   -- 4 ноя: самый широкий уровень колеса — у каждой колонки нот свои поля и эффекты (MPE)
+          -- 4 ноя: самый широкий уровень — у колонок нот свои поля и эффекты (MPE); 17 ноя: ПЛАВНО — с MAXLVL по одной колонке за
+          -- шаг (было: все разом — трек с 10 колонками нот вырастал в 10 раз одним шагом)
+          if narrow and kx > 0 and si <= 1 + kx and not c.compact then narrow = false end
           local G = c.compact and (narrow and L.GCN or L.GC) or (narrow and L.GN or nil)
           if llvl and llvl >= 2 and not narrow then G = (nsub == 1 and D.SMART_COLS ~= false and L.smartG(lane, llvl)) or L.GL[math.min(llvl, 3 + L.MAXFX)] end   -- 15 ноя: одна подколонка — пустые поля уходят первыми
           if not narrow and D.col_is_kit(col) then G = L.kitG(G) end   -- 19 окт: кит — без Sxx (и на уровнях ширины)

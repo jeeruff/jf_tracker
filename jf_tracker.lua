@@ -21633,7 +21633,7 @@ function ctx.width_step(d, which)
       else
         local cur = state.wlevel[c2.guid] or state.wzlevel or full
         local nl = cur + d
-        state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10)) and math.max(0, nl) or nil
+        state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10) + 15) and math.max(0, nl) or nil   -- 17 ноя: +15 — шире по одной колонке нот
       end
     end
     relayout()
@@ -21657,7 +21657,7 @@ function ctx.width_step(d, which)
     cur = math.min(L.MAXLVL or 10, need)
   end
   local nl = cur + d                                         -- d > 0 — шире
-  if nl > (L.MAXLVL or 10) then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека
+  if nl > (L.MAXLVL or 10) + 15 then nl = nil else nl = math.max(0, nl) end   -- шире самого широкого — как у каждого трека (17 ноя: +15 — по колонке нот)
   state.wzlevel = nl
   reaper.SetExtState(EXT, 'wzlevel', nl and tostring(nl) or '', true)
   relayout()
