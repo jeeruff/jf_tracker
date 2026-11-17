@@ -5875,10 +5875,13 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           -- неё картинка текста ×2 складывается с фоном, и тёмное пропадало
           local kf = key_fill(k[1], white_c)
           local lb = D.key_label and D.key_label(k[2]) or k[2]               -- русская раскладка — кириллицей (5 окт)
-          text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, U.readable(U.BG, kf, dim and 2.0 or 4.5), kf)
+          -- 17 ноя: libkeys — вместо буквы номер инструмента lib (как в lib: 01 02 …, слайс S1), бирюзой; буква — в строке lib
+          local lkw = cc.libkeys and cc.key_tags and cc.key_tags[k[1]]
+          if lkw then lb = fit(lkw, kw - 2) end
+          text(bx + math.floor((kw - 1 - ms(lb)) / 2), ky + kh - L.rh, lb, lkw and U.readable(U.CYAN, kf, 4.5) or U.readable(U.BG, kf, dim and 2.0 or 4.5), kf)
           out.letters = out.letters + 1
           -- 15 ноя: keyspat / keyphr — на клавише имя паттерна / фразы, которую она запускает (над буквой клавиши)
-          local tg = info and info.ctrl and info.ctrl.key_tags and info.ctrl.key_tags[k[1]]
+          local tg = not cc.libkeys and info and info.ctrl and info.ctrl.key_tags and info.ctrl.key_tags[k[1]]
           if tg and kh >= 2 * L.rh then
             local ts = fit(tg, kw - 2)
             text(bx + math.max(0, math.floor((kw - 1 - ms(ts)) / 2)), ky + 1, ts, U.readable(U.AMBER, kf, 3.0), kf)
@@ -5894,7 +5897,22 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
         set(U.LINE); gfx.rect(bx, ky, bw, bh, 0)
         out.black = out.black + 1
         local blb = k[2]
-        local fl = D.PIANO_FROW and blb:match('^f(%d+)$')
+        -- 17 ноя: libkeys — номер инструмента lib вместо буквы; не влез обычным шрифтом — мелким (Menlo), не влез и им — пусто
+        local lkb = cc.libkeys and letters and cc.key_tags and cc.key_tags[k[1]]
+        if lkb then
+          local tc = U.readable(U.CYAN, fill, 4.5)
+          if ms(lkb) <= bw - 2 then text(bx + math.floor((bw - ms(lkb)) / 2), ky + 1, lkb, tc)
+          else
+            local px = math.max(7, math.min(L.rh - 2, math.floor((bw - 1) / (0.62 * #lkb))))
+            if D.fkey_px ~= px then gfx.setfont(7, 'Menlo', px, string.byte('b')); D.fkey_px = px else gfx.setfont(7) end
+            local nw = gfx.measurestr(lkb)
+            if nw <= bw - 1 then set(tc); gfx.x, gfx.y = bx + math.floor((bw - nw) / 2), ky + 1; gfx.drawstr(lkb) end
+            gfx.setfont(D.font_id)
+          end
+          out.letters = out.letters + 1
+          blb = nil
+        end
+        local fl = blb and D.PIANO_FROW and blb:match('^f(%d+)$')
         if fl and letters then
           -- 16 окт: f-клавиша — «f» сверху, номер под ним, своим мелким шрифтом (влезает в узкую чёрную)
           local px = math.max(7, math.min(math.floor((bh - 2) / 2), math.floor(bw * 0.9)))
@@ -5909,7 +5927,7 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
           gfx.setfont(D.font_id)
           out.letters = out.letters + 1
           blb = nil
-        elseif ms(blb) > bw - 2 and #blb > 1 then blb = blb:sub(2) end          -- 16 окт: f11 не влезло — 11
+        elseif blb and ms(blb) > bw - 2 and #blb > 1 then blb = blb:sub(2) end          -- 16 окт: f11 не влезло — 11
         if blb and letters and bw >= ms(blb) + 2 then
           text(bx + math.floor((bw - ms(blb)) / 2), ky + 1, blb, dim and U.mix(fill, U.TEXT, 0.4) or U.readable(U.TEXT, fill, 4.5))
           out.letters = out.letters + 1
@@ -7516,6 +7534,9 @@ end
 
 D.pool_scroll = 0
 D.pool_dbg = ''
+-- 17 ноя: libkeys — строка lib, которую играет нотная клавиша: звук, открытый слайс / слой, плагин-инструмент, фраза
+-- (разделы, пустые слоты, пэды, их эффекты, midi clips — нет); main берёт этот же отбор из D.lib_nav2
+function D.libkey_ok(s) return s.i ~= nil or (s.fx == true and s.num ~= nil) or s.phr ~= nil end
 function D.draw_instruments(L, info, ix, iy, w, H, hover)
   local mx, my = gfx.mouse_x, gfx.mouse_y
   set(U.PANEL); gfx.rect(ix, iy, w, H, 1)
@@ -7580,7 +7601,14 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local lw3 = ms('load') + 2 * L.pad
     local lx3 = ix + L.pad + fw + L.pad   -- 2 ноя: после «/ find»
     hbtn(lx3, lw3, 'load', false, U.CYAN, 'poolload')
-    local room = bx2 - L.pad - (lx3 + lw3 + L.pad)
+    -- 17 ноя: lib2keys — нотные клавиши играют инструменты lib сверху вниз (libkeys, Opt+M); горит, когда вкл;
+    -- не влезает вместе с пресетом — без кнопки (Opt+M, :libkeys)
+    local after = lx3 + lw3 + L.pad
+    do
+      local lw4 = ms('lib2keys') + 2 * L.pad
+      if after + lw4 + L.pad + ms('<> pre') + L.pad <= bx2 - L.pad then hbtn(after, lw4, 'lib2keys', info.libkeys, U.CYAN, 'poollibkeys'); after = after + lw4 + L.pad end
+    end
+    local room = bx2 - L.pad - after
     local ptw = math.min(ms('< ' .. nm .. ' >') + L.pad, room)
     if ptw > ms('<>') + ms('pre') then
       local px = bx2 - L.pad - ptw
@@ -7775,18 +7803,24 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   L.pool_rows = rows
   -- 17 ноя (дерево): остановки курсора по всему списку, как он нарисован (разделы, звуки, слайсы, инструменты, пэды, эффекты)
   D.lib_nav2 = {}
-  for _, r in ipairs(rows) do
+  -- 17 ноя: libkeys — строкам-инструментам (D.libkey_ok) подпись клавиши: lkrow[строка] = порядковый номер с 0;
+  -- lbl — номер, как в lib (01 02 …; слайс S1, слой L1), — для подписи на клавише внизу
+  local lkrow, nlk = {}, 0
+  for ri, r in ipairs(rows) do
     local s
     if r.sechdr then s = { sec = r.hdr }
     elseif r.pad then s = { pad = true, key = r.kitkey, k = r.padk, kitnum = r.kitnum }
     elseif r.pslot ~= nil and r.sk and r.sk > 0 then s = { slot = true, key = r.kitkey, pk = r.padk, sk = r.sk, kitnum = r.kitnum }
-    elseif r.i and r.sub then s = { i = r.i, kind = r.sub, k = r.k }
-    elseif r.i then s = { i = r.i }
+    elseif r.i and r.sub then s = { i = r.i, kind = r.sub, k = r.k, lbl = (r.sub == 's' and 'S%X' or 'L%d'):format(r.k or 0) }
+    elseif r.i then s = { i = r.i, lbl = ('%02d'):format((pool[r.i] and pool[r.i].num) or r.i) }
     elseif r.empty then s = { num = r.empty }
-    elseif r.instfx and r.num then s = { num = r.num + HID, kitkey = r.kitkey }   -- место в пуле (как vim.inst)
+    elseif r.instfx and r.num then s = { num = r.num + HID, kitkey = r.kitkey, fx = true, col = r.col, lbl = ('%02d'):format(r.num) }   -- место в пуле (как vim.inst)
     elseif r.midi then s = { midi = true }
-    elseif r.phr then s = { phr = r.phr } end
-    if s then D.lib_nav2[#D.lib_nav2 + 1] = s end
+    elseif r.phr then s = { phr = r.phr, lbl = ('%02d'):format(r.num or 0) } end
+    if s then
+      D.lib_nav2[#D.lib_nav2 + 1] = s
+      if D.libkey_ok(s) then lkrow[ri] = nlk; nlk = nlk + 1 end
+    end
   end
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
@@ -7814,6 +7848,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   end
   if D.pool_scroll > math.max(0, #rows - nvis) then D.pool_scroll = math.max(0, #rows - nvis) end
   if D.pool_scroll < 0 then D.pool_scroll = 0 end
+  -- 17 ноя: libkeys — слева колонка клавиш (какая нотная клавиша играет строку); список сдвинут на её ширину,
+  -- правый край тот же (колонки len / pt / bs и превью считаются уже от сдвинутого края)
+  local LKG, LKX = 0, ix
+  if info.libkeys_lbl and w > ms('f9') + 24 * L.cw then LKG = ms('f9') + 2 * L.pad + 4; ix = ix + LKG; w = w - LKG end
   local label_w = math.min(L.cw * 18, math.floor(w * 0.55))
   -- 6 ноя: имя — полностью, если есть место: колонка имени до самого длинного имени (len / pt / bs и место под волну
   -- остаются); место под «+ 16$» — только если в lib есть нарезанный сэмпл / слои. Кэш на таблицу pool и ширину
@@ -7970,6 +8008,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   for r = D.pool_scroll + 1, math.min(#rows, D.pool_scroll + nvis) do
     local row = rows[r]
     local y = iy + 2 + 2 * L.rh + LEG + TBH + (r - D.pool_scroll - 1) * L.rh
+    if LKG > 0 and lkrow[r] then   -- 17 ноя: libkeys — клавиша строки в своей колонке слева
+      local kl = info.libkeys_lbl(lkrow[r])
+      if kl then text(LKX + 4, y + 1, fit(kl, LKG - 4 - L.pad), U.CYAN) end
+    end
     if row.gap then
       -- пустая строка перед секцией
     elseif row.pslot ~= nil then   -- 17 ноя: эффект пэда (подпапка пэда): имя, категория; обойдён — тускло

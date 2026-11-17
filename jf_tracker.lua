@@ -406,6 +406,7 @@ local state = {
   slice1 = flag('slice1', false),   -- 15 окт: слайсы: 1 = весь сэмпл, q = слайс 1   -- 15 окт: набранное (3d, [E_]) — тегом прямо на ячейке курсора
   slicepitch0 = reaper.GetExtState(EXT, 'slicepitch0') == '6' and '6' or '1',
   shiftlisten = reaper.GetExtState(EXT, 'shiftlisten') == '1',
+  libkeys = flag('libkeys', false),   -- 17 ноя: libkeys (lib2keys, Opt+M) — нотные клавиши = инструменты lib сверху вниз
   hexfill = reaper.GetExtState(EXT, 'hexfill') == 'left' and 'left' or 'right',   -- 17 окт: Enter в недобранном hex
   bigname = reaper.GetExtState(EXT, 'bigname') ~= '' and reaper.GetExtState(EXT, 'bigname') or 'off',   -- 20 окт: big trackname
   anpatch = flag('anpatch', false), aninst = flag('aninst', false), anitem = flag('anitem', false),   -- 20 окт: имя трека само (патч / инструмент / айтем)
@@ -773,7 +774,7 @@ local function save_win()
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
   S('declip', tostring(state.declip or 10)); S('mixrouter_frac', tostring(state.mixrouter_frac or 0.5))
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('framefx', state.framefx or ''); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode2', state.bsmode or 'view'); S('foldfast2', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('popdock', state.popdock and '1' or '0'); S('tptop', state.tptop and '1' or '0'); S('selinv', state.selinv and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('knob', state.knob or 'auto'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option'); S('spcmenu', state.spcmenu or 'main'); S('spcdelay', tostring(state.spcdelay or 250))
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('libkeys', state.libkeys and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('framefx', state.framefx or ''); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode2', state.bsmode or 'view'); S('foldfast2', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('popdock', state.popdock and '1' or '0'); S('tptop', state.tptop and '1' or '0'); S('selinv', state.selinv and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('knob', state.knob or 'auto'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option'); S('spcmenu', state.spcmenu or 'main'); S('spcdelay', tostring(state.spcdelay or 250))
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -16216,6 +16217,7 @@ ctx = {
       { key = 'k', label = 'keyboard: notes / patterns', sub = function() return { title = 'keyboard', items = {
           { key = 'm', label = 'notes - the note keys play the instrument' .. (vim.piano and '  (on)' or ''), fn = function() if ctx.toggle_piano then ctx.toggle_piano() else vim.piano = not vim.piano end end },
           { key = 'f', label = 'keyphr - the note keys play the phrases (1st key - phrase 1)' .. (state.keyphr and '  (on)' or ''), fn = function() ctx.keyphr_cmd() end },
+          { key = 'l', label = 'libkeys - the note keys are the lib instruments, top to bottom (Opt+M)' .. (state.libkeys and '  (on)' or ''), fn = function() ctx.libkeys_cmd() end },   -- 17 ноя
           { key = 'p', label = 'keyspat - the note keys play the patterns of the song (MPC)' .. ((ctx.PADS and ctx.PADS.on) and '  (on)' or ''), fn = function() ctx.pads_cmd((ctx.PADS and ctx.PADS.on) and 'off' or '') end },
         } } end },
       { key = 'I', label = 'instrument (pool)', sub = function()
@@ -16641,7 +16643,7 @@ ctx.patai = function(arg)
 end
 -- 16 ноя: кнопки (hover-ключи), щелчок по которым «.» повторяет; клетки, вкладки, слайдеры, списки — нет
 ctx.REP_BTNS = { 'ctrl', 'btn', 'dspbtn', 'dspab', 'envpm', 'fxcolbtn', 'insprevbtn', 'lanebtn', 'lanemono', 'libautobtn', 'libgrpbtn',
-  'liblp', 'libxi', 'mixmode', 'monobtn', 'mxctl', 'poolbsync', 'poolkit', 'poollayer', 'poolload', 'poolpprev', 'poolsort', 'recbtn',
+  'liblp', 'libxi', 'mixmode', 'monobtn', 'mxctl', 'poolbsync', 'poolkit', 'poollayer', 'poolload', 'poollibkeys', 'poolpprev', 'poolsort', 'recbtn',
   'retrobtn', 'rgbtn', 'sidectl', 'snapc', 'swapbtn', 'trsbtn', 'viewbtn', 'scopemode', 'scopes_on', 'pinmx', 'mixsnap', 'prevbtn' }
 ctx.click_repeat = function(lr, n)
   ctx.click_replay = { x = lr.x, y = lr.y, sig = lr.sig, n = math.max(1, n or 1) }
@@ -26330,6 +26332,10 @@ local function frame()
       local n = 0
       if trk and vim.mode == 'normal' then left, n = left:gsub('NORMAL', kw, 1); if n == 0 then left, n = left:gsub('KEYS', kw, 1) end end
       if n == 0 then left = left == '' and kw or (kw .. ' ' .. left) end
+    elseif state.libkeys then   -- 17 ноя: libkeys — KEYS → LIBKEYS, иначе спереди (LIBKEYS INSERT, LIBKEYS NORMAL)
+      local n = 0
+      if trk and vim.mode == 'normal' then left, n = left:gsub('KEYS', 'LIBKEYS', 1) end
+      if n == 0 then left = left == '' and 'LIBKEYS' or ('LIBKEYS ' .. left) end
     end
   end
   draw.mode_major = major
@@ -26782,7 +26788,7 @@ local function frame()
       tour = OPT.tour.active, ss_open = vim.hydra ~= nil and (vim.hydra.title or ''):match('^screenset') ~= nil,
       metro = reaper.GetToggleCommandState(40364) == 1,
       ptabs = state.ptabs and ctx.ptabs_info() or nil,   -- 12 ноя: опрос 4 Гц (был перебор проектов каждый кадр)
-      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.SW[edit.track_swing(cur_col() and cur_col().track)].on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, swing_v = ctx.swing_vals(), key_tags = ctx.key_tags(), swing_tr = edit.track_swing(cur_col() and cur_col().track), time = ctx.pos_time(playpos or curpos), marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
+      quick = ctx.quick_str(), qgen = ctx.quick_generic(), oneclick = state.oneclick, autofocus = state.autofocus, swing_on = edit.SW[edit.track_swing(cur_col() and cur_col().track)].on, swing_txt = ctx.swing_label(), swing_amt = edit.sw.on and edit.sw.amt or 0, swing_v = ctx.swing_vals(), key_tags = ctx.key_tags(), libkeys = state.libkeys, swing_tr = edit.track_swing(cur_col() and cur_col().track), time = ctx.pos_time(playpos or curpos), marks = ctx.marker_set(), perf = ctx.PERF and ctx.PERF.active, debug = state.debug,
       recording = reaper.GetPlayState() & 4 == 4, reclib = state.reclib, hear = state.preview, sellisten = state.sellisten, steplisten = state.steplisten, trklisten = state.trklisten, tpbuttons = state.tpstyle == 'big', tptext = state.tpstyle == 'text' or state.tpstyle == 'full', tpfull = state.tpstyle == 'full',
       frz = ctx.frz and ctx.frz_label(ctx.frz.len) or nil, halfplay = ctx.slowrec ~= nil and ctx.slowrec.play and ctx.slowrec.rate or nil, shiftrec = ctx.shiftrec and (ctx.shiftrec.wait and 'wait' or 'rec') or nil, slowtxt = state.slowrate and ctx.slow_label(state.slowrate) or nil, playstate = reaper.GetPlayState(),
       punch = ctx.punch_on(),
@@ -26797,7 +26803,7 @@ local function frame()
     lib_tsel = ctx.lib_tsel,   -- 17 ноя (дерево): курсор на разделе / пэде / эффекте пэда
     lib_kit = (function() local c, f, k = ctx.lib_kit_get(); return f and { kids = f.kids, sel = k.sel, name = f.name, inpad = k.inpad, slot = k.slot } or nil end)(),   -- 17 ноя: пэды drumrs5k (inpad — эффекты пэда)
     libtabs = state.libtabs, libtab = state.libtab, lib_seccol = ctx.lib_seccol, lib_dir = (ctx.lib_dir and ctx.lib_dir == vim.inst) and ctx.lib_dir or nil,   -- 17 ноя: подпапка lib
-    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
+    toptab = state.toptab, modsel = modsel, poolprev = state.poolprev, libkeys = state.libkeys, libkeys_lbl = state.libkeys and ctx.libkeys_lbl or nil, libauto = state.libauto, libfolders = state.libfolders, inputs_on = state.panes and draw.panes.visible(state.panes, 'inputs') or false, phr_inst = state.phr_inst, phr_list = ctx.phr_list, auto_inst = state.auto_inst, auto_n = state.auto_inst and #ctx.ai_list() or nil, midi_inst = state.midi_inst, midi_n = state.midi_inst and #ctx.mc_list() or nil, midi_scope = ctx.mc_scope,
     inspreview = state.preview, visor_namethumb = ctx.visor_namethumb,
     -- выделенные в REAPER треки (3 окт): фон их колонок чуть светлее; опрос
     -- каждый кадр — смена выделения не всегда пересобирает снимок
@@ -27978,6 +27984,7 @@ local function frame()
   elseif hover.poolsortcol then state.status = 'sort the lib by this column - #: tree by track / marks (click again), name, len, type (audio / video); numbers stay'
   elseif hover.poollayer then state.status = 'layer (L): another lib sound plays together with the selected one on one note (a ¥ instrument; its layers in the lib folder)'
   elseif hover.poolload then state.status = 'load: kits - the samples of a kit are ADDED to the lib (the preset < > replaces the whole lib)'
+  elseif hover.poollibkeys then state.status = 'lib2keys (Opt+M, :libkeys): the note keys are the lib instruments top to bottom - C of the keyboard octave the 1st, C# the 2nd ...; INSERT writes it on its own track, KEYS / Shift listen - ' .. (state.libkeys and 'on' or 'off')
   elseif hover.poolsort then state.status = 'lib order: ' .. (state.poolsort or 'track') .. ' - click: the list (track / name / len / marks / type), or click a column head; numbers stay'
   elseif hover.caption then state.status = ({
     wave = 'wv: spectral peaks of the item (colour = frequency), amber ticks = stretch markers - :wave on|off',
@@ -29623,6 +29630,8 @@ local function frame()
       click = { t = now2, zone = 'poolsort' }
     elseif hover.poolload then
       ctx.set_focus('inst'); ctx.kit_add_menu(); click = { t = now2, zone = 'poolload' }
+    elseif hover.poollibkeys then   -- 17 ноя: кнопка lib2keys (= Opt+M, :libkeys)
+      ctx.libkeys_cmd(); click = { t = now2, zone = 'poollibkeys' }
     elseif hover.poollayer then   -- 4 ноя: кнопка layer (= L в lib)
       ctx.set_focus('inst'); ctx.inst_layer_pick(); click = { t = now2, zone = 'poollayer' }
     elseif hover.garden then
@@ -33217,6 +33226,14 @@ local function frame()
   if c == 6697266 and ctx.mods().cmd and ctx.mods().alt and not ctx.mods().ctrl then ctx.fill_reaper(); c = 0 end   -- 6 ноя: Cmd+Opt+F12 — на всё окно REAPER
   if c == 6697266 and ctx.mods().cmd and not ctx.mods().ctrl and not ctx.mods().alt then ctx.reloading = true; quit = true; c = 0 end
   if c == 6697264 and ctx.mods().cmd and not ctx.mods().ctrl then ctx.viper_toggle(); c = 0 end   -- 29 окт: Cmd+F10 — viper
+  -- 17 ноя: Opt+M (µ) — libkeys вкл / выкл (трекер, lib); в раскладке renoise m — нота: в INSERT и KEYS Opt+M остаётся
+  -- нотой аккорда, как было (там — кнопка lib2keys / :libkeys)
+  if c > 0 and (c == 181 or c == 0x75000000 + 181 or (c == 109 and ctx.mods().alt)) and (state.focus == 'tracker' or state.focus == 'inst')
+     and not vim.picker and not vim.hydra and not vim.pending and not vim.op and vim.mode ~= 'cmd' and vim.mode ~= 'search'
+     and not (keys.layout == 'renoise' and (vim.mode == 'insert' or vim.piano)) then
+    local m = ctx.mods()
+    if not (m.cmd or m.ctrl) then ctx.libkeys_cmd(); c = 0 end
+  end
   -- 17 окт: pads — нотная клавиша запускает паттерн (трекер в NORMAL / матрица, без модификаторов)
   -- 12 ноя: keyphr — нотные клавиши играют фразы проекта (1-я клавиша — фраза 1, как keyspat с паттернами)
   if c > 0 and state.keyphr and keys.piano[c] and (state.focus == 'tracker' or state.focus == 'matrix' or state.focus == 'inst')
@@ -35892,6 +35909,7 @@ ctx.PADS = dofile(DIR .. '/jf_tracker_padseq.lua')
 ctx.pad_list = function() return ctx.PADS.list(ctx.sequence()) end
 -- 15 ноя: подписи на клавишах полосы: keyphr — имя фразы клавиши, keyspat — имя паттерна (смещение от C → имя); иначе nil
 ctx.key_tags = function()
+  if state.libkeys then return ctx.libkeys_tags() end   -- 17 ноя: libkeys — номер инструмента lib на клавише
   local list
   if state.keyphr then list = ctx.phr_list() elseif ctx.PADS and ctx.PADS.on then list = ctx.pad_list() end
   if not list or #list == 0 then return nil end
@@ -35950,6 +35968,7 @@ ctx.keyphr_cmd = function(arg)
   local on = (arg == 'off' and false) or (arg == 'on' and true) or not state.keyphr
   state.keyphr = on or nil
   if on and ctx.PADS then ctx.PADS.on, ctx.PADS.rec = false, false end
+  if on then state.libkeys = false end   -- 17 ноя: keyphr / keyspat / libkeys — одно из трёх
   local n = #ctx.phr_list()
   vim.msg = on and ('keyphr on: the note keys / MIDI C1.. play the %d phrase(s) (Shift+Space on a trigger - its copies; :keyphr off)'):format(n) or 'keyphr off'
 end
@@ -35963,6 +35982,7 @@ ctx.pads_cmd = function(arg)
   local P = ctx.PADS
   arg = (arg or ''):match('%a+') or ''
   state.keyphr = nil   -- 12 ноя: keyspat и keyphr — одно из двух
+  if arg ~= 'off' then state.libkeys = false end   -- 17 ноя: и libkeys
   if arg == 'quant' or arg == 'sudden' then P.mode = arg; P.on = true
   elseif arg == 'rec' then
     if P.rec then P.rec = false; ctx.pads_write(); return end
@@ -35971,6 +35991,136 @@ ctx.pads_cmd = function(arg)
   else P.on = not P.on; if not P.on then P.rec = false end end
   vim.msg = P.on and ('pads on (%s%s): the note keys play the patterns - %s; :pads quant | sudden | rec | off'):format(P.mode, P.rec and ', REC' or '',
     P.mode == 'sudden' and 'at once, the same place inside' or 'when the playing one ends') or 'pads off'
+end
+-- 17 ноя: libkeys (кнопка lib2keys в lib, Opt+M, :libkeys) — нотные клавиши = инструменты lib сверху вниз (вертикально):
+-- клавиша C октавы клавиатуры (смещение 0) — 1-я строка-инструмент lib, C# — 2-я, D — 3-я … (ниже C — ничего). Строки — как
+-- нарисованы (draw.lib_nav2, отбор draw.libkey_ok: звуки, открытые слайсы / слои, плагины, фразы). Выкл — клавиатура как была
+ctx.libkeys_on = function() return state.libkeys and true or false end
+ctx.libkeys_cmd = function(arg)
+  arg = (arg or ''):match('%a+') or ''
+  local on = (arg == 'off' and false) or (arg == 'on' and true) or not state.libkeys
+  state.libkeys = on
+  reaper.SetExtState(EXT, 'libkeys', on and '1' or '0', true)
+  if on then state.keyphr = nil; if ctx.PADS then ctx.PADS.on, ctx.PADS.rec = false, false end end
+  vim.msg = on and ('libkeys: on - each key a lib instrument (%d now): INSERT writes it on its own track, KEYS / Shift listen (Opt+M - off)'):format(#ctx.libkeys_list())
+    or 'libkeys: off - the keys play the selected instrument by pitch'
+end
+ctx.libkeys_list = function()
+  local out = {}
+  local nav = draw.lib_nav2
+  if nav and #nav > 0 then
+    for _, s in ipairs(nav) do if draw.libkey_ok(s) then out[#out + 1] = s end end
+  else   -- lib ещё не рисовалась — звуки пула по порядку
+    local col = cur_col()
+    for i, e in ipairs(col and col.pool or {}) do if not e.parent then out[#out + 1] = { i = i, lbl = ('%02d'):format(e.num or i) } end end
+  end
+  return out
+end
+ctx.libkeys_entry = function(off) if off then return ctx.libkeys_list()[off + 1] end end
+-- клавиша n-й (с 0) строки lib — подпись в колонке клавиш lib
+ctx.libkeys_lbl = function(n) local ch = keys.plabel[n]; return ch and keys.label(ch) or nil end
+-- номер инструмента lib на клавише полосы (смещение клавиши → его lbl: 01 02 …, слайс S1, слой L1)
+ctx.libkeys_tags = function()
+  local t = ctx.lk_tags_t or {}; ctx.lk_tags_t = t
+  for k in pairs(t) do t[k] = nil end
+  local l = ctx.libkeys_list()
+  for _, off in pairs(keys.piano) do local s = l[off + 1]; if s then t[off] = s.lbl or '?' end end
+  return t
+end
+-- ВЫСОТА ноты инструмента — одно место (потом — своя у каждого инструмента): слайс — его нота (нота = слайс, как клавиши
+-- и список слайсов), остальное — C-3 (MIDI 48; у аудио «C-4 = оригинал», так что звук и фраза — октавой ниже)
+ctx.libkeys_pitch = function(s)
+  if s and s.kind == 's' then return ctx.slice_base() + s.k - 1 end
+  return 48
+end
+-- трек инструмента: плагин — его трек (и номер эффекта); звук / слайс / слой — трек, где звучит он или его слайсы (трек
+-- курсора, если и он); фраза — трек курсора. free — звук нигде не звучит: первый трек от курсора вправо (по кругу) без
+-- события в строке row и без плагина-инструмента; такого нет — трек курсора
+ctx.libkeys_track = function(s, row, free)
+  local col = cur_col()
+  if not s or s.phr or not col then return col end
+  local pool = col.pool or {}
+  if s.fx then
+    local oc, k = ctx.inst_owner(s.num - #pool - draw.empty_slots(#pool))
+    local ti = oc and ctx.track_insts(oc)[k]
+    return oc, ti and ti.fx
+  end
+  local root = pool[s.i]
+  local names, seen = {}, {}
+  for _, e in ipairs(pool) do
+    if root and (e == root or e.parent == root) then
+      for _, nm in ipairs(e.tracks or {}) do
+        if nm == col.name then return col end
+        if not seen[nm] then seen[nm] = true; names[#names + 1] = nm end
+      end
+    end
+  end
+  for _, nm in ipairs(names) do for _, c in ipairs(snap and snap.cols or {}) do if c.name == nm then return c end end end
+  if not free then return nil end
+  local list, at = {}, 1
+  for _, f in ipairs(L and L.flat or {}) do if f.col and f.col ~= list[#list] then list[#list + 1] = f.col; if f.col == col then at = #list end end end
+  for d = 0, #list - 1 do
+    local c = list[(at - 1 + d) % #list + 1]
+    if c ~= (snap and snap.master) and c.track and #ctx.track_insts(c) == 0 then
+      local busy = false
+      for _, ln in ipairs(c.lanes or {}) do for _, sb in ipairs(ln.subs or {}) do if sb[row] then busy = true end end end
+      if not busy then return c end
+    end
+  end
+  return col
+end
+-- место в L.flat для записи в трек col в строке row: трек курсора — колонка курсора (обычный набор, с перезаписью);
+-- другой — первая его подколонка с пустой строкой, все заняты — первая и рядом (beside); трек не виден — nil
+ctx.libkeys_fi = function(col, row)
+  if not col or col == cur_col() then return vim.cur.fi end
+  local first
+  for fi, f in ipairs(L and L.flat or {}) do
+    if f.col == col and not f.env and not f.ml then
+      if f.folded then return fi, false end
+      first = first or fi
+      if not (f.sub and f.sub[row]) then return fi, false end
+    end
+  end
+  if first then return first, true end
+end
+-- INSERT: выбрать инструмент клавиши (как выбор в lib) на колонке его трека; вернуть, куда и какой высотой писать —
+-- саму ноту пишет обычный путь набора (vim), курсор остаётся на своей колонке
+ctx.libkeys_prep = function(off, row)
+  local s = ctx.libkeys_entry(off)
+  if not s then vim.msg = ('libkeys: no lib instrument on this key (%d in the lib)'):format(#ctx.libkeys_list()); return nil end
+  local col, fx = ctx.libkeys_track(s, row, true)
+  local fi, beside = ctx.libkeys_fi(col, row)
+  local hidden = not fi
+  fi = fi or vim.cur.fi
+  local fi0, pp = vim.cur.fi, state.poolprev
+  vim.cur.fi = fi; state.poolprev = false   -- выбор — без своего превью (звук даст вставка)
+  local ok, err = pcall(function()
+    if s.phr then ctx.phr_select(s.phr)
+    elseif s.fx then if col and fx then ctx.inst_fx_pick(col, fx, false, true) end
+    else ctx.inst_select(s.i); ctx.lib_sub_go(s.i, s.kind and { kind = s.kind, k = s.k } or nil) end
+  end)
+  vim.cur.fi, state.poolprev = fi0, pp
+  if not ok then error(err, 0) end
+  if hidden and col then vim.msg = ('libkeys: the track %s is not shown - written on the cursor track'):format(col.name or '?') end
+  return { fi = fi, pitch = ctx.libkeys_pitch(s), beside = beside, whole = s.kind ~= 's' }
+end
+-- KEYS / Shift: только послушать инструмент клавиши (выбор не меняется) — через его трек (нет — трек курсора)
+ctx.libkeys_play = function(off, key)
+  local s = ctx.libkeys_entry(off)
+  if not s then vim.msg = ('libkeys: no lib instrument on this key (%d in the lib)'):format(#ctx.libkeys_list()); return end
+  if s.phr then ctx.phr_preview(s.phr); vim.msg = 'libkeys: phrase ' .. s.phr; return end
+  local col0 = cur_col(); local pool = col0 and col0.pool or {}
+  local col = ctx.libkeys_track(s, vim.cur.row, false) or col0
+  local tr = col and col.track
+  if not tr then return end
+  local p = ctx.libkeys_pitch(s)
+  if s.fx then ctx.preview(tr, p, 'midi', nil, 1, nil, key); vim.msg = ('libkeys: %s plugin on %s'):format(s.lbl or '', col.name or '?'); return end
+  local e = pool[s.i]
+  if not e then return end
+  if s.kind == 's' and e.slices and e.slices[s.k] then ctx.preview_slice(tr, e, e.slices[s.k], (not e.playthru and e.slices[s.k + 1]) or e.len, 0)
+  elseif s.kind == 'y' then ctx.layer_listen(e.layers and e.layers[s.k])
+  else ctx.preview(tr, p, e.item, vim.cur.row, 1, nil, key) end
+  vim.msg = ('libkeys: %s %s'):format(s.lbl or '', e.name or '')
 end
 -- 18 окт: playlist (region playlist) — порядок паттернов текстом прямо в матрице (кнопка playlist): имена паттернов /
 -- секций с автодополнением (Tab), номера регионов, xN повтор, :N / /N сокращение, -N проскок, +N — ещё раз первые N строк. Именованные, в проекте.
@@ -36595,6 +36745,7 @@ ctx.mode_menu = function()
     { key = ' ', label = 'major mode - the module in focus (' .. tostring(draw.mode_major or '') .. '); below - its minor modes' },
     { key = 'c', label = 'COMMAND - type a command (:)', fn = base(':') },
     { key = 'f', label = on(state.keyphr, 'KEYPHR - the note keys play the phrases'), fn = function() ctx.keyphr_cmd() end },
+    { key = 'l', label = on(state.libkeys, 'LIBKEYS - the note keys are the lib instruments, top to bottom (Opt+M)'), fn = function() ctx.libkeys_cmd() end },   -- 17 ноя
     { key = 'i', label = on(m == 'insert', 'INSERT - the note keys write notes (Esc)'), fn = base('i') },
     { key = 'k', label = on(vim.piano, 'KEYS - the note keys play the instrument in NORMAL (m)'), fn = function() if ctx.toggle_piano then ctx.toggle_piano(true) end end },
     { key = 'n', label = on(m == 'normal' and not state.keyphr and not pads and not vim.piano, 'NORMAL - the keys are commands'), fn = function()

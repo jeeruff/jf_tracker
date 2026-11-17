@@ -1286,5 +1286,33 @@ do
   V.occur('zzzz-nothing'); eq('occur: nothing found - message', (V.msg or ''):match('^occur: nothing') ~= nil, true)
   local _, am = V.cands('occur C-4'); eq(':occur C-4 runs as typed', am, true)
 end
+-- 17 ноя: libkeys — клавиша = инструмент lib (смещение от C — строка lib): INSERT пишет его на трек инструмента в строку
+-- курсора, курсор остаётся на своей колонке и шагает; Shift / KEYS — только слушать; выкл — набор как был
+do
+  local init0 = V.init
+  local LK = { on = true }
+  V.init = function(c)
+    c.libkeys_on = function() return LK.on end
+    c.libkeys_prep = function(off, row) calls[#calls + 1] = ('lkprep:%d@%d'):format(off, row); return { fi = 3, pitch = 48, whole = true } end
+    c.libkeys_play = function(off) calls[#calls + 1] = 'lkplay:' .. off end
+    init0(c)
+  end
+  reset(); V.mode = 'insert'; V.cur.fi = 1; V.cur.row = 6
+  keysin('w')   -- qwerty: w = D = смещение 2 → 3-я строка lib
+  eq('libkeys INSERT: the instrument of the key is picked (offset 2)', had('lkprep:2@6'), true)
+  eq('libkeys INSERT: written on its track (M) at the cursor row, C-3', last(), 'ins:trM@6:48:1')
+  eq('libkeys INSERT: the cursor stays on its column', V.cur.fi, 1)
+  eq('libkeys INSERT: the row steps', V.cur.row, 7)
+  shift_down = true; local nc = #calls; keysin('W'); shift_down = false
+  eq('libkeys INSERT Shift: listen only', last(), 'lkplay:2'); eq('libkeys INSERT Shift: nothing written', #calls, nc + 1)
+  V.key(27)
+  AUTO_KBD = false; V.mode = 'normal'; V.piano = true
+  keysin('q'); eq('libkeys KEYS: the key plays its lib row (offset 0)', last(), 'lkplay:0')
+  V.piano = false; AUTO_KBD = true
+  LK.on = false
+  reset(); V.mode = 'insert'; V.cur.row = 4; keysin('q'); eq('libkeys off: typing as before (cursor track, pitch of the key)', last(), 'ins:trA@4:60:1')
+  V.key(27)
+  V.init = init0
+end
 print(('%d checks, %d failed'):format(checks, fails))
 os.exit(fails == 0 and 0 or 1)

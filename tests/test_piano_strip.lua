@@ -30,5 +30,21 @@ local r = D.piano_strip(L1, 0, 0, 800, L1.piano_h, { octave = 4, held = { [0] = 
 eq(r.white, 10, '10 white keys'); eq(r.black, 7, '7 black keys'); eq(r.letters, 17, 'all letters')
 local r2 = D.piano_strip(L1, 0, 0, 120, L1.piano_h, { octave = 4, held = {} })
 eq(r2.letters, 0, 'narrow: no letters (no overlap)')
+-- 17 ноя: libkeys — на клавишах номера инструментов lib вместо букв (клавиши без инструмента — с буквой)
+do
+  local drawn = {}
+  local ds0 = gfx.drawstr
+  gfx.drawstr = function(s) drawn[#drawn + 1] = tostring(s) end
+  local function has(x) for _, s in ipairs(drawn) do if s == x then return true end end return false end
+  D.piano_strip(L1, 0, 0, 800, L1.piano_h, { octave = 4, held = {} }, { kbd_only = true, ctrl = { libkeys = true, key_tags = { [0] = '01', [1] = '02', [2] = 'S1' } } }, {})
+  eq(has('01') and has('S1'), true, 'libkeys: lib numbers on the keys')   -- 02 — на чёрной: в заглушке шрифт не мельчает, не влез — пусто
+  eq(has('q') or has('2') or has('w'), false, 'libkeys: no letter under a number')
+  eq(has('e'), true, 'libkeys: a key without an instrument keeps its letter')
+  gfx.drawstr = ds0
+  eq(D.libkey_ok({ i = 3 }), true, 'libkey_ok: sound'); eq(D.libkey_ok({ i = 3, kind = 's', k = 2 }), true, 'libkey_ok: slice')
+  eq(D.libkey_ok({ num = 9, fx = true }), true, 'libkey_ok: plugin'); eq(D.libkey_ok({ phr = 'a' }), true, 'libkey_ok: phrase')
+  eq(D.libkey_ok({ num = 9 }), false, 'libkey_ok: empty slot'); eq(D.libkey_ok({ sec = 'audio' }), false, 'libkey_ok: section')
+  eq(D.libkey_ok({ pad = true, k = 1 }), false, 'libkey_ok: pad'); eq(D.libkey_ok({ midi = true }), false, 'libkey_ok: midi clips')
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
