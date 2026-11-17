@@ -2625,6 +2625,11 @@ local function spec_colour(sp)
   return c
 end
 D.spec_colour = spec_colour
+-- 17 ноя: текст поверх волны — кайма цветом фона на 1 px со всех сторон (сам текст рисует вызывающий)
+function D.halo(x, y, s)
+  if not s or s == '' then return end
+  for _, d in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }) do text(x + d[1], y + d[2], s, U.BG) end
+end
 local function draw_wave(L, head, i, x, y, muted, inv)
   -- волна строго в границах item: дробные начало (start_f) и длина (rows_f)
   local total = math.max(1, math.floor((head.rows_f or head.rows) * L.rh + 0.5))
@@ -2916,6 +2921,7 @@ end
 D.DEC2, D.SHEX, D.HEX2 = {}, {}, {}
 for i = 0, 255 do D.DEC2[i] = ('%02d'):format(i % 100); D.SHEX[i] = ('S%02X'):format(i); D.HEX2[i] = ('%02X'):format(i) end
 local function draw_cell(L, cell, x, y, ty, inv)
+  D.on_wave = nil   -- 17 ноя: ставит ветка волны режима note (имя ноты поверх волны — с каймой)
   -- 11 окт: wave only — в аудио-подколонке только волна (пустая строка — тусклая точка по центру)
   if L.wave_only then
     if D.cur_box then D.cur_box(); D.cur_box = nil end
@@ -2957,12 +2963,14 @@ local function draw_cell(L, cell, x, y, ty, inv)
     -- колонка волны: голова и все cont-строки аудио-item
     if k == 'audio' then draw_wave(L, cell, 0, x, y, cell.muted, inv == 1)
     elseif k == 'cont' and cell.of.kind == 'audio' then draw_wave(L, cell.of, cell.i, x, y, cell.of.muted, inv == 1) end
-  elseif k == 'cont' and cell.of.kind == 'audio' and not D.wave_none and not D.wave_back then
-    local head = cell.of
-    local text_rows = (D.itemnames and head.name ~= '') and 2 or 1
+  elseif (k == 'audio' or (k == 'cont' and cell.of.kind == 'audio')) and not D.wave_none and not D.wave_back then
+    -- 17 ноя: режим note — волна с ПЕРВОЙ строки ноты (без обрубка под именем), имя ноты / item поверх волны с тёмной
+    -- каймой (D.on_wave): читается и на волне, и на пустом месте; справа от ноты пусто не остаётся
+    local head = k == 'audio' and cell or cell.of
     -- режим note: волна под подсвеченным полем рисуется инверсией — подложка раньше
     if D.cur_box then D.cur_box(); D.cur_box = nil end
-    if cell.i >= text_rows then draw_wave(L, head, cell.i, x, y, head.muted, inv == 1) end
+    draw_wave(L, head, k == 'audio' and 0 or cell.i, x, y, head.muted, inv == 1)
+    D.on_wave = inv ~= 1   -- под курсором (подсветка поля) — без каймы
   end
   if D.cur_box then D.cur_box(); D.cur_box = nil end
   -- 19 окт: fold — сложенные быстрые ноты строки: линия в своё время внутри строки (белая — нота; под командами — цвет команд)
@@ -3007,6 +3015,7 @@ local function draw_cell(L, cell, x, y, ty, inv)
   if k == 'audio' or k == 'midi' then
     local muted = cell.muted
     local offkey = D.key_pcs and cell.pitch and not cell.video and not D.key_pcs[math.floor(cell.pitch + 0.5) % 12]   -- 21 окт: нота вне лада (:key mark)
+    if D.on_wave then D.halo(x + L.x_note, ty, cell.video and 'VID' or cell.note) end   -- 17 ноя: имя ноты поверх волны — с каймой фона
     text(x + L.x_note, ty, cell.video and 'VID' or cell.note, c(1, muted and U.GREY or (cell.video and U.CYAN or (offkey and D.OFFKEY or U.TEXT))))   -- видео-событие (9 окт)
     if cell.micro and L.micro_w and D.micro_tag then text(x + L.x_note + ms(cell.note), ty, D.micro_tag(cell.micro), c(1, muted and U.GREY or U.CYAN)) end   -- 16 окт
     if not L.notes_only then text(x + L.x_vol, ty, cell.vol, c(2, muted and U.GREY or D.RN_VOL)) end   -- 11 окт: цвета Renoise
@@ -3071,7 +3080,11 @@ local function draw_cell(L, cell, x, y, ty, inv)
         -- вторая строка: имя item (опция item names, 3 окт); номер — на строке ноты
         -- курсор на этой строке: подложка — шириной поля ноты, не всего имени (3 окт)
         if inv == 1 then text(x + L.x_note, ty, fit(head.name, L.w_note), U.BG)
-        else text(x + L.x_note, ty, fit(head.name, L.sub_w - L.x_note - L.pad), U.GREY) end
+        else
+          local nm = fit(head.name, L.sub_w - L.x_note - L.pad)
+          if D.on_wave then D.halo(x + L.x_note, ty, nm) end
+          text(x + L.x_note, ty, nm, U.GREY)
+        end
       end
       -- 12 окт: у строки внутри ноты — свои команды (действуют с этой строки до следующей того же рода)
       for i = 1, L.nfx do
