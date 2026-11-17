@@ -392,10 +392,27 @@ do
   local snap = M.build(4)
   local head
   for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do for _, c in pairs(sub) do if c.kind == 'audio' then head = c end end end end
-  eq('slice note shows its pitch C-4', head and head.note, 'C-4')
+  -- 17 ноя: нота = слайс — нота слайса 2 = нота слайса 1 + 1 (по умолчанию слайс 1 = C#4)
+  eq('17 ноя: slice note shows its slice (slice 2 = D-4)', head and head.note, 'D-4')
   local hasS, hasT = nil, false
   for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 2) == '0S' then hasS = f elseif f:sub(1, 2) == 'SB' then hasT = true end end
   eq('13 окт: slice number in its own field, no 0S command', hasS == nil and head.slice == 2, true); eq('no SB on a slice note', hasT, false)
+  eq('17 ноя: no own pitch - no +/- mark', head and head.tsemis, nil)
+  -- 17 ноя: нота слайса 1 — опция (ctx.slice_base): C-3 = S01, S02 = C#3; старт 0Sxx — метка jf_slofs; своя высота — tsemis
+  local n1 = M.slice_note1
+  M.slice_note1 = function() return 48 end
+  it.ext['P_EXT:jf_slofs'] = '128'
+  tk.pitch = 3
+  state_count = state_count + 1
+  snap = M.build(4)
+  for _, lane in ipairs(snap.cols[1].lanes) do for _, sub in ipairs(lane.subs) do for _, c in pairs(sub) do if c.kind == 'audio' then head = c end end end end
+  eq('17 ноя: slice base C-3 - slice 2 is C#3', head and head.note, 'C#3')
+  hasS = nil
+  for _, f in ipairs(head and head.fx or {}) do if f:sub(1, 2) == '0S' then hasS = f end end
+  eq('17 ноя: 0S80 - start offset of the slice note', hasS, '0S80')
+  eq('17 ноя: own pitch of the slice note +3', head and head.tsemis and math.floor(head.tsemis + 0.5), 3)
+  M.slice_note1 = n1
+  it.ext['P_EXT:jf_slofs'] = nil; tk.pitch = nil
 end
 -- обратная карта stretch-маркеров (5 окт): шов лупа по маркерам
 do

@@ -1228,7 +1228,7 @@ ctx = {
       if it and rows then reaper.SetMediaItemInfo_Value(it, 'D_LENGTH', edit.row_time(vim.cur.row + rows, state.lpb, 0) - edit.row_time(vim.cur.row, state.lpb, 0)) end
     end)
     vim.last_slice = k
-    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name((model.SLICE_BASE or model.BASE_NOTE) + k), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
+    model.invalidate(); vim.msg = ('slice %d = %s%s'):format(k, model.note_name(ctx.slice_base() + k - 1), (semis and semis ~= 0) and (' %+d st'):format(semis) or '')
     ctx.ins_advance(rows)
   end,
   insert_whole = function(rows)
@@ -5075,6 +5075,10 @@ ctx = {
     -- 24 окт: корень растянут маркерами — превью играет тот же кусок файла, что вставит insert_slice
     local a, b, r
     if entry and entry.item and edit.slice_src then a, b, r = edit.slice_src(entry.item, t0, t1) end
+    -- 17 ноя: высота слайса (его свойство, edit.slp_of) — слышна и в прослушке
+    if entry and entry.item and entry.slices and edit.slp_of and reaper.ValidatePtr(entry.item, 'MediaItem*') then
+      for kk, t in ipairs(entry.slices) do if math.abs(t - (t0 or -1)) < 1e-6 then semis = (semis or 0) + edit.slp_of(entry.item, kk); break end end
+    end
     PV.slice(track, entry, t0, t1, semis, a and { a, b, r } or nil)
   end,
   -- выбранный слайс (4 окт): последний выделенный мышкой / Option+J K / сыгранный;
@@ -17736,6 +17740,54 @@ ctx.step_hydra = function(title, get, step, typed, back)
   if typed then items[#items + 1] = { key = 't', label = 'type a value ...', fn = typed } end
   if back then items[#items + 1] = { key = 'b', label = 'back to the list', fn = back } end
   vim.open_hydra({ title = title .. ': ' .. tostring(get() or ''), items = items })
+end
+-- 17 ноя: нота = слайс — высота слайса его свойство (edit.slp_*): цель — строка слайса в дереве lib или нота-слайс
+-- под курсором трекера → запись корня (с нарезкой), номер слайса
+ctx.slp_target = function()
+  local col = cur_col(); local pool = col and col.pool or {}
+  local cs = draw.LIBSUB
+  if state.focus == 'inst' and cs and cs.kind == 's' then
+    local root = pool[cs.i]
+    if root and root.parent then root = root.parent end
+    if root and root.item and root.slices then return root, cs.k end
+  end
+  local h = vim.heads_in(vim.cur.fi, vim.cur.fi, vim.cur.row, vim.cur.row)[1] or vim.covering(vim.cur.fi, vim.cur.row)[1]
+  if h and h.kind == 'audio' and h.slice then
+    local i = snap and snap.inst_of and snap.inst_of[h.item]
+    local pe = i and pool[i]
+    local root = pe and (pe.parent or pe)
+    if root and root.item and root.slices then return root, h.slice end
+  end
+  return nil
+end
+-- гидра внизу: - = полутон, [ ] октава, t число (:slpitch); каждое изменение слышно
+ctx.slp_hydra = function(root, k)
+  if not root then root, k = ctx.slp_target() end
+  if not (root and k and root.item and reaper.ValidatePtr(root.item, 'MediaItem*')) then vim.msg = 'slice pitch: put the cursor on a slice note (or a slice row in the lib)'; return end
+  local col = cur_col()
+  local function set(v)
+    local n = edit.slp_set(root.item, k, v)
+    model.invalidate()
+    vim.msg = ('slice S%02X of %s: pitch %+g st - %d note(s) follow'):format(k, root.name or '', edit.slp_of(root.item, k), n)
+    if col and col.track and root.slices[k] then ctx.preview_slice(col.track, root, root.slices[k], (not root.playthru and root.slices[k + 1]) or root.len, 0) end
+  end
+  ctx.slp_tgt = { root = root, k = k }
+  ctx.step_hydra(('slice S%02X pitch (%s)'):format(k, root.name or ''), function() return ('%+g st'):format(edit.slp_of(root.item, k)) end,
+    function(d, big) set(edit.slp_of(root.item, k) + d * (big and 12 or 1)) end,
+    function() ctx.slp_tgt = { root = root, k = k }; vim.open_prompt('slpitch ', ('%g'):format(edit.slp_of(root.item, k))) end)
+end
+-- :slpitch N — число (из гидры — её слайс, иначе цель под курсором)
+ctx.slp_typed = function(arg)
+  local t = ctx.slp_tgt
+  ctx.slp_tgt = nil
+  local root, k
+  if t and t.root and t.root.item and reaper.ValidatePtr(t.root.item, 'MediaItem*') then root, k = t.root, t.k else root, k = ctx.slp_target() end
+  local v = tonumber(((arg or ''):match('[%+%-]?%d*%.?%d+')))
+  if not (root and k) then vim.msg = 'slpitch: put the cursor on a slice note (or a slice row in the lib)'; return end
+  if not v then vim.msg = 'slpitch: a number of semitones, like 5 or -12'; return end
+  local n = edit.slp_set(root.item, k, v)
+  model.invalidate()
+  vim.msg = ('slice S%02X of %s: pitch %+g st - %d note(s) follow'):format(k, root.name or '', edit.slp_of(root.item, k), n)
 end
 ctx.np_hydra = function(item, multi)
   if not (item and reaper.ValidatePtr(item, 'MediaItem*')) then return end
@@ -40619,6 +40671,7 @@ ctx.set_baseoct = function(o)
   vim.msg = ('base octave C%d: slices and pads start on C%d, the keyboard octave %d'):format(state.baseoct, state.baseoct, state.baseoct)
 end
 model.SLICE_BASE = 12 * (state.baseoct + 1); draw.slice_base_note = model.SLICE_BASE; vim.octave = state.baseoct   -- при запуске
+model.slice_note1 = function() return ctx.slice_base() end   -- 17 ноя: нота = слайс — нота слайса 1 в ячейке, как клавиши
 -- 18 окт: строка конца паттерна под строкой row (nil — вне паттерна): граница step next
 -- 19 окт: секция строки (регион без кода, поверх паттернов): первая и последняя строки — для gs / gS
 ctx.section_rows = function(row)
@@ -40990,6 +41043,7 @@ ctx.lib_tree_key = function(c)
       if c == 13 or ch == 'i' then ctx.slice_list_do('insert'); return true end
       if ch == 'x' or ch == 'd' then ctx.slice_list_do('delete'); return true end
       if ch == 'e' or ch == 'l' then ctx.slice_list_do('edit'); return true end
+      if ch == 'T' and e then ctx.slp_hydra(e.parent or e, cs.k); return true end   -- 17 ноя: высота слайса (в трекере — Opt+T p)
     end
     return false
   end

@@ -3119,15 +3119,12 @@ local function draw_cell(L, cell, x, y, ty, inv)
     elseif cell.delay > 0 then text(x + L.x_del, ty, D.HEX2[cell.delay % 256], c(3, D.RN_DELAY))
     else text(x + L.x_del, ty, '..', c(3, D.EMPTY)) end
     local fx = cell.fx or DCS.NOFX
-    -- 21 окт: слайс аудио-ноты — 0Sxx в первой свободной колонке команд (своей 0S нет)
+    -- 17 ноя: нота = слайс — слайс виден нотой (было 21 окт: 0Sxx в первой свободной колонке команд; 0S теперь — старт).
+    -- Своя высота ноты-слайса на месте (сверх высоты слайса) — «+05» / «-12» в первой свободной колонке команд
     local vs_i
-    if k == 'audio' and cell.slice and L.nfx > 0 then
-      local has = false
-      for i = 1, L.nfx do if fx[i] and fx[i]:sub(1, 2) == '0S' then has = true end end
-      if not has then for i = 1, L.nfx do if not fx[i] then vs_i = i; break end end end
-    end
+    if k == 'audio' and cell.tsemis and math.abs(cell.tsemis) >= 0.5 and L.nfx > 0 then for i = 1, L.nfx do if not fx[i] then vs_i = i; break end end end
     for i = 1, L.nfx do
-      if i == vs_i then text(x + L.x_fx[i], ty, '0S' .. D.HEX2[cell.slice % 256], c(3 + i, muted and U.GREY or (D.FX_COL['0S'] or D.RN_OTHER)))
+      if i == vs_i then text(x + L.x_fx[i], ty, ('%+03d'):format(math.max(-99, math.min(99, math.floor(cell.tsemis + 0.5)))), c(3 + i, muted and U.GREY or (D.FX_COL['0U'] or D.RN_OTHER)))
       elseif fx[i] then
         -- 11 окт: цвет команды — по группе, как в Renoise: громкость / панорама / питч / глобальные / прочее
         local col = D.FX_COL[fx[i]:sub(1, 2)] or (fx[i]:sub(1, 1) == 'Z' and D.RN_GLOBAL) or D.RN_OTHER

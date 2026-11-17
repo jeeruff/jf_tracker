@@ -21,6 +21,8 @@ M.DEPOT = 'LIB'          -- 8 окт: библиотека — заглушён�
 M.LIB_NAMES = { LIB = true }
 function M.is_lib_name(name) return M.LIB_NAMES[name or ''] == true end
 M.BASE_NOTE = 60         -- «C-4 = оригинал»: MIDI 60 показываем как C-4
+-- 17 ноя: нота = слайс — нота слайса 1 (как клавиши и список слайсов); main ставит ctx.slice_base
+M.slice_note1 = function() return (M.SLICE_BASE or M.BASE_NOTE) + 1 end
 M.MAX_UNROLL = 256       -- предел разворота зацикленного MIDI-item (повторов)
 
 -- ── ноты и числа ──────────────────────────────────────────────────────────
@@ -421,7 +423,7 @@ M._place = place
 -- Колонки команд аудио-item (этап 5, пока только показ): двухсимвольные коды
 -- Renoise (12 окт), значения из свойств item/take, доли — от строки. Только
 -- не-дефолтные. Свойства самого сэмпла (в Renoise — настройки сэмпла) — на S:
---   0Sxx слайс (P_EXT:jf_slice) / смещение xx/256 источника   0Pxx pan (80 = центр)
+--   0Sxx старт: нота-слайс — xx/256 слайса (P_EXT:jf_slofs), иначе xx/256 источника   0Pxx pan (80 = центр)
 --   SIxx / SOxx fade in/out (строки × 16, >20 мс)   SL00 loop source ВЫКЛ
 --   SM0x канал   SBxx beatsync на xx строк   SFxx подстройка в центах (80 = 0)
 function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
@@ -434,7 +436,13 @@ function M.audio_fx(it, take, src, lpb, qn0, qn1, pitch, rate, ppitch)
   slk = tonumber(slk)
   -- слайс (4 окт, вечер): номер — командой Sxx (hex, как в Renoise); нота — высота
   -- 13 окт: номер слайса — своё поле ячейки (Sxx); командой 0S не дублируется
-  if slk then offs = 0 end
+  -- 17 ноя: нота = слайс; 0Sxx ноты-слайса — старт xx/256 её слайса (метка P_EXT:jf_slofs, edit.slice_to)
+  if slk then
+    offs = 0
+    local _, so = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slofs', '', false)
+    so = tonumber(so)
+    if so and so > 0 then fx[#fx + 1] = '0S' .. M.hex2(so) end
+  end
   if offs > 1e-6 and src then
     local slen = R.GetMediaSourceLength(src)
     -- смещение — Sxx, как в Renoise (3 окт; ввод 9xx тоже понимается): xx/256 источника
@@ -806,7 +814,7 @@ function M.cache_key(lpb, now)
     cache.hashes = midi_hashes()
     cache.hash_t = now
   end
-  return string.format('%s|%d|%s|%s', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), tostring(lpb), cache.hashes)   -- 8 ноя: lpb строкой (дробный — макро)   -- 7 ноя: и проект — вкладки с тем же счётчиком
+  return string.format('%s|%d|%s|%s|%s', (R.EnumProjects and tostring(R.EnumProjects(-1)) or ''), R.GetProjectStateChangeCount(0), tostring(lpb), cache.hashes, tostring(M.slice_note1()))   -- 17 ноя: и нота слайса 1 (опции base octave / slice1)   -- 8 ноя: lpb строкой (дробный — макро)   -- 7 ноя: и проект — вкладки с тем же счётчиком
 end
 
 local pool_by_item = {}        -- item → gkey (все items, не только первый) — номер инструмента в ячейке
@@ -1047,6 +1055,7 @@ function M.build(lpb)
     if p and p.slices then
       local t0 = (e.offs - p.offs) / (p.rate ~= 0 and p.rate or 1)
       for k, st in ipairs(p.slices) do if math.abs(st - t0) < 0.01 then e.slice_k = k end end
+      if not e.slice_k and type(e.gkey) == 'string' then e.slice_k = tonumber(e.gkey:match('^iid:[^#@~]+#(%d+)')) end   -- 17 ноя: нота со стартом 0Sxx — слайс по метке
       if not e.slice_k and t0 < 0.01 then e.slice_k = 0 end   -- начало сэмпла до первого слайса
     end
   end
@@ -1138,6 +1147,7 @@ function M.build(lpb)
     return 0
   end
   for i, e in ipairs(all) do snap.inst_semis[i] = base_of(e) end
+  local n1 = M.slice_note1()   -- 17 ноя: нота слайса 1
   for _, col in ipairs(snap.cols) do
     for _, lane in ipairs(col.lanes) do
       for _, sub in ipairs(lane.subs) do
@@ -1150,6 +1160,21 @@ function M.build(lpb)
               cell.semis = cell.semis - base
               cell.note = M.note_name(M.BASE_NOTE + cell.semis)
               cell.frac = math.abs(cell.semis - math.floor(cell.semis + 0.5)) > 0.01
+            end
+          end
+          -- 17 ноя: нота = слайс (как в Renoise): нота ноты-слайса — нота её слайса (S01 = нота слайса 1, как клавиши
+          -- и список слайсов); высота слайса — его свойство (корень, slpitch), сверх неё — своя высота на месте (tsemis)
+          if cell.kind == 'audio' and cell.slice and cell.item then
+            local i = snap.inst_of[cell.item]
+            local r = i and all[i] and (all[i].parent or all[i])
+            cell.note = M.note_name(n1 + cell.slice - 1)
+            if not cell.mroot then
+              local own = r and r.slpitch and r.slpitch[cell.slice] or 0
+              local raw = cell.semis_abs or cell.semis or 0
+              local rb = (r and r.slices) and M.take_semitones(r.pitch or 0, r.rate or 1, r.ppitch) or (raw - (cell.semis or 0))   -- транспоз корня нарезки
+              local t = raw - rb - own
+              cell.tsemis = math.abs(t) > 0.01 and t or nil
+              cell.frac = cell.tsemis ~= nil and math.abs(t - math.floor(t + 0.5)) > 0.01
             end
           end
         end
@@ -1444,6 +1469,13 @@ pool_add_entry = function(pool, at, it, take, name, key, from_depot)
     local f = (r0 and rn > 1e-9) and (r0 / rn) or 1
     if math.abs(f - 1) > 1e-9 then for i = 1, #t do t[i] = t[i] * f end end
     pool[at].slices = t
+    -- 17 ноя: высоты слайсов (свойство слайса, edit.slp_set): «k:полутоны,…»
+    local _, sp = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slpitch', '', false)
+    if sp and sp ~= '' then
+      local p = {}
+      for k, v in sp:gmatch('(%d+):([%-%d%.]+)') do p[tonumber(k)] = tonumber(v) end
+      pool[at].slpitch = p
+    end
   end
   -- beatsync: «N;span;rate0;pp0» (edit.bsync_set) — долей = первое поле (5 окт:
   -- tonumber всей строки давал nil, lib и свойства показывали off)

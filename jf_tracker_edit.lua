@@ -652,13 +652,99 @@ end
 
 -- питч ноты-слайса (4 окт, Option + нота): D_PITCH, скорость не трогается —
 -- длина и кусок слайса те же
+-- 17 ноя: semis — высота НА МЕСТЕ: сверх транспоза корня и высоты самого слайса (E.slp_of)
 function E.slice_pitch(it, semis)
   local tk = R.GetActiveTake(it)
-  local ref = E.inst_ref and E.inst_ref(it)
-  local rtk = ref and ref ~= it and R.GetActiveTake(ref)
-  local base = rtk and R.GetMediaItemTakeInfo_Value(rtk, 'D_PITCH') or 0   -- transpose инструмента — база (6 окт)
+  local base = E.slice_pitch0(it)
+  if not base then
+    local ref = E.inst_ref and E.inst_ref(it)
+    local rtk = ref and ref ~= it and R.GetActiveTake(ref)
+    base = rtk and R.GetMediaItemTakeInfo_Value(rtk, 'D_PITCH') or 0   -- transpose инструмента — база (6 окт)
+  end
   if tk then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', base + semis) end
 end
+-- 17 ноя: нота = слайс (как в Renoise). Высота слайса — свойство слайса: P_EXT:jf_slpitch у корня
+-- («k:полутоны,…»), её слышат все ноты слайса; D_PITCH ноты = транспоз корня + высота слайса + своя на месте
+E.SLP = 'P_EXT:jf_slpitch'
+function E.slp_get(root)
+  local t = {}
+  if not (root and R.ValidatePtr(root, 'MediaItem*')) then return t end
+  local _, s = R.GetSetMediaItemInfo_String(root, E.SLP, '', false)
+  for k, v in (s or ''):gmatch('(%d+):([%-%d%.]+)') do t[tonumber(k)] = tonumber(v) end
+  return t
+end
+function E.slp_of(root, k) return (k and E.slp_get(root)[k]) or 0 end
+function E.slp_put(root, t)
+  local ks = {}
+  for k, v in pairs(t) do if v and math.abs(v) > 1e-9 then ks[#ks + 1] = k end end
+  table.sort(ks)
+  local parts = {}
+  for _, k in ipairs(ks) do parts[#parts + 1] = ('%d:%s'):format(k, ('%.4f'):format(t[k]):gsub('0+$', ''):gsub('%.$', '')) end
+  R.GetSetMediaItemInfo_String(root, E.SLP, table.concat(parts, ','), true)
+end
+-- корень нарезки ноты (item с P_EXT:jf_slices той же метки jf_iid до #) → item, слайсы, база; E.root_cache — на время правки
+function E.slice_root(it)
+  if not (it and R.ValidatePtr(it, 'MediaItem*')) then return nil end
+  local sl, b0 = E.item_slices(it)
+  if #sl > 0 then return it, sl, b0 end
+  local base = iid_base(E.get_iid(it))
+  if base == '' then return nil end
+  local rc = E.root_cache
+  local c = rc and rc[base]
+  if c and R.ValidatePtr(c, 'MediaItem*') then local s2, b2 = E.item_slices(c); return c, s2, b2 end
+  if c == false then return nil end
+  for _, o in ipairs(E.items_with_iid(base)) do
+    local s2, b2 = E.item_slices(o)
+    if #s2 > 0 then if rc then rc[base] = o end; return o, s2, b2 end
+  end
+  if rc then rc[base] = false end
+  return nil
+end
+-- высота слайса k ноты it без своей: транспоз корня + высота слайса; nil — не нота-слайс / корня нет
+function E.slice_pitch0(it, k)
+  if not k then local _, sk = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false); k = tonumber(sk) end
+  local c = k and E.slice_root(it)
+  local ctk = c and c ~= it and R.GetActiveTake(c)
+  if not ctk then return nil end
+  return R.GetMediaItemTakeInfo_Value(ctk, 'D_PITCH') + E.slp_of(c, k)
+end
+-- своя высота ноты-слайса на месте (полутоны сверх высоты слайса); nil — не нота-слайс
+function E.slice_place(it)
+  local b = E.slice_pitch0(it)
+  local tk = b and R.GetActiveTake(it)
+  return tk and (R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') - b) or nil
+end
+-- задать высоту слайса k корня root (v полутонов): все ноты этого слайса (метка корня + jf_slice = k) сдвигаются
+-- на разницу, своя высота на месте у каждой остаётся. → число нот
+function E.slp_set(root, k, v)
+  if not (root and k and R.ValidatePtr(root, 'MediaItem*')) then return 0 end
+  local t = E.slp_get(root)
+  local old = t[k] or 0
+  v = math.max(-48, math.min(48, v))
+  if math.abs(v - old) < 1e-9 then return 0 end
+  local n = 0
+  run(('slice %02X pitch %+g'):format(k, v), function()
+    t[k] = v
+    E.slp_put(root, t)
+    local base = iid_base(E.ensure_iid(root))
+    for ti = 0, R.CountTracks(0) - 1 do
+      local tr = R.GetTrack(0, ti)
+      for ii = 0, R.CountTrackMediaItems(tr) - 1 do
+        local o = R.GetTrackMediaItem(tr, ii)
+        local otk = o ~= root and iid_base(E.get_iid(o)) == base and R.GetActiveTake(o)
+        if otk and tonumber((select(2, R.GetSetMediaItemInfo_String(o, 'P_EXT:jf_slice', '', false)))) == k then
+          R.SetMediaItemTakeInfo_Value(otk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(otk, 'D_PITCH') + v - old)
+          R.UpdateItemInProject(o)
+          n = n + 1
+        end
+      end
+    end
+  end)
+  return n
+end
+-- нота слайса 1 (как клавиши и список слайсов: ctx.slice_base) — ставит main через model.slice_note1
+local function slice_note1() return (model and model.slice_note1 and model.slice_note1()) or 61 end
+E.slice_note1 = slice_note1
 -- полутоны инструмента ноты (его item в lib: D_PITCH / rate); 0 — нет / сам
 E.inst_ref = nil                      -- ставит main: item → item-инструмент из снимка
 local function inst_base(it)
@@ -676,25 +762,28 @@ function E.transpose_map(heads, lpb, map, label)
 end
 function E.transpose(heads, lpb, semis, map, label)
   if #heads == 0 or (semis == 0 and not map) then return end
+  E.root_cache = {}
   run(label or ('transpose %+d'):format(semis), function()
     local mic = {}
     for _, h in ipairs(heads) do
+      local slk   -- 7 ноя: `a and f()` отдаёт одно значение — slk всегда был nil, ветка слайса не работала
+      if h.kind == 'audio' and h.item then local _r; _r, slk = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false) end
+      slk = tonumber(slk)
       if map then   -- сдвиг этой ноты: от её высоты
         local p0
         if h.kind == 'midi' then local _, n = midi_note(h, lpb); p0 = n and n.pitch
+        elseif h.kind == 'audio' and slk then p0 = slice_note1() + slk - 1   -- 17 ноя: нота-слайс — нота её слайса
         elseif h.kind == 'audio' and h.take then p0 = (h.mroot or 60) + audio_semis(h) end   -- 27 окт: от маркера высоты
         semis = p0 and (map(p0, h) - p0) or 0   -- 26 окт: и сама нота (к аккорду её строки)
       end
       if semis == 0 then goto next_head end
-      local slk   -- 7 ноя: `a and f()` отдаёт одно значение — slk всегда был nil, ветка слайса не работала
-      if h.kind == 'audio' then local _r; _r, slk = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false) end
-      if h.kind == 'audio' and h.take and tonumber(slk) then
-        -- 15 окт: слайс — его высота (как E.set_pitch): D_PITCH от базы инструмента; раньше шло через rate
-        -- (resample), а слайс держит свою длину — высота не менялась
-        local ref = E.inst_ref and E.inst_ref(h.item)
-        local rtk = ref and ref ~= h.item and R.GetActiveTake(ref)
-        local base = rtk and R.GetMediaItemTakeInfo_Value(rtk, 'D_PITCH') or 0
-        E.slice_pitch(h.item, R.GetMediaItemTakeInfo_Value(h.take, 'D_PITCH') - base + semis)
+      if h.kind == 'audio' and h.take and slk then
+        -- 17 ноя: нота = слайс — транспоз (F1 / F2, F11 / F12, :tr) ведёт к соседнему слайсу; своя высота и 0S остаются
+        -- (было 15 окт: D_PITCH слайса)
+        local k1 = slk + math.floor(semis + 0.5)
+        local _, sl = E.slice_root(h.item)
+        if sl and k1 >= 1 and k1 <= #sl then E.slice_to(h.item, k1)
+        else E.skip_msg = ('no slice %d (the sample has %d)'):format(k1, sl and #sl or 0) end
       elseif h.kind == 'audio' and h.take then
         audio_set_semis(h, audio_semis(h) + semis)
       elseif h.kind == 'midi' then
@@ -709,6 +798,7 @@ function E.transpose(heads, lpb, semis, map, label)
     end
     for tk, over in pairs(mic) do E.micro_sync(tk, over) end
   end)
+  E.root_cache = nil
 end
 
 -- 16 окт: микротоны (72-EDO, ступень 1/6 тона); у айтема — дробь D_PITCH. 2 ноя: MIDI — MPE (model.micro_rewrite):
@@ -813,12 +903,16 @@ function E.set_pitch(heads, lpb, pitch)
     for _, h in ipairs(heads) do
       local slk   -- 7 ноя: `a and f()` отдаёт одно значение — slk всегда был nil, ветка слайса не работала
       if h.kind == 'audio' then local _r; _r, slk = R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false) end
-      if h.kind == 'audio' and h.take and h.mroot then
+      if h.kind == 'audio' and h.take and tonumber(slk) then
+        -- 17 ноя: нота = слайс — нота выбирает слайс (своя высота на месте и 0S остаются); ниже слайса 1 — не трогаем
+        -- (было 4 окт: нота — высота слайса, слайс — Sxx); маркер высоты (:pitch) у слайса — тоже слайс
+        local k = pitch - slice_note1() + 1
+        local _, sl = E.slice_root(h.item)
+        if sl and k >= 1 and k <= #sl then E.slice_to(h.item, k)
+        else E.skip_msg = ('no slice %d for this note (the sample has %d; below slice 1 is the whole sample)'):format(k, sl and #sl or 0) end
+      elseif h.kind == 'audio' and h.take and h.mroot then
         -- 27 окт: у сэмпла маркер высоты (:pitch) — звучит набранной нотой: транспоз = нота − определённая
         audio_set_semis(h, pitch - h.mroot)
-      elseif h.kind == 'audio' and h.take and tonumber(slk) then
-        -- слайс (4 окт, вечер): нота — его высота (слайс — Sxx)
-        E.slice_pitch(h.item, pitch - model.BASE_NOTE)
       elseif h.kind == 'audio' and h.take then
         audio_set_semis(h, inst_base(h.item) + pitch - model.BASE_NOTE)   -- от транспоза инструмента (6 окт)
       elseif h.kind == 'midi' then
@@ -1012,49 +1106,12 @@ local function apply_fx(h, lpb, cmd, xx)
     R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
     E.note_modified(it)
   elseif cmd == '0S' then
-    -- слайс xx нарезанного инструмента (P_EXT:jf_slices у item); без нарезки —
-    -- offset xx/256 источника (как 0Sxx в Renoise)
-    local slices, base = E.item_slices(it)
-    -- нота-слайс (3 окт): своей таблицы нет — берётся у исходника (та же метка
-    -- jf_iid до #), 0Sxx = слайс xx; исходник с маркерами — кусок без них
+    -- 17 ноя: 0Sxx — только старт, как sample offset Renoise: нота-слайс — с xx/256 длины СВОЕГО слайса
+    -- (слайс выбирает нота: E.slice_to; было 3 окт: 0Sxx = слайс xx), иначе — xx/256 источника
     local _, own_k = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
-    if #slices == 0 and tonumber(own_k) then
-      for _, c in ipairs(E.items_with_iid(iid_base(E.get_iid(it)))) do
-        local sl, b0 = E.item_slices(c)
-        if #sl > 0 then
-          local k = math.max(1, math.min(#sl, xx))
-          local rtk = R.GetActiveTake(c)
-          local rate = R.GetMediaItemTakeInfo_Value(rtk, 'D_PLAYRATE')
-          local a0, b1 = sl[k], sl[k + 1] or b0.len or R.GetMediaItemInfo_Value(c, 'D_LENGTH')
-          local pts = E.root_markers(rtk)
-          if pts then E.unwarp_piece(it, pts, rate, a0, b1)
-          else
-            R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate)
-            R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (b0.offs or 0) + a0 * rate)
-            R.SetMediaItemInfo_Value(it, 'D_LENGTH', b1 - a0)
-          end
-          R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
-          E.set_iid(it, iid_base(E.get_iid(c)) .. '#' .. k)
-          return
-        end
-      end
-    end
-    if #slices > 0 then
-      local k = math.max(1, math.min(#slices, xx))
-      local bs = E.bsync_of(it)
-      if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
-      local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
-      local t0 = slices[k]
-      local t1 = (not E.playthru(it) and slices[k + 1]) or (base.len or len)   -- playthru: до конца сэмпла (6 окт)
-      R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + t0 * rate)
-      R.SetMediaItemInfo_Value(it, 'D_LENGTH', t1 - t0)
-      R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
-      E.set_iid(it, iid_base(E.ensure_iid(it)) .. '#' .. k)
-      if bs then E.bsync_fit(it, bs) end
-    else
-      R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
-      E.note_modified(it)                               -- смещение копии — видоизменение
-    end
+    if tonumber(own_k) and E.slice_to(it, tonumber(own_k), xx) then return end
+    R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', xx / 256 * src_len(h))
+    E.note_modified(it)                               -- смещение копии — видоизменение
   elseif cmd == 'SB' then
     -- beatsync (как в Renoise): источник от offset растянут ровно на xx строк
     if xx > 0 then
@@ -1227,7 +1284,7 @@ function E.scramble(heads, lpb, rnd)
         for i = #ks, 2, -1 do local j = rnd(i); ks[i], ks[j] = ks[j], ks[i] end
         for i, e in ipairs(t) do
           if ks[i] ~= e.k then
-            apply_fx(e.h, lpb, '0S', ks[i])
+            E.slice_to(e.h.item, ks[i])   -- 17 ноя: было apply_fx 0S (0S теперь — старт)
             if R.GetMediaItemInfo_Value(e.h.item, 'D_LENGTH') > e.len then R.SetMediaItemInfo_Value(e.h.item, 'D_LENGTH', e.len) end
             n = n + 1
           end
@@ -2216,6 +2273,7 @@ local function insert_chunk(track, lane_idx, t, chunk)
   -- копия — уже кусок, нарезка инструмента-родителя ей не принадлежит
   R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slices', '', true)
   R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice_base', '', true)
+  R.GetSetMediaItemInfo_String(it, E.SLP, '', true)   -- 17 ноя: высоты слайсов — у корня
   R.SetMediaItemInfo_Value(it, 'D_POSITION', t)
   if lane_idx and R.GetMediaTrackInfo_Value(track, 'I_FREEMODE') == 2 then
     R.SetMediaItemInfo_Value(it, 'I_FIXEDLANE', lane_idx)
@@ -2673,6 +2731,87 @@ function E.slice_len(inst_item, slices, base, k, track, lane_idx, pos, keep)
   end
   return math.max(0.001, len), b
 end
+-- 17 ноя: нота it играет слайс k своего корня (E.slice_root) со старта xx/256 его длины (xx nil — прежний 0S ноты,
+-- метка P_EXT:jf_slofs: модель показывает её, не D_STARTOFFS). Длина: нота, что доигрывала свой слайс до конца,
+-- доигрывает и новый (не дальше следующей ноты колонки), короче — остаётся, но не длиннее остатка слайса.
+-- Высота: транспоз корня + высота слайса k + своя высота ноты на месте (сохраняется). false — корня нет
+E.SLOFS = 'P_EXT:jf_slofs'
+function E.slofs(it) local _, v = R.GetSetMediaItemInfo_String(it, E.SLOFS, '', false); return tonumber(v) or 0 end
+function E.slice_to(it, k, xx)
+  local tk = it and R.ValidatePtr(it, 'MediaItem*') and R.GetActiveTake(it)
+  if not tk then return false end
+  local c, sl, b0 = E.slice_root(it)
+  if not (c and sl and #sl > 0) then return false end
+  k = math.max(1, math.min(#sl, math.floor(k)))
+  local _, k0s = R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', '', false)
+  local k0 = tonumber(k0s)
+  local x0 = E.slofs(it)
+  xx = math.max(0, math.min(255, math.floor(xx or x0)))
+  local thru = E.playthru(it) or E.playthru(c)
+  local function span(kk)   -- начало и конец слайса kk (секунды корня)
+    local a0 = sl[kk] or 0
+    return a0, (not thru and sl[kk + 1]) or b0.len or R.GetMediaItemInfo_Value(c, 'D_LENGTH')
+  end
+  local len0 = R.GetMediaItemInfo_Value(it, 'D_LENGTH')
+  local to_end = true
+  if k0 and sl[k0] then
+    local a, b = span(k0)
+    to_end = len0 >= (b - a) * (1 - x0 / 256) - 1e-4
+  end
+  local place = (c ~= it) and E.slice_place(it) or nil   -- своя высота — до смены слайса
+  local a0, b1 = span(k)
+  local a = a0 + xx / 256 * (b1 - a0)
+  local bs = E.bsync_of(it)
+  if c == it then
+    if bs then R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', bs.rate0) end
+    local rate = R.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+    R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (b0.offs or 0) + a * rate)
+  else
+    local rtk = R.GetActiveTake(c)
+    local rate = R.GetMediaItemTakeInfo_Value(rtk, 'D_PLAYRATE')
+    local pts = E.root_markers(rtk)
+    if pts then E.unwarp_piece(it, pts, rate, a, b1)                -- исходник с маркерами — кусок без них
+    else
+      R.SetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE', rate)
+      R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (b0.offs or 0) + a * rate)
+    end
+  end
+  local rest = math.max(0.001, b1 - a)
+  local len = to_end and rest or math.min(len0, rest)
+  if to_end and len > len0 + 1e-6 then                              -- длиннее прежней — не налезть на следующую ноту
+    local tr = R.GetMediaItem_Track(it)
+    local pos = R.GetMediaItemInfo_Value(it, 'D_POSITION')
+    local lane = R.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2 and math.floor(R.GetMediaItemInfo_Value(it, 'I_FIXEDLANE')) or nil
+    local nx = next_start(tr, lane, pos, it)
+    if nx then len = math.max(len0, math.min(len, nx - pos)) end
+  end
+  R.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
+  R.GetSetMediaItemInfo_String(it, 'P_EXT:jf_slice', tostring(k), true)
+  R.GetSetMediaItemInfo_String(it, E.SLOFS, xx > 0 and tostring(xx) or '', true)
+  E.set_iid(it, iid_base(E.ensure_iid(c)) .. '#' .. k)
+  if c == it and bs then E.bsync_fit(it, bs) end
+  if place then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', E.slice_pitch0(it, k) + place) end
+  R.UpdateItemInProject(it)
+  return true
+end
+-- 17 ноя: ноты-слайсы heads → слайс k (rel — на k от своего: F1 / F2), строка, длина, своя высота и 0S те же. → число
+function E.set_slice(heads, lpb, k, rel)
+  local n = 0
+  E.root_cache = {}
+  run(rel and ('slice %+d'):format(k) or ('slice %02X'):format(k), function()
+    for _, h in ipairs(heads) do
+      local k0 = h.kind == 'audio' and h.item and tonumber((select(2, R.GetSetMediaItemInfo_String(h.item, 'P_EXT:jf_slice', '', false))))
+      if k0 then
+        local k1 = rel and (k0 + k) or k
+        local _, sl = E.slice_root(h.item)
+        if sl and k1 >= 1 and k1 <= #sl then if E.slice_to(h.item, k1) then n = n + 1 end
+        else E.skip_msg = ('no slice %d (the sample has %d)'):format(k1, sl and #sl or 0) end
+      end
+    end
+  end)
+  E.root_cache = nil
+  return n
+end
 -- переключить playthru у инструмента: флаг на корне и копиях, длины уже
 -- стоящих нот-слайсов пересчитаны (один undo)
 function E.set_playthru(root, items, on)
@@ -2718,6 +2857,9 @@ function E.insert_slice(track, lane_idx, lpb, row, inst_item, k, t_exact)
       local len, b = E.slice_len(inst_item, slices, base, k, track, lane_idx, t0, it)   -- playthru: до конца сэмпла (6 окт)
       R.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', (base.offs or 0) + a * rate)
       R.SetMediaItemInfo_Value(it, 'D_LENGTH', len)
+      -- 17 ноя: высота слайса k (свойство слайса, E.slp_of) — сверх транспоза корня
+      local own = E.slp_of(inst_item, k)
+      if own ~= 0 then R.SetMediaItemTakeInfo_Value(tk, 'D_PITCH', R.GetMediaItemTakeInfo_Value(tk, 'D_PITCH') + own) end
       -- 16 окт: D_PITCH не обнуляется — копия из чанка корня несёт transpose инструмента
       -- (весь сэмпл звучал с ним, слайсы — без, «на полтона ниже»), как E.slice_pitch
       -- корень растянут маркерами (smart quantize): свой кусок источника

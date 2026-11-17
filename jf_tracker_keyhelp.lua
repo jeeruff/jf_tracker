@@ -43,7 +43,7 @@ KH.PAGES = {
     { k = 'macro', t = {}, d = ':macro - zoom out: a row is a beat (LPB 1); :macro again - back to the previous LPB' },
     { k = 'pt', t = {}, d = ':pt - PT-mode, a dumbed-down ProTracker view: exactly 4 channels from the scroll, note / sample / vol / one command, no waves or envelopes, LPB 4, bitmap x4 (smaller if 4 do not fit), scopes on top; :pt new creates CH1..CH4 in the project; :pt again restores everything' },
     { k = 'arp', t = {}, d = ':arp [up|down|updown|random|played] [step] [octaves] [gate%] - the chord on the cursor row (notes in the subcolumns of the track) becomes an arpeggio over its length' },
-    { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the key picks the slice (1 f1 2 f2 ... = slice 01 02 ..., shown as the command 0S01 0S02 in the fx column - edit it there; the whole sample: Ctrl+Shift+1 (Ctrl+Shift + slice key - from that slice to the end); qwerty: q 2 w 3 ...); not sliced - the sample at that pitch. Shift+Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Option+note - chord, as on any sample; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). The selected slice: picked in the slice list, with Cmd+J / K, or the last one played' },
+    { k = 'slices', t = {}, d = 'notes (INSERT + m): a sliced sample - the note is the slice (1 f1 2 f2 ... = slice 01 02 ...; slice 1 is the note of the slice list, e.g. C-3, then C#3 ...; r + note or F1 / F2 - another slice; 0Sxx - start xx/256 into the slice; the pitch of a slice - Opt+T p, every note of it follows; a note pitched on its own shows +05 / -12 in a free command column); the whole sample: Ctrl+Shift+1 (Ctrl+Shift + slice key - from that slice to the end); qwerty: q 2 w 3 ...); not sliced - the sample at that pitch. Shift+Option+note - the selected slice (or the whole item if whole is selected) at that pitch; Option+note - chord, as on any sample; Cmd+note - the whole item at that pitch; Ctrl+note - held note (length = how long). The selected slice: picked in the slice list, with Cmd+J / K, or the last one played' },
     { k = 'Opt+J / K', d = 'previous / next instrument of the lib (samples, plugins, automation; a count jumps N)' },
     { k = 'Ctrl+Opt+H L', d = 'playrate of the selected instrument slower / faster (a count - N steps); on an fx column - fewer / more command columns of the track' },
     { k = 'Ctrl+Cmd+F1 F2', d = 'transpose the selected instrument of the lib -1 / +1 semitone (Shift - an octave)' },
@@ -222,6 +222,7 @@ KH.PAGES = {
     { k = 'zb', d = 'the cursor row to the bottom (as in Vim)' },
     { k = 'zt', d = 'zoom the track: the cursor track bigger - all fields of its columns, automation, MIDI lanes, audio as a big wave - the others folded; zt again - back' },
     { k = 'Opt+T f / o', t = { 'T' }, m = 'take fx: add / open', d = 'Opt+T f - add a take fx to the note under the cursor, Opt+T o - its take fx chain in DSP' },
+    { k = 'Opt+T p', t = { 'T' }, m = 'slice pitch', d = 'pitch of the slice of the note under the cursor (note = slice): - = a semitone, [ ] an octave, t - type it (:slpitch N); every note of that slice follows, a note pitched on its own keeps its +/- (in the lib: Shift+T on a slice row)' },
     { k = 'tT', m = 'track from template', d = 'a track from a template after the cursor track' },
     { k = 'tFf', m = 'into left folder', d = 'the cursor track goes into the folder of the track to the left' },
     { k = 'tFu', m = 'unpack folder', d = 'unpack the folder (the cursor track or its parent): the tracks stay where they are, the folder is gone' },
@@ -546,7 +547,7 @@ KH.PAGES = {
     { k = 'J K', d = 'move the sample down / up in the lib - the numbers follow (also drag a row with the mouse)' },
     { k = 'L', d = 'layer (¥): another lib instrument sounds together with this one on one note; tracks - its layers in the folder (Space listen, Enter offset / pan / random / cycle / phase); browser a y - files as layers' },
     { k = 'gg G', d = 'first / the bottom row - midi clips (G; Cmd+G from anywhere - automation); g is a prefix in most modules (not the browser, fx list, notes): gt - go to a module, gT - a project tab' },
-    { k = 'h l', d = 'as in lf: l - open the instrument folder (its layers ¥ and slices) / into it, h - back / close; inside: j k, Space listen, Enter - a layer: its menu, a slice: insert, x remove, e - the slice in the item tab (Tab - the lib / tracks tab; another track - from the tracker)' },
+    { k = 'h l', d = 'as in lf: l - open the instrument folder (its layers ¥ and slices) / into it, h - back / close; inside: j k, Space listen, Enter - a layer: its menu, a slice: insert, x remove, Shift+T - the pitch of the slice (- = [ ] t), e - the slice in the item tab (Tab - the lib / tracks tab; another track - from the tracker)' },
     { k = 'Shift+click', t = {}, d = 'select several instruments: from the selected one to the clicked one (as v)' },
     { k = 'dd x', d = 'cut instrument: its events on the tracks and the library item (to the register); x - the same' },
     { k = 'yy', d = 'yank instrument to the register' },
@@ -1060,7 +1061,7 @@ do
     return out
   end
   KH.PAGES.slixer = { title = 'DSP: slixer (slicer sampler)', e = from_dsp({
-    { k = 'slixer', t = {}, d = 'the sampler of the tracker: a sample cut into slices, every slice a note (C-3 up); the module shows the wave with the slices, its buttons on top and the MIDI row below. Notes of the track play the slices; 0Sxx picks a slice, 0Rxy retriggers it' },
+    { k = 'slixer', t = {}, d = 'the sampler of the tracker: a sample cut into slices, every slice a note (C-3 up); the module shows the wave with the slices, its buttons on top and the MIDI row below. Notes of the track play the slices; 0Sxx starts later in the slice, 0Rxy retriggers it' },
     'Opt+letter (slixer)', 'slixer slots', 'ze', 'Shift+Opt+J K  H L',
     { k = 'drag a slice edge', t = {}, d = 'on the wave: move the edge of a slice (spam on - it rolls while you drag, let go - the slice plays); click a slice - select and hear it' },
     'h l', 'w W', 'j k g G', '+ - ^A ^X', 'i', 'Z' }) }

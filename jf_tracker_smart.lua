@@ -286,7 +286,7 @@ end
 -- порядок: часто нужные сперва). 0 — эффекты, S — свойства сэмпла (item),
 -- Z — песня. Единственный список кодов для ввода, меню и подсказок
 SM.FX = {
-  { '0S', 'start offset xx/256 of the sample (drumrs5k: of the pad; sliced audio: slice xx; slixer: of the slice)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
+  { '0S', 'start offset xx/256 of the sample (a slice note: of its slice; drumrs5k: of the pad; slixer: of the slice)' }, { '0M', 'note volume xx/80' }, { '0P', 'pan (80 = centre)' },
   { '0U', 'pitch up xx/16 semitone per row' }, { '0D', 'pitch down xx/16 semitone per row' },
   { '0G', 'glide from the previous note in xx rows' }, { '0V', 'vibrato: speed x (period 16/x rows), depth y/8 semitone' },
   { '0A', 'arpeggio 0, x, y semitones' }, { '0I', 'volume up xx/256 per row' }, { '0T', 'tremolo: speed x (period 16/x rows), depth y/16' }, { '0O', 'volume down xx/256 per row' },
@@ -304,7 +304,7 @@ for _, e in ipairs(SM.FX) do SM.FX_DESC[e[1]] = e[2] end
 -- 12 окт: что значит значение xx команды — строка подсказки смарт-панели (9E = 158 -> …)
 local function st(x) return ('%+.2f'):format(x):gsub('0+$', ''):gsub('%.$', '') end
 SM.FX_MEAN = {
-  ['0S'] = function(v) return ('start at %d%% (sliced audio: slice %d)'):format(math.floor(v / 256 * 100 + 0.5), v) end,
+  ['0S'] = function(v) return ('start at %d%% (a slice note: of its slice)'):format(math.floor(v / 256 * 100 + 0.5)) end,
   ['0M'] = function(v) return ('volume %d%%'):format(math.floor(v / 128 * 100 + 0.5)) end,
   ['0P'] = function(v) if v == 128 then return 'centre' end; return (v < 128 and 'left ' or 'right ') .. math.floor(math.abs(v - 128) / 128 * 100 + 0.5) .. '%' end,
   ['0U'] = function(v) return st(v / 16) .. ' semitone per row' end,

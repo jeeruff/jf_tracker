@@ -5,6 +5,8 @@ V.VERSION = '0.9.4'
 V.DATE = '2026-11-05'
 V.CHANGES = {
   { v = '0.9.4', d = '2026-11-05', items = {
+    -- 17 ноя
+    'note = slice (as the slice list: S01 = C-3 ...): the note shows the slice, F1 / F2, r + note - another slice; 0Sxx - start xx/256 into the slice; slice pitch - Opt+T p (lib: Shift+T), every note of the slice follows',
     -- 13-16 ноя
     'transport bar: one bar of the whole window at the bottom, one block with the status line (option transport on top); gone from the tracker pane',
     'status line as a modeline: mode-coloured bar, mode without dashes, hover text on the right',
