@@ -4406,6 +4406,10 @@ function V.key_impl(c)
     local lr = V.last_rep
     if lr and lr.kind == 'cmd' then V.cmdbuf = {}; V.count = nil; for _ = 1, n do V.run_cmd(lr.line) end; if (V.msg or '') == '' then V.msg = '. :' .. lr.line end
     elseif lr and lr.kind == 'click' and ctx.click_repeat then V.cmdbuf = {}; V.count = nil; ctx.click_repeat(lr, n)   -- 16 ноя: щелчок по кнопке
+    elseif lr and lr.kind == 'seq' then   -- 17 ноя: последовательность клавиш (z. z, zT …) — N раз
+      V.cmdbuf = {}; V.count = nil; V.seq_replay = true
+      for _ = 1, n do for _, k in ipairs(lr.keys) do V.key(k) end end
+      V.seq_replay = nil
     elseif lr and lr.kind == 'fn' then
       V.cmdbuf = {}; V.count = nil; V.rep_running = true
       for _ = 1, n do local ok, e = pcall(lr.fn); if not ok then V.msg = tostring(e):match('[^\n]*$'); break end end
@@ -5172,10 +5176,31 @@ function V.status()
 end
 
 -- обёртка: оператор, начатый из INSERT (d…), по завершении возвращает в INSERT
+-- 17 ноя: «.» повторяет ЛЮБУЮ команду трекера (z. z, zT …), не только правки: набранная последовательность клавиш в
+-- NORMAL (от свободного состояния до свободного) запоминается, если обработчик сам ничего не записал и это не движение
+local SEQ_MOTION = {}
+for _, k in ipairs({ 'h', 'j', 'k', 'l', 'w', 'b', 'e', 'W', 'B', 'E', 'G', '0', '$', '^', '{', '}', 'H', 'L', 'M', '.', ':', '/', '?', 'n', 'N',
+                     'u', 'v', 'V', 'i', 'a', 'I', 'A', ' ', '1', '2', '3', '4', '5', '6', '7', '8', '9', '%', '*', '#', ';', ',', '`', "'" }) do SEQ_MOTION[k:byte()] = true end
+for _, k in ipairs({ 27, 13, 9, 8, 21, 4, 6, 2, 18, 1818584692, 1685026670, 30064, 1919379572 }) do SEQ_MOTION[k] = true end
+local function seq_is_cmd(seq)
+  if #seq == 0 then return false end
+  if #seq == 1 and SEQ_MOTION[seq[1]] then return false end
+  if seq[1] == ('g'):byte() and (seq[2] == ('g'):byte() or seq[2] == ('e'):byte()) then return false end   -- gg ge — движения
+  if seq[1] == ('f'):byte() or seq[1] == ('t'):byte() or seq[1] == ('F'):byte() or seq[1] == ('T'):byte() then return false end
+  return true
+end
 function V.key(c)
   if ctx.piano_on then V.piano = ctx.piano_on() end    -- клавиатура = видна снизу (m), 5 окт
   local p0 = V.cur.fi * 1e6 + V.cur.row * 10 + (V.cur.field or 1)
+  if not V.seq_replay and (V.replaying or 0) == 0 then
+    if not V.pending and not V.op and V.mode == 'normal' and not V.hydra and not V.picker then V.seqbuf = {}; V.seq_rep0 = V.last_rep end
+    if V.seqbuf then V.seqbuf[#V.seqbuf + 1] = c end
+  end
   local r = V.key_impl(c)
+  if V.seqbuf and not V.pending and not V.op and not V.seq_replay then
+    local seq = V.seqbuf; V.seqbuf = nil
+    if V.last_rep == V.seq_rep0 and V.mode ~= 'cmd' and seq_is_cmd(seq) then V.last_rep = { kind = 'seq', keys = seq } end
+  end
   local E0 = ctx.edit
   if E0 and E0.skip_msg then V.msg = E0.skip_msg; E0.skip_msg = nil end   -- 19 okt: команда, которую нота не умеет
   if ctx.piano_on then V.piano = ctx.piano_on() end

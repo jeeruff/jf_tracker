@@ -303,6 +303,10 @@ for _, c in ipairs({ { 'z>', 'w:1:cur' }, { 'z<', 'w:-1:cur' }, { 'z.', 'w:1:all
   reset(); keysin(c[1]); eq('width ' .. c[1], last(), c[2])
 end
 reset(); keysin('3z>'); eq('3z> - three steps', #calls, 3)
+-- 17 ноя: «.» повторяет любую команду (z. — не правка), счётчик — N раз
+reset(); keysin('z.'); keysin('.'); eq('. repeats z.', #calls, 2); eq('. repeats z. (all tracks)', last(), 'w:1:all')
+keysin('3.'); eq('3. repeats z. three times', #calls, 5)
+reset(); keysin('z,'); keysin('j'); keysin('.'); eq('. after a motion still repeats z,', last(), 'w:-1:all')
 -- gg / G — в список прыжков (9 окт); на месте — нет
 reset(); V.cur.row = 8; keysin('gg'); eq('gg marks a jump', last(), 'jmark'); eq('gg moved', V.cur.row, 0)
 reset(); V.cur.row = 0; keysin('gg'); eq('gg in place - no mark', #calls, 0)
