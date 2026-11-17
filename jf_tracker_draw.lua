@@ -7490,11 +7490,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   L.inst_rect = { ix, iy, w, H - 2 }
   -- 17 ноя: lib как lf — слева колонка разделов (audio / instruments / midi / phrases), справа — их содержимое
   -- (вместо строки вкладок); h — в разделы, j k — раздел, l / Enter — в него
+  -- 17 ноя (2): «в одной панели» — без колонки сбоку: разделы — корень того же списка (h — вверх к ним, l — внутрь),
+  -- над списком — путь «lib › audio»
   local SW, ix0 = 0, ix
-  if info.libtabs and w >= 24 * L.cw then
-    SW = ms('" phrases 99') + 2 * L.pad + 2
-    ix, w = ix + SW, w - SW
-  end
   local col = info.pool_col
   local pool = col and col.pool or {}
   local inst = info.inst or 1
@@ -7699,7 +7697,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
   L.pool_rows = rows
   -- 10 окт: хинты включены — сверху строка-расшифровка пометок lib
   local LEG = (L.hint_h or 0) > 0 and L.rh or 0
-  local TBH = (info.libtabs and SW == 0) and (L.rh + 2) or 0   -- строка вкладок lib (узкий lib; иначе — колонка разделов)
+  local TBH = info.libtabs and (L.rh + 2) or 0   -- строка пути lib (lib › раздел)
   local nvis = math.max(1, math.floor((H - 3 * L.rh - 6 - LEG - TBH) / L.rh))
   -- прокрутка: выбранный инструмент (и его заголовок группы) в окне
   local sel_r = 1
@@ -7814,21 +7812,37 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     end
   end
   if TBH > 0 then
-    -- вкладки lib (10 окт): как вкладки панелей — рамками встык, активная янтарём
+    -- 17 ноя (2): путь, как в lf: «lib › audio 10» (в корне — «lib»); щелчок по «lib» — к разделам
     local ty = iy + 2 + 2 * L.rh + LEG
-    local tx = ix + 2
-    for _, nm in ipairs(D.lib_tab_list()) do
-      local tw2 = ms(nm) + 2 * L.pad
-      if tx + tw2 > ix + w - 2 then break end
+    local GL = { audio = '@', instruments = '#', automation = '~', midi = D.mu(), phrases = '"' }
+    local tx = ix + L.pad
+    local hot = mx >= tx and mx < tx + ms('lib') and my >= ty and my < ty + L.rh
+    text(tx, ty + 1, 'lib', (hot or info.lib_seccol) and U.AMBER or U.GREY)
+    if hot then hover.libroot = true end
+    tx = tx + ms('lib ')
+    if not info.lib_seccol then
+      local nm = info.libtab or 'audio'
+      local nn = D.lib_sec_n and D.lib_sec_n[nm]
+      text(tx, ty + 1, '› ' .. (GL[nm] or '') .. ' ' .. nm .. (nn and ('  ' .. nn) or ''), U.AMBER)
+      text(ix + w - L.pad - ms('h - up'), ty + 1, 'h - up', U.DIM)
+    else text(ix + w - L.pad - ms('l - into'), ty + 1, 'l - into', U.DIM) end
+    set(U.LINE); gfx.rect(ix + 2, ty + L.rh, w - 4, 1, 1)
+  end
+  -- 17 ноя (2): корень — разделы строками (вместо списка)
+  if info.libtabs and info.lib_seccol then
+    local GL = { audio = '@', instruments = '#', automation = '~', midi = D.mu(), phrases = '"' }
+    local y0 = iy + 2 + 2 * L.rh + LEG + TBH + 2
+    for k, nm in ipairs(D.lib_tab_list()) do
+      local ty = y0 + (k - 1) * L.rh
       local on = (info.libtab or 'audio') == nm
-      local hot = mx >= tx and mx < tx + tw2 and my >= ty and my < ty + L.rh
-      set(on and U.tint(U.AMBER, 0.25) or (hot and D.CURROW or U.BG)); gfx.rect(tx, ty, tw2, L.rh, 1)
-      set(on and U.AMBER or U.LINE); gfx.rect(tx, ty, tw2, L.rh, 0)
-      text(tx + L.pad, ty, nm, on and U.AMBER or (hot and U.TEXT or U.GREY))
+      local hot = mx >= ix and mx < ix + w and my >= ty and my < ty + L.rh
+      if on then set(U.tint(U.AMBER, 0.30)); gfx.rect(ix + 1, ty, w - 2, L.rh, 1) elseif hot then set(D.CURROW); gfx.rect(ix + 1, ty, w - 2, L.rh, 1) end
+      text(ix + L.pad, ty + 1, (GL[nm] or ' ') .. ' ' .. nm .. '/', on and U.AMBER or U.TEXT)
+      local nn = D.lib_sec_n and D.lib_sec_n[nm]
+      if nn then local t = tostring(nn); text(ix + w - 2 * L.pad - ms(t), ty + 1, t, U.DIM) end
       if hot then hover.libtab = nm end
-      hint('libtab', tx, ty, tw2, L.rh, nm)
-      tx = tx + tw2 - 1
     end
+    rows = {}   -- список раздела не рисуется (клавиши берут L.pool_rows — он уже записан)
   end
   -- цвет трека по имени — запасной цвет волны, когда у item нет своего
   local trgb = {}

@@ -30647,8 +30647,9 @@ local function frame()
       ctx.set_focus('inst')
       if dbl and click.zone == 'poolphr' and state.phr_inst == hover.pool.phr then ctx.phr_do({ op = 'edit', name = hover.pool.phr }) else ctx.phr_select(hover.pool.phr) end
       click = { t = now2, zone = 'poolphr' }
+    elseif hover.libroot then ctx.lib_seccol = true; ctx.set_focus('inst'); vim.msg = 'lib: j k - a section, l / Enter - into it'   -- 17 ноя: путь «lib» — к разделам
     elseif hover.libtab then
-      state.libtab = hover.libtab; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. ' (F4)'
+      state.libtab = hover.libtab; ctx.lib_seccol = nil; ctx.set_focus('inst'); vim.msg = 'lib: ' .. hover.libtab .. '  (h - up to the sections)'
       click = { t = now2, zone = 'libtab' }
     elseif ctx.sl_layer_hot and reaper.time_precise() - ctx.sl_layer_hot.t < 0.25 then   -- 19 окт: дорожка слоя в слайсере
       local hl = ctx.sl_layer_hot
@@ -33897,7 +33898,7 @@ local function frame()
           elseif (ch == 'h' or c == LF) and not (ctx.lib_folder_cur and ctx.lib_folder_cur() and not (ctx.lib_hidden and ctx.lib_hidden(vim.inst)))
              and not (ctx.lib_hdr and ctx.lib_hdr()) and not (ctx.lib_sub_cur and ctx.lib_sub_cur())
              and not (function() local cc = cur_col(); local e = cc and cc.pool and cc.pool[vim.inst or 0]; return e and draw.LIBO and draw.LIBO[e.gkey or ''] end)() then   -- открытая папка слайсов / слоёв — h её сворачивает
-            ctx.lib_seccol = true; vim.msg = 'lib sections: j k - the section, l / Enter - into it'; return
+            ctx.lib_seccol = true; vim.msg = 'lib: j k - a section, l / Enter - into it'; return
           end
         end
         if ctx.lib_tree_key(c) then return end   -- 19 окт: папки инструментов (слои / слайсы), как lf
