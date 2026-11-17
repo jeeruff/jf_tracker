@@ -21773,7 +21773,7 @@ function ctx.width_step(d, which)
       else
         local cur = state.wlevel[c2.guid] or state.wzlevel or full
         local nl = cur + d
-        state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10) + 15) and math.max(0, nl) or nil   -- 17 ноя: +15 — шире по одной колонке нот
+        state.wlevel[c2.guid] = (nl <= (L.MAXLVL or 10) + 15) and math.max(-16, nl) or nil   -- 17 ноя: +15 — шире по одной колонке нот; ниже 0 — пока уходят пустые подколонки (лестница длиннее)
       end
     end
     relayout()

@@ -1132,9 +1132,19 @@ function D.layout_core(snap, state, nregions)
     -- 20 окт: autozoom — трек курсора во всю ширину; 2 ноя: и поверх его своей ширины (z,) и свёртки za — иначе свёрнутый оставался полоской
     local azc = state.autozoom and state.az_full == col.guid and not state.ptmode and state.az_keep ~= col.guid   -- 2 ноя: только что za — уважать
     if azc then lvl = nil; if fs ~= 'chord' and fs ~= 'pan' then fs = nil end end
-    if lvl and fs ~= 'chord' and fs ~= 'pan' then fs = (lvl <= 0 and 'mini') or (lvl == 1 and true) or nil end
+    -- 17 ноя (ревизия): ПЛАВНО вниз — у трека с пустыми подколонками (кнопкой +) лестница длиннее на их число: сначала по
+    -- одной уходят пустые подколонки, потом по одному поля, и только потом свёртка (было: с уровня 2 на 1 — сразу полоска)
+    local spareS = 0
+    if lvl and D.SMART_COLS ~= false then
+      for _, lane in ipairs(col.lanes or {}) do
+        local ns = math.max(1, #lane.subs, (state.subs_min or {})[col.guid .. ':' .. tostring(lane.idx)] or 0)
+        spareS = math.max(spareS, ns - math.max(1, #lane.subs))
+      end
+    end
+    local efl = lvl and (lvl + spareS)
+    if lvl and fs ~= 'chord' and fs ~= 'pan' then fs = (efl <= 0 and 'mini') or (efl == 1 and true) or nil end
     -- 11 ноя: трек с видом волны (zt) — уровень 1 не свёртка, а узкая волна: шаг «уже» убавляет волну, полоска — только на 0
-    if lvl == 1 and fs == true and D.track_view and D.track_view(col) then fs = nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
+    if efl == 1 and fs == true and D.track_view and D.track_view(col) then fs = nil end   -- 26 окт: chord lane не сбивается уровнем ширины (autozoom)
     if state.ptmode then fs = nil end             -- PT-mode: каналы во всю ширину, без свёрток
     -- зум ширины (Cmd + горизонтальное колесо, 3 окт): 1 — все треки компактно
     -- (нота + волна), 2 — все полоской; 0 — как у каждого трека
@@ -1177,7 +1187,7 @@ function D.layout_core(snap, state, nregions)
           local base = 3 + math.min(L.MAXFX, L.nfx or 0)
           if lvl and lvl < base and D.SMART_COLS ~= false then
             local spare = nsub - math.max(1, #lane.subs)
-            if spare > 0 and lvl >= 2 and not c.compact then local rm = math.min(spare, base - lvl); nsub = nsub - rm; llvl = lvl + rm
+            if spare > 0 and lvl + spare >= 2 and not c.compact then local rm = math.min(spare, base - lvl); nsub = nsub - rm; llvl = lvl + rm   -- 17 ноя: и ниже 2 (уровень может быть < 0)
             elseif spare > 0 then nsub = nsub - spare end   -- компактный вид (нота + волна) и уже — пустых подколонок нет вовсе
           end
         end

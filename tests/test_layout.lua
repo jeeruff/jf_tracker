@@ -99,5 +99,32 @@ do
   end
   D.panes = nil
 end
+-- 17 ноя: ширина трека плавно в обе стороны: у трека с 1 занятой и 7 пустыми подколонками (кнопкой +) каждый шаг уровня
+-- меняет ширину не больше чем на одну широкую колонку (было: с уровня 2 на 1 — сразу полоска)
+do
+  local K = col('K', 1)
+  local s3 = { cols = { K, col('Z', 1) } }
+  local state = { fontscale = 2, folds = {}, fxcols = 4, envs = false, hscroll = 1, wave = 'off', subs_min = { ['K:0'] = 8 }, wlevel = {} }
+  D.set_font(state)
+  local function width(lv)
+    state.wlevel.K = lv
+    local ok, L = pcall(D.layout, s3, state, 0)
+    if not ok then return nil, L end
+    local w = 0
+    for _, c in ipairs(L.cols or {}) do if c.col == K then w = c.w or 0 end end
+    return w, L
+  end
+  local full, L0 = width(7)
+  eq(full ~= nil, true, 'smooth width: layout ' .. tostring(L0))
+  local big = 0
+  if L0 and L0.flat then for _, f in ipairs(L0.flat) do if f.col == K and (f.w or 0) > big then big = f.w end end end
+  local prev, worst = full, 0
+  for lv = 6, -8, -1 do
+    local w = width(lv)
+    if w and prev then worst = math.max(worst, prev - w) end
+    prev = w or prev
+  end
+  eq(worst <= big + 2, true, ('smooth width: the biggest step %d <= one column %d'):format(worst, big))
+end
 print(('%d checks, %d failed'):format(n, bad))
 os.exit(bad == 0 and 0 or 1)
