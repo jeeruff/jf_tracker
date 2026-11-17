@@ -7815,6 +7815,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local pre_w = ms('00* ') + (lc.kids and ms('+ 16$') or 0) + 6
     local cols = ms('88.88s') + ms('-12.5') + ms('16b') + 5 * L.pad + 8 * L.cw   -- len, pt, bs, мини-волна (не уже 8 знаков)
     label_w = math.max(label_w, math.min(pre_w + lc.long + L.pad, w - 12 - cols))
+    if w < 64 * L.cw then label_w = math.min(label_w, math.floor(w * 0.36)) end   -- 17 ноя: узкий lib — превью шире, имя короче
     D.lib_kids = lc.kids
   end
   -- колонка ~ (9 окт): у item есть точки в огибающих take — щелчок открывает
@@ -7831,6 +7832,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     C.XPW, C.XBW, C.DW = ms('-12.5') + L.pad, ms('16b') + L.pad, ms('88.88s') + L.pad
     C.len = ix + w - L.pad - 4
     C.LPW = ms('lp') + 2 * L.pad                 -- 15 ноя: колонка lp — луп источника, тумблер
+    -- 17 ноя: узкий lib — колонок bs и lp нет (почти всегда «-»), их место — превью (волна шире)
+    C.slim = w < 64 * L.cw
+    if C.slim then C.LPW, C.XBW = 0, 0 end
     C.lp = C.len - C.DW
     C.bs = C.lp - C.LPW
     C.pt = C.bs - C.XBW
@@ -7852,8 +7856,10 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     if C.on then
       if tew > 0 then cols_h[#cols_h + 1] = { '~', C.tx, false, TILDE, nil } end
       cols_h[#cols_h + 1] = { 'pt', C.pt - C.XPW + L.pad, false, 'pt', nil, C.pt }
-      cols_h[#cols_h + 1] = { 'bs', C.bs - C.XBW + L.pad, false, 'bs', nil, C.bs }
-      cols_h[#cols_h + 1] = { 'lp', C.lp - C.LPW + L.pad, false, 'lp', nil, C.lp }
+      if not C.slim then
+        cols_h[#cols_h + 1] = { 'bs', C.bs - C.XBW + L.pad, false, 'bs', nil, C.bs }
+        cols_h[#cols_h + 1] = { 'lp', C.lp - C.LPW + L.pad, false, 'lp', nil, C.lp }
+      end
       cols_h[#cols_h + 1] = { 'len', C.len - C.DW + L.pad, sort == 'len', 'len', 'len', C.len }
     end
     -- type (9 окт): у правого края строки заголовков — сортировка по типу
@@ -8083,7 +8089,7 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
           local ps = math.abs(pv) < 0.005 and '0' or ('%+g'):format(math.floor(pv * 10 + 0.5) / 10)
           text(C.pt - ms(ps), y + 1, ps, math.abs(pv) >= 0.005 and U.TEXT or U.DIM)
           local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
-          text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+          if not C.slim then text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM) end
         else lbl = lbl .. ('  %.2fs'):format(math.max(0, t1 - t0)) end
       end
       text(ix + 6 + 4 * L.cw, y + 1, fit(lbl, row.sub == 's' and math.min(w - 12 - 4 * L.cw, label_w - 4 * L.cw) or (w - 12 - 4 * L.cw)), on and U.AMBER or U.TEXT)
@@ -8155,9 +8161,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
         local ps = math.abs(e.pitch or 0) < 0.005 and '0' or ('%+g'):format(math.floor((e.pitch or 0) * 10 + 0.5) / 10)
         text(C.pt - ms(ps), y + 1, ps, (math.abs(e.pitch or 0) >= 0.005) and U.TEXT or U.DIM)
         local bs = e.bsync and ('%gb'):format(e.bsync) or '-'
-        text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM)
+        if not C.slim then text(C.bs - ms(bs), y + 1, bs, e.bsync and U.CYAN or U.DIM) end
         -- 15 ноя: lp — луп источника: ∞ вкл / - выкл; щелчок переключает (всем нотам инструмента, как строка loop в свойствах)
-        if e.item and not child then
+        if e.item and not child and not C.slim then
           local lx = C.lp - C.LPW
           local lhot = mx >= lx and mx < C.lp + 1 and my >= y and my < y + L.rh
           local lt = e.loop and '∞' or '-'
