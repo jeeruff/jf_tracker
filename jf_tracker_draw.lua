@@ -7833,7 +7833,9 @@ function D.draw_instruments(L, info, ix, iy, w, H, hover)
     local pre_w = ms('00* ') + (lc.kids and ms('+ 16$') or 0) + 6
     local cols = ms('88.88s') + ms('-12.5') + ms('16b') + 5 * L.pad + 8 * L.cw   -- len, pt, bs, мини-волна (не уже 8 знаков)
     label_w = math.max(label_w, math.min(pre_w + lc.long + L.pad, w - 12 - cols))
-    if w < 64 * L.cw then label_w = math.min(label_w, math.floor(w * 0.36)) end   -- 17 ноя: узкий lib — превью шире, имя короче
+    -- 17 ноя (2): имя — не больше ~трети ширины (не уже номера + 12 знаков), остальное — превью волны (было: имя во всю длину,
+    -- превью — полоска в несколько знаков)
+    label_w = math.min(label_w, math.max(pre_w + 12 * L.cw, math.floor(w * (w < 64 * L.cw and 0.36 or 0.34))))
     D.lib_kids = lc.kids
   end
   -- колонка ~ (9 окт): у item есть точки в огибающих take — щелчок открывает
