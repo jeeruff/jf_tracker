@@ -6012,18 +6012,44 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
     for i = 1, #blist do btot = btot + TW[i] + D.TPGAP end   -- 6 ноя: зазор — как в нижнем ряду (ряды разъезжались); 14 ноя: D.TPGAP
     -- строка тоглов записи (от колонки 3) длиннее кнопок — группа шире на неё, кнопки остаются узкими
     if need > 0 then btot = math.max(btot, need) end   -- тоглы записи длиннее колонок справа от play — группа шире
-    -- 17 ноя: две строки — нижний ряд кнопок (|< |> /2 x2 ** >|) в ту же строку, следом за верхним; каждая — по своему тексту
+    -- 17 ноя (3): две строки — все кнопки одной строкой, по порядку кассетника: в начало, назад, пауза, freeze, стоп здесь,
+    -- /2, play, x2, loop, rec, вперёд, в конец; между кнопками — один пробел; с подсказками — под каждой её клавиша
     if D.TP2 then
-      D.tp2_sub = {}
-      local sx = btot + L.cw
+      local def = {}
+      for _, b in ipairs(blist) do def[b[1]] = { b[5] or b[2], b[4] or b[3] } end
       for _, b in ipairs(D.transport_sub(c)) do
-        if b.halves then for _, h in ipairs(b.halves) do D.tp2_sub[#D.tp2_sub + 1] = { h = h, dx = sx, w = ms(h[2]) }; sx = sx + ms(h[2]) + L.cw end
-        elseif b[1] then D.tp2_sub[#D.tp2_sub + 1] = { h = b, dx = sx, w = ms(b[2]) }; sx = sx + ms(b[2]) + L.cw end
+        if b.halves then for _, h in ipairs(b.halves) do def[h[1]] = { h[2], h[3] } end
+        elseif b[1] then def[b[1]] = { b[2], b[4] or b[3] } end
       end
-      btot = sx - L.cw
+      local KEYS = { tp_play = 'spc', rec = 'o-r', stophere = 'esc', slowplay = 's-c-spc' }
+      D.tp2_list = {}
+      local sx = 0
+      for _, id in ipairs({ 'tp_start', 'tp_rew', 'tp_pause', 'freeze', 'stophere', 'slowplay', 'tp_play', 'fastplay', 'loop', 'rec', 'tp_fwd', 'tp_end' }) do
+        local d = def[id]
+        if d then
+          local lab = d[1]
+          if id == 'tp_play' then lab = lab:gsub('%s', '') end
+          local w = ms(lab)
+          D.tp2_list[#D.tp2_list + 1] = { id = id, lab = lab, col = d[2], dx = sx, w = w, key = KEYS[id] }
+          sx = sx + w + L.cw
+        end
+      end
+      btot = math.max(0, sx - L.cw)
     end
   end
   local function draw_text_buttons(bx0)
+    if D.TP2 and D.tp2_list then   -- 17 ноя (3): одна строка по порядку кассетника, под кнопкой — её клавиша (с подсказками)
+      for _, e in ipairs(D.tp2_list) do
+        local hx = bx0 + e.dx
+        local hot = mx >= hx - 2 and mx < hx + e.w + 2 and my >= ly and my < ly + L.rh
+        if hot then set(D.CURROW); gfx.rect(hx - 2, ly, e.w + 4, L.rh, 1); hover.ctrl = e.id end
+        text(hx, ly + 1, e.lab, hot and U.AMBER or (e.col or U.TEXT))
+        hint('ctrl', hx, ly, e.w, L.rh, e.id)
+        if D.hints_on and e.key then text(hx + math.floor((e.w - ms(e.key)) / 2), ly + L.rh + 2, e.key, U.DIM) end
+      end
+      D.strip_cols[#D.strip_cols + 1] = { bx0, bx0 + math.max(btot, sep), { { 'Space', 'play' }, { 'Opt+R', 'rec' } } }
+      return
+    end
     local bx = bx0
     local by, bh = ly, L.rh   -- 15 окт: одна строка — только символ
     -- 12 окт: срезанный угол — только у крайних кнопок блока (фон в угол, рамка по диагонали, 2 px)
@@ -6303,11 +6329,11 @@ function D.piano_strip(L, x, y, w, h, p, info, hover, st)
   local kb_off = D.KB_HIDE and p and p.active == false and not p.ins   -- INSERT — клавиатура пишет ноты, видна
   -- 14 ноя: клавиатура — в правом углу полосы (общая полоса окна); узко — как раньше, первой слева
   local kbblk = (D.kbd_w > 0 and not kb_off and not (D.kb_pane and L.pn and L.pn.by_panel and L.pn.by_panel.keycaster)) and { pri = 11, w = D.kbd_w, draw = function(gx) D.kbd_block(gx - L.pad) end } or nil   -- 6 ноя: панелью keys — в транспорте нет
-  if D.TP2 and by_id.tpx then   -- 17 ноя (2): кнопки одной строкой, под ними mark x1.00 pun pre slo qtz
+  if D.TP2 and by_id.tpx and not D.hints_on then   -- 17 ноя (2): кнопки одной строкой, под ними mark x1.00 pun pre slo qtz (с подсказками — под кнопками клавиши, а этот ряд — блоком справа)
     local gx2 = by_id.tpx
     local bw2 = math.max(btot, group_w(gx2))
     order[#order + 1] = { pri = 10, w = bw2, draw = function(gx) draw_buttons(gx); draw_group(gx2, gx, bw2, ly + L.rh + 2) end }
-  else order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons } end
+  else order[#order + 1] = { pri = 10, w = btot, draw = draw_buttons }; if D.TP2 then addg('tpx') end end
   -- 11 окт: full — sig / metro / доли под BPM (одна строка); блок шириной по большей из строк
   if big and c.tpfull and by_id.sig then
     local g = by_id.sig
