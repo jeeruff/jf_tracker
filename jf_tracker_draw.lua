@@ -11827,6 +11827,8 @@ function D.frame(L, snap, rows, state, info)
                 D.PEAK, D.PEAKM = p0, pm0
               end
               draw_cell(f.G or L, cell, x, y, ty, inv)
+              -- 17 ноя: отметка :occur / VS — рамка бирюзой вокруг ячейки
+              if info.occ_set and info.occ_set[fi * 100000 + r.row] then set(U.CYAN); gfx.rect(x, y, (f.w or L.sub_w or 8), L.rh, 0) end
               -- 27 окт: в строке есть автоматизация трека — «~» в колонке слева от ноты (сложенные ноты «+» важнее)
               -- «+» уже нарисован: «~» рядом (колонка в два знака) или под ним (высокая строка); без «+» — на его месте
               local G2 = f.G or L

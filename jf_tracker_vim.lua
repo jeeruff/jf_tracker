@@ -4342,6 +4342,17 @@ function V.key_impl(c)
   -- 6 окт: / — поиск КОМАНД под курсором (fzf: действия ячейки, клавиши модуля,
   -- :команды); поиск по содержимому — f (метки прыжка)
   elseif ch == '/' then V.count = nil; if ctx.command_search then ctx.command_search() else V.mode = 'search'; V.searchline = '' end; return
+  elseif (ch == 'n' or ch == 'N') and V.occ and #V.occ > 0 then   -- 17 ноя: отметки :occur — по ним (по порядку строк)
+    local d = ch == 'n' and 1 or -1
+    for _ = 1, n do
+      local key = V.cur.row * 1000 + V.cur.fi
+      local best
+      if d > 0 then for _, o in ipairs(V.occ) do if o.row * 1000 + o.fi > key then best = o; break end end; best = best or V.occ[1]
+      else for k = #V.occ, 1, -1 do local o = V.occ[k]; if o.row * 1000 + o.fi < key then best = o; break end end; best = best or V.occ[#V.occ] end
+      V.cur.fi, V.cur.row, V.cur.field = best.fi, best.row, 1
+    end
+    local at = 0; for k, o in ipairs(V.occ) do if o.fi == V.cur.fi and o.row == V.cur.row then at = k end end
+    V.msg = ('occur %d / %d  (n N, Esc - marks off)'):format(at, #V.occ)
   elseif ch == 'n' then for _ = 1, n do V.find_next(1) end
   elseif ch == 'N' then for _ = 1, n do V.find_next(-1) end
   elseif ch == '*' then
@@ -4489,7 +4500,8 @@ function V.key_impl(c)
     -- Esc (4 окт, как Edit mode в Renoise): из NORMAL — в INSERT; набранный
     -- счётчик Esc сначала только сбрасывает (как в Vim)
     -- 10 окт: опция Esc mode = vim — Esc только NORMAL (сбрасывает счётчик и сообщение)
-    if V.count then V.count = nil; finish_move() elseif ctx.esc_vim and ctx.esc_vim() then V.msg = ''; finish_move() else V.mode = 'insert'; V.msg = '' end
+    if V.occ then V.occ, V.occ_set = nil, nil; V.msg = 'occur marks off'; finish_move()   -- 17 ноя: сначала снимаются отметки :occur
+    elseif V.count then V.count = nil; finish_move() elseif ctx.esc_vim and ctx.esc_vim() then V.msg = ''; finish_move() else V.mode = 'insert'; V.msg = '' end
   elseif ch == '+' then ctx.set_lpb(nil, 1)   -- 7 ноя: = — beatsync (ветка выше), здесь до него не доходило
   elseif ch == '-' then ctx.set_lpb(nil, -1)
   end
@@ -4525,6 +4537,8 @@ local function head_matches(h, q)
   q = q:lower()
   if (h.name or ''):lower():find(q, 1, true) then return true end
   if (h.note or ''):lower() == q then return true end
+  -- 17 ноя: номер инструмента (05) — ноты этого инструмента
+  if q:match('^%d%d?$') and ctx.cell_inst_num and ctx.cell_inst_num(h) == tonumber(q) then return true end
   for _, f in ipairs(h.fx or {}) do if f:lower():find(q, 1, true) then return true end end
   return false
 end
@@ -4532,6 +4546,15 @@ end
 -- 17 ноя: :occur текст — все места в песне, где он есть (нота C-4, имя сэмпла, команда 0S06), списком; Enter — туда (Emacs occur)
 function V.occur(q)
   q = (q or ''):match('^%s*(.-)%s*$')
+  -- 17 ноя: «.» — то, что под курсором: номер инструмента, иначе нота, иначе имя
+  if q == '.' then
+    local f = flat()[V.cur.fi]
+    local c
+    for _, sub in ipairs(f and subs_of(f) or {}) do local x = sub[V.cur.row]; if x and x.kind == 'cont' then x = x.of end; if is_head(x) then c = x; break end end
+    if not c then V.msg = 'occur .: no note under the cursor'; return end
+    local n = ctx.cell_inst_num and ctx.cell_inst_num(c)
+    q = n and ('%02d'):format(n) or c.note or c.name or ''
+  end
   if q == '' then V.msg = ':occur text - every place with it (a note C-4, a sample name, a command 0S06)'; return end
   local items = {}
   for fi, f in ipairs(flat()) do
@@ -4547,6 +4570,9 @@ function V.occur(q)
   end
   table.sort(items, function(a, b) return a.ord < b.ord end)
   if #items == 0 then V.msg = 'occur: nothing with ' .. q; return end
+  -- 17 ноя: все найденные места отмечены (рамкой), n / N прыгают по ним; Esc в NORMAL — снять
+  V.occ, V.occ_set = {}, {}
+  for _, it in ipairs(items) do V.occ[#V.occ + 1] = it.data; V.occ_set[it.data.fi * 100000 + it.data.row] = true end
   V.open_picker(('occur %s - %d place(s), Enter - go there'):format(q, #items), items, function(it)
     V.cur.fi, V.cur.row, V.cur.field = it.data.fi, it.data.row, 1
     if V.ensure_visible then V.ensure_visible() end

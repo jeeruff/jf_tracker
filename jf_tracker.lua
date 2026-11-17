@@ -16675,6 +16675,7 @@ end
 -- 17 ноя: BPM — список внизу (набор фильтрует, Enter), вместо своего окна-выпадашки; ввод числа — двойной щелчок / цифры в фокусе транспорта
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
 -- 17 ноя: g? / :describe — следующая клавиша не выполняется: что она делает (справка: страница модуля в фокусе — первой)
+ctx.cell_inst_num = function(c) return c and c.item and ((draw.inst_num and draw.inst_num[c.item]) or (draw.inst_of and draw.inst_of[c.item])) or nil end   -- 17 ноя: номер инструмента ноты (:occur 05)
 ctx.describe_arm = function() ctx.describe_next = true; vim.msg = 'describe: press a key (it is not run)' end
 ctx.describe_key = function(c)
   ctx.describe_next = nil
@@ -26476,7 +26477,7 @@ local function frame()
     status_left = state.kslider and ('-- FADE -- | %s: h l value, j k next fader, Esc done'):format(state.kslider.what) or left,   -- 5 окт: режим слайдера виден; 14 окт: CONTROL → FADE (fademode), CONTROL — жест по параметрам
     status_right = (state.focus == 'matrix' and MX.pending_hint()) or (state.focus == 'dsp' and DK.pending_hint()) or (state.focus == 'inst' and IK.pending_hint())
       or (state.focus ~= 'matrix' and state.focus ~= 'dsp' and state.focus ~= 'inst' and vim.pending_hint()) or state.status,
-    hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, win_focus = ctx.win_focus, vcur = vim.cur, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
+    hexbuf = vim.mode == 'insert' and vim.hexbuf or nil, typed = state.typedtag and typed or nil, win_focus = ctx.win_focus, vcur = vim.cur, occ_set = vim.occ_set, vis = vis, focus = state.focus, mixfocus = state.mixfocus, regions = seq, vmode = vim.mode,
     ruler = ruler_info(),
     hdrfill = state.hdrfill,
     -- блок трека в DSP (3 окт): вход, отправки, master send, фаза, FX вкл
