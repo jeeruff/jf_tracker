@@ -2512,8 +2512,8 @@ function M.cmd_lane(lpb)
     if not isrgn and not name:match('^=') and not name:match('^v:') and not name:match('^ch:') then   -- 11 окт: v: — колонка visor; 21 окт: ch: — аккорды
       local r = M.row_of_qn(R.TimeMap2_timeToQN(0, pos), lpb)
       local e = ml.ev[r]
-      if e then e.n = e.n + 1; e.text = e.text .. ' ' .. name; e.idx[#e.idx + 1] = idx
-      else ml.ev[r] = { text = name, n = 1, idx = { idx }, pos = pos }; ml.rows[#ml.rows + 1] = r end
+      if e then e.n = e.n + 1; e.text = e.text .. ' ' .. name; e.idx[#e.idx + 1] = idx; e.names[#e.names + 1] = name; e.poss[#e.poss + 1] = pos
+      else ml.ev[r] = { text = name, n = 1, idx = { idx }, pos = pos, names = { name }, poss = { pos } }; ml.rows[#ml.rows + 1] = r end   -- 19 ноя: names / poss — команды строки по отдельности
     end
     i = i + 1
   end

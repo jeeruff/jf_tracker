@@ -16702,6 +16702,17 @@ ctx.mcmd_menu = function(row)
     { key = 'd', label = 'double time here (' .. ('%.1f'):format(bpm0 * 2) .. ')', fn = function() tempo(bpm0 * 2) end },
     { key = 's', label = 'time signature from this row ...', fn = function()
       ctx.mcmd_val = { row = row, sig = true }; vim.open_prompt('mcmdval ', '4/4') end },
+    { key = 'j', label = 'jump / loop: back to a row, N times (>0128 x4) ...', fn = function()
+      ctx.mcmd_val = { row = row, jump = true }; vim.open_prompt('mcmdval ', ('%04d x2'):format(ctx.mcmd_block_start(row))) end },
+    { key = 'M', label = 'mute / unmute / solo a track here ...', fn = function() ctx.mcmd_pick_track('mute / solo from row ' .. ('%04d'):format(row), function(tr, nm)
+      vim.open_hydra({ title = nm .. ' from row ' .. ('%04d'):format(row), items = {
+        { key = 'm', label = 'mute', fn = function() ctx.mcmd_add(row, 'mute ' .. nm) end },
+        { key = 'u', label = 'unmute', fn = function() ctx.mcmd_add(row, 'unmute ' .. nm) end },
+        { key = 's', label = 'solo', fn = function() ctx.mcmd_add(row, 'solo ' .. nm) end },
+        { key = 'o', label = 'unsolo', fn = function() ctx.mcmd_add(row, 'unsolo ' .. nm) end },
+      } }) end) end },
+    { key = 'p', label = 'program change to a track (its hardware / synth) ...', fn = function() ctx.mcmd_pick_track('program change at row ' .. ('%04d'):format(row), function(tr, nm)
+      ctx.mcmd_val = { row = row, pc = tr, name = nm }; vim.open_prompt('mcmdval ', '0') end) end },
     { key = 'x', label = 'stop playback here', fn = function() act(1016, 'stop') end },
     { key = 'm', label = 'metronome on / off here', fn = function() act(40364, 'metronome on / off') end },
     { key = '!', label = 'a REAPER action here ...', fn = function() vim.cmd_from = 'normal'; vim.mode = 'cmd'; vim.cmdline = 'mcmd !' end },
@@ -16709,10 +16720,145 @@ ctx.mcmd_menu = function(row)
     { key = 'X', label = 'delete the command of this row', fn = function() ctx.mcmd_set(row, '') end },
   } })
 end
+-- 19 ноя: команды мастера, которые исполняет трекер (REAPER их не знает): «>0128 x4» — назад на строку, всего 4
+-- прохода (без x — пока не остановишь; вперёд — прыжок), «mute / unmute / solo / unsolo <трек>». Назад — родной луп
+-- REAPER (без щелчка, сэмпл в сэмпл): точки лупа и repeat ставятся на блок и возвращаются, как было, после
+-- последнего прохода / стопа. Мьюты — на ~40 мс раньше строки (кадр скрипта); старт с середины догоняет их состояние
+ctx.mcmd_track = function(s)
+  s = (s or ''):lower():gsub('^%s+', ''):gsub('%s+$', '')
+  local n = tonumber(s)
+  if n then return reaper.GetTrack(0, n - 1) end
+  local pre
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, i)
+    local _, nm = reaper.GetTrackName(tr); nm = (nm or ''):lower()
+    if nm == s then return tr end
+    if not pre and nm:sub(1, #s) == s then pre = tr end
+  end
+  return pre
+end
+ctx.mcmd_pick_track = function(title, fn)
+  local items = {}
+  for i = 0, reaper.CountTracks(0) - 1 do
+    local tr = reaper.GetTrack(0, i)
+    local _, nm = reaper.GetTrackName(tr)
+    items[#items + 1] = { label = ('%2d  %s'):format(i + 1, nm), data = { tr, (nm ~= '' and not nm:find(',') and nm) or tostring(i + 1) } }
+  end
+  vim.open_picker(title, items, function(it) fn(it.data[1], it.data[2]) end)
+end
+-- строка начала паттерна (региона) с этой строкой — подсказка, куда прыгать назад
+ctx.mcmd_block_start = function(row)
+  local t = edit.row_time(row, state.lpb, 0) - 1e-6
+  local best = 0
+  for _, rg in ipairs(regions or {}) do
+    if not rg.lib and rg.pos and rg.pos <= t and (rg.rgnend or rg.pos) > t and rg.r0 and rg.r0 > best then best = rg.r0 end
+  end
+  return best
+end
+-- ещё одна команда в строке (не заменяя остальные)
+ctx.mcmd_add = function(row, text)
+  local t0 = edit.row_time(row, state.lpb, 0)
+  edit.run('command', function() reaper.AddProjectMarker2(0, false, t0, 0, text, -1, 0) end)
+  model.invalidate()
+  vim.msg = ('cmd %04d: %s'):format(row, text)
+end
+do   -- 19 ноя: свои локали в блоке — главный чанк у лимита 200
+local function mc_parse(name)
+  local r, x = name:match('^>%s*(%d+)%s*[xX]?%s*(%d*)')
+  if r then return { jump = tonumber(r), n = tonumber(x) } end
+  local un, what, who = name:match('^(un)(mute)%s+(.+)')
+  if not un then un, what, who = name:match('^(un)(solo)%s+(.+)') end
+  if not un then what, who = name:match('^(mute)%s+(.+)'); if not what then what, who = name:match('^(solo)%s+(.+)') end end
+  if what then return { what = what, on = un == nil, who = who } end
+end
+local function mc_apply(c)
+  for w in (c.who .. ','):gmatch('([^,]+),') do
+    local tr = ctx.mcmd_track(w)
+    if tr then reaper.SetMediaTrackInfo_Value(tr, c.what == 'mute' and 'B_MUTE' or 'I_SOLO', c.on and (c.what == 'mute' and 1 or 2) or 0) end
+  end
+end
+local function mc_each(cmd, f)   -- f(pos, команда) по порядку
+  for _, r in ipairs(cmd.rows) do
+    local e = cmd.ev[r]
+    for k, nm in ipairs(e.names or { e.text }) do
+      local c = mc_parse(nm)
+      if c then f((e.poss and e.poss[k]) or e.pos, c) end
+    end
+  end
+end
+local function mc_restore()
+  local j = ctx.mj; ctx.mj = nil
+  if not j then return end
+  reaper.GetSet_LoopTimeRange2(0, true, true, j.ls, j.le, false)
+  reaper.GetSetRepeat(j.rep)
+end
+local function mc_chase(cmd, pp)   -- старт / прыжок: мьюты и соло — какими они должны быть к этой точке
+  local last = {}
+  mc_each(cmd, function(pos, c) if c.what and pos <= pp + 1e-6 then last[c.what .. ':' .. c.who] = c end end)
+  for _, c in pairs(last) do mc_apply(c) end
+end
+ctx.mcmd_tick = function()
+  local playing = reaper.GetPlayState() & 1 == 1
+  local cmd = snap and snap.master and snap.master.cmd
+  if not playing or not cmd then
+    if ctx.mc_prev then ctx.mc_prev = nil; ctx.mj_done = {}; mc_restore() end
+    return
+  end
+  local pp, prev = reaper.GetPlayPosition2(), ctx.mc_prev
+  ctx.mc_prev = pp
+  ctx.mj_done = ctx.mj_done or {}
+  if not prev then mc_chase(cmd, pp); return end
+  local LA = 0.04
+  local wrapped = pp < prev - 0.05
+  local jumped = wrapped or pp > prev + 0.5
+  if jumped then mc_chase(cmd, pp + LA) end
+  local j = ctx.mj
+  if j then
+    if wrapped and math.abs(pp - j.t) < 0.5 then
+      j.count = j.count + 1
+      if j.n and j.count >= j.n - 1 then mc_restore(); ctx.mj_done[j.pos] = true end
+    elseif pp < j.t - 0.05 or pp > j.pos + 0.05 then mc_restore() end
+  end
+  local fired
+  mc_each(cmd, function(pos, c)
+    if c.jump then
+      local tt = edit.row_time(c.jump, state.lpb, 0)
+      if tt < pos - 0.01 then
+        if pp > pos + 0.05 or pp < tt - 0.05 then ctx.mj_done[pos] = nil   -- блок пройден — в следующий раз снова N раз
+        elseif not ctx.mj and not ctx.mj_done[pos] and c.n ~= 1 and pp >= tt - 0.01 and pp < pos - 0.05 then
+          local ls, le = reaper.GetSet_LoopTimeRange2(0, false, true, 0, 0, false)
+          ctx.mj = { pos = pos, t = tt, n = c.n, count = 0, ls = ls, le = le, rep = reaper.GetSetRepeat(-1) }
+          reaper.GetSet_LoopTimeRange2(0, true, true, tt, pos, false)
+          reaper.GetSetRepeat(1)
+        end
+      elseif not jumped and not fired and pos > prev + LA and pos <= pp + LA then
+        fired = true; reaper.SetEditCurPos(tt, false, true)   -- вперёд — прыжок
+      end
+    elseif not jumped and pos > prev + LA and pos <= pp + LA then mc_apply(c) end
+  end)
+end
+end
 -- :mcmdval — значение из меню команд мастера (темп числом, размер N/D)
 ctx.mcmd_value = function(arg)
   local m = ctx.mcmd_val; ctx.mcmd_val = nil
   if not m then return end
+  if m.jump then
+    local r, x = (arg or ''):match('(%d+)%s*[xX]?%s*(%d*)')
+    if not r then vim.msg = 'jump: a row, and x N for N passes (0128 x4); no x - loops until stop'; return end
+    ctx.mcmd_add(m.row, ('>%04d'):format(tonumber(r)) .. (x ~= '' and (' x' .. x) or ''))
+    return
+  end
+  if m.pc then
+    local v = tonumber((arg or ''):match('%d+'))
+    if not v or v > 127 then vim.msg = 'program: 0..127'; return end
+    local g = reaper.GetTrackGUID(m.pc)
+    local t = model.extra_lanes[g] or {}
+    local has; for _, y in ipairs(t) do if y == 'pc' then has = true end end
+    if not has then t[#t + 1] = 'pc'; model.extra_lanes[g] = t; state.midilanes = true end
+    ctx.ml_set({ col = { track = m.pc }, ml = { kind = 'pc', name = 'PC' } }, m.row, v)
+    if (vim.msg or ''):match('^PC') then vim.msg = ('PC %d -> %s at %04d (its PC lane; MIDI goes where the track sends it)'):format(v, m.name, m.row) end
+    return
+  end
   if m.sig then
     local n, d = (arg or ''):match('(%d+)%s*/%s*(%d+)')
     n, d = tonumber(n), tonumber(d)
@@ -33062,6 +33208,7 @@ local function frame()
   local c_raw = c                                                  -- журнал клавиш (4 окт)
   do local ok, err = pcall(ctx.llm_poll); if not ok then vim.msg = 'llm bridge: ' .. tostring(err) end end
   do local ok, err = pcall(ctx.visor_tick); if not ok then vim.msg = 'visor: ' .. tostring(err) end end
+  do local ok, err = pcall(ctx.mcmd_tick); if not ok then vim.msg = 'master cmd: ' .. tostring(err) end end   -- 19 ноя: прыжки, мьюты
   if ctx.mx_solo and ctx.mx_solo_owner == 'smart' and not (MX.SMART.active and MX.SMART.active()) then ctx.mx_cell_preview_end() end   -- 12 окт: панель клетки закрыта — соло как были
   if ctx.mx_solo and ctx.mx_solo_owner ~= 'smart' and not PV.playing() then ctx.mx_cell_preview_end() end   -- sel / step: звук кончился
   -- 12 окт: listen sel — выделение (v / V) звучит на своих треках, когда перестало меняться (0.25 с)
