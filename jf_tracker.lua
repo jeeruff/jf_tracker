@@ -21947,7 +21947,7 @@ end
 -- треки (общий уровень), 'sel' — выделенные в REAPER (нет — как все),
 -- 'cur' — трек курсора (свой уровень). Уровень: 0 полоски … 3 нота + vol +
 -- delay, дальше колонки эффектов и нот; шире MAXLVL — «как у трека»
-function ctx.width_step(d, which)
+function ctx.width_step(d, which, dir)
   if which == 'cur' and ctx.pan_res and ctx.pan_res(d) then return end   -- 3 ноя: на поле пана — деления грубее / тоньше
   local list = {}
   if which == 'sel' then
@@ -21958,7 +21958,7 @@ function ctx.width_step(d, which)
   local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
   -- 17 ноя: мастер — шире / уже, как обычный трек (z> z<, Opt+Shift+L H, Cmd+колесо): шаг — 2 знака сверх его колонок
   if which == 'cur' and #list == 1 and snap and list[1] == snap.master then
-    ctx.mcmd_cols_step(d); return   -- 19 ноя: ширина мастера — колонками cmd (как колонки эффектов трека)
+    ctx.mcmd_cols_step(dir and -d or d); return   -- 19 ноя: ширина мастера — колонками cmd; h / l — по направлению: мастер приколот справа, растёт влево (h — шире)
   end
   if #list > 0 then
     state.wlevel = state.wlevel or {}

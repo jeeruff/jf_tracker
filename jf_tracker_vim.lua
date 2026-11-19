@@ -2776,7 +2776,7 @@ function V.key_impl(c)
   end
   -- 27 окт: Shift+Opt+H / L — колонки трека курсора уже / шире по шагу, как z, / z. (счётчик — N шагов); было playrate инструмента
   if mods.alt and mods.shift and not mods.ctrl and not mods.cmd and (hk == 'h' or hk == 'l' or c == LEFT or c == RIGHT) and V.mode ~= 'cmd' and V.mode ~= 'search' then
-    if ctx.width_step then for _ = 1, n do ctx.width_step((hk == 'l' or c == RIGHT) and 1 or -1, 'cur') end end
+    if ctx.width_step then for _ = 1, n do ctx.width_step((hk == 'l' or c == RIGHT) and 1 or -1, 'cur', true) end end   -- 19 ноя: true — по направлению (мастер справа: h шире)
     V.count = nil; return
   end
   -- повтор паттерна над курсором (4 окт, Paketti): Ctrl+Opt+J / ↓ — трек курсора;
