@@ -1741,6 +1741,7 @@ local function run_cmd(line)
   elseif cmd == 'smk' then if ctx.smk_transients then ctx.smk_transients() end   -- 10 ноя
   elseif cmd == 'log' then if ctx.log_show then ctx.log_show() end   -- 10 ноя: что происходило
   elseif cmd == 'dedup' then if ctx.dedup then ctx.dedup() end   -- 14 ноя
+  elseif cmd == 'mcmdval' then if ctx.mcmd_value then ctx.mcmd_value(arg) end   -- 18 ноя: значение из меню команд мастера
   elseif cmd == 'occur' then V.occur(arg)   -- 17 ноя: Emacs occur
   elseif cmd == 'describe' then if ctx.describe_arm then ctx.describe_arm() end   -- 17 ноя: Emacs describe-key
   elseif cmd == 'winner' then if ctx.winner then ctx.winner((arg or ''):match('^r') and 1 or -1) end   -- 17 ноя: Emacs winner-mode
@@ -2957,7 +2958,7 @@ function V.key_impl(c)
     end
     if cf and cf.ml and cf.ml.kind == 'cmd' and (V.mode == 'normal' or V.mode == 'insert') then
       local e = cf.ml.ev[V.cur.row]
-      if c == 13 then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd ' .. (e and e.text or ''); return end
+      if c == 13 then if ctx.mcmd_menu then ctx.mcmd_menu(V.cur.row) else V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd ' .. (e and e.text or '') end; return end   -- 18 ноя: меню команд
       if c == ('!'):byte() then V.cmd_from = V.mode; V.mode = 'cmd'; V.cmdline = 'mcmd !'; return end
       if c == BS or c == DEL or (V.mode == 'normal' and c == ('x'):byte()) then
         if ctx.mcmd_set then ctx.mcmd_set(V.cur.row, '') end; return
@@ -4343,6 +4344,8 @@ function V.key_impl(c)
     if st and st.ptmode and (V.cur.field or 1) == 1 and not env_of(V.cur.fi) and ctx.time_edit then   -- 1 ноя: только поле ноты
       ctx.time_edit('insert', V.cur.fi, V.cur.row, n, ctx.mods and ctx.mods().shift or false); finish_edit(); return
     end
+    -- 18 ноя: колонка cmd мастера — меню её команд (до смарт-панели: «this MIDI lane has no values»)
+    do local cf = flat()[V.cur.fi]; if cf and cf.ml and cf.ml.kind == 'cmd' and ctx.mcmd_menu then ctx.mcmd_menu(V.cur.row); return end end
     -- старое Enter: на огибающей / MIDI-лейне — меню «что вставить», иначе смарт-панель значений поля
     local function values()
       if V.mode ~= 'visual' and V.mode ~= 'vline' and ctx.lane_menu and ctx.lane_menu() then return end

@@ -16682,6 +16682,52 @@ end
 ctx.set_bpm = function(v, why) return set_bpm(v, why) end   -- 17 ноя: :bpm N
 -- 17 ноя: g? / :describe — следующая клавиша не выполняется: что она делает (справка: страница модуля в фокусе — первой)
 ctx.cell_inst_num = function(c) return c and c.item and ((draw.inst_num and draw.inst_num[c.item]) or (draw.inst_of and draw.inst_of[c.item])) or nil end   -- 17 ноя: номер инструмента ноты (:occur 05)
+-- 18 ноя: колонка cmd мастера — Enter: меню команд строки (смена темпа, плавный темп, размер, стоп, метроном, действие
+-- REAPER, текст маркера, удалить); темп и размер — точкой смены темпа REAPER на строке, остальное — маркер (REAPER сам
+-- исполняет «!id» на проигрывании)
+ctx.mcmd_menu = function(row)
+  local t = edit.row_time(row, state.lpb, 0)
+  local bpm0 = reaper.TimeMap2_GetDividedBpmAtTime and reaper.TimeMap2_GetDividedBpmAtTime(0, t) or reaper.Master_GetTempo()
+  local function tempo(v, ramp)
+    v = math.max(20, math.min(400, v))
+    edit.run(ramp and 'tempo ramp' or 'tempo change', function() edit.keep_markers_qn(function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, v, 0, 0, ramp and true or false) end) end)
+    reaper.UpdateTimeline(); model.invalidate()
+    vim.msg = ('%04d: tempo %s %.2f BPM'):format(row, ramp and 'ramp to the next change from' or 'change', v)
+  end
+  local function act(id, what) ctx.mcmd_set(row, '!' .. id); vim.msg = ('%04d: %s when playback passes'):format(row, what) end
+  vim.open_hydra({ title = ('master command at row %04d (now %.1f BPM)'):format(row, bpm0), items = {
+    { key = 't', label = 'tempo change here ...', fn = function() ctx.mcmd_val = { row = row, f = function(v) tempo(v) end }; vim.open_prompt('mcmdval ', ('%g'):format(math.floor(bpm0 * 100 + 0.5) / 100)) end },
+    { key = 'r', label = 'tempo ramp from here (gradual to the next change) ...', fn = function() ctx.mcmd_val = { row = row, f = function(v) tempo(v, true) end }; vim.open_prompt('mcmdval ', ('%g'):format(math.floor(bpm0 * 100 + 0.5) / 100)) end },
+    { key = 'h', label = 'half time here (' .. ('%.1f'):format(bpm0 / 2) .. ')', fn = function() tempo(bpm0 / 2) end },
+    { key = 'd', label = 'double time here (' .. ('%.1f'):format(bpm0 * 2) .. ')', fn = function() tempo(bpm0 * 2) end },
+    { key = 's', label = 'time signature from this row ...', fn = function()
+      ctx.mcmd_val = { row = row, sig = true }; vim.open_prompt('mcmdval ', '4/4') end },
+    { key = 'x', label = 'stop playback here', fn = function() act(1016, 'stop') end },
+    { key = 'm', label = 'metronome on / off here', fn = function() act(40364, 'metronome on / off') end },
+    { key = '!', label = 'a REAPER action here ...', fn = function() vim.cmd_from = 'normal'; vim.mode = 'cmd'; vim.cmdline = 'mcmd !' end },
+    { key = 'e', label = 'marker text (a name, a note) ...', fn = function() vim.open_prompt('mcmd ', '') end },
+    { key = 'X', label = 'delete the command of this row', fn = function() ctx.mcmd_set(row, '') end },
+  } })
+end
+-- :mcmdval — значение из меню команд мастера (темп числом, размер N/D)
+ctx.mcmd_value = function(arg)
+  local m = ctx.mcmd_val; ctx.mcmd_val = nil
+  if not m then return end
+  if m.sig then
+    local n, d = (arg or ''):match('(%d+)%s*/%s*(%d+)')
+    n, d = tonumber(n), tonumber(d)
+    if not (n and d) then vim.msg = 'signature: N/D, like 7/8'; return end
+    local t = edit.row_time(m.row, state.lpb, 0)
+    local bpm = reaper.TimeMap2_GetDividedBpmAtTime and reaper.TimeMap2_GetDividedBpmAtTime(0, t) or reaper.Master_GetTempo()
+    edit.run('time signature', function() edit.keep_markers_qn(function() reaper.SetTempoTimeSigMarker(0, -1, t, -1, -1, bpm, n, d, false) end) end)
+    reaper.UpdateTimeline(); model.invalidate()
+    vim.msg = ('%04d: time signature %d/%d from here'):format(m.row, n, d)
+    return
+  end
+  local v = tonumber((arg or ''):match('[%d%.]+'))
+  if not v then vim.msg = 'a number, like 140'; return end
+  m.f(v)
+end
 ctx.describe_arm = function() ctx.describe_next = true; vim.msg = 'describe: press a key (it is not run)' end
 ctx.describe_key = function(c)
   ctx.describe_next = nil
