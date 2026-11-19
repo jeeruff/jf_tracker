@@ -324,7 +324,6 @@ local state = {
   sbw = tonumber(reaper.GetExtState(EXT, 'sbw')) or 3,
   phtail = tonumber(reaper.GetExtState(EXT, 'phtail')) or 0,   -- 10 окт: по умолчанию 0 — плейхед обычной строкой, шлейф (shade) — опцией
   beacon = reaper.GetExtState(EXT, 'beacon') ~= '0',   -- 10 окт: вспышка там, куда перелетел курсор (beacon-mode Emacs)
-  mpin = flag('mpin', true),
   spcleader = flag('spcleader', true),
   holdmetro = flag('holdmetro', false),           -- 9 ноя: щелчки метронома, пока держишь ноту в INSERT
   spcmenu = reaper.GetExtState(EXT, 'spcmenu') == 'here' and 'here' or 'main',   -- 9 ноя: Space открывает: главное меню / меню под курсором
@@ -410,7 +409,7 @@ local state = {
   hexfill = reaper.GetExtState(EXT, 'hexfill') == 'left' and 'left' or 'right',   -- 17 окт: Enter в недобранном hex
   bigname = reaper.GetExtState(EXT, 'bigname') ~= '' and reaper.GetExtState(EXT, 'bigname') or 'off',   -- 20 окт: big trackname
   anpatch = flag('anpatch', false), aninst = flag('aninst', false), anitem = flag('anitem', false),   -- 20 окт: имя трека само (патч / инструмент / айтем)
-  mfold = reaper.GetExtState(EXT, 'mfold') == '1', mfoldauto = reaper.GetExtState(EXT, 'mfoldauto') == '1',   -- 17 окт: мастер сложен / складывать сам   -- 17 окт: Shift+нота — прослушать (по умолчанию выкл)
+  -- 19 ноя: mfold / mfoldauto / mpin убраны (один вид мастера)   -- 17 окт: мастер сложен / складывать сам   -- 17 окт: Shift+нота — прослушать (по умолчанию выкл)
   shadehue = tonumber(reaper.GetExtState(EXT, 'shadehue')) or 0,   -- 17 окт: оттенок shades (0 — акцент темы)   -- 17 окт: питч слайса от клавиши 1 или 6 (середина)
   panecol = ({ ['0'] = 'off', shades = 'shades' })[reaper.GetExtState(EXT, 'panecol')] or 'colours',   -- 17 окт: цвета панелей: colours — свой у каждой, shades — оттенки акцента темы, off
   focusbeacon = flag('focusbeacon', true), dimfocus = tonumber(reaper.GetExtState(EXT, 'dimamt')) or 0,   -- 15 окт: dim unfocused — сила затемнения, % (0 = выкл; было вкл/выкл)   -- 15 окт: вспышка рамки при смене фокуса / притушить остальные модули   -- 14 окт: щелчок по имени параметра DSP ставит значение от мыши (странная опция)
@@ -476,7 +475,8 @@ local state = {
   sroslash = reaper.GetExtState(EXT, 'sroslash2') ~= '0',   -- 16 окт: маршрутизация /// цветами вместо sro (по умолчанию вкл, новый ключ)
   popdock = reaper.GetExtState(EXT, 'popdock') ~= '0',   -- 14 ноя: меню / which-key / списки — всегда внизу окна (по умолчанию вкл)
   vipersel = reaper.GetExtState(EXT, 'vipersel') == 'exclusive' and 'exclusive' or 'cursor',   -- 17 ноя: viper — выделение ведёт курсор (exclusive — прячет треки)
-  mwide = tonumber(reaper.GetExtState(EXT, 'mwide')) or 0,   -- 17 ноя: ширина мастера сверх колонок (шаги по 2 знака)
+  mhide = reaper.GetExtState(EXT, 'mhide') == '1',   -- 19 ноя: мастер спрятан (h в его шапке) — один вид, без fold / ширины
+  mcmdn = tonumber(reaper.GetExtState(EXT, 'mcmdn')) or 1,   -- 19 ноя: колонок cmd на мастере (− + в шапке, z. z, на мастере)
   libtabs = false,   -- 17 ноя (3): lib — одним деревом (разделы, звуки, киты, пэды — папки); вкладки / lf сняты
   tlrp = reaper.GetExtState(EXT, 'tlrp') == '1',            -- 13 окт: столбцы tcp / mcp в модуле tracks
   llm = (function() local v = reaper.GetExtState(EXT, 'llm'); return (v == 'ask' or v == 'on') and v or 'off' end)(),   -- 10 окт: мост к модели
@@ -767,14 +767,14 @@ local function save_win()
   S('viewreg', state.view_reg and '1' or '0'); S('viewsec', state.view_secmode and '1' or '0')
   do local z = state.panes.zoom; state.panes.zoom = nil; S('panes', draw.panes.encode(state.panes)); state.panes.zoom = z end   -- дерево панелей (9 окт), без zoom
   S('notes', state.notes_open and '1' or '0')
-  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'wavefrm', 'fxauto', 'ggrel', 'mpin', 'spcleader', 'holdmetro' }) do S(k, state[k] and '1' or '0') end
+  for _, k in ipairs({ 'outnotes', 'insred', 'cracks', 'sand', 'bloodviz', 'ctxdim', 'clipsnap', 'pancol', 'noautofloat', 'pixel', 'fxbenter', 'notesus', 'offevent', 'focusback', 'dotcolor', 'namedrag', 'focusbeacon', 'typedtag', 'slice1', 'ruler', 'mkedges', 'rgnames', 'mknames', 'rgedges', 'rgbar', 'mxregion', 'mxmarks', 'follow', 'envs', 'preview', 'autosync', 'poolprev', 'libauto', 'kbhide2', 'side', 'sidenarrow', 'top', 'meters', 'dsp', 'icons', 'xfade', 'lock', 'fixed', 'captions', 'khelp', 'endstop', 'itemnames', 'itemcol', 'scopes', 'mxruler', 'mxstack', 'stepflash', 'mxfold', 'keepsamples', 'copymedia', 'fxb', 'hints', 'bigstatus', 'tpbuttons', 'tintmute', 'aifill', 'oneclick', 'autofocus', 'nofloat', 'dspleft', 'offdim', 'envwide', 'slicekeys', 'midilanes', 'envpoints', 'aipoints', 'debug', 'synchdr', 'dsptrack', 'dsptrackslim', 'eqgraph', 'browserleft', 'whichkey', 'hdrinfo', 'fxparams', 'mixer', 'bigfader', 'panknob', 'notitle', 'offend', 'ctlmap', 'ctlx2', 'patitem', 'roundrack', 'lanetop', 'autoadd', 'offbar', 'bigcur', 'pianosmall', 'pianokeys', 'ptabs', 'ssbsync', 'pmgrid', 'pmthumb', 'pmicon', 'reclib', 'stretchmarks', 'recdelprompt', 'panes_ui', 'dbmarks', 'clipmark', 'faderfocus', 'mixroute', 'mixrouter', 'mixvnames', 'jumps', 'rowjumps', 'unitedruler', 'jrbg', 'pmpane', 'anpatch', 'aninst', 'anitem', 'relwave', 'wavefrm', 'fxauto', 'ggrel', 'spcleader', 'holdmetro' }) do S(k, state[k] and '1' or '0') end
   S('pvvol', tostring(state.pvvol or 1)); S('step_auto', vim.step_auto and '1' or '0'); S('step_next', vim.step_next and '1' or '0'); S('wave_os', tostring(state.wave_os or 1)); S('vel', tostring(vim.vel or 100))
   do local t = {}; for k, v in pairs(state.subs_min or {}) do if v > 1 then t[#t + 1] = k .. '=' .. v end end; S('subsmin', table.concat(t, ',')) end
   S('bigbpm2', state.bigbpm and '1' or '0'); S('zoommods', state.zoommods or 'cmd'); S('xfade_ms', tostring(state.xfade_ms)); S('xfademode', state.xfademode or 'vol')
   do local t = {}; for g, v in pairs(state.trackenvs or {}) do t[#t + 1] = g .. '=' .. (v and '1' or '0') end; S('trackenvs', table.concat(t, ',')) end
   do local t = {}; for k, m in pairs(state.envvals or {}) do t[#t + 1] = k .. '=' .. m end; S('envvals', table.concat(t, '|')) end
   S('declip', tostring(state.declip or 10)); S('mixrouter_frac', tostring(state.mixrouter_frac or 0.5))
-  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('libkeys', state.libkeys and '1' or '0'); S('hexfill', state.hexfill or 'right'); S('mfold', state.mfold and '1' or '0'); S('mfoldauto', state.mfoldauto and '1' or '0'); S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('framefx', state.framefx or ''); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode2', state.bsmode or 'view'); S('foldfast2', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('popdock', state.popdock and '1' or '0'); S('tptop', state.tptop and '1' or '0'); S('selinv', state.selinv and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('knob', state.knob or 'auto'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option'); S('spcmenu', state.spcmenu or 'main'); S('spcdelay', tostring(state.spcdelay or 250))
+  S('panecol', state.panecol == 'off' and '0' or state.panecol); S('slicepitch0', state.slicepitch0 or '1'); S('shadehue', tostring(state.shadehue or 0)); S('shiftlisten', state.shiftlisten and '1' or '0'); S('libkeys', state.libkeys and '1' or '0'); S('hexfill', state.hexfill or 'right');   S('fps', tostring(state.fps or 'max')); S('toppos2', state.toppos or 'mid'); S('ctrlpos', state.ctrlpos or 'top'); S('hdrin', state.hdrin and '1' or '0'); S('curlead', tostring(state.curlead or 15)); S('meterstyle', state.meterstyle or 'blocks'); S('mixnames', state.mixnames or 'bottom'); S('cmsens', tostring(state.cmsens or 50)); S('krdelay', tostring(state.krdelay or 250)); S('krrate', tostring(state.krrate or 30)); S('human', tostring(state.human or 0)); S('framefx', state.framefx or ''); S('unhuman', state.unhuman and '1' or '0'); S('slicemono', state.slicemono and '1' or '0'); S('insmode', state.insmode or 'fixed'); S('slicepick', state.slicepick or 'key'); S('libfolders', state.libfolders and '1' or '0'); S('hardedges2', state.hardedges and '1' or '0'); S('escstop', state.escstop and '1' or '0'); S('escmode', state.escmode or 'renoise'); S('patcode', state.patcode or 'hex'); S('hidereaper', state.hidereaper and '1' or '0'); S('slicemk', state.slicemk or 'double'); S('edgezoom', state.edgezoom and '1' or '0'); S('wavebar', state.wavebar and '1' or '0'); S('waveinv', state.waveinv and '1' or '0'); S('tababc', state.tababc and '1' or '0'); S('hdrmeter', state.hdrmeter and '1' or '0'); S('kitsize', state.kitsize or 'l'); S('bsmode2', state.bsmode or 'view'); S('foldfast2', state.foldfast and '1' or '0'); S('envmark', state.envmark and '1' or '0'); S('sroslash2', state.sroslash and '1' or '0'); S('libtabs', state.libtabs and '1' or '0'); S('popdock', state.popdock and '1' or '0'); S('tptop', state.tptop and '1' or '0'); S('selinv', state.selinv and '1' or '0'); S('tlrp', state.tlrp and '1' or '0'); S('llm', state.llm or 'off'); S('propsitem', state.propsitem and '1' or '0'); S('automidi', state.automidi and '1' or '0'); S('autoinst', state.autoinst and '1' or '0'); S('armsel', state.armsel and '1' or '0'); S('pvsolo', state.pvsolo and '1' or '0'); S('masterpos', state.masterpos or 'right'); S('dsptabs', state.dsptabs or 'bottom'); S('smlisten', state.smlisten and '1' or '0'); S('hintpos', state.hintpos or 'tabs'); S('slicefollow', state.slicefollow and '1' or '0'); S('sliceaud2', state.sliceaudition and '1' or '0'); S('velrand', state.velrand and '1' or '0'); S('notesscale', tostring(state.notes_scale or 0)); S('keycast', state.keycast and '1' or '0'); S('textonly', state.textonly and '1' or '0'); S('waveonly', state.waveonly and '1' or '0'); S('steplisten', state.steplisten and '1' or '0'); S('sellisten', state.sellisten and '1' or '0'); S('cut0x', state.cut0x and '1' or '0'); S('cutsnap', state.cutsnap and '1' or '0'); S('cutquant', state.cutquant and '1' or '0'); S('trklisten', state.trklisten and '1' or '0'); S('fxopen', state.fxopen and '1' or '0'); S('dspmeters', state.dspmeters and '1' or '0'); S('slicespos', state.slicespos or 'module'); S('propspos2', state.propspos or 'right'); S('kcscale', tostring(state.kc_scale or 0)); S('knob', state.knob or 'auto'); S('itemframe', state.itemframe or 'item'); S('hdrfill', state.hdrfill or 'line'); S('seldrag', state.seldrag or 'right'); S('envfmt', state.envfmt or 'midi'); S('quick', state.quick or ''); S('opttab', state.opt_tab or 'theme'); S('ttf', state.ttf or 'off'); S('ttfcustom', state.ttfcustom or ''); S('ttfpx', tostring(state.ttfpx or 14)); S('focusclick', state.focusclick or 'option'); S('spcmenu', state.spcmenu or 'main'); S('spcdelay', tostring(state.spcdelay or 250))
   S('scopemode', state.scopemode or 'scope'); S('wave', state.wave or 'peaks'); S('poolsort', state.poolsort or 'track'); S('prevmode', state.prevmode or 'full'); S('curline', state.curline or 'top'); S('theme', state.theme or 'reaper'); S('tlruler', state.tlruler or 'off'); S('wavemode', state.wavemode or 'column'); S('itemalpha', tostring(state.itemalpha or 5)); S('dimamt', tostring(state.dimfocus or 0))
   S('side_px', state.side_px and tostring(math.floor(state.side_px)) or ''); S('top_px', state.top_px and tostring(math.floor(state.top_px)) or '')
   S('inst_px', state.inst_px and tostring(math.floor(state.inst_px)) or '')
@@ -6172,8 +6172,12 @@ ctx = {
     model.invalidate(); ctx.chord_pub.cc = -1
     vim.msg = name == '' and ('chord removed on row %04d'):format(row) or ('chord %s on row %04d (chordfollow tracks follow it)'):format(name, row)
   end,
-  mcmd_set = function(row, text)
+  mcmd_set = function(row, text, slot)
     text = (text or ''):gsub('^%s+', ''):gsub('%s+$', '')
+    -- 19 ноя: колонок cmd несколько — правится команда своей колонки (k-я в строке; последняя колонка — k-я и дальше)
+    local cf = L and L.flat and L.flat[vim.cur.fi]
+    slot = slot or (cf and cf.ml and cf.ml.kind == 'cmd' and cf.ml.slot) or 1
+    local last = slot >= ((L and L.mcmdn) or 1)
     local t0, t1 = edit.row_time(row, state.lpb, 0), edit.row_time(row + 1, state.lpb, 0)
     local found, i = {}, 0
     while true do
@@ -6182,10 +6186,13 @@ ctx = {
       if not isrgn and pos >= t0 - 1e-6 and pos < t1 - 1e-6 and not (name or ''):match('^=') and not (name or ''):match('^v:') and not (name or ''):match('^ch:') then found[#found + 1] = { idx = idx, pos = pos, color = color } end   -- 22 окт: ch: — аккорды, не команды
       i = i + 1
     end
-    if text == '' and #found == 0 then vim.msg = 'cmd: no command on this row'; return end
+    if text == '' and not found[slot] then vim.msg = 'cmd: no command on this row'; return end
     edit.run(text == '' and 'delete command' or 'command', function()
-      if text == '' then for _, f in ipairs(found) do reaper.DeleteProjectMarker(0, f.idx, false) end
-      elseif #found > 0 then reaper.SetProjectMarker3(0, found[1].idx, false, found[1].pos, 0, text, found[1].color or 0)
+      -- удаление с конца: номера маркеров после удаления не сдвигаются у оставшихся
+      if text == '' then for k = last and #found or slot, slot, -1 do reaper.DeleteProjectMarker(0, found[k].idx, false) end
+      elseif found[slot] then
+        reaper.SetProjectMarker3(0, found[slot].idx, false, found[slot].pos, 0, text, found[slot].color or 0)
+        if last then for k = #found, slot + 1, -1 do reaper.DeleteProjectMarker(0, found[k].idx, false) end end
       else reaper.AddProjectMarker2(0, false, t0, 0, text, -1, 0) end
     end)
     model.invalidate()
@@ -14003,7 +14010,6 @@ ctx = {
       { key = 'pvsolo', label = 'preview only its track', kind = 'toggle', desc = 'a previewed note / pad (mouse, keys) sounds only on its own track: other armed tracks on all-MIDI input lose the arm for 0.8 s; off - every armed track hears the virtual keyboard (layering by arm); MIDI out sends work either way', get = function() return state.pvsolo end, set = function(v) state.pvsolo = v end },
       { key = 'armsel', label = 'rec follows selection', kind = 'toggle', desc = 'record arm follows the selected tracks: REAPER auto record-arm (track menu: Automatic record-arm when track selected) on every track, new ones too; off - removed from all tracks', get = function() return state.armsel end, set = function(v) state.armsel = v; ctx.armsel_apply(v) end },
       { key = 'dsptabs', label = 'DSP page tabs', kind = 'cycle', values = { 'bottom', 'top', 'right' }, desc = 'tabs of modules with pages (Surge, big plugins: main osc filter ...): a row along the bottom / a row under the module name / a column on the right', get = function() return state.dsptabs or 'bottom' end, set = function(v) state.dsptabs = v end },
-      { key = 'masterpos', label = 'master strip', kind = 'cycle', values = { 'right', 'left' }, desc = 'the master in the bottom mixer: right - its own corner on the right (as in Renoise), the tracks stop before it; left - under the row numbers', get = function() return state.masterpos or 'right' end, set = function(v) state.masterpos = v; ctx.relayout() end },
       flag('autoinst', 'auto instrument', 'the cursor picks the instrument of its track: the audio clip under the cursor (or the last one above it), on a track without audio - its plugin instrument; choosing one by hand holds until the cursor reaches another clip or track'),
       flag('automidi', 'auto MIDI input', 'you play notes into a track with a plugin instrument but its input is audio - switch the input to all MIDI inputs (all channels) and turn monitoring on'),
       flag('waveinv', 'selection: inverse wave', 'the selected slice in the sample wave: off - its wave a bit brighter; on - inverse (a lit block, the wave cut out dark)'),
@@ -14108,7 +14114,6 @@ ctx = {
       flag('anpatch', 'track autoname by patch', 'the track takes the name of the patch / preset of its instrument (Surge XT patch, REAPER preset); a name you typed yourself is kept'),
       flag('aninst', 'track autoname by dsp instrument', 'the track takes the name of its instrument in DSP (Surge XT, ReaSynth, drumrs5k ...); a name you typed yourself is kept'),
       flag('anitem', 'track autoname by item', 'the track takes the name of its first item (the sample / clip); a name you typed yourself is kept'),
-      flag('mfoldauto', 'auto fold master', 'the master column stays folded (a stereo meter, RMS at the sides) while the cursor is not on it; Opt+W, l from the last track or a click on it opens it; the same as the auto button in its header'),
       { key = 'shadehue', label = 'shades hue', kind = 'num', min = 0, max = 360, step = 10, fmt = '%d', desc = 'pane colours = shades: the colour the shades are made of - 0 = the theme accent, 1..360 - a hue on the colour wheel (30 orange, 120 green, 200 blue, 280 violet); Shift - fine', get = function() return state.shadehue or 0 end, set = function(v) state.shadehue = v end },
       { key = 'dimfocus', label = 'dim unfocused', kind = 'num', min = 0, max = 60, step = 2, fmt = '%d %%', desc = 'how much darker the modules without the keyboard focus are (0 = off; digits type the value)', get = function() return state.dimfocus or 0 end, set = function(v) state.dimfocus = v end },   -- 15 окт: слайдер
       flag('namedrag', 'name click sets', 'a click (and drag) anywhere on a DSP parameter row, its name too, sets the value from the mouse position; off - only the bar changes it, a click on the name just selects the parameter'),
@@ -14172,7 +14177,7 @@ ctx = {
       { 'cursor and editing', { 'noautofloat', 'pixel', 'knob', 'acvzoom', 'acvbehind', 'notetube', 'endglyph', 'freeglyph', 'offrel', 'dspmove', 'dspauto', 'slidemode', 'slidespeed', 'slidezero', 'slicekeys', 'notesus', 'offevent', 'focusback', 'ggrel', 'jumps', 'jrbg', 'rowjumps', 'unitedruler', 'curline', 'curacc', 'rowbase', 'outnotes', 'clipsnap', 'curlead', 'bigcur', 'phtail', 'beacon', 'typedtag', 'tlruler', 'envfmt', 'seldrag', 'bsmode', 'foldfast', 'envmark', 'focusclick', 'oneclick', 'autofocus', 'nofloat', 'zoommods', 'offbar', 'offend', 'midilanes', 'envpoints', 'aipoints', 'aifill' } },
       { 'control mode', { 'ctlmap', 'ctlx2' } },   -- 27 окт: свой отдел
       { 'keyboard', { 'krdelay', 'krrate' } },   -- 27 окт: автоповтор зажатой клавиши
-      { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'masterpos', 'mfoldauto', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
+      { 'headers and mixer', { 'fadercap', 'contedge', 'bigname', 'anpatch', 'aninst', 'anitem', 'sroslash', 'hdrfill', 'hdrin', 'hdrinfo', 'synchdr', 'captions', 'meters', 'meterstyle', 'scopes', 'mixer', 'mixnames', 'mixroute', 'bigfader', 'panknob', 'dbmarks', 'mixvnames', 'clipmark', 'declip', 'faderfocus', 'dsptrack', 'dsptrackslim', 'dspmeters', 'dsptabs', 'eqgraph', 'dspleft', 'roundrack', 'lanetop', 'offdim', 'envwide' } },
       { 'items and waves', { 'patitem', 'textonly', 'waveonly', 'wavemode', 'relwave', 'wavefrm', 'wave_os', 'itemframe', 'itemcol', 'itemalpha', 'itemnames', 'stretchmarks', 'xfademode', 'propspos' } },
       { 'sound and samples', { 'bsplit', 'slice1', 'slicepitch0', 'shiftlisten', 'llm', 'autoinst', 'armsel', 'pvsolo', 'automidi', 'edgezoom', 'wavebar', 'waveinv', 'slicemk', 'steplisten', 'preview', 'poolprev', 'libauto', 'poolsort', 'autosync', 'hardedges', 'keepsamples', 'copymedia', 'pancol', 'kbwhere', 'fxbenter', 'endstop', 'recdelprompt' } },
       { 'drop', { 'ssbsync' } },
@@ -21953,11 +21958,7 @@ function ctx.width_step(d, which)
   local full = 3 + math.min(L.MAXFX or 4, state.fxcols or 0)
   -- 17 ноя: мастер — шире / уже, как обычный трек (z> z<, Opt+Shift+L H, Cmd+колесо): шаг — 2 знака сверх его колонок
   if which == 'cur' and #list == 1 and snap and list[1] == snap.master then
-    state.mwide = math.max(0, math.min(16, (state.mwide or 0) + d))
-    reaper.SetExtState(EXT, 'mwide', tostring(state.mwide), true)
-    relayout()
-    vim.msg = 'width of master ' .. (d > 0 and 'wider' or 'narrower') .. (state.mwide == 0 and ' (as narrow as its columns)' or (' (+' .. 2 * state.mwide .. ')'))
-    return
+    ctx.mcmd_cols_step(d); return   -- 19 ноя: ширина мастера — колонками cmd (как колонки эффектов трека)
   end
   if #list > 0 then
     state.wlevel = state.wlevel or {}
@@ -24736,7 +24737,7 @@ ctx.VIEW_GROUPS = {
   { 't', 'tracker', { 'fixed', 'follow', 'curline', 'bigcur', 'captions', 'envs', 'meters', 'foldfast', 'lanetop', 'offdim', 'itemnames', 'wavebar', 'dotbright', 'tintmute' } },
   { 's', 'screen', { 'hints', 'bigstatus', 'keycast', 'mixer', 'dsp', 'top', 'side' } },
 }
-ctx.VIEW_MIXER = { 'm', 'mixer', { 'mixvnames', 'mixnames', 'mixroute', 'declip', 'clipmark', 'dbmarks', 'meterstyle', 'hdrmeter', 'fadercap', 'bigfader', 'panknob', 'faderfocus', 'masterpos', 'mfoldauto' } }
+ctx.VIEW_MIXER = { 'm', 'mixer', { 'mixvnames', 'mixnames', 'mixroute', 'declip', 'clipmark', 'dbmarks', 'meterstyle', 'hdrmeter', 'fadercap', 'bigfader', 'panknob', 'faderfocus' } }
 -- 10 ноя: SPC v B — всё крупное одним меню (переключение — сразу, меню остаётся)
 ctx.big_menu = function()
   local by = {}
@@ -28057,10 +28058,9 @@ local function frame()
     kview = 'pads / list of the rack (cv)', bands = '÷ - this effect into 3 / 4 / 5 frequency bands (REAPER band splitter + joiner; zr shows the bands)', kmidi = 'midi out - MIDI-only sends of the rack to other tracks', krprev = 'every pad of the rack - back to its previous sample', krxi = 'every pad of the rack - a random sample like its own (one undo)', krnext = 'every pad of the rack - the next sample like its own' })[hover.dspbtn.what] or '')   -- 19 окт: незнакомая кнопка не роняет кадр (скобки: .. сильнее or)
   elseif hover.dsptarget then state.status = (hover.dsptarget == 'take' and 'DSP shows the take fx of the selected instrument (t; take fx row in sample props)' or 'DSP shows the fx of the cursor track (t)') .. ' - T: pin the DSP to this track (°)'   -- 12 ноя
   elseif hover.mautoarm then state.status = 'autoarm all: every track ' .. (hover.mautoarm == 'on' and 'gets auto-arm - whichever track you select is armed for recording' or 'loses auto-arm') .. ' (tA)'
-  elseif hover.mfold then state.status = state.mfold and 'master folded - click: open the master column' or 'fold: the master into two characters - a stereo meter and the gain reduction of its compressor / limiter (option auto fold master)'
-  elseif hover.mpin then state.status = state.mpin ~= false and 'pin: the master stays on the right - click: the master becomes the last track (shown when the tracks to the right are over)' or 'pin off: the master is the last track - click: pin it to the right'
-  elseif hover.mfoldauto then state.status = 'auto: the master stays folded while the cursor is not on it; Opt+W, l from the last track or a click on it opens it'
-  elseif hover.mfold_meter then state.status = ('master: peaks L R in the middle, RMS L R at the sides (same scale as the tracks, -60..+12 dB)%s - click / Opt+W: open'):format(hover.mfold_meter > 0.05 and (', gain reduction %.1f dB'):format(hover.mfold_meter) or '')
+  elseif hover.mhide then state.status = 'h: hide the master (a thin ∑ stays on the right - click it to show; zM h)'
+  elseif hover.mshow then state.status = 'master hidden - click: show it (zM h)'
+  elseif hover.mcmdbtn then state.status = ('command columns of the master: %d - click - / + (1..8); z> / z< with the cursor on the master'):format(L and L.mcmdn or 1)
   elseif hover.dspview then state.status = hover.dspview.f.name .. ': grain cloud - click / drag sets Position (native parameter)'
   elseif hover.cslide then state.status = (hover.cslide.name or 'chain volume') .. ' - click / drag left / right'
   elseif hover.knob then state.status = ('%s %d %% - drag up / down (Shift - fine)'):format(hover.knob.name or 'knob', math.floor((hover.knob.v or 0) * 100 + 0.5))
@@ -28764,20 +28764,9 @@ local function frame()
   end
   if U.click and ctx.opt_m() then OPT.click(gfx.mouse_x, gfx.mouse_y); U.click = false; if OPT.pane and state.focus ~= 'options' and OPT.active then ctx.set_focus('options') end end
   if U.click and hover.mautoarm then ctx.autoarm_all(hover.mautoarm == 'on'); U.click = false end   -- 18 окт: autoarm — все треки (20 окт: = tA)
-  if U.click and hover.mfold then
-    U.click = false
-    -- 20 окт: сложен (сам или auto fold) — клик открывает: auto держал сложенным, переключение mfold не помогало
-    if L and L.mfold then
-      state.mfold = false
-      if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
-    else
-      state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded: L R meter, RMS at the sides (click it, Opt+Shift+W or zM u to open)'
-    end
-  end   -- 17 окт
+  if U.click and (hover.mhide or hover.mshow) then U.click = false; ctx.master_hide(hover.mhide and true or false) end   -- 19 ноя
+  if U.click and hover.mcmdbtn then local d = hover.mcmdbtn; U.click = false; ctx.mcmd_cols_step(d) end
   -- 20 окт: auto — мастер сложен, пока курсор не на нём; клик по сложенному мастеру — раскрыть и курсор на мастер
-  if U.click and hover.mpin then state.mpin = state.mpin == false; U.click = false; relayout(); vim.msg = state.mpin and 'master pinned to the right' or 'master: the last track (scroll to the end to see it)' end   -- 8 ноя
-  if U.click and hover.mfoldauto then state.mfoldauto = not state.mfoldauto; state.m_peek = nil; U.click = false; relayout(); vim.msg = state.mfoldauto and 'master auto: folded while the cursor is not on it (Opt+W / l from the last track / a click opens it)' or 'master auto off' end
-  if U.click and (hover.mfold_meter or hover.mfold_open) then U.click = false; ctx.master_jump() end
   if U.click and (hover.khelp_big or hover.docsec) then if hover.docsec then ctx.DOC.sec = hover.docsec; ctx.DOC.scroll = 0 end; if hover.docsec and state.focus ~= 'manual' and draw.panes.visible(state.panes, 'manual') then ctx.set_focus('manual') end; U.click = false end   -- справка F1 / панель manual: раздел мышью
   if state.nofloat and not state.fxopen then
     local c0 = ctx.FF.closed
@@ -38153,18 +38142,8 @@ ctx.master_menu = function()
     { key = 'C', label = ('monitor FX (%d) - only to the speakers'):format(nmfx) .. on(41884):gsub('%*', 'bypassed'), fn = function() ctx.mfx_open() end },
     { key = 'b', label = 'monitor FX bypass' .. on(41884), fn = act(41884, 'monitor FX bypass toggled') },
     { key = 'm', label = 'mono (L+R)' .. on(40917), fn = act(40917, 'master mono toggled') },
-    { key = 'p', label = 'pin: the master stays on the right (off - it is the last track)' .. (state.mpin ~= false and '  *' or ''), fn = function()   -- 8 ноя: = кнопка pin
-      state.mpin = state.mpin == false; relayout(); vim.msg = state.mpin and 'master pinned to the right' or 'master: the last track (scroll to the end to see it)' end },
+    { key = 'h', label = state.mhide and 'show the master column' or 'hide the master column (a thin ∑ stays)', fn = function() ctx.master_hide(not state.mhide) end },   -- 19 ноя
     { key = 'r', label = 'routing and I/O of the master', fn = act(42235, 'master routing') },
-    { key = 'u', label = (L and L.mfold) and 'unfold the master column (Opt+Shift+W)' or 'fold the master column into a meter', fn = function()   -- 1 ноя
-      if L and L.mfold then state.mfold = false; if state.mfoldauto then ctx.master_jump() else state.m_peek = nil; relayout(); vim.msg = 'master open' end
-      else state.mfold = true; state.m_peek = nil; relayout(); vim.msg = 'master folded (zM u / Opt+Shift+W / a click on it opens)' end
-    end },
-    { key = 'a', label = 'auto fold: the master folds when the cursor leaves it' .. (state.mfoldauto and '  *' or ''), fn = function()   -- 1 ноя: кнопка auto видна только в развёрнутой шапке
-      state.mfoldauto = not state.mfoldauto; state.m_peek = nil
-      if not state.mfoldauto then state.mfold = false end
-      relayout(); vim.msg = state.mfoldauto and 'master auto fold on' or 'master auto fold off - the master stays open'
-    end },
     { key = 'v', label = 'master track visible in REAPER (TCP)' .. on(40075), fn = act(40075, 'master in the arrange toggled') },
     { key = 't', label = 'tempo envelope of the master' .. on(41046), fn = act(41046, 'master tempo envelope toggled') },
     { key = 'w', label = 'master in a separate mixer window' .. on(41636), fn = act(41636, 'master window toggled') },
@@ -39013,19 +38992,33 @@ ctx.master_fi = function()
   if not (mc and L) then return nil end
   for i, f in ipairs(L.flat) do if f.col == mc then return i end end
 end
+-- 19 ноя: один вид мастера: h — спрятать / показать; колонок cmd − + (1..8)
+ctx.master_hide = function(on)
+  state.mhide = on and true or false
+  reaper.SetExtState(EXT, 'mhide', state.mhide and '1' or '0', true)
+  if state.mhide and L and L.flat and L.flat[vim.cur.fi] and snap and L.flat[vim.cur.fi].col == snap.master then vim.cur.fi, vim.cur.field = 1, 1 end
+  relayout()
+  vim.msg = state.mhide and 'master hidden (click the ∑ on the right or zM h - show)' or 'master shown'
+end
+ctx.mcmd_cols_step = function(d)
+  state.mcmdn = math.max(1, math.min(8, (state.mcmdn or 1) + d))
+  reaper.SetExtState(EXT, 'mcmdn', tostring(state.mcmdn), true)
+  relayout()
+  vim.msg = ('master: %d command column(s)'):format(state.mcmdn)
+end
 ctx.master_peek = function()
   if not (L and L.mfold) then return false end
   state.m_peek = true; relayout()
   return ctx.master_fi() ~= nil
 end
 ctx.master_jump = function()
-  if L and L.mfold then ctx.master_peek() end
+  if state.mhide then ctx.master_hide(false); relayout() end   -- 19 ноя: спрятан — показать
   local i = ctx.master_fi()
   if not i then vim.msg = 'no master column (options: master position)'; return end
   if ctx.jump_mark then ctx.jump_mark() end
   vim.cur.fi, vim.cur.field, vim.cur.sub = i, 1, nil
   if vim.ensure_visible then vim.ensure_visible() end
-  vim.msg = 'master (Opt+W): the cursor on the master columns' .. ((state.mfold or state.mfoldauto) and ' - it folds again when the cursor leaves' or '')
+  vim.msg = 'master (Opt+W): the cursor on the master columns'
 end
 -- 20 окт: autozoom — курсор перешёл на другой трек: раскрыть его, ужать остальные (relayout)
 -- 20 окт: track autoname by patch / dsp instrument / item (опции, по умолчанию выкл): имя трека — от патча
