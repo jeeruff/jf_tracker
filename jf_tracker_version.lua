@@ -1,10 +1,28 @@
 -- jf_tracker_version.lua — версия и список изменений (Options → about).
 -- Новая версия: добавить запись в начало CHANGES и поднять VERSION.
 local V = {}
-V.VERSION = '0.9.4'
-V.DATE = '2026-11-05'
+V.VERSION = '0.9.5'
+V.DATE = '2026-11-19'
 V.CHANGES = {
-  { v = '0.9.4', d = '2026-11-05', items = {
+  { v = '0.9.5', d = '2026-11-19', items = {
+    -- 17-19 ноя
+    'performance: per-frame polls cached (project tabs 4 Hz, punch / pre-roll ids, smart input file, SWS check, main module label widths)',
+    'master: one view, always on the right; h hides it (a thin sum sign stays, click - show); - + N command columns (Opt+Shift+H more, L fewer)',
+    'master cmd: Enter - a menu: tempo change / ramp / half / double, time signature, jump or loop back (>0128 x4, seamless), mute / solo a track, program change, stop, metronome, a REAPER action',
+    'command line like Ivy / Helm: words in any order over commands, history, keys and REAPER actions; . before a command - at the cursor only (:.bpm 140); := - the row number',
+    ':occur (instrument number, . under the cursor, or the selection) - cyan frames, n N walk them; g? - describe a key; Ctrl+O - actions on the picked line; :winner',
+    'lib as one tree: sections, sounds with slices and layers, drumrs5k kits - pads - pad effects; replace a pad sample in place; one cursor',
+    '. repeats any tracker command (3. - three times)',
+    'track width smooth: one note column per step both ways; zw - data columns first',
+    'zT g - spectrogram track view; the note name over the wave',
+    'microtones: quarter tones as a sign in the sharp place (note always 3 chars); the sign is dim; flats only in a flat key of the song (:key, shown in the transport)',
+    '[ ] - only the keyboard octave, everywhere; Opt+Space - the step down in any mode; Cmd+two digits within 0.25 s - track 12',
+    'BPM and note pickers take the typed value on Enter',
+    'menus opened with the mouse drop at the mouse',
+    'Enter does not auto-repeat (a slow plugin load added it three times)',
+    'slicer: a click selects a slice, it moves after 5 px; the aim is two corners on top',
+    'Shift+F remembers the database; Esc cancels the find at once',
+    'viper: an item selected in REAPER moves the cursor to it, all tracks stay visible',
     -- 17 ноя
     'libkeys (Opt+M, lib2keys button, :libkeys): the note keys are the lib instruments top to bottom; INSERT writes on the instrument track',
     'note = slice (as the slice list: S01 = C-3 ...): the note shows the slice, F1 / F2, r + note - another slice; 0Sxx - start xx/256 into the slice; slice pitch - Opt+T p (lib: Shift+T), every note of the slice follows',
@@ -54,13 +72,14 @@ V.CHANGES = {
     'keyspat: MIDI Program Change plays the pattern of that number',
     ':learn: patterns of the song from a controller - a knob picks, buttons next / prev (keyspat quant / sudden)',
     ':learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer',
+  } },
+  { v = '0.9.4', d = '2026-11-05', items = {
     'fix: Windows crashed on start (jf_tracker.lua:14030) - thanks for the report',
     ':debug share - a debug log safe to post: names, paths and your own text are replaced',
     'DSP: Opt+H L - the track, Opt+J K and Opt+1..0 - the instrument, as in the tracker; Shift+Opt+J K - preset, Shift+Opt+H L - preset folder; slixer lists its Option keys',
     'plugin windows over DSP (gui): only by the gui button; they follow their own track, hide behind options, other tabs and other apps, close with the tracker and give the keyboard back',
     'mixer: track names vertical in the tracker font, trnames and view buttons; zk - a folder wide with its children narrow',
     'tracker: the view button next to W H; the track scroll stops at the last track',
-    'performance: per-frame polls cached (project tabs 4 Hz, punch / pre-roll ids, smart input file, SWS check, main module label widths)',
   } },
   { v = '0.9.3', d = '2026-11-04', items = {
     'mixer router (router button): the mixer split in half - every channel with its devices next to the fader and cables in the colour of the track: sends, folders, hardware outs; drag the line to share the height',
