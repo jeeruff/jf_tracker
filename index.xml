@@ -452,6 +452,262 @@
         <source file="samples/README.md">{{BASE}}/v/v0.9.4/samples/README.md</source>
         <source file="samples/amen_8bit.mp3">{{BASE}}/v/v0.9.4/samples/amen_8bit.mp3</source>
       </version>
+      <version name="0.9.5" author="jeeruff" time="2026-11-19T08:36:47Z">
+        <changelog>- performance: per-frame polls cached (project tabs 4 Hz, punch / pre-roll ids, smart input file, SWS check, main module label widths)
+- master: one view, always on the right; h hides it (a thin sum sign stays, click - show); - + N command columns (Opt+Shift+H more, L fewer)
+- master cmd: Enter - a menu: tempo change / ramp / half / double, time signature, jump or loop back (&gt;0128 x4, seamless), mute / solo a track, program change, stop, metronome, a REAPER action
+- command line like Ivy / Helm: words in any order over commands, history, keys and REAPER actions; . before a command - at the cursor only (:.bpm 140); := - the row number
+- :occur (instrument number, . under the cursor, or the selection) - cyan frames, n N walk them; g? - describe a key; Ctrl+O - actions on the picked line; :winner
+- lib as one tree: sections, sounds with slices and layers, drumrs5k kits - pads - pad effects; replace a pad sample in place; one cursor
+- . repeats any tracker command (3. - three times)
+- track width smooth: one note column per step both ways; zw - data columns first
+- zT g - spectrogram track view; the note name over the wave
+- microtones: quarter tones as a sign in the sharp place (note always 3 chars); the sign is dim; flats only in a flat key of the song (:key, shown in the transport)
+- [ ] - only the keyboard octave, everywhere; Opt+Space - the step down in any mode; Cmd+two digits within 0.25 s - track 12
+- BPM and note pickers take the typed value on Enter
+- menus opened with the mouse drop at the mouse
+- Enter does not auto-repeat (a slow plugin load added it three times)
+- slicer: a click selects a slice, it moves after 5 px; the aim is two corners on top
+- Shift+F remembers the database; Esc cancels the find at once
+- viper: an item selected in REAPER moves the cursor to it, all tracks stay visible
+- libkeys (Opt+M, lib2keys button, :libkeys): the note keys are the lib instruments top to bottom; INSERT writes on the instrument track
+- note = slice (as the slice list: S01 = C-3 ...): the note shows the slice, F1 / F2, r + note - another slice; 0Sxx - start xx/256 into the slice; slice pitch - Opt+T p (lib: Shift+T), every note of the slice follows
+- transport bar: one bar of the whole window at the bottom, one block with the status line (option transport on top); gone from the tracker pane
+- status line as a modeline: mode-coloured bar, mode without dashes, hover text on the right
+- mode word: major (module in focus) + minor (NORMAL INSERT KEYS ...); click - menu of all modes (:modes)
+- menus, which-key and pick lists open at the bottom and push the panes up (option menus at the bottom); preset lists stay at the preset
+- Space leader: the menu stays after Space is released; Space again or ':' - the command line, '/' - search the whole menu tree
+- transport: time under the position, metronome and a bigger beat counter under BPM, air between the blocks, wider buttons and keys; in keyspat / keyphr the keys carry pattern / phrase names
+- e - the row after the event, again - after the next one (3e); ge - after the previous one
+- selection shown by inversion in the tracker and the matrix (option selection inverted)
+- track width: narrowing hides the empty columns first (spare note sub-columns, then empty vol / delay / command columns); automation with data stays
+- pattern boundary in the tracker: 3 px - ending pattern colour, grey line, starting pattern colour
+- strictly one MIDI clip per pattern: MIDI items an edit made or moved merge into the clip of their pattern
+- dsp: in INSERT with the DSP in focus a moved parameter writes a point into its automation at the cursor row
+- envelope column: Ctrl+A / Ctrl+X step one shown unit (was four), Shift - 16
+- :patai [all] - the automation of a pattern into automation items the length of the pattern, linked in its repeats (first step, by command)
+- :dedup - remove duplicate items (same position, length, lane, notes / source)
+- tL / :lanesplit - fixed lanes of a track to tracks or into a folder
+- lib: loop column (lp) with toggles, new samples come with loop off; &lt; xi &gt; next to layer; automation section removed
+- item properties: slider on length, ticks and a light snap at the slice edges
+- go to module (g t) lists hidden modules too
+- matrix: yw copies the cell under the cursor; empty cells of a track with automation show the dots again
+- theme gruber-darker; module borders 2 px with a 7 px gap; row jumps two digits wide next to the grid
+- mixer: mini strip in a low pane; master named in full or by the sum sign
+- loom switched off for now
+- fix: a pasted item could come out one row long (a stale note-entry length cap)
+- fix: copies of a linked pattern were laid at the old positions after a tempo change
+- fix: a track zoomed with zt stayed in the big wave view after a reload (no notes shown)
+- fix: Opt+digit picks by the number shown in the lib, reaches midi clips and phrases
+- phrases: listen from a MIDI key or Shift + a note key (the phrase tracks solo); Shift+Space on a trigger plays its transposed copies; MIDI rec writes triggers
+- phrases: the trigger note shows the phrase number from the lib like any instrument - no " mark, no box over the item
+- playlist: a phrase by its bare name (p1); the seq row explains itself in the status; Ctrl+W ? hints, I help
+- view buttons phr pat sec prj: phr - the phrase source in the tracker, looped
+- :loom man / auto - the pattern loops while you weave it; man: Opt+Enter - the next turn as a new pattern after it
+- :keyphr - the note keys and MIDI play the phrases
+- the tracker pane has a title like every pane: tracker; the second one - phrase p1 / pattern B1
+- tracker 2: its own LPB (+ -) - two grids over the same time, as the REAPER playhead and edit cursor are shared
+- fix: a layout holding a second pane (tracker 2, dsp 2) was lost on restart; tracker 2 crashed with a fractional LPB
+- phrases: Enter on a trigger note opens the phrase in tracker 2; playing copies show as thin bars in it
+- tracker 2: Ctrl+W D on the tracker - a second tracker view with its own pattern or phrase; Enter takes the main cursor there to edit (phrase sources too)
+- DSP: T pins the panel to its track (° after the name), T again - follow the cursor
+- panes as buffers: Ctrl+W D duplicates a pane with its own state - inputs, and dsp (the copy is pinned to the cursor track, the first follows the cursor); tracker next
+- midi tab (own MIDI learn of the slicer) removed: its knobs and buttons are jf_tracker actions now (:learn)
+- seq: the written song gets a section (the list name by default); :seq write NAME
+- keyspat: MIDI Program Change plays the pattern of that number
+- :learn: patterns of the song from a controller - a knob picks, buttons next / prev (keyspat quant / sudden)
+- :learn - any controller on the tracker by the native REAPER learn (MIDI CC / OSC / key): jf_tracker actions - slider under the cursor, next / prev, Enter, reform, humanizer</changelog>
+        <source file="API.md">{{BASE}}/v/v0.9.5/API.md</source>
+        <source file="LICENSE">{{BASE}}/v/v0.9.5/LICENSE</source>
+        <source file="NOTICE">{{BASE}}/v/v0.9.5/NOTICE</source>
+        <source file="PLAN_SP404.md">{{BASE}}/v/v0.9.5/PLAN_SP404.md</source>
+        <source file="README.md">{{BASE}}/v/v0.9.5/README.md</source>
+        <source file="README.ru.md">{{BASE}}/v/v0.9.5/README.ru.md</source>
+        <source file="SOURCES.md">{{BASE}}/v/v0.9.5/SOURCES.md</source>
+        <source file="actions/jf_tracker_enter.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_enter.lua</source>
+        <source file="actions/jf_tracker_human_amt.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_human_amt.lua</source>
+        <source file="actions/jf_tracker_inst_next.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_inst_next.lua</source>
+        <source file="actions/jf_tracker_inst_pick.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_inst_pick.lua</source>
+        <source file="actions/jf_tracker_inst_prev.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_inst_prev.lua</source>
+        <source file="actions/jf_tracker_next.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_next.lua</source>
+        <source file="actions/jf_tracker_pat_next.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_pat_next.lua</source>
+        <source file="actions/jf_tracker_pat_pick.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_pat_pick.lua</source>
+        <source file="actions/jf_tracker_pat_prev.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_pat_prev.lua</source>
+        <source file="actions/jf_tracker_play.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_play.lua</source>
+        <source file="actions/jf_tracker_prev.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_prev.lua</source>
+        <source file="actions/jf_tracker_reform_curve.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_reform_curve.lua</source>
+        <source file="actions/jf_tracker_reform_scale.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_reform_scale.lua</source>
+        <source file="actions/jf_tracker_reform_shift.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_reform_shift.lua</source>
+        <source file="actions/jf_tracker_slice_all.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_all.lua</source>
+        <source file="actions/jf_tracker_slice_autotrim.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_autotrim.lua</source>
+        <source file="actions/jf_tracker_slice_clear.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_clear.lua</source>
+        <source file="actions/jf_tracker_slice_depot.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_depot.lua</source>
+        <source file="actions/jf_tracker_slice_detect.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_detect.lua</source>
+        <source file="actions/jf_tracker_slice_end.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_end.lua</source>
+        <source file="actions/jf_tracker_slice_eq16.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_eq16.lua</source>
+        <source file="actions/jf_tracker_slice_eq2.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_eq2.lua</source>
+        <source file="actions/jf_tracker_slice_eq32.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_eq32.lua</source>
+        <source file="actions/jf_tracker_slice_eq4.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_eq4.lua</source>
+        <source file="actions/jf_tracker_slice_eq8.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_eq8.lua</source>
+        <source file="actions/jf_tracker_slice_insert.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_insert.lua</source>
+        <source file="actions/jf_tracker_slice_move.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_move.lua</source>
+        <source file="actions/jf_tracker_slice_norm.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_norm.lua</source>
+        <source file="actions/jf_tracker_slice_preview.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_preview.lua</source>
+        <source file="actions/jf_tracker_slice_quant.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_quant.lua</source>
+        <source file="actions/jf_tracker_slice_sens.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_sens.lua</source>
+        <source file="actions/jf_tracker_slice_snap.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_snap.lua</source>
+        <source file="actions/jf_tracker_slice_start.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_start.lua</source>
+        <source file="actions/jf_tracker_slice_trans.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_trans.lua</source>
+        <source file="actions/jf_tracker_slice_view.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_view.lua</source>
+        <source file="actions/jf_tracker_slice_vol.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slice_vol.lua</source>
+        <source file="actions/jf_tracker_slicer.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_slicer.lua</source>
+        <source file="actions/jf_tracker_value.lua">{{BASE}}/v/v0.9.5/actions/jf_tracker_value.lua</source>
+        <source file="docs/rk_config/README-LAYER.md">{{BASE}}/v/v0.9.5/docs/rk_config/README-LAYER.md</source>
+        <source file="docs/rk_config/actions.lua">{{BASE}}/v/v0.9.5/docs/rk_config/actions.lua</source>
+        <source file="docs/rk_config/bindings.lua">{{BASE}}/v/v0.9.5/docs/rk_config/bindings.lua</source>
+        <source file="docs/rk_config/config.lua">{{BASE}}/v/v0.9.5/docs/rk_config/config.lua</source>
+        <source file="fonts/3270NerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/3270NerdFontMono-Regular.ttf</source>
+        <source file="fonts/BigBlueTerm437NerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/BigBlueTerm437NerdFontMono-Regular.ttf</source>
+        <source file="fonts/BigBlueTermPlusNerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/BigBlueTermPlusNerdFontMono-Regular.ttf</source>
+        <source file="fonts/DepartureMonoNerdFontMono-Regular.otf">{{BASE}}/v/v0.9.5/fonts/DepartureMonoNerdFontMono-Regular.otf</source>
+        <source file="fonts/GohuFont11NerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/GohuFont11NerdFontMono-Regular.ttf</source>
+        <source file="fonts/GohuFont14NerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/GohuFont14NerdFontMono-Regular.ttf</source>
+        <source file="fonts/NotoSansRunic-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/NotoSansRunic-Regular.ttf</source>
+        <source file="fonts/ProFontIIxNerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/ProFontIIxNerdFontMono-Regular.ttf</source>
+        <source file="fonts/ProggyCleanNerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/ProggyCleanNerdFontMono-Regular.ttf</source>
+        <source file="fonts/README.md">{{BASE}}/v/v0.9.5/fonts/README.md</source>
+        <source file="fonts/TerminessNerdFontMono-Regular.ttf">{{BASE}}/v/v0.9.5/fonts/TerminessNerdFontMono-Regular.ttf</source>
+        <source file="fonts/licenses/BigBlueTerm.txt">{{BASE}}/v/v0.9.5/fonts/licenses/BigBlueTerm.txt</source>
+        <source file="fonts/licenses/DepartureMono-MIT.txt">{{BASE}}/v/v0.9.5/fonts/licenses/DepartureMono-MIT.txt</source>
+        <source file="fonts/licenses/GohuFont.txt">{{BASE}}/v/v0.9.5/fonts/licenses/GohuFont.txt</source>
+        <source file="fonts/licenses/IBM3270.txt">{{BASE}}/v/v0.9.5/fonts/licenses/IBM3270.txt</source>
+        <source file="fonts/licenses/NerdFonts-MIT.txt">{{BASE}}/v/v0.9.5/fonts/licenses/NerdFonts-MIT.txt</source>
+        <source file="fonts/licenses/NerdFonts-icon-licenses.md">{{BASE}}/v/v0.9.5/fonts/licenses/NerdFonts-icon-licenses.md</source>
+        <source file="fonts/licenses/NotoSansRunic-OFL.txt">{{BASE}}/v/v0.9.5/fonts/licenses/NotoSansRunic-OFL.txt</source>
+        <source file="fonts/licenses/ProFont.txt">{{BASE}}/v/v0.9.5/fonts/licenses/ProFont.txt</source>
+        <source file="fonts/licenses/ProggyClean.txt">{{BASE}}/v/v0.9.5/fonts/licenses/ProggyClean.txt</source>
+        <source file="fonts/licenses/Terminus-OFL.txt">{{BASE}}/v/v0.9.5/fonts/licenses/Terminus-OFL.txt</source>
+        <source file="help/actions.png">{{BASE}}/v/v0.9.5/help/actions.png</source>
+        <source file="help/dsp.png">{{BASE}}/v/v0.9.5/help/dsp.png</source>
+        <source file="help/headers.png">{{BASE}}/v/v0.9.5/help/headers.png</source>
+        <source file="help/itemtab.png">{{BASE}}/v/v0.9.5/help/itemtab.png</source>
+        <source file="help/mixer.png">{{BASE}}/v/v0.9.5/help/mixer.png</source>
+        <source file="help/ripple.png">{{BASE}}/v/v0.9.5/help/ripple.png</source>
+        <source file="help/screen.png">{{BASE}}/v/v0.9.5/help/screen.png</source>
+        <source file="help/slices.png">{{BASE}}/v/v0.9.5/help/slices.png</source>
+        <source file="help/strip.png">{{BASE}}/v/v0.9.5/help/strip.png</source>
+        <source file="help/undo.png">{{BASE}}/v/v0.9.5/help/undo.png</source>
+        <source file="jf_tracker.lua" main="main">{{BASE}}/v/v0.9.5/jf_tracker.lua</source>
+        <source file="jf_tracker_actin.lua">{{BASE}}/v/v0.9.5/jf_tracker_actin.lua</source>
+        <source file="jf_tracker_actions.lua">{{BASE}}/v/v0.9.5/jf_tracker_actions.lua</source>
+        <source file="jf_tracker_aiedit.lua">{{BASE}}/v/v0.9.5/jf_tracker_aiedit.lua</source>
+        <source file="jf_tracker_aim.lua">{{BASE}}/v/v0.9.5/jf_tracker_aim.lua</source>
+        <source file="jf_tracker_arc.lua">{{BASE}}/v/v0.9.5/jf_tracker_arc.lua</source>
+        <source file="jf_tracker_arr.lua">{{BASE}}/v/v0.9.5/jf_tracker_arr.lua</source>
+        <source file="jf_tracker_ask.lua">{{BASE}}/v/v0.9.5/jf_tracker_ask.lua</source>
+        <source file="jf_tracker_audio.lua">{{BASE}}/v/v0.9.5/jf_tracker_audio.lua</source>
+        <source file="jf_tracker_autocanvas.lua">{{BASE}}/v/v0.9.5/jf_tracker_autocanvas.lua</source>
+        <source file="jf_tracker_browser.lua">{{BASE}}/v/v0.9.5/jf_tracker_browser.lua</source>
+        <source file="jf_tracker_buffers.lua">{{BASE}}/v/v0.9.5/jf_tracker_buffers.lua</source>
+        <source file="jf_tracker_chord.lua">{{BASE}}/v/v0.9.5/jf_tracker_chord.lua</source>
+        <source file="jf_tracker_cmds.lua">{{BASE}}/v/v0.9.5/jf_tracker_cmds.lua</source>
+        <source file="jf_tracker_console.lua">{{BASE}}/v/v0.9.5/jf_tracker_console.lua</source>
+        <source file="jf_tracker_ctrlmouse.lua">{{BASE}}/v/v0.9.5/jf_tracker_ctrlmouse.lua</source>
+        <source file="jf_tracker_curves.lua">{{BASE}}/v/v0.9.5/jf_tracker_curves.lua</source>
+        <source file="jf_tracker_dbgshare.lua">{{BASE}}/v/v0.9.5/jf_tracker_dbgshare.lua</source>
+        <source file="jf_tracker_doc.lua">{{BASE}}/v/v0.9.5/jf_tracker_doc.lua</source>
+        <source file="jf_tracker_draw.lua">{{BASE}}/v/v0.9.5/jf_tracker_draw.lua</source>
+        <source file="jf_tracker_drumrack.lua">{{BASE}}/v/v0.9.5/jf_tracker_drumrack.lua</source>
+        <source file="jf_tracker_dspbig.lua">{{BASE}}/v/v0.9.5/jf_tracker_dspbig.lua</source>
+        <source file="jf_tracker_dspkeys.lua">{{BASE}}/v/v0.9.5/jf_tracker_dspkeys.lua</source>
+        <source file="jf_tracker_dspmods.lua">{{BASE}}/v/v0.9.5/jf_tracker_dspmods.lua</source>
+        <source file="jf_tracker_dsprack.lua">{{BASE}}/v/v0.9.5/jf_tracker_dsprack.lua</source>
+        <source file="jf_tracker_edit.lua">{{BASE}}/v/v0.9.5/jf_tracker_edit.lua</source>
+        <source file="jf_tracker_freesound.lua">{{BASE}}/v/v0.9.5/jf_tracker_freesound.lua</source>
+        <source file="jf_tracker_fxbrowser.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxbrowser.lua</source>
+        <source file="jf_tracker_fxclass.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxclass.lua</source>
+        <source file="jf_tracker_fxdump.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxdump.lua</source>
+        <source file="jf_tracker_fxfloat.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxfloat.lua</source>
+        <source file="jf_tracker_fxparse.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxparse.lua</source>
+        <source file="jf_tracker_fxpresets.lua">{{BASE}}/v/v0.9.5/jf_tracker_fxpresets.lua</source>
+        <source file="jf_tracker_garden.lua">{{BASE}}/v/v0.9.5/jf_tracker_garden.lua</source>
+        <source file="jf_tracker_harm.lua">{{BASE}}/v/v0.9.5/jf_tracker_harm.lua</source>
+        <source file="jf_tracker_help.html">{{BASE}}/v/v0.9.5/jf_tracker_help.html</source>
+        <source file="jf_tracker_hints.lua">{{BASE}}/v/v0.9.5/jf_tracker_hints.lua</source>
+        <source file="jf_tracker_humanizer.lua">{{BASE}}/v/v0.9.5/jf_tracker_humanizer.lua</source>
+        <source file="jf_tracker_import.lua">{{BASE}}/v/v0.9.5/jf_tracker_import.lua</source>
+        <source file="jf_tracker_inputs.lua">{{BASE}}/v/v0.9.5/jf_tracker_inputs.lua</source>
+        <source file="jf_tracker_instkeys.lua">{{BASE}}/v/v0.9.5/jf_tracker_instkeys.lua</source>
+        <source file="jf_tracker_keycaster.lua">{{BASE}}/v/v0.9.5/jf_tracker_keycaster.lua</source>
+        <source file="jf_tracker_keyhelp.lua">{{BASE}}/v/v0.9.5/jf_tracker_keyhelp.lua</source>
+        <source file="jf_tracker_keyrep.lua">{{BASE}}/v/v0.9.5/jf_tracker_keyrep.lua</source>
+        <source file="jf_tracker_keys.lua">{{BASE}}/v/v0.9.5/jf_tracker_keys.lua</source>
+        <source file="jf_tracker_layers.lua">{{BASE}}/v/v0.9.5/jf_tracker_layers.lua</source>
+        <source file="jf_tracker_lfogen.lua">{{BASE}}/v/v0.9.5/jf_tracker_lfogen.lua</source>
+        <source file="jf_tracker_llm.lua">{{BASE}}/v/v0.9.5/jf_tracker_llm.lua</source>
+        <source file="jf_tracker_logo.lua">{{BASE}}/v/v0.9.5/jf_tracker_logo.lua</source>
+        <source file="jf_tracker_macro.lua">{{BASE}}/v/v0.9.5/jf_tracker_macro.lua</source>
+        <source file="jf_tracker_macros.lua">{{BASE}}/v/v0.9.5/jf_tracker_macros.lua</source>
+        <source file="jf_tracker_matrix.lua">{{BASE}}/v/v0.9.5/jf_tracker_matrix.lua</source>
+        <source file="jf_tracker_mem.lua">{{BASE}}/v/v0.9.5/jf_tracker_mem.lua</source>
+        <source file="jf_tracker_mini.lua">{{BASE}}/v/v0.9.5/jf_tracker_mini.lua</source>
+        <source file="jf_tracker_model.lua">{{BASE}}/v/v0.9.5/jf_tracker_model.lua</source>
+        <source file="jf_tracker_modmatrix.lua">{{BASE}}/v/v0.9.5/jf_tracker_modmatrix.lua</source>
+        <source file="jf_tracker_names.lua">{{BASE}}/v/v0.9.5/jf_tracker_names.lua</source>
+        <source file="jf_tracker_nmodui.lua">{{BASE}}/v/v0.9.5/jf_tracker_nmodui.lua</source>
+        <source file="jf_tracker_notemod.lua">{{BASE}}/v/v0.9.5/jf_tracker_notemod.lua</source>
+        <source file="jf_tracker_notes.lua">{{BASE}}/v/v0.9.5/jf_tracker_notes.lua</source>
+        <source file="jf_tracker_numkeys.lua">{{BASE}}/v/v0.9.5/jf_tracker_numkeys.lua</source>
+        <source file="jf_tracker_options.lua">{{BASE}}/v/v0.9.5/jf_tracker_options.lua</source>
+        <source file="jf_tracker_padseq.lua">{{BASE}}/v/v0.9.5/jf_tracker_padseq.lua</source>
+        <source file="jf_tracker_panes.lua">{{BASE}}/v/v0.9.5/jf_tracker_panes.lua</source>
+        <source file="jf_tracker_panview.lua">{{BASE}}/v/v0.9.5/jf_tracker_panview.lua</source>
+        <source file="jf_tracker_params.lua">{{BASE}}/v/v0.9.5/jf_tracker_params.lua</source>
+        <source file="jf_tracker_perf.lua">{{BASE}}/v/v0.9.5/jf_tracker_perf.lua</source>
+        <source file="jf_tracker_phrase.lua">{{BASE}}/v/v0.9.5/jf_tracker_phrase.lua</source>
+        <source file="jf_tracker_phrasepane.lua">{{BASE}}/v/v0.9.5/jf_tracker_phrasepane.lua</source>
+        <source file="jf_tracker_pins.lua">{{BASE}}/v/v0.9.5/jf_tracker_pins.lua</source>
+        <source file="jf_tracker_playlist.lua">{{BASE}}/v/v0.9.5/jf_tracker_playlist.lua</source>
+        <source file="jf_tracker_png.lua">{{BASE}}/v/v0.9.5/jf_tracker_png.lua</source>
+        <source file="jf_tracker_pooled.lua">{{BASE}}/v/v0.9.5/jf_tracker_pooled.lua</source>
+        <source file="jf_tracker_premod.lua">{{BASE}}/v/v0.9.5/jf_tracker_premod.lua</source>
+        <source file="jf_tracker_presets.lua">{{BASE}}/v/v0.9.5/jf_tracker_presets.lua</source>
+        <source file="jf_tracker_preview.lua">{{BASE}}/v/v0.9.5/jf_tracker_preview.lua</source>
+        <source file="jf_tracker_ptfx.lua">{{BASE}}/v/v0.9.5/jf_tracker_ptfx.lua</source>
+        <source file="jf_tracker_reform.lua">{{BASE}}/v/v0.9.5/jf_tracker_reform.lua</source>
+        <source file="jf_tracker_renderer.lua">{{BASE}}/v/v0.9.5/jf_tracker_renderer.lua</source>
+        <source file="jf_tracker_sampleprops.lua">{{BASE}}/v/v0.9.5/jf_tracker_sampleprops.lua</source>
+        <source file="jf_tracker_screensets.lua">{{BASE}}/v/v0.9.5/jf_tracker_screensets.lua</source>
+        <source file="jf_tracker_sections.lua">{{BASE}}/v/v0.9.5/jf_tracker_sections.lua</source>
+        <source file="jf_tracker_sgram.lua">{{BASE}}/v/v0.9.5/jf_tracker_sgram.lua</source>
+        <source file="jf_tracker_sigpick.lua">{{BASE}}/v/v0.9.5/jf_tracker_sigpick.lua</source>
+        <source file="jf_tracker_slicer.lua">{{BASE}}/v/v0.9.5/jf_tracker_slicer.lua</source>
+        <source file="jf_tracker_slxpanel.lua">{{BASE}}/v/v0.9.5/jf_tracker_slxpanel.lua</source>
+        <source file="jf_tracker_smap.lua">{{BASE}}/v/v0.9.5/jf_tracker_smap.lua</source>
+        <source file="jf_tracker_smart.lua">{{BASE}}/v/v0.9.5/jf_tracker_smart.lua</source>
+        <source file="jf_tracker_snaps.lua">{{BASE}}/v/v0.9.5/jf_tracker_snaps.lua</source>
+        <source file="jf_tracker_surge.lua">{{BASE}}/v/v0.9.5/jf_tracker_surge.lua</source>
+        <source file="jf_tracker_themes.lua">{{BASE}}/v/v0.9.5/jf_tracker_themes.lua</source>
+        <source file="jf_tracker_themetab.lua">{{BASE}}/v/v0.9.5/jf_tracker_themetab.lua</source>
+        <source file="jf_tracker_theory.lua">{{BASE}}/v/v0.9.5/jf_tracker_theory.lua</source>
+        <source file="jf_tracker_tour.lua">{{BASE}}/v/v0.9.5/jf_tracker_tour.lua</source>
+        <source file="jf_tracker_tracks.lua">{{BASE}}/v/v0.9.5/jf_tracker_tracks.lua</source>
+        <source file="jf_tracker_ui.lua">{{BASE}}/v/v0.9.5/jf_tracker_ui.lua</source>
+        <source file="jf_tracker_undosnap.lua">{{BASE}}/v/v0.9.5/jf_tracker_undosnap.lua</source>
+        <source file="jf_tracker_undotree.lua">{{BASE}}/v/v0.9.5/jf_tracker_undotree.lua</source>
+        <source file="jf_tracker_utf8.lua">{{BASE}}/v/v0.9.5/jf_tracker_utf8.lua</source>
+        <source file="jf_tracker_version.lua">{{BASE}}/v/v0.9.5/jf_tracker_version.lua</source>
+        <source file="jf_tracker_video.lua">{{BASE}}/v/v0.9.5/jf_tracker_video.lua</source>
+        <source file="jf_tracker_vim.lua">{{BASE}}/v/v0.9.5/jf_tracker_vim.lua</source>
+        <source file="jf_tracker_viper_toggle.lua">{{BASE}}/v/v0.9.5/jf_tracker_viper_toggle.lua</source>
+        <source file="jf_tracker_visor.lua">{{BASE}}/v/v0.9.5/jf_tracker_visor.lua</source>
+        <source file="jf_tracker_whichkey.lua">{{BASE}}/v/v0.9.5/jf_tracker_whichkey.lua</source>
+        <source file="jf_tracker_xform.lua">{{BASE}}/v/v0.9.5/jf_tracker_xform.lua</source>
+        <source file="jf_tracker_zones.lua">{{BASE}}/v/v0.9.5/jf_tracker_zones.lua</source>
+        <source file="modules/freesound.lua">{{BASE}}/v/v0.9.5/modules/freesound.lua</source>
+        <source file="samples/README.md">{{BASE}}/v/v0.9.5/samples/README.md</source>
+        <source file="samples/amen_8bit.mp3">{{BASE}}/v/v0.9.5/samples/amen_8bit.mp3</source>
+      </version>
     </reapack>
     <reapack name="jf_tracker effects.jsfx" type="effect" desc="jf_tracker helpers: jf_rec (retro sampler), jf_tracker_scope">
       <version name="0.9.2" author="jeeruff" time="2026-11-04T07:28:09Z">
@@ -492,6 +748,19 @@
         <source file="jf_tracker_trig.jsfx">{{BASE}}/v/v0.9.4/effects/jf_tracker_trig.jsfx</source>
         <source file="jf_tracker_zone.jsfx">{{BASE}}/v/v0.9.4/effects/jf_tracker_zone.jsfx</source>
         <source file="jf_voice.jsfx-inc">{{BASE}}/v/v0.9.4/effects/jf_voice.jsfx-inc</source>
+      </version>
+      <version name="0.9.5" author="jeeruff" time="2026-11-19T08:36:47Z">
+        <source file="jf_fx_airwindows.jsfx-inc">{{BASE}}/v/v0.9.5/effects/jf_fx_airwindows.jsfx-inc</source>
+        <source file="jf_rec.jsfx">{{BASE}}/v/v0.9.5/effects/jf_rec.jsfx</source>
+        <source file="jf_slixer.jsfx">{{BASE}}/v/v0.9.5/effects/jf_slixer.jsfx</source>
+        <source file="jf_tracker_choke.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_choke.jsfx</source>
+        <source file="jf_tracker_chordfollow.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_chordfollow.jsfx</source>
+        <source file="jf_tracker_macro.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_macro.jsfx</source>
+        <source file="jf_tracker_probe.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_probe.jsfx</source>
+        <source file="jf_tracker_scope.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_scope.jsfx</source>
+        <source file="jf_tracker_trig.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_trig.jsfx</source>
+        <source file="jf_tracker_zone.jsfx">{{BASE}}/v/v0.9.5/effects/jf_tracker_zone.jsfx</source>
+        <source file="jf_voice.jsfx-inc">{{BASE}}/v/v0.9.5/effects/jf_voice.jsfx-inc</source>
       </version>
     </reapack>
   </category>
